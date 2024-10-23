@@ -9,7 +9,7 @@ use crate::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
 use crate::legacy;
 use crate::mode_management::iface_manager_api::IfaceManagerApi;
 use crate::mode_management::phy_manager::{PhyManager, PhyManagerApi};
-use crate::mode_management::{create_iface_manager, device_monitor, recovery};
+use crate::mode_management::{create_iface_manager, device_monitor, recovery, DEFECT_CHANNEL_SIZE};
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::listener;
 use crate::util::testing::{create_inspect_persistence_channel, run_while};
@@ -37,7 +37,7 @@ use {
     fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_common_security as fidl_common_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme, hex, zx,
+    fidl_fuchsia_wlan_sme as fidl_sme, hex,
 };
 
 pub const TEST_CLIENT_IFACE_ID: u16 = 42;
@@ -237,6 +237,7 @@ fn test_setup(
         telemetry_sender.clone(),
         recovery_sender,
     )));
+    let (defect_sender, defect_receiver) = mpsc::channel(DEFECT_CHANNEL_SIZE);
     let (iface_manager, iface_manager_service) = create_iface_manager(
         phy_manager.clone(),
         client_update_sender.clone(),
@@ -246,6 +247,8 @@ fn test_setup(
         connection_selection_requester.clone(),
         roam_manager.clone(),
         telemetry_sender.clone(),
+        defect_sender,
+        defect_receiver,
         recovery_receiver,
         inspect::Inspector::default().root().create_child("iface_manager"),
     );

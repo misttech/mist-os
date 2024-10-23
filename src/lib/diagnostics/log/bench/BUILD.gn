@@ -29,6 +29,8 @@ rustc_binary("encoding-bin") {
     "src/common.rs",
     "src/encoding.rs",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("core-bin") {
@@ -51,6 +53,8 @@ rustc_binary("core-bin") {
   ]
 
   sources = [ "src/core.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("decoding-bin") {
@@ -76,6 +80,8 @@ rustc_binary("decoding-bin") {
     "src/common.rs",
     "src/decoding.rs",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("encoding-component") {
@@ -127,12 +133,6 @@ group("bench") {
   deps = [
     ":diagnostics-log-rust-core-benchmark",
     ":diagnostics-log-rust-decoding-benchmark",
+    ":diagnostics-log-rust-encoding-benchmark",
   ]
-
-  # TODO(https://fxbug.dev/42081258): diagnostics_log_encoding_bench
-  # currently fails to build for ARM64/VIM3 due to a toolchain bug.
-  # Re-enable it for ARM64 when the bug is fixed.
-  if (target_cpu != "arm64") {
-    deps += [ ":diagnostics-log-rust-encoding-benchmark" ]
-  }
 }

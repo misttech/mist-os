@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_test_manager as ftest_manager;
 use ftest_manager::{
     CaseStatus, DebugDataIteratorMarker, Event as FidlEvent, EventDetails as FidlEventDetails,
     RunEvent as FidlRunEvent, RunEventPayload as FidlRunEventPayload, SuiteEvent as FidlSuiteEvent,
     SuiteEventPayload as FidlSuiteEventPayload, SuiteResult, SuiteStatus, TestCaseResult,
 };
-use {fidl_fuchsia_test_manager as ftest_manager, zx};
 
 pub(crate) enum RunEventPayload {
     DebugData(ClientEnd<DebugDataIteratorMarker>),

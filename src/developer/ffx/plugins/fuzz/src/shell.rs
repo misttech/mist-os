@@ -9,7 +9,9 @@ use errors::ffx_bail;
 use ffx_fuzz_args::*;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_io::OpenFlags;
-use fuchsia_fuzzctl::{get_corpus_type, get_fuzzer_urls, Duration, Manager, OutputSink, Writer};
+use fuchsia_fuzzctl::{
+    get_corpus_type, get_fuzzer_urls, Manager, MonotonicDuration, OutputSink, Writer,
+};
 use futures::{pin_mut, select, FutureExt};
 use serde_json::json;
 use std::cell::RefCell;
@@ -376,7 +378,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
         no_syslog: bool,
     ) -> Result<NextAction> {
         let url = Url::parse(url).context("invalid fuzzer URL")?;
-        let output = match (output, ffx_config::get(DEFAULT_FUZZING_OUTPUT_VARIABLE).await) {
+        let output = match (output, ffx_config::get(DEFAULT_FUZZING_OUTPUT_VARIABLE)) {
             (Some(output), _) | (None, Ok(output)) => output,
             _ => {
                 self.writer.error("output directory is not set.");
@@ -466,7 +468,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
                     self.writer.println(format!("  Runs performed: {}", runs));
                 };
                 if let Some(elapsed) = status.elapsed {
-                    let seconds = Duration::from_nanos(elapsed).into_seconds();
+                    let seconds = MonotonicDuration::from_nanos(elapsed).into_seconds();
                     self.writer.println(format!("    Time elapsed: {} seconds", seconds));
                 };
                 if let (Some(covered_pcs), Some(covered_features)) =
@@ -661,7 +663,7 @@ mod test_fixtures {
     use ffx_fuzz_args::FuzzerState;
     use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _, ServerEnd};
     use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
-    use fuchsia_fuzzctl::Duration;
+    use fuchsia_fuzzctl::MonotonicDuration;
     use fuchsia_fuzzctl_test::{
         create_task, serve_manager, BufferSink, FakeController, Test, TEST_URL,
     };
@@ -764,7 +766,7 @@ mod test_fixtures {
             // workflow that runs to completion.
             if !self.runs_indefinitely && self.state == FuzzerState::Running {
                 let mut reader = self.shell.reader.borrow_mut();
-                reader.interrupt(Duration::from_millis(10)).await;
+                reader.interrupt(MonotonicDuration::from_millis(10)).await;
                 test.output_matches("Workflow complete. Press any key to continue...");
                 self.state = FuzzerState::Idle;
             }
@@ -779,7 +781,7 @@ mod test_fixtures {
         /// Simulates the user pressing a key to interrupt output from a long-running workflow.
         pub async fn interrupt(&self, test: &mut Test) {
             let mut reader = self.shell.reader.borrow_mut();
-            reader.interrupt(Duration::from_millis(10)).await;
+            reader.interrupt(MonotonicDuration::from_millis(10)).await;
             test.output_matches("Fuzzer output has been paused.");
             test.output_matches("To resume output, use the `resume` command.");
         }
@@ -843,7 +845,7 @@ mod tests {
     use super::DEFAULT_FUZZING_OUTPUT_VARIABLE;
     use anyhow::Result;
     use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
-    use fuchsia_fuzzctl::{digest_path, Duration};
+    use fuchsia_fuzzctl::{digest_path, MonotonicDuration};
     use fuchsia_fuzzctl_test::{verify_saved, Test, TEST_URL};
     use std::path::PathBuf;
     use zx_status as zx;
@@ -1287,7 +1289,7 @@ mod tests {
         let status = fuzz::Status {
             // running: Some(true),
             runs: Some(1),
-            elapsed: Some(Duration::from_seconds(2).into_nanos()),
+            elapsed: Some(MonotonicDuration::from_seconds(2).into_nanos()),
             covered_pcs: Some(3),
             covered_features: Some(4),
             corpus_num_inputs: Some(5),

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_inspect::NumericProperty;
+use fuchsia_inspect::{NumericProperty, Property};
 use starnix_core::fileops_impl_nonseekable;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
@@ -12,6 +12,7 @@ use starnix_logging::{log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::time::duration_from_timeval;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
@@ -53,8 +54,14 @@ pub struct InspectStatus {
     /// The number of uapi::input_events generated from TouchEvents.
     pub uapi_events_generated_count: fuchsia_inspect::UintProperty,
 
-    /// The number of uapi::input_events read from this touch file by external process.
+    /// The event time of the last generated uapi::input_event.
+    pub last_generated_uapi_event_timestamp_ns: fuchsia_inspect::IntProperty,
+
+    /// The number of uapi::input_events read from this input file by external process.
     pub uapi_events_read_count: fuchsia_inspect::UintProperty,
+
+    /// The event time of the last uapi::input_event read by external process.
+    pub last_read_uapi_event_timestamp_ns: fuchsia_inspect::IntProperty,
 }
 
 impl InspectStatus {
@@ -64,7 +71,11 @@ impl InspectStatus {
         let fidl_events_unexpected_count = node.create_uint("fidl_events_unexpected_count", 0);
         let fidl_events_converted_count = node.create_uint("fidl_events_converted_count", 0);
         let uapi_events_generated_count = node.create_uint("uapi_events_generated_count", 0);
+        let last_generated_uapi_event_timestamp_ns =
+            node.create_int("last_generated_uapi_event_timestamp_ns", 0);
         let uapi_events_read_count = node.create_uint("uapi_events_read_count", 0);
+        let last_read_uapi_event_timestamp_ns =
+            node.create_int("last_read_uapi_event_timestamp_ns", 0);
         Self {
             _inspect_node: node,
             fidl_events_received_count,
@@ -72,7 +83,9 @@ impl InspectStatus {
             fidl_events_unexpected_count,
             fidl_events_converted_count,
             uapi_events_generated_count,
+            last_generated_uapi_event_timestamp_ns,
             uapi_events_read_count,
+            last_read_uapi_event_timestamp_ns,
         }
     }
 
@@ -92,12 +105,14 @@ impl InspectStatus {
         self.fidl_events_converted_count.add(count);
     }
 
-    pub fn count_generated_events(&self, count: u64) {
+    pub fn count_generated_events(&self, count: u64, event_time_ns: i64) {
         self.uapi_events_generated_count.add(count);
+        self.last_generated_uapi_event_timestamp_ns.set(event_time_ns);
     }
 
-    pub fn count_read_events(&self, count: u64) {
+    pub fn count_read_events(&self, count: u64, event_time_ns: i64) {
         self.uapi_events_read_count.add(count);
+        self.last_read_uapi_event_timestamp_ns.set(event_time_ns);
     }
 }
 
@@ -463,8 +478,15 @@ impl FileOps for InputFile {
             );
             inner.waiters.notify_fd_events(FdEvents::POLLIN);
         }
-        let events = inner.events.drain(..limit).collect::<Vec<_>>();
-        inner.inspect_status.as_ref().map(|status| status.count_read_events(events.len() as u64));
+        let events: Vec<uapi::input_event> = inner.events.drain(..limit).collect::<Vec<_>>();
+        let last_event_timeval = events.last().expect("events is nonempty").time;
+        let last_event_time_ns = duration_from_timeval::<zx::MonotonicTimeline>(last_event_timeval)
+            .unwrap()
+            .into_nanos();
+        inner
+            .inspect_status
+            .as_ref()
+            .map(|status| status.count_read_events(events.len() as u64, last_event_time_ns));
         data.write_all(events.as_bytes())
     }
 

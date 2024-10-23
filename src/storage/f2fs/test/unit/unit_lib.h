@@ -197,9 +197,11 @@ class MkfsTester {
 
 class GcTester {
  public:
-  static zx_status_t DoGarbageCollect(SegmentManager &manager, uint32_t segno, GcType gc_type);
+  static zx_status_t DoGarbageCollect(SegmentManager &manager, uint32_t segno, GcType gc_type)
+      __TA_EXCLUDES(f2fs::GetGlobalLock());
   static zx_status_t GcDataSegment(SegmentManager &manager, const SummaryBlock &sum_blk,
-                                   unsigned int segno, GcType gc_type);
+                                   unsigned int segno, GcType gc_type)
+      __TA_EXCLUDES(f2fs::GetGlobalLock());
 };
 
 class DeviceTester {

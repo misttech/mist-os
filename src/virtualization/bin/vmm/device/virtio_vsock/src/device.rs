@@ -11,6 +11,7 @@ use fidl::endpoints::Proxy;
 use fidl_fuchsia_virtualization::{
     HostVsockAcceptorProxy, HostVsockEndpointConnectResponder, HOST_CID,
 };
+use fuchsia_async as fasync;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::future::{self, LocalBoxFuture};
 use futures::stream::FuturesUnordered;
@@ -25,7 +26,6 @@ use virtio_device::chain::{ReadableChain, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
 use zerocopy::{FromBytes, IntoBytes};
-use {fuchsia_async as fasync, zx};
 
 pub struct VsockDevice {
     // Device configuration. This currently only stores the guest CID, which should not change

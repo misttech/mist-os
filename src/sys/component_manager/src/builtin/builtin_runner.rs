@@ -11,6 +11,7 @@ use elf_runner::crash_info::CrashRecords;
 use elf_runner::process_launcher::NamespaceConnector;
 use fidl::endpoints;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, RequestStream, ServerEnd};
+use fidl_fuchsia_data::Dictionary;
 use fuchsia_runtime::UtcClock;
 
 use cm_util::{AbortHandle, AbortableScope};
@@ -136,7 +137,8 @@ impl BuiltinRunner {
         let namespace: Namespace =
             start_info.ns.take().ok_or(BuiltinRunnerError::MissingNamespace)?.try_into()?;
         let program_type = runner::get_program_string(&start_info, TYPE)
-            .ok_or(BuiltinRunnerError::MissingProgramType)?;
+            .ok_or(BuiltinRunnerError::MissingProgramType)?
+            .to_string();
         let main_process_critical =
             runner::get_program_string(&start_info, "main_process_critical").unwrap_or("false");
         let root_job_critical = match main_process_critical {
@@ -144,6 +146,7 @@ impl BuiltinRunner {
             "false" => None,
             _ => return Err(BuiltinRunnerError::IllegalProgram),
         };
+        let program_section: Option<Dictionary> = start_info.program.take();
 
         let job = self.root_job.create_child_job().map_err(BuiltinRunnerError::JobCreation)?;
         let job2 = job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
@@ -151,9 +154,9 @@ impl BuiltinRunner {
             endpoints::create_proxy::<fprocess_lifecycle::LifecycleMarker>().unwrap();
         let body: BuiltinProgramFn = self
             .builtin_programs
-            .get(&program_type)
+            .get(program_type.as_str())
             .map(|f| f())
-            .ok_or_else(|| BuiltinRunnerError::UnsupportedProgramType(program_type.into()))?;
+            .ok_or_else(|| BuiltinRunnerError::UnsupportedProgramType(program_type))?;
         let program = BuiltinProgram::new(
             body,
             job,
@@ -162,6 +165,7 @@ impl BuiltinRunner {
             namespace,
             outgoing_dir,
             lifecycle_server,
+            program_section,
         );
         Ok((program, Box::pin(wait_for_job_termination(job2))))
     }
@@ -179,39 +183,67 @@ impl BuiltinRunner {
         let f: BuiltinProgramGen = Box::new(move || {
             let elf_runner_resources = elf_runner_resources.clone();
             Box::new(
-                move |
-                    job: zx::Job,
-                    namespace: Namespace,
-                    outgoing_dir: ServerEnd<fio::DirectoryMarker>,
-                    lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
+                move |job: zx::Job,
+                      namespace: Namespace,
+                      outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+                      lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+                      _program: Option<Dictionary>| {
                     async move {
                         let program = ElfRunnerProgram::new(job, namespace, elf_runner_resources);
                         program.serve_outgoing(outgoing_dir);
                         program.wait_for_shutdown(lifecycle_server).await;
                     }
                     .boxed()
-                }
+                },
             )
         });
         out.insert("elf_runner", f);
 
         let f: BuiltinProgramGen = Box::new(|| {
-            Box::new(move |
-                _job: zx::Job,
-                namespace: Namespace,
-                outgoing_dir: ServerEnd<fio::DirectoryMarker>,
-                lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
-                async move {
-                    let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
-                    let res = devfs::main(ns_entries, outgoing_dir, lifecycle_server).await;
-                    if let Err(e) = res {
-                        error!("[devfs] {e}");
+            Box::new(
+                move |_job: zx::Job,
+                      namespace: Namespace,
+                      outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+                      lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+                      _program: Option<Dictionary>| {
+                    async move {
+                        let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
+                        let res = devfs::main(ns_entries, outgoing_dir, lifecycle_server).await;
+                        if let Err(e) = res {
+                            error!("[devfs] {e}");
+                        }
                     }
-                }
-                .boxed()
-            })
+                    .boxed()
+                },
+            )
         });
         out.insert("devfs", f);
+
+        let f: BuiltinProgramGen = Box::new(|| {
+            Box::new(
+                move |_job: zx::Job,
+                      namespace: Namespace,
+                      outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+                      lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+                      program: Option<Dictionary>| {
+                    async move {
+                        let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
+                        let res = service_broker::main(
+                            ns_entries,
+                            outgoing_dir,
+                            lifecycle_server,
+                            program,
+                        )
+                        .await;
+                        if let Err(e) = res {
+                            error!("[service-broker] {e}");
+                        }
+                    }
+                    .boxed()
+                },
+            )
+        });
+        out.insert("service-broker", f);
 
         out
     }
@@ -297,6 +329,7 @@ type BuiltinProgramFn = Box<
             Namespace,
             ServerEnd<fio::DirectoryMarker>,
             ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+            Option<Dictionary>,
         ) -> BoxFuture<'static, ()>
         + Send
         + 'static,
@@ -311,6 +344,7 @@ impl BuiltinProgram {
         namespace: Namespace,
         outgoing_dir: ServerEnd<fio::DirectoryMarker>,
         lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+        program: Option<Dictionary>,
     ) -> Self {
         let (abort_scope, task_abort) = AbortableScope::new();
         let main_process_critical = root_job_if_critical.is_some();
@@ -335,7 +369,9 @@ impl BuiltinProgram {
         let f = Finalize { job, root_job_if_critical };
         let task = fasync::Task::spawn(async move {
             let _f = f;
-            _ = abort_scope.run(body(job2, namespace, outgoing_dir, lifecycle_server)).await;
+            _ = abort_scope
+                .run(body(job2, namespace, outgoing_dir, lifecycle_server, program))
+                .await;
         })
         .boxed()
         .shared();
@@ -570,7 +606,7 @@ mod tests {
     use cm_types::NamespacePath;
     use fcrunner::{ComponentNamespaceEntry, ComponentStartInfo};
     use fidl::endpoints::ClientEnd;
-    use fidl_fuchsia_data::{Dictionary, DictionaryEntry, DictionaryValue};
+    use fidl_fuchsia_data::{DictionaryEntry, DictionaryValue};
     use fidl_fuchsia_io::{self as fio, DirectoryProxy};
     use fidl_fuchsia_process as fprocess;
     use fuchsia_async::TestExecutor;
@@ -661,27 +697,27 @@ mod tests {
         let mut out = HashMap::new();
         let f: BuiltinProgramGen = Box::new(|| {
             Box::new(
-                move |
-                    _job: zx::Job,
-                    _namespace: Namespace,
-                    _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
-                    lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
+                move |_job: zx::Job,
+                      _namespace: Namespace,
+                      _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+                      lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+                      _program: Option<Dictionary>| {
                     async move {
                         let _lifecycle_server = lifecycle_server;
                     }
                     .boxed()
-                }
+                },
             )
         });
         out.insert("test-exit-immediately", f);
 
         let f: BuiltinProgramGen = Box::new(|| {
             Box::new(
-                move |
-                    _job: zx::Job,
-                    _namespace: Namespace,
-                    _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
-                    lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
+                move |_job: zx::Job,
+                      _namespace: Namespace,
+                      _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+                      lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+                      _program: Option<Dictionary>| {
                     async move {
                         let mut stream = lifecycle_server.into_stream().unwrap();
                         #[allow(clippy::never_loop)]
@@ -698,24 +734,24 @@ mod tests {
                         std::future::pending::<()>().await;
                     }
                     .boxed()
-                }
+                },
             )
         });
         out.insert("test-watch-lifecycle", f);
 
         let f: BuiltinProgramGen = Box::new(|| {
             Box::new(
-                move |
-                    _job: zx::Job,
-                    _namespace: Namespace,
-                    _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
-                    lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
+                move |_job: zx::Job,
+                      _namespace: Namespace,
+                      _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+                      lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+                      _program: Option<Dictionary>| {
                     async move {
                         let _lifecycle_server = lifecycle_server;
                         std::future::pending::<()>().await;
                     }
                     .boxed()
-                }
+                },
             )
         });
         out.insert("test-hang", f);

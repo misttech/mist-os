@@ -5,9 +5,9 @@
 use crate::util::ProviderFactory;
 use crate::{FONTS_MEDIUM_CM, FONTS_SMALL_CM};
 use anyhow::{format_err, Context as _, Error};
+use fidl_fuchsia_fonts as fonts;
 use tracing::info;
 use zx::AsHandleRef;
-use {fidl_fuchsia_fonts as fonts, zx};
 
 macro_rules! assert_buf_eq {
     ($font_info_a:ident, $font_info_b:ident) => {

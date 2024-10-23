@@ -477,7 +477,7 @@ mod tests {
     use super::*;
     use crate::logs::stored_message::StoredMessage;
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
+    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
     use fidl_fuchsia_logger::LogSinkMarker;
 
     use moniker::ExtendedMoniker;
@@ -607,17 +607,17 @@ mod tests {
 
     fn make_message(msg: &str, timestamp: zx::BootInstant) -> StoredMessage {
         let record = Record {
-            timestamp: timestamp.into_nanos(),
+            timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
-                Argument { name: "pid".to_string(), value: Value::UnsignedInt(1) },
-                Argument { name: "tid".to_string(), value: Value::UnsignedInt(2) },
-                Argument { name: "message".to_string(), value: Value::Text(msg.to_string()) },
+                Argument::pid(zx::Koid::from_raw(1)),
+                Argument::tid(zx::Koid::from_raw(2)),
+                Argument::message(msg),
             ],
         };
         let mut buffer = Cursor::new(vec![0u8; 1024]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        encoder.write_record(&record).unwrap();
+        encoder.write_record(record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
         StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }

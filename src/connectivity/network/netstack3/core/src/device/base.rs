@@ -49,7 +49,9 @@ use netstack3_ip::device::{
 use netstack3_ip::nud::{
     ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
 };
-use netstack3_ip::{self as ip, IpPacketDestination, IpRoutingDeviceContext, RawMetric};
+use netstack3_ip::{
+    self as ip, DeviceIpLayerMetadata, IpPacketDestination, IpRoutingDeviceContext, RawMetric,
+};
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
@@ -153,7 +155,8 @@ where
     }
 }
 
-impl<I, D, L, BC> ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC> for RecvIpFrameMeta<D, I>
+impl<I, D, L, BC> ReceivableFrameMeta<CoreCtx<'_, BC, L>, BC>
+    for RecvIpFrameMeta<D, DeviceIpLayerMetadata, I>
 where
     BC: BindingsContext,
     D: Into<DeviceId<BC>>,
@@ -166,15 +169,30 @@ where
         bindings_ctx: &mut BC,
         frame: B,
     ) {
-        let RecvIpFrameMeta { device, frame_dst, marker: IpVersionMarker { .. } } = self;
+        let RecvIpFrameMeta {
+            device,
+            frame_dst,
+            ip_layer_metadata,
+            marker: IpVersionMarker { .. },
+        } = self;
         let device = device.into();
         match I::VERSION {
-            IpVersion::V4 => {
-                ip::receive_ipv4_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
-            }
-            IpVersion::V6 => {
-                ip::receive_ipv6_packet(core_ctx, bindings_ctx, &device, frame_dst, frame)
-            }
+            IpVersion::V4 => ip::receive_ipv4_packet(
+                core_ctx,
+                bindings_ctx,
+                &device,
+                frame_dst,
+                ip_layer_metadata,
+                frame,
+            ),
+            IpVersion::V6 => ip::receive_ipv6_packet(
+                core_ctx,
+                bindings_ctx,
+                &device,
+                frame_dst,
+                ip_layer_metadata,
+                frame,
+            ),
         }
     }
 }
@@ -191,6 +209,7 @@ impl<
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
         destination: IpPacketDestination<I, &DeviceId<BC>>,
+        ip_layer_metadata: DeviceIpLayerMetadata,
         body: S,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
@@ -198,7 +217,7 @@ impl<
         S: Serializer,
         S::Buffer: BufferMut,
     {
-        send_ip_frame(self, bindings_ctx, device, destination, body)
+        send_ip_frame(self, bindings_ctx, device, destination, ip_layer_metadata, body)
     }
 }
 
@@ -215,6 +234,7 @@ impl<
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
         destination: IpPacketDestination<I, &DeviceId<BC>>,
+        ip_layer_metadata: DeviceIpLayerMetadata,
         body: S,
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
@@ -223,7 +243,7 @@ impl<
         S::Buffer: BufferMut,
     {
         let Self { config: _, core_ctx } = self;
-        send_ip_frame(core_ctx, bindings_ctx, device, destination, body)
+        send_ip_frame(core_ctx, bindings_ctx, device, destination, ip_layer_metadata, body)
     }
 }
 
@@ -908,6 +928,7 @@ fn send_ip_frame<BC, S, I, L>(
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
     destination: IpPacketDestination<I, &DeviceId<BC>>,
+    ip_layer_metadata: DeviceIpLayerMetadata,
     body: S,
 ) -> Result<(), SendFrameError<S>>
 where
@@ -926,9 +947,14 @@ where
         DeviceId::Ethernet(id) => {
             ethernet::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
         }
-        DeviceId::Loopback(id) => {
-            loopback::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
-        }
+        DeviceId::Loopback(id) => loopback::send_ip_frame(
+            core_ctx,
+            bindings_ctx,
+            id,
+            destination,
+            ip_layer_metadata,
+            body,
+        ),
         DeviceId::PureIp(id) => {
             pure_ip::send_ip_frame(core_ctx, bindings_ctx, id, destination, body)
         }

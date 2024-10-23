@@ -26,10 +26,13 @@
         },
         {
             protocol: [
+                "fuchsia.bluetooth.bredr.Profile",
                 "fuchsia.bluetooth.gatt.Server",
+                "fuchsia.bluetooth.gatt2.Server",
                 "fuchsia.bluetooth.le.Central",
                 "fuchsia.bluetooth.le.Peripheral",
                 "fuchsia.bluetooth.sys.Access",
+                "fuchsia.bluetooth.sys.HostWatcher",
                 "fuchsia.bluetooth.sys.Pairing",
             ],
             from: "#bluetooth-core",
@@ -299,6 +302,9 @@
             config: [
                 "fuchsia.session.AutoLaunch",
                 "fuchsia.session.SessionUrl",
+                "fuchsia.session.window.Collection",
+                "fuchsia.session.window.InitialElementUrl",
+                "fuchsia.session.window.InitialViewIdAnnotation",
             ],
             from: "parent",
             to: "#session-manager",
@@ -327,7 +333,7 @@
             from: "parent",
             as: "root-data",
             to: "#session-manager",
-            rights: [ 'r*' ],
+            rights: [ "r*" ],
         },
 
         // These all originated from session.smart.from_platform.core_shard.cml
@@ -439,12 +445,6 @@
             directory: "bin",
             from: "parent",
             to: "#session-manager",
-        },
-        {
-            protocol: "fuchsia.bluetooth.sys.HostWatcher",
-            from: "#bluetooth-core",
-            to: "#session-manager",
-            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.hardware.pty.Device",

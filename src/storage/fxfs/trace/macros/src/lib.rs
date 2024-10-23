@@ -139,12 +139,7 @@ struct TraceMethodArgs(AttributeArgs);
 
 impl Parse for TraceMethodArgs {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        if input.is_empty() {
-            return Ok(Self::default());
-        }
-        let content;
-        syn::parenthesized!(content in input);
-        Ok(Self(content.parse()?))
+        Ok(Self(input.parse()?))
     }
 }
 
@@ -161,14 +156,17 @@ impl Parse for TraceFnArgs {
 /// Returns `Ok(Some(TraceMethodArgs))` if the attribute is present, `Ok(None)` if the attribute is
 /// not present, and `Err` if parsing the attribute's arguments fails.
 fn remove_trace_attribute(attrs: &mut Vec<Attribute>) -> syn::Result<Option<TraceMethodArgs>> {
-    let position = attrs.iter().position(|attr| attr.path.is_ident("trace"));
-    let tokens = match position {
+    let position = attrs.iter().position(|attr| attr.path().is_ident("trace"));
+    let attr = match position {
         None => {
             return Ok(None);
         }
-        Some(pos) => attrs.remove(pos).tokens,
+        Some(pos) => attrs.remove(pos),
     };
-    Ok(Some(syn::parse2(tokens)?))
+    if let syn::Meta::Path(_) = attr.meta {
+        return Ok(Some(TraceMethodArgs::default()));
+    }
+    Ok(Some(attr.parse_args::<TraceMethodArgs>()?))
 }
 
 /// Replaces `impl Trait` with `_` in `Type` objects.
@@ -256,8 +254,8 @@ fn add_tracing_to_impl(mut item_impl: ItemImpl, args: TraceImplArgs) -> syn::Res
     };
 
     for item in &mut item_impl.items {
-        if let ImplItem::Method(method) = item {
-            let trace_fn_args = remove_trace_attribute(&mut method.attrs)?.or_else(|| {
+        if let ImplItem::Fn(func) = item {
+            let trace_fn_args = remove_trace_attribute(&mut func.attrs)?.or_else(|| {
                 if args.trace_all_methods {
                     Some(TraceMethodArgs::default())
                 } else {
@@ -270,21 +268,17 @@ fn add_tracing_to_impl(mut item_impl: ItemImpl, args: TraceImplArgs) -> syn::Res
             let trace_name = if let Some(name) = trace_fn_args.0.name {
                 name
             } else {
-                format!("{}::{}", prefix, method.sig.ident)
+                format!("{}::{}", prefix, func.sig.ident)
             };
-            if method.sig.asyncness.is_some() {
+            if func.sig.asyncness.is_some() {
                 add_tracing_to_async_block(
-                    &method.sig.output,
-                    &mut method.block,
+                    &func.sig.output,
+                    &mut func.block,
                     &trace_name,
                     trace_fn_args.0.trace_args,
                 );
             } else {
-                add_tracing_to_sync_block(
-                    &mut method.block,
-                    &trace_name,
-                    trace_fn_args.0.trace_args,
-                );
+                add_tracing_to_sync_block(&mut func.block, &trace_name, trace_fn_args.0.trace_args);
             }
         }
     }

@@ -19,7 +19,6 @@
 
 namespace {
 
-using power_management::PowerModel;
 using power_management::PowerState;
 
 constexpr uint32_t kModelId = 123;
@@ -107,6 +106,18 @@ TEST(PowerStateTest, SetOrUpdateDomainClearsPowerLevelWhenDifferentModelId) {
   ASSERT_EQ(state.SetOrUpdateDomain(domain_2), domain);
 
   ASSERT_EQ(state.domain(), domain_2);
+  ASSERT_FALSE(state.active_power_level());
+  ASSERT_FALSE(state.desired_active_power_level());
+}
+
+TEST(PowerStateTest, SetOrUpdateDomainNullptrClearsState) {
+  auto domain = MakePowerDomainHelper(kModelId, 1, 2, 3, 4, 5, 6);
+  PowerState state(domain, std::nullopt, 2, 2);
+
+  // No previous domain.
+  ASSERT_EQ(state.SetOrUpdateDomain(nullptr), domain);
+
+  ASSERT_EQ(state.domain(), nullptr);
   ASSERT_FALSE(state.active_power_level());
   ASSERT_FALSE(state.desired_active_power_level());
 }
@@ -224,6 +235,26 @@ TEST(PowerStateTest, UpdateUtilizationReflectsOnDomain) {
   state.UpdateUtilization(24);
 
   EXPECT_EQ(domain->total_normalized_utilization(), 24u);
+}
+
+TEST(PowerLevelTransitionTest, PortPacket) {
+  power_management::PowerLevelUpdateRequest t = {
+      .domain_id = 1,
+      .target_id = 2,
+      .control = power_management::ControlInterface::kArmWfi,
+      .control_argument = 12345,
+      .options = 1221212121,
+  };
+
+  auto port_packet = t.port_packet();
+
+  EXPECT_EQ(port_packet.key, t.domain_id);
+  EXPECT_EQ(port_packet.type, ZX_PKT_TYPE_PROCESSOR_POWER_LEVEL_TRANSITION_REQUEST);
+  EXPECT_EQ(port_packet.status, ZX_OK);
+  EXPECT_EQ(port_packet.processor_power_level_transition.domain_id, t.target_id);
+  EXPECT_EQ(port_packet.processor_power_level_transition.control_interface,
+            static_cast<uint64_t>(t.control));
+  EXPECT_EQ(port_packet.processor_power_level_transition.control_argument, t.control_argument);
 }
 
 }  // namespace

@@ -431,8 +431,8 @@ mod tests {
 
     use super::*;
     use crate::internal::base::{
-        self, IpCounters, IpDeviceMtuContext, IpLayerPacketMetadata, IpPacketDestination,
-        IpSendFrameError, SendIpPacketMeta,
+        self, DeviceIpLayerMetadata, IpCounters, IpDeviceMtuContext, IpLayerPacketMetadata,
+        IpPacketDestination, IpSendFrameError, SendIpPacketMeta,
     };
     use crate::internal::gmp::{
         GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
@@ -584,6 +584,7 @@ mod tests {
             bindings_ctx: &mut FakeBindingsCtxImpl,
             device_id: &Self::DeviceId,
             destination: IpPacketDestination<Ipv6, &Self::DeviceId>,
+            _ip_layer_metadata: DeviceIpLayerMetadata,
             body: S,
             ProofOfEgressCheck { .. }: ProofOfEgressCheck,
         ) -> Result<(), SendFrameError<S>>

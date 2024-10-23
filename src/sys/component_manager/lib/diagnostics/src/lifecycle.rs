@@ -8,7 +8,7 @@ use fuchsia_sync::Mutex;
 use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
 use moniker::Moniker;
 use std::sync::{Arc, Weak};
-use {fuchsia_inspect as inspect, fuchsia_inspect_contrib as inspect_contrib, zx};
+use {fuchsia_inspect as inspect, fuchsia_inspect_contrib as inspect_contrib};
 
 const MAX_NUMBER_OF_LIFECYCLE_EVENTS: usize = 150;
 const MONIKER: &str = "moniker";

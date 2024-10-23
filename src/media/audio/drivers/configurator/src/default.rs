@@ -15,11 +15,11 @@ use fidl::prelude::*;
 use fidl_fuchsia_hardware_audio::*;
 use fidl_fuchsia_hardware_audio_signalprocessing::*;
 use fidl_fuchsia_media::AudioDeviceEnumeratorMarker;
+use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::{select, StreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
-use {fuchsia_async as fasync, zx};
 
 pub struct CodecState {
     /// Codec manufacturer name.

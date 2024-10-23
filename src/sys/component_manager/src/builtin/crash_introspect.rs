@@ -6,7 +6,7 @@ use anyhow::Error;
 use elf_runner::crash_info::CrashRecords;
 use futures::TryStreamExt;
 use std::sync::Arc;
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, zx};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys};
 
 pub struct CrashIntrospectSvc(CrashRecords);
 

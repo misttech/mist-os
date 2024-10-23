@@ -54,10 +54,7 @@ pub trait Rtc: Send + Sync {
 }
 
 fn get_dir() -> Result<fio::DirectoryProxy, fuchsia_fs::node::OpenError> {
-    directory::open_in_namespace_deprecated(
-        RTC_PATH,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-    )
+    directory::open_in_namespace(RTC_PATH, fio::PERM_READABLE)
 }
 
 /// An implementation of the `Rtc` trait that connects to an RTC device in /dev/class/rtc.

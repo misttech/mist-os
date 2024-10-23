@@ -103,14 +103,13 @@ pub fn ip_test(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     if emit_test.unwrap_or_else(|| {
-        !attrs.iter().any(|a| a.path.is_ident("test_case") || a.path.is_ident("test_matrix"))
+        !attrs.iter().any(|a| a.path().is_ident("test_case") || a.path().is_ident("test_matrix"))
     }) {
         attrs.push(Attribute {
-            path: syn::parse_quote!(test),
-            bracket_token: Default::default(),
             pound_token: Default::default(),
             style: syn::AttrStyle::Outer,
-            tokens: Default::default(),
+            bracket_token: Default::default(),
+            meta: syn::parse_quote!(test),
         });
     }
     // borrow here because `test_attrs` is used twice in `quote_spanned!` below.
@@ -134,7 +133,7 @@ pub fn ip_test(attr: TokenStream, input: TokenStream) -> TokenStream {
 
     let net_types_path = |ty| {
         let mut p = net_types.clone();
-        let rest: Path = syn::parse_str(ty).unwrap();
+        let rest = syn::parse_str::<Path>(ty).unwrap();
         p.segments.extend(rest.segments.into_iter());
         p
     };
@@ -166,7 +165,8 @@ pub fn ip_test(attr: TokenStream, input: TokenStream) -> TokenStream {
                     for expr in punctuated.iter_mut() {
                         visit.visit_expr_mut(expr);
                     }
-                    attr.tokens = quote!((#punctuated #tail));
+                    let path = attr.meta.path();
+                    attr.meta = parse_quote!(#path(#punctuated #tail));
                 }
                 attr
             })
@@ -306,20 +306,20 @@ impl syn::parse::Parse for IpTestArgs {
         }
         if !input.is_empty() {
             let args = Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(input)?;
-            for syn::MetaNameValue { path, lit, .. } in args {
+            for syn::MetaNameValue { path, value, .. } in args {
                 let ident = path
                     .get_ident()
                     .ok_or_else(|| Error::new(path.span(), "expecting identifier"))?;
                 if ident == "test" {
-                    let notest = match lit {
-                        syn::Lit::Bool(b) => b,
-                        _ => return Err(Error::new(lit.span(), "expected boolean")),
+                    let notest = match value {
+                        syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Bool(b), .. }) => b,
+                        _ => return Err(Error::new(value.span(), "expected boolean")),
                     };
                     emit_test = Some(notest.value);
                 } else if ident == "net_types" {
-                    let v = match lit {
-                        syn::Lit::Str(s) => s,
-                        _ => return Err(Error::new(lit.span(), "extected string")),
+                    let v = match value {
+                        syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(s), .. }) => s,
+                        _ => return Err(Error::new(value.span(), "extected string")),
                     };
                     net_types = Some(syn::parse_str(&v.value()).map_err(|mut e| {
                         e.combine(Error::new(v.span(), "can't parse path"));

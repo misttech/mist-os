@@ -63,8 +63,7 @@ DeviceWatcher::DeviceWatcher(async_dispatcher_t* dispatcher,
 std::unique_ptr<DeviceWatcher> DeviceWatcher::Create(const std::string& directory_path,
                                                      ExistsCallback exists_callback,
                                                      async_dispatcher_t* dispatcher) {
-  return CreateWithIdleCallback(
-      directory_path, std::move(exists_callback), [] {}, dispatcher);
+  return CreateWithIdleCallback(directory_path, std::move(exists_callback), [] {}, dispatcher);
 }
 
 std::unique_ptr<DeviceWatcher> DeviceWatcher::CreateWithIdleCallback(
@@ -99,9 +98,9 @@ void DeviceWatcher::Handler(async_dispatcher_t* dispatcher, async::WaitBase* wai
   if (signal->observed & ZX_CHANNEL_READABLE) {
     uint32_t size;
     uint8_t buf[fio::wire::kMaxBuf];
-    zx_status_t status =
+    zx_status_t read_status =
         dir_watcher_.channel().read(0, buf, nullptr, sizeof(buf), 0, &size, nullptr);
-    FX_CHECK(status == ZX_OK) << zx_status_get_string(status);
+    FX_CHECK(read_status == ZX_OK) << zx_status_get_string(read_status);
 
     auto weak = weak_ptr_factory_.GetWeakPtr();
     uint8_t* msg = buf;

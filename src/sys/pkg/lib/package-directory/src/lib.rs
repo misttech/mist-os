@@ -5,6 +5,7 @@
 #![allow(clippy::let_unit_value)]
 
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
 use std::collections::HashSet;
 use std::convert::TryInto as _;
 use std::future::Future;
@@ -13,7 +14,6 @@ use vfs::common::send_on_open_with_error;
 use vfs::directory::entry::EntryInfo;
 use vfs::directory::entry_container::Directory;
 use vfs::ObjectRequestRef;
-use {fidl_fuchsia_io as fio, zx};
 
 mod meta_as_dir;
 mod meta_subdir;

@@ -151,7 +151,6 @@ TEST_F(IncomingProtocolTest, CloneWorksForServiceDirectories) {
   RunLoop();
 }
 
-using Empty = fidl_service_test::Empty;
 using EmptyCloneableNode = fidl_service_test::EmptyCloneableNode;
 
 // |EmptyCloneableNode| server that asserts that only |fuchsia.io/Node.Clone| is called.
@@ -195,12 +194,14 @@ class IncomingCloneTest : public IncomingTest {
   constexpr static const char kProtocolName[] = "empty";
 };
 
-TEST_F(IncomingCloneTest, CloneWithTagAssumeProtocolComposesNodeAlwaysDispatchesToNode) {
+// TODO(https://fxbug.dev/324111518): This should call `fuchsia.unknown/Cloneable.Clone2` instead
+// of `fuchsia.io/Node.Clone` when all out-of-tree servers have support for Clone2.
+TEST_F(IncomingCloneTest, CloneDispatchesToNodeClone) {
   // Manually convert to the |Empty| protocol.
-  auto empty = component::ConnectAt<Empty>(TakeSvcDirectoryRoot(), kProtocolName);
+  auto empty = component::ConnectAt<EmptyCloneableNode>(TakeSvcDirectoryRoot(), kProtocolName);
   ASSERT_OK(empty.status_value());
 
-  auto empty_clone = component::Clone<Empty>(empty.value(), component::AssumeProtocolComposesNode);
+  auto empty_clone = component::Clone<EmptyCloneableNode>(empty.value());
   ASSERT_OK(empty_clone.status_value());
 
   // The channel should not have been closed with an error.

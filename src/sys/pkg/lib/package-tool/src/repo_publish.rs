@@ -101,7 +101,7 @@ async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
     let _log_warning_task = fasync::Task::local({
         let lock_path = lock_path.clone();
         async move {
-            fasync::Timer::new(fasync::Duration::from_secs(30)).await;
+            fasync::Timer::new(fasync::MonotonicDuration::from_secs(30)).await;
             warn!("Obtaining a lock at {} not complete after 30s", &lock_path.display());
         }
     });
@@ -235,7 +235,7 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
 
     // Try to connect to the repository. This should succeed if we have at least some root metadata
     // in the repository. If none exists, we'll create a new repository.
-    let client = get_client(cmd, &repo).await?;
+    let client = get_client(&repo, cmd.trusted_root.as_ref()).await?;
     let mut repo_builder = if let Some(client) = &client {
         RepoBuilder::from_database(&repo, &repo_trusted_keys, client.database())
     } else {
@@ -315,10 +315,10 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
 }
 
 async fn get_trusted_root(
-    cmd: &RepoPublishCommand,
     repo: &PmRepository,
+    trusted_root: Option<&Utf8PathBuf>,
 ) -> Result<Option<RawSignedMetadata<Pouf1, RootMetadata>>> {
-    if let Some(trusted_root_path) = &cmd.trusted_root {
+    if let Some(trusted_root_path) = trusted_root {
         let buf = async_fs::read(&trusted_root_path)
             .await
             .with_context(|| format!("reading trusted root {trusted_root_path}"))?;
@@ -357,10 +357,10 @@ async fn get_trusted_root(
 /// Try to connect to the repository. This should succeed if we have at least
 /// some root metadata in the repository.
 async fn get_client<'a>(
-    cmd: &'a RepoPublishCommand,
     repo: &'a PmRepository,
+    trusted_root: Option<&Utf8PathBuf>,
 ) -> Result<Option<RepoClient<&'a PmRepository>>> {
-    let Some(trusted_root) = get_trusted_root(cmd, repo).await? else {
+    let Some(trusted_root) = get_trusted_root(repo, trusted_root).await? else {
         return Ok(None);
     };
 
@@ -568,7 +568,7 @@ mod tests {
 
     // Waits for the repo to be unlocked.
     async fn ensure_repo_unlocked(repo_path: &Utf8Path) {
-        fasync::Timer::new(fasync::Duration::from_millis(100)).await;
+        fasync::Timer::new(fasync::MonotonicDuration::from_millis(100)).await;
         lock_repository(repo_path).await.unwrap().unlock().unwrap();
     }
 
@@ -1381,7 +1381,16 @@ mod tests {
         let mut pb_pkgs = pb_client.list_packages().await.unwrap();
         pb_pkgs.sort();
 
-        assert_eq!(repo_pkgs, pb_pkgs);
+        for (repo_pkg, pb_pkg) in std::iter::zip(repo_pkgs, pb_pkgs) {
+            assert_eq!(repo_pkg.name, pb_pkg.name);
+            assert_eq!(repo_pkg.size, pb_pkg.size);
+            assert_eq!(repo_pkg.hash, pb_pkg.hash);
+            // Although the test is fairly quick, it does happen that the modified stamps differ by
+            // a short timespan (1-2 seconds), hence we allow a grace period of 5 seconds to pass.
+            let repo_pkg_mtime = repo_pkg.modified.unwrap();
+            let pb_pkg_mtime = pb_pkg.modified.unwrap();
+            assert!(repo_pkg_mtime.abs_diff(pb_pkg_mtime) < 5);
+        }
 
         for entry in std::fs::read_dir(pb_blobs_dir.join("1")).unwrap() {
             let entry = entry.unwrap();

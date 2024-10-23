@@ -14,7 +14,7 @@ use std::pin::pin;
 use tracing::{info, trace, warn};
 use {
     fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
-    fidl_fuchsia_settings as settings, zx,
+    fidl_fuchsia_settings as settings,
 };
 
 /// Represents set volume request.

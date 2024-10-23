@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.net.filter") {
-  sdk_category = "internal"
-
   sources = [
     "admin.fidl",
     "constants.fidl",

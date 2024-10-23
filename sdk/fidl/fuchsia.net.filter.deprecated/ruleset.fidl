@@ -45,7 +45,7 @@ type Rule = struct {
     /// If true, matches any address that is NOT contained in the subnet.
     dst_subnet_invert_match bool;
     dst_port_range PortRange;
-    nic uint32;
+    nic fuchsia.net.InterfaceId;
     log bool;
     keep_state bool;
     /// Matches on packets originating from or destined to interfaces with
@@ -69,7 +69,7 @@ type Empty = struct {};
 type Nat = struct {
     proto SocketProtocol;
     src_subnet fuchsia.net.Subnet;
-    outgoing_nic uint32;
+    outgoing_nic fuchsia.net.InterfaceId;
 };
 
 /// RDR is a special rule for Redirector, which forwards an incoming packet
@@ -80,5 +80,5 @@ type Rdr = struct {
     dst_port_range PortRange;
     new_dst_addr fuchsia.net.IpAddress;
     new_dst_port_range PortRange;
-    nic uint32;
+    nic fuchsia.net.InterfaceId;
 };

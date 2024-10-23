@@ -75,7 +75,7 @@ use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::state::{
-    CloseError, CloseReason, Closed, Initial, State, Takeable, TakeableRef,
+    CloseError, CloseReason, Closed, Initial, NewlyClosed, State, Takeable, TakeableRef,
 };
 
 /// A marker trait for dual-stack socket features.
@@ -1760,11 +1760,12 @@ impl<
         core_ctx: &mut CC,
         seq: SeqNum,
         error: IcmpErrorCode,
-    ) {
+    ) -> NewlyClosed {
         let Connection { soft_error, state, .. } = self;
-        let new_soft_error =
+        let (new_soft_error, newly_closed) =
             core_ctx.with_counters(|counters| state.on_icmp_error(counters, error, seq));
         *soft_error = soft_error.or(new_soft_error);
+        newly_closed
     }
 }
 
@@ -2968,35 +2969,31 @@ where
                             let _: Result<(), CloseError> = conn.state.shutdown_recv();
 
                             conn.defunct = true;
-                            let already_closed = match core_ctx.with_counters(|counters| {
+                            let newly_closed = match core_ctx.with_counters(|counters| {
                                 conn.state.close(
                                     counters,
                                     CloseReason::Close { now: bindings_ctx.now() },
                                     &conn.socket_options,
                                 )
                             }) {
-                                Err(CloseError::NoConnection) => true,
-                                Err(CloseError::Closing) | Ok(()) => false,
+                                Err(CloseError::NoConnection) => NewlyClosed::No,
+                                Err(CloseError::Closing) | Ok(NewlyClosed::No) => {
+                                    do_send_inner(&id, conn, &addr, timer, core_ctx, bindings_ctx)
+                                }
+                                Ok(NewlyClosed::Yes) => NewlyClosed::Yes,
                             };
                             // The connection transitions to closed because of
                             // this call, we need to unregister it from the
                             // socketmap.
-                            let now_closed = if !already_closed {
-                                do_send_inner(&id, conn, &addr, timer, core_ctx, bindings_ctx);
-                                let now_closed = matches!(conn.state, State::Closed(_));
-                                if now_closed {
-                                    core_ctx.with_demux_mut(|DemuxState { socketmap }| {
-                                        socketmap
-                                            .conns_mut()
-                                            .remove(demux_id, addr)
-                                            .expect("failed to remove from socketmap");
-                                    });
-                                    let _: Option<_> = bindings_ctx.cancel_timer(timer);
-                                }
-                                now_closed
-                            } else {
-                                true
-                            };
+                            handle_newly_closed(
+                                core_ctx,
+                                bindings_ctx,
+                                newly_closed,
+                                demux_id,
+                                addr,
+                                timer,
+                            );
+                            let now_closed = matches!(conn.state, State::Closed(_));
                             if now_closed {
                                 debug_assert!(
                                     core_ctx.with_demux_mut(|DemuxState { socketmap }| {
@@ -3115,8 +3112,6 @@ where
                                 + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                                 + CounterContext<TcpCounters<SockI>>,
                         {
-                            let was_closed = matches!(conn.state, State::Closed(_));
-
                             let (shutdown_send, shutdown_receive) = shutdown_type.to_send_receive();
                             if shutdown_receive {
                                 match conn.state.shutdown_recv() {
@@ -3137,22 +3132,26 @@ where
                                     &conn.socket_options,
                                 )
                             }) {
-                                Ok(()) => {
-                                    // We should not be here if we were already closed.
-                                    assert!(!was_closed);
-                                    do_send_inner(id, conn, addr, timer, core_ctx, bindings_ctx);
-                                    if matches!(conn.state, State::Closed(_)) {
-                                        // Uphold the invariant that we remove
-                                        // ourselves from the demux when moving
-                                        // to the closed state.
-                                        core_ctx.with_demux_mut(|DemuxState { socketmap }| {
-                                            socketmap
-                                                .conns_mut()
-                                                .remove(demux_id, addr)
-                                                .expect("failed to remove from socketmap");
-                                        });
-                                        let _: Option<_> = bindings_ctx.cancel_timer(timer);
-                                    }
+                                Ok(newly_closed) => {
+                                    let newly_closed = match newly_closed {
+                                        NewlyClosed::Yes => NewlyClosed::Yes,
+                                        NewlyClosed::No => do_send_inner(
+                                            id,
+                                            conn,
+                                            addr,
+                                            timer,
+                                            core_ctx,
+                                            bindings_ctx,
+                                        ),
+                                    };
+                                    handle_newly_closed(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        newly_closed,
+                                        demux_id,
+                                        addr,
+                                        timer,
+                                    );
                                     Ok(())
                                 }
                                 Err(CloseError::NoConnection) => Err(NoConnection),
@@ -3559,17 +3558,42 @@ where
             match core_ctx {
                 MaybeDualStack::NotDualStack((core_ctx, converter)) => {
                     let (conn, addr) = converter.convert(conn);
-                    do_send_inner(conn_id, conn, addr, timer, core_ctx, bindings_ctx);
+                    do_send_inner_and_then_handle_newly_closed(
+                        conn_id,
+                        I::into_demux_socket_id(conn_id.clone()),
+                        conn,
+                        addr,
+                        timer,
+                        core_ctx,
+                        bindings_ctx,
+                    );
                 }
                 MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(conn) {
                     EitherStack::ThisStack((conn, addr)) => {
-                        do_send_inner(conn_id, conn, addr, timer, core_ctx, bindings_ctx)
+                        do_send_inner_and_then_handle_newly_closed(
+                            conn_id,
+                            I::into_demux_socket_id(conn_id.clone()),
+                            conn,
+                            addr,
+                            timer,
+                            core_ctx,
+                            bindings_ctx,
+                        )
                     }
                     EitherStack::OtherStack((conn, addr)) => {
-                        do_send_inner(conn_id, conn, addr, timer, core_ctx, bindings_ctx)
+                        let other_demux_id = core_ctx.into_other_demux_socket_id(conn_id.clone());
+                        do_send_inner_and_then_handle_newly_closed(
+                            conn_id,
+                            other_demux_id,
+                            conn,
+                            addr,
+                            timer,
+                            core_ctx,
+                            bindings_ctx,
+                        );
                     }
                 },
-            }
+            };
         })
     }
 
@@ -3620,23 +3644,12 @@ where
                         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
                         + CounterContext<TcpCounters<SockI>>,
                 {
-                    #[derive(Eq, PartialEq)]
-                    enum PrevState {
-                        Closed,
-                        NotClosed{ time_wait: bool }
-                    }
-
-                    let prev_state = match conn.state {
-                        State::Closed(_) => PrevState::Closed,
-                        State::TimeWait(_) => PrevState::NotClosed{ time_wait: true },
-                        _ => PrevState::NotClosed{ time_wait: false }
-                    };
-                    do_send_inner(id, conn, addr, timer, core_ctx, bindings_ctx);
-                    let is_now_closed = matches!(conn.state, State::Closed(_));
-                    match (is_now_closed, prev_state) {
+                    let time_wait = matches!(conn.state, State::TimeWait(_));
+                    let newly_closed = do_send_inner(id, conn, addr, timer, core_ctx, bindings_ctx);
+                    match (newly_closed, time_wait) {
                         // Moved to closed state, remove from demux and cancel
                         // timers.
-                        (true, PrevState::NotClosed{ time_wait }) => {
+                        (NewlyClosed::Yes, time_wait) => {
                             let result = core_ctx.with_demux_mut(|DemuxState { socketmap }| {
                                 socketmap
                                     .conns_mut()
@@ -3661,9 +3674,9 @@ where
                             });
                             let _: Option<_> = bindings_ctx.cancel_timer(timer);
                         }
-                        (true, PrevState::Closed) | (false, _) => (),
+                        (NewlyClosed::No, _) => {},
                     }
-                    conn.defunct && is_now_closed
+                    conn.defunct && matches!(conn.state, State::Closed(_))
                 }
                 match core_ctx {
                     MaybeDualStack::NotDualStack((core_ctx, converter)) => {
@@ -3739,7 +3752,15 @@ where
                         let old = conn.socket_options;
                         let result = f(&mut conn.socket_options);
                         if old != conn.socket_options {
-                            do_send_inner(id, conn, &*addr, timer, core_ctx, bindings_ctx);
+                            do_send_inner_and_then_handle_newly_closed(
+                                id,
+                                I::into_demux_socket_id(id.clone()),
+                                conn,
+                                &*addr,
+                                timer,
+                                core_ctx,
+                                bindings_ctx,
+                            );
                         }
                         result
                     }
@@ -3749,7 +3770,15 @@ where
                                 let old = conn.socket_options;
                                 let result = f(&mut conn.socket_options);
                                 if old != conn.socket_options {
-                                    do_send_inner(id, conn, &*addr, timer, core_ctx, bindings_ctx);
+                                    do_send_inner_and_then_handle_newly_closed(
+                                        id,
+                                        I::into_demux_socket_id(id.clone()),
+                                        conn,
+                                        &*addr,
+                                        timer,
+                                        core_ctx,
+                                        bindings_ctx,
+                                    );
                                 }
                                 result
                             }
@@ -3757,7 +3786,17 @@ where
                                 let old = conn.socket_options;
                                 let result = f(&mut conn.socket_options);
                                 if old != conn.socket_options {
-                                    do_send_inner(id, conn, &*addr, timer, core_ctx, bindings_ctx);
+                                    let other_demux_id =
+                                        core_ctx.into_other_demux_socket_id(id.clone());
+                                    do_send_inner_and_then_handle_newly_closed(
+                                        id,
+                                        other_demux_id,
+                                        conn,
+                                        &*addr,
+                                        timer,
+                                        core_ctx,
+                                        bindings_ctx,
+                                    );
                                 }
                                 result
                             }
@@ -3969,83 +4008,89 @@ where
                 TcpSocketStateInner::Bound(
                     BoundSocketState::Connected { conn, sharing: _, timer } ) => (conn, timer),
                 "invalid socket ID");
-            let (accept_queue, state, soft_error, handshake_status, this_or_other_stack) =
-                match core_ctx {
-                    MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                        let (conn, addr) = converter.convert(conn_and_addr);
-                        conn.on_icmp_error(core_ctx, seq, error);
-                        (
-                            &mut conn.accept_queue,
-                            &mut conn.state,
-                            &mut conn.soft_error,
-                            &mut conn.handshake_status,
-                            EitherStack::ThisStack((
-                                core_ctx.as_this_stack(),
-                                I::into_demux_socket_id(id.clone()),
-                                addr,
-                            )),
-                        )
-                    }
-                    MaybeDualStack::DualStack((core_ctx, converter)) => {
-                        match converter.convert(conn_and_addr) {
-                            EitherStack::ThisStack((conn, addr)) => {
-                                conn.on_icmp_error(core_ctx, seq, error);
-                                (
-                                    &mut conn.accept_queue,
-                                    &mut conn.state,
-                                    &mut conn.soft_error,
-                                    &mut conn.handshake_status,
-                                    EitherStack::ThisStack((
-                                        core_ctx.as_this_stack(),
-                                        I::into_demux_socket_id(id.clone()),
-                                        addr,
-                                    )),
-                                )
-                            }
-                            EitherStack::OtherStack((conn, addr)) => {
-                                conn.on_icmp_error(core_ctx, seq, error);
-                                let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
-                                (
-                                    &mut conn.accept_queue,
-                                    &mut conn.state,
-                                    &mut conn.soft_error,
-                                    &mut conn.handshake_status,
-                                    EitherStack::OtherStack((core_ctx, demux_id, addr)),
-                                )
-                            }
+            let (
+                newly_closed,
+                accept_queue,
+                state,
+                soft_error,
+                handshake_status,
+                this_or_other_stack,
+            ) = match core_ctx {
+                MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                    let (conn, addr) = converter.convert(conn_and_addr);
+                    let newly_closed = conn.on_icmp_error(core_ctx, seq, error);
+                    (
+                        newly_closed,
+                        &mut conn.accept_queue,
+                        &mut conn.state,
+                        &mut conn.soft_error,
+                        &mut conn.handshake_status,
+                        EitherStack::ThisStack((
+                            core_ctx.as_this_stack(),
+                            I::into_demux_socket_id(id.clone()),
+                            addr,
+                        )),
+                    )
+                }
+                MaybeDualStack::DualStack((core_ctx, converter)) => {
+                    match converter.convert(conn_and_addr) {
+                        EitherStack::ThisStack((conn, addr)) => {
+                            let newly_closed = conn.on_icmp_error(core_ctx, seq, error);
+                            (
+                                newly_closed,
+                                &mut conn.accept_queue,
+                                &mut conn.state,
+                                &mut conn.soft_error,
+                                &mut conn.handshake_status,
+                                EitherStack::ThisStack((
+                                    core_ctx.as_this_stack(),
+                                    I::into_demux_socket_id(id.clone()),
+                                    addr,
+                                )),
+                            )
+                        }
+                        EitherStack::OtherStack((conn, addr)) => {
+                            let newly_closed = conn.on_icmp_error(core_ctx, seq, error);
+                            let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
+                            (
+                                newly_closed,
+                                &mut conn.accept_queue,
+                                &mut conn.state,
+                                &mut conn.soft_error,
+                                &mut conn.handshake_status,
+                                EitherStack::OtherStack((core_ctx, demux_id, addr)),
+                            )
                         }
                     }
-                };
+                }
+            };
 
             if let State::Closed(Closed { reason }) = state {
                 debug!("handshake_status: {handshake_status:?}");
                 let _: bool = handshake_status.update_if_pending(HandshakeStatus::Aborted);
-                // Always unregister the socket from the socketmap.
+                // Unregister the socket from the socketmap if newly closed.
                 match this_or_other_stack {
                     EitherStack::ThisStack((core_ctx, demux_id, addr)) => {
-                        TcpDemuxContext::<I, _, _>::with_demux_mut(
+                        handle_newly_closed::<I, _, _, _>(
                             core_ctx,
-                            |DemuxState { socketmap }| {
-                                socketmap
-                                    .conns_mut()
-                                    .remove(&demux_id, addr)
-                                    .expect("failed to remove from socketmap");
-                            },
+                            bindings_ctx,
+                            newly_closed,
+                            &demux_id,
+                            addr,
+                            timer,
                         );
                     }
                     EitherStack::OtherStack((core_ctx, demux_id, addr)) => {
-                        TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
+                        handle_newly_closed::<I::OtherVersion, _, _, _>(
                             core_ctx,
-                            |DemuxState { socketmap }| {
-                                socketmap
-                                    .conns_mut()
-                                    .remove(&demux_id, addr)
-                                    .expect("failed to remove from socketmap");
-                            },
+                            bindings_ctx,
+                            newly_closed,
+                            &demux_id,
+                            addr,
+                            timer,
                         );
                     }
                 };
-                let _: Option<_> = bindings_ctx.cancel_timer(timer);
                 match accept_queue {
                     Some(accept_queue) => {
                         accept_queue.remove(&id);
@@ -4519,18 +4564,10 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
         + CounterContext<TcpCounters<SockI>>,
     BC: TcpBindingsContext,
 {
-    if !matches!(conn.state, State::Closed(_)) {
-        core_ctx.with_demux_mut(|DemuxState { socketmap }| {
-            socketmap
-                .conns_mut()
-                .remove(demux_id, conn_addr)
-                .expect("failed to remove from socketmap");
-        });
-        let _: Option<_> = bindings_ctx.cancel_timer(timer);
-    }
-
     debug!("aborting pending socket {sock_id:?}");
-    if let Some(reset) = core_ctx.with_counters(|counters| conn.state.abort(counters)) {
+    let (maybe_reset, newly_closed) = core_ctx.with_counters(|counters| conn.state.abort(counters));
+    handle_newly_closed(core_ctx, bindings_ctx, newly_closed, demux_id, conn_addr, timer);
+    if let Some(reset) = maybe_reset {
         let ConnAddr { ip, device: _ } = conn_addr;
         send_tcp_segment(
             core_ctx,
@@ -4544,8 +4581,10 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
     }
 }
 
-fn do_send_inner<SockI, WireI, CC, BC>(
+// Calls `do_send_inner` and handle the result.
+fn do_send_inner_and_then_handle_newly_closed<SockI, WireI, CC, BC>(
     conn_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+    demux_id: WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
     conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
     addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
     timer: &mut BC::Timer,
@@ -4555,25 +4594,74 @@ fn do_send_inner<SockI, WireI, CC, BC>(
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
     BC: TcpBindingsContext,
+    CC: TransportIpContext<WireI, BC>
+        + CounterContext<TcpCounters<SockI>>
+        + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
+{
+    let newly_closed = do_send_inner(conn_id, conn, addr, timer, core_ctx, bindings_ctx);
+    handle_newly_closed(core_ctx, bindings_ctx, newly_closed, &demux_id, addr, timer);
+}
+
+#[inline]
+fn handle_newly_closed<I, D, CC, BC>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    newly_closed: NewlyClosed,
+    demux_id: &I::DemuxSocketId<D, BC>,
+    addr: &ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>,
+    timer: &mut BC::Timer,
+) where
+    I: DualStackIpExt,
+    D: WeakDeviceIdentifier,
+    CC: TcpDemuxContext<I, D, BC>,
+    BC: TcpBindingsContext,
+{
+    if newly_closed == NewlyClosed::Yes {
+        core_ctx.with_demux_mut(|DemuxState { socketmap }| {
+            socketmap.conns_mut().remove(demux_id, addr).expect("failed to remove from demux");
+            let _: Option<_> = bindings_ctx.cancel_timer(timer);
+        });
+    }
+}
+
+fn do_send_inner<SockI, WireI, CC, BC>(
+    conn_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+    conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+    addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
+    timer: &mut BC::Timer,
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+) -> NewlyClosed
+where
+    SockI: DualStackIpExt,
+    WireI: DualStackIpExt,
+    BC: TcpBindingsContext,
     CC: TransportIpContext<WireI, BC> + CounterContext<TcpCounters<SockI>>,
 {
-    while let Some(seg) = core_ctx.with_counters(|counters| {
-        conn.state.poll_send(counters, u32::MAX, bindings_ctx.now(), &conn.socket_options)
-    }) {
-        send_tcp_segment(
-            core_ctx,
-            bindings_ctx,
-            Some(conn_id),
-            Some(&conn.ip_sock),
-            addr.ip.clone(),
-            seg,
-            &conn.socket_options.ip_options,
-        );
-    }
+    let newly_closed = loop {
+        match core_ctx.with_counters(|counters| {
+            conn.state.poll_send(counters, u32::MAX, bindings_ctx.now(), &conn.socket_options)
+        }) {
+            Ok(seg) => {
+                send_tcp_segment(
+                    core_ctx,
+                    bindings_ctx,
+                    Some(conn_id),
+                    Some(&conn.ip_sock),
+                    addr.ip.clone(),
+                    seg,
+                    &conn.socket_options.ip_options,
+                );
+            }
+            Err(newly_closed) => break newly_closed,
+        }
+    };
 
     if let Some(instant) = conn.state.poll_send_at() {
         let _: Option<_> = bindings_ctx.schedule_timer_instant(instant, timer);
     }
+
+    newly_closed
 }
 
 enum SendBufferSize {}
@@ -8659,6 +8747,94 @@ mod tests {
             let (accepted, _addr, _accepted_ends) =
                 ctx.tcp_api::<I>().accept(&server).expect("failed to accept");
             assert_eq!(ctx.tcp_api::<I>().get_mark(&accepted, MarkDomain::Mark1), Mark(Some(1)));
+        });
+    }
+
+    #[ip_test(I)]
+    fn do_send_can_remove_sockets_from_demux_state<I: TcpTestIpExt>()
+    where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
+            I,
+            TcpBindingsCtx<FakeDeviceId>,
+            SingleStackConverter = I::SingleStackConverter,
+            DualStackConverter = I::DualStackConverter,
+        >,
+    {
+        let (mut net, client, _client_snd_end, accepted) = bind_listen_connect_accept_inner(
+            I::UNSPECIFIED_ADDRESS,
+            BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false },
+            0,
+            0.0,
+        );
+        net.with_context(LOCAL, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            assert_eq!(api.shutdown(&client, ShutdownType::Send), Ok(true));
+        });
+        // client -> accepted FIN.
+        assert!(!net.step().is_idle());
+        // accepted -> client ACK.
+        assert!(!net.step().is_idle());
+        net.with_context(REMOTE, |ctx| {
+            let mut api = ctx.tcp_api::<I>();
+            assert_eq!(api.shutdown(&accepted, ShutdownType::Send), Ok(true));
+        });
+        // accepted -> client FIN.
+        assert!(!net.step().is_idle());
+        // client -> accepted ACK.
+        assert!(!net.step().is_idle());
+
+        // client is now in TIME_WAIT
+        net.with_context(LOCAL, |CtxPair { core_ctx, bindings_ctx: _ }| {
+            TcpDemuxContext::<I, _, _>::with_demux(core_ctx, |DemuxState { socketmap }| {
+                assert_eq!(socketmap.len(), 1);
+            })
+        });
+        assert_matches!(
+            &client.get().deref().socket_state,
+            TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => {
+                let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(
+                    conn,
+                    &I::converter()
+                );
+                assert_matches!(
+                    conn,
+                    Connection {
+                        state: State::TimeWait(_),
+                        ..
+                    }
+                );
+            }
+        );
+        net.with_context(LOCAL, |ctx| {
+            // Advance the current time but don't fire the timer.
+            ctx.with_fake_timer_ctx_mut(|ctx| {
+                ctx.instant.time =
+                    ctx.instant.time.checked_add(Duration::from_secs(120 * 60)).unwrap()
+            });
+            // Race with `do_send`.
+            let mut api = ctx.tcp_api::<I>();
+            api.do_send(&client);
+        });
+        assert_matches!(
+            &client.get().deref().socket_state,
+            TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => {
+                let (conn, _addr) = assert_this_stack_conn::<I, _, TcpCoreCtx<_, _>>(
+                    conn,
+                    &I::converter()
+                );
+                assert_matches!(
+                    conn,
+                    Connection {
+                        state: State::Closed(_),
+                        ..
+                    }
+                );
+            }
+        );
+        net.with_context(LOCAL, |CtxPair { core_ctx, bindings_ctx: _ }| {
+            TcpDemuxContext::<I, _, _>::with_demux(core_ctx, |DemuxState { socketmap }| {
+                assert_eq!(socketmap.len(), 0);
+            })
         });
     }
 }

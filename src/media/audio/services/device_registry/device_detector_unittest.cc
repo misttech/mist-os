@@ -147,6 +147,7 @@ class DeviceTracker {
   size_t size() const { return devices_.size(); }
   const std::vector<DeviceConnection>& devices() const { return devices_; }
   DeviceDetectionHandler handler() { return handler_; }
+  DeviceDetectionIdleHandler idle_handler() { return idle_handler_; }
   async_dispatcher_t* dispatcher() { return dispatcher_; }
 
  private:
@@ -154,17 +155,21 @@ class DeviceTracker {
                                            fad::DriverClient driver_client) {
     ASSERT_TRUE(detection_is_expected_) << "Unexpected device detection";
 
-    devices_.emplace_back(DeviceConnection{name, device_type, std::move(driver_client)});
+    devices_.emplace_back(DeviceConnection{
+        .name = name, .device_type = device_type, .client = std::move(driver_client)});
   };
+  DeviceDetectionIdleHandler idle_handler_ = [this]() { detection_idle_received_ = true; };
+
   async_dispatcher_t* dispatcher_;
   const bool detection_is_expected_;
+  bool detection_idle_received_ = false;
 
   std::vector<DeviceConnection> devices_;
 };
 
 class DeviceDetectorTest : public gtest::TestLoopFixture {
  protected:
-  static inline constexpr zx::duration kCommandTimeout = zx::sec(10);
+  static constexpr zx::duration kCommandTimeout = zx::sec(10);
 
   void SetUp() override {
     // Use our production Inspector during DeviceDetector unittests.
@@ -337,7 +342,8 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
   ASSERT_EQ(0u, tracker->size());
   {
     // Create the detector; expect 8 events (1 for each device above);
-    auto device_detector = DeviceDetector::Create(tracker->handler(), dispatcher());
+    auto device_detector =
+        DeviceDetector::Create(tracker->handler(), tracker->idle_handler(), dispatcher());
     zx::time deadline = zx::clock::get_monotonic() + kCommandTimeout;
     while (zx::clock::get_monotonic() < deadline) {
       // A fake audio device could still be setting up its server end, by the time the
@@ -422,7 +428,8 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
 
   auto tracker = std::make_shared<DeviceTracker>(dispatcher(), true);
   {
-    auto device_detector = DeviceDetector::Create(tracker->handler(), dispatcher());
+    auto device_detector =
+        DeviceDetector::Create(tracker->handler(), tracker->idle_handler(), dispatcher());
 
     RunLoopUntilIdle();
     ASSERT_EQ(0u, tracker->size());
@@ -519,7 +526,8 @@ TEST_F(DeviceDetectorTest, NoDanglingDetectors) {
   auto tracker = std::make_shared<DeviceTracker>(dispatcher(), false);
 
   {
-    auto device_detector = DeviceDetector::Create(tracker->handler(), dispatcher());
+    auto device_detector =
+        DeviceDetector::Create(tracker->handler(), tracker->idle_handler(), dispatcher());
     RunLoopUntilIdle();  // Allow erroneous device handler callbacks to reveal themselves.
     ASSERT_EQ(0u, tracker->size());
   }

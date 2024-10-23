@@ -10,20 +10,12 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
-            from: "parent",
-            to: "#sysinfo",
-        },
-        {
             service: "fuchsia.sysinfo.Service",
             from: "#boot-drivers",
             to: "#sysinfo",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: "fuchsia.logger.LogSink",
             from: "#archivist",
             to: "#sysinfo",
         },

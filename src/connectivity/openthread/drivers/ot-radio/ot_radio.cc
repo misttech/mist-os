@@ -251,7 +251,7 @@ zx_status_t OtRadioDevice::Init() {
     return configure_interrupt_result->error_value();
   }
 
-  fidl::WireResult interrupt_result = gpio_[OT_RADIO_INT_PIN]->GetInterrupt2({});
+  fidl::WireResult interrupt_result = gpio_[OT_RADIO_INT_PIN]->GetInterrupt({});
   if (!interrupt_result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to interrupt gpio: %s",
            interrupt_result.status_string());
@@ -578,22 +578,34 @@ zx_status_t OtRadioDevice::RadioThread() {
       return thrd_error;
     }
 
+    // TODO(https://fxbug.dev/356951180): We are still using an implementation that potentially
+    // starving TX transactions. That requires a fix.
     if (packet.key == PORT_KEY_EXIT_THREAD) {
       break;
-    } else if (packet.key == PORT_KEY_RADIO_IRQ || packet.key == PORT_KEY_TX_TO_RADIO) {
-      zxlogf(DEBUG, "ot-radio: handle TX/RX in the loop");
-
+    } else if (packet.key == PORT_KEY_RADIO_IRQ) {
+      zxlogf(DEBUG, "ot-radio: interrupt");
+      // Since we are using level based interrupt triggering, after handling the interrupt
+      // and re-enable it, if there are more frames available in SPI, another packet will
+      // be queued to `port_` to let this loop keeps polling the frames.
+      spinel_framer_->HandleInterrupt();
+      ReadRadioPacket();
+      HandleResetRetry();
+      interrupt_.ack();
+    } else if (packet.key == PORT_KEY_TX_TO_RADIO) {
       fbl::AutoLock lock(&spi_tx_lock_);
       if (spi_tx_queue_.size() > 0) {
         zxlogf(DEBUG, "ot-radio: transmitting data of size: %ld", spi_tx_queue_.front().size());
         if (ZX_OK != spinel_framer_->TryBufferTxPacket(spi_tx_queue_.front().data(),
                                                        spi_tx_queue_.front().size())) {
           lock.release();
+          // Cannot write to TX buffer at this point because
+          // (1) There is a spinel frame in RX buffer pending processing.
+          // (2) There is already a spinel frame in TX buffer that hasn't been sent out yet.
 
-          // Read packet out in case there is a pending inbound frame.
+          // Handle the packet that is not polled from the RX buffer in spinel framer.
           ReadRadioPacket();
-
-          // For the potential pending outbound frame, it will be handled in the next code block.
+          // Try send out pending frame in TX buffer.
+          spinel_framer_->TrySpiTransaction();
 
           // zx::port is thread-safe: Ok to queue directly to the port.
           zx_port_packet packet = {PORT_KEY_TX_TO_RADIO, ZX_PKT_TYPE_USER, ZX_OK, {}};
@@ -602,21 +614,10 @@ zx_status_t OtRadioDevice::RadioThread() {
           }
           port_.queue(&packet);
         } else {
+          spinel_framer_->TrySpiTransaction();
           spi_tx_queue_.pop_front();
         }
       }
-
-      // Since we are using level based interrupt triggering, after handling the interrupt
-      // and re-enable it, if there are more frames available in SPI, another packet will
-      // be queued to `port_` to let this loop keeps polling the frames.
-      if (packet.key == PORT_KEY_RADIO_IRQ) {
-        spinel_framer_->HandleInterrupt();
-        interrupt_.ack();
-      } else {
-        spinel_framer_->TrySpiTransaction();
-      }
-      ReadRadioPacket();
-      HandleResetRetry();
     }
   }
   zxlogf(DEBUG, "ot-radio: exiting");

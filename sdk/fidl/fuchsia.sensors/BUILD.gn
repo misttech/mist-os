@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.sensors") {
-  sdk_category = "internal"
-
   sources = [ "sensors.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.sensors",

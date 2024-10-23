@@ -5,6 +5,7 @@
 use anyhow::format_err;
 use async_utils::hanging_get::client::HangingGetStream;
 use bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol};
+use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_hfp::{NetworkInformation, PeerHandlerProxy};
 use fuchsia_async::Task;
 use fuchsia_bluetooth::profile::{Attribute, ProtocolDescriptor};
@@ -21,7 +22,6 @@ use std::fmt;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use vigil::{DropWatch, Vigil};
-use {fidl_fuchsia_bluetooth_bredr as bredr, zx};
 
 use super::calls::{Call, CallAction, Calls};
 use super::gain_control::GainControl;

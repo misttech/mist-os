@@ -154,7 +154,7 @@ zx_status_t GetBootItem(const std::vector<board_test::DeviceEntry>& entries, uin
       break;
     }
     default:
-      break;
+      return ZX_ERR_NOT_FOUND;
   }
   *out = std::move(vmo);
   return ZX_OK;
@@ -169,13 +169,27 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items> {
     zx_status_t status =
         GetBootItem(entries, request->type, board_name_, request->extra, &vmo, &length);
     if (status != ZX_OK) {
-      FX_LOG_KV(ERROR, "Failed to get boot items", FX_KV("status", status));
+      FX_LOG_KV(WARNING, "Failed to get boot items", FX_KV("status", status));
     }
     completer.Reply(std::move(vmo), length);
   }
   void Get2(Get2RequestView request, Get2Completer::Sync& completer) override {
-    FX_LOG_KV(ERROR, "Unsupported Get2 called.");
-    completer.Close(ZX_OK);
+    std::vector<board_test::DeviceEntry> entries = {};
+    zx::vmo vmo;
+    uint32_t length = 0;
+    uint32_t extra = 0;
+    zx_status_t status = GetBootItem(entries, request->type, board_name_, extra, &vmo, &length);
+    if (status != ZX_OK) {
+      FX_LOG_KV(WARNING, "Failed to get boot items", FX_KV("status", status));
+      completer.Reply(zx::error(status));
+      return;
+    }
+    std::vector<fuchsia_boot::wire::RetrievedItems> result;
+    fuchsia_boot::wire::RetrievedItems items = {
+        .payload = std::move(vmo), .length = length, .extra = extra};
+    result.emplace_back(std::move(items));
+    completer.ReplySuccess(
+        fidl::VectorView<fuchsia_boot::wire::RetrievedItems>::FromExternal(result));
   }
 
   void GetBootloaderFile(GetBootloaderFileRequestView request,

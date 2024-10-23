@@ -21,6 +21,7 @@ use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
 use crate::strict_mutex::StrictMutex;
+use crate::term_util::printed_length;
 
 static DOUBLE_TAB_TIME: Duration = Duration::from_millis(500);
 
@@ -142,7 +143,7 @@ impl ReplInner {
         };
 
         for line in output.split('\n') {
-            self.last_line_len = line.len() + chars_before;
+            self.last_line_len = printed_length(line) + chars_before;
             chars_before = 0;
             print!("{line}\r\n");
         }

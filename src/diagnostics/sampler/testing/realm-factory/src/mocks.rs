@@ -13,7 +13,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use {
     fidl_fuchsia_hardware_power_statecontrol as reboot,
-    fidl_fuchsia_mockrebootcontroller as controller, fuchsia_async as fasync, zx,
+    fidl_fuchsia_mockrebootcontroller as controller, fuchsia_async as fasync,
 };
 
 /// Test data for moniker <-> ID file.

@@ -61,7 +61,7 @@ use packet_formats::ipv6::{Ipv6Header, Ipv6Packet, Ipv6PacketBuilder};
 use packet_formats::udp::UdpPacketBuilder;
 use sockaddr::{IntoSockAddr as _, PureIpSockaddr, TryToSockaddrLl};
 use socket2::{InterfaceIndexOrAddress, SockRef};
-use test_case::test_case;
+use test_case::{test_case, test_matrix};
 use zx::{self as zx, AsHandleRef as _};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
@@ -4901,4 +4901,90 @@ async fn tos_tclass_send<
     })
     .await
     .expect("didn't receive the packet before end of the stream");
+}
+
+#[netstack_test]
+#[test_matrix(
+    [fposix_socket::Domain::Ipv4, fposix_socket::Domain::Ipv6],
+    [fposix_socket::DatagramSocketProtocol::Udp, fposix_socket::DatagramSocketProtocol::IcmpEcho],
+    [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
+    [
+        fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+        fposix_socket::OptionalUint32::Value(0)
+    ]
+)]
+async fn datagram_socket_mark(
+    name: &str,
+    domain: fposix_socket::Domain,
+    proto: fposix_socket::DatagramSocketProtocol,
+    mark_domain: fposix_socket::MarkDomain,
+    mark: fposix_socket::OptionalUint32,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create client realm");
+    let sock =
+        realm.datagram_socket(domain, proto).await.expect("failed to create datagram socket");
+    let channel = fdio::clone_channel(sock).expect("failed to clone channel");
+    let proxy = fposix_socket::BaseSocketProxy::new(fidl::AsyncChannel::from_channel(channel));
+    proxy.set_mark(mark_domain, &mark).await.expect("fidl error").expect("set mark");
+    assert_eq!(proxy.get_mark(mark_domain).await.expect("fidl error").expect("get mark"), mark);
+}
+
+#[netstack_test]
+#[test_matrix(
+    [fposix_socket::Domain::Ipv4, fposix_socket::Domain::Ipv6],
+    [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
+    [
+        fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+        fposix_socket::OptionalUint32::Value(0)
+    ]
+)]
+async fn stream_socket_mark(
+    name: &str,
+    domain: fposix_socket::Domain,
+    mark_domain: fposix_socket::MarkDomain,
+    mark: fposix_socket::OptionalUint32,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create client realm");
+    let sock = realm
+        .stream_socket(domain, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("failed to create datagram socket");
+    let channel = fdio::clone_channel(sock).expect("failed to clone channel");
+    let proxy = fposix_socket::BaseSocketProxy::new(fidl::AsyncChannel::from_channel(channel));
+    proxy.set_mark(mark_domain, &mark).await.expect("fidl error").expect("set mark");
+    assert_eq!(proxy.get_mark(mark_domain).await.expect("fidl error").expect("get mark"), mark);
+}
+
+#[netstack_test]
+#[test_matrix(
+    [fposix_socket::Domain::Ipv4, fposix_socket::Domain::Ipv6],
+    [
+        fposix_socket_raw::ProtocolAssociation::Unassociated(fposix_socket_raw::Empty),
+        fposix_socket_raw::ProtocolAssociation::Associated(0)
+    ],
+    [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
+    [
+        fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+        fposix_socket::OptionalUint32::Value(0)
+    ]
+)]
+async fn raw_socket_mark(
+    name: &str,
+    domain: fposix_socket::Domain,
+    proto: fposix_socket_raw::ProtocolAssociation,
+    mark_domain: fposix_socket::MarkDomain,
+    mark: fposix_socket::OptionalUint32,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create client realm");
+    let sock = realm.raw_socket(domain, proto).await.expect("failed to create datagram socket");
+    let channel = fdio::clone_channel(sock).expect("failed to clone channel");
+    let proxy = fposix_socket::BaseSocketProxy::new(fidl::AsyncChannel::from_channel(channel));
+    proxy.set_mark(mark_domain, &mark).await.expect("fidl error").expect("set mark");
+    assert_eq!(proxy.get_mark(mark_domain).await.expect("fidl error").expect("get mark"), mark);
 }

@@ -294,7 +294,7 @@ void Device::CompleteSuspend() {
   suspend_completer_.complete_ok();
 }
 
-const char* Device::Name() const { return name_.data(); }
+const char* Device::Name() const { return name_.c_str(); }
 
 bool Device::HasChildren() const { return !children_.empty(); }
 
@@ -320,12 +320,6 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
       std::make_shared<Device>(compat_device, zx_args->ops, driver_, this, logger_, dispatcher_);
   // Update the compat symbol name pointer with a pointer the device owns.
   device->compat_symbol_.name = device->name_.data();
-
-  device->topological_path_ = topological_path_;
-  if (!device->topological_path_.empty()) {
-    device->topological_path_ += "/";
-  }
-  device->topological_path_ += device->name_;
 
   if (driver()) {
     device->device_id_ = driver()->GetNextDeviceId();
@@ -380,7 +374,7 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
     return zx::error(ZX_ERR_PROTOCOL_NOT_SUPPORTED);
   };
 
-  device->device_server_.Init(outgoing_name, device->topological_path_, std::move(service_offers),
+  device->device_server_.Init(outgoing_name, "", std::move(service_offers),
                               std::move(banjo_config));
 
   // Add the metadata from add_args:
@@ -421,12 +415,12 @@ zx_status_t Device::ExportAfterInit() {
   if (zx_status_t status = device_server_.Serve(dispatcher_, &driver()->outgoing());
       status != ZX_OK) {
     FDF_LOGL(INFO, *logger_, "Device %s failed to add to outgoing directory: %s",
-             topological_path_.c_str(), zx_status_get_string(status));
+             OutgoingName().c_str(), zx_status_get_string(status));
     return status;
   }
 
   if (zx_status_t status = CreateNode(); status != ZX_OK) {
-    FDF_LOGL(ERROR, *logger_, "Device %s: failed to create node: %s", topological_path_.c_str(),
+    FDF_LOGL(ERROR, *logger_, "Device %s: failed to create node: %s", OutgoingName().c_str(),
              zx_status_get_string(status));
     return status;
   }
@@ -494,7 +488,7 @@ zx_status_t Device::CreateNode() {
             // if the NodeController is removed but the driver didn't ask to be
             // removed. We need to investigate the correct behavior here.
             FDF_LOGL(INFO, ptr->logger(), "Device %s has its NodeController unexpectedly removed",
-                     (ptr)->topological_path_.data());
+                     (ptr)->OutgoingName().c_str());
           }
         }
         completer.complete_ok();
@@ -514,10 +508,10 @@ zx_status_t Device::CreateNode() {
   if (!parent_.value()->node_.is_valid()) {
     if (parent_.value()->device_flags_ & DEVICE_ADD_NON_BINDABLE) {
       FDF_LOGL(ERROR, *logger_, "Cannot add device, as parent '%s' does not have a valid node",
-               (*parent_)->topological_path_.data());
+               (*parent_)->OutgoingName().c_str());
     } else {
       FDF_LOGL(ERROR, *logger_, "Cannot add device, as parent '%s' is not marked NON_BINDABLE.",
-               (*parent_)->topological_path_.data());
+               (*parent_)->OutgoingName().c_str());
     }
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -526,7 +520,7 @@ zx_status_t Device::CreateNode() {
   {
     if (!devfs_connector_.has_value() || !devfs_controller_connector_.has_value()) {
       FDF_LOGL(ERROR, *logger_, "Device %s failed to add to devfs: no devfs_connector",
-               topological_path_.c_str());
+               OutgoingName().c_str());
       return ZX_ERR_INTERNAL;
     }
 
@@ -541,14 +535,14 @@ zx_status_t Device::CreateNode() {
     zx::result connector = devfs_connector_.value().Bind(dispatcher());
     if (connector.is_error()) {
       FDF_LOGL(ERROR, *logger_, "Device %s failed to create devfs connector: %s",
-               topological_path_.c_str(), connector.status_string());
+               OutgoingName().c_str(), connector.status_string());
       return connector.error_value();
     }
 
     zx::result controller_connector = devfs_controller_connector_.value().Bind(dispatcher());
     if (controller_connector.is_error()) {
       FDF_LOGL(ERROR, *logger_, "Device %s failed to create devfs controller_connector: %s",
-               topological_path_.c_str(), controller_connector.status_string());
+               OutgoingName().c_str(), controller_connector.status_string());
       return controller_connector.error_value();
     }
     auto devfs_args = fdf::wire::DevfsAddArgs::Builder(arena)
@@ -714,7 +708,7 @@ fpromise::promise<void> Device::Remove() {
 
 void Device::UnbindAndRelease() {
   ZX_ASSERT_MSG(parent_.has_value(), "UnbindAndRelease called without a parent_: %s",
-                topological_path_.c_str());
+                OutgoingName().c_str());
 
   // We schedule our removal on our parent's executor because we can't be removed
   // while being run in a promise on our own executor.
@@ -863,7 +857,7 @@ void Device::InitReply(zx_status_t status) {
             status = ExportAfterInit();
             if (status != ZX_OK) {
               FDF_LOGL(WARNING, *logger_, "Device %s failed to create node: %s",
-                       topological_path_.c_str(), zx_status_get_string(status));
+                       OutgoingName().c_str(), zx_status_get_string(status));
             }
           }
 
@@ -1031,7 +1025,7 @@ void Device::AddDelayedChildReleaseOp(std::unique_ptr<DelayedReleaseOp> op) {
 }
 
 void Device::LogError(const char* error) {
-  FDF_LOGL(ERROR, *logger_, "%s: %s", topological_path_.c_str(), error);
+  FDF_LOGL(ERROR, *logger_, "%s: %s", OutgoingName().c_str(), error);
 }
 bool Device::IsUnbound() { return pending_removal_; }
 
@@ -1132,7 +1126,8 @@ void Device::ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) {
 }
 
 void Device::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
-  completer.ReplySuccess(fidl::StringView::FromExternal("/dev/" + topological_path_));
+  ZX_ASSERT_MSG(false, "CALLED GetTopologicalPath ON THE COMPAT DEVICE!!!!");
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace compat

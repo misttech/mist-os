@@ -29,6 +29,22 @@
             <td></td>
             <td>No default</td>
         </tr>
+        <tr id="AllInstants.monotonic_ticks">
+            <td><code>monotonic_ticks</code></td>
+            <td>
+                <code><a class='link' href='../zx/'>zx</a>/<a class='link' href='../zx/#InstantMonoTicks'>InstantMonoTicks</a></code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="AllInstants.boot_ticks">
+            <td><code>boot_ticks</code></td>
+            <td>
+                <code><a class='link' href='../zx/'>zx</a>/<a class='link' href='../zx/#InstantBootTicks'>InstantBootTicks</a></code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
 </table>
 
 
@@ -38,7 +54,7 @@
 ### ComplexInstants  {#ComplexInstants data-text="ComplexInstants"}
 
 
-*Defined in [test.time/time.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/time.test.fidl;l=10)*
+*Defined in [test.time/time.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/time.test.fidl;l=12)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -55,6 +71,22 @@
             <td><code>boot</code></td>
             <td>
                 <code>vector&lt;<a class='link' href='../zx/'>zx</a>/<a class='link' href='../zx/#InstantBoot'>InstantBoot</a>&gt;</code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="ComplexInstants.monotonic_ticks">
+<td><h3 id="ComplexInstants.monotonic_ticks" class="add-link hide-from-toc">3</h3></td>
+            <td><code>monotonic_ticks</code></td>
+            <td>
+                <code>array&lt;<a class='link' href='../zx/'>zx</a>/<a class='link' href='../zx/#InstantMonoTicks'>InstantMonoTicks</a>,&nbsp;10&gt;</code>
+            </td>
+            <td></td>
+        </tr>
+        <tr id="ComplexInstants.boot_ticks">
+<td><h3 id="ComplexInstants.boot_ticks" class="add-link hide-from-toc">4</h3></td>
+            <td><code>boot_ticks</code></td>
+            <td>
+                <code>array&lt;<a class='link' href='../zx/'>zx</a>/<a class='link' href='../zx/#InstantBootTicks'>InstantBootTicks</a>,&nbsp;10&gt;</code>
             </td>
             <td></td>
         </tr>

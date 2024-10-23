@@ -523,12 +523,13 @@ pub fn sys_fstatfs(
 }
 
 pub fn sys_statfs(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     user_buf: UserRef<statfs>,
 ) -> Result<(), Errno> {
-    let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    let name =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
     let fs = name.entry.node.fs();
     let mut stat = fs.statfs(current_task)?;
     stat.f_flags |= name.mount.flags().bits() as i64;
@@ -589,7 +590,8 @@ where
         return error!(ENOENT);
     }
     let mut context = LookupContext::default();
-    let (parent, basename) = current_task.lookup_parent_at(&mut context, dir_fd, path.as_ref())?;
+    let (parent, basename) =
+        current_task.lookup_parent_at(locked, &mut context, dir_fd, path.as_ref())?;
     callback(locked, context, parent, basename)
 }
 
@@ -645,12 +647,16 @@ impl From<StatxFlags> for LookupFlags {
     }
 }
 
-fn lookup_at(
+fn lookup_at<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
     options: LookupFlags,
-) -> Result<NamespaceNode, Errno> {
+) -> Result<NamespaceNode, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     log_trace!(%dir_fd, %path, "lookup_at");
     if path.is_empty() {
@@ -664,7 +670,7 @@ fn lookup_at(
 
     let mut parent_context = LookupContext::default();
     let (parent, basename) =
-        current_task.lookup_parent_at(&mut parent_context, dir_fd, path.as_ref())?;
+        current_task.lookup_parent_at(locked, &mut parent_context, dir_fd, path.as_ref())?;
 
     let mut child_context = if parent_context.must_be_directory {
         // The child must resolve to a directory. This is because a trailing slash
@@ -675,7 +681,7 @@ fn lookup_at(
         parent_context.with(options.symlink_mode)
     };
 
-    parent.lookup_child(current_task, &mut child_context, basename)
+    parent.lookup_child(locked, current_task, &mut child_context, basename)
 }
 
 fn do_openat(
@@ -767,7 +773,7 @@ pub fn sys_faccessat(
 }
 
 pub fn sys_faccessat2(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -776,7 +782,7 @@ pub fn sys_faccessat2(
 ) -> Result<(), Errno> {
     let mode = Access::from_bits(mode).ok_or_else(|| errno!(EINVAL))?;
     let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
-    let name = lookup_at(current_task, dir_fd, user_path, lookup_flags)?;
+    let name = lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?;
     name.check_access(current_task, mode, CheckAccessReason::Access)
 }
 
@@ -795,11 +801,12 @@ pub fn sys_getdents64(
 }
 
 pub fn sys_chroot(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
 ) -> Result<(), Errno> {
-    let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    let name =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
     if !name.entry.node.is_dir() {
         return error!(ENOTDIR);
     }
@@ -809,11 +816,12 @@ pub fn sys_chroot(
 }
 
 pub fn sys_chdir(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
 ) -> Result<(), Errno> {
-    let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    let name =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
     if !name.entry.node.is_dir() {
         return error!(ENOTDIR);
     }
@@ -856,7 +864,7 @@ pub fn sys_fstat(
 }
 
 pub fn sys_newfstatat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -865,14 +873,14 @@ pub fn sys_newfstatat(
 ) -> Result<(), Errno> {
     let flags =
         LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT)?;
-    let name = lookup_at(current_task, dir_fd, user_path, flags)?;
+    let name = lookup_at(locked, current_task, dir_fd, user_path, flags)?;
     let result = name.entry.node.stat(current_task)?;
     current_task.write_object(buffer, &result)?;
     Ok(())
 }
 
 pub fn sys_statx(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -887,14 +895,14 @@ pub fn sys_statx(
         return error!(EINVAL);
     }
 
-    let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::from(flags))?;
+    let name = lookup_at(locked, current_task, dir_fd, user_path, LookupFlags::from(flags))?;
     let result = name.entry.node.statx(current_task, flags, mask)?;
     current_task.write_object(statxbuf, &result)?;
     Ok(())
 }
 
 pub fn sys_readlinkat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -914,7 +922,7 @@ pub fn sys_readlinkat(
     } else {
         LookupFlags::no_follow()
     };
-    let name = lookup_at(current_task, dir_fd, user_path, lookup_flags)?;
+    let name = lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?;
 
     let target = match name.readlink(current_task)? {
         SymlinkTarget::Path(path) => path,
@@ -937,7 +945,8 @@ pub fn sys_truncate(
     length: off_t,
 ) -> Result<(), Errno> {
     let length = length.try_into().map_err(|_| errno!(EINVAL))?;
-    let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    let name =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
     name.truncate(locked, current_task, length)?;
     Ok(())
 }
@@ -966,8 +975,12 @@ pub fn sys_mkdirat(
     if path.is_empty() {
         return error!(ENOENT);
     }
-    let (parent, basename) =
-        current_task.lookup_parent_at(&mut LookupContext::default(), dir_fd, path.as_ref())?;
+    let (parent, basename) = current_task.lookup_parent_at(
+        locked,
+        &mut LookupContext::default(),
+        dir_fd,
+        path.as_ref(),
+    )?;
     parent.create_node(
         locked,
         current_task,
@@ -1020,7 +1033,7 @@ pub fn sys_linkat(
     }
 
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_FOLLOW)?;
-    let target = lookup_at(current_task, old_dir_fd, old_user_path, flags)?;
+    let target = lookup_at(locked, current_task, old_dir_fd, old_user_path, flags)?;
     lookup_parent_at(
         locked,
         current_task,
@@ -1107,6 +1120,7 @@ pub fn sys_renameat2(
     }
 
     NamespaceNode::rename(
+        locked,
         current_task,
         &old_parent,
         old_basename.as_ref(),
@@ -1139,7 +1153,7 @@ pub fn sys_fchmodat(
 ) -> Result<(), Errno> {
     // Remove the filetype from the mode.
     let mode = mode & FileMode::PERMISSIONS;
-    let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::default())?;
+    let name = lookup_at(locked, current_task, dir_fd, user_path, LookupFlags::default())?;
     name.entry.node.chmod(locked, current_task, &name.mount, mode)?;
     name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
@@ -1182,7 +1196,7 @@ pub fn sys_fchownat(
     flags: u32,
 ) -> Result<(), Errno> {
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
-    let name = lookup_at(current_task, dir_fd, user_path, flags)?;
+    let name = lookup_at(locked, current_task, dir_fd, user_path, flags)?;
     name.entry.node.chown(locked, current_task, &name.mount, maybe_uid(owner), maybe_uid(group))?;
     name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
@@ -1228,14 +1242,15 @@ fn do_getxattr(
 }
 
 pub fn sys_getxattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
     value_addr: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
+    let node =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
     do_getxattr(current_task, &node, name_addr, value_addr, size)
 }
 
@@ -1252,14 +1267,15 @@ pub fn sys_fgetxattr(
 }
 
 pub fn sys_lgetxattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
     value_addr: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
+    let node =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
     do_getxattr(current_task, &node, name_addr, value_addr, size)
 }
 
@@ -1304,7 +1320,7 @@ pub fn sys_fsetxattr(
 }
 
 pub fn sys_lsetxattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
@@ -1312,12 +1328,13 @@ pub fn sys_lsetxattr(
     size: usize,
     flags: u32,
 ) -> Result<(), Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
+    let node =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
     do_setxattr(current_task, &node, name_addr, value_addr, size, flags)
 }
 
 pub fn sys_setxattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
@@ -1325,7 +1342,8 @@ pub fn sys_setxattr(
     size: usize,
     flags: u32,
 ) -> Result<(), Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
+    let node =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
     do_setxattr(current_task, &node, name_addr, value_addr, size, flags)
 }
 
@@ -1343,22 +1361,24 @@ fn do_removexattr(
 }
 
 pub fn sys_removexattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
 ) -> Result<(), Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
+    let node =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
     do_removexattr(current_task, &node, name_addr)
 }
 
 pub fn sys_lremovexattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
 ) -> Result<(), Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
+    let node =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
     do_removexattr(current_task, &node, name_addr)
 }
 
@@ -1397,24 +1417,26 @@ fn do_listxattr(
 }
 
 pub fn sys_listxattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     list_addr: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
+    let node =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
     do_listxattr(current_task, &node, list_addr, size)
 }
 
 pub fn sys_llistxattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     list_addr: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
+    let node =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
     do_listxattr(current_task, &node, list_addr, size)
 }
 
@@ -1663,12 +1685,13 @@ pub fn sys_mount(
         errno!(EINVAL)
     })?;
 
-    let target = lookup_at(current_task, FdNumber::AT_FDCWD, target_addr, LookupFlags::default())?;
+    let target =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, target_addr, LookupFlags::default())?;
 
     if flags.contains(MountFlags::REMOUNT) {
         do_mount_remount(target, flags, data_addr)
     } else if flags.contains(MountFlags::BIND) {
-        do_mount_bind(current_task, source_addr, target, flags)
+        do_mount_bind(locked, current_task, source_addr, target, flags)
     } else if flags.intersects(MountFlags::SHARED | MountFlags::PRIVATE | MountFlags::DOWNSTREAM) {
         do_mount_change_propagation_type(current_task, target, flags)
     } else {
@@ -1708,12 +1731,14 @@ fn do_mount_remount(
 }
 
 fn do_mount_bind(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     source_addr: UserCString,
     target: NamespaceNode,
     flags: MountFlags,
 ) -> Result<(), Errno> {
-    let source = lookup_at(current_task, FdNumber::AT_FDCWD, source_addr, LookupFlags::default())?;
+    let source =
+        lookup_at(locked, current_task, FdNumber::AT_FDCWD, source_addr, LookupFlags::default())?;
     log_trace!(
         source=%source.path(current_task),
         target=%target.path(current_task),
@@ -1801,7 +1826,7 @@ fn do_mount_create(
 }
 
 pub fn sys_umount2(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     target_addr: UserCString,
     flags: u32,
@@ -1831,7 +1856,7 @@ pub fn sys_umount2(
     } else {
         LookupFlags::default()
     };
-    let target = lookup_at(current_task, FdNumber::AT_FDCWD, target_addr, lookup_flags)?;
+    let target = lookup_at(locked, current_task, FdNumber::AT_FDCWD, target_addr, lookup_flags)?;
 
     security::sb_umount(current_task, &target, unmount_flags)?;
 
@@ -2710,7 +2735,7 @@ pub fn sys_inotify_init1(
 }
 
 pub fn sys_inotify_add_watch(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_path: UserCString,
@@ -2728,7 +2753,7 @@ pub fn sys_inotify_add_watch(
     } else {
         LookupFlags::default()
     };
-    let watched_node = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, options)?;
+    let watched_node = lookup_at(locked, current_task, FdNumber::AT_FDCWD, user_path, options)?;
     if mask.contains(InotifyMask::ONLYDIR) && !watched_node.entry.node.is_dir() {
         return error!(ENOTDIR);
     }
@@ -2785,7 +2810,7 @@ pub fn sys_utimensat(
         node
     } else {
         let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;
-        lookup_at(current_task, dir_fd, user_path, lookup_flags)?
+        lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?
     };
     name.entry.node.update_atime_mtime(locked, current_task, &name.mount, atime, mtime)?;
     let event_mask = match (atime, mtime) {

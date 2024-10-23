@@ -657,6 +657,7 @@ impl FsNodeOps for RemoteNode {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1492,15 +1493,20 @@ mod test {
         let root = ns.root();
         let mut context = LookupContext::default();
         assert_eq!(
-            root.lookup_child(&current_task, &mut context, "nib".into()).err(),
+            root.lookup_child(&mut locked, &current_task, &mut context, "nib".into()).err(),
             Some(errno!(ENOENT))
         );
         let mut context = LookupContext::default();
-        root.lookup_child(&current_task, &mut context, "lib".into()).unwrap();
+        root.lookup_child(&mut locked, &current_task, &mut context, "lib".into()).unwrap();
 
         let mut context = LookupContext::default();
         let _test_file = root
-            .lookup_child(&current_task, &mut context, "data/tests/hello_starnix".into())?
+            .lookup_child(
+                &mut locked,
+                &current_task,
+                &mut context,
+                "data/tests/hello_starnix".into(),
+            )?
             .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())?;
         Ok(())
     }
@@ -1659,7 +1665,7 @@ mod test {
 
             let mut context = LookupContext::new(SymlinkMode::NoFollow);
             let child = root
-                .lookup_child(&current_task, &mut context, "symlink".into())
+                .lookup_child(&mut locked, &current_task, &mut context, "symlink".into())
                 .expect("lookup_child failed");
 
             match child.readlink(&current_task).expect("readlink failed") {
@@ -1684,7 +1690,7 @@ mod test {
         .await;
 
         {
-            let (kernel, current_task) = create_kernel_and_task();
+            let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
             fixture
                 .root()
@@ -1701,7 +1707,7 @@ mod test {
             let root = ns.root();
             let mut context = LookupContext::new(SymlinkMode::NoFollow);
             let child = root
-                .lookup_child(&current_task, &mut context, "symlink".into())
+                .lookup_child(&mut locked, &current_task, &mut context, "symlink".into())
                 .expect("lookup_child failed after remount");
 
             match child.readlink(&current_task).expect("readlink failed after remount") {
@@ -1818,7 +1824,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -1831,7 +1837,7 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, "file".into())
+                        .lookup_child(locked, &current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
                     assert_matches!(
                         &*child.entry.node.info(),
@@ -1839,7 +1845,7 @@ mod test {
                     );
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, "dir".into())
+                        .lookup_child(locked, &current_task, &mut context, "dir".into())
                         .expect("lookup_child failed");
                     assert_matches!(
                         &*child.entry.node.info(),
@@ -1847,7 +1853,7 @@ mod test {
                     );
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, "dev".into())
+                        .lookup_child(locked, &current_task, &mut context, "dev".into())
                         .expect("lookup_child failed");
                     assert_matches!(
                         &*child.entry.node.info(),
@@ -2003,7 +2009,7 @@ mod test {
                     .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let fifo_node = root
-                        .lookup_child(&current_task, &mut context, "fifo".into())
+                        .lookup_child(locked, &current_task, &mut context, "fifo".into())
                         .expect("lookup_child failed");
 
                     // Test that we get expected behaviour for RemoteSpecialNode operation, e.g.
@@ -2029,7 +2035,7 @@ mod test {
                     .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let reg_node = root
-                        .lookup_child(&current_task, &mut context, "file".into())
+                        .lookup_child(locked, &current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
 
                     // We should be able to perform truncate on regular files
@@ -2118,7 +2124,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2131,11 +2137,11 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let child1 = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, "file1".into())
+                        .lookup_child(locked, &current_task, &mut context, "file1".into())
                         .expect("lookup_child failed");
                     let child2 = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, "file2".into())
+                        .lookup_child(locked, &current_task, &mut context, "file2".into())
                         .expect("lookup_child failed");
                     assert!(Arc::ptr_eq(&child1.entry.node, &child2.entry.node));
                 }
@@ -2217,7 +2223,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2230,7 +2236,7 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let _child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, "file".into())
+                        .lookup_child(locked, &current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
                 }
             })
@@ -2306,7 +2312,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2319,7 +2325,7 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, "file".into())
+                        .lookup_child(locked, &current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
                     assert_eq!(child.entry.node.info().mode, MODE | FileMode::ALLOW_ALL);
                 }
@@ -2412,7 +2418,7 @@ mod test {
                     .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let reg_node = root
-                        .lookup_child(&current_task, &mut context, "file".into())
+                        .lookup_child(locked, &current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
 
                     reg_node
@@ -2473,7 +2479,7 @@ mod test {
                     .expect("create_node failed");
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let reg_node = root
-                        .lookup_child(&current_task, &mut context, "file".into())
+                        .lookup_child(locked, &current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
 
                     reg_node
@@ -2581,7 +2587,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2594,7 +2600,7 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, "file".into())
+                        .lookup_child(locked, &current_task, &mut context, "file".into())
                         .expect("lookup_child failed");
                     let last_modified = child
                         .entry
@@ -2853,7 +2859,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |_, current_task| {
+                move |locked, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2866,7 +2872,7 @@ mod test {
                     let mut context = LookupContext::new(SymlinkMode::NoFollow);
                     let child = ns
                         .root()
-                        .lookup_child(&current_task, &mut context, "dir".into())
+                        .lookup_child(locked, &current_task, &mut context, "dir".into())
                         .expect("lookup_child failed");
                     let casefold = child
                         .entry

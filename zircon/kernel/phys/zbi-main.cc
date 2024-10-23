@@ -7,12 +7,7 @@
 #include <lib/boot-options/boot-options.h>
 #include <lib/uart/all.h>
 #include <lib/zbitl/view.h>
-#include <stdio.h>
 
-#include <limits>
-
-#include <ktl/byte.h>
-#include <ktl/span.h>
 #include <phys/boot-options.h>
 #include <phys/main.h>
 #include <phys/stdio.h>

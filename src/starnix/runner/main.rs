@@ -13,7 +13,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_settings as fsettings, fidl_fuchsia_starnix_runner as fstarnixrunner, zx,
+    fidl_fuchsia_settings as fsettings, fidl_fuchsia_starnix_runner as fstarnixrunner,
 };
 
 enum Services {

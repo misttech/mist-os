@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_examples_inspect::{ReverserRequest, ReverserRequestStream};
+use fuchsia_async as fasync;
 use futures::TryStreamExt;
-use {fuchsia_async as fasync, zx};
 
 // [START reverser_def]
 pub struct ReverserServerFactory {}

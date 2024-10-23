@@ -11,6 +11,7 @@ use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fidl_fuchsia_hardware_block_volume::VolumeManagerMarker;
+use fidl_fuchsia_io as fio;
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
 use fs_management::format::DiskFormat;
 use fs_management::{Fxfs, Minfs};
@@ -23,7 +24,6 @@ use storage_isolated_driver_manager::{
     create_random_guid, find_block_device, into_guid, wait_for_block_device, BlockDeviceMatcher,
     Guid,
 };
-use {fidl_fuchsia_io as fio, zx};
 
 const DATA_FILESYSTEM_FORMAT: &'static str = std::env!("DATA_FILESYSTEM_FORMAT");
 

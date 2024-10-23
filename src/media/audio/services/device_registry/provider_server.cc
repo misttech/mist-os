@@ -88,7 +88,7 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
   }
 
   ADR_LOG_METHOD(kLogDeviceDetection)
-      << "request to add " << *request.device_type() << " '" << *request.device_name() << "'";
+      << "request to add " << request.device_type() << " '" << *request.device_name() << "'";
 
   // This kicks off device initialization, which notifies the parent when it completes.
   parent_->AddDevice(Device::Create(parent_, thread().dispatcher(), *request.device_name(),

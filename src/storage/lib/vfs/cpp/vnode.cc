@@ -61,7 +61,7 @@ void Vnode::OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::String
   ZX_PANIC("OpenRemote should only be called on remote nodes!");
 }
 
-void Vnode::OpenRemote(fuchsia_io::wire::Directory2Open3Request request) const {
+void Vnode::OpenRemote(fuchsia_io::wire::DirectoryOpen3Request request) const {
   ZX_PANIC("OpenRemote should only be called on remote nodes!");
 }
 

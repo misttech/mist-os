@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("codec") {
   testonly = true

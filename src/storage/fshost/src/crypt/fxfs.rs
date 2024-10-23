@@ -17,7 +17,7 @@ use key_bag::{Aes256Key, KeyBagManager, WrappingKey, AES128_KEY_SIZE, AES256_KEY
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx};
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
 async fn unwrap_or_create_keys(
     mut keybag: KeyBagManager,
@@ -86,10 +86,10 @@ pub async fn unlock_data_volume<'a>(
         .open_volume(UNENCRYPTED_VOLUME_LABEL, MountOptions::default())
         .await
         .context("Failed to open unencrypted")?;
-    let keybag_dir = fuchsia_fs::directory::open_directory_deprecated(
+    let keybag_dir = fuchsia_fs::directory::open_directory(
         root_vol.root(),
         "keys",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
     )
     .await
     .context("Failed to open keys dir")?;
@@ -132,10 +132,10 @@ pub async fn init_data_volume<'a>(
         .create_volume(UNENCRYPTED_VOLUME_LABEL, CreateOptions::default(), MountOptions::default())
         .await
         .context("Failed to create unencrypted")?;
-    let keybag_dir = fuchsia_fs::directory::create_directory_deprecated(
+    let keybag_dir = fuchsia_fs::directory::create_directory(
         root_vol.root(),
         "keys",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
     )
     .await
     .context("Failed to create keys dir")?;
@@ -255,10 +255,10 @@ impl Drop for CryptService {
 }
 
 pub async fn shred_key_bag(unencrypted_volume: &ServingVolume) -> Result<(), Error> {
-    let dir = fuchsia_fs::directory::open_directory_deprecated(
+    let dir = fuchsia_fs::directory::open_directory(
         unencrypted_volume.root(),
         "keys",
-        fio::OpenFlags::RIGHT_WRITABLE,
+        fio::PERM_WRITABLE,
     )
     .await
     .context("Failed to open keys dir")?;

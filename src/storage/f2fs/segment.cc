@@ -376,15 +376,15 @@ bool SegmentManager::SecUsageCheck(unsigned int secno) const {
   return IsCurSec(secno) || cur_victim_sec_ == secno;
 }
 
-bool SegmentManager::HasNotEnoughFreeSecs(uint32_t freed, uint32_t needed) {
+bool SegmentManager::HasNotEnoughFreeSecs(size_t freed, size_t needed) {
   if (fs_->IsOnRecovery())
     return false;
 
-  uint32_t blocks_per_sec = safemath::CheckMul<uint32_t>(superblock_info_.GetBlocksPerSeg(),
-                                                         superblock_info_.GetSegsPerSec())
-                                .ValueOrDie();
-  uint32_t freed_sec = CheckedDivRoundUp(freed, blocks_per_sec);
-  uint32_t needed_sec = CheckedDivRoundUp(needed, blocks_per_sec);
+  size_t blocks_per_sec = safemath::CheckMul<uint32_t>(superblock_info_.GetBlocksPerSeg(),
+                                                       superblock_info_.GetSegsPerSec())
+                              .ValueOrDie();
+  size_t freed_sec = CheckedDivRoundUp(freed, blocks_per_sec);
+  size_t needed_sec = CheckedDivRoundUp(needed, blocks_per_sec);
   return FreeSections() + freed_sec <=
          fs_->GetFreeSectionsForDirtyPages() + ReservedSections() + needed_sec;
 }

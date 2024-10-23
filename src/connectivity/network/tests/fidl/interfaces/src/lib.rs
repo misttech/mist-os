@@ -22,7 +22,7 @@ use test_case::test_case;
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, zx,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
 };
 
 #[netstack_test]

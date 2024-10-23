@@ -7,7 +7,7 @@
 use anyhow::Result;
 use fidl::endpoints::create_sync_proxy;
 use fuchsia_component::client::connect_to_protocol_sync;
-use {fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_topology_test as fpt, zx};
+use {fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_topology_test as fpt};
 
 use std::sync::Arc;
 

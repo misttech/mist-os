@@ -13,7 +13,8 @@ rustc_binary("puppet") {
   deps = [
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/rust/zx",
-    "//src/diagnostics/validator/logs/encoding/fidl:validate_rust",
+    "//src/diagnostics/validator/logs/fidl:fuchsia.validate.logs_rust",
+    "//src/diagnostics/validator/logs/rust/utils",
     "//src/lib/diagnostics/log/encoding/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -23,6 +24,8 @@ rustc_binary("puppet") {
   ]
 
   sources = [ "src/main.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("component") {

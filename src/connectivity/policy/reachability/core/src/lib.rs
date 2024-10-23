@@ -31,7 +31,7 @@ use std::collections::hash_map::{Entry, HashMap};
 use tracing::{debug, error, info};
 use {
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 use std::net::IpAddr;
@@ -1416,7 +1416,7 @@ mod tests {
     use test_case::test_case;
     use {
         fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
-        fuchsia_async as fasync, zx,
+        fuchsia_async as fasync,
     };
 
     const ETHERNET_INTERFACE_NAME: &str = "eth1";

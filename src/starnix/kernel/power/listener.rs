@@ -11,7 +11,7 @@ use crate::power::manager::{SuspendResult, SuspendResumeManagerHandle, STARNIX_P
 use fidl::endpoints::create_request_stream;
 use futures::StreamExt;
 use starnix_logging::{log_error, log_info, log_warn};
-use {fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fsession, zx};
+use {fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fsession};
 
 pub(super) fn init_listener(
     power_manager: &SuspendResumeManagerHandle,

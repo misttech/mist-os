@@ -4,6 +4,7 @@
 
 #include "src/developer/debug/debug_agent/mock_process.h"
 
+#include "src/developer/debug/debug_agent/debugged_job.h"
 #include "src/developer/debug/debug_agent/mock_thread.h"
 
 namespace debug_agent {

@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.pointer.augment") {
-  sdk_category = "internal"
-
   sources = [ "augment.fidl" ]
 
   public_deps = [

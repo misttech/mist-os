@@ -45,17 +45,23 @@ impl DevTmpFs {
         let mkdir = |locked, name| {
             // This creates content inside the temporary FS. This doesn't depend on the mount
             // information.
-            root.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
-                dir.mknod(
-                    locked,
-                    current_task,
-                    mount,
-                    name,
-                    mode!(IFDIR, 0o755),
-                    DeviceType::NONE,
-                    FsCred::root(),
-                )
-            })
+            root.create_entry(
+                locked,
+                current_task,
+                &MountInfo::detached(),
+                name,
+                |locked, dir, mount, name| {
+                    dir.mknod(
+                        locked,
+                        current_task,
+                        mount,
+                        name,
+                        mode!(IFDIR, 0o755),
+                        DeviceType::NONE,
+                        FsCred::root(),
+                    )
+                },
+            )
             .unwrap();
         };
 
@@ -113,10 +119,11 @@ where
     L: LockBefore<FileOpsCore>,
 {
     parent_dir.get_or_create_entry(
+        locked,
         current_task,
         &MountInfo::detached(),
         dir_name,
-        |dir, mount, name| {
+        |locked, dir, mount, name| {
             dir.mknod(
                 locked,
                 current_task,
@@ -148,10 +155,11 @@ where
     // This creates content inside the temporary FS. This doesn't depend on the mount
     // information.
     parent_dir.create_entry(
+        locked,
         current_task,
         &MountInfo::detached(),
         device_name,
-        |dir, mount, name| {
+        |locked, dir, mount, name| {
             dir.mknod(locked, current_task, mount, name, mode, device_type, FsCred::root())
         },
     )
@@ -168,10 +176,11 @@ where
     // This creates content inside the temporary FS. This doesn't depend on the mount
     // information.
     DevTmpFs::from_task(locked, current_task).root().create_entry(
+        locked,
         current_task,
         &MountInfo::detached(),
         name,
-        |dir, mount, name| {
+        |locked, dir, mount, name| {
             dir.mknod(
                 locked,
                 current_task,
@@ -196,7 +205,8 @@ where
     let root_node =
         NamespaceNode::new_anonymous(DevTmpFs::from_task(locked, current_task).root().clone());
     let mut context = LookupContext::default();
-    let (parent_node, device_name) = current_task.lookup_parent(&mut context, &root_node, path)?;
+    let (parent_node, device_name) =
+        current_task.lookup_parent(locked, &mut context, &root_node, path)?;
     parent_node.entry.remove_child(device_name.into(), &current_task.kernel().mounts);
     Ok(())
 }
@@ -227,7 +237,13 @@ where
 {
     // This creates content inside the temporary FS. This doesn't depend on the mount
     // information.
-    entry.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
-        dir.create_symlink(locked, current_task, mount, name, target, FsCred::root())
-    })
+    entry.create_entry(
+        locked,
+        current_task,
+        &MountInfo::detached(),
+        name,
+        |locked, dir, mount, name| {
+            dir.create_symlink(locked, current_task, mount, name, target, FsCred::root())
+        },
+    )
 }

@@ -42,6 +42,8 @@ rustc_library("sampler-config") {
     "src/selector_list.rs",
     "src/string_list.rs",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("sampler-config-tests") {

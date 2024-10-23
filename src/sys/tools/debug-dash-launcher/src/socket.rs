@@ -9,7 +9,7 @@ use fuchsia_component::client::connect_to_protocol;
 use futures::future::{AbortHandle, Abortable};
 use futures::io::{ReadHalf, WriteHalf};
 use futures::prelude::*;
-use {fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 async fn dash_to_client_loop(
     server: pty::DeviceProxy,

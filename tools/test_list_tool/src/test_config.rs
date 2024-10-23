@@ -6,6 +6,7 @@
 // complete.
 
 use crate::TestsJsonEntry;
+use diagnostics_log_types::Severity;
 use serde::{Deserialize, Serialize};
 use test_list::{FuchsiaComponentExecutionEntry, TestTag};
 
@@ -70,7 +71,7 @@ pub struct Execution {
 
     /// Max severity of the logs that the test is
     /// supposed to produce
-    pub max_severity_logs: Option<diagnostics_data::Severity>,
+    pub max_severity_logs: Option<Severity>,
 
     /// Run tests in parallel, if non-zero
     pub parallel: Option<u16>,
@@ -113,7 +114,6 @@ pub fn create_test_config_entry(
 mod tests {
     use super::*;
     use crate::TestEntry;
-    use diagnostics_data::Severity;
 
     #[test]
     fn test_create_test_config_entry() {

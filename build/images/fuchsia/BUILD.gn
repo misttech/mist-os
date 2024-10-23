@@ -54,15 +54,13 @@ if (is_fuchsia) {
   fuchsia_base = {
     testonly = fuchsia_zbi_testonly
     check_production_tag = check_production_eligibility
+    include_legacy_bundle = true
 
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob
     generate_fvm_fastboot = !fxfs_blob && assembly_generate_fvm_fastboot
     generate_fvm_nand = !fxfs_blob && assembly_generate_fvm_nand
     generate_vbmeta = use_vbmeta
-
-    # Use the GN arg for including shell commands.
-    include_shell_commands = include_shell_commands_package
 
     board_config_label = board_configuration_label
 

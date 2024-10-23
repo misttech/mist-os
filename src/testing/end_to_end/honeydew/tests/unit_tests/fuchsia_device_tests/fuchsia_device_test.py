@@ -34,6 +34,9 @@ from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
 from honeydew.affordances.fuchsia_controller.wlan import (
     wlan_policy as wlan_policy_fc,
 )
+from honeydew.affordances.power.system_power_state_controller import (
+    system_power_state_controller_using_starnix,
+)
 from honeydew.affordances.sl4f.bluetooth import bluetooth_common
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_sl4f,
@@ -43,9 +46,6 @@ from honeydew.affordances.sl4f.bluetooth.profiles import (
 )
 from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
 from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
-from honeydew.affordances.starnix import (
-    system_power_state_controller as system_power_state_controller_starnix,
-)
 from honeydew.fuchsia_device import fuchsia_device
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
@@ -125,8 +125,8 @@ def _file_read_result(data: f_io.Transfer) -> f_io.ReadableReadResult:
 
 def _file_attr_resp(
     status: fuchsia_controller.ZxStatus, size: int
-) -> f_io.Node1GetAttrResponse:
-    return f_io.Node1GetAttrResponse(
+) -> f_io.NodeGetAttrResponse:
+    return f_io.NodeGetAttrResponse(
         s=status,
         attributes=f_io.NodeAttributes(
             content_size=size,
@@ -357,7 +357,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        system_power_state_controller_starnix.SystemPowerStateController,
+        system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
         "_run_starnix_console_shell_cmd",
         autospec=True,
     )
@@ -369,7 +369,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         system_power_state_controller affordance implemented using starnix"""
         self.assertIsInstance(
             self.fd_fc_obj.system_power_state_controller,
-            system_power_state_controller_starnix.SystemPowerStateController,
+            system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
         )
         mock_run_starnix_console_shell_cmd.assert_called_once()
 

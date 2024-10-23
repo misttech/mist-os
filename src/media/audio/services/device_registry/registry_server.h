@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_REGISTRY_SERVER_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_REGISTRY_SERVER_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_REGISTRY_SERVER_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_REGISTRY_SERVER_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
@@ -44,6 +44,7 @@ class RegistryServer
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Registry> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void InitialDeviceDiscoveryIsComplete();
   void DeviceWasAdded(const std::shared_ptr<const Device>& new_device);
   void DeviceWasRemoved(TokenId removed_id);
 
@@ -53,7 +54,7 @@ class RegistryServer
   }
 
   // Static object count, for debugging purposes.
-  static inline uint64_t count() { return count_; }
+  static uint64_t count() { return count_; }
 
  private:
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
@@ -63,10 +64,11 @@ class RegistryServer
   static inline uint64_t count_ = 0;
 
   explicit RegistryServer(std::shared_ptr<AudioDeviceRegistry> parent);
-  void ReplyWithAddedDevices();
-  void ReplyWithNextRemovedDevice();
+  void MaybeReplyWatchDevicesAdded();
+  void MaybeReplyWatchDeviceRemoved();
 
   std::shared_ptr<AudioDeviceRegistry> parent_;
+  bool initial_device_discovery_complete_ = false;
   bool responded_to_initial_watch_devices_added_ = false;
 
   std::vector<fuchsia_audio_device::Info> devices_added_since_notify_;
@@ -80,4 +82,4 @@ class RegistryServer
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_REGISTRY_SERVER_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_REGISTRY_SERVER_H_

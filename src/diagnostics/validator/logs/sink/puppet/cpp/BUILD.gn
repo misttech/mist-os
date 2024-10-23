@@ -15,7 +15,7 @@ executable("cpp-puppet") {
     "//sdk/lib/fidl",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/diagnostics/validator/logs/sink/fidl:sink-puppet_hlcpp",
+    "//src/diagnostics/validator/logs/fidl:fuchsia.validate.logs_hlcpp",
   ]
 }
 

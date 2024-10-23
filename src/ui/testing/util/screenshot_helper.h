@@ -12,6 +12,7 @@
 #include <map>
 #include <vector>
 
+#include "fuchsia/ui/composition/cpp/fidl.h"
 #include "src/ui/scenic/lib/utils/pixel.h"
 
 namespace ui_testing {
@@ -30,7 +31,10 @@ class Screenshot {
   // |rotation| - The display rotation value in degrees. The width and the height of the screenshot
   //              are flipped if this value is 90 or 270 degrees as the screenshot shows how content
   //              is seen by the user.
-  Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t height, int rotation);
+  // |format| - The raw pixel format to be used for this screenshot. Defaults to BGRA.
+  Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t height, int rotation,
+             fuchsia::ui::composition::ScreenshotFormat format =
+                 fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW);
 
   // Use this specifically to create a |Screenshot| object from a PNG encoded vmo.
   explicit Screenshot(const zx::vmo& png_vmo);
@@ -102,10 +106,12 @@ class Screenshot {
   // Populates |screenshot_| by converting the linear array of bytes in |screenshot_vmo| of size |4
   // * width_ * height_| to a 2D vector of |Pixel|s of size |height_ * width_|.
   // Note: Size of each pixel is 4 bytes.
-  void ExtractScreenshotFromVMO(uint8_t* screenshot_vmo);
+  void ExtractScreenshotFromVMO(uint8_t* screenshot_vmo,
+                                fuchsia::ui::composition::ScreenshotFormat format);
 
   // Returns the |Pixel|s in the |row_index| row of the screenshot.
-  std::vector<Pixel> GetPixelsInRow(uint8_t* screenshot_vmo, size_t row_index);
+  std::vector<Pixel> GetPixelsInRow(uint8_t* screenshot_vmo, size_t row_index,
+                                    fuchsia::ui::composition::ScreenshotFormat format) const;
 
   uint64_t width_ = 0;
   uint64_t height_ = 0;

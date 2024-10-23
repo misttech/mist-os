@@ -5,7 +5,9 @@
 #ifndef SRC_STORAGE_LIB_FS_MANAGEMENT_CPP_FVM_H_
 #define SRC_STORAGE_LIB_FS_MANAGEMENT_CPP_FVM_H_
 
+#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zx/result.h>
 #include <stdint.h>
 #include <stdlib.h>

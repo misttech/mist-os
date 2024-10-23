@@ -6,6 +6,7 @@
 
 use anyhow::{format_err, Context, Error};
 use camino::{Utf8Path, Utf8PathBuf};
+use diagnostics_log_types::Severity;
 use fidl::unpersist;
 use fidl_fuchsia_component_decl::Component;
 use fidl_fuchsia_data as fdata;
@@ -54,8 +55,8 @@ struct TestEntry {
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct LogSettings {
-    max_severity: Option<diagnostics_data::Severity>,
-    min_severity: Option<diagnostics_data::Severity>,
+    max_severity: Option<Severity>,
+    min_severity: Option<Severity>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
@@ -130,10 +131,10 @@ impl FuchsiaTestTags {
 }
 
 impl TestEntry {
-    fn get_max_log_severity(&self) -> Option<diagnostics_data::Severity> {
+    fn get_max_log_severity(&self) -> Option<Severity> {
         self.log_settings.as_ref().map(|settings| settings.max_severity).unwrap_or(None)
     }
-    fn get_min_log_severity(&self) -> Option<diagnostics_data::Severity> {
+    fn get_min_log_severity(&self) -> Option<Severity> {
         self.log_settings.as_ref().map(|settings| settings.min_severity).unwrap_or(None)
     }
 }
@@ -737,15 +738,12 @@ mod tests {
         // Explicit severity
         let test_list_entry = to_test_list_entry(
             &make_test_entry(Some(LogSettings {
-                max_severity: Some(diagnostics_data::Severity::Error),
+                max_severity: Some(Severity::Error),
                 min_severity: None,
             })),
             None,
         );
-        assert_eq!(
-            test_list_entry,
-            make_expected_test_list_entry(Some(diagnostics_data::Severity::Error), None)
-        );
+        assert_eq!(test_list_entry, make_expected_test_list_entry(Some(Severity::Error), None));
 
         // pass in realm
         let test_list_entry =
@@ -1113,8 +1111,8 @@ mod tests {
                         ]),
                         package_label: Some("//build/components/tests:echo-integration-test(//build/toolchain/fuchsia:x64)".into()),
                         log_settings: Some(LogSettings {
-                            max_severity: Some(diagnostics_data::Severity::Warn),
-                            min_severity: Some(diagnostics_data::Severity::Debug),
+                            max_severity: Some(Severity::Warn),
+                            min_severity: Some(Severity::Debug),
                         }),
                         ..TestEntry::default()
                     },

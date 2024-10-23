@@ -569,11 +569,13 @@ zx::result<std::unique_ptr<BcacheMapper>> MkfsTester::FormatDevice(MkfsWorker &m
 }
 
 zx_status_t GcTester::DoGarbageCollect(SegmentManager &manager, uint32_t segno, GcType gc_type) {
+  std::lock_guard lock(f2fs::GetGlobalLock());
   return manager.DoGarbageCollect(segno, gc_type);
 }
 
 zx_status_t GcTester::GcDataSegment(SegmentManager &manager, const SummaryBlock &sum_blk,
                                     unsigned int segno, GcType gc_type) {
+  std::lock_guard lock(f2fs::GetGlobalLock());
   return manager.GcDataSegment(sum_blk, segno, gc_type);
 }
 

@@ -33,12 +33,7 @@ impl BlobActor {
         // Write the file to disk
         let file = self
             .root_dir
-            .open_file(
-                &merkle_root_hash,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::CREATE_IF_ABSENT
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-            )
+            .open_file(&merkle_root_hash, fio::Flags::FLAG_MUST_CREATE | fio::PERM_WRITABLE)
             .await?;
         file.truncate(data_bytes.len() as u64).await?;
         file.write(&data_bytes).await?;

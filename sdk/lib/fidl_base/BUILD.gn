@@ -26,7 +26,6 @@ source_set("fidl_txn_header") {
 # functions will be linked to the final binary.
 sdk_source_set("fidl_base") {
   category = "partner"
-  api = "//sdk/lib/fidl_base/fidl_base.api"
   sdk_name = "fidl_base"
   stable = true
 

@@ -458,8 +458,8 @@ impl DeviceRegistry {
     ) where
         L: LockBefore<FileOpsCore>,
     {
-        self.objects.destroy_device(&device);
         self.dispatch_uevent(UEventAction::Remove, device.clone());
+        self.objects.destroy_device(&device);
 
         if let Err(err) =
             devtmpfs_remove_node(locked, current_task, device.metadata.devname.as_ref())

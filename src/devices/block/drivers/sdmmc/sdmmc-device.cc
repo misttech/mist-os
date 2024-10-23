@@ -774,7 +774,6 @@ zx_status_t SdmmcDevice::HostInfo(sdmmc_host_info_t* info) {
   auto& response = result.value();
   info->caps = response->info.caps;
   info->max_transfer_size = response->info.max_transfer_size;
-  info->max_transfer_size_non_dma = response->info.max_transfer_size_non_dma;
   info->max_buffer_regions = response->info.max_buffer_regions;
   return ZX_OK;
 }

@@ -5,9 +5,7 @@
 //! Parse diagnostic records from streams, returning FIDL-generated structs that match expected
 //! diagnostic service APIs.
 
-use crate::{ArgType, Header, StringRef};
-use fidl_fuchsia_diagnostics_stream::{Argument, RawSeverity, Record, Value};
-
+use crate::{ArgType, Argument, Header, RawSeverity, Record, Value};
 use nom::bytes::complete::take;
 use nom::multi::many0;
 use nom::number::complete::{le_f64, le_i64, le_u64};
@@ -31,7 +29,7 @@ pub fn basic_info(buf: &[u8]) -> Result<(zx::BootInstant, RawSeverity), nom::Err
 
 /// Attempt to parse a diagnostic record from the head of this buffer, returning the record and any
 /// unused portion of the buffer if successful.
-pub fn parse_record(buf: &[u8]) -> Result<(Record, &[u8]), ParseError> {
+pub fn parse_record<'a>(buf: &'a [u8]) -> Result<(Record<'a>, &'a [u8]), ParseError> {
     match try_parse_record(buf) {
         Ok((remainder, record)) => Ok((record, remainder)),
         Err(Err::Incomplete(n)) => Err(ParseError::Incomplete(n)),
@@ -50,7 +48,7 @@ enum ParseState {
     InArguments,
 }
 
-pub(crate) fn try_parse_record(buf: &[u8]) -> ParseResult<'_, Record> {
+pub(crate) fn try_parse_record<'a>(buf: &'a [u8]) -> ParseResult<'a, Record<'a>> {
     let (after_header, header) = parse_header(buf)?;
 
     if header.raw_type() != crate::TRACING_FORMAT_LOG_RECORD_TYPE {
@@ -72,6 +70,7 @@ pub(crate) fn try_parse_record(buf: &[u8]) -> ParseResult<'_, Record> {
     let (_, arguments) =
         many0(|input| parse_argument_internal(input, &mut state.borrow_mut()))(args_buf)?;
 
+    let timestamp = zx::BootInstant::from_nanos(timestamp);
     Ok((after_record, Record { timestamp, severity, arguments }))
 }
 
@@ -83,19 +82,20 @@ fn parse_header(buf: &[u8]) -> ParseResult<'_, Header> {
 }
 
 /// Parses an argument
-pub fn parse_argument(buf: &[u8]) -> ParseResult<'_, Argument> {
+pub fn parse_argument<'a>(buf: &'a [u8]) -> ParseResult<'a, Argument<'a>> {
     let mut state = ParseState::Initial;
     parse_argument_internal(buf, &mut state)
 }
 
-fn parse_argument_internal<'a>(buf: &'a [u8], state: &mut ParseState) -> ParseResult<'a, Argument> {
+fn parse_argument_internal<'a>(
+    buf: &'a [u8],
+    state: &mut ParseState,
+) -> ParseResult<'a, Argument<'a>> {
     let (after_header, header) = parse_header(buf)?;
     let arg_ty = ArgType::try_from(header.raw_type()).map_err(nom::Err::Failure)?;
 
     let (after_name, name) = string_ref(header.name_ref(), after_header, false)?;
-    if matches!(state, ParseState::Initial)
-        && matches!(&name, StringRef::Inline(Cow::Borrowed("message")))
-    {
+    if matches!(state, ParseState::Initial) && matches!(&name, Cow::Borrowed("message")) {
         *state = ParseState::InMessage;
     }
     let (value, after_value) = match arg_ty {
@@ -115,7 +115,7 @@ fn parse_argument_internal<'a>(buf: &'a [u8], state: &mut ParseState) -> ParseRe
         ArgType::String => {
             let (rem, s) =
                 string_ref(header.value_ref(), after_name, matches!(state, ParseState::InMessage))?;
-            (Value::Text(s.to_string()), rem)
+            (Value::Text(s), rem)
         }
         ArgType::Bool => (Value::Boolean(header.bool_val()), after_name),
         ArgType::Pointer | ArgType::Koid | ArgType::I32 | ArgType::U32 => {
@@ -126,16 +126,16 @@ fn parse_argument_internal<'a>(buf: &'a [u8], state: &mut ParseState) -> ParseRe
         *state = ParseState::InArguments;
     }
 
-    Ok((after_value, Argument { name: name.to_string(), value }))
+    Ok((after_value, Argument::new(name, value)))
 }
 
 fn string_ref(
     ref_mask: u16,
     buf: &[u8],
     support_invalid_utf8: bool,
-) -> ParseResult<'_, StringRef<'_>> {
+) -> ParseResult<'_, Cow<'_, str>> {
     Ok(if ref_mask == 0 {
-        (buf, StringRef::Empty)
+        (buf, "".into())
     } else if (ref_mask & 1 << 15) == 0 {
         return Err(Err::Failure(ParseError::Unsupported));
     } else {
@@ -154,7 +154,7 @@ fn string_ref(
         };
         let (_padding, after_padding) = after_name.split_at(after_name.len() % 8);
 
-        (after_padding, StringRef::Inline(parsed))
+        (after_padding, parsed)
     })
 }
 
@@ -205,19 +205,19 @@ mod tests {
 
     #[fuchsia::test]
     fn basic_structured_info() {
-        let expected_timestamp = 72;
+        let expected_timestamp = zx::BootInstant::from_nanos(72);
         let record = Record {
             timestamp: expected_timestamp,
-            severity: Severity::Error.into_primitive(),
+            severity: Severity::Error as u8,
             arguments: vec![],
         };
         let mut buffer = Cursor::new(vec![0u8; 1000]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        encoder.write_record(&record).unwrap();
+        encoder.write_record(record).unwrap();
         let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
 
         let (timestamp, severity) = basic_info(encoded).unwrap();
-        assert_eq!(timestamp, zx::BootInstant::from_nanos(expected_timestamp));
+        assert_eq!(timestamp, expected_timestamp);
         assert_eq!(severity, Severity::Error.into_primitive());
     }
 }

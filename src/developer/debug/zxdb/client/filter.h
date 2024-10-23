@@ -43,6 +43,11 @@ class Filter : public ClientObject {
   void SetRecursive(bool recursive);
   bool recursive() const { return filter_.config.recursive; }
 
+  void SetJobOnly(bool job_only);
+  bool job_only() const { return filter_.config.job_only; }
+
+  bool ShouldDeferModuleLoading() const;
+
   // Accessing the underlying filter storage.
   const debug_ipc::Filter& filter() const { return filter_; }
   SettingStore& settings() { return settings_; }

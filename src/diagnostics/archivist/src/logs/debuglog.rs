@@ -10,12 +10,12 @@ use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
 use fidl::prelude::*;
 use fidl_fuchsia_boot::ReadOnlyLogMarker;
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::{unfold, Stream};
 use moniker::ExtendedMoniker;
 use std::future::Future;
 use std::sync::{Arc, LazyLock};
-use {fuchsia_async as fasync, zx};
 
 const KERNEL_URL: &str = "fuchsia-boot://kernel";
 pub static KERNEL_IDENTITY: LazyLock<Arc<ComponentIdentity>> = LazyLock::new(|| {

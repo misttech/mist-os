@@ -14,7 +14,7 @@ use std::cell::Cell;
 use std::collections::HashSet;
 use std::fmt::{self, Debug};
 use tracing::*;
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy, zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 pub struct WlanPolicyFacade {
     controller: RwLock<InnerController>,

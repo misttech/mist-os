@@ -150,19 +150,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
-    use crate as diagnostics_log;
-    use crate::{increment_clock, log_every_n_seconds};
-
     use super::*;
+    use crate::{increment_clock, log_every_n_seconds};
     use diagnostics_log_encoding::parse::parse_record;
-    use diagnostics_log_encoding::Severity;
+    use diagnostics_log_encoding::{Argument, Record, Severity};
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
     use futures::stream::StreamExt;
     use futures::AsyncReadExt;
+    use std::time::Duration;
     use tracing::{debug, error, info, info_span, trace, warn};
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::Registry;
@@ -181,17 +177,8 @@ mod tests {
         }
     }
 
-    fn arg_prefix() -> Vec<Argument> {
-        vec![
-            Argument {
-                name: "pid".into(),
-                value: Value::UnsignedInt(PROCESS_ID.with(|p| p.raw_koid()) as _),
-            },
-            Argument {
-                name: "tid".into(),
-                value: Value::UnsignedInt(THREAD_ID.with(|t| t.raw_koid() as _)),
-            },
-        ]
+    fn arg_prefix() -> Vec<Argument<'static>> {
+        vec![Argument::pid(PROCESS_ID.with(|p| *p)), Argument::tid(THREAD_ID.with(|t| *t))]
     }
 
     #[fuchsia::test(logging = false)]
@@ -240,7 +227,7 @@ mod tests {
             let len = socket.read(&mut buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record
+            record.into_owned()
         };
 
         // emit some expected messages and then we'll retrieve them for parsing
@@ -254,7 +241,7 @@ mod tests {
         let observed_warn = next_message();
         error!(e = "something went pretty wrong", "this is an error");
         let error_line = line!() - 1;
-        let metatag = Argument { name: "tag".into(), value: Value::Text(TARGET.into()) };
+        let metatag = Argument::tag(TARGET);
         let observed_error = next_message();
 
         // TRACE
@@ -265,13 +252,8 @@ mod tests {
                 arguments: arg_prefix(),
             };
             expected_trace.arguments.push(metatag.clone());
-            expected_trace.arguments.push(Argument {
-                name: "message".into(),
-                value: Value::Text("whoa this is noisy".into()),
-            });
-            expected_trace
-                .arguments
-                .push(Argument { name: "count".into(), value: Value::SignedInt(123) });
+            expected_trace.arguments.push(Argument::message("whoa this is noisy"));
+            expected_trace.arguments.push(Argument::new("count", 123));
             assert_eq!(observed_trace, expected_trace);
         }
 
@@ -283,13 +265,8 @@ mod tests {
                 arguments: arg_prefix(),
             };
             expected_debug.arguments.push(metatag.clone());
-            expected_debug.arguments.push(Argument {
-                name: "message".into(),
-                value: Value::Text("don't try this at home".into()),
-            });
-            expected_debug
-                .arguments
-                .push(Argument { name: "maybe".into(), value: Value::Boolean(true) });
+            expected_debug.arguments.push(Argument::message("don't try this at home"));
+            expected_debug.arguments.push(Argument::new("maybe", true));
             assert_eq!(observed_debug, expected_debug);
         }
 
@@ -301,10 +278,7 @@ mod tests {
                 arguments: arg_prefix(),
             };
             expected_info.arguments.push(metatag.clone());
-            expected_info.arguments.push(Argument {
-                name: "message".into(),
-                value: Value::Text("this is a message".into()),
-            });
+            expected_info.arguments.push(Argument::message("this is a message"));
             assert_eq!(observed_info, expected_info);
         }
 
@@ -316,13 +290,8 @@ mod tests {
                 arguments: arg_prefix(),
             };
             expected_warn.arguments.push(metatag.clone());
-            expected_warn.arguments.push(Argument {
-                name: "message".into(),
-                value: Value::Text("this is a warning".into()),
-            });
-            expected_warn
-                .arguments
-                .push(Argument { name: "reason".into(), value: Value::Text("just cuz".into()) });
+            expected_warn.arguments.push(Argument::message("this is a warning"));
+            expected_warn.arguments.push(Argument::new("reason", "just cuz"));
             assert_eq!(observed_warn, expected_warn);
         }
 
@@ -333,22 +302,13 @@ mod tests {
                 severity: Severity::Error.into_primitive(),
                 arguments: arg_prefix(),
             };
-            expected_error.arguments.push(Argument {
-                name: "file".into(),
-                value: Value::Text("src/lib/diagnostics/log/rust/src/fuchsia/sink.rs".into()),
-            });
             expected_error
                 .arguments
-                .push(Argument { name: "line".into(), value: Value::UnsignedInt(error_line as _) });
+                .push(Argument::file("src/lib/diagnostics/log/rust/src/fuchsia/sink.rs"));
+            expected_error.arguments.push(Argument::line(error_line as u64));
             expected_error.arguments.push(metatag);
-            expected_error.arguments.push(Argument {
-                name: "message".into(),
-                value: Value::Text("this is an error".into()),
-            });
-            expected_error.arguments.push(Argument {
-                name: "e".into(),
-                value: Value::Text("something went pretty wrong".into()),
-            });
+            expected_error.arguments.push(Argument::message("this is an error"));
+            expected_error.arguments.push(Argument::new("e", "something went pretty wrong"));
             assert_eq!(observed_error, expected_error);
         }
     }
@@ -365,7 +325,7 @@ mod tests {
             let len = socket.read(&mut buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record
+            record.into_owned()
         };
 
         info!("this should have a tag");
@@ -376,13 +336,8 @@ mod tests {
             severity: Severity::Info.into_primitive(),
             arguments: arg_prefix(),
         };
-        expected.arguments.push(Argument {
-            name: "message".into(),
-            value: Value::Text("this should have a tag".into()),
-        });
-        expected
-            .arguments
-            .push(Argument { name: "tag".into(), value: Value::Text("tags_are_sent".into()) });
+        expected.arguments.push(Argument::message("this should have a tag"));
+        expected.arguments.push(Argument::tag("tags_are_sent"));
         assert_eq!(observed, expected);
     }
 
@@ -394,7 +349,7 @@ mod tests {
             let len = socket.read(buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record
+            record.into_owned()
         };
 
         let log_fn = || {
@@ -409,10 +364,7 @@ mod tests {
                 severity: Severity::Info.into_primitive(),
                 arguments: arg_prefix(),
             };
-            expected.arguments.push(Argument {
-                name: "message".into(),
-                value: Value::Text("test message".into()),
-            });
+            expected.arguments.push(Argument::message("test message"));
             assert_eq!(observed, expected);
         };
 
@@ -438,7 +390,7 @@ mod tests {
             let len = socket.read(&mut buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record
+            record.into_owned()
         };
 
         let span = info_span!("span 1", tag = "foo");
@@ -454,14 +406,9 @@ mod tests {
                 severity: Severity::Info.into_primitive(),
                 arguments: arg_prefix(),
             };
-            expected
-                .arguments
-                .push(Argument { name: "tag".into(), value: Value::Text("foo".into()) });
-            expected.arguments.push(Argument { name: "key".into(), value: Value::SignedInt(2) });
-            expected.arguments.push(Argument {
-                name: "message".into(),
-                value: Value::Text("this should have span fields".into()),
-            });
+            expected.arguments.push(Argument::tag("foo"));
+            expected.arguments.push(Argument::new("key", 2));
+            expected.arguments.push(Argument::message("this should have span fields"));
             assert_eq!(observed, expected);
         }
 
@@ -473,11 +420,8 @@ mod tests {
             severity: Severity::Info.into_primitive(),
             arguments: arg_prefix(),
         };
-        expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("foo".into()) });
-        expected.arguments.push(Argument {
-            name: "message".into(),
-            value: Value::Text("this should have outer span fields".into()),
-        });
+        expected.arguments.push(Argument::tag("foo"));
+        expected.arguments.push(Argument::message("this should have outer span fields"));
         assert_eq!(observed, expected);
     }
 
@@ -489,7 +433,7 @@ mod tests {
             let len = socket.read(&mut buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record
+            record.into_owned()
         };
 
         let span = info_span!("span 1", tag = "foo");
@@ -502,11 +446,8 @@ mod tests {
             severity: Severity::Info.into_primitive(),
             arguments: arg_prefix(),
         };
-        expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("foo".into()) });
-        expected.arguments.push(Argument {
-            name: "message".into(),
-            value: Value::Text("this should have span fields".into()),
-        });
+        expected.arguments.push(Argument::tag("foo"));
+        expected.arguments.push(Argument::message("this should have span fields"));
         assert_eq!(observed, expected);
 
         span.record("tag", "bar");
@@ -518,11 +459,8 @@ mod tests {
             severity: Severity::Info.into_primitive(),
             arguments: arg_prefix(),
         };
-        expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("bar".into()) });
-        expected.arguments.push(Argument {
-            name: "message".into(),
-            value: Value::Text("this should have updated span fields".into()),
-        });
+        expected.arguments.push(Argument::tag("bar"));
+        expected.arguments.push(Argument::message("this should have updated span fields"));
         assert_eq!(observed, expected);
     }
 
@@ -549,16 +487,10 @@ mod tests {
             let mut expected_args = arg_prefix();
 
             if with_drops {
-                expected_args.push(Argument {
-                    name: "num_dropped".into(),
-                    value: Value::UnsignedInt(NUM_DROPPED as _),
-                });
+                expected_args.push(Argument::dropped(NUM_DROPPED as u64));
             }
 
-            expected_args.push(Argument {
-                name: "message".into(),
-                value: Value::Text("it's-a-me, a message-o".into()),
-            });
+            expected_args.push(Argument::message("it's-a-me, a message-o"));
 
             assert_eq!(
                 record,

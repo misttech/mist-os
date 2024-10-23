@@ -47,6 +47,7 @@ def _fuchsia_toolchain_info_impl(ctx):
         funnel = ctx.executable.funnel,
         fvm = ctx.executable.fvm,
         fvm_manifest = ctx.file.fvm_manifest,
+        gen_android_starnix_container = ctx.executable.gen_android_starnix_container,
         gtest_runner_shard = ctx.attr.gtest_runner_shard,
         merkleroot = ctx.executable.merkleroot,
         minfs = ctx.executable.minfs,
@@ -282,6 +283,13 @@ included in the Fuchsia IDK.
             doc = "fvm tool's manifest, required by ffx.",
             mandatory = True,
             cfg = "exec",
+            allow_single_file = True,
+        ),
+        "gen_android_starnix_container": attr.label(
+            doc = "gen_android_starnix_container tool executable.",
+            mandatory = True,
+            cfg = "exec",
+            executable = True,
             allow_single_file = True,
         ),
         "gtest_runner_shard": attr.string(

@@ -51,7 +51,7 @@ pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
             ptr as u64,
             size as u64,
             compressed_stack_trace,
-            timestamp.into_nanos(),
+            timestamp,
         );
     });
 }
@@ -87,7 +87,7 @@ pub extern "C" fn __scudo_realloc_allocate_hook(
                 old_ptr as u64,
                 size as u64,
                 compressed_stack_trace,
-                timestamp.into_nanos(),
+                timestamp,
             );
         } else {
             profiler.record_allocation(
@@ -95,7 +95,7 @@ pub extern "C" fn __scudo_realloc_allocate_hook(
                 new_ptr as u64,
                 size as u64,
                 compressed_stack_trace,
-                timestamp.into_nanos(),
+                timestamp,
             );
             profiler.forget_allocation(thread_data, old_ptr as u64);
         }

@@ -14,26 +14,26 @@ use moniker::{ChildName, ExtendedMoniker, Moniker, EXTENDED_MONIKER_COMPONENT_MA
 use std::borrow::{Borrow, Cow};
 use std::fs;
 use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 // Character used to delimit the different sections of an inspect selector,
 // the component selector, the tree selector, and the property selector.
-pub static SELECTOR_DELIMITER: char = ':';
+pub const SELECTOR_DELIMITER: char = ':';
 
 // Character used to delimit nodes within a component hierarchy path.
-static PATH_NODE_DELIMITER: char = '/';
+const PATH_NODE_DELIMITER: char = '/';
 
 // Character used to escape interperetation of this parser's "special
-// characers"; *, /, :, and \.
-static ESCAPE_CHARACTER: char = '\\';
+// characters"; *, /, :, and \.
+pub const ESCAPE_CHARACTER: char = '\\';
 
-static TAB_CHAR: char = '\t';
-static SPACE_CHAR: char = ' ';
+const TAB_CHAR: char = '\t';
+const SPACE_CHAR: char = ' ';
 
 // Pattern used to encode wildcard.
-static WILDCARD_SYMBOL_CHAR: char = '*';
+const WILDCARD_SYMBOL_CHAR: char = '*';
 
-static RECURSIVE_WILDCARD_SYMBOL_STR: &str = "**";
+const RECURSIVE_WILDCARD_SYMBOL_STR: &str = "**";
 
 /// Returns true iff a component selector uses the recursive glob.
 /// Assumes the selector has already been validated.
@@ -65,68 +65,6 @@ where
         SelectorArgument::RawSelector(r) => parse_selector::<VerboseError>(&r),
         _ => Err(Error::InvalidSelectorArgument),
     }
-}
-
-/// Increments the CharIndices iterator and updates the token builder
-/// in order to avoid processing characters being escaped by the selector.
-fn handle_escaped_char(
-    token_builder: &mut String,
-    selection_iter: &mut std::str::CharIndices<'_>,
-) -> Result<(), anyhow::Error> {
-    token_builder.push(ESCAPE_CHARACTER);
-    let escaped_char_option: Option<(usize, char)> = selection_iter.next();
-    match escaped_char_option {
-        Some((_, escaped_char)) => token_builder.push(escaped_char),
-        None => {
-            return Err(format_err!(
-                "Selecter fails verification due to unmatched escape character",
-            ));
-        }
-    }
-    Ok(())
-}
-
-/// Converts a string into a vector of string tokens representing the unparsed
-/// string delimited by the provided delimiter, excluded escaped delimiters.
-pub fn tokenize_string(
-    untokenized_selector: &str,
-    delimiter: char,
-) -> Result<Vec<String>, anyhow::Error> {
-    let mut token_aggregator = Vec::new();
-    let mut curr_token_builder: String = String::new();
-    let mut unparsed_selector_iter = untokenized_selector.char_indices();
-
-    while let Some((_, selector_char)) = unparsed_selector_iter.next() {
-        match selector_char {
-            escape if escape == ESCAPE_CHARACTER => {
-                handle_escaped_char(&mut curr_token_builder, &mut unparsed_selector_iter)?;
-            }
-            selector_delimiter if selector_delimiter == delimiter => {
-                if curr_token_builder.is_empty() {
-                    return Err(format_err!(
-                        "Cannot have empty strings delimited by {}",
-                        delimiter
-                    ));
-                }
-                token_aggregator.push(curr_token_builder);
-                curr_token_builder = String::new();
-            }
-            _ => curr_token_builder.push(selector_char),
-        }
-    }
-
-    // Push the last section of the selector into the aggregator since we don't delimit the
-    // end of the selector.
-    if curr_token_builder.is_empty() {
-        return Err(format_err!(
-            "Cannot have empty strings delimited by {}: {}",
-            delimiter,
-            untokenized_selector
-        ));
-    }
-
-    token_aggregator.push(curr_token_builder);
-    return Ok(token_aggregator);
 }
 
 /// Converts an unparsed tree selector string into a TreeSelector.
@@ -240,6 +178,10 @@ where
     Ok(result.into())
 }
 
+pub fn parse_verbose<'a>(unparsed_selector: &'a str) -> Result<Selector, Error> {
+    parse_selector::<VerboseError>(unparsed_selector)
+}
+
 /// Remove any comments process a quoted line.
 pub fn parse_selector_file<E>(selector_file: &Path) -> Result<Vec<Selector>, Error>
 where
@@ -258,24 +200,6 @@ where
         }
     }
     Ok(result)
-}
-
-/// Loads all the selectors in the given directory.
-pub fn parse_selectors<E>(directory: &Path) -> Result<Vec<Selector>, Error>
-where
-    E: for<'a> ParsingError<'a>,
-{
-    let path: PathBuf = directory.to_path_buf();
-    let mut selector_vec: Vec<Selector> = Vec::new();
-    for entry in fs::read_dir(path)? {
-        let entry = entry?;
-        if entry.path().is_dir() {
-            return Err(Error::NonFlatDirectory);
-        } else {
-            selector_vec.append(&mut parse_selector_file::<E>(&entry.path())?);
-        }
-    }
-    Ok(selector_vec)
 }
 
 /// Helper method for converting ExactMatch StringSelectors to regex. We must
@@ -320,7 +244,7 @@ pub fn sanitize_moniker_for_selectors(moniker: &str) -> String {
     moniker.replace(":", "\\:")
 }
 
-pub fn match_moniker_against_component_selector<I, S>(
+fn match_moniker_against_component_selector<I, S>(
     mut moniker_segments: I,
     component_selector: &ComponentSelector,
 ) -> Result<bool, anyhow::Error>
@@ -365,7 +289,7 @@ where
 /// Accounts for semantics like unspecified tree-name-filter lists.
 ///
 /// Returns an error if the selector is invalid.
-pub fn match_component_and_tree_name<T>(
+fn match_component_and_tree_name<T>(
     moniker: impl AsRef<[T]>,
     tree_name: &str,
     selector: &Selector,
@@ -405,7 +329,7 @@ pub fn match_tree_name_against_selector(tree_name: &str, selector: &Selector) ->
 ///
 /// Requires: hierarchy_path is not empty.
 ///           selectors contains valid Selectors.
-pub fn match_component_moniker_against_selector<T>(
+fn match_component_moniker_against_selector<T>(
     moniker: impl AsRef<[T]>,
     selector: &Selector,
 ) -> Result<bool, anyhow::Error>
@@ -431,7 +355,7 @@ where
 ///
 /// Requires: hierarchy_path is not empty.
 ///           selectors contains valid Selectors.
-pub fn match_component_moniker_against_selectors<'a>(
+fn match_component_moniker_against_selectors<'a>(
     moniker: Vec<String>,
     selectors: impl IntoIterator<Item = &'a Selector>,
 ) -> impl Iterator<Item = Result<&'a Selector, anyhow::Error>> {
@@ -456,7 +380,7 @@ pub fn match_component_moniker_against_selectors<'a>(
 ///
 /// Requires: moniker is not empty.
 ///           component_selectors contains valid ComponentSelectors.
-pub fn match_moniker_against_component_selectors<'a, S, T>(
+fn match_moniker_against_component_selectors<'a, S, T>(
     moniker: &[T],
     selectors: &'a [S],
 ) -> Result<Vec<&'a ComponentSelector>, anyhow::Error>
@@ -940,8 +864,27 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::prelude::*;
+    use std::path::PathBuf;
     use std::str::FromStr;
     use tempfile::TempDir;
+
+    /// Loads all the selectors in the given directory.
+    pub fn parse_selectors<E>(directory: &Path) -> Result<Vec<Selector>, Error>
+    where
+        E: for<'a> ParsingError<'a>,
+    {
+        let path: PathBuf = directory.to_path_buf();
+        let mut selector_vec: Vec<Selector> = Vec::new();
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            if entry.path().is_dir() {
+                return Err(Error::NonFlatDirectory);
+            } else {
+                selector_vec.append(&mut parse_selector_file::<E>(&entry.path())?);
+            }
+        }
+        Ok(selector_vec)
+    }
 
     #[fuchsia::test]
     fn successful_selector_parsing() {

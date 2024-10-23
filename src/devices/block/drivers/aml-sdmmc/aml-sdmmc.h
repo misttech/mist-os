@@ -15,6 +15,7 @@
 #include <lib/dma-buffer/buffer.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
@@ -113,8 +114,7 @@ class AmlSdmmc : public fdf::DriverBase,
   zx_status_t ResumePower() TA_REQ(lock_);
 
   // Visible for tests
-  zx_status_t Init(const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info)
-      TA_EXCL(lock_);
+  zx_status_t Init(const fdf::PDev::DeviceInfo& device_info) TA_EXCL(lock_);
 
  protected:
   virtual zx_status_t WaitForInterruptImpl();
@@ -201,8 +201,8 @@ class AmlSdmmc : public fdf::DriverBase,
     inspect::UintProperty distance_to_failing_point;
     inspect::BoolProperty power_suspended;
 
-    void Init(const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info,
-              inspect::Node& parent, bool is_power_suspended);
+    void Init(const fdf::PDev::DeviceInfo& device_info, inspect::Node& parent,
+              bool is_power_suspended);
   };
 
   struct TuneContext {
@@ -243,8 +243,7 @@ class AmlSdmmc : public fdf::DriverBase,
   // Register power configs from the board driver with Power Broker, and begin the continuous
   // power level adjustment of hardware. For boards/products that don't support the Power Framework,
   // this method simply returns success.
-  zx::result<> ConfigurePowerManagement(
-      fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
+  zx::result<> ConfigurePowerManagement(fdf::PDev& pdev);
 
   void Serve(fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> request);
 

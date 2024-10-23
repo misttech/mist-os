@@ -6,7 +6,7 @@ use assert_matches::assert_matches;
 use diagnostics_data::{Data, Logs, Severity};
 use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_component as fcomponent;
-use fuchsia_async::{Duration, TestExecutor, Timer};
+use fuchsia_async::{MonotonicDuration, TestExecutor, Timer};
 use fuchsia_component_test::ScopedInstance;
 use futures::StreamExt;
 use test_case::test_case;
@@ -76,7 +76,7 @@ async fn test_inner(url: &str, moniker: &str, expected: Expected) {
     let full_moniker = &format!("{}:{}", COLLECTION_NAME, moniker);
 
     // wait a little to increase chances we detect extra messages we don't want
-    Timer::new(Duration::from_seconds(3)).await;
+    Timer::new(MonotonicDuration::from_seconds(3)).await;
 
     // Golang prints messages to stdout and stderr when it finds it's missing any of the stdio
     // handles. Ignore messages that come from the runtime so we can match on our expectations.

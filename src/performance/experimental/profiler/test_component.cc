@@ -94,8 +94,6 @@ zx::result<> profiler::TestComponent::Start(ComponentWatcher::ComponentEventHand
         }
       });
 
-  suite_name_ = url_.substr(url_.find_last_of('/') + 1);
-
   return zx::ok();
 }
 

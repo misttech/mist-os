@@ -14,7 +14,7 @@ use stream_processor_decoder_factory::*;
 use stream_processor_encoder_factory::*;
 use stream_processor_test::*;
 use video_frame_stream::*;
-use {fidl_fuchsia_images2 as images2, fidl_fuchsia_sysmem2 as sysmem2, zx};
+use {fidl_fuchsia_images2 as images2, fidl_fuchsia_sysmem2 as sysmem2};
 
 pub struct H264NalValidator {
     pub expected_nals: Option<Vec<H264NalKind>>,

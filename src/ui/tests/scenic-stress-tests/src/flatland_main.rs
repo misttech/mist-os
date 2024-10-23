@@ -11,10 +11,10 @@ mod metrics_discarder;
 mod pointer_state;
 
 use argh::FromArgs;
+use diagnostics_log::Severity;
 use flatland_environment::FlatlandEnvironment;
 use fuchsia_async as fasync;
 use stress_test::run_test;
-use tracing::Level;
 
 #[derive(Clone, Debug, FromArgs)]
 /// Creates an instance of scenic and performs stressful operations on it
@@ -25,7 +25,7 @@ pub struct Args {
 
     /// filter logging by level (off, error, warn, info, debug, trace)
     #[argh(option, short = 'l')]
-    log_filter: Option<Level>,
+    log_filter: Option<Severity>,
 
     /// if set, the test runs for this time limit before exiting successfully.
     #[argh(option, short = 't')]

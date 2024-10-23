@@ -22,10 +22,11 @@ constexpr int kSwitchJob = 1;
 constexpr int kSwitchExact = 2;
 constexpr int kSwitchWeak = 3;
 constexpr int kSwitchRecursive = 4;
+constexpr int kSwitchJobOnly = 5;
 
 const char kAttachShortHelp[] = "attach: Attach to processes.";
 const char kAttachUsage[] =
-    "attach [ --job / -j <pid/koid> ] [ --exact ] [ --weak ] [ --recursive / -r ] [ <what> ]";
+    "attach [ --job / -j <pid/koid> ] [ --exact ] [ --weak ] [ --recursive / -r ] [ --job-only ] [ <what> ]";
 const char kAttachHelp[] = R"(
   Attaches to current or future process.
 
@@ -37,6 +38,14 @@ Arguments
         Only attaching to processes under the job with an id of <koid>. The
         <what> argument can be omitted and all processes under the job will be
         attached.
+
+    --job-only
+        [Fuchsia only]
+        Attach directly to the highest job that matches the given filter. If the
+        filter matches a process directly, this will attach to the parent job.
+        For components, it will attach to the root job of that component.
+        Implies --weak. Cannot be used with --recursive
+        https://fxbug.dev/373824677.
 
     --exact
         Attaching to processes with an exact name. The argument will be
@@ -108,6 +117,16 @@ Attaching to all processes within a realm
   package URL. Note using a short moniker substring could unintentionally attach
   to many processes, which will slow down the system.
 
+Attaching to the root job of a realm
+
+  Using any of the above component filters, use the --job-only option to attach
+  to the root job of that component. No processes will be attached unless
+  explicitly requested. This can be useful when DebugAgent should only monitor
+  and report exceptions from any and all child processes, but no interactive
+  debugging is needed. Since all sub-realms of this realm will report exceptions
+  through this job, we never need to attach to any child jobs. This is why
+  --recursive is disallowed when using --job-only.
+
 Attaching to processes by a process name
 
   Other arguments will be interpreted as a general filter which is a substring
@@ -164,6 +183,9 @@ Examples
   attach foobar.cm
       Attaches to processes in components with the above name.
 
+  attach --job-only foobar.cm
+      Attaches to the root job within the realm associated with foobar.cm
+
   attach --exact /pkg/bin/foobar
       Attaches to processes with a name "/pkg/bin/foobar".
 
@@ -208,7 +230,7 @@ void RunVerbAttach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
     if (err_or_target.has_error())
       return cmd_context->ReportError(err_or_target.err());
     err_or_target.value()->Attach(
-        koid, {.weak = false},
+        koid, {.weak = false, .target = debug_ipc::AttachConfig::Target::kProcess},
         [cmd_context](fxl::WeakPtr<Target> target, const Err& err, uint64_t timestamp) mutable {
           // Don't display a message on success because the ConsoleContext will print the new
           // process information when it's detected.
@@ -245,6 +267,18 @@ void RunVerbAttach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
 
   if (cmd.HasSwitch(kSwitchRecursive)) {
     filter->SetRecursive(true);
+  }
+
+  if (cmd.HasSwitch(kSwitchJobOnly)) {
+    if (cmd_context->GetConsoleContext()->session()->platform() != debug::Platform::kFuchsia) {
+      return cmd_context->ReportError(Err("--job-only is only available when debugging Fuchsia."));
+    }
+    if (filter->recursive()) {
+      return cmd_context->ReportError(
+          Err("--recursive and --job-only are mutually exclusive. See `help attach` for details.\n"
+              "Comment on https://fxbug.dev/373824677 if you have a desired use case."));
+    }
+    filter->SetJobOnly(true);
   }
 
   std::string pattern;
@@ -301,6 +335,7 @@ VerbRecord GetAttachVerbRecord() {
   attach.switches.emplace_back(kSwitchExact, false, "exact");
   attach.switches.emplace_back(kSwitchWeak, false, "weak");
   attach.switches.emplace_back(kSwitchRecursive, false, "recursive", 'r');
+  attach.switches.emplace_back(kSwitchJobOnly, false, "job-only");
   return attach;
 }
 

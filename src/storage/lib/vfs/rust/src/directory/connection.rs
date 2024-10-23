@@ -103,8 +103,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
                 trace::duration!(c"storage", c"Directory::GetConnectionInfo");
-                // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES, ENUMERATE, and TRAVERSE.
-                // TODO(https://fxbug.dev/42157659): Implement MODIFY_DIRECTORY and UPDATE_ATTRIBUTES.
                 responder.send(fio::ConnectionInfo {
                     rights: Some(self.options.rights),
                     ..Default::default()
@@ -124,7 +122,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
             fio::DirectoryRequest::GetAttributes { query, responder } => {
                 async move {
-                    // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
+                    // TODO(https://fxbug.dev/346585458): Restrict or remove GET_ATTRIBUTES.
                     let attrs = self.directory.get_attributes(query).await;
                     responder.send(
                         attrs

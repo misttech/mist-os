@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_starnix_gralloc as fgralloc;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
@@ -17,7 +18,6 @@ use virtgralloc::{
     virtgralloc_SetVulkanModeResult, virtgralloc_VulkanMode, virtgralloc_set_vulkan_mode,
     VIRTGRALLOC_IOCTL_SET_VULKAN_MODE, VIRTGRALLOC_SET_VULKAN_MODE_RESULT_SUCCESS,
 };
-use {fidl_fuchsia_starnix_gralloc as fgralloc, zx};
 
 pub struct GrallocFile {
     mode_setter: fgralloc::VulkanModeSetterSynchronousProxy,

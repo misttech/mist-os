@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_STUB_REGISTRY_SERVER_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_STUB_REGISTRY_SERVER_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_STUB_REGISTRY_SERVER_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_STUB_REGISTRY_SERVER_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
@@ -35,6 +35,7 @@ class StubRegistryServer
 
   // fuchsia.audio.device.Registry implementation
   void WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& completer) final {
+    // Here we assume the parent has already sent us the InitialDeviceDiscoveryIsComplete().
     if (!responded_to_initial_watch_devices_added_) {
       ADR_LOG_STATIC(kLogStubRegistryServer) << " initial call; returning empty list";
       completer.Reply(fit::success(fuchsia_audio_device::RegistryWatchDevicesAddedResponse{{
@@ -93,4 +94,4 @@ class StubRegistryServer
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_STUB_REGISTRY_SERVER_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_STUB_REGISTRY_SERVER_H_

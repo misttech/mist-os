@@ -16,6 +16,7 @@ rustc_library("blobfs") {
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",

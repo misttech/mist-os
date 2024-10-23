@@ -88,28 +88,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
 
   DeviceServer() = default;
 
-  // Deprecated constructor. Use empty constructor with |Init| call after to manually initialize,
-  // or use the sync/async-initialization helpers.
-  // TODO(https://fxbug.dev/42086090): Remove once all usages are migrated
-  DeviceServer(std::string name, uint32_t proto_id, std::string topological_path) {
-    ZX_ASSERT(proto_id == 0);
-    BanjoConfig config{proto_id};
-    Init(std::move(name), std::move(topological_path), {}, std::move(config));
-  }
-
-  // Leaving for soft transition of vendor repo drivers.
-  // TODO(https://fxbug.dev/42086090): Remove once all usages are migrated
-  DeviceServer(async_dispatcher_t* dispatcher, const std::shared_ptr<fdf::Namespace>& incoming,
-               const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
-               const std::optional<std::string>& node_name, std::string_view child_node_name,
-               const std::optional<std::string>& child_additional_path,
-               const ForwardMetadata& forward_metadata = ForwardMetadata::None(),
-               std::optional<BanjoConfig> banjo_config = std::nullopt);
-  // Leaving for soft transition of vendor repo drivers.
-  // TODO(https://fxbug.dev/42086090): Remove once all usages are migrated
-  void OnInitialized(fit::callback<void(zx::result<>)> complete_callback);
-
-  void Init(std::string name, std::string topological_path,
+  void Init(std::string name, std::string topological_path = "",
             std::optional<ServiceOffersV1> service_offers = std::nullopt,
             std::optional<BanjoConfig> banjo_config = std::nullopt);
 
@@ -128,7 +107,6 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   std::vector<fuchsia_driver_framework::Offer> CreateOffers2();
 
   std::string_view name() const { return name_; }
-  std::string topological_path() const { return topological_path_.value_or(""); }
   BanjoProtoId proto_id() const {
     return banjo_config_.has_value() ? banjo_config_->default_proto_id : 0;
   }
@@ -136,13 +114,14 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
 
  private:
   // fuchsia.driver.compat.Compat
-  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
   void GetMetadata(GetMetadataCompleter::Sync& completer) override;
   void GetBanjoProtocol(GetBanjoProtocolRequestView request,
                         GetBanjoProtocolCompleter::Sync& completer) override;
+  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
+    completer.Reply(fidl::StringView::FromExternal("SHOULD_NOT_BE_USED"));
+  }
 
   std::string name_;
-  std::optional<std::string> topological_path_;
   MetadataMap metadata_;
   std::optional<ServiceOffersV1> service_offers_;
   std::optional<BanjoConfig> banjo_config_;
@@ -212,9 +191,9 @@ class SyncInitializedDeviceServer {
   void reset() { device_server_.reset(); }
 
  private:
-  zx::result<> CreateAndServeWithTopologicalPath(
-      std::string topological_path, const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
-      std::string child_node_name, std::optional<DeviceServer::BanjoConfig> banjo_config);
+  zx::result<> CreateAndServe(const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+                              std::string child_node_name,
+                              std::optional<DeviceServer::BanjoConfig> banjo_config);
 
   std::optional<compat::DeviceServer> device_server_;
 };
@@ -303,11 +282,9 @@ class AsyncInitializedDeviceServer {
  private:
   void BeginAsyncInit();
   void OnParentDevices(zx::result<std::vector<ParentDevice>> parent_devices);
-  void OnTopologicalPathResult(
-      fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetTopologicalPath>& result);
   void OnMetadataResult(
       fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetMetadata>& result);
-  zx::result<> CreateAndServeWithTopologicalPath(std::string topological_path);
+  zx::result<> CreateAndServe();
   void CompleteInitialization(zx::result<> result);
 
   std::optional<AsyncInitStorage> storage_;
@@ -317,8 +294,6 @@ class AsyncInitializedDeviceServer {
   fidl::WireClient<fuchsia_driver_compat::Device> default_parent_client_ = {};
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_ =
       {};
-  // Set in OnTopologicalPathResult()
-  std::string topological_path_;
 
   fdf::async_helpers::TaskGroup async_tasks_;
 };

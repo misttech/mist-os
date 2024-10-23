@@ -10,7 +10,7 @@ use std::sync::{Arc, RwLock};
 use tracing::{debug, error};
 use {
     fidl_fuchsia_hardware_powersource as hpower, fidl_fuchsia_power_battery as fpower,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 #[derive(Debug, PartialEq)]

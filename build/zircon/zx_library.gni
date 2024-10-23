@@ -351,9 +351,15 @@ template("zx_library") {
       public_deps = lib_public_deps
 
       if (sdkable && sdk_category == "partner") {
-        # For targets that require modification acknowledgement, ensure the
-        # `.api` file location is under `//sdk/lib`.
-        api = "//sdk/lib/$target_name/$target_name.api"
+        target_path = get_label_info(target_name, "label_no_toolchain")
+        is_in_sdk_dir = target_path ==
+                        "//sdk/" + string_replace(target_path, "//sdk/", "", 1)
+        if (!is_in_sdk_dir) {
+          # For targets outside `//sdk` that require modification
+          # acknowledgement, override the default `.api` file location with
+          # one under `//sdk/lib`.
+          api = "//sdk/lib/$target_name/$target_name.api"
+        }
       }
 
       if (_has_public_headers) {

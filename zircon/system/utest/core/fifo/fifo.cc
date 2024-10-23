@@ -25,6 +25,51 @@ zx_signals_t GetSignals(const zx::fifo& fifo) {
 
 #define EXPECT_SIGNALS(h, s) EXPECT_EQ(GetSignals(h), s)
 
+// Helper class to map a VMO somewhere in the address space with a page of padding to either side.
+// Cleans up on destruction.
+class VmoMapWithPadding {
+ public:
+  VmoMapWithPadding() = default;
+  ~VmoMapWithPadding() {
+    if (vmar_.is_valid()) {
+      vmar_.unmap(vmar_addr_, vmar_size_);
+      vmar_.destroy();
+      vmar_.reset();
+    }
+  }
+
+  zx_status_t Map(const zx::vmo& vmo, size_t vmo_size, zx_vaddr_t* out_addr) {
+    if (vmar_.is_valid()) {
+      return ZX_ERR_BAD_STATE;
+    }
+
+    // Create a vmar with a page on either side as padding.
+    vmar_size_ = vmo_size + 2 * zx_system_get_page_size();
+    zx_status_t err = zx::vmar::root_self()->allocate(
+        ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0, vmar_size_, &vmar_,
+        &vmar_addr_);
+    if (err != ZX_OK) {
+      return err;
+    }
+
+    // Map the passed in vmo.
+    zx_vaddr_t addr;
+    err = vmar_.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC, zx_system_get_page_size(),
+                    vmo, 0, vmo_size, &addr);
+    if (err != ZX_OK) {
+      return err;
+    }
+
+    *out_addr = addr;
+    return ZX_OK;
+  }
+
+ private:
+  zx::vmar vmar_;
+  zx_vaddr_t vmar_addr_ = 0;
+  size_t vmar_size_ = 0;
+};
+
 TEST(FifoTest, InvalidParametersReturnOutOfRange) {
   zx::fifo fifo_a, fifo_b;
 
@@ -339,11 +384,9 @@ TEST(FifoTest, ReadPartialBadBuffer) {
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(kVmoSize, 0, &vmo));
 
+  VmoMapWithPadding map;
   zx_vaddr_t addr;
-
-  ASSERT_OK(
-      zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, kVmoSize, &addr));
-  auto unmap = fit::defer([&]() { zx::vmar::root_self()->unmap(addr, kVmoSize); });
+  ASSERT_OK(map.Map(vmo, kVmoSize, &addr));
 
   // Calculate buffer such that 1 element will fit, and the next will be out of bounds.
   void* buffer = reinterpret_cast<void*>(addr + kVmoSize - sizeof(ElementType));
@@ -365,11 +408,9 @@ TEST(FifoTest, WritePartialBadBuffer) {
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(kVmoSize, 0, &vmo));
 
+  VmoMapWithPadding map;
   zx_vaddr_t addr;
-
-  ASSERT_OK(
-      zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, kVmoSize, &addr));
-  auto unmap = fit::defer([&]() { zx::vmar::root_self()->unmap(addr, kVmoSize); });
+  ASSERT_OK(map.Map(vmo, kVmoSize, &addr));
 
   // Calculate buffer such that 1 element will fit, and the next will be out of bounds.
   void* buffer = reinterpret_cast<void*>(addr + kVmoSize - sizeof(ElementType));

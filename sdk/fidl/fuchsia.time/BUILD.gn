@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.time") {
-  sdk_category = "internal"
   sources = [ "time.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 

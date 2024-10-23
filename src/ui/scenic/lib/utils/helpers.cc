@@ -134,9 +134,8 @@ SysmemTokens CreateSysmemTokens(fuchsia::sysmem2::Allocator_Sync* sysmem_allocat
   return {std::move(local_token), std::move(dup_token)};
 }
 
-fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints(uint32_t buffer_count,
-                                                                       uint32_t width,
-                                                                       uint32_t height) {
+fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints(
+    uint32_t buffer_count, uint32_t width, uint32_t height, fuchsia::images2::PixelFormat format) {
   fuchsia::sysmem2::BufferCollectionConstraints constraints;
   constraints.mutable_buffer_memory_constraints()->set_cpu_domain_supported(true);
   constraints.mutable_buffer_memory_constraints()->set_ram_domain_supported(true);
@@ -146,7 +145,7 @@ fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints(uint32_t 
 
   auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
   image_constraints.mutable_color_spaces()->push_back(fuchsia::images2::ColorSpace::SRGB);
-  image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+  image_constraints.set_pixel_format(format);
   image_constraints.set_pixel_format_modifier(fuchsia::images2::PixelFormatModifier::LINEAR);
 
   image_constraints.set_required_min_size({.width = width, .height = height});

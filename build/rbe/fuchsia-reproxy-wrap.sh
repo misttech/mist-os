@@ -149,10 +149,13 @@ If you see this, file a go/fx-build-bug.
 EOF
 }
 
+# LINT.IfChange(reproxy_log_dirs)
 readonly old_logs_root="$project_root/$build_subdir/.reproxy_logs"
 # Move the reproxy logs outside of $build_subdir so they do not get cleaned,
 # but under 'out' so it does not pollute the source root.
+# `fx rbe cleanlogs` will remove all of the accumulated reproxy logs.
 readonly logs_root="$project_root/${build_subdir_arr[0]}/.reproxy_logs/${build_subdir_arr[1]}"
+# LINT.ThenChange(/tools/devshell/rbe:reproxy_log_dirs)
 mkdir -p "$old_logs_root"
 mkdir -p "$logs_root"
 

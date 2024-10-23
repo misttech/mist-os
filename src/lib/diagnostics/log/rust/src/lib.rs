@@ -8,8 +8,6 @@
 //! This library isn't Fuchsia-specific and provides a general `tracing::Subscriber` that allows
 //! the library to also be used in the host.
 
-use tracing::Level;
-
 #[cfg(target_os = "fuchsia")]
 mod fuchsia;
 #[cfg(target_os = "fuchsia")]
@@ -20,32 +18,8 @@ mod portable;
 #[cfg(not(target_os = "fuchsia"))]
 use self::portable as implementation;
 
-pub use fidl_fuchsia_diagnostics::{Interest, Severity};
+pub use diagnostics_log_types::Severity;
 pub use implementation::*;
-
-/// Trait that allows to convert a type into a `fidl_fuchsia_diagnostics::Severity`
-pub trait IntoSeverity {
-    /// Returns a Severity.
-    fn into_severity(self) -> Severity;
-}
-
-impl IntoSeverity for Severity {
-    fn into_severity(self) -> Severity {
-        self
-    }
-}
-
-impl IntoSeverity for Level {
-    fn into_severity(self) -> Severity {
-        match self {
-            Level::TRACE => Severity::Trace,
-            Level::DEBUG => Severity::Debug,
-            Level::INFO => Severity::Info,
-            Level::WARN => Severity::Warn,
-            Level::ERROR => Severity::Error,
-        }
-    }
-}
 
 /// Adds a panic hook which will log an `ERROR` log with the panic information.
 pub(crate) fn install_panic_hook(prefix: Option<&'static str>) {
@@ -127,9 +101,9 @@ macro_rules! publisher_options {
                 /// An interest filter to apply to messages published.
                 ///
                 /// Default: EMPTY, which implies INFO.
-                pub fn minimum_severity(mut $self, severity: impl IntoSeverity) -> Self {
+                pub fn minimum_severity(mut $self, severity: impl Into<Severity>) -> Self {
                     let this = &mut $self$(.$self_arg)*;
-                    this.interest.min_severity = Some(severity.into_severity());
+                    this.interest.min_severity = Some(severity.into().into());
                     $self
                 }
             }

@@ -190,7 +190,6 @@ inline void PrintTo(const Attachment& attachment, std::ostream* os) {
 inline void PrintTo(const Annotation& annotation, std::ostream* os) {
   *os << fostr::Indent;
   *os << fostr::NewLine << "key: " << annotation.key;
-  *os << fostr::NewLine << "value: ";
   *os << fostr::NewLine << "value: " << annotation.value;
   *os << fostr::Outdent;
 }

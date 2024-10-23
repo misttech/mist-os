@@ -12,7 +12,7 @@ var tcpCoreExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{1, 3}:   Pass,
 	{1, 4}:   Pass,
 	{1, 5}:   Pass,
-	{1, 17}:  Pass,
+	{1, 17}:  Flaky,
 	{1, 18}:  Pass,
 	{1, 19}:  Pass,
 	{1, 20}:  Pass,

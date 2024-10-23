@@ -26,7 +26,7 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use validating_log_listener::{validate_log_dump, validate_log_stream};
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 pub struct TestHarness {
     inspector: Inspector,
@@ -148,16 +148,16 @@ impl TestHarness {
         let mut lm2 = copy_log_message(&lm1);
         let mut lm3 = copy_log_message(&lm1);
         let mut stream = self.create_stream(Arc::new(ComponentIdentity::unknown()));
-        stream.write_packet(&p);
+        stream.write_packet(p.clone());
 
         p.metadata.severity = LogLevelFilter::Info.into_primitive().into();
         lm2.severity = LogLevelFilter::Info.into_primitive().into();
         lm3.severity = LogLevelFilter::Info.into_primitive().into();
-        stream.write_packet(&p);
+        stream.write_packet(p.clone());
 
         p.metadata.pid = 2;
         lm3.pid = 2;
-        stream.write_packet(&p);
+        stream.write_packet(p);
         drop(stream);
         self.check_pending_streams();
         if test_dump_logs {
@@ -222,7 +222,7 @@ pub trait LogWriter {
     type Packet;
     fn connect(log_sink: &LogSinkProxy, sout: zx::Socket);
 
-    fn write(sout: &zx::Socket, packet: &Self::Packet);
+    fn write(sout: &zx::Socket, packet: Self::Packet);
 }
 
 /// A `LogWriter` that writes `fx_log_packet_t` to a LogSink in the syslog
@@ -240,19 +240,19 @@ impl LogWriter for LogPacketWriter {
         log_sink.connect(sout).expect("unable to connect out socket to log sink");
     }
 
-    fn write(sin: &zx::Socket, packet: &fx_log_packet_t) {
+    fn write(sin: &zx::Socket, packet: fx_log_packet_t) {
         sin.write(packet.as_bytes()).unwrap();
     }
 }
 
 impl LogWriter for StructuredMessageWriter {
-    type Packet = Record;
+    type Packet = Record<'static>;
 
     fn connect(log_sink: &LogSinkProxy, sin: zx::Socket) {
         log_sink.connect_structured(sin).expect("unable to connect out socket to log sink");
     }
 
-    fn write(sin: &zx::Socket, record: &Record) {
+    fn write(sin: &zx::Socket, record: Record<'_>) {
         let mut buffer = Cursor::new(vec![0; MAX_DATAGRAM_LEN]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(record).unwrap();
@@ -384,11 +384,11 @@ where
 {
     pub fn write_packets(&mut self, packets: Vec<P>) {
         for p in packets {
-            self.write_packet(&p);
+            self.write_packet(p);
         }
     }
 
-    pub fn write_packet(&mut self, packet: &P) {
+    pub fn write_packet(&mut self, packet: P) {
         E::write(&self.sin, packet);
     }
 }

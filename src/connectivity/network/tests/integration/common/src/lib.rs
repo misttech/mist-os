@@ -29,7 +29,7 @@ use futures::future::FutureExt as _;
 use futures::stream::{Stream, StreamExt as _, TryStreamExt as _};
 use futures::{select, Future};
 use std::pin::pin;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_netemul as fnetemul, zx};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_netemul as fnetemul};
 
 use crate::realms::TestSandboxExt as _;
 
@@ -243,7 +243,7 @@ pub async fn get_deprecated_netstack2_inspect_data(
                 println!("Failed to load hierarchy, retrying. Error: {err:?}")
             }
         }
-        fasync::Timer::new(fasync::Duration::from_millis(100)).await;
+        fasync::Timer::new(fasync::MonotonicDuration::from_millis(100)).await;
     }
 }
 

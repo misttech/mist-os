@@ -188,14 +188,14 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // 2) The mapping by writing to the underlying file.
   virtual zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo);
 
-  // If |IsRemote()| returns true, requests to open this Vnode using fuchsia.io/Openable.Open will
+  // If |IsRemote()| returns true, requests to open this Vnode using fuchsia.io/Directory.Open will
   // be forwarded to this function.
   virtual void OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                           fidl::ServerEnd<fuchsia_io::Node>) const;
 
   // If |IsRemote()| returns true, requests to open this Vnode via fuchsia.io/Directory.Open3 will
   // be forwarded to this function.
-  virtual void OpenRemote(fuchsia_io::wire::Directory2Open3Request request) const;
+  virtual void OpenRemote(fuchsia_io::wire::DirectoryOpen3Request request) const;
 
   // Instead of adding a |file_lock::FileLock| member variable to |Vnode|,
   // maintain a map from |this| to the lock objects. This is done, because

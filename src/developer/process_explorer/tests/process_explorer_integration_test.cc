@@ -16,7 +16,7 @@
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
 #include "lib/sys/component/cpp/testing/realm_builder_types.h"
-#include "src/developer/process_explorer/utils.h"
+#include "src/developer/process_explorer/process_data.h"
 #include "src/lib/fsl/socket/strings.h"
 
 namespace process_explorer {

@@ -19,6 +19,7 @@ debug::Status DebuggedJob::Init(DebuggedJobCreateInfo&& info) {
     return debug::Status("Cannot initialize DebuggedJob with an invalid JobHandle.");
   }
 
+  type_ = info.type;
   job_handle_ = std::move(info.handle);
 
   if (auto status = job_handle_->WatchJobExceptions(this, info.type); status.has_error()) {

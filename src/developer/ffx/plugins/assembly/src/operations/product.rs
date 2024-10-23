@@ -51,9 +51,12 @@ Resulting product is not supported and may misbehave!
 
     let product_path = product;
 
+    let board_info_path = board_info;
+
     // If there are developer overrides, then those need to be parsed  and applied before other
     // actions can be taken, since they impact how the rest of the assembly process works.
-    let (platform, product, developer_overrides) = if let Some(overrides_path) = developer_overrides
+    let (platform, product, board_info, developer_overrides) = if let Some(overrides_path) =
+        developer_overrides
     {
         // If developer overrides are in use, parse to intermediate types so
         // that overrides can be applied.
@@ -72,31 +75,41 @@ Resulting product is not supported and may misbehave!
         print_developer_overrides_banner(&developer_overrides, &overrides_path)
             .context("Displaying developer overrides.")?;
 
-        // Extract the platform and product config developer overrides so that we can apply them to the
-        // product-provided platform and product configs.
+        // Extract the platform, product, and board config developer overrides so that we can apply
+        // them to the product and board configs.
         let platform_config_overrides = developer_overrides.platform;
         let product_config_overrides = developer_overrides.product;
+        let board_config_overrides = developer_overrides.board;
 
-        let config_path = if file_relative_paths { Some(&product_path) } else { None };
+        let product_config_path = if file_relative_paths { Some(&product_path) } else { None };
 
         let mut platform: PlatformConfig = merge_override_values_with_resolved_paths(
             platform,
-            config_path,
+            product_config_path,
             platform_config_overrides,
         )
         .context("Merging developer overrides into platform configuration")?;
         let product = merge_override_values_with_resolved_paths(
             product,
-            config_path,
+            product_config_path,
             product_config_overrides,
         )
         .context("Merging developer overrides into product configuration")?;
+        let board_info = read_config::<serde_json::Value>(&board_info_path)
+            .context("Reading board information")?;
+        let board_info = merge_override_values_with_resolved_paths(
+            board_info,
+            Some(&board_info_path),
+            board_config_overrides,
+        )
+        .context("Merging developer overrides into board configuration")?;
 
         // Reconstitute the developer overrides struct, but with a null platform and product
         // configs, since they've been used to modify the main platform and product configurations.
         let developer_overrides = DeveloperOverrides {
             platform: serde_json::Value::Null,
             product: serde_json::Value::Null,
+            board: serde_json::Value::Null,
             ..developer_overrides
         };
 
@@ -107,26 +120,23 @@ Resulting product is not supported and may misbehave!
         }
         let platform = platform;
 
-        (platform, product, Some(developer_overrides))
+        (platform, product, board_info, Some(developer_overrides))
     } else {
-        let config: AssemblyConfig =
-            read_config(&product_path).context("Reading product configuration")?;
-        if config.file_relative_paths {
-            let resolved_config = config
+        let config = read_config::<AssemblyConfig>(&product_path)
+            .context("Reading product configuration")?;
+        let config = if config.file_relative_paths {
+            config
                 .resolve_paths_from_file(&product_path)
-                .context("Resoving paths in product config")?;
-            (resolved_config.platform, resolved_config.product, None)
+                .context("Resolving paths in product config")?
         } else {
-            (config.platform, config.product, None)
-        }
+            config
+        };
+        let board_info = read_config::<BoardInformation>(&board_info_path)
+            .context("Reading board configuration")?
+            .resolve_paths_from_file(&board_info_path)
+            .context("Resolving paths in board config")?;
+        (config.platform, config.product, board_info, None)
     };
-
-    let board_info_path = board_info;
-    let board_info = read_config::<BoardInformation>(&board_info_path)
-        .context("Reading board information")?
-        // and then resolve the file-relative paths to be relative to the cwd instead.
-        .resolve_paths_from_file(&board_info_path)
-        .context("Resolving paths in board configuration.")?;
 
     // Parse the board's Board Input Bundles, if it has them, and merge their
     // configuration fields into that of the board_info struct.
@@ -447,6 +457,14 @@ fn print_developer_overrides_banner(
         println!();
         println!("  Product Configuration Overrides / Additions:");
         for line in serde_json::to_string_pretty(&overrides.product)?.lines() {
+            println!("    {}", line);
+        }
+    }
+
+    if overrides.board.as_object().is_some_and(|p| !p.is_empty()) {
+        println!();
+        println!("  Board Configuration Overrides / Additions:");
+        for line in serde_json::to_string_pretty(&overrides.board)?.lines() {
             println!("    {}", line);
         }
     }

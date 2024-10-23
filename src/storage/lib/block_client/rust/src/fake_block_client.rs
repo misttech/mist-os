@@ -4,11 +4,11 @@
 
 use async_trait::async_trait;
 use block_client::{BlockClient, BufferSlice, MutableBufferSlice, VmoId, WriteOptions};
+use fidl_fuchsia_hardware_block as block;
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::atomic::{self, AtomicU32};
 use std::sync::Mutex;
-use {fidl_fuchsia_hardware_block as block, zx};
 
 type VmoRegistry = BTreeMap<u16, zx::Vmo>;
 

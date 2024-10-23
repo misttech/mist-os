@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
+use fuchsia_async as fasync;
 use futures::{AsyncReadExt, AsyncWriteExt, StreamExt};
 use machina_virtio_device::{GuestMem, WrappedDescChainStream};
 use virtio_device::chain::{ReadableChain, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
-use {fuchsia_async as fasync, zx};
 
 pub struct ConsoleDevice {
     // Guest end of a socket provided by the controller.

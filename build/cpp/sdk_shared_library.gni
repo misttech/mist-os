@@ -24,13 +24,14 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     [string] The API area responsible for maintaining this library.
 #     See //build/sdk/sdk_atom.gni.
 #
-#     Override path to the file representing the API of this library.
+#   api (optional)
+#     Override path for the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
 #     explicitly acknowledged.
-#     If not specified, the path will be "<SDK name>.api".
-#     Only allowed when `no_headers` is false.
+#     If not specified, the path will be "<sdk_name>.api".
+#     Not allowed when `no_headers` is true.
 #
-#   symbols_api
+#   symbols_api (required)
 #     Path to the ifs file containing the public symbols of this library.
 #     This file is used to ensure modifications to the library's ABI are
 #     explicitly acknowledged.
@@ -161,10 +162,12 @@ template("sdk_shared_library") {
       defined(invoker.symbols_api),
       "Must define path to an ifs file. See comment in //build/cpp/verify_public_symbols.gni")
 
+  output_name = target_name
   if (defined(invoker.output_name)) {
+    assert(
+        invoker.output_name != output_name,
+        "The specified `output_name` (`${invoker.output_name}`) matches the default. `output_name` only needs to be specified when overriding the default.")
     output_name = invoker.output_name
-  } else {
-    output_name = target_name
   }
 
   assert(
@@ -472,6 +475,9 @@ template("sdk_shared_library") {
     } else {
       api = "${atom_name}.api"
       if (defined(invoker.api)) {
+        assert(
+            rebase_path(invoker.api, "//") != rebase_path(api, "//"),
+            "The specified `api` file (`${invoker.api}`) matches the default. `api` only needs to be specified when overriding the default.")
         api = invoker.api
       }
 

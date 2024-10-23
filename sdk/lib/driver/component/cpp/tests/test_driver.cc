@@ -165,25 +165,13 @@ void TestDriver::Stop() { g_driver_stopped = true; }
 zx::result<> TestDriver::InitSyncCompat() {
   auto result = sync_device_server_.Initialize(incoming(), outgoing(), node_name(), "child",
                                                compat::ForwardMetadata::All());
-  if (result.is_ok()) {
-    FDF_LOG(INFO, "The topological path is %s",
-            sync_device_server_.inner().topological_path().c_str());
-  }
-
   return result;
 }
 
 void TestDriver::BeginInitAsyncCompat(fit::callback<void(zx::result<>)> completed) {
   async_device_server_.Begin(
       incoming(), outgoing(), node_name(), "child",
-      [this, completed_cb = std::move(completed)](zx::result<> result) mutable {
-        if (result.is_ok()) {
-          FDF_LOG(INFO, "The topological path is %s",
-                  async_device_server_.inner().topological_path().c_str());
-        }
-
-        completed_cb(result);
-      },
+      [completed_cb = std::move(completed)](zx::result<> result) mutable { completed_cb(result); },
       compat::ForwardMetadata::All());
 }
 

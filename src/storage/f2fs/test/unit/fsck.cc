@@ -385,9 +385,9 @@ TEST(FsckTest, InvalidNatEntry) {
 
     // Find data blkaddr.
     {
-      auto result = root_dir->FindDataBlkAddr(0);
-      ASSERT_TRUE(result.is_ok());
-      data_blkaddr = result.value();
+      zx::result addrs_or = root_dir->GetDataBlockAddresses(0, 1, true);
+      ASSERT_TRUE(addrs_or.is_ok());
+      data_blkaddr = addrs_or->front();
     }
 
     std::vector<fbl::RefPtr<VnodeF2fs>> vnodes;
@@ -478,9 +478,9 @@ TEST(FsckTest, InvalidSsaEntry) {
     // Find data blkaddr.
     {
       target_file_ino = file->GetKey();
-      auto result = file->FindDataBlkAddr(0);
-      ASSERT_TRUE(result.is_ok());
-      data_blkaddr = result.value();
+      zx::result addrs_or = file->GetDataBlockAddresses(0, 1, true);
+      ASSERT_TRUE(addrs_or.is_ok());
+      data_blkaddr = addrs_or->front();
     }
 
     ASSERT_EQ(file->Close(), ZX_OK);

@@ -384,6 +384,21 @@ struct NaturalCodingTraits<fidl::basic_time<ClockId>, NaturalCodingConstraintEmp
   }
 };
 
+template <zx_clock_t ClockId>
+struct NaturalCodingTraits<fidl::basic_ticks<ClockId>, NaturalCodingConstraintEmpty> {
+  static constexpr size_t kInlineSize = sizeof(zx_ticks_t);
+  static constexpr bool kIsMemcpyCompatible = true;
+
+  static void Encode(NaturalEncoder* encoder, const fidl::basic_ticks<ClockId>* value,
+                     size_t offset, size_t recursion_depth) {
+    *encoder->template GetPtr<zx_ticks_t>(offset) = value->get();
+  }
+  static void Decode(NaturalDecoder* decoder, fidl::basic_ticks<ClockId>* value, size_t offset,
+                     size_t recursion_depth) {
+    *value = fidl::basic_ticks<ClockId>(*decoder->template GetPtr<zx_ticks_t>(offset));
+  }
+};
+
 template <typename T, typename Constraint>
 struct NaturalCodingTraits<cpp17::optional<std::vector<T>>, Constraint> {
   static constexpr size_t kInlineSize = sizeof(fidl_vector_t);

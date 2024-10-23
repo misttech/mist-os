@@ -16,7 +16,7 @@ use test_manager::{
 };
 use tracing::warn;
 use url::Url;
-use {fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager, zx};
+use {fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager};
 
 // If this much time elapses from a test suite's start without it connecting to the fuzz-registry,
 // the test is assumed to not be a fuzz test.

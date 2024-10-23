@@ -8,13 +8,13 @@ use assert_matches::assert_matches;
 use cm_rust::*;
 use cm_rust_testing::*;
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
 use futures::channel::mpsc;
 use lazy_static::lazy_static;
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::execution_scope::ExecutionScope;
 use vfs::remote::RemoteLike;
 use zx::AsHandleRef;
-use {fidl_fuchsia_io as fio, zx};
 
 use crate::model::actions::{ActionsManager, DestroyAction};
 use crate::model::component::StartReason;

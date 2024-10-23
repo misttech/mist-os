@@ -21,7 +21,7 @@ use netstack3_core::neighbor::{LinkResolutionContext, LinkResolutionResult};
 use netstack3_core::routes::{NextHop, ResolvedRoute};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
 use crate::bindings::routes::rules_state::RuleInterest;

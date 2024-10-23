@@ -292,7 +292,7 @@ pub async fn write_instance_info(
     let instance_root = if let Some(context) = env_context {
         context.get("repository.process_dir")?
     } else {
-        ffx_config::get("repository.process_dir").await?
+        ffx_config::get("repository.process_dir")?
     };
     let mgr = PkgServerInstances::new(instance_root);
 

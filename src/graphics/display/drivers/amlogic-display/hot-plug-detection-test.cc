@@ -56,9 +56,9 @@ class HotPlugDetectionTest : public ::testing::Test {
   GpioResources GetPinGpioResources() {
     fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> pin_gpio_client = GetPinGpioClient();
     zx::interrupt pin_gpio_interrupt = runtime_.PerformBlockingWork([&]() -> zx::interrupt {
-      fidl::WireResult result = fidl::WireCall(pin_gpio_client)->GetInterrupt2({});
+      fidl::WireResult result = fidl::WireCall(pin_gpio_client)->GetInterrupt({});
       ZX_ASSERT_MSG(result.ok(), "FIDL connection failed: %s", result.status_string());
-      fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::GetInterrupt2>& interrupt_value =
+      fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::GetInterrupt>& interrupt_value =
           result.value();
       ZX_ASSERT_MSG(interrupt_value.is_ok(), "GPIO GetInterrupt failed: %s",
                     zx_status_get_string(interrupt_value.error_value()));

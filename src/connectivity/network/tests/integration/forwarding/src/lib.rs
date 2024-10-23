@@ -4,7 +4,7 @@
 #![cfg(test)]
 
 use assert_matches::assert_matches;
-use fuchsia_async::{Duration, DurationExt, TimeoutExt};
+use fuchsia_async::{DurationExt, MonotonicDuration, TimeoutExt};
 use futures_util::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt, SinkExt, StreamExt};
 use net_declare::{fidl_ip, fidl_subnet};
 use net_types::ip::{Ipv4, Ipv6};
@@ -272,12 +272,12 @@ async fn forwarding<N: Netstack>(name: &str, setup_config: SetupConfig) {
 async fn send_ping_and_wait_response(
     source_realm: &netemul::TestRealm<'_>,
     addr: fnet::IpAddress,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 ) -> Option<Result<(), PingError>> {
     async fn inner<I: ping::FuchsiaIpExt>(
         source_realm: &netemul::TestRealm<'_>,
         addr: I::SockAddr,
-        timeout: Duration,
+        timeout: MonotonicDuration,
     ) -> Option<Result<(), PingError>> {
         const PAYLOAD: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         const SEQ: u16 = 1;
@@ -412,7 +412,7 @@ async fn probe_connectivity_with_udp(
     send_addr: &fnet::Subnet,
     receiver: &netemul::TestRealm<'_>,
     receive_addr: &fnet::Subnet,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 ) -> Result<(), ProbeError> {
     const PORT: u16 = 12345;
 

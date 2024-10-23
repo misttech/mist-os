@@ -11,7 +11,7 @@ use fidl_fuchsia_ui_input3::KeyEventType;
 use fuchsia_inspect::health::Reporter;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use metrics_registry::*;
-use {fidl_fuchsia_ui_input3 as fidl_ui_input3, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_ui_input3 as fidl_ui_input3, fuchsia_async as fasync};
 
 /// A [`KeyboardEvent`] represents an input event from a keyboard device.
 ///
@@ -606,8 +606,8 @@ impl KeyboardBinding {
 mod tests {
     use super::*;
     use crate::testing_utilities;
+    use fuchsia_async as fasync;
     use futures::StreamExt;
-    use {fuchsia_async as fasync, zx};
 
     /// Tests that a key that is present in the new report, but was not present in the previous report
     /// is propagated as pressed.

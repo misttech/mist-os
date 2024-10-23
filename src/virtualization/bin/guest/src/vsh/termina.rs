@@ -6,7 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_virtualization::{
     ContainerStatus, LinuxGuestInfo, LinuxManagerEvent, LinuxManagerProxy,
 };
-use fuchsia_async::{Duration, Interval};
+use fuchsia_async::{Interval, MonotonicDuration};
 
 use futures::future::ready;
 use futures::{select, stream, StreamExt};
@@ -124,7 +124,7 @@ pub async fn launch(linux_manager: &LinuxManagerProxy, w: &mut impl Write) -> Re
 
     let mut spinner = "|/-\\".chars().cycle();
     let mut end_of_line = 0;
-    let mut interval = Interval::new(Duration::from_millis(100));
+    let mut interval = Interval::new(MonotonicDuration::from_millis(100));
     let final_info = loop {
         info = select! {
             () = interval.select_next_some() => {

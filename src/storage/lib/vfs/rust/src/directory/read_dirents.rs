@@ -101,7 +101,7 @@ pub async fn read_dirents<'a>(
         TraversalPosition::End => {
             return Ok((TraversalPosition::End, sink.seal()));
         }
-        TraversalPosition::Name(_) => {
+        TraversalPosition::Name(_) | TraversalPosition::Bytes(_) => {
             unreachable!("the VFS should never send this to us, since we never return it here");
         }
     };

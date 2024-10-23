@@ -24,7 +24,7 @@ use std::pin::pin;
 use test_case::test_case;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_netemul_network as fnetemul_network, fuchsia_async as fasync, zx,
+    fidl_fuchsia_netemul_network as fnetemul_network, fuchsia_async as fasync,
 };
 
 const MAC: net_types::ethernet::Mac = net_declare::net_mac!("00:00:00:00:00:01");

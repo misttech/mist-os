@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.hrtimer") {
-  sdk_category = "internal"
   sources = [ "hrtimer.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.power.broker",

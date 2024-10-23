@@ -5,6 +5,7 @@
 use crate::dynamic_thread_spawner::DynamicThreadSpawner;
 use crate::task::{CurrentTask, Kernel, Task, ThreadGroup};
 use fragile::Fragile;
+use fuchsia_async as fasync;
 use once_cell::sync::OnceCell;
 use pin_project::pin_project;
 use starnix_sync::{Locked, Unlocked};
@@ -17,7 +18,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Weak;
 use std::task::{Context, Poll};
-use {fuchsia_async as fasync, zx};
 
 /// The threads that the kernel runs internally.
 ///

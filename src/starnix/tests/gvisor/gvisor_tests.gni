@@ -262,12 +262,12 @@ gvisor_tests_custom_manifest = [
   {
     test_name = "syslog_cap_syslog_test"
     binary = "syslog_test"
-    capabilities = [ "SYS_ADMIN" ]
+    capabilities = [ "SYSLOG" ]
   },
   {
     test_name = "syslog_cap_sys_admin_test"
     binary = "syslog_test"
-    capabilities = [ "SYSLOG" ]
+    capabilities = [ "SYS_ADMIN" ]
   },
 ]
 

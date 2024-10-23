@@ -7,7 +7,7 @@
 use crate::file::ReadError;
 use crate::node::{self, CloneError, CloseError, OpenError, RenameError};
 use fidl::endpoints::{ClientEnd, ServerEnd};
-use fuchsia_async::{Duration, DurationExt, TimeoutExt};
+use fuchsia_async::{DurationExt, MonotonicDuration, TimeoutExt};
 use futures::future::BoxFuture;
 use futures::stream::{self, BoxStream, StreamExt};
 use std::collections::VecDeque;
@@ -678,7 +678,7 @@ impl DirEntry {
 /// to specify the maximum time to wait for a directory to be read.
 pub fn readdir_recursive_filtered<'a, ResultFn, RecurseFn>(
     dir: &'a fio::DirectoryProxy,
-    timeout: Option<Duration>,
+    timeout: Option<MonotonicDuration>,
     results_filter: ResultFn,
     recurse_filter: RecurseFn,
 ) -> BoxStream<'a, Result<DirEntry, RecursiveEnumerateError>>
@@ -776,7 +776,7 @@ where
 /// read.
 pub fn readdir_recursive(
     dir: &fio::DirectoryProxy,
-    timeout: Option<Duration>,
+    timeout: Option<MonotonicDuration>,
 ) -> BoxStream<'_, Result<DirEntry, RecursiveEnumerateError>> {
     readdir_recursive_filtered(
         dir,
@@ -840,7 +840,7 @@ pub async fn readdir(dir: &fio::DirectoryProxy) -> Result<Vec<DirEntry>, Enumera
 /// takes longer than the given `timeout` duration.
 pub async fn readdir_with_timeout(
     dir: &fio::DirectoryProxy,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 ) -> Result<Vec<DirEntry>, EnumerateError> {
     readdir(&dir).on_timeout(timeout.after_now(), || Err(EnumerateError::Timeout)).await
 }
@@ -857,7 +857,7 @@ pub async fn dir_contains(dir: &fio::DirectoryProxy, name: &str) -> Result<bool,
 pub async fn dir_contains_with_timeout(
     dir: &fio::DirectoryProxy,
     name: &str,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 ) -> Result<bool, EnumerateError> {
     Ok(readdir_with_timeout(&dir, timeout).await?.iter().any(|e| e.name == name))
 }
@@ -1005,10 +1005,10 @@ mod tests {
 
     #[cfg(target_os = "fuchsia")]
     #[cfg(target_os = "fuchsia")]
-    const LONG_DURATION: Duration = Duration::from_seconds(30);
+    const LONG_DURATION: MonotonicDuration = MonotonicDuration::from_seconds(30);
 
     #[cfg(not(target_os = "fuchsia"))]
-    const LONG_DURATION: Duration = Duration::from_secs(30);
+    const LONG_DURATION: MonotonicDuration = MonotonicDuration::from_secs(30);
 
     proptest! {
         #[test]

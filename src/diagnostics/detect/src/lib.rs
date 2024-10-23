@@ -15,6 +15,7 @@ use argh::FromArgs;
 use delay_tracker::DelayTracker;
 use fidl_fuchsia_diagnostics_test::DetectControllerRequestStream;
 use fidl_fuchsia_feedback::MAX_CRASH_SIGNATURE_LENGTH;
+use fuchsia_async as fasync;
 use fuchsia_async::Task;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::health::Reporter;
@@ -32,7 +33,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use triage_detect_config::Config as ComponentConfig;
-use {fuchsia_async as fasync, zx};
 
 const MINIMUM_CHECK_TIME_NANOS: i64 = 60 * 1_000_000_000;
 const CONFIG_GLOB: &str = "/config/data/*.triage";

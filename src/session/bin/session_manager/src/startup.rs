@@ -10,7 +10,7 @@ use tracing::info;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
-    fidl_fuchsia_session as fsession, fuchsia_async as fasync, zx,
+    fidl_fuchsia_session as fsession, fuchsia_async as fasync,
 };
 
 /// Errors returned by calls startup functions.

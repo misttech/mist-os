@@ -6,27 +6,30 @@ use crate::{DictExt, RoutingError};
 use async_trait::async_trait;
 use cm_types::IterablePath;
 use router_error::RouterError;
-use sandbox::{Capability, Request, Routable, Router};
+use sandbox::{
+    Capability, Dict, Request, Routable, Router, SpecificRoutable, SpecificRouter,
+    SpecificRouterResponse,
+};
 use std::fmt::Debug;
 
-/// Implements the `lazy_get` function for [`Routable`] objects.
-pub trait LazyGet: Routable {
-    /// Returns a router that requests capabilities from the specified `path` relative to
+/// Implements the `lazy_get` function for [`SpecificRoutable<Dict>`].
+pub trait LazyGet: SpecificRoutable<Dict> {
+    /// Returns a router that requests a dictionary from the specified `path` relative to
     /// the base routable or fails the request with `not_found_error` if the member is not
-    /// found. The base routable should resolve with a dictionary capability.
+    /// found.
     fn lazy_get<P>(self, path: P, not_found_error: RoutingError) -> Router
     where
         P: IterablePath + Debug + 'static;
 }
 
-impl<T: Routable + 'static> LazyGet for T {
+impl<T: SpecificRoutable<Dict> + 'static> LazyGet for T {
     fn lazy_get<P>(self, path: P, not_found_error: RoutingError) -> Router
     where
         P: IterablePath + Debug + 'static,
     {
         #[derive(Debug)]
         struct ScopedDictRouter<P: IterablePath + Debug + 'static> {
-            router: Router,
+            router: SpecificRouter<Dict>,
             path: P,
             not_found_error: RoutingError,
         }
@@ -43,7 +46,7 @@ impl<T: Routable + 'static> LazyGet for T {
                 // obtain the actual Dict and not its debug info.
                 let init_request = request.as_ref().map(|r| r.try_clone()).transpose()?;
                 match self.router.route(init_request, false).await? {
-                    Capability::Dictionary(dict) => {
+                    SpecificRouterResponse::<Dict>::Capability(dict) => {
                         let request = request.as_ref().map(|r| r.try_clone()).transpose()?;
                         let maybe_capability = dict
                             .get_with_request(
@@ -64,7 +67,7 @@ impl<T: Routable + 'static> LazyGet for T {
         }
 
         Router::new(ScopedDictRouter {
-            router: Router::new(self),
+            router: SpecificRouter::<Dict>::new(self),
             path,
             not_found_error: not_found_error.into(),
         })

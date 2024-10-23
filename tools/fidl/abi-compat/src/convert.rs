@@ -170,7 +170,7 @@ pub trait ConvertType {
 impl ConvertType for ir::Type {
     fn identifier(&self) -> Option<&str> {
         match self {
-            ir::Type::Request { subtype, .. } => Some(subtype),
+            ir::Type::Endpoint { protocol, .. } => Some(protocol),
             ir::Type::Identifier { identifier, .. } => Some(identifier),
             _ => None,
         }
@@ -208,50 +208,51 @@ impl ConvertType for ir::Type {
                 crate::compare::HandleRights::from_bits(*rights)
                     .ok_or_else(|| anyhow!("invalid handle rights bits 0x{:x}", *rights))?,
             ),
-            ir::Type::Request { protocol_transport, subtype, nullable } => {
-                let decl = context.get(subtype)?;
-                if let ir::Declaration::Protocol(protocol) = decl {
-                    compare::Type::ServerEnd(
+            ir::Type::Endpoint { role, protocol_transport, protocol, nullable } => {
+                let decl = context.get(protocol)?;
+                let ir::Declaration::Protocol(protocol_decl) = decl else {
+                    panic!("endpoint had a protocol that wasn't a protocol: {decl:?}")
+                };
+
+                match role {
+                    ir::EndpointRole::Client => compare::Type::ClientEnd(
                         context.path(),
-                        protocol.name.clone(),
+                        protocol_decl.name.clone(),
                         protocol_transport.into(),
                         convert_nullable(nullable),
-                        Box::new(convert_protocol(&protocol, &context)?),
-                    )
-                } else {
-                    panic!("Got server_end for {decl:?}");
+                        Box::new(convert_protocol(&protocol_decl, &context)?),
+                    ),
+
+                    ir::EndpointRole::Server => compare::Type::ServerEnd(
+                        context.path(),
+                        protocol_decl.name.clone(),
+                        protocol_transport.into(),
+                        convert_nullable(nullable),
+                        Box::new(convert_protocol(&protocol_decl, &context)?),
+                    ),
                 }
             }
-            ir::Type::Identifier { identifier, nullable, protocol_transport } => {
+            ir::Type::Identifier { identifier, nullable } => {
                 if let Some(cycle) = context.find_identifier_cycle(identifier) {
                     compare::Type::Cycle(context.path(), identifier.clone(), cycle + 1)
                 } else {
                     let decl = context.get(identifier)?;
-                    if let ir::Declaration::Protocol(protocol) = decl {
-                        compare::Type::ClientEnd(
-                            context.path(),
-                            protocol.name.clone(),
-                            protocol_transport.into(),
-                            convert_nullable(nullable),
-                            Box::new(convert_protocol(&protocol, &context)?),
-                        )
-                    } else {
-                        assert!(protocol_transport.is_none());
-                        let path = context.path();
-                        let t = match decl {
-                            ir::Declaration::Bits(decl) => decl.convert(&context)?,
-                            ir::Declaration::Enum(decl) => decl.convert(&context)?,
-                            ir::Declaration::Struct(decl) => decl.convert(&context)?,
-                            ir::Declaration::Table(decl) => decl.convert(&context)?,
-                            ir::Declaration::Union(decl) => decl.convert(&context)?,
-                            ir::Declaration::Protocol(_) => panic!("Handled in the if let above."),
-                        };
-
-                        if *nullable {
-                            compare::Type::Box(path, Box::new(t))
-                        } else {
-                            t
+                    let path = context.path();
+                    let t = match decl {
+                        ir::Declaration::Bits(decl) => decl.convert(&context)?,
+                        ir::Declaration::Enum(decl) => decl.convert(&context)?,
+                        ir::Declaration::Struct(decl) => decl.convert(&context)?,
+                        ir::Declaration::Table(decl) => decl.convert(&context)?,
+                        ir::Declaration::Union(decl) => decl.convert(&context)?,
+                        ir::Declaration::Protocol(_) => {
+                            panic!("Identifiers cannot refer to protocols")
                         }
+                    };
+
+                    if *nullable {
+                        compare::Type::Box(path, Box::new(t))
+                    } else {
+                        t
                     }
                 }
             }
@@ -377,16 +378,13 @@ impl ConvertType for ir::Declaration {
         match self {
             ir::Declaration::Bits(decl) => decl.convert(&context),
             ir::Declaration::Enum(decl) => decl.convert(&context),
-            ir::Declaration::Protocol(decl) => Ok(compare::Type::ClientEnd(
-                context.path(),
-                decl.name.clone(),
-                compare::Transport::Channel,    /* TODO */
-                compare::Optionality::Required, /* TODO */
-                Box::new(convert_protocol(decl, &context)?),
-            )),
             ir::Declaration::Struct(decl) => decl.convert(&context),
             ir::Declaration::Table(decl) => decl.convert(&context),
             ir::Declaration::Union(decl) => decl.convert(&context),
+            ir::Declaration::Protocol(decl) => panic!(
+                "Protocols are not type declarations and thus can't be converted to types: {:?}",
+                decl
+            ),
         }
     }
 }

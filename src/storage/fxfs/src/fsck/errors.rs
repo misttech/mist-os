@@ -253,6 +253,10 @@ pub enum FsckError {
     BadGraveyardValue(u64, u64),
     MissingEncryptionKeys(u64, u64),
     MissingKey(u64, u64, u64),
+    EncryptedChildDirectoryNoWrappingKey(u64, u64),
+    EncryptedDirectoryHasUnencryptedChild(u64, u64, u64),
+    UnencryptedDirectoryHasEncryptedChild(u64, u64, u64),
+    ChildEncryptedWithDifferentWrappingKeyThanParent(u64, u64, u64, u128, u128),
     DuplicateKey(u64, u64, u64),
     ZombieFile(u64, u64, Vec<u64>),
     ZombieDir(u64, u64, u64),
@@ -424,6 +428,36 @@ impl FsckError {
             FsckError::MissingKey(store_id, object_id, key_id) => {
                 format!("Missing encryption key for <{}, {}, {}>", store_id, object_id, key_id)
             }
+            FsckError::EncryptedChildDirectoryNoWrappingKey(store_id, object_id) => {
+                format!(
+                    "Encrypted directory {} in store {} does not have a wrapping key id set",
+                    object_id, store_id
+                )
+            }
+            FsckError::EncryptedDirectoryHasUnencryptedChild(store_id, parent_oid, child_oid) => {
+                format!(
+                    "Encrypted parent directory {} in store {} has unencrypted child {}",
+                    parent_oid, store_id, child_oid
+                )
+            }
+            FsckError::UnencryptedDirectoryHasEncryptedChild(store_id, parent_oid, child_oid) => {
+                format!(
+                    "Unencrypted parent directory {} in store {} has encrypted child {}",
+                    parent_oid, store_id, child_oid
+                )
+            }
+            FsckError::ChildEncryptedWithDifferentWrappingKeyThanParent(
+                store_id,
+                parent_id,
+                child_id,
+                parent_wrapping_key_id,
+                child_wrapping_key_id,
+            ) => {
+                format!(
+                    "Parent directory {} in store {} encrypted with {}, child {} encrypted with {}",
+                    parent_id, store_id, parent_wrapping_key_id, child_id, child_wrapping_key_id
+                )
+            }
             FsckError::DuplicateKey(store_id, object_id, key_id) => {
                 format!("Duplicate key for <{}, {}, {}>", store_id, object_id, key_id)
             }
@@ -593,6 +627,37 @@ impl FsckError {
             }
             FsckError::MissingKey(store_id, oid, key_id) => {
                 error!(store_id, oid, key_id, "Missing encryption key");
+            }
+            FsckError::EncryptedChildDirectoryNoWrappingKey(store_id, oid) => {
+                error!(store_id, oid, "Encrypted directory does not have a wrapping key id");
+            }
+            FsckError::EncryptedDirectoryHasUnencryptedChild(store_id, parent_oid, child_oid) => {
+                error!(
+                    store_id,
+                    parent_oid, child_oid, "Encrypted directory has unencrypted child"
+                );
+            }
+            FsckError::UnencryptedDirectoryHasEncryptedChild(store_id, parent_oid, child_oid) => {
+                error!(
+                    store_id,
+                    parent_oid, child_oid, "Unencrypted directory has encrypted child"
+                );
+            }
+            FsckError::ChildEncryptedWithDifferentWrappingKeyThanParent(
+                store_id,
+                parent_id,
+                child_id,
+                parent_wrapping_key_id,
+                child_wrapping_key_id,
+            ) => {
+                error!(
+                    store_id,
+                    parent_id,
+                    child_id,
+                    parent_wrapping_key_id,
+                    child_wrapping_key_id,
+                    "Child directory encrypted with different wrapping key than parent"
+                );
             }
             FsckError::DuplicateKey(store_id, oid, key_id) => {
                 error!(store_id, oid, key_id, "Duplicate key")

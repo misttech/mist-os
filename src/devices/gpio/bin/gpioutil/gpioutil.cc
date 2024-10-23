@@ -311,7 +311,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_pin::Debug> client, GpioFun
         return -2;
       }
 
-      auto result = gpio_client->GetInterrupt2({});
+      auto result = gpio_client->GetInterrupt({});
       if (!result.ok()) {
         fprintf(stderr, "Call to get GPIO interrupt failed: %s\n",
                 result.FormatDescription().c_str());

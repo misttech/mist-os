@@ -24,6 +24,7 @@
 #include <zircon/fidl.h>
 #include <zircon/syscalls.h>
 
+#include <cstddef>
 #include <cstdio>
 
 #include "sdk/lib/zxio/private.h"
@@ -734,6 +735,22 @@ zx_status_t AttributesGetCommon(const fidl::WireSyncClient<Protocol>& client,
   return ZX_OK;
 }
 
+bool NodeAttrHasAtLeastOne(const zxio_node_attributes_t::zxio_node_attr_has_t& has) {
+  // Avoid using any reinterpret casting to catch if this turns into a bitfield, use the first
+  // member instead, ensuring that it is still the first member.
+  static_assert(offsetof(zxio_node_attributes_t::zxio_node_attr_has_t, protocols) == 0);
+  const bool* has_ptr = &has.protocols;
+  bool result = false;
+
+  // Ensure that we can't exceed the size of the struct no matter what ends up inside it.
+  static_assert(sizeof(has) % sizeof(has.protocols) == 0);
+  constexpr size_t members = sizeof(has) / sizeof(has.protocols);
+  for (size_t i = 0; i < members; ++i) {
+    result = result || has_ptr[i];
+  }
+  return result;
+}
+
 template <typename Protocol, typename ToIo1ModePermissions>
 zx_status_t AttrSetCommon(const fidl::WireSyncClient<Protocol>& client, ToIo1ModePermissions to_io1,
                           const zxio_node_attributes_t* attr) {
@@ -747,8 +764,7 @@ zx_status_t AttrSetCommon(const fidl::WireSyncClient<Protocol>& client, ToIo1Mod
     flags |= fio::wire::NodeAttributeFlags::kModificationTime;
     remaining.modification_time = false;
   }
-  constexpr zxio_node_attributes_t::zxio_node_attr_has_t all_absent = {};
-  if (remaining != all_absent) {
+  if (NodeAttrHasAtLeastOne(remaining)) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   const fidl::WireResult result = client->SetAttr(flags, ToNodeAttributes(*attr, to_io1));

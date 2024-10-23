@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -12,7 +13,6 @@ use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path as VfsPath;
 use vfs::{immutable_attributes, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest};
-use {fidl_fuchsia_io as fio, zx};
 
 /// The pkgfs /ctl/validation directory, except it contains only the "missing" file (e.g. does not
 /// have the "present" file).

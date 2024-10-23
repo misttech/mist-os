@@ -11,6 +11,7 @@ import datetime
 import enum
 import itertools
 import logging
+import math
 import operator
 import os
 import re
@@ -20,7 +21,7 @@ import subprocess
 import time
 from collections import deque
 from collections.abc import Iterable, Iterator, Mapping
-from typing import Any, Self, Sequence
+from typing import Any, BinaryIO, Self, Sequence
 
 from trace_processing import trace_model, trace_time
 
@@ -402,6 +403,7 @@ class Sample:
         aux_current: float | str | None = None,
         power: float | str | None = None,
         rail_id: int = 1,
+        rail_name: str | None = None,
     ) -> None:
         self.timestamp = int(timestamp)
         self.current = float(current)
@@ -413,6 +415,7 @@ class Sample:
             float(power) if power is not None else self.current * self.voltage
         )
         self.rail_id = rail_id
+        self.rail_name = rail_name
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, Sample):
@@ -424,13 +427,14 @@ class Sample:
             and self.aux_current == other.aux_current
             and self.power == other.power
             and self.rail_id == other.rail_id
+            and self.rail_name == other.rail_name
         )
 
     def __repr__(self) -> str:
         return (
             f"ts: {self.timestamp}ms, current: {self.current}, "
             f"voltage: {self.voltage}, aux: {self.aux_current}, "
-            f"power: {self.power}, rail: {self.rail_id}"
+            f"power: {self.power}, rail_id: {self.rail_id}, rail_name: {self.rail_name}"
         )
 
 
@@ -483,10 +487,27 @@ def _append_power_data(
         fake_thread_koid = 0x8C01_1EC7_EDDA_7A20  # CollectedData20
         fake_thread_ref = 0xFF
 
-        def inline_string_ref(string: str) -> int:
-            # Inline fxt ids have their top bit set to 1. The remaining bits indicate the number of
-            # inline bytes.
-            return 0x8000 | len(string)
+        BYTES_PER_WORD = 8
+
+        class InlineString:
+            def __init__(self, s: str):
+                self.num_words: int = math.ceil(len(s) / BYTES_PER_WORD)
+
+                # Inline fxt ids have their top bit set to 1.
+                # The remaining bits indicate the number of inline bytes are valid.
+                self.ref: int = 0x8000 | len(s)
+
+                # Pad the word with 0x00 bytes to fill a full multiple of words.
+                size = self.num_words * BYTES_PER_WORD
+                assert (
+                    len(s) <= size
+                ), f"String {s} is longer than {size} bytes."
+                tail_zeros = "\0" * (size - len(s))
+                b = bytes(s + tail_zeros, "utf-8")
+                assert (
+                    len(b) == size
+                ), f"Binary string {b!r} must be {size} bytes."
+                self.data: bytes = b
 
         # See //docs/reference/tracing/trace-format for the below trace format
         def thread_record_header(thread_ref: int) -> int:
@@ -521,28 +542,30 @@ def _append_power_data(
         ZX_OBJ_TYPE_THREAD = 2
 
         # Name the fake process
+        process_name = InlineString("Power Measurements")
         merged_trace.write(
             kernel_object_record_header(
                 0,
-                inline_string_ref("Power Measurements"),
+                process_name.ref,
                 ZX_OBJ_TYPE_PROCESS,
-                5,  # 1 word header, 1 word koid, 3 words for name stream
+                process_name.num_words + 2,  # 1 word header, 1 word koid
             ).to_bytes(8, "little")
         )
         merged_trace.write(fake_process_koid.to_bytes(8, "little"))
-        merged_trace.write(b"Power Measurements\0\0\0\0\0\0")
+        merged_trace.write(process_name.data)
 
         # Name the fake thread
+        thread_name = InlineString("Power Measurements")
         merged_trace.write(
             kernel_object_record_header(
                 0,
-                inline_string_ref("Power Measurements"),
+                thread_name.ref,
                 ZX_OBJ_TYPE_THREAD,
-                5,  # 1 word header, 1 word koid, 3 words for name stream
+                thread_name.num_words + 2,  # 1 word header, 1 word koid
             ).to_bytes(8, "little")
         )
         merged_trace.write(fake_thread_koid.to_bytes(8, "little"))
-        merged_trace.write(b"Power Measurements\0\0\0\0\0\0")
+        merged_trace.write(thread_name.data)
 
         def counter_event_header(
             name_id: int,
@@ -565,11 +588,16 @@ def _append_power_data(
 
         # Now write our sample data as counter events into the trace
         for sample in power_samples:
+            category = InlineString("Metrics")
+            name = InlineString(sample.rail_name or "Metrics")
+
             # We will be providing either 3 or 4 arguments, depending on whether
-            # or not this sample has raw aux current data in it.  Each argument
-            # takes 3 words of storage.
+            # or not this sample has raw aux current data in it.
             arg_count = 4 if sample.aux_current is not None else 3
-            arg_words = arg_count * 3
+            words_per_arg = (
+                category.num_words + name.num_words + 1  # 1 word for header.
+            )
+            arg_words = arg_count * words_per_arg
 
             # Counter events can store up to 15 args only.
             assert arg_count <= 15
@@ -577,8 +605,8 @@ def _append_power_data(
             # Emit the counter track
             merged_trace.write(
                 counter_event_header(
-                    inline_string_ref("Metrics"),
-                    inline_string_ref("Metrics"),
+                    name.ref,
+                    category.ref,
                     0xFF,
                     arg_count,
                     # 1 word counter, 1 word ts,
@@ -592,58 +620,36 @@ def _append_power_data(
                 (sample.timestamp * TICKS_PER_NS) + starting_ticks
             )
             merged_trace.write(timestamp_ticks.to_bytes(8, "little"))
-            # Inline strings need to be 0 padded to a multiple of 8 bytes.
-            merged_trace.write(b"Metrics\0")
-            merged_trace.write(b"Metrics\0")
+            merged_trace.write(category.data)
+            merged_trace.write(name.data)
 
             def double_argument_header(name_ref: int, size: int) -> int:
                 argument_type = 5
                 return name_ref << 16 | size << 4 | argument_type
 
-            # Write the Voltage
-            merged_trace.write(
-                double_argument_header(
-                    inline_string_ref("Voltage"), 3
-                ).to_bytes(8, "little")
-            )
-            merged_trace.write(b"Voltage\0")
-            data = [sample.voltage]
-            s = struct.pack("d" * len(data), *data)
-            merged_trace.write(s)
-
-            # Write the Current
-            merged_trace.write(
-                double_argument_header(
-                    inline_string_ref("Current"), 3
-                ).to_bytes(8, "little")
-            )
-            merged_trace.write(b"Current\0")
-            data = [sample.current]
-            s = struct.pack("d" * len(data), *data)
-            merged_trace.write(s)
-
-            # Write the Power
-            merged_trace.write(
-                double_argument_header(inline_string_ref("Power"), 3).to_bytes(
-                    8, "little"
-                )
-            )
-            merged_trace.write(b"Power\0\0\0")
-            data = [sample.power]
-            s = struct.pack("d" * len(data), *data)
-            merged_trace.write(s)
-
-            # Write the raw aux current, if present.
-            if sample.aux_current is not None:
-                merged_trace.write(
+            def write_double_argument(
+                trace_file: BinaryIO, name: str, data: float
+            ) -> None:
+                # Words are 8 bytes. 2 for header and data. Variable for name.
+                name_string = InlineString(name)
+                words_total = 2 + name_string.num_words
+                trace_file.write(
                     double_argument_header(
-                        inline_string_ref("Raw Aux"), 3
+                        name_string.ref, words_total
                     ).to_bytes(8, "little")
                 )
-                merged_trace.write(b"Raw Aux\0")
-                data = [sample.aux_current]
-                s = struct.pack("d" * len(data), *data)
-                merged_trace.write(s)
+                trace_file.write(name_string.data)
+                s = struct.pack("d", data)
+                trace_file.write(s)
+
+            write_double_argument(merged_trace, "Voltage", sample.voltage)
+            write_double_argument(merged_trace, "Current", sample.current)
+            write_double_argument(merged_trace, "Power", sample.power)
+
+            if sample.aux_current is not None:
+                write_double_argument(
+                    merged_trace, "Raw Aux", sample.aux_current
+                )
 
             # Write the counter_id, taken as the power rail's ID.
             merged_trace.write(sample.rail_id.to_bytes(8, "little"))
@@ -931,10 +937,43 @@ class GonkSample:
         )
 
 
+def read_gonk_header(csv_path: str) -> list[str]:
+    """Get power rail names based on Gonk CSV header."""
+    with open(csv_path, "r") as power_csv:
+        reader = csv.reader(power_csv)
+        headers = next(reader)
+        headers = [h.strip() for h in headers]
+        assert (
+            headers[0] == "host_time"
+        ), f"Header should be host_time: {headers[0]}"
+        assert (
+            headers[1] == "delta_micros"
+        ), f"Header should be delta_micros: {headers[1]}"
+        names = headers[2:-1]
+        assert (
+            headers[-1] == "comment"
+        ), f"Header should be comment: {headers[-1]}"
+
+        # Number of samples must be a multiple of 3 for voltage, current, power on n rails.
+        assert (
+            len(names) % 3 == 0
+        ), f"Number of sample header columns must be a multiple of 3. names={names}"
+
+        # Only look at the voltage samples to get the rail names (prefixed with 'V_').
+        # Current and power samples are assumed to have similar names.
+        num_rails = len(names) // 3
+
+        return [
+            n.lstrip("V_").replace("(", "_").replace(")", "").strip("_")
+            for n in names[:num_rails]
+        ]
+
+
 def read_gonk_samples(csv_path: str) -> Iterator[GonkSample]:
     with open(csv_path, "r") as power_csv:
         reader = csv.reader(power_csv)
-        # No header expected. Just read values line by line.
+        # Skip the header.
+        next(reader)
         prev_time = trace_time.TimePoint(0)
         for line in reader:
             sample = GonkSample.from_values(line, prev_time)
@@ -943,7 +982,10 @@ def read_gonk_samples(csv_path: str) -> Iterator[GonkSample]:
 
 
 def merge_gonk_data(
-    model: trace_model.Model, gonk_samples: Iterable[GonkSample], fxt_path: str
+    model: trace_model.Model,
+    gonk_samples: Iterable[GonkSample],
+    fxt_path: str,
+    rail_names: list[str],
 ) -> None:
     """Merges gonk_samples into model, placing merged trace at fxt_path.
 
@@ -1019,6 +1061,7 @@ def merge_gonk_data(
                     aux_current=None,
                     power=s.powers[i],
                     rail_id=(i + 1),
+                    rail_name=rail_names[i],
                 )
             )
 

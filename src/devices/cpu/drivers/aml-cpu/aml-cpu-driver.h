@@ -17,14 +17,12 @@ class AmlCpuPerformanceDomain : public AmlCpu {
  public:
   AmlCpuPerformanceDomain(async_dispatcher_t* dispatcher,
                           const std::vector<operating_point_t>& operating_points,
-                          const perf_domain_t& perf_domain)
-      : AmlCpu(operating_points, perf_domain),
+                          const perf_domain_t& perf_domain, inspect::ComponentInspector& inspect)
+      : AmlCpu(operating_points, perf_domain, inspect),
         dispatcher_(dispatcher),
         devfs_connector_(fit::bind_member<&AmlCpuPerformanceDomain::CpuCtrlConnector>(this)) {}
 
   zx::result<> AddChild(fidl::WireSyncClient<fuchsia_driver_framework::Node>& node);
-
-  zx::vmo inspect_vmo() { return inspector_.DuplicateVmo(); }
 
   void CpuCtrlConnector(fidl::ServerEnd<fuchsia_hardware_cpu_ctrl::Device> server);
 

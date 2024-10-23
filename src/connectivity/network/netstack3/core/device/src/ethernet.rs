@@ -26,7 +26,7 @@ use netstack3_base::{
 use netstack3_ip::nud::{
     LinkResolutionContext, NudBindingsTypes, NudHandler, NudState, NudTimerId, NudUserConfig,
 };
-use netstack3_ip::IpPacketDestination;
+use netstack3_ip::{DeviceIpLayerMetadata, IpPacketDestination};
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::arp::{peek_arp_types, ArpHardwareType, ArpNetworkType};
 use packet_formats::ethernet::{
@@ -449,8 +449,8 @@ impl<CC, BC> ReceivableFrameMeta<CC, BC> for RecvEthernetFrameMeta<CC::DeviceId>
 where
     BC: EthernetIpLinkDeviceBindingsContext + TracingContext,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv4>, BC>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv6>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata, Ipv4>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata, Ipv6>, BC>
         + ArpPacketHandler<EthernetLinkDevice, BC>
         + DeviceSocketHandler<EthernetLinkDevice, BC>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>
@@ -524,7 +524,11 @@ where
                 });
                 core_ctx.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv4>::new(device_id, Some(frame_dst)),
+                    RecvIpFrameMeta::<_, _, Ipv4>::new(
+                        device_id,
+                        Some(frame_dst),
+                        DeviceIpLayerMetadata::default(),
+                    ),
                     buffer,
                 )
             }
@@ -534,7 +538,11 @@ where
                 });
                 core_ctx.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv6>::new(device_id, Some(frame_dst)),
+                    RecvIpFrameMeta::<_, _, Ipv6>::new(
+                        device_id,
+                        Some(frame_dst),
+                        DeviceIpLayerMetadata::default(),
+                    ),
                     buffer,
                 )
             }

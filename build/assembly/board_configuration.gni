@@ -299,7 +299,7 @@ template("board_configuration") {
       sources = [ _dtb_path ]
       outputs = [ "${files.board_configuration_dir}/${_dtb_rebased_path}" ]
 
-      deps = [ devicetree + ".dtb" ]
+      deps = [ devicetree ]
     }
 
     creation_deps += [ ":${target_name}.devicetree" ]

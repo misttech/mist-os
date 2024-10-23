@@ -256,7 +256,7 @@ closed protocol Channel {
     /// array of raw `zx_handle_t` handle values while `zx_channel_read_etc()` returns
     /// an array of `zx_handle_info_t` structures of the form:
     ///
-    /// ```
+    /// ```c
     /// typedef struct {
     ///     zx_handle_t handle;     // handle value
     ///     zx_obj_type_t type;     // type of object, see ZX_OBJ_TYPE_
@@ -529,7 +529,7 @@ closed protocol Channel {
     /// addition it will perform operations for the handles that are being
     /// transferred with *handles* being an array of `zx_handle_disposition_t`:
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_handle_disposition {
     ///     zx_handle_op_t operation;
     ///     zx_handle_t handle;
@@ -950,7 +950,7 @@ closed protocol Channel {
     /// `zx_channel_read_etc()` and `zx_channel_write_etc()` are instead specified with
     /// `zx_channel_call_etc_args_t`:
     ///
-    /// ```
+    /// ```c
     /// typedef struct {
     ///     const void* wr_bytes;
     ///     zx_handle_disposition_t* wr_handles;

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
@@ -42,7 +42,7 @@ inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
 inline constexpr bool kLogDeviceAddErrorRemove = true;
-inline constexpr bool kLogDeviceInfo = true;
+inline constexpr bool kLogDeviceInfo = false;
 
 inline constexpr bool kTraceInspector = false;
 inline constexpr bool kLogObjectLifetimes = false;
@@ -481,4 +481,4 @@ inline std::ostream& operator<<(std::ostream& out,
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_LOGGING_H_

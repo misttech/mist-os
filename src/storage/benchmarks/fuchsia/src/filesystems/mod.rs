@@ -5,13 +5,13 @@
 use async_trait::async_trait;
 use delivery_blob::{CompressionMode, Type1Blob};
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
+use fidl_fuchsia_io as fio;
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
 use fs_management::FSConfig;
 use fuchsia_merkle::Hash;
 use std::path::Path;
 use storage_benchmarks::block_device::BlockDevice;
 use storage_benchmarks::{CacheClearableFilesystem, Filesystem};
-use {fidl_fuchsia_io as fio, zx};
 
 mod blobfs;
 mod f2fs;

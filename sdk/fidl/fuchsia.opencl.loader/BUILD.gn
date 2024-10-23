@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.opencl.loader") {
-  sdk_category = "internal"
-
   sources = [ "opencl_loader.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 

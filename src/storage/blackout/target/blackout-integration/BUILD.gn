@@ -17,6 +17,7 @@ rustc_binary("blackout-integration-bin") {
   testonly = true
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/storage/blackout/target/lib:blackout-target",

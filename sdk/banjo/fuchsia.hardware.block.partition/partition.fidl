@@ -41,4 +41,10 @@ closed protocol BlockPartition {
         status zx.Status;
         name string:<MAX_PARTITION_NAME_LENGTH, optional>;
     });
+
+    /// Get the flags of the partition.
+    strict GetFlags() -> (struct {
+        status zx.Status;
+        flags uint64;
+    });
 };

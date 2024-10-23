@@ -1,0 +1,52 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+
+rustc_library("types") {
+  name = "diagnostics_log_types"
+  with_unit_tests = true
+  edition = "2021"
+
+  deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  # Some host tools use serde to serialize/deserialize severity.
+  features = []
+  if (is_host) {
+    features += [ "serde" ]
+    deps += [
+      "//third_party/rust_crates:schemars",
+      "//third_party/rust_crates:serde",
+    ]
+  }
+
+  sources = [
+    "src/lib.rs",
+    "src/serde_ext.rs",
+  ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+}
+
+# Provided for users who need to use serde in the target.
+rustc_library("types-serde") {
+  name = "diagnostics_log_types_serde"
+  with_unit_tests = true
+  edition = "2021"
+  source_root = "src/serde_lib.rs"
+
+  deps = [
+    ":types",
+    "//third_party/rust_crates:serde",
+  ]
+
+  sources = [
+    "src/serde_ext.rs",
+    "src/serde_lib.rs",
+  ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+}

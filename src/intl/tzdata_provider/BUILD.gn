@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//src/lib/icu/tzdata/icu_tzdata_resource.gni")
 import("//src/lib/intl/tz/zoneinfo_resource.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("tzdata_provider") {
   testonly = true

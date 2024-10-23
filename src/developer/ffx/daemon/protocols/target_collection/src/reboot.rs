@@ -232,7 +232,7 @@ impl RebootController {
             _ => {
                 //TODO(125639): Remove when Power Manager stabilizes
                 let use_ssh_for_reboot: bool =
-                    ffx_config::get(USE_SSH_FOR_REBOOT_FROM_PRODUCT).await.unwrap_or(false);
+                    ffx_config::get(USE_SSH_FOR_REBOOT_FROM_PRODUCT).unwrap_or(false);
 
                 if use_ssh_for_reboot {
                     let res = run_ssh_command(Rc::downgrade(&self.target), state).await;

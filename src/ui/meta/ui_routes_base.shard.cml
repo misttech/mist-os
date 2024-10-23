@@ -113,6 +113,7 @@
                 "fuchsia.ui.IdleThresholdMs",
                 "fuchsia.ui.SupportedInputDevices",
                 "fuchsia.ui.ViewingDistance",
+                "fuchsia.ui.VisualDebuggingLevel",
             ],
             from: "parent",
             to: [ "#ui" ],

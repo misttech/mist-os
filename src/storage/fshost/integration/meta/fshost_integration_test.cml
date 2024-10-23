@@ -12,7 +12,10 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.process.Launcher" ],
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.process.Launcher",
+            ],
         },
     ],
     offer: [

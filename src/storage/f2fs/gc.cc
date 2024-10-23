@@ -329,12 +329,7 @@ zx_status_t SegmentManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned 
 
     LockedPage data_page;
     const size_t block_index = start_bidx + ofs_in_node;
-    // Keeps as long as dir vnodes use discardable vmos.
-    if (vnode_or->IsReg()) {
-      if (auto err = vnode_or->GrabLockedPage(block_index, &data_page); err != ZX_OK) {
-        continue;
-      }
-    } else if (auto err = vnode_or->GetLockedDataPage(block_index, &data_page); err != ZX_OK) {
+    if (vnode_or->GrabLockedPage(block_index, &data_page) != ZX_OK) {
       continue;
     }
 
@@ -352,7 +347,7 @@ zx_status_t SegmentManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned 
       // the pages.
       size_t start = data_page->GetKey();
       data_page.reset();
-      vnode_or->TruncateHole(start, start + 1, false);
+      vnode_or->TruncateHoleUnsafe(start, start + 1, false);
       continue;
     }
     data_page.SetDirty();

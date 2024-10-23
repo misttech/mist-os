@@ -35,6 +35,7 @@ class LinuxProcessHandle final : public ProcessHandle, public LinuxTaskObserver 
   debug::Status Kill() override;
   int64_t GetReturnCode() const override { return task_->exit_code(); }
   debug::Status Attach(ProcessHandleObserver* observer) override;
+  bool IsAttached() const override;
   void Detach() override;
   uint64_t GetLoaderBreakpointAddress() override;
   std::vector<debug_ipc::AddressRegion> GetAddressSpace(uint64_t address) const override;

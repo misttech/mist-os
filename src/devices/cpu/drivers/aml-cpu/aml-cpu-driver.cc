@@ -135,7 +135,8 @@ zx::result<std::unique_ptr<AmlCpuPerformanceDomain>> AmlCpuDriver::BuildPerforma
     power_client = std::move(client_end_result.value());
   }
 
-  auto device = std::make_unique<AmlCpuPerformanceDomain>(dispatcher(), pd_op_points, perf_domain);
+  auto device = std::make_unique<AmlCpuPerformanceDomain>(dispatcher(), pd_op_points, perf_domain,
+                                                          inspector());
 
   auto st = device->Init(std::move(pll_div16_client), std::move(cpu_div16_client),
                          std::move(cpu_scaler_client), std::move(power_client));
@@ -168,7 +169,6 @@ zx::result<> AmlCpuPerformanceDomain::AddChild(
                    .connector(std::move(connector.value()))
                    .connector_supports(fuchsia_device_fs::ConnectionType::kDevice |
                                        fuchsia_device_fs::ConnectionType::kController)
-                   .inspect(inspector_.DuplicateVmo())
                    .class_name("cpu-ctrl");
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)

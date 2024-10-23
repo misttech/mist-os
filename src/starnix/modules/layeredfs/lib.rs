@@ -85,6 +85,7 @@ impl FsNodeOps for LayeredNodeOps {
 
     fn lookup(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -92,7 +93,7 @@ impl FsNodeOps for LayeredNodeOps {
         if let Some(fs) = self.fs.mappings.get(name) {
             Ok(fs.root().node.clone())
         } else {
-            self.fs.base_fs.root().node.lookup(current_task, &MountInfo::detached(), name)
+            self.fs.base_fs.root().node.lookup(locked, current_task, &MountInfo::detached(), name)
         }
     }
 }

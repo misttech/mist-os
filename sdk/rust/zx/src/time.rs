@@ -133,12 +133,6 @@ impl MonotonicInstant {
 
 impl BootInstant {
     /// Get the current boot time which advances during system suspend.
-    ///
-    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
-    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
-    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
-    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
-    /// clock begins pausing during suspend.
     pub fn get() -> Self {
         // SAFETY: FFI call that is always sound to call.
         unsafe { Self::from_nanos(sys::zx_clock_get_boot()) }
@@ -189,12 +183,6 @@ impl BootTicks {
     /// Read the number of high-precision timer ticks on the boot timeline. These ticks may be
     /// processor cycles, high speed timer, profiling timer, etc. They advance while the
     /// system is suspended.
-    ///
-    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
-    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
-    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
-    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
-    /// clock begins pausing during suspend.
     pub fn get() -> Self {
         // SAFETY: FFI call that is always sound to call.
         Self(unsafe { sys::zx_ticks_get_boot() }, std::marker::PhantomData)
@@ -265,12 +253,6 @@ pub struct MonotonicTimeline;
 impl Timeline for MonotonicTimeline {}
 
 /// A marker type for the system's boot timeline which continues running during suspend.
-///
-/// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
-/// not yet available in the stable vdso. This currently uses the monotonic clock which is
-/// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
-/// suspend in the near future. This will be migrated to the boot clock before the monotonic
-/// clock begins pausing during suspend.
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BootTimeline;
 impl Timeline for BootTimeline {}
@@ -488,12 +470,6 @@ impl Timer<BootTimeline> {
     /// syscall.
     ///
     /// If the timer elapses while the system is suspended it will not wake the system.
-    ///
-    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
-    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
-    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
-    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
-    /// clock begins pausing during suspend.
     ///
     /// # Panics
     ///

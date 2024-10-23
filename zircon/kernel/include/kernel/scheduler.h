@@ -8,6 +8,9 @@
 
 #include <lib/fit/function.h>
 #include <lib/fxt/interned_string.h>
+#include <lib/power-management/controller-dpc.h>
+#include <lib/power-management/energy-model.h>
+#include <lib/power-management/power-state.h>
 #include <lib/relaxed_atomic.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -388,6 +391,16 @@ class Scheduler {
   }
   static cpu_mask_t PeekIdleMask() { return idle_schedulers_.load(ktl::memory_order_relaxed); }
   static bool PeekIsIdle(cpu_num_t cpu) { return (PeekIdleMask() & cpu_num_to_mask(cpu)) != 0; }
+
+  void SetPowerDomain(fbl::RefPtr<power_management::PowerDomain> domain) TA_EXCL(queue_lock_) {
+    Guard<MonitoredSpinLock, IrqSave> g(&queue_lock_, SOURCE_TAG);
+    power_state_.SetOrUpdateDomain(std::move(domain));
+  }
+
+  zx::result<> SetPowerLevel(size_t power_level) TA_EXCL(queue_lock_) {
+    Guard<MonitoredSpinLock, IrqSave> g(&queue_lock_, SOURCE_TAG);
+    return power_state_.UpdatePowerLevel(power_level);
+  }
 
  private:
   friend struct Thread;
@@ -881,6 +894,16 @@ class Scheduler {
     }();
   }
 
+  power_management::ControllerDpc::TransitionDetails GetPowerLevelTransitionDetails() {
+    // This method will be called from the DPC thread, to obtain the data required for the
+    // transition.
+    Guard<MonitoredSpinLock, IrqSave> guard(&queue_lock_, SOURCE_TAG);
+    power_management::ControllerDpc::TransitionDetails details = {
+        .domain = power_state_.domain(), .request = pending_power_level_transition_};
+    pending_power_level_transition_.reset();
+    return details;
+  }
+
   // Add a couple of small no-op helpers which inform the static analyzer of
   // some properties which are very difficult to apply to the lambdas used in
   // the functional programming patterns below.  Neither of these methods
@@ -1010,7 +1033,7 @@ class Scheduler {
   SchedTime target_preemption_time_ns_{ZX_TIME_INFINITE};
 
   // The sum of the expected runtimes of all active threads on this CPU. This
-  // value is an estimate of the average queuimg time for this CPU, given the
+  // value is an estimate of the average queuing time for this CPU, given the
   // current set of active threads.
   TA_GUARDED(queue_lock_)
   SchedDuration total_expected_runtime_ns_{0};
@@ -1039,18 +1062,18 @@ class Scheduler {
   // Performance scale of this CPU relative to the highest performance CPU. This
   // value is initially determined from the system topology, when available, and
   // by userspace performance/thermal management at runtime.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale performance_scale_{1};
+  TA_GUARDED(queue_lock_) SchedPerformanceScale performance_scale_ { 1 };
   TA_GUARDED(queue_lock_)
   RelaxedAtomic<SchedPerformanceScale> performance_scale_reciprocal_{SchedPerformanceScale{1}};
 
   // Performance scale requested by userspace. The operational performance scale
   // is updated to this value (possibly adjusted for the minimum allowed value)
   // on the next reschedule, after the current thread's accounting is updated.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale pending_user_performance_scale_{1};
+  TA_GUARDED(queue_lock_) SchedPerformanceScale pending_user_performance_scale_ { 1 };
 
   // Default performance scale, determined from the system topology, when
   // available.
-  TA_GUARDED(queue_lock_) SchedPerformanceScale default_performance_scale_{1};
+  TA_GUARDED(queue_lock_) SchedPerformanceScale default_performance_scale_ { 1 };
 
   // The CPU this scheduler instance is associated with.
   // NOTE: This member is not initialized to prevent clobbering the value set
@@ -1088,6 +1111,18 @@ class Scheduler {
   // Scheduler::LockHandoff to release the previous thread's lock after a
   // context switch operation has fully completed.
   Thread* previous_thread_{nullptr};
+
+  // Contains the power domain, energy model and controller for this scheduler's CPU.
+  TA_GUARDED(queue_lock_) power_management::PowerState power_state_;
+
+  // Wraps a `Timer` and `Dpc` object. The only method provided in this object is meant to be
+  // called from the scheduler context. It will arm the underlying Timer. When the DPC Task executes
+  // it will clear the stored pending transition.
+  TA_GUARDED(queue_lock_)
+  power_management::ControllerDpc power_level_controller_dpc_{
+      [this]() { return GetPowerLevelTransitionDetails(); }};
+  TA_GUARDED(queue_lock_)
+  ktl::optional<power_management::PowerLevelUpdateRequest> pending_power_level_transition_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_H_

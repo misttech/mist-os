@@ -7,7 +7,7 @@ pub mod names;
 #[doc(hidden)]
 pub use fuchsia_trace as __trace;
 
-use {fuchsia_trace as trace, zx};
+use fuchsia_trace as trace;
 
 /// Writes a duration event when the current scope exits. No event is written at the start of the
 /// duration. As with all wlan-trace macros, the category will be "wlan" by default.

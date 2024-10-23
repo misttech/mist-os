@@ -41,7 +41,9 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 use zerocopy::SplitByteSlice;
 
-use crate::internal::base::{IpCounters, IpDeviceMtuContext, IpPacketDestination};
+use crate::internal::base::{
+    DeviceIpLayerMetadata, IpCounters, IpDeviceMtuContext, IpPacketDestination,
+};
 use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
@@ -1206,6 +1208,7 @@ pub trait IpDeviceSendContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
         destination: IpPacketDestination<I, &Self::DeviceId>,
+        ip_layer_metadata: DeviceIpLayerMetadata,
         body: S,
         egress_proof: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>

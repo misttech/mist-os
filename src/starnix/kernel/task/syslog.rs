@@ -5,6 +5,7 @@
 use crate::task::{CurrentTask, EventHandler, WaitCallback, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::OutputBuffer;
 use diagnostics_data::{Data, Logs, Severity};
+use fidl_fuchsia_diagnostics as fdiagnostics;
 use fuchsia_component::client::connect_to_protocol_sync;
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
@@ -16,7 +17,6 @@ use std::cmp;
 use std::collections::VecDeque;
 use std::io::{self, Write};
 use std::sync::{mpsc, Arc};
-use {fidl_fuchsia_diagnostics as fdiagnostics, zx};
 
 const BUFFER_SIZE: i32 = 1_049_000;
 

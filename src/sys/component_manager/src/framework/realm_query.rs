@@ -29,7 +29,7 @@ use vfs::ToObjectRequest;
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
 };
 
 lazy_static! {
@@ -712,7 +712,7 @@ mod tests {
     use fidl::endpoints;
     use fidl::endpoints::{create_endpoints, create_proxy};
     use routing_test_helpers::component_id_index::make_index_file;
-    use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, zx};
+    use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio};
 
     fn is_closed(handle: impl fidl::AsHandleRef) -> bool {
         handle

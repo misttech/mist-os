@@ -7,6 +7,7 @@ use crate::meta_subdir::MetaSubdir;
 use crate::non_meta_subdir::NonMetaSubdir;
 use crate::{usize_to_u64_safe, Error, NonMetaStorageError};
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
 use fuchsia_pkg::MetaContents;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -21,7 +22,6 @@ use vfs::path::Path as VfsPath;
 use vfs::{
     immutable_attributes, CreationMode, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
 };
-use {fidl_fuchsia_io as fio, zx};
 
 /// The root directory of Fuchsia package.
 #[derive(Debug)]

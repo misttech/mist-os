@@ -8,20 +8,22 @@ use component_events::events::*;
 use component_events::matcher::*;
 use diagnostics_log_encoding::encode::EncoderOpts;
 use diagnostics_log_encoding::parse::parse_record;
-use diagnostics_log_encoding::{Argument, Record, Severity, Value};
-use fidl_fuchsia_diagnostics::Interest;
-use fidl_fuchsia_diagnostics_stream::{MAX_ARGS, MAX_ARG_NAME_LENGTH};
+use diagnostics_log_encoding::{Argument, Record};
+use diagnostics_log_validator_utils as utils;
+use fidl_fuchsia_diagnostics::{Interest, Severity};
 use fidl_fuchsia_logger::{
     LogSinkMarker, LogSinkRequest, LogSinkRequestStream, LogSinkWaitForInterestChangeResponder,
     MAX_DATAGRAM_LEN_BYTES,
 };
-use fidl_fuchsia_validate_logs::{LogSinkPuppetMarker, LogSinkPuppetProxy, PuppetInfo, RecordSpec};
+use fidl_fuchsia_validate_logs::{
+    self as fvalidate, LogSinkPuppetMarker, LogSinkPuppetProxy, PuppetInfo, RecordSpec, MAX_ARGS,
+    MAX_ARG_NAME_LENGTH,
+};
 use fuchsia_async::{Socket, Task};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
-
 use futures::channel::mpsc;
 use futures::prelude::*;
 use proptest::collection::vec;
@@ -62,7 +64,7 @@ struct Puppet {
     proxy: LogSinkPuppetProxy,
     _puppet_stopped_watchdog: Task<()>,
     new_file_line_rules: bool,
-    ignored_tags: Vec<Value>,
+    ignored_tags: Vec<String>,
     _instance: RealmInstance,
 }
 
@@ -201,7 +203,7 @@ impl Puppet {
             start_time,
             _puppet_stopped_watchdog,
             new_file_line_rules,
-            ignored_tags: ignored_tags.into_iter().map(Value::Text).collect(),
+            ignored_tags,
             _instance: instance,
         };
         if test_invalid_unicode {
@@ -275,7 +277,9 @@ impl Puppet {
             })?;
             if let Some(record) = record.as_mut() {
                 record.arguments.remove("tid");
-                record.arguments.insert("tid".to_string(), Value::UnsignedInt(expected_tid));
+                record
+                    .arguments
+                    .insert("tid".to_string(), fvalidate::Value::UnsignedInt(expected_tid));
             }
             return Ok(record);
         }
@@ -399,15 +403,13 @@ where
             let record = RecordSpec {
                 file: "test_file.cc".to_string(),
                 line: 9001,
-                record: Record {
-                    arguments: vec![Argument {
+                record: fvalidate::Record {
+                    arguments: vec![fvalidate::Argument {
                         name: "message".to_string(),
-                        value: diagnostics_log_encoding::Value::Text(
-                            stringify!($severity).to_string(),
-                        ),
+                        value: fvalidate::Value::Text(stringify!($severity).to_string()),
                     }],
-                    severity: Severity::$severity.into_primitive(),
-                    timestamp: 0,
+                    severity: Severity::$severity,
+                    timestamp: zx::BootInstant::ZERO,
                 },
             };
             puppet.proxy.emit_log(&record).await?;
@@ -509,13 +511,13 @@ async fn assert_dot_removal(puppet: &mut Puppet, new_file_line_rules: bool) -> R
     let record = RecordSpec {
         file: "../../test_file.cc".to_string(),
         line: 9001,
-        record: Record {
-            arguments: vec![Argument {
+        record: fvalidate::Record {
+            arguments: vec![fvalidate::Argument {
                 name: "key".to_string(),
-                value: diagnostics_log_encoding::Value::Text("value".to_string()),
+                value: fvalidate::Value::Text("value".to_string()),
             }],
-            severity: Severity::Error.into_primitive(),
-            timestamp: 0,
+            severity: Severity::Error,
+            timestamp: zx::BootInstant::ZERO,
         },
     };
     puppet.proxy.emit_log(&record).await?;
@@ -528,7 +530,7 @@ async fn assert_dot_removal(puppet: &mut Puppet, new_file_line_rules: bool) -> R
         RecordAssertion::new(&puppet.info, Severity::Error, false)
             .add_string("file", "test_file.cc")
             .add_string("key", "value")
-            .add_unsigned("line", 9001)
+            .add_unsigned("line", 9001u64)
             .build(puppet.start_time..zx::BootInstant::get())
     );
     info!("Dot removed");
@@ -541,15 +543,18 @@ struct TestVector {
     #[proptest(strategy = "severity_strategy()")]
     severity: Severity,
     #[proptest(strategy = "args_strategy()")]
-    args: Vec<(String, Value)>,
+    args: Vec<(String, fvalidate::Value)>,
 }
 
 impl TestVector {
-    fn record(&self) -> Record {
-        let mut record =
-            Record { arguments: vec![], severity: self.severity.into_primitive(), timestamp: 0 };
+    fn record(&self) -> fvalidate::Record {
+        let mut record = fvalidate::Record {
+            arguments: vec![],
+            severity: self.severity,
+            timestamp: zx::BootInstant::ZERO,
+        };
         for (name, value) in &self.args {
-            record.arguments.push(Argument { name: name.clone(), value: value.clone() });
+            record.arguments.push(fvalidate::Argument { name: name.clone(), value: value.clone() });
         }
         record
     }
@@ -557,12 +562,12 @@ impl TestVector {
 
 fn vector_filter(vector: &TestVector) -> bool {
     // check to make sure the generated message is small enough
-    let record = vector.record();
+    let record = utils::fidl_to_record(vector.record());
     // TODO(https://fxbug.dev/42145630) avoid this overallocation by supporting growth of the vec
     let mut buf = Cursor::new(vec![0; 1_000_000]);
     {
         diagnostics_log_encoding::encode::Encoder::new(&mut buf, EncoderOpts::default())
-            .write_record(&record)
+            .write_record(record)
             .unwrap();
     }
 
@@ -579,17 +584,17 @@ fn severity_strategy() -> impl Strategy<Value = Severity> {
     ]
 }
 
-fn args_strategy() -> impl Strategy<Value = Vec<(String, Value)>> {
+fn args_strategy() -> impl Strategy<Value = Vec<(String, fvalidate::Value)>> {
     let key_strategy = any::<String>().prop_filter(Reason::from("key too large"), move |s| {
         s.len() <= MAX_ARG_NAME_LENGTH as usize
     });
 
     let value_strategy = prop_oneof![
-        any::<String>().prop_map(|s| Value::Text(s)),
-        any::<i64>().prop_map(|n| Value::SignedInt(n)),
-        any::<u64>().prop_map(|n| Value::UnsignedInt(n)),
-        any::<f64>().prop_map(|f| Value::Floating(f)),
-        any::<bool>().prop_map(|f| Value::Boolean(f)),
+        any::<String>().prop_map(|s| fvalidate::Value::Text(s.into())),
+        any::<i64>().prop_map(|n| fvalidate::Value::SignedInt(n)),
+        any::<u64>().prop_map(|n| fvalidate::Value::UnsignedInt(n)),
+        any::<f64>().prop_map(|f| fvalidate::Value::Floating(f)),
+        any::<bool>().prop_map(|f| fvalidate::Value::Boolean(f)),
     ];
 
     vec((key_strategy, value_strategy), 0..=MAX_ARGS as usize)
@@ -606,12 +611,14 @@ impl TestCycle {
         let mut assertion = RecordAssertion::new(&info, vector.severity, new_file_line_rules);
         for (name, value) in vector.args {
             match value {
-                Value::Text(t) => assertion.add_string(&name, &t),
-                Value::SignedInt(n) => assertion.add_signed(&name, n),
-                Value::UnsignedInt(n) => assertion.add_unsigned(&name, n),
-                Value::Floating(f) => assertion.add_floating(&name, f),
-                Value::Boolean(f) => assertion.add_boolean(&name, f),
-                _ => unreachable!("we don't generate these"),
+                fvalidate::Value::Text(t) => assertion.add_string(&name, t.to_string()),
+                fvalidate::Value::SignedInt(n) => assertion.add_signed(&name, n),
+                fvalidate::Value::UnsignedInt(n) => assertion.add_unsigned(&name, n),
+                fvalidate::Value::Floating(f) => assertion.add_floating(&name, f),
+                fvalidate::Value::Boolean(f) => assertion.add_boolean(&name, f),
+                _ => {
+                    unreachable!("we don't generate unknown values")
+                }
             };
         }
 
@@ -624,15 +631,15 @@ const STUB_ERROR_LINE: u64 = 0x1A4;
 
 #[derive(Debug, PartialEq)]
 struct TestRecord {
-    timestamp: i64,
+    timestamp: zx::BootInstant,
     severity: Severity,
-    arguments: BTreeMap<String, Value>,
+    arguments: BTreeMap<String, fvalidate::Value>,
 }
 
 struct TestRecordParseArgs<'a> {
     buf: &'a [u8],
     new_file_line_rules: bool,
-    ignored_tags: &'a [Value],
+    ignored_tags: &'a [String],
     override_file_line: bool,
 }
 
@@ -642,24 +649,37 @@ impl TestRecord {
 
         let mut sorted_args = BTreeMap::new();
 
-        for Argument { name, value } in arguments {
-            // check for ignored tags
-            if name == "tag" && args.ignored_tags.iter().any(|t| t == &value) {
-                return Ok(None);
-            }
-
-            if (severity >= Severity::Error.into_primitive() || args.new_file_line_rules)
-                && args.override_file_line
-            {
-                if name == "file" {
-                    sorted_args.insert(name, Value::Text(STUB_ERROR_FILENAME.to_owned()));
-                    continue;
-                } else if name == "line" {
-                    sorted_args.insert(name, Value::UnsignedInt(STUB_ERROR_LINE));
-                    continue;
+        let error_or_file_line_rules_apply = (severity >= Severity::Error.into_primitive()
+            || args.new_file_line_rules)
+            && args.override_file_line;
+        for argument in arguments {
+            let name = argument.name().to_string();
+            match argument {
+                Argument::Tag(tag) => {
+                    // check for ignored tags
+                    if args.ignored_tags.iter().any(|t| t.as_str() == tag) {
+                        return Ok(None);
+                    }
+                }
+                Argument::File(_) => {
+                    if error_or_file_line_rules_apply {
+                        sorted_args
+                            .insert(name, fvalidate::Value::Text(STUB_ERROR_FILENAME.into()));
+                    } else {
+                        sorted_args.insert(name, utils::value_to_fidl(argument.value()));
+                    }
+                }
+                Argument::Line(_) => {
+                    if error_or_file_line_rules_apply {
+                        sorted_args.insert(name, fvalidate::Value::UnsignedInt(STUB_ERROR_LINE));
+                    } else {
+                        sorted_args.insert(name, utils::value_to_fidl(argument.value()));
+                    }
+                }
+                _ => {
+                    sorted_args.insert(name, utils::value_to_fidl(argument.value()));
                 }
             }
-            sorted_args.insert(name, value);
         }
 
         Ok(Some(Self {
@@ -679,7 +699,7 @@ impl PartialEq<RecordAssertion> for TestRecord {
 struct RecordAssertion {
     valid_times: Range<zx::BootInstant>,
     severity: Severity,
-    arguments: BTreeMap<String, Value>,
+    arguments: BTreeMap<String, fvalidate::Value>,
 }
 
 impl RecordAssertion {
@@ -704,7 +724,7 @@ impl RecordAssertion {
 
 impl PartialEq<TestRecord> for RecordAssertion {
     fn eq(&self, rhs: &TestRecord) -> bool {
-        self.valid_times.contains(&zx::BootInstant::from_nanos(rhs.timestamp))
+        self.valid_times.contains(&rhs.timestamp)
             && self.severity == rhs.severity
             && self.arguments == rhs.arguments
     }
@@ -712,7 +732,7 @@ impl PartialEq<TestRecord> for RecordAssertion {
 
 struct RecordAssertionBuilder {
     severity: Severity,
-    arguments: BTreeMap<String, Value>,
+    arguments: BTreeMap<String, fvalidate::Value>,
 }
 
 impl RecordAssertionBuilder {
@@ -724,28 +744,28 @@ impl RecordAssertionBuilder {
         }
     }
 
-    fn add_string(&mut self, name: &str, value: &str) -> &mut Self {
-        self.arguments.insert(name.to_owned(), Value::Text(value.to_owned()));
+    fn add_string(&mut self, name: &str, value: impl Into<String>) -> &mut Self {
+        self.arguments.insert(name.to_owned(), fvalidate::Value::Text(value.into().into()));
         self
     }
 
     fn add_unsigned(&mut self, name: &str, value: u64) -> &mut Self {
-        self.arguments.insert(name.to_owned(), Value::UnsignedInt(value));
+        self.arguments.insert(name.to_owned(), fvalidate::Value::UnsignedInt(value));
         self
     }
 
     fn add_signed(&mut self, name: &str, value: i64) -> &mut Self {
-        self.arguments.insert(name.to_owned(), Value::SignedInt(value));
+        self.arguments.insert(name.to_owned(), fvalidate::Value::SignedInt(value));
         self
     }
 
     fn add_floating(&mut self, name: &str, value: f64) -> &mut Self {
-        self.arguments.insert(name.to_owned(), Value::Floating(value));
+        self.arguments.insert(name.to_owned(), fvalidate::Value::Floating(value));
         self
     }
 
     fn add_boolean(&mut self, name: &str, value: bool) -> &mut Self {
-        self.arguments.insert(name.to_owned(), Value::Boolean(value));
+        self.arguments.insert(name.to_owned(), fvalidate::Value::Boolean(value));
         self
     }
 }

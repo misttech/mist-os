@@ -11,12 +11,12 @@ use crate::{input_device, mouse_binding, touch_binding};
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use core::cell::RefCell;
+use fidl_fuchsia_input_report as fidl_input_report;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::{ArrayProperty, Node as InspectNode};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use std::any::Any;
 use std::fmt::Debug;
-use {fidl_fuchsia_input_report as fidl_input_report, zx};
 
 struct GestureArenaInitialContenders {}
 
@@ -1284,10 +1284,10 @@ mod tests {
         use crate::utils::Size;
         use crate::{input_device, keyboard_binding, mouse_binding, touch_binding, Position};
         use assert_matches::assert_matches;
+        use fidl_fuchsia_input_report as fidl_input_report;
         use maplit::hashset;
         use std::cell::{Cell, RefCell};
         use std::rc::Rc;
-        use {fidl_fuchsia_input_report as fidl_input_report, zx};
 
         /// The gesture arena is mostly agnostic to the event details. Consequently, most
         /// tests can use the same lightly populated touchpad event.
@@ -3533,7 +3533,7 @@ mod tests {
         use maplit::hashset;
         use std::rc::Rc;
         use test_case::test_case;
-        use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync, zx};
+        use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync};
 
         struct EmptyContenderFactory {}
 

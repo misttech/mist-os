@@ -4,9 +4,9 @@
 
 use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
-use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn open_dir_without_describe_flag() {
@@ -895,5 +895,3 @@ async fn open3_open_existing_directory() {
         .await
         .expect("failed to open existing entry");
 }
-
-// TODO(https://fxbug.dev/42157659): Add open3 connect tests.

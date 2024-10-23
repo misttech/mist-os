@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.bluetooth.avdtp.test") {
-  sdk_category = "internal"
-
   sources = [
     "avdtp.fidl",
     "types.fidl",

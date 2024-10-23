@@ -5,6 +5,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use blackout_target::{Test, TestServer};
+use fidl_fuchsia_io as fio;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -35,11 +36,8 @@ impl Test for IntegrationTest {
         }
 
         // Make sure we have access to /dev
-        let proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
-            "/dev",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )
-        .expect("failed to open /dev");
+        let proxy = fuchsia_fs::directory::open_in_namespace("/dev", fio::PERM_READABLE)
+            .expect("failed to open /dev");
         let _: Vec<_> = proxy.query().await?;
 
         Ok(())

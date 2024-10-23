@@ -251,7 +251,9 @@ zx_status_t AddWifiComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
 
   constexpr uint32_t kSdioFunctionCount = 2;
   std::vector<fdf::ParentSpec> wifi_parents = {
-      fdf::ParentSpec{{kGpioWifiHostRules, kGpioWifiHostProperties}}};
+      fdf::ParentSpec{{kGpioWifiHostRules, kGpioWifiHostProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}},
+  };
   wifi_parents.reserve(wifi_parents.size() + kSdioFunctionCount);
   for (uint32_t i = 1; i <= kSdioFunctionCount; i++) {
     auto sdio_bind_rules = {
@@ -347,6 +349,9 @@ zx_status_t Astro::SdioInit() {
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
+
+  gpio_init_steps_.push_back(
+      GpioPull(S905D2_WIFI_SDIO_WAKE_HOST, fuchsia_hardware_pin::Pull::kNone));
 
   fdf::Arena wifi_arena('WIFI');
   auto status = AddWifiComposite(pbus_, fidl_arena, wifi_arena);

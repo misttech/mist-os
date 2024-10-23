@@ -12,10 +12,12 @@ use core::future::Future;
 use zx::Status;
 
 mod context;
+mod incoming;
 pub mod macros;
 mod server;
 
 pub use context::*;
+pub use incoming::*;
 
 /// Entry points into a driver for starting and stopping.
 ///

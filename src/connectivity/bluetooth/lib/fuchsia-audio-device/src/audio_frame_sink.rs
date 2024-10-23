@@ -121,8 +121,8 @@ mod tests {
     use fidl_fuchsia_hardware_audio::*;
     use fidl_fuchsia_media::{AudioChannelId, AudioPcmMode, PcmFormat};
     use fixture::fixture;
+    use fuchsia_async as fasync;
     use futures::AsyncWriteExt;
-    use {fuchsia_async as fasync, zx};
 
     const TEST_UNIQUE_ID: &[u8; 16] = &[5; 16];
     const TEST_CLOCK_DOMAIN: u32 = 0x00010203;

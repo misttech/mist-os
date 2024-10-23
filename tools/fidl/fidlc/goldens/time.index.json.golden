@@ -466,8 +466,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/time.test.fidl",
         "data": "ComplexInstants",
-        "start_offset": 123,
-        "end_offset": 138
+        "start_offset": 200,
+        "end_offset": 215
       },
       "members": [
         {
@@ -477,8 +477,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/time.test.fidl",
             "data": "monotonic",
-            "start_offset": 156,
-            "end_offset": 165
+            "start_offset": 233,
+            "end_offset": 242
           },
           "type": {
             "kind": "array"
@@ -491,11 +491,39 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/time.test.fidl",
             "data": "boot",
-            "start_offset": 200,
-            "end_offset": 204
+            "start_offset": 277,
+            "end_offset": 281
           },
           "type": {
             "kind": "vector"
+          }
+        },
+        {
+          "is_reserved": false,
+          "name": "monotonic_ticks",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/time.test.fidl",
+            "data": "monotonic_ticks",
+            "start_offset": 313,
+            "end_offset": 328
+          },
+          "type": {
+            "kind": "array"
+          }
+        },
+        {
+          "is_reserved": false,
+          "name": "boot_ticks",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/time.test.fidl",
+            "data": "boot_ticks",
+            "start_offset": 368,
+            "end_offset": 378
+          },
+          "type": {
+            "kind": "array"
           }
         }
       ]
@@ -534,6 +562,32 @@
             "data": "boot",
             "start_offset": 93,
             "end_offset": 97
+          },
+          "type": {
+            "kind": "primitive"
+          }
+        },
+        {
+          "name": "monotonic_ticks",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/time.test.fidl",
+            "data": "monotonic_ticks",
+            "start_offset": 118,
+            "end_offset": 133
+          },
+          "type": {
+            "kind": "primitive"
+          }
+        },
+        {
+          "name": "boot_ticks",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/time.test.fidl",
+            "data": "boot_ticks",
+            "start_offset": 159,
+            "end_offset": 169
           },
           "type": {
             "kind": "primitive"

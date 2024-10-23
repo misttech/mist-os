@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <lib/async/dispatcher.h>
@@ -313,4 +313,4 @@ class Inspector {
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_H_

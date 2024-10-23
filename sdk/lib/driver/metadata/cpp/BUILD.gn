@@ -32,6 +32,7 @@ sdk_source_set("cpp") {
   include_base = "//sdk"
 
   sources = [
+    "metadata.cc",
     "metadata.h",
     "metadata_server.h",
   ]

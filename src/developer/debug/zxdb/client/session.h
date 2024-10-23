@@ -198,6 +198,9 @@ class Session : public SettingStoreObserver {
     // be used to synchronize the stack explicitly but use the rest of the metadata from the
     // exception to keep the thread information in sync.
     bool skip_metadata_frames = false;
+    // Do not assume that we have symbols loaded for this process. Only dispatch the exception
+    // notification.
+    bool notify_only = false;
   };
 
   void HandleException(ThreadImpl* thread, const debug_ipc::NotifyException& notify,

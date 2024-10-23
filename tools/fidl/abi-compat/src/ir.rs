@@ -82,16 +82,23 @@ impl Constant {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum EndpointRole {
+    Client,
+    Server,
+}
+
 #[derive(Deserialize, Debug, Clone)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind_v2", rename_all = "snake_case")]
 pub enum Type {
     Array { element_count: u64, element_type: Box<Type> },
     StringArray { element_count: u64 },
     Vector { element_type: Box<Type>, maybe_element_count: Option<u64>, nullable: bool },
     String { maybe_element_count: Option<u64>, nullable: bool },
     Handle { nullable: bool, subtype: String, rights: u32 },
-    Request { protocol_transport: String, subtype: String, nullable: bool },
-    Identifier { identifier: String, nullable: bool, protocol_transport: Option<String> },
+    Endpoint { role: EndpointRole, protocol: String, protocol_transport: String, nullable: bool },
+    Identifier { identifier: String, nullable: bool },
     Internal { subtype: String },
     Primitive { subtype: String },
 }

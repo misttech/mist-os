@@ -83,36 +83,36 @@ zx::result<DentryInfo> Dir::FindInInlineDir(std::string_view name, fbl::RefPtr<P
   return zx::ok(ret);
 }
 
-zx_status_t Dir::MakeEmptyInlineDir(VnodeF2fs *vnode) {
+zx_status_t Dir::MakeEmptyInlineDir(ino_t parent_ino) {
   LockedPage ipage;
 
-  if (zx_status_t err = fs()->GetNodeManager().GetNodePage(vnode->Ino(), &ipage); err != ZX_OK)
+  if (zx_status_t err = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); err != ZX_OK)
     return err;
 
-  DirEntry *de = &InlineDentryArray(&(*ipage), *vnode)[0];
+  DirEntry *de = &InlineDentryArray(&(*ipage), *this)[0];
   de->name_len = CpuToLe(static_cast<uint16_t>(1));
   de->hash_code = 0;
-  de->ino = CpuToLe(vnode->Ino());
-  std::memcpy(InlineDentryFilenameArray(&(*ipage), *vnode)[0], ".", 1);
-  SetDirEntryType(*de, *vnode);
+  de->ino = CpuToLe(Ino());
+  std::memcpy(InlineDentryFilenameArray(&(*ipage), *this)[0], ".", 1);
+  SetDirEntryType(*de, *this);
 
-  de = &InlineDentryArray(&(*ipage), *vnode)[1];
+  de = &InlineDentryArray(&(*ipage), *this)[1];
   de->hash_code = 0;
   de->name_len = CpuToLe(static_cast<uint16_t>(2));
-  de->ino = CpuToLe(Ino());
-  std::memcpy(InlineDentryFilenameArray(&(*ipage), *vnode)[1], "..", 2);
-  SetDirEntryType(*de, *vnode);
+  de->ino = CpuToLe(parent_ino);
+  std::memcpy(InlineDentryFilenameArray(&(*ipage), *this)[1], "..", 2);
+  SetDirEntryType(*de, *this);
 
-  auto bits = vnode->GetBitmap(ipage.CopyRefPtr());
+  auto bits = GetBitmap(ipage.CopyRefPtr());
   ZX_DEBUG_ASSERT(bits.is_ok());
   bits->Set(0);
   bits->Set(1);
 
   ipage.SetDirty();
 
-  if (vnode->GetSize() < vnode->MaxInlineData()) {
-    vnode->SetSize(vnode->MaxInlineData());
-    vnode->SetFlag(InodeInfoFlag::kUpdateDir);
+  if (GetSize() < MaxInlineData()) {
+    SetSize(MaxInlineData());
+    SetFlag(InodeInfoFlag::kUpdateDir);
   }
 
   return ZX_OK;
@@ -211,7 +211,7 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
     if (bit_pos + slots <= MaxInlineDentry()) {
       ipage.WaitOnWriteback();
 
-      if (zx_status_t err = InitInodeMetadata(vnode); err != ZX_OK) {
+      if (zx_status_t err = vnode->InitInodeMetadata(); err != ZX_OK) {
         if (TestFlag(InodeInfoFlag::kUpdateDir)) {
           ClearFlag(InodeInfoFlag::kUpdateDir);
           SetDirty();

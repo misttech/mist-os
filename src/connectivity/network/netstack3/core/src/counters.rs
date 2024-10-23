@@ -284,6 +284,7 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         tx_illegal_loopback_address,
         version_rx,
         multicast_no_interest,
+        invalid_cached_conntrack_entry,
     } = counters;
     inspector.record_child("PacketTx", |inspector| {
         inspector.record_counter("Sent", send_ip_packet);
@@ -300,6 +301,7 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         inspector.record_counter("MulticastNoInterest", multicast_no_interest);
         inspector.record_counter("DeliveredUnicast", deliver_unicast);
         inspector.record_counter("DeliveredMulticast", deliver_multicast);
+        inspector.record_counter("InvalidCachedConntrackEntry", invalid_cached_conntrack_entry);
         inspector.delegate_inspectable(version_rx);
     });
     inspector.record_child("Forwarding", |inspector| {

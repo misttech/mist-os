@@ -8,7 +8,7 @@ use fidl::endpoints::create_proxy;
 use std::collections::HashMap;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
-    fidl_fuchsia_test as ftest, zx,
+    fidl_fuchsia_test as ftest,
 };
 
 pub async fn run_selinux_cases(
@@ -56,7 +56,7 @@ fn start_selinux(
     {
         for entry in entries {
             match entry.key.as_str() {
-                "binary" | "uid" | "seclabel" => {
+                "binary" | "uid" | "seclabel" | "fsseclabel" => {
                     program_entries.push(entry.clone());
                 }
                 _ => (),

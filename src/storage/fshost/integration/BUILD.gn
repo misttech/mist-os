@@ -30,6 +30,8 @@ rustc_library("fshost_test_fixture") {
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/lib/device-watcher/rust",
     "//sdk/rust/zx",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

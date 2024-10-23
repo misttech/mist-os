@@ -392,10 +392,11 @@ void PagerProxy::Dump(uint depth) {
     printf("  ");
   }
   if (active_request_) {
-    printf("  active %s request on pager port [0x%lx, 0x%lx)\n",
+    printf("  active %s request on pager port [0x%lx, 0x%lx) (port koid 0x%lx)\n",
            PageRequestTypeToString(GetRequestType(active_request_)),
            GetRequestOffset(active_request_),
-           GetRequestOffset(active_request_) + GetRequestLen(active_request_));
+           GetRequestOffset(active_request_) + GetRequestLen(active_request_),
+           port_.get()->get_koid());
   } else {
     printf("  no active request on pager port\n");
   }

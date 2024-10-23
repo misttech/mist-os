@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 
 use ffx_config::global_env_context;
 use ffx_process_args::{Args, ProcessCommand, Task};
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::{BuildInfo, ProviderProxy};
 use fidl_fuchsia_process_explorer::{
     ProcessExplorerGetStackTraceRequest, ProcessExplorerKillTaskRequest, ProcessExplorerProxy,
@@ -34,9 +34,7 @@ const BARRIER: &str = "<ffx symbolizer>\n";
 
 pub(crate) type Writer = MachineWriter<processed::ProcessesData>;
 
-// TODO(https://fxbug.dev/42059381): The plugin must remain experimental until the FIDL API is strongly typed.
 #[derive(FfxTool)]
-#[check(AvailabilityFlag("ffx_process"))]
 pub struct ProcessTool {
     #[with(moniker("/core/process_explorer"))]
     query_proxy: QueryProxy,
@@ -46,6 +44,8 @@ pub struct ProcessTool {
     provider_proxy: ProviderProxy,
     #[command]
     cmd: ProcessCommand,
+
+    task_writer: MachineWriter<raw::TasksData>,
 }
 
 fho::embedded_plugin!(ProcessTool);
@@ -54,32 +54,37 @@ fho::embedded_plugin!(ProcessTool);
 impl FfxMain for ProcessTool {
     type Writer = Writer;
 
-    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        handle_cmd(self.query_proxy, self.explorer_proxy, self.provider_proxy, self.cmd, writer)
-            .await
-            .map_err(Into::into)
+    async fn main(self, writer: Writer) -> fho::Result<()> {
+        self.handle_cmd(writer).await.map_err(Into::into)
     }
 }
 
-/// Prints processes data.
-pub async fn handle_cmd(
-    query_proxy: QueryProxy,
-    explorer_proxy: ProcessExplorerProxy,
-    buildinfo_provider_proxy: ProviderProxy,
-    cmd: ProcessCommand,
-    writer: MachineWriter<processed::ProcessesData>,
-) -> Result<()> {
-    let processes_data = get_processes_data(query_proxy).await?;
-    let output = processed::ProcessesData::from(processes_data);
+impl ProcessTool {
+    async fn handle_cmd(self, writer: Writer) -> Result<()> {
+        // We handle the tree subcommand before the other subcommands because it uses a different
+        // JSON blob. There's no sense in transferring the process data JSON blob for the tree
+        // subcommand because we'll just throw away that data.
+        if let Args::Tree(arg) = &self.cmd.arg {
+            return tree_subcommand(self.query_proxy, self.task_writer, arg.threads).await;
+        }
 
-    let build_info = buildinfo_provider_proxy.get_build_info().await?;
+        let processes_data = get_processes_data(self.query_proxy).await?;
+        let output = processed::ProcessesData::from(processes_data);
 
-    match cmd.arg {
-        Args::List(arg) => list_subcommand(writer, output, arg.verbose),
-        Args::Filter(arg) => filter_subcommand(writer, output, arg.process_koids),
-        Args::GenerateFuchsiaMap(_) => generate_fuchsia_map_subcommand(writer, build_info, output),
-        Args::Kill(arg) => kill_subcommand(writer, explorer_proxy, arg.task_to_kill).await,
-        Args::StackTrace(arg) => stack_trace_subcommand(writer, explorer_proxy, arg.task).await,
+        let build_info = self.provider_proxy.get_build_info().await?;
+
+        match self.cmd.arg {
+            Args::List(arg) => list_subcommand(writer, output, arg.verbose),
+            Args::Filter(arg) => filter_subcommand(writer, output, arg.process_koids),
+            Args::GenerateFuchsiaMap(_) => {
+                generate_fuchsia_map_subcommand(writer, build_info, output)
+            }
+            Args::Kill(arg) => kill_subcommand(writer, self.explorer_proxy, arg.task_to_kill).await,
+            Args::StackTrace(arg) => {
+                stack_trace_subcommand(writer, self.explorer_proxy, arg.task).await
+            }
+            Args::Tree(_) => unreachable!(), // Handled above.
+        }
     }
 }
 
@@ -156,6 +161,55 @@ fn list_subcommand(
     } else {
         pretty_print_processes_name_and_koid(w, processes_data)
     }
+}
+
+async fn get_tasks_data(
+    query_proxy: impl fidl_fuchsia_process_explorer::QueryProxyInterface,
+) -> Result<raw::TasksData> {
+    let (rx, tx) = fidl::Socket::create_stream();
+
+    // Send one end of the socket to the remote device.
+    query_proxy.write_json_task_hierarchy_data(tx)?;
+
+    // Read all the bytes sent from the other end of the socket.
+    let mut rx_async = fidl::AsyncSocket::from_socket(rx);
+    let mut buffer = Vec::new();
+    rx_async.read_to_end(&mut buffer).await?;
+    Ok(serde_json::from_slice(&buffer)?)
+}
+
+fn get_symbol_for_task_type(task_type: &str) -> &'static str {
+    match task_type {
+        "job" => "j",
+        "process" => "p",
+        "thread" => "t",
+        _ => "?",
+    }
+}
+
+async fn tree_subcommand(
+    query_proxy: impl fidl_fuchsia_process_explorer::QueryProxyInterface,
+    mut w: MachineWriter<raw::TasksData>,
+    threads: bool,
+) -> Result<()> {
+    let tasks_data = get_tasks_data(query_proxy).await?;
+
+    if w.is_machine() {
+        w.machine(&tasks_data)?;
+    } else {
+        for task in tasks_data.tasks {
+            if !threads && task.task_type == "thread" {
+                continue;
+            }
+            for _ in 0..task.depth {
+                write!(w, "  ")?;
+            }
+            let symbol = get_symbol_for_task_type(&task.task_type);
+            writeln!(w, "{}: {:<6} {}", symbol, task.koid, task.name)?;
+        }
+    }
+
+    Ok(())
 }
 
 fn filter_subcommand(
@@ -354,6 +408,10 @@ mod tests {
                 })
                 .detach();
             }
+            QueryRequest::WriteJsonTaskHierarchyData { .. } => {
+                unreachable!();
+            }
+            _ => unreachable!(),
         })
     }
 

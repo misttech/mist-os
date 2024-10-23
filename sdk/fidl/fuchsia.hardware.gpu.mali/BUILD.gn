@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.gpu.mali") {
-  sdk_category = "internal"
-
   sources = [ "mali.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 

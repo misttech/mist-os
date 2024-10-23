@@ -11,7 +11,7 @@ use wlan_hw_sim::event::{action, branch, Handler};
 use wlan_hw_sim::*;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_tap as fidl_tap, zx,
+    fidl_fuchsia_wlan_tap as fidl_tap,
 };
 
 fn scan_and_associate<'h>(

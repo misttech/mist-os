@@ -10,11 +10,15 @@
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/fit/result.h>
+#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/inspector.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/interrupt.h>
 
 #include <optional>
 #include <variant>
+
+#include "lib/inspect/component/cpp/component.h"
 
 namespace hrtimer {
 constexpr size_t kTimersAll[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
@@ -35,7 +39,8 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
       fidl::Client<fuchsia_power_broker::RequiredLevel> required_level,
       fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag, zx::interrupt irq_a,
       zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d, zx::interrupt irq_f,
-      zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i);
+      zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i,
+      inspect::ComponentInspector& inspect);
 
   void ShutDown();
 
@@ -69,6 +74,9 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
+  inspect::UintProperty& IrqEntries() { return irq_entries_; }
+  inspect::UintProperty& IrqExits() { return irq_exits_; }
+
   enum class MaxTicks : uint8_t {
     k16Bit,
     k64Bit,
@@ -88,7 +96,7 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
     bool extend_max_ticks;
   };
   struct Timer {
-    Timer(AmlHrtimerServer& server, TimersProperties& props) : parent(server), properties(props) {}
+    Timer(AmlHrtimerServer& server, TimersProperties& props);
     void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                    const zx_packet_interrupt_t* interrupt);
     AmlHrtimerServer& parent;
@@ -157,6 +165,17 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   // FIDL client used to request wake leases directly from SAG.
   fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag_;
   async_dispatcher_t* dispatcher_;
+
+  // TODO(b/369886005): These inspect properties exist to help diagnose b/369886005
+  // and can probably be safely removed once that bug is resolved.
+  inspect::Node inspect_node_;
+  inspect::UintProperty lease_requests_;
+  inspect::UintProperty lease_replies_;
+  inspect::UintProperty update_requests_;
+  inspect::UintProperty update_replies_;
+  inspect::UintProperty irq_entries_;
+  inspect::UintProperty irq_exits_;
 };
+
 }  // namespace hrtimer
 #endif  // SRC_DEVICES_HRTIMER_DRIVERS_AML_HRTIMER_AML_HRTIMER_SERVER_H_

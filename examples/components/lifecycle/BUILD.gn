@@ -4,13 +4,13 @@
 
 import("//build/components.gni")
 
-group("lifecycle-example") {
+group("lifecycle") {
   testonly = true
   deps = [
     ":lifecycle-example-cpp",
     ":lifecycle-example-rust",
-    "cpp:lifecycle",
-    "rust:lifecycle",
+    "cpp",
+    "rust",
   ]
 }
 
@@ -20,7 +20,7 @@ fuchsia_package("lifecycle-example-cpp") {
   renameable_subpackages = [
     {
       name = "lifecycle"
-      package = "cpp:lifecycle"
+      package = "cpp"
     },
     {
       package = "//examples/components/routing/cpp/echo_server"
@@ -34,7 +34,7 @@ fuchsia_package("lifecycle-example-rust") {
   renameable_subpackages = [
     {
       name = "lifecycle"
-      package = "rust:lifecycle"
+      package = "rust"
     },
     {
       package = "//examples/components/routing/rust/echo_server"

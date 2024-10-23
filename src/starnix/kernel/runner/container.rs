@@ -648,7 +648,7 @@ fn mount_filesystems(
         let action = MountAction::from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
             .with_source_context(|| format!("creating filesystem from spec: {}", &mount_spec))?;
         let mount_point = system_task
-            .lookup_path_from_root(action.path.as_ref())
+            .lookup_path_from_root(locked, action.path.as_ref())
             .with_source_context(|| format!("lookup path from root: {}", action.path))?;
         mount_point.mount(WhatToMount::Fs(action.fs), action.flags)?;
     }
@@ -724,10 +724,15 @@ async fn wait_for_init_file(
 ) -> Result<(), Error> {
     // TODO(https://fxbug.dev/42178400): Use inotify machinery to wait for the file.
     loop {
-        fasync::Timer::new(fasync::Duration::from_millis(100).after_now()).await;
+        fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
         let root = current_task.fs().root();
         let mut context = LookupContext::default();
-        match current_task.lookup_path(&mut context, root, startup_file_path.into()) {
+        match current_task.lookup_path(
+            current_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+            &mut context,
+            root,
+            startup_file_path.into(),
+        ) {
             Ok(_) => break,
             Err(error) if error == ENOENT => continue,
             Err(error) => return Err(anyhow::Error::from(error)),

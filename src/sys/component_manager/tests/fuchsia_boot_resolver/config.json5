@@ -13,6 +13,7 @@
     builtin_capabilities: [
         {
             protocol: [
+                "fuchsia.pkg.PackageResolver-boot",
                 "fuchsia.sys2.CrashIntrospect",
                 "fuchsia.sys2.SystemController",
             ],

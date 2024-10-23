@@ -12,4 +12,5 @@
     max_display_vertical_resolution_px: -1,
     min_display_refresh_rate_millihertz: -1,
     max_display_refresh_rate_millihertz: -1,
+    visual_debugging_level: 0,
 }

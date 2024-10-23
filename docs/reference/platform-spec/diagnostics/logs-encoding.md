@@ -24,13 +24,6 @@ extensions. Strings are padded with zeroes until 8-byte aligned.
 
 Records consist of a number of 8-byte words and are 8-byte aligned.
 
-## Records
-
-Implementors are encouraged to use FIDL bindings from
-[/sdk/fidl/fuchsia.diagnostics.stream/record.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.diagnostics.stream/record.fidl)
-as the "reference" API for records when testing
-their encoder. These types allow for cross-validating interoperability of log readers and writers.
-
 ### Header
 
 The required metadata for a log record are a record type, the overall length of the record, and a

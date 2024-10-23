@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use {fidl_fuchsia_net_name as fnet_name, zx};
+use fidl_fuchsia_net_name as fnet_name;
 
 use async_utils::stream::{Tagged, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};

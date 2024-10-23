@@ -193,6 +193,7 @@ pub fn sys_bind(
                 let mode = file.node().info().mode;
                 let mode = current_task.fs().apply_umask(mode).with_type(FileMode::IFSOCK);
                 let (parent, basename) = current_task.lookup_parent_at(
+                    locked,
                     &mut LookupContext::default(),
                     FdNumber::AT_FDCWD,
                     name.as_ref(),
@@ -293,7 +294,7 @@ pub fn sys_connect(
             if name.is_empty() {
                 return error!(ECONNREFUSED);
             }
-            SocketPeer::Handle(resolve_unix_socket_address(current_task, name.as_ref())?)
+            SocketPeer::Handle(resolve_unix_socket_address(locked, current_task, name.as_ref())?)
         }
         // Connect not available for AF_VSOCK
         SocketAddress::Vsock(_) => return error!(ENOSYS),

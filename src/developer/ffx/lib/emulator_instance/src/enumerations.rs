@@ -132,6 +132,9 @@ pub enum EngineType {
 
     /// Qemu emulator.
     Qemu,
+
+    /// Crosvm emulator.
+    Crosvm,
 }
 
 impl Default for EngineType {

@@ -433,6 +433,9 @@ class ZxInfoKmemStats : public Class<zx_info_kmem_stats_t> {
 
   static size_t total_bytes(const zx_info_kmem_stats_t* from) { return from->total_bytes; }
   static size_t free_bytes(const zx_info_kmem_stats_t* from) { return from->free_bytes; }
+  static size_t free_loaned_bytes(const zx_info_kmem_stats_t* from) {
+    return from->free_loaned_bytes;
+  }
   static size_t wired_bytes(const zx_info_kmem_stats_t* from) { return from->wired_bytes; }
   static size_t total_heap_bytes(const zx_info_kmem_stats_t* from) {
     return from->total_heap_bytes;
@@ -442,7 +445,29 @@ class ZxInfoKmemStats : public Class<zx_info_kmem_stats_t> {
   static size_t mmu_overhead_bytes(const zx_info_kmem_stats_t* from) {
     return from->mmu_overhead_bytes;
   }
+  static size_t ipc_bytes(const zx_info_kmem_stats_t* from) { return from->ipc_bytes; }
+  static size_t cache_bytes(const zx_info_kmem_stats_t* from) { return from->cache_bytes; }
+  static size_t slab_bytes(const zx_info_kmem_stats_t* from) { return from->slab_bytes; }
+  static size_t zram_bytes(const zx_info_kmem_stats_t* from) { return from->zram_bytes; }
   static size_t other_bytes(const zx_info_kmem_stats_t* from) { return from->other_bytes; }
+  static size_t vmo_reclaim_total_bytes(const zx_info_kmem_stats_t* from) {
+    return from->vmo_reclaim_total_bytes;
+  }
+  static size_t vmo_reclaim_newest_bytes(const zx_info_kmem_stats_t* from) {
+    return from->vmo_reclaim_newest_bytes;
+  }
+  static size_t vmo_reclaim_oldest_bytes(const zx_info_kmem_stats_t* from) {
+    return from->vmo_reclaim_oldest_bytes;
+  }
+  static size_t vmo_reclaim_disabled_bytes(const zx_info_kmem_stats_t* from) {
+    return from->vmo_reclaim_disabled_bytes;
+  }
+  static size_t vmo_discardable_locked_bytes(const zx_info_kmem_stats_t* from) {
+    return from->vmo_discardable_locked_bytes;
+  }
+  static size_t vmo_discardable_unlocked_bytes(const zx_info_kmem_stats_t* from) {
+    return from->vmo_discardable_unlocked_bytes;
+  }
 
  private:
   ZxInfoKmemStats() : Class("zx_info_kmem_stats_t") {
@@ -450,6 +475,8 @@ class ZxInfoKmemStats : public Class<zx_info_kmem_stats_t> {
         "total_bytes", SyscallType::kSize, total_bytes));
     AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
         "free_bytes", SyscallType::kSize, free_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "free_loaned_bytes", SyscallType::kSize, free_loaned_bytes));
     AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
         "wired_bytes", SyscallType::kSize, wired_bytes));
     AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
@@ -461,7 +488,27 @@ class ZxInfoKmemStats : public Class<zx_info_kmem_stats_t> {
     AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
         "mmu_overhead_bytes", SyscallType::kSize, mmu_overhead_bytes));
     AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "ipc_bytes", SyscallType::kSize, ipc_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "cache_bytes", SyscallType::kSize, cache_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "slab_bytes", SyscallType::kSize, slab_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "zram_bytes", SyscallType::kSize, zram_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
         "other_bytes", SyscallType::kSize, other_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "vmo_reclaim_total_bytes", SyscallType::kSize, vmo_reclaim_total_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "vmo_reclaim_newest_bytes", SyscallType::kSize, vmo_reclaim_newest_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "vmo_reclaim_oldest_bytes", SyscallType::kSize, vmo_reclaim_oldest_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "vmo_reclaim_disabled_bytes", SyscallType::kSize, vmo_reclaim_disabled_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "vmo_discardable_locked_bytes", SyscallType::kSize, vmo_discardable_locked_bytes));
+    AddField(std::make_unique<ClassField<zx_info_kmem_stats_t, size_t>>(
+        "vmo_discardable_unlocked_bytes", SyscallType::kSize, vmo_discardable_unlocked_bytes));
   }
   ZxInfoKmemStats(const ZxInfoKmemStats&) = delete;
   ZxInfoKmemStats& operator=(const ZxInfoKmemStats&) = delete;
@@ -2656,7 +2703,9 @@ void SyscallDecoderDispatcher::Populate() {
     zx_clock_get->Output<zx_time_t>(ZX_OK, "out", std::make_unique<ArgumentAccess<zx_time_t>>(out));
   }
 
-  { Add("zx_clock_get_monotonic", SyscallReturnType::kTime); }
+  {
+    Add("zx_clock_get_monotonic", SyscallReturnType::kTime);
+  }
 
   {
     Syscall* zx_nanosleep = Add("zx_nanosleep", SyscallReturnType::kStatus);
@@ -2667,9 +2716,13 @@ void SyscallDecoderDispatcher::Populate() {
                                    std::make_unique<ArgumentAccess<zx_time_t>>(deadline));
   }
 
-  { Add("zx_ticks_get", SyscallReturnType::kTicks); }
+  {
+    Add("zx_ticks_get", SyscallReturnType::kTicks);
+  }
 
-  { Add("zx_ticks_per_second", SyscallReturnType::kTicks); }
+  {
+    Add("zx_ticks_per_second", SyscallReturnType::kTicks);
+  }
 
   {
     Syscall* zx_deadline_after = Add("zx_deadline_after", SyscallReturnType::kTime);
@@ -2694,13 +2747,21 @@ void SyscallDecoderDispatcher::Populate() {
     zx_clock_adjust->Input<int64_t>("offset", std::make_unique<ArgumentAccess<int64_t>>(offset));
   }
 
-  { Add("zx_system_get_dcache_line_size", SyscallReturnType::kUint32); }
+  {
+    Add("zx_system_get_dcache_line_size", SyscallReturnType::kUint32);
+  }
 
-  { Add("zx_system_get_num_cpus", SyscallReturnType::kUint32); }
+  {
+    Add("zx_system_get_num_cpus", SyscallReturnType::kUint32);
+  }
 
-  { Add("zx_system_get_version_string", SyscallReturnType::kStringView); }
+  {
+    Add("zx_system_get_version_string", SyscallReturnType::kStringView);
+  }
 
-  { Add("zx_system_get_physmem", SyscallReturnType::kUint64); }
+  {
+    Add("zx_system_get_physmem", SyscallReturnType::kUint64);
+  }
 
   {
     Syscall* zx_system_get_event = Add("zx_system_get_event", SyscallReturnType::kStatus);
@@ -3787,7 +3848,9 @@ void SyscallDecoderDispatcher::Populate() {
         "disposition_peer", std::make_unique<ArgumentAccess<uint32_t>>(disposition_peer));
   }
 
-  { Add("zx_thread_exit", SyscallReturnType::kNoReturn); }
+  {
+    Add("zx_thread_exit", SyscallReturnType::kNoReturn);
+  }
 
   {
     Syscall* zx_thread_create = Add("zx_thread_create", SyscallReturnType::kStatus);

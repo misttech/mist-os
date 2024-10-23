@@ -4,11 +4,11 @@
 
 //! Helpers for capturing logs from Fuchsia processes.
 
+use fuchsia_async as fasync;
 use futures::{future, AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _};
 use std::num::NonZeroUsize;
 use thiserror::Error;
 use zx::HandleBased as _;
-use {fuchsia_async as fasync, zx};
 
 /// Buffer size for socket read calls to `LoggerStream::buffer_and_drain`.
 const SOCKET_BUFFER_SIZE: usize = 2048;

@@ -24,7 +24,7 @@ use zerocopy::SplitByteSlice;
 use zx::{HandleBased, Peered};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
-    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fpraw, zx,
+    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fpraw,
 };
 
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};
@@ -523,13 +523,14 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetIpv6Checksum { responder } => {
                 respond_not_supported!("raw::GetIpv6Checksum", responder)
             }
-            fpraw::SocketRequest::SetMark { domain: _, mark: _, responder } => {
-                // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                respond_not_supported!("raw::SetMark", responder)
+            fpraw::SocketRequest::SetMark { domain, mark, responder } => {
+                ctx.api().raw_ip_socket().set_mark(&data.id, domain.into_core(), mark.into_core());
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
-            fpraw::SocketRequest::GetMark { domain: _, responder } => {
-                // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                respond_not_supported!("raw::GetMark", responder)
+            fpraw::SocketRequest::GetMark { domain, responder } => {
+                let mark =
+                    ctx.api().raw_ip_socket().get_mark(&data.id, domain.into_core()).into_fidl();
+                responder.send(Ok(&mark)).unwrap_or_log("failed to respond");
             }
         }
         ControlFlow::Continue(None)

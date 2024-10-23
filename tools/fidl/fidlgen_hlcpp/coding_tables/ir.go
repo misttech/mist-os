@@ -583,7 +583,7 @@ func nameType(typ fidlgen.Type, decls fidlgen.DeclInfoMap) string {
 			// bindings, so treat them as such in coding tables as well.
 			case "zx/ObjType", "zx/Rights":
 				return nameType(fidlgen.Type{Kind: fidlgen.PrimitiveType, PrimitiveSubtype: fidlgen.Uint32}, decls)
-			case "zx/InstantMono", "zx/InstantBoot":
+			case "zx/InstantMono", "zx/InstantBoot", "zx/InstantMonoTicks", "zx/InstantBootTicks":
 				return nameType(fidlgen.Type{Kind: fidlgen.PrimitiveType, PrimitiveSubtype: fidlgen.Int64}, decls)
 			default:
 				panic(fmt.Sprintf("unexpected zx type: %s", typ.Identifier))

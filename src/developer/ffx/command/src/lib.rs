@@ -180,6 +180,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
 
     ffx_config::logging::init(&context, app.verbose, &log_dest).await?;
     tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
+    tracing::info!("with context: {kind:#?}", kind = context.env_kind());
 
     let metrics = MetricsSession::start(&context).await?;
     tracing::debug!("metrics session started");

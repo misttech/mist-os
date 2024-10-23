@@ -294,8 +294,14 @@ impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
 }
 
 impl IterablePath for Name {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + Send + '_> {
-        Box::new(iter::once(self))
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
+        iter::once(self)
+    }
+}
+
+impl IterablePath for &Name {
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
+        iter::once(*self)
     }
 }
 
@@ -374,7 +380,7 @@ impl NamespacePath {
 }
 
 impl IterablePath for NamespacePath {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + Send + '_> {
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
         self.0.iter_segments()
     }
 }
@@ -526,7 +532,7 @@ impl Path {
 }
 
 impl IterablePath for Path {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + Send + '_> {
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
         Box::new(self.0.iter_segments())
     }
 }
@@ -688,7 +694,7 @@ impl RelativePath {
 }
 
 impl IterablePath for RelativePath {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + Send + '_> {
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
         Box::new(self.segments.iter())
     }
 }
@@ -808,7 +814,7 @@ impl fmt::Display for BorrowedSeparatedPath<'_> {
 }
 
 impl IterablePath for BorrowedSeparatedPath<'_> {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + Send + '_> {
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
         Box::new(self.dirname.iter_segments().chain(iter::once(self.basename)))
     }
 }
@@ -830,7 +836,7 @@ impl SeparatedPath {
 }
 
 impl IterablePath for SeparatedPath {
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + Send + '_> {
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
         Box::new(self.dirname.iter_segments().chain(iter::once(&self.basename)))
     }
 }
@@ -848,7 +854,7 @@ impl fmt::Display for SeparatedPath {
 /// Trait implemented by path types that provides an API to iterate over path segments.
 pub trait IterablePath: Clone + Send + Sync {
     /// Returns a double-sided iterator over the segments in this path.
-    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &Name> + Send + '_>;
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send;
 }
 
 /// A component URL. The URL is validated, but represented as a string to avoid

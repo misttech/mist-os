@@ -456,12 +456,12 @@ mod tests {
     use anyhow::Result;
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult};
+    use fuchsia_async as fasync;
     use fuchsia_fuzzctl::constants::*;
     use fuchsia_fuzzctl::{digest_path, OutputSink};
     use fuchsia_fuzzctl_test::{create_task, serve_manager, BufferSink, Test, TEST_URL};
     use std::path::PathBuf;
     use url::Url;
-    use {fuchsia_async as fasync, zx};
 
     // Test fixtures.
 

@@ -112,6 +112,7 @@ fuchsia_toolchain_info(
     fvm = "//tools:{{HOST_CPU}}/fvm",
     fvm_manifest = "//tools:{{HOST_CPU}}/fvm-meta.json",
     gtest_runner_shard = "sys/testing/gtest_runner.shard.cml",
+    gen_android_starnix_container = "//tools:{{HOST_CPU}}/gen-android-starnix-container",
     merkleroot = "//tools:{{HOST_CPU}}/merkleroot",
     minfs = "//tools:{{HOST_CPU}}/minfs",
     minfs_manifest = "//tools:{{HOST_CPU}}/minfs-meta.json",

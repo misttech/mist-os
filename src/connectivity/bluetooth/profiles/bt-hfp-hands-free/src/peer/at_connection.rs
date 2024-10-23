@@ -6,6 +6,7 @@
 #![allow(unused)]
 
 use anyhow::{format_err, Result};
+use at_commands as at;
 use at_commands::{DeserializeBytes, SerDe};
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::io::AsyncWriteExt;
@@ -17,7 +18,6 @@ use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tracing::warn;
-use {at_commands as at, zx};
 
 pub struct AtConnection {
     peer_id: PeerId,

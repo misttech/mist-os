@@ -3,22 +3,22 @@
 // found in the LICENSE file.
 
 /// This module exists to abstract away the differences between the dev host and target versions
-/// of `fuchsia_async::Duration`.
+/// of `fuchsia_async::MonotonicDuration`.
 ///
-/// In particular, on development hosts `fuchsia_async::{Duration, MonotonicInstant}` are actually
+/// In particular, on development hosts `fuchsia_async::{MonotonicDuration, MonotonicInstant}` are actually
 /// `std::time::{Duration, Instant}`.
-pub use self::platform::{deadline_after, Duration};
+pub use self::platform::{deadline_after, MonotonicDuration};
 
 #[cfg(not(target_os = "fuchsia"))]
 mod platform {
     use std::time::{Duration as OsDuration, Instant as OsTime};
 
     #[derive(Debug)]
-    pub struct Duration {
+    pub struct MonotonicDuration {
         base: OsDuration,
     }
 
-    impl Duration {
+    impl MonotonicDuration {
         pub const fn from_nanos(nanos: i64) -> Self {
             Self { base: OsDuration::from_nanos(nanos as u64) }
         }
@@ -52,11 +52,11 @@ mod platform {
 
 #[cfg(target_os = "fuchsia")]
 mod platform {
-    pub use fuchsia_async::Duration;
     use fuchsia_async::DurationExt;
+    pub use fuchsia_async::MonotonicDuration;
 
     /// Provides a deadline after `timeout` nanoseconds that a `fuchsia_async::Timer` can wait until.
     pub fn deadline_after(timeout: Option<i64>) -> Option<fuchsia_async::MonotonicInstant> {
-        timeout.map(|nanos| Duration::from_nanos(nanos).after_now())
+        timeout.map(|nanos| MonotonicDuration::from_nanos(nanos).after_now())
     }
 }

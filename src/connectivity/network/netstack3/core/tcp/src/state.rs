@@ -1695,6 +1695,13 @@ impl<'a, T> TakeableRef<'a, T> {
     }
 }
 
+#[must_use = "must check to determine if the socket needs to be removed from the demux state"]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NewlyClosed {
+    No,
+    Yes,
+}
+
 impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
     State<I, R, S, ActiveOpen>
 {
@@ -1703,19 +1710,18 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         &mut self,
         counters: &TcpCountersInner,
         new_state: State<I, R, S, ActiveOpen>,
-    ) {
-        if let State::Closed(Closed { reason }) = &new_state {
-            let was_established = match self {
-                State::Closed(_) | State::Listen(_) | State::SynRcvd(_) | State::SynSent(_) => {
-                    false
-                }
+    ) -> NewlyClosed {
+        let newly_closed = if let State::Closed(Closed { reason }) = &new_state {
+            let (was_established, was_closed) = match self {
+                State::Closed(_) => (false, true),
+                State::Listen(_) | State::SynRcvd(_) | State::SynSent(_) => (false, false),
                 State::Established(_)
                 | State::CloseWait(_)
                 | State::LastAck(_)
                 | State::FinWait1(_)
                 | State::FinWait2(_)
                 | State::Closing(_)
-                | State::TimeWait(_) => true,
+                | State::TimeWait(_) => (true, false),
             };
             if was_established {
                 counters.established_closed.increment();
@@ -1730,8 +1736,12 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     _ => {}
                 }
             }
-        }
-        *self = new_state
+            (!was_closed).then_some(NewlyClosed::Yes).unwrap_or(NewlyClosed::No)
+        } else {
+            NewlyClosed::No
+        };
+        *self = new_state;
+        newly_closed
     }
     /// Processes an incoming segment and advances the state machine.
     ///
@@ -1754,61 +1764,67 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             ip_options: _,
         }: &SocketOptions,
         defunct: bool,
-    ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>, DataAcked)
+    ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>, DataAcked, NewlyClosed)
     where
         BP::PassiveOpen: Debug,
         ActiveOpen: IntoBuffers<R, S>,
     {
         let mut passive_open = None;
         let mut data_acked = DataAcked::No;
-        let seg = (|| {
+        let (seg, newly_closed) = (|| {
             let (mut rcv_nxt, rcv_wnd, rcv_wnd_scale, snd_max, rst_on_new_data) = match self {
-                State::Closed(closed) => return closed.on_segment(&incoming),
+                State::Closed(closed) => return (closed.on_segment(&incoming), NewlyClosed::No),
                 State::Listen(listen) => {
-                    return match listen.on_segment(incoming, now) {
-                        ListenOnSegmentDisposition::SendSynAckAndEnterSynRcvd(
-                            syn_ack,
-                            SynRcvd {
-                                iss,
-                                irs,
-                                timestamp,
-                                retrans_timer,
-                                simultaneous_open,
-                                buffer_sizes,
-                                smss,
-                                rcv_wnd_scale,
-                                snd_wnd_scale,
-                            },
-                        ) => {
-                            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
-                            match simultaneous_open {
-                                None => {
-                                    self.transition_to_state(
-                                        counters,
-                                        State::SynRcvd(SynRcvd {
-                                            iss,
-                                            irs,
-                                            timestamp,
-                                            retrans_timer,
-                                            simultaneous_open: None,
-                                            buffer_sizes,
-                                            smss,
-                                            rcv_wnd_scale,
-                                            snd_wnd_scale,
-                                        }),
-                                    );
+                    return (
+                        match listen.on_segment(incoming, now) {
+                            ListenOnSegmentDisposition::SendSynAckAndEnterSynRcvd(
+                                syn_ack,
+                                SynRcvd {
+                                    iss,
+                                    irs,
+                                    timestamp,
+                                    retrans_timer,
+                                    simultaneous_open,
+                                    buffer_sizes,
+                                    smss,
+                                    rcv_wnd_scale,
+                                    snd_wnd_scale,
+                                },
+                            ) => {
+                                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
+                                match simultaneous_open {
+                                    None => {
+                                        assert_eq!(
+                                            self.transition_to_state(
+                                                counters,
+                                                State::SynRcvd(SynRcvd {
+                                                    iss,
+                                                    irs,
+                                                    timestamp,
+                                                    retrans_timer,
+                                                    simultaneous_open: None,
+                                                    buffer_sizes,
+                                                    smss,
+                                                    rcv_wnd_scale,
+                                                    snd_wnd_scale,
+                                                }),
+                                            ),
+                                            NewlyClosed::No
+                                        )
+                                    }
+                                    Some(infallible) => match infallible {},
                                 }
-                                Some(infallible) => match infallible {},
+                                Some(syn_ack)
                             }
-                            Some(syn_ack)
-                        }
-                        ListenOnSegmentDisposition::SendRst(rst) => Some(rst),
-                        ListenOnSegmentDisposition::Ignore => None,
-                    };
+                            ListenOnSegmentDisposition::SendRst(rst) => Some(rst),
+                            ListenOnSegmentDisposition::Ignore => None,
+                        },
+                        NewlyClosed::No,
+                    );
                 }
                 State::SynSent(synsent) => {
                     return match synsent.on_segment(incoming, now) {
-                        SynSentOnSegmentDisposition::SendAckAndEnterEstablished(established) => {
+                        SynSentOnSegmentDisposition::SendAckAndEnterEstablished(established) => (
                             replace_with_and(self, |this| {
                                 assert_matches!(this, State::SynSent(SynSent {
                                     active_open,
@@ -1830,8 +1846,9 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                     ));
                                     (State::Established(established), ack)
                                 })
-                            })
-                        }
+                            }),
+                            NewlyClosed::No,
+                        ),
                         SynSentOnSegmentDisposition::SendSynAckAndEnterSynRcvd(
                             syn_ack,
                             mut syn_rcvd,
@@ -1845,14 +1862,17 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                     State::SynRcvd(syn_rcvd)
                                 })
                             });
-                            Some(syn_ack)
+                            (Some(syn_ack), NewlyClosed::No)
                         }
-                        SynSentOnSegmentDisposition::SendRst(rst) => Some(rst),
+                        SynSentOnSegmentDisposition::SendRst(rst) => (Some(rst), NewlyClosed::No),
                         SynSentOnSegmentDisposition::EnterClosed(closed) => {
-                            self.transition_to_state(counters, State::Closed(closed));
-                            None
+                            assert_eq!(
+                                self.transition_to_state(counters, State::Closed(closed)),
+                                NewlyClosed::Yes,
+                            );
+                            (None, NewlyClosed::Yes)
                         }
-                        SynSentOnSegmentDisposition::Ignore => None,
+                        SynSentOnSegmentDisposition::Ignore => (None, NewlyClosed::No),
                     }
                 }
                 State::SynRcvd(SynRcvd {
@@ -1910,11 +1930,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             // Reset the connection if we receive new data while the socket is being closed
             // and the receiver has been shut down.
             if rst_on_new_data && (incoming.header.seq + incoming.data.len()).after(rcv_nxt) {
-                self.transition_to_state(
-                    counters,
-                    State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+                return (
+                    Some(Segment::rst(snd_max)),
+                    self.transition_to_state(
+                        counters,
+                        State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+                    ),
                 );
-                return Some(Segment::rst(snd_max));
             }
 
             // Unreachable note(1): The above match returns early for states CLOSED,
@@ -1940,11 +1962,14 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     //     <SEQ=SND.NXT><ACK=RCV.NXT><CTL=ACK>
                     //   After sending the acknowledgment, drop the unacceptable segment
                     //   and return.
-                    return if is_rst {
-                        None
-                    } else {
-                        Some(Segment::ack(snd_max, rcv_nxt, rcv_wnd >> rcv_wnd_scale))
-                    };
+                    return (
+                        if is_rst {
+                            None
+                        } else {
+                            Some(Segment::ack(snd_max, rcv_nxt, rcv_wnd >> rcv_wnd_scale))
+                        },
+                        NewlyClosed::No,
+                    );
                 }
             };
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-70):
@@ -1955,11 +1980,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             //   "connection reset" signal.  Enter the CLOSED state, delete the
             //   TCB, and return.
             if control == Some(Control::RST) {
-                self.transition_to_state(
-                    counters,
-                    State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+                return (
+                    None,
+                    self.transition_to_state(
+                        counters,
+                        State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+                    ),
                 );
-                return None;
             }
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-70):
             //   fourth, check the SYN bit
@@ -1972,11 +1999,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             //   and an ack would have been sent in the first step (sequence
             //   number check).
             if control == Some(Control::SYN) {
-                self.transition_to_state(
-                    counters,
-                    State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+                return (
+                    Some(Segment::rst(snd_max)),
+                    self.transition_to_state(
+                        counters,
+                        State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+                    ),
                 );
-                return Some(Segment::rst(snd_max));
             }
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
             //   fifth check the ACK field
@@ -2010,7 +2039,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         // store the `SND` variables because they can be easily derived
                         // from ISS: SND.UNA=ISS and SND.NXT=ISS+1.
                         if seg_ack != *iss + 1 {
-                            return Some(Segment::rst(seg_ack));
+                            return (Some(Segment::rst(seg_ack)), NewlyClosed::No);
                         } else {
                             let mut rtt_estimator = Estimator::default();
                             if let Some(syn_rcvd_ts) = syn_rcvd_ts {
@@ -2057,7 +2086,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 }
                                 .into(),
                             };
-                            self.transition_to_state(counters, State::Established(established));
+                            assert_eq!(
+                                self.transition_to_state(counters, State::Established(established)),
+                                NewlyClosed::No
+                            );
                         }
                         // Unreachable note(2): Because we either return early or
                         // transition to Established for the ack processing, it is
@@ -2071,7 +2103,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         );
                         data_acked = segment_acked_data;
                         if let Some(ack) = ack {
-                            return Some(ack);
+                            return (Some(ack), NewlyClosed::No);
                         }
                     }
                     State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => {
@@ -2083,13 +2115,15 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         );
                         data_acked = segment_acked_data;
                         if let Some(ack) = ack {
-                            return Some(ack);
+                            return (Some(ack), NewlyClosed::No);
                         } else if seg_ack == fin_seq {
-                            self.transition_to_state(
-                                counters,
-                                State::Closed(Closed { reason: None }),
+                            return (
+                                None,
+                                self.transition_to_state(
+                                    counters,
+                                    State::Closed(Closed { reason: None }),
+                                ),
                             );
-                            return None;
                         }
                     }
                     State::FinWait1(FinWait1 { snd, rcv }) => {
@@ -2101,7 +2135,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         );
                         data_acked = segment_acked_data;
                         if let Some(ack) = ack {
-                            return Some(ack);
+                            return (Some(ack), NewlyClosed::No);
                         } else if seg_ack == fin_seq {
                             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-73):
                             //   In addition to the processing for the ESTABLISHED
@@ -2118,7 +2152,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 timeout_at: fin_wait2_timeout
                                     .and_then(|timeout| defunct.then_some(now.add(timeout))),
                             };
-                            self.transition_to_state(counters, State::FinWait2(finwait2));
+                            assert_eq!(
+                                self.transition_to_state(counters, State::FinWait2(finwait2)),
+                                NewlyClosed::No
+                            );
                         }
                     }
                     State::Closing(Closing { snd, last_ack, last_wnd, last_wnd_scale }) => {
@@ -2131,7 +2168,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         data_acked = segment_acked_data;
                         if let Some(ack) = ack {
                             data_acked = segment_acked_data;
-                            return Some(ack);
+                            return (Some(ack), NewlyClosed::No);
                         } else if seg_ack == fin_seq {
                             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-73):
                             //   In addition to the processing for the ESTABLISHED state, if
@@ -2144,14 +2181,17 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 expiry: new_time_wait_expiry(now),
                                 last_wnd_scale: *last_wnd_scale,
                             };
-                            self.transition_to_state(counters, State::TimeWait(timewait));
+                            assert_eq!(
+                                self.transition_to_state(counters, State::TimeWait(timewait)),
+                                NewlyClosed::No
+                            );
                         }
                     }
                     State::FinWait2(_) | State::TimeWait(_) => {}
                 },
                 // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
                 //   if the ACK bit is off drop the segment and return
-                None => return None,
+                None => return (None, NewlyClosed::No),
             }
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-74):
             //   seventh, process the segment text
@@ -2278,7 +2318,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         let scaled_wnd = last_wnd >> rcv.wnd_scale;
                         let closewait =
                             CloseWait { snd: snd.to_ref().to_takeable(), last_ack, last_wnd };
-                        self.transition_to_state(counters, State::CloseWait(closewait));
+                        assert_eq!(
+                            self.transition_to_state(counters, State::CloseWait(closewait)),
+                            NewlyClosed::No
+                        );
                         Some(Segment::ack(snd_max, last_ack, scaled_wnd))
                     }
                     State::CloseWait(_) | State::LastAck(_) | State::Closing(_) => {
@@ -2302,7 +2345,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             last_wnd,
                             last_wnd_scale: rcv.wnd_scale,
                         };
-                        self.transition_to_state(counters, State::Closing(closing));
+                        assert_eq!(
+                            self.transition_to_state(counters, State::Closing(closing)),
+                            NewlyClosed::No
+                        );
                         Some(Segment::ack(snd_max, last_ack, scaled_wnd))
                     }
                     State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => {
@@ -2317,7 +2363,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             expiry: new_time_wait_expiry(now),
                             last_wnd_scale: rcv.wnd_scale,
                         };
-                        self.transition_to_state(counters, State::TimeWait(timewait));
+                        assert_eq!(
+                            self.transition_to_state(counters, State::TimeWait(timewait)),
+                            NewlyClosed::No,
+                        );
                         Some(Segment::ack(snd_max, last_ack, scaled_window))
                     }
                     State::TimeWait(TimeWait {
@@ -2340,24 +2389,28 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             };
             // If we generated an ACK to FIN, then because of the cumulative nature
             // of ACKs, the ACK generated to text (if any) can be safely overridden.
-            ack_to_fin.or(ack_to_text)
+            (ack_to_fin.or(ack_to_text), NewlyClosed::No)
         })();
-        (seg, passive_open, data_acked)
+        (seg, passive_open, data_acked, newly_closed)
     }
 
     /// Polls if there are any bytes available to send in the buffer.
     ///
     /// Forms one segment of at most `limit` available bytes, as long as the
     /// receiver window allows.
+    ///
+    /// Returns `Ok` if a segment is available, otherwise whether the state has
+    /// become closed will be returned in `Err`.
     pub(crate) fn poll_send(
         &mut self,
         counters: &TcpCountersInner,
         limit: u32,
         now: I,
         socket_options: &SocketOptions,
-    ) -> Option<Segment<S::Payload<'_>>> {
-        if self.poll_close(counters, now, socket_options) {
-            return None;
+    ) -> Result<Segment<S::Payload<'_>>, NewlyClosed> {
+        let newly_closed = self.poll_close(counters, now, socket_options);
+        if matches!(self, State::Closed(_)) {
+            return Err(newly_closed);
         }
         fn poll_rcv_then_snd<
             'a,
@@ -2390,7 +2443,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             }
             seg
         }
-        match self {
+        let seg = match self {
             State::SynSent(SynSent {
                 iss,
                 timestamp,
@@ -2449,7 +2502,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 rcv.poll_send(*last_seq, now).map(|seg| seg.into_empty())
             }
             State::Closed(_) | State::Listen(_) | State::TimeWait(_) => None,
-        }
+        };
+        seg.ok_or(NewlyClosed::No)
     }
 
     /// Polls the state machine to check if the connection should be closed.
@@ -2468,7 +2522,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             max_syn_retries: _,
             ip_options: _,
         }: &SocketOptions,
-    ) -> bool {
+    ) -> NewlyClosed {
         let timed_out = match self {
             State::Established(Established { snd, rcv: _ }) => snd.timed_out(now, keep_alive),
             State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
@@ -2507,16 +2561,16 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             }
         };
         if timed_out {
-            self.transition_to_state(
+            return self.transition_to_state(
                 counters,
                 State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }),
             );
         } else if let State::TimeWait(tw) = self {
             if tw.expiry <= now {
-                self.transition_to_state(counters, State::Closed(Closed { reason: None }));
+                return self.transition_to_state(counters, State::Closed(Closed { reason: None }));
             }
         }
-        matches!(self, State::Closed(_))
+        NewlyClosed::No
     }
 
     /// Returns an instant at which the caller SHOULD make their best effort to
@@ -2587,15 +2641,14 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         counters: &TcpCountersInner,
         close_reason: CloseReason<I>,
         socket_options: &SocketOptions,
-    ) -> Result<(), CloseError>
+    ) -> Result<NewlyClosed, CloseError>
     where
         ActiveOpen: IntoBuffers<R, S>,
     {
         match self {
             State::Closed(_) => Err(CloseError::NoConnection),
             State::Listen(_) | State::SynSent(_) => {
-                self.transition_to_state(counters, State::Closed(Closed { reason: None }));
-                Ok(())
+                Ok(self.transition_to_state(counters, State::Closed(Closed { reason: None })))
             }
             State::SynRcvd(SynRcvd {
                 iss,
@@ -2669,8 +2722,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     }
                     .into(),
                 };
-                self.transition_to_state(counters, State::FinWait1(finwait1));
-                Ok(())
+                Ok(self.transition_to_state(counters, State::FinWait1(finwait1)))
             }
             State::Established(Established { snd, rcv }) => {
                 // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-60):
@@ -2682,8 +2734,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     snd: snd.to_ref().take().queue_fin().into(),
                     rcv: rcv.to_ref().to_takeable(),
                 };
-                self.transition_to_state(counters, State::FinWait1(finwait1));
-                Ok(())
+                Ok(self.transition_to_state(counters, State::FinWait1(finwait1)))
             }
             State::CloseWait(CloseWait { snd, last_ack, last_wnd }) => {
                 let lastack = LastAck {
@@ -2691,8 +2742,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     last_ack: *last_ack,
                     last_wnd: *last_wnd,
                 };
-                self.transition_to_state(counters, State::LastAck(lastack));
-                Ok(())
+                Ok(self.transition_to_state(counters, State::LastAck(lastack)))
             }
             State::LastAck(_) | State::FinWait1(_) | State::Closing(_) | State::TimeWait(_) => {
                 Err(CloseError::Closing)
@@ -2734,7 +2784,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
 
     /// Corresponds to [ABORT](https://tools.ietf.org/html/rfc9293#section-3.10.5)
     /// user call.
-    pub(crate) fn abort(&mut self, counters: &TcpCountersInner) -> Option<Segment<()>> {
+    pub(crate) fn abort(
+        &mut self,
+        counters: &TcpCountersInner,
+    ) -> (Option<Segment<()>>, NewlyClosed) {
         let reply = match self {
             //   LISTEN STATE
             //      *  Any outstanding RECEIVEs should be returned with "error:
@@ -2791,11 +2844,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 Some(Segment::rst_ack(snd.nxt, *last_ack))
             }
         };
-        self.transition_to_state(
-            counters,
-            State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
-        );
-        reply
+        (
+            reply,
+            self.transition_to_state(
+                counters,
+                State::Closed(Closed { reason: Some(ConnectionError::ConnectionReset) }),
+            ),
+        )
     }
 
     pub(crate) fn buffers_mut(&mut self) -> BuffersRefMut<'_, R, S> {
@@ -2839,8 +2894,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         counters: &TcpCountersInner,
         err: IcmpErrorCode,
         seq: SeqNum,
-    ) -> Option<ConnectionError> {
-        let err = ConnectionError::try_from_icmp_error(err)?;
+    ) -> (Option<ConnectionError>, NewlyClosed) {
+        let Some(err) = ConnectionError::try_from_icmp_error(err) else {
+            return (None, NewlyClosed::No);
+        };
         // We consider the following RFC quotes when implementing this function.
         // Per RFC 5927 Section 4.1:
         //  Many TCP implementations have incorporated a validation check such
@@ -2861,7 +2918,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         //  for connections in the SYN-SENT or SYN-RECEIVED states. For example,
         //  this workaround has been implemented in the Linux kernel since
         //  version 2.0.0 (released in 1996) [Linux]
-        match self {
+        let connect_error = match self {
             State::Closed(_) => None,
             State::Listen(listen) => unreachable!(
                 "ICMP errors should not be delivered on a listener, received code {:?} on {:?}",
@@ -2889,7 +2946,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 rcv_wnd_scale: _,
             }) => {
                 if *iss == seq {
-                    self.transition_to_state(counters, State::Closed(Closed { reason: Some(err) }));
+                    return (
+                        None,
+                        self.transition_to_state(
+                            counters,
+                            State::Closed(Closed { reason: Some(err) }),
+                        ),
+                    );
                 }
                 None
             }
@@ -2907,7 +2970,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             // The following states does not have any outstanding segments, so
             // they don't expect any incoming ICMP error.
             State::FinWait2(_) | State::TimeWait(_) => None,
-        }
+        };
+        (connect_error, NewlyClosed::No)
     }
 }
 
@@ -3026,7 +3090,7 @@ mod test {
             now: FakeInstant,
             counters: &TcpCountersInner,
         ) -> Option<Segment<S::Payload<'_>>> {
-            self.poll_send(counters, mss, now, &SocketOptions::default())
+            self.poll_send(counters, mss, now, &SocketOptions::default()).ok()
         }
 
         fn on_segment_with_default_options<P: Payload, BP: BufferProvider<R, S, ActiveOpen = ()>>(
@@ -3041,7 +3105,7 @@ mod test {
             S: Default,
         {
             // In testing, it is convenient to disable delayed ack by default.
-            let (segment, passive_open, _data_acked) = self.on_segment::<P, BP>(
+            let (segment, passive_open, _data_acked, _newly_closed) = self.on_segment::<P, BP>(
                 counters,
                 incoming,
                 now,
@@ -3353,7 +3417,10 @@ mod test {
         let clock = FakeInstantCtx::default();
         let counters = TcpCountersInner::default();
         let mut state = State::new_syn_rcvd(clock.now());
-        let segment = state.abort(&counters).unwrap();
+        let segment = assert_matches!(
+            state.abort(&counters),
+            (Some(seg), NewlyClosed::Yes) => seg
+        );
         assert_eq!(segment.header.control, Some(Control::RST));
         assert_eq!(segment.header.seq, ISS_2 + 1);
         assert_eq!(segment.header.ack, Some(ISS_1 + 1));
@@ -4304,7 +4371,7 @@ mod test {
                 clock.now(),
                 &SocketOptions { nagle_enabled: false, ..SocketOptions::default() }
             ),
-            Some(Segment::data(
+            Ok(Segment::data(
                 ISS_1 + 4,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
@@ -4529,7 +4596,7 @@ mod test {
         // Then call CLOSE to transition the state machine to LastAck.
         assert_eq!(
             state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
-            Ok(())
+            Ok(NewlyClosed::No)
         );
         assert_eq!(
             state,
@@ -4642,7 +4709,7 @@ mod test {
         });
         assert_eq!(
             state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
-            Ok(())
+            Ok(NewlyClosed::No)
         );
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
@@ -4691,7 +4758,7 @@ mod test {
         });
         assert_eq!(
             state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
-            Ok(())
+            Ok(NewlyClosed::No)
         );
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
@@ -4945,7 +5012,7 @@ mod test {
         });
         assert_eq!(
             state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
-            Ok(())
+            Ok(NewlyClosed::No)
         );
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
@@ -5290,7 +5357,7 @@ mod test {
                 clock.now(),
                 socket_options,
             ),
-            None,
+            Err(NewlyClosed::No),
         );
         // so the above poll_send call will install a timer, which will fire
         // after `keep_alive.idle`.
@@ -5306,7 +5373,7 @@ mod test {
                 socket_options,
                 false, /* defunct */
             ),
-            (None, None, DataAcked::No)
+            (None, None, DataAcked::No, NewlyClosed::No)
         );
         // the timer is reset to fire in 2 hours.
         assert_eq!(state.poll_send_at(), Some(clock.now().add(keep_alive.idle.into())),);
@@ -5322,7 +5389,7 @@ mod test {
                     clock.now(),
                     socket_options,
                 ),
-                Some(Segment::ack(ISS_1 - 1, ISS_2, UnscaledWindowSize::from(u16::MAX)))
+                Ok(Segment::ack(ISS_1 - 1, ISS_2, UnscaledWindowSize::from(u16::MAX)))
             );
             clock.sleep(keep_alive.interval.into());
             assert_matches!(state, State::Established(_));
@@ -5337,7 +5404,7 @@ mod test {
                 clock.now(),
                 socket_options,
             ),
-            None,
+            Err(NewlyClosed::Yes),
         );
         assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
         assert_eq!(counters.established_closed.get(), 1);
@@ -5609,18 +5676,21 @@ mod test {
         let mut socket_options = SocketOptions::default();
         assert_eq!(
             state.poll_send(&counters, 3, clock.now(), &socket_options),
-            Some(Segment::data(
+            Ok(Segment::data(
                 ISS_1 + 1,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
                 FragmentedPayload::new_contiguous(&TEST_BYTES[0..3])
             ))
         );
-        assert_eq!(state.poll_send(&counters, 3, clock.now(), &socket_options), None);
+        assert_eq!(
+            state.poll_send(&counters, 3, clock.now(), &socket_options),
+            Err(NewlyClosed::No)
+        );
         socket_options.nagle_enabled = false;
         assert_eq!(
             state.poll_send(&counters, 3, clock.now(), &socket_options),
-            Some(Segment::data(
+            Ok(Segment::data(
                 ISS_1 + 4,
                 ISS_2 + 1,
                 UnscaledWindowSize::from_usize(BUFFER_SIZE),
@@ -5741,7 +5811,7 @@ mod test {
         });
         let mut times = 1;
         let start = clock.now();
-        while let Some(seg) = state.poll_send(
+        while let Ok(seg) = state.poll_send(
             &counters,
             u32::MAX,
             clock.now(),
@@ -5753,7 +5823,7 @@ mod test {
                     seg.header.seq,
                     UnscaledWindowSize::from(0),
                 );
-                assert_eq!(
+                assert_matches!(
                     state.on_segment::<(), ClientlessBufferProvider>(
                         &counters,
                         zero_window_ack,
@@ -5764,7 +5834,7 @@ mod test {
                         },
                         false,
                     ),
-                    (None, None, DataAcked::No)
+                    (None, None, DataAcked::No, _newly_closed)
                 );
             }
             let deadline = state.poll_send_at().expect("must have a retransmission timer");
@@ -5918,13 +5988,13 @@ mod test {
                 &socket_options,
                 false, /* defunct */
             ),
-            (None, None, DataAcked::No)
+            (None, None, DataAcked::No, NewlyClosed::No)
         );
         assert_eq!(state.poll_send_at(), Some(clock.now().add(ACK_DELAY_THRESHOLD)));
         clock.sleep(ACK_DELAY_THRESHOLD);
         assert_eq!(
             state.poll_send(&counters, u32::MAX, clock.now(), &socket_options),
-            Some(Segment::ack(
+            Ok(Segment::ack(
                 ISS_1 + 1,
                 ISS_2 + 1 + TEST_BYTES.len(),
                 UnscaledWindowSize::from_u32(2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE)),
@@ -5946,7 +6016,7 @@ mod test {
                 &socket_options,
                 false, /* defunct */
             ),
-            (None, None, DataAcked::No)
+            (None, None, DataAcked::No, NewlyClosed::No)
         );
         // ... but just a timer.
         assert_eq!(state.poll_send_at(), Some(clock.now().add(ACK_DELAY_THRESHOLD)));
@@ -5973,6 +6043,7 @@ mod test {
                 )),
                 None,
                 DataAcked::No,
+                NewlyClosed::No,
             )
         );
         assert_eq!(state.poll_send_at(), None);
@@ -6041,6 +6112,7 @@ mod test {
                 )),
                 None,
                 DataAcked::No,
+                NewlyClosed::No,
             )
         );
         assert_eq!(state.poll_send_at(), None);
@@ -6067,6 +6139,7 @@ mod test {
                 )),
                 None,
                 DataAcked::No,
+                NewlyClosed::No
             )
         );
         assert_eq!(state.poll_send_at(), None);
@@ -6091,6 +6164,7 @@ mod test {
                 )),
                 None,
                 DataAcked::No,
+                NewlyClosed::No,
             )
         );
         assert_eq!(state.poll_send_at(), None);
@@ -6692,5 +6766,65 @@ mod test {
                 None,
             )
         );
+    }
+
+    #[test_case(
+        State::Closed(Closed { reason: None }),
+        State::Closed(Closed { reason: None }) => NewlyClosed::No; "closed to closed")]
+    #[test_case(
+        State::SynSent(SynSent {
+            iss: ISS_1,
+            timestamp: Some(FakeInstant::default()),
+            retrans_timer: RetransTimer::new(
+                FakeInstant::default(),
+                Estimator::RTO_INIT,
+                DEFAULT_USER_TIMEOUT,
+                DEFAULT_MAX_SYN_RETRIES,
+            ),
+            active_open: (),
+            buffer_sizes: BufferSizes::default(),
+            default_mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            device_mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
+            rcv_wnd_scale: WindowScale::default(),
+        }),
+        State::Closed(Closed { reason: None }) => NewlyClosed::Yes; "non-closed to closed")]
+    #[test_case(
+        State::SynSent(SynSent {
+                iss: ISS_1,
+                timestamp: Some(FakeInstant::default()),
+                retrans_timer: RetransTimer::new(
+                    FakeInstant::default(),
+                    Estimator::RTO_INIT,
+                    DEFAULT_USER_TIMEOUT,
+                    DEFAULT_MAX_SYN_RETRIES,
+                ),
+                active_open: (),
+                buffer_sizes: BufferSizes::default(),
+                default_mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+                device_mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
+                rcv_wnd_scale: WindowScale::default(),
+            },
+        ),
+        State::SynRcvd(SynRcvd {
+            iss: ISS_1,
+            irs: ISS_2,
+            timestamp: None,
+            retrans_timer: RetransTimer::new(
+                FakeInstant::default(),
+                Estimator::RTO_INIT,
+                Duration::from_secs(10),
+                DEFAULT_MAX_SYNACK_RETRIES,
+            ),
+            simultaneous_open: None,
+            buffer_sizes: BufferSizes { send: 0, receive: 0 },
+            smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            rcv_wnd_scale: WindowScale::new(0).unwrap(),
+            snd_wnd_scale: WindowScale::new(0),
+        }) => NewlyClosed::No; "non-closed to non-closed")]
+    fn transition_to_state(
+        mut old_state: State<FakeInstant, RingBuffer, RingBuffer, ()>,
+        new_state: State<FakeInstant, RingBuffer, RingBuffer, ()>,
+    ) -> NewlyClosed {
+        old_state.transition_to_state(&Default::default(), new_state)
     }
 }

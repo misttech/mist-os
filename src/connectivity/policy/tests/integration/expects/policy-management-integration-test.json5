@@ -32,6 +32,8 @@
                 // TODO(https://fxbug.dev/331264840): Once Masquerade NAT is
                 // implemented in NS3, add support to netcfg.
                 "test_masquerade_ns3*",
+                "test_masquerade_lifetime_ns3*",
+                "test_masquerade_multiple_controllers_ns3*",
             ],
         },
         {

@@ -14,6 +14,7 @@ use fidl_contrib::ProtocolConnector;
 use fidl_fuchsia_metrics::{
     MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
 };
+use fuchsia_async as fasync;
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_runtime::{UtcClock, UtcDuration};
@@ -36,7 +37,6 @@ use time_metrics_registry::{
     TIMEKEEPER_TIME_SOURCE_EVENTS_MIGRATED_METRIC_ID, TIMEKEEPER_TRACK_EVENTS_MIGRATED_METRIC_ID,
 };
 use time_util::time_at_monotonic;
-use {fuchsia_async as fasync, zx};
 
 /// The number of parts in a million.
 const ONE_MILLION: i64 = 1_000_000;

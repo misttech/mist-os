@@ -30,7 +30,7 @@ namespace fake_gpio {
 
 bool WriteSubState::operator==(const WriteSubState& other) const { return value == other.value; }
 
-bool ReadSubState::operator==(const ReadSubState& other) const { return flags == other.flags; }
+bool ReadSubState::operator==(const ReadSubState& other) const { return true; }
 
 bool AltFunctionSubState::operator==(const AltFunctionSubState& other) const {
   return function == other.function;
@@ -45,8 +45,8 @@ FakeGpio::FakeGpio() : set_buffer_mode_callback_(DefaultSetBufferModeCallback) {
   interrupt_ = zx::ok(std::move(interrupt));
 }
 
-void FakeGpio::GetInterrupt2(GetInterrupt2RequestView request,
-                             GetInterrupt2Completer::Sync& completer) {
+void FakeGpio::GetInterrupt(GetInterruptRequestView request,
+                            GetInterruptCompleter::Sync& completer) {
   if (interrupt_.is_error()) {
     completer.ReplyError(interrupt_.error_value());
     return;
@@ -57,9 +57,7 @@ void FakeGpio::GetInterrupt2(GetInterrupt2RequestView request,
     return;
   }
 
-  auto sub_state = state_log_.empty()
-                       ? ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull}
-                       : state_log_.back().sub_state;
+  auto sub_state = state_log_.empty() ? ReadSubState{} : state_log_.back().sub_state;
   state_log_.emplace_back(State{
       .interrupt_options = request->options,
       .sub_state = sub_state,
@@ -70,56 +68,15 @@ void FakeGpio::GetInterrupt2(GetInterrupt2RequestView request,
   completer.ReplySuccess(std::move(interrupt));
 }
 
-void FakeGpio::GetInterrupt(GetInterruptRequestView request,
-                            GetInterruptCompleter::Sync& completer) {
-  if (interrupt_.is_ok()) {
-    if (!interrupt_used_.exchange(/*desired=*/true, std::memory_order_relaxed)) {
-      zx::interrupt interrupt;
-      ZX_ASSERT(interrupt_.value().duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt) == ZX_OK);
-      completer.ReplySuccess(std::move(interrupt));
-    } else {
-      completer.ReplyError(ZX_ERR_ALREADY_BOUND);
-    }
-  } else {
-    completer.ReplyError(interrupt_.error_value());
-  }
-}
-
 void FakeGpio::ConfigureInterrupt(ConfigureInterruptRequestView request,
                                   ConfigureInterruptCompleter::Sync& completer) {
   if (request->config.has_mode()) {
-    auto sub_state = state_log_.empty()
-                         ? ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull}
-                         : state_log_.back().sub_state;
+    auto sub_state = state_log_.empty() ? ReadSubState{} : state_log_.back().sub_state;
     state_log_.emplace_back(State{
         .interrupt_mode = request->config.mode(),
         .sub_state = sub_state,
     });
   }
-  completer.ReplySuccess();
-}
-
-void FakeGpio::SetAltFunction(SetAltFunctionRequestView request,
-                              SetAltFunctionCompleter::Sync& completer) {
-  state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
-                                .sub_state = AltFunctionSubState{.function = request->function}});
-  completer.ReplySuccess();
-}
-
-void FakeGpio::ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) {
-  if (state_log_.empty() || !std::holds_alternative<ReadSubState>(state_log_.back().sub_state)) {
-    state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
-                                  .sub_state = ReadSubState{.flags = request->flags}});
-  } else {
-    auto& state = std::get<ReadSubState>(state_log_.back().sub_state);
-    state.flags = request->flags;
-  }
-  completer.ReplySuccess();
-}
-
-void FakeGpio::ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) {
-  state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
-                                .sub_state = WriteSubState{.value = request->initial_value}});
   completer.ReplySuccess();
 }
 
@@ -201,11 +158,6 @@ uint8_t FakeGpio::GetWriteValue() const {
   ZX_ASSERT(!state_log_.empty());
   const auto& state = std::get<WriteSubState>(state_log_.back().sub_state);
   return state.value;
-}
-
-fuchsia_hardware_gpio::GpioFlags FakeGpio::GetReadFlags() const {
-  const auto& state = std::get<ReadSubState>(state_log_.back().sub_state);
-  return state.flags;
 }
 
 fuchsia_hardware_gpio::InterruptMode FakeGpio::GetInterruptMode() const {

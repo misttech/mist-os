@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use diagnostics_log_types_serde::{optional_severity, Severity};
 use serde::{Deserialize, Serialize};
 use std::cmp::{Eq, PartialEq};
 use std::fmt::Debug;
@@ -86,13 +87,15 @@ pub struct FuchsiaComponentExecutionEntry {
     /// This may be used to catch log spam from components by ensuring
     /// that all logging during test execution is equal to or below
     /// this level.
-    pub max_severity_logs: Option<diagnostics_data::Severity>,
+    #[serde(default, with = "optional_severity")]
+    pub max_severity_logs: Option<Severity>,
 
     /// The minimum severity of logs the test will be asked to produce.
     ///
     /// This may be used to request DEBUG or TRACE level logs from tests
     /// which only produce INFO and above by default.
-    pub min_severity_logs: Option<diagnostics_data::Severity>,
+    #[serde(default, with = "optional_severity")]
+    pub min_severity_logs: Option<Severity>,
 
     /// The moniker of the realm to to run this test in.
     pub realm: Option<String>,

@@ -41,11 +41,11 @@ template("fidlc") {
   fidl_target_name = invoker.fidl_target_name
 
   # These paths are expected by the templates in //build/c/fidlc.gni.
-  generated_binding_dir = "${invoker.gen_dir}/$fidl_target_name/c"
+  generated_binding_dir = "${invoker.gen_dir}/${fidl_target_name}/c"
   fidlc_depfile_path = "$generated_binding_dir/${invoker.fidl_library_name}.d"
 
-  libraries_file = "${invoker.gen_dir}/$fidl_target_name.libraries"
-  response_file = "${invoker.gen_dir}/$target_name.args"
+  libraries_file = "${invoker.gen_dir}/${fidl_target_name}.libraries"
+  response_file = "${invoker.gen_dir}/${fidl_target_name}.args"
   response_file_target_name = "${main_target_name}_response_file"
   action(response_file_target_name) {
     forward_variables_from(invoker,

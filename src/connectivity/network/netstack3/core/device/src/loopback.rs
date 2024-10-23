@@ -20,7 +20,7 @@ use netstack3_base::{
     SendFrameErrorReason, SendableFrameMeta, StrongDeviceIdentifier, TimerContext,
     WeakDeviceIdentifier,
 };
-use netstack3_ip::IpPacketDestination;
+use netstack3_ip::{DeviceIpLayerMetadata, IpPacketDestination};
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
@@ -123,18 +123,27 @@ pub struct LoopbackTxQueueMeta<D: WeakDeviceIdentifier> {
     /// Device that should be used to deliver the packet. If not set then the
     /// packet delivered as if it came from the loopback device.
     target_device: Option<D>,
+    /// Metadata that is produced and consumed by the IP layer but which traverses
+    /// the device layer through the loopback device.
+    ip_layer_metadata: DeviceIpLayerMetadata,
 }
 
 /// Metadata associated with a frame in the Loopback RX queue.
+#[derive(Debug)]
 pub struct LoopbackRxQueueMeta<D: WeakDeviceIdentifier> {
     /// Device that should be used to deliver the packet. If not set then the
     /// packet delivered as if it came from the loopback device.
     target_device: Option<D>,
+    /// Metadata that is produced and consumed by the IP layer but which traverses
+    /// the device layer through the loopback device.
+    ip_layer_metadata: DeviceIpLayerMetadata,
 }
 
 impl<D: WeakDeviceIdentifier> From<LoopbackTxQueueMeta<D>> for LoopbackRxQueueMeta<D> {
-    fn from(LoopbackTxQueueMeta { target_device }: LoopbackTxQueueMeta<D>) -> Self {
-        Self { target_device }
+    fn from(
+        LoopbackTxQueueMeta { target_device, ip_layer_metadata }: LoopbackTxQueueMeta<D>,
+    ) -> Self {
+        Self { target_device, ip_layer_metadata }
     }
 }
 
@@ -198,9 +207,21 @@ where
         >,
     // Loopback needs to deliver messages to `AnyDevice`.
     CC: DeviceIdAnyCompatContext<LoopbackDevice>
-        + RecvFrameContext<RecvIpFrameMeta<<CC as DeviceIdContext<AnyDevice>>::DeviceId, Ipv4>, BC>
-        + RecvFrameContext<RecvIpFrameMeta<<CC as DeviceIdContext<AnyDevice>>::DeviceId, Ipv6>, BC>
-        + ResourceCounterContext<<CC as DeviceIdContext<AnyDevice>>::DeviceId, DeviceCounters>
+        + RecvFrameContext<
+            RecvIpFrameMeta<
+                <CC as DeviceIdContext<AnyDevice>>::DeviceId,
+                DeviceIpLayerMetadata,
+                Ipv4,
+            >,
+            BC,
+        > + RecvFrameContext<
+            RecvIpFrameMeta<
+                <CC as DeviceIdContext<AnyDevice>>::DeviceId,
+                DeviceIpLayerMetadata,
+                Ipv6,
+            >,
+            BC,
+        > + ResourceCounterContext<<CC as DeviceIdContext<AnyDevice>>::DeviceId, DeviceCounters>
         + DeviceSocketHandler<AnyDevice, BC>,
     CC::Buffer: BufferMut + Debug,
     BC: DeviceLayerTypes,
@@ -224,8 +245,9 @@ where
                 Ok(e) => e,
             };
 
+        let LoopbackRxQueueMeta { target_device, ip_layer_metadata } = rx_meta;
         let target_device: <CC as DeviceIdContext<AnyDevice>>::DeviceId =
-            match rx_meta.target_device.map(|d| d.upgrade()) {
+            match target_device.map(|d| d.upgrade()) {
                 // This is a packet that should be delivered on `target_device`.
                 Some(Some(dev)) => dev,
 
@@ -256,7 +278,11 @@ where
                 });
                 self.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv4>::new(target_device, Some(frame_dest)),
+                    RecvIpFrameMeta::<_, _, Ipv4>::new(
+                        target_device,
+                        Some(frame_dest),
+                        ip_layer_metadata,
+                    ),
                     buf,
                 );
             }
@@ -266,7 +292,11 @@ where
                 });
                 self.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv6>::new(target_device, Some(frame_dest)),
+                    RecvIpFrameMeta::<_, _, Ipv6>::new(
+                        target_device,
+                        Some(frame_dest),
+                        ip_layer_metadata,
+                    ),
                     buf,
                 );
             }
@@ -330,6 +360,7 @@ pub fn send_ip_frame<CC, BC, I, S>(
     bindings_ctx: &mut BC,
     device_id: &<CC as DeviceIdContext<LoopbackDevice>>::DeviceId,
     destination: IpPacketDestination<I, &<CC as DeviceIdContext<AnyDevice>>::DeviceId>,
+    ip_layer_metadata: DeviceIpLayerMetadata,
     packet: S,
 ) -> Result<(), SendFrameError<S>>
 where
@@ -359,7 +390,7 @@ where
         packet,
         I::ETHER_TYPE,
         LOOPBACK_MAC,
-        LoopbackTxQueueMeta { target_device },
+        LoopbackTxQueueMeta { target_device, ip_layer_metadata },
     )
 }
 

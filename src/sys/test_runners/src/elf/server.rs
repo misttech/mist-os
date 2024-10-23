@@ -18,7 +18,7 @@ use std::sync::{Arc, Weak};
 use thiserror::Error;
 use tracing::{error, warn};
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
-use {fidl_fuchsia_test as ftest, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_test as ftest, fuchsia_async as fasync};
 
 /// A pinned, boxed future whose output is `Result<T, E>`.
 pub type PinnedFuture<T, E> = Pin<Box<dyn Future<Output = Result<T, E>> + Send>>;

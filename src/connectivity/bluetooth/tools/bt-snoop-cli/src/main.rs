@@ -84,10 +84,10 @@ fn format_to_byte(format: Option<PacketFormat>) -> u8 {
 }
 
 fn timestamp_to_secs_and_micros(timestamp: i64) -> (u32, u32) {
-    let timestamp = fasync::Duration::from_nanos(timestamp);
+    let timestamp = fasync::MonotonicDuration::from_nanos(timestamp);
     (
         timestamp.into_seconds() as u32,
-        (timestamp.into_micros() % fasync::Duration::from_seconds(1).into_micros()) as u32,
+        (timestamp.into_micros() % fasync::MonotonicDuration::from_seconds(1).into_micros()) as u32,
     )
 }
 

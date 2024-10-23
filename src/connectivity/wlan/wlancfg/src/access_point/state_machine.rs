@@ -269,7 +269,7 @@ struct CommonStateDependencies {
     req_stream: ReqStream,
     state_tracker: Arc<ApStateTracker>,
     telemetry_sender: TelemetrySender,
-    defect_sender: mpsc::UnboundedSender<Defect>,
+    defect_sender: mpsc::Sender<Defect>,
     status_publisher: StateMachineStatusPublisher<Status>,
 }
 
@@ -280,7 +280,7 @@ pub async fn serve(
     req_stream: Fuse<mpsc::Receiver<ManualRequest>>,
     message_sender: ApListenerMessageSender,
     telemetry_sender: TelemetrySender,
-    defect_sender: mpsc::UnboundedSender<Defect>,
+    defect_sender: mpsc::Sender<Defect>,
     status_publisher: StateMachineStatusPublisher<Status>,
 ) {
     let state_tracker = Arc::new(ApStateTracker::new(message_sender));
@@ -434,10 +434,9 @@ async fn starting_state(
         Ok(code) => {
             // Log a metric indicating that starting the AP failed.
             deps.telemetry_sender.send(TelemetryEvent::StartApResult(Err(())));
-            if let Err(e) =
-                deps.defect_sender.unbounded_send(Defect::Iface(IfaceFailure::ApStartFailure {
-                    iface_id: deps.iface_id,
-                }))
+            if let Err(e) = deps
+                .defect_sender
+                .try_send(Defect::Iface(IfaceFailure::ApStartFailure { iface_id: deps.iface_id }))
             {
                 warn!("Failed to log AP start defect: {}", e)
             }
@@ -647,7 +646,7 @@ mod tests {
         ap_req_sender: mpsc::Sender<ManualRequest>,
         update_receiver: mpsc::UnboundedReceiver<listener::ApMessage>,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
-        defect_receiver: mpsc::UnboundedReceiver<Defect>,
+        defect_receiver: mpsc::Receiver<Defect>,
         status_reader: StateMachineStatusReader<Status>,
     }
 
@@ -656,7 +655,7 @@ mod tests {
         let (update_sender, update_receiver) = mpsc::unbounded();
         let (telemetry_sender, telemetry_receiver) = mpsc::channel(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (defect_sender, defect_receiver) = mpsc::unbounded();
+        let (defect_sender, defect_receiver) = mpsc::channel(100);
         let (status_publisher, status_reader) = status_publisher_and_reader::<Status>();
         let (sme_proxy, sme_server) =
             create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create an sme channel");

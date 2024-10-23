@@ -4,7 +4,231 @@
 
 library fuchsia.io;
 
+using fuchsia.unknown;
 using zx;
+
+/// The maximum size for an extended attribute name.
+@available(added=18)
+const MAX_ATTRIBUTE_NAME uint64 = 255;
+
+/// The maximum size for passing the SELinux context as an attribute.
+@available(added=HEAD)
+const MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN uint64 = 256;
+
+/// The name of the extended attribute accessible via the SELinux context attribute.
+@available(added=HEAD)
+const SELINUX_CONTEXT_NAME string = "security.selinux";
+
+/// The name of an extended attribute. It can not contain any null bytes. Other
+/// than that and the maximum size, no particular structure is imposed on the
+/// name.
+@available(added=18)
+alias ExtendedAttributeName = vector<uint8>:MAX_ATTRIBUTE_NAME;
+
+/// The maximum size for an extended attribute value to be included inline.
+/// Values larger than this size are passed in a vmo.
+@available(added=18)
+const MAX_INLINE_ATTRIBUTE_VALUE uint64 = 32768;
+
+/// The maximum size of a chunk in the ListExtendedAttributes iterator.
+@available(added=18)
+const MAX_LIST_ATTRIBUTES_CHUNK uint64 = 128;
+
+/// The value type for an extended attribute. If the value is less than 32768
+/// bytes, then it is included inline. Values larger than this size are written
+/// into a vmo buffer.
+@available(added=18)
+type ExtendedAttributeValue = flexible resource union {
+    1: bytes vector<uint8>:MAX_INLINE_ATTRIBUTE_VALUE;
+    2: buffer zx.Handle:VMO;
+};
+
+// TODO(https://fxbug.dev/42159332): Remove the need for this.
+/// Used in places where empty structs are needed, such as empty union members, to avoid creating
+/// new struct types.
+@available(added=HEAD)
+type EmptyStruct = struct {};
+
+type NodeAttributesQuery = flexible bits : uint64 {
+    /// Requests [`NodeAttributes.protocols`].
+    PROTOCOLS = 0x1;
+
+    /// Requests [`NodeAttributes.abilities`].
+    ABILITIES = 0x2;
+
+    /// Requests [`NodeAttributes.content_size`].
+    CONTENT_SIZE = 0x4;
+
+    /// Requests [`NodeAttributes.storage_size`].
+    STORAGE_SIZE = 0x8;
+
+    /// Requests [`NodeAttributes.link_count`].
+    LINK_COUNT = 0x10;
+
+    /// Requests [`NodeAttributes.id`].
+    ID = 0x20;
+
+    /// Requests [`NodeAttributes.creation_time`].
+    CREATION_TIME = 0x40;
+
+    /// Requests [`NodeAttributes.modification_time`].
+    MODIFICATION_TIME = 0x80;
+
+    /// Posix attributes.
+    @available(added=18)
+    MODE = 0x100;
+    @available(added=18)
+    UID = 0x200;
+    @available(added=18)
+    GID = 0x400;
+    @available(added=18)
+    RDEV = 0x800;
+    @available(added=18)
+    ACCESS_TIME = 0x1000;
+    @available(added=18)
+    CHANGE_TIME = 0x2000;
+
+    /// Verity attributes.
+    @available(added=HEAD)
+    OPTIONS = 0x4000;
+    @available(added=HEAD)
+    ROOT_HASH = 0x8000;
+    @available(added=HEAD)
+    VERITY_ENABLED = 0x10000;
+
+    /// Casefold (case-insensitive filename) support.
+    /// When true, file lookups will be case-insensitive but case-preserving. i.e. "Foo" will
+    /// be stored verbatim but can be opened as "foo", "fOO", etc. Casefolding is done in
+    /// accordance to the Unicode 12 NFD normalization and casefolding standard.
+    @available(added=HEAD)
+    CASEFOLD = 0x20000;
+
+    /// Requests [`MutableNodeAttributes.selinux_context`]. See that field for more detail.
+    @available(added=HEAD)
+    SELINUX_CONTEXT = 0x40000;
+
+    /// fscrypt attribute.
+    @available(added=HEAD)
+    WRAPPING_KEY_ID = 0x80000;
+};
+
+type MutableNodeAttributes = table {
+    /// Time of creation in nanoseconds since the Unix epoch, UTC.
+    1: creation_time uint64;
+
+    /// Time of last modification in nanoseconds since the Unix epoch, UTC.
+    2: modification_time uint64;
+
+    /// POSIX compatibility attributes. Most filesystems will not support
+    /// these. Those that do must simply store and retrieve them (e.g. as
+    /// extended attributes) and not attempt to interpret them (e.g. by doing
+    /// permission checks or handling device opens specially).
+    @available(added=18)
+    3: mode uint32; // mode_t
+    @available(added=18)
+    4: uid uint32; // uid_t
+    @available(added=18)
+    5: gid uint32; // gid_t
+    @available(added=18)
+    6: rdev uint64; // dev_t
+
+    /// Time of last access in nanoseconds since the Unix epoch, UTC. Note that servers might not
+    /// always update this if this is the only attribute being updated.
+    @available(added=18)
+    7: access_time uint64;
+
+    /// Casefold (case-insensitive filename) support
+    /// This attribute can only be changed on empty directories and will be inherited by any
+    /// child directories that are subsequently created.
+    /// The only filesystem to support this at the time of writing is Fxfs.
+    @available(added=HEAD)
+    8: casefold bool;
+
+    /// The value of the extended attribute "security.selinux" to be used in the context of SELinux
+    /// implementations. The value can only be set or returned if it is
+    /// [`MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN`] characters or less to constrain the size of the
+    /// response. If the value is not currently found on the node the response the field will not
+    /// be included in the repsonse. If the value is found on the node but the server is not
+    /// returning it here due to size or implementation, then it will return
+    /// `use_extended_attributes` to indicate using the ['fuchsia.io/Node.GetExtendedAttribute`]
+    /// to retreive it.
+    ///
+    /// ZX_ERR_INVALID_ARGS will be returned if there is an attempt set this attribute with the
+    /// `use_extended_attributes` member.
+    @available(added=HEAD)
+    9: selinux_context flexible union {
+        1: data vector<uint8>:MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN;
+        2: use_extended_attributes EmptyStruct;
+    };
+
+    /// Fscrypt support
+    /// This attribute can only be changed on empty directories and will be inherited by any
+    /// child directories that are subsequently created. This attribute can only be set once per
+    /// directory. The wrapping_key_id set will be used to encrypt file contents and filenames for
+    /// this directory and its children.
+    /// The only filesystem to support this at the time of writing is Fxfs.
+    @available(added=HEAD)
+    10: wrapping_key_id array<uint8, 16>;
+};
+
+// TODO(https://fxbug.dev/42057114): Inline this into its only reference when fidlgen_go is fixed.
+type ConnectionInfo = resource table {
+    /// The rights possessed by the current connection. Note: `rights` limits
+    /// the set of operations allowed on the connection, but does not guarantee
+    /// their availability. For example, one may have the [`Rights.EXECUTE`]
+    /// right on a file connection, but the file itself does not have the
+    /// `EXECUTE` ability, and hence cannot be executed. See
+    /// [`ConnectionOptions.rights`].
+    1: rights Rights;
+};
+
+type NodeAttributes2 = struct {
+    // TODO(https://fxbug.dev/42124231): fostr does not escape C++ keywords.
+    // Drop the `_attributes` suffixes when fostr is fixed or retired.
+    mutable_attributes MutableNodeAttributes;
+    immutable_attributes @generated_name("ImmutableNodeAttributes") table {
+        /// Describes the kinds of representations supported by the node.
+        /// Note: This is not the result of the connection-time negotiation,
+        /// which is conveyed via `representation`.
+        1: protocols NodeProtocolKinds;
+
+        /// Describes the kinds of operations supported by the node.
+        /// Note: This is distinct from the rights used at connection time.
+        2: abilities Abilities;
+
+        /// Node size, in bytes.
+        3: content_size uint64;
+
+        /// Space needed to store the node (possibly larger than size), in bytes.
+        4: storage_size uint64;
+
+        /// Number of hard links to the node. It must be at least one.
+        5: link_count uint64;
+
+        /// An ID for the node. See [`Id`].
+        /// This `id` should be unique among all entries of a directory.
+        6: id Id;
+
+        /// Time of last change to the metadata in nanoseconds since the Unix epoch, UTC.
+        @available(added=HEAD)
+        7: change_time uint64;
+
+        /// Contains the verification options for verity-enabled files.
+        @available(added=HEAD)
+        8: options VerificationOptions;
+
+        /// The root hash for the file. Not all filesystems support this across all files.
+        @available(added=HEAD)
+        9: root_hash vector<uint8>:64;
+
+        /// True if this file is verity-enabled.
+        @available(added=HEAD)
+        10: verity_enabled bool;
+    };
+};
+
+// TODO(https://fxbug.dev/42056856): Use a generated constant.
+const NODE_PROTOCOL_NAME string = "fuchsia.io/Node";
 
 /// The fields of 'attributes' which are used to update the Node are indicated
 /// by the 'flags' argument.
@@ -56,14 +280,14 @@ type NodeAttributes = struct {
 
 const MAX_FS_NAME_BUFFER uint64 = 32;
 
+/// Node defines the minimal interface for entities which can be accessed in a filesystem.
 @discoverable
 closed(removed=24) open(added=24) protocol Node {
-    compose Node1;
-    compose Node2;
-};
+    @available(added=9)
+    compose fuchsia.unknown.Closeable;
+    @available(added=9)
+    compose fuchsia.unknown.Queryable;
 
-/// Node defines the minimal interface for entities which can be accessed in a filesystem.
-closed(removed=24) open(added=24) protocol Node1 {
     /// Create another connection to the same remote object.
     ///
     /// `flags` may be any of:
@@ -86,6 +310,23 @@ closed(removed=24) open(added=24) protocol Node1 {
     strict Clone(resource struct {
         flags OpenFlags;
         object server_end:Node;
+    });
+
+    /// Creates another connection to the same node.
+    @selector("fuchsia.io/Node.Reopen")
+    strict Reopen(resource struct {
+        // [`Rights`] can't be optional or boxed, hence a table.
+        rights_request @generated_name("RightsRequest") table {
+            /// Requested rights on the new connection.
+            ///
+            /// If [`rights`] exceed the rights of the requesting connection
+            /// then [`object_request`] will be closed with a
+            /// `ZX_ERR_ACCESS_DENIED` epitaph.
+            ///
+            /// If absent, inherits the rights from the requesting connection.
+            1: rights Rights;
+        };
+        object_request server_end:Node;
     });
 
     /// An event produced eagerly by a FIDL server if requested by `OpenFlags.DESCRIBE`.
@@ -218,4 +459,227 @@ closed(removed=24) open(added=24) protocol Node1 {
             name array<int8, MAX_FS_NAME_BUFFER>;
         }>;
     });
+
+    /// An event produced eagerly by the server if requested by
+    /// [`NodeFlags.GET_REPRESENTATION`]. This event will be the first message
+    /// from the server, and is sent exactly once.
+    ///
+    /// The active variant corresponds to one of the supported protocols of
+    /// the node, and represents the result of the connection-time
+    /// negotiation. Provides auxiliary handles if applicable.
+    ///
+    /// If the client specified more than one protocol in `protocols` during
+    /// [`Directory.Open`], the [`Representation`] carries additionally the
+    /// result of the connection-time negotiation via its tag.
+    ///
+    /// The elements have one-to-one correspondence with the members of
+    /// [`NodeProtocolKinds`].
+    ///
+    /// This is a special case of [`fuchsia.unknown/Queryable.Query`] +
+    /// inherent `Describe` methods on the specific protocols. It exists as
+    /// an optimization to avoid an additional round trip.
+    @selector("fuchsia.io/Node.OnRepresentation")
+    strict -> OnRepresentation(@generated_name("Representation") flexible resource union {
+        /// Auxiliary data for the connector representation of a node, used
+        /// for protocol discovery and connection.
+        ///
+        /// It supports connecting to arbitrary protocols exported by the
+        /// filesystem server at a path, including ones that do not compose
+        /// [`Node2`].
+        ///
+        /// See [`NodeProtocolKinds.CONNECTOR`].
+        1: connector @generated_name("ConnectorInfo") table {
+            /// Requested attributes for the object. This is only populated if requested.
+            @available(added=18)
+            1: attributes NodeAttributes2;
+        };
+
+        /// Auxiliary data for the directory representation of a node. The
+        /// selection of this variant in [`Representation`] implies that the
+        /// connection speaks the [`Directory`] protocol.
+        ///
+        /// See [`NodeProtocolKinds.DIRECTORY`].
+        2: directory DirectoryInfo;
+
+        /// Auxiliary data for the file representation of a node. The
+        /// selection of this variant in [`Representation`] implies that the
+        /// connection speaks the [`File`] protocol.
+        ///
+        /// See [`NodeProtocolKinds.FILE`].
+        3: file FileInfo;
+
+        /// Auxilliary data for the symlink representation of a node. The
+        /// selection of this variant in [`Representation`] implies that the
+        /// connection speaks the [`Symlink`] protocol.
+        ///
+        /// See [`NodeProtocolKinds.SYMLINK`].
+        @available(added=18)
+        4: symlink SymlinkInfo;
+    });
+
+    // TODO(https://fxbug.dev/42157659): uncomment and implement.
+
+    // /// Acquires a token which can be used to identify this connection at a later point in
+    // /// time. The token will remain valid for as long as the connection requesting the token
+    // /// remains open.
+    // ///
+    // /// This method does not require any rights. Note that the token identifies
+    // /// the connection, hence carries the rights information on this connection.
+    // @selector("fuchsia.io/Node.GetToken")
+    // GetToken2() -> (resource struct {
+    //     token Token;
+    // }) error zx.Status;
+
+    /// Acquires information about the connection.
+    ///
+    /// This method does not require any rights.
+    @selector("fuchsia.io/Node.GetConnectionInfo")
+    strict GetConnectionInfo() -> (ConnectionInfo);
+
+    /// Acquires information about the node.
+    ///
+    /// The attributes of a node should be stable, independent of the
+    /// specific protocol used to access it.
+    ///
+    /// If a particular attribute is not applicable or not supported,
+    /// filesystems should leave the corresponding field absent.
+    ///
+    /// + `query` a bit-mask specifying which attributes to fetch. The server
+    ///   should not return more than necessary.
+    /// - `attributes` the returned attributes.
+    ///
+    /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
+    @selector("fuchsia.io/Node.GetAttributes")
+    strict GetAttributes(struct {
+        /// Set the corresponding bit to one to query that particular attribute.
+        ///
+        /// The elements here correspond one-to-one with [`NodeAttributes`].
+        query NodeAttributesQuery;
+    }) -> (NodeAttributes2) error zx.Status;
+
+    /// Updates information about the node.
+    ///
+    /// + `attributes` the presence of a table field in `attributes` indicates
+    /// the intent to update the corresponding attribute.
+    ///
+    /// Returns `ZX_ERR_NOT_SUPPORTED` if the node does not support any of the specified attributes.
+    ///
+    /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
+    @selector("fuchsia.io/Node.UpdateAttributes")
+    strict UpdateAttributes(MutableNodeAttributes) -> () error zx.Status;
+
+    /// Synchronizes updates to the node to the underlying media, if it exists.
+    ///
+    /// This method will return when the filesystem server has flushed the
+    /// relevant updates to the underlying media, but does not guarantee the
+    /// underlying media has persisted the information, nor that any information
+    /// is committed to hardware. Clients may use `Sync` to ensure ordering
+    /// between operations.
+    ///
+    /// This method does not require any rights.
+    @selector("fuchsia.io/Node.Sync")
+    strict Sync() -> () error zx.Status;
+
+    /// Creates an iterator over all the extended attribute names associated
+    /// with this node. If an error occurs it is returned as an epitaph on the
+    /// iterator request channel, and then the channel is closed.
+    ///
+    /// GetExtendedAttributes can be used with any of these names to retrieve
+    /// the associated value.
+    ///
+    /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
+    @available(added=18)
+    @selector("fuchsia.io/Node.ListExtendedAttributes")
+    strict ListExtendedAttributes(resource struct {
+        iterator server_end:ExtendedAttributeIterator;
+    });
+
+    /// Get the value associated with the given attribute `name` for this node.
+    ///
+    /// Attribute names have a maximum length of MAX_ATTRIBUTE_NAME. No
+    /// particular structure is imposed on them.
+    ///
+    /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
+    @available(added=18)
+    @selector("fuchsia.io/Node.GetExtendedAttribute")
+    strict GetExtendedAttribute(struct {
+        name ExtendedAttributeName;
+    }) -> (ExtendedAttributeValue) error zx.Status;
+
+    /// Set the value for the given attribute `name` to `value` for this node.
+    ///
+    /// The attribute name may exist, in which case the attribute is updated.
+    /// If the attribute doesn't exist, it is created. The name should have no
+    /// null bytes in it. If it does, ZX_ERR_INVALID_ARGS is returned.
+    ///
+    /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
+    @available(added=18)
+    @selector("fuchsia.io/Node.SetExtendedAttribute")
+    strict SetExtendedAttribute(resource struct {
+        name ExtendedAttributeName;
+        value ExtendedAttributeValue;
+        /// Specifies the behavior based on the current state of the attribute.
+        mode @generated_name("SetExtendedAttributeMode") strict enum {
+            /// Set the value of the extended attribute regardless of whether it
+            /// already exists.
+            SET = 1;
+
+            /// Create a new extended attribute. Fail if it already exists.
+            CREATE = 2;
+
+            /// Replace the value of an existing extended attribute. Fail if it
+            /// doesn't already exist.
+            REPLACE = 3;
+        };
+    }) -> () error zx.Status;
+
+    /// Remove the specified extended attribute.
+    ///
+    /// If the attribute doesn't exist, ZX_ERR_NOT_FOUND is returned.
+    ///
+    /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
+    @available(added=18)
+    @selector("fuchsia.io/Node.RemoveExtendedAttribute")
+    strict RemoveExtendedAttribute(struct {
+        name ExtendedAttributeName;
+    }) -> () error zx.Status;
+};
+
+@available(added=18)
+closed protocol ExtendedAttributeIterator {
+    /// Get the next chunk of extended attribute names. If this is the last
+    /// chunk, last will be true, and the channel will be closed after the
+    /// call.
+    @selector("fuchsia.io/ExtendedAttributeIterator.GetNext")
+    strict GetNext() -> (struct {
+        attributes vector<ExtendedAttributeName>:MAX_LIST_ATTRIBUTES_CHUNK;
+        last bool;
+    }) error zx.Status;
+};
+
+// Not all nodes support Linkable (e.g. Directories don't).
+@available(added=18)
+closed protocol Linkable {
+    /// Creates a link to this this object with name `dst` in the directory represented by
+    /// `dst_parent_token`.
+    ///
+    /// `dst` must be a resolved object name. Including "/" in the string will return
+    /// `ZX_ERR_INVALID_ARGS`.
+    ///
+    /// This method requires the maximal set of rights supported by the filesystem for this object.
+    /// For files this would typically be [`Rights.READ_BYTES`], [`Rights.WRITE_BYTES`],
+    /// [`Rights.GET_ATTRIBUTES`] and [`Rights.UPDATE_ATTRIBUTES`]. Some filesystems might also
+    /// support the [`Rights.EXECUTE`] right. Insufficient rights will result in
+    /// `ZX_ERR_ACCESS_DENIED`.
+    ///
+    /// If this object has no links, it will fail with `ZX_ERR_NOT_FOUND`.
+    ///
+    /// This method does not have the same atomicity properties has the `Directory::Link` method,
+    /// which means that calling `Open` then `LinkInto` is not equivalent to `Directory::Link`
+    /// because `LinkInto` will not prevent the source from being renamed or unlinked.
+    @selector("fuchsia.io/Linkable.LinkInto")
+    strict LinkInto(resource struct {
+        dst_parent_token Token;
+        dst Name;
+    }) -> () error zx.Status;
 };

@@ -87,10 +87,29 @@ zx_status_t MockOS::GetInfo(zx_handle_t handle, uint32_t topic, void* buffer, si
   return r->ret;
 }
 
+zx_info_kmem_stats_extended_t ExtendedStats(const zx_info_kmem_stats_t& stats) {
+  return zx_info_kmem_stats_extended_t{
+      .total_bytes = stats.total_bytes,
+      .free_bytes = stats.free_bytes,
+      .wired_bytes = stats.wired_bytes,
+      .total_heap_bytes = stats.total_heap_bytes,
+      .free_heap_bytes = stats.free_heap_bytes,
+      .vmo_bytes = stats.vmo_bytes,
+      .vmo_pager_total_bytes = stats.vmo_reclaim_total_bytes,
+      .vmo_pager_newest_bytes = stats.vmo_reclaim_newest_bytes,
+      .vmo_pager_oldest_bytes = stats.vmo_reclaim_oldest_bytes,
+      .vmo_discardable_locked_bytes = stats.vmo_discardable_locked_bytes,
+      .vmo_discardable_unlocked_bytes = stats.vmo_discardable_unlocked_bytes,
+      .mmu_overhead_bytes = stats.mmu_overhead_bytes,
+      .ipc_bytes = stats.ipc_bytes,
+      .other_bytes = stats.other_bytes,
+      .vmo_reclaim_disabled_bytes = stats.vmo_reclaim_disabled_bytes,
+  };
+}
+
 zx_status_t MockOS::GetKernelMemoryStats(
     const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client, zx_info_kmem_stats_t& kmem) {
-  const GetInfoResponse* r =
-      GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
+  const GetInfoResponse* r = GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS);
   if (r == nullptr)
     return ZX_ERR_INVALID_ARGS;
   memcpy(&kmem, r->values, r->value_size);
@@ -100,16 +119,16 @@ zx_status_t MockOS::GetKernelMemoryStats(
 zx_status_t MockOS::GetKernelMemoryStatsExtended(
     const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
     zx_info_kmem_stats_extended_t& kmem_ext, zx_info_kmem_stats_t* kmem) {
-  const GetInfoResponse* r1 =
-      GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
+  const GetInfoResponse* r1 = GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS);
   if (r1 == nullptr)
     return ZX_ERR_INVALID_ARGS;
   memcpy(kmem, r1->values, r1->value_size);
-  const GetInfoResponse* r2 =
-      GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
+  const GetInfoResponse* r2 = GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS);
   if (r2 == nullptr)
     return ZX_ERR_INVALID_ARGS;
-  memcpy(&kmem_ext, r2->values, r2->value_size);
+  zx_info_kmem_stats_t stats;
+  memcpy(&stats, r2->values, r2->value_size);
+  kmem_ext = ExtendedStats(stats);
   return r2->ret;
 }
 

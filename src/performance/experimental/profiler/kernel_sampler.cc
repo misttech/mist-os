@@ -32,9 +32,11 @@ profiler::KernelSamplerSession::CreateAndInit(const zx_sampler_config_t& config)
 
   zx::iob iob;
 
+  FX_LOGS(DEBUG) << "Creating kernel sampler.";
   if (zx_status_t init_status =
           zx_sampler_create(debug_resource.get(), 0, &config, iob.reset_and_get_address());
       init_status != ZX_OK) {
+    FX_PLOGS(ERROR, init_status) << "Failed to create the kernel sampler.";
     return zx::error(init_status);
   }
 
@@ -46,6 +48,7 @@ zx::result<> profiler::KernelSamplerSession::Start() {
   if (running_) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
+  FX_LOGS(DEBUG) << "Starting kernel sampler.";
   running_ = true;
   return zx::make_result(zx_sampler_start(per_cpu_buffers_.get()));
 }
@@ -98,12 +101,19 @@ zx::result<> profiler::KernelSampler::Start(size_t buffer_size_mb) {
   }
   session_ = std::move(session_result).value();
 
+  FX_LOGS(DEBUG) << "Attaching to known tasks and watching for new ones.";
   zx::result known_threads_res = targets_.ForEachProcess(
       [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
         TRACE_DURATION("cpu_profiler", "KernelSampler::Start/ForEachProcess");
         for (const auto& [koid, thread] : p.threads) {
-          if (zx::result res = session_->AttachThread(thread.handle); res.is_error()) {
-            FX_PLOGS(ERROR, res.error_value()) << "failed to set up thread sampling";
+          zx::result res = session_->AttachThread(thread.handle);
+          if (res.is_ok()) {
+            continue;
+          }
+          if (res.error_value() == ZX_ERR_BAD_STATE) {
+            FX_PLOGS(DEBUG, res.error_value()) << "Thread exited before attaching, skipping";
+          } else {
+            FX_PLOGS(ERROR, res.error_value()) << "Failed to attach sampler to thread.";
             return res;
           }
         }
@@ -122,15 +132,20 @@ zx::result<> profiler::KernelSampler::Start(size_t buffer_size_mb) {
         if (emplaced) {
           zx::result watch_result = it->second->Watch(dispatcher_);
           if (watch_result.is_error()) {
-            FX_PLOGS(ERROR, watch_result.status_value()) << "Failed to watch process: " << p.pid;
-            job_watchers_.clear();
-            process_watchers_.clear();
-            return watch_result.take_error();
+            if (watch_result.error_value() == ZX_ERR_BAD_STATE) {
+              FX_LOGS(DEBUG) << "Process terminated before being watched.";
+            } else {
+              FX_PLOGS(ERROR, watch_result.status_value()) << "Failed to watch process: " << p.pid;
+              job_watchers_.clear();
+              process_watchers_.clear();
+              return watch_result.take_error();
+            }
           }
         }
         return zx::ok();
       });
   if (known_threads_res.is_error()) {
+    FX_PLOGS(ERROR, known_threads_res.error_value()) << "Failed to set up all known processes.";
     return known_threads_res;
   }
 
@@ -169,6 +184,7 @@ zx::result<> profiler::KernelSampler::AddTarget(JobTarget&& target) {
 
 zx::result<> profiler::KernelSampler::Stop() {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  FX_LOGS(DEBUG) << "Stopping kernel sampler.";
   if (zx::result res = session_->Stop(); res.is_error()) {
     FX_PLOGS(WARNING, res.error_value()) << "Failed to stop";
     return res;

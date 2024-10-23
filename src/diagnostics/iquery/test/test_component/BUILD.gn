@@ -19,6 +19,7 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:structopt",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("test_component") {

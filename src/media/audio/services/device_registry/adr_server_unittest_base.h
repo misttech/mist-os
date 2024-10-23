@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
@@ -133,7 +133,8 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   std::optional<zx_status_t>& provider_fidl_error_status() { return provider_fidl_error_status_; }
 
   // Registry support
-  std::unique_ptr<TestServerAndNaturalAsyncClient<RegistryServer>> CreateTestRegistryServer() {
+  std::unique_ptr<TestServerAndNaturalAsyncClient<RegistryServer>>
+  CreateTestRegistryServerNoDeviceDiscovery() {
     auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Registry>();
     auto server = adr_service_->CreateRegistryServer(std::move(server_end));
     registry_fidl_error_status().reset();
@@ -141,6 +142,11 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
                                                                registry_fidl_handler_.get());
     return std::make_unique<TestServerAndNaturalAsyncClient<RegistryServer>>(
         test_loop(), std::move(server), std::move(client));
+  }
+  std::unique_ptr<TestServerAndNaturalAsyncClient<RegistryServer>> CreateTestRegistryServer() {
+    auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+    registry->server().InitialDeviceDiscoveryIsComplete();
+    return registry;
   }
   class RegistryFidlHandler final : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
                                     public FidlHandler {
@@ -331,4 +337,4 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_

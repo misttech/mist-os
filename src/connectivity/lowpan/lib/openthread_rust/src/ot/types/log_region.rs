@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::prelude_internal::*;
-use fidl_fuchsia_diagnostics::Severity;
+use diagnostics_log::Severity;
 use fidl_fuchsia_lowpan_thread::DetailedLoggingLevel;
 
 /// Logging Region.

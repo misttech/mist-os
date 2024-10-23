@@ -18,12 +18,9 @@ pub struct Directory {
 
 impl Directory {
     // Opens a path in the namespace as a Directory.
-    pub fn from_namespace(
-        path: impl AsRef<Path>,
-        flags: fio::OpenFlags,
-    ) -> Result<Directory, Status> {
+    pub fn from_namespace(path: impl AsRef<Path>, flags: fio::Flags) -> Result<Directory, Status> {
         let path = path.as_ref().to_str().unwrap();
-        match fuchsia_fs::directory::open_in_namespace_deprecated(path, flags) {
+        match fuchsia_fs::directory::open_in_namespace(path, flags) {
             Ok(proxy) => Ok(Directory { proxy }),
             Err(OpenError::OpenError(s)) => {
                 debug!(%path, status = %s, "from_namespace failed");
@@ -46,9 +43,9 @@ impl Directory {
     pub async fn open_directory(
         &self,
         filename: &str,
-        flags: fio::OpenFlags,
+        flags: fio::Flags,
     ) -> Result<Directory, Status> {
-        match fuchsia_fs::directory::open_directory_deprecated(&self.proxy, filename, flags).await {
+        match fuchsia_fs::directory::open_directory(&self.proxy, filename, flags).await {
             Ok(proxy) => Ok(Directory { proxy }),
             Err(OpenError::OpenError(s)) => {
                 debug!(%filename, ?flags, status = %s, "open_directory failed");
@@ -67,8 +64,8 @@ impl Directory {
     }
 
     // Open a file in the parent dir with the given |filename|.
-    pub async fn open_file(&self, filename: &str, flags: fio::OpenFlags) -> Result<File, Status> {
-        match fuchsia_fs::directory::open_file_deprecated(&self.proxy, filename, flags).await {
+    pub async fn open_file(&self, filename: &str, flags: fio::Flags) -> Result<File, Status> {
+        match fuchsia_fs::directory::open_file(&self.proxy, filename, flags).await {
             Ok(proxy) => Ok(File { proxy }),
             Err(OpenError::OpenError(s)) => {
                 debug!(%filename, ?flags, status = %s, "open_file failed");
@@ -90,10 +87,9 @@ impl Directory {
     pub async fn create_directory(
         &self,
         filename: &str,
-        flags: fio::OpenFlags,
+        flags: fio::Flags,
     ) -> Result<Directory, Status> {
-        match fuchsia_fs::directory::create_directory_deprecated(&self.proxy, filename, flags).await
-        {
+        match fuchsia_fs::directory::create_directory(&self.proxy, filename, flags).await {
             Ok(proxy) => Ok(Directory { proxy }),
             Err(OpenError::OpenError(s)) => {
                 debug!(%filename, ?flags, status = %s, "create_directory failed");

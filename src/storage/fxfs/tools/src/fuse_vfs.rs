@@ -337,7 +337,7 @@ impl FuseFs {
                 handle.flush().await?;
             }
         } else if object_type == ObjectDescriptor::Directory {
-            let mut transaction = self
+            let transaction = self
                 .fs
                 .clone()
                 .new_transaction(
@@ -347,7 +347,7 @@ impl FuseFs {
                 .await?;
             let dir = self.open_dir(inode).await?;
             dir.update_attributes(
-                &mut transaction,
+                transaction,
                 Some(&fio::MutableNodeAttributes {
                     modification_time: mtime.map(|t| t.as_nanos()),
                     access_time: atime.map(|t| t.as_nanos()),
@@ -357,7 +357,6 @@ impl FuseFs {
                 ctime,
             )
             .await?;
-            transaction.commit().await?;
         }
 
         Ok(ReplyAttr { ttl: TTL, attr: self.create_object_attr(inode, object_type).await? })

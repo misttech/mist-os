@@ -5,7 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.boot") {
+  # TODO(https://fxbug.dev/333907192): Promote to "partner" or
+  # "partner_internal" and remove support for "internal" FIDL libraries.
   sdk_category = "internal"
+
   sources = [
     "arguments.fidl",
     "factory-items.fidl",

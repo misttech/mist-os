@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use crate::inspect_util;
+use fidl_fuchsia_pkg as fpkg;
 use fuchsia_inspect::Node;
 use fuchsia_url::AbsolutePackageUrl;
 use futures::future::BoxFuture;
-use {fidl_fuchsia_pkg as fpkg, zx};
 
 fn now_monotonic_nanos() -> i64 {
     zx::MonotonicInstant::get().into_nanos()

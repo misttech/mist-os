@@ -19,11 +19,17 @@ uint64_t fidl::WireTableFrame<::test_time::wire::ComplexInstants>::ComputeMaxOrd
   if (!boot_.has_data()) {
     max_ordinal = 2;
   }
+  if (!monotonic_ticks_.has_data()) {
+    max_ordinal = 3;
+  }
+  if (!boot_ticks_.has_data()) {
+    max_ordinal = 4;
+  }
   return max_ordinal;
 }
 
 bool ::test_time::wire::ComplexInstants::HasUnknownData() const {
-  if (max_ordinal_ > 2) {
+  if (max_ordinal_ > 4) {
     return true;
   }
   if (frame_ptr_ == nullptr) {

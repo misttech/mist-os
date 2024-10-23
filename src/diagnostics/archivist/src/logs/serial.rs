@@ -6,6 +6,7 @@ use crate::logs::repository::LogsRepository;
 use anyhow::Error;
 use diagnostics_data::{Data, Logs};
 use fidl_fuchsia_diagnostics::{Selector, StreamMode};
+use fuchsia_trace as ftrace;
 use futures::StreamExt;
 use selectors::FastError;
 use std::borrow::Cow;
@@ -14,7 +15,6 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use std::sync::Arc;
 use tracing::warn;
-use {fuchsia_trace as ftrace, zx};
 
 const MAX_SERIAL_WRITE_SIZE: usize = 256;
 
@@ -195,7 +195,7 @@ mod tests {
     use crate::logs::stored_message::StoredMessage;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
+    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use moniker::ExtendedMoniker;
@@ -347,22 +347,20 @@ mod tests {
 
     fn make_message(msg: &str, tag: Option<&str>, timestamp: zx::BootInstant) -> StoredMessage {
         let mut record = Record {
-            timestamp: timestamp.into_nanos(),
+            timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
-                Argument { name: "pid".to_string(), value: Value::UnsignedInt(1) },
-                Argument { name: "tid".to_string(), value: Value::UnsignedInt(2) },
-                Argument { name: "message".to_string(), value: Value::Text(msg.to_string()) },
+                Argument::pid(zx::Koid::from_raw(1)),
+                Argument::tid(zx::Koid::from_raw(2)),
+                Argument::message(msg),
             ],
         };
         if let Some(tag) = tag {
-            record
-                .arguments
-                .push(Argument { name: "tag".to_string(), value: Value::Text(tag.to_string()) });
+            record.arguments.push(Argument::tag(tag));
         }
         let mut buffer = Cursor::new(vec![0u8; 1024]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        encoder.write_record(&record).unwrap();
+        encoder.write_record(record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
         StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }

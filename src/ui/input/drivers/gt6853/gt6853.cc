@@ -264,7 +264,7 @@ zx_status_t Gt6853Device::Init() {
     }
   }
 
-  fidl::WireResult interrupt_result = interrupt_gpio_->GetInterrupt2({});
+  fidl::WireResult interrupt_result = interrupt_gpio_->GetInterrupt({});
   if (!interrupt_result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to interrupt gpio: %s",
            interrupt_result.status_string());

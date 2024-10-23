@@ -10,6 +10,7 @@ use anyhow::{anyhow, Error};
 use async_lock::{Mutex, RwLock};
 use fidl::client::QueryResponseFut;
 use fidl_fuchsia_virtualization::HostVsockEndpointConnectResponder;
+use fuchsia_async as fasync;
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::{AbortHandle, Abortable, Aborted};
 use std::mem;
@@ -17,7 +18,6 @@ use std::rc::Rc;
 use virtio_device::chain::{ReadableChain, WritableChain};
 use virtio_device::mem::DriverMem;
 use virtio_device::queue::DriverNotify;
-use {fuchsia_async as fasync, zx};
 
 #[derive(Clone, Copy, Default, Debug)]
 pub struct ConnectionCredit {

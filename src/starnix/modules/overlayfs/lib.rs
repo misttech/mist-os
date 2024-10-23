@@ -102,20 +102,37 @@ impl ActiveEntry {
         &self.mount
     }
 
-    fn component_lookup(&self, current_task: &CurrentTask, name: &FsStr) -> Result<Self, Errno> {
+    fn component_lookup<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<Self, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.entry()
-            .component_lookup(current_task, self.mount(), name)
+            .component_lookup(locked, current_task, self.mount(), name)
             .map(ActiveEntry::mapper(self))
     }
 
-    fn create_entry(
+    fn create_entry<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
-        create_node_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
-    ) -> Result<Self, Errno> {
+        create_node_fn: impl FnOnce(
+            &mut Locked<'_, L>,
+            &FsNodeHandle,
+            &MountInfo,
+            &FsStr,
+        ) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<Self, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.entry()
-            .create_entry(current_task, self.mount(), name, create_node_fn)
+            .create_entry(locked, current_task, self.mount(), name, create_node_fn)
             .map(ActiveEntry::mapper(self))
     }
 
@@ -157,7 +174,7 @@ impl ActiveEntry {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.create_entry(current_task, name, |dir, mount, name| {
+        self.create_entry(locked, current_task, name, |locked, dir, mount, name| {
             dir.mknod(
                 locked,
                 current_task,
@@ -179,16 +196,20 @@ impl ActiveEntry {
     /// Checks whether the child of this entry represented by `info` is a "whiteout".
     ///
     /// Only looks up the corresponding `DirEntry` when necessary.
-    fn is_whiteout_child(
+    fn is_whiteout_child<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         info: &DirEntryInfo,
-    ) -> Result<bool, Errno> {
+    ) -> Result<bool, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // We need to lookup the node only if the file is a char device.
         if info.entry_type != DirectoryEntryType::CHR {
             return Ok(false);
         }
-        let entry = self.component_lookup(current_task, info.name.as_ref())?;
+        let entry = self.component_lookup(locked, current_task, info.name.as_ref())?;
         Ok(entry.is_whiteout())
     }
 
@@ -313,16 +334,21 @@ impl OverlayNode {
                     SymlinkTarget::Node(_) => return error!(EIO),
                     SymlinkTarget::Path(path) => path,
                 };
-                parent_upper.create_entry(current_task, name.as_ref(), |dir, mount, name| {
-                    dir.create_symlink(
-                        locked,
-                        current_task,
-                        mount,
-                        name,
-                        link_path.as_ref(),
-                        info.cred(),
-                    )
-                })
+                parent_upper.create_entry(
+                    locked,
+                    current_task,
+                    name.as_ref(),
+                    |locked, dir, mount, name| {
+                        dir.create_symlink(
+                            locked,
+                            current_task,
+                            mount,
+                            name,
+                            link_path.as_ref(),
+                            info.cred(),
+                        )
+                    },
+                )
             } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
                 // Regular files need to be copied from lower FS to upper FS.
                 self.stack.create_upper_entry(
@@ -331,25 +357,35 @@ impl OverlayNode {
                     parent_upper,
                     name.as_ref(),
                     |locked, dir, name| {
-                        dir.create_entry(current_task, name, |dir_node, mount, name| {
-                            dir_node.mknod(
-                                locked,
-                                current_task,
-                                mount,
-                                name,
-                                info.mode,
-                                DeviceType::NONE,
-                                cred,
-                            )
-                        })
+                        dir.create_entry(
+                            locked,
+                            current_task,
+                            name,
+                            |locked, dir_node, mount, name| {
+                                dir_node.mknod(
+                                    locked,
+                                    current_task,
+                                    mount,
+                                    name,
+                                    info.mode,
+                                    DeviceType::NONE,
+                                    cred,
+                                )
+                            },
+                        )
                     },
                     |locked, entry| copy_file_content(locked, current_task, lower, &entry),
                 )
             } else {
                 // TODO(sergeyu): create_node() checks access, but we don't need that here.
-                parent_upper.create_entry(current_task, name.as_ref(), |dir, mount, name| {
-                    dir.mknod(locked, current_task, mount, name, info.mode, info.rdev, cred)
-                })
+                parent_upper.create_entry(
+                    locked,
+                    current_task,
+                    name.as_ref(),
+                    |locked, dir, mount, name| {
+                        dir.mknod(locked, current_task, mount, name, info.mode, info.rdev, cred)
+                    },
+                )
             };
 
             track_stub!(TODO("https://fxbug.dev/322874151"), "overlayfs copy xattrs");
@@ -363,9 +399,17 @@ impl OverlayNode {
     }
 
     /// Check that an item isn't present in the lower FS.
-    fn lower_entry_exists(&self, current_task: &CurrentTask, name: &FsStr) -> Result<bool, Errno> {
+    fn lower_entry_exists<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<bool, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         match &self.lower {
-            Some(lower) => match lower.component_lookup(current_task, name) {
+            Some(lower) => match lower.component_lookup(locked, current_task, name) {
                 Ok(entry) => Ok(!entry.is_whiteout()),
                 Err(err) if err.code == ENOENT => Ok(false),
                 Err(err) => Err(err),
@@ -395,7 +439,7 @@ impl OverlayNode {
     {
         let upper = self.ensure_upper(locked, current_task)?;
 
-        match upper.component_lookup(current_task, name) {
+        match upper.component_lookup(locked, current_task, name) {
             Ok(existing) => {
                 // If there is an entry in the upper dir, then it must be a whiteout.
                 if !existing.is_whiteout() {
@@ -405,7 +449,7 @@ impl OverlayNode {
 
             Err(e) if e.code == ENOENT => {
                 // If we don't have the entry in the upper fs, then check lower.
-                if self.lower_entry_exists(current_task, name)? {
+                if self.lower_entry_exists(locked, current_task, name)? {
                     return error!(EEXIST);
                 }
             }
@@ -439,7 +483,7 @@ impl OverlayNode {
             let mut lower_entries = BTreeSet::new();
             if let Some(dir) = &self.lower {
                 for item in dir.read_dir_entries(locked, current_task)?.drain(..) {
-                    if !dir.is_whiteout_child(current_task, &item)? {
+                    if !dir.is_whiteout_child(locked, current_task, &item)? {
                         lower_entries.insert(item.name);
                     }
                 }
@@ -448,7 +492,7 @@ impl OverlayNode {
             if let Some(dir) = self.upper.get() {
                 let mut to_remove = Vec::<FsString>::new();
                 for item in dir.read_dir_entries(locked, current_task)?.drain(..) {
-                    if !dir.is_whiteout_child(current_task, &item)? {
+                    if !dir.is_whiteout_child(locked, current_task, &item)? {
                         return error!(ENOTEMPTY);
                     }
                     lower_entries.remove(&item.name);
@@ -528,15 +572,17 @@ impl FsNodeOps for OverlayNodeOps {
 
     fn lookup(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let resolve_child = |dir_opt: Option<&ActiveEntry>| {
+        let resolve_child = |locked: &mut Locked<'_, FileOpsCore>,
+                             dir_opt: Option<&ActiveEntry>| {
             // TODO(sergeyu): lookup() checks access, but we don't need that here.
             dir_opt
                 .as_ref()
-                .map(|dir| match dir.component_lookup(current_task, name) {
+                .map(|dir| match dir.component_lookup(locked, current_task, name) {
                     Ok(entry) => Some(Ok(entry)),
                     Err(e) if e.code == ENOENT => None,
                     Err(e) => Some(Err(e)),
@@ -545,7 +591,7 @@ impl FsNodeOps for OverlayNodeOps {
                 .transpose()
         };
 
-        let upper: Option<ActiveEntry> = resolve_child(self.node.upper.get())?;
+        let upper: Option<ActiveEntry> = resolve_child(locked, self.node.upper.get())?;
 
         let (upper_is_dir, upper_is_opaque) = match &upper {
             Some(upper) if upper.is_whiteout() => return error!(ENOENT),
@@ -562,7 +608,7 @@ impl FsNodeOps for OverlayNodeOps {
         // We don't need to resolve the lower node if we have an opaque node in the upper dir.
         let lookup_lower = !parent_upper_is_opaque && !upper_is_opaque;
         let lower: Option<ActiveEntry> = if lookup_lower {
-            match resolve_child(self.node.lower.as_ref())? {
+            match resolve_child(locked, self.node.lower.as_ref())? {
                 // If the upper node is a directory and the lower isn't then ignore the lower node.
                 Some(lower) if upper_is_dir && !lower.entry().node.is_dir() => None,
                 Some(lower) if lower.is_whiteout() => None,
@@ -591,9 +637,14 @@ impl FsNodeOps for OverlayNodeOps {
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node =
             self.node.create_entry(locked, current_task, name, |locked, dir, temp_name| {
-                dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
-                    dir_node.mknod(locked, current_task, mount, name, mode, dev, owner.clone())
-                })
+                dir.create_entry(
+                    locked,
+                    current_task,
+                    temp_name,
+                    |locked, dir_node, mount, name| {
+                        dir_node.mknod(locked, current_task, mount, name, mode, dev, owner.clone())
+                    },
+                )
             })?;
         Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
@@ -609,8 +660,11 @@ impl FsNodeOps for OverlayNodeOps {
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node =
             self.node.create_entry(locked, current_task, name, |locked, dir, temp_name| {
-                let entry =
-                    dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
+                let entry = dir.create_entry(
+                    locked,
+                    current_task,
+                    temp_name,
+                    |locked, dir_node, mount, name| {
                         dir_node.mknod(
                             locked,
                             current_task,
@@ -620,7 +674,8 @@ impl FsNodeOps for OverlayNodeOps {
                             DeviceType::NONE,
                             owner.clone(),
                         )
-                    })?;
+                    },
+                )?;
 
                 // Set opaque attribute to ensure the new directory is not merged with lower.
                 entry.set_opaque_xattr(current_task)?;
@@ -642,16 +697,21 @@ impl FsNodeOps for OverlayNodeOps {
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node =
             self.node.create_entry(locked, current_task, name, |locked, dir, temp_name| {
-                dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
-                    dir_node.create_symlink(
-                        locked,
-                        current_task,
-                        mount,
-                        name,
-                        target,
-                        owner.clone(),
-                    )
-                })
+                dir.create_entry(
+                    locked,
+                    current_task,
+                    temp_name,
+                    |locked, dir_node, mount, name| {
+                        dir_node.create_symlink(
+                            locked,
+                            current_task,
+                            mount,
+                            name,
+                            target,
+                            owner.clone(),
+                        )
+                    },
+                )
             })?;
         Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
@@ -671,7 +731,7 @@ impl FsNodeOps for OverlayNodeOps {
         let child_overlay = OverlayNode::from_fs_node(child)?;
         let upper_child = child_overlay.ensure_upper(locked, current_task)?;
         self.node.create_entry(locked, current_task, name, |locked, dir, temp_name| {
-            dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
+            dir.create_entry(locked, current_task, temp_name, |locked, dir_node, mount, name| {
                 dir_node.link(locked, current_task, mount, name, &upper_child.entry().node)
             })
         })?;
@@ -690,7 +750,7 @@ impl FsNodeOps for OverlayNodeOps {
         let child_overlay = OverlayNode::from_fs_node(child)?;
         child_overlay.prepare_to_unlink(locked, current_task)?;
 
-        let need_whiteout = self.node.lower_entry_exists(current_task, name)?;
+        let need_whiteout = self.node.lower_entry_exists(locked, current_task, name)?;
         if need_whiteout {
             self.node.stack.create_upper_entry(
                 locked,
@@ -831,7 +891,7 @@ impl OverlayDirectory {
                 if merge_with_lower {
                     upper_set.insert(item.name.clone());
                 }
-                if !dir.is_whiteout_child(current_task, &item)? {
+                if !dir.is_whiteout_child(locked, current_task, &item)? {
                     entries.push(item);
                 }
             }
@@ -841,7 +901,7 @@ impl OverlayDirectory {
             if let Some(dir) = &self.node.lower {
                 for item in dir.read_dir_entries(locked, current_task)?.drain(..) {
                     if !upper_set.contains(&item.name)
-                        && !dir.is_whiteout_child(current_task, &item)?
+                        && !dir.is_whiteout_child(locked, current_task, &item)?
                     {
                         entries.push(item);
                     }
@@ -1116,6 +1176,7 @@ impl OverlayStack {
         do_init(locked, &entry)
             .and_then(|()| {
                 DirEntry::rename(
+                    locked,
                     current_task,
                     self.work.entry(),
                     self.work.mount(),
@@ -1188,9 +1249,11 @@ impl FileSystemOps for OverlayFs {
         let new_parent_overlay = OverlayNode::from_fs_node(new_parent)?;
         let new_parent_upper = new_parent_overlay.ensure_upper(&mut locked, current_task)?;
 
-        let need_whiteout = old_parent_overlay.lower_entry_exists(current_task, old_name)?;
+        let need_whiteout =
+            old_parent_overlay.lower_entry_exists(&mut locked, current_task, old_name)?;
 
         DirEntry::rename(
+            &mut locked,
             current_task,
             old_parent_upper.entry(),
             old_parent_upper.mount(),

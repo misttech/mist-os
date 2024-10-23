@@ -18,7 +18,7 @@ use wlan_common::security::{wep, wpa, SecurityAuthenticator, SecurityDescriptor}
 use {
     fidl_fuchsia_wlan_common_security as fidl_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
-    fidl_fuchsia_wlan_sme as fidl_sme, zx,
+    fidl_fuchsia_wlan_sme as fidl_sme,
 };
 
 pub fn generate_ssid(ssid: &str) -> types::Ssid {

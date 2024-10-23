@@ -806,7 +806,7 @@ mod tests {
         OrdLowerBound, OrdUpperBound, SortByU64,
     };
     use crate::lsm_tree::{self, Query, Value};
-    use crate::object_store::{self, ObjectKey, ObjectValue};
+    use crate::object_store::{self, ObjectKey, ObjectValue, VOLUME_DATA_KEY_ID};
     use crate::serialized_types::{
         versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
     };
@@ -1884,16 +1884,30 @@ mod tests {
     async fn test_merge_bloom_filters_limited_range() {
         // NB: This test uses ObjectKey so that we don't have to reimplement the complex merging
         // logic for range-like keys.
-        let layer_0_items =
-            vec![Item::new(ObjectKey::extent(0, 0, 0..2048), ObjectValue::extent(0))];
+        let layer_0_items = vec![Item::new(
+            ObjectKey::extent(0, 0, 0..2048),
+            ObjectValue::extent(0, VOLUME_DATA_KEY_ID),
+        )];
         let layer_1_items = vec![
-            Item::new(ObjectKey::extent(0, 0, 1024..4096), ObjectValue::extent(32768)),
-            Item::new(ObjectKey::extent(0, 0, 16384..17408), ObjectValue::extent(65536)),
+            Item::new(
+                ObjectKey::extent(0, 0, 1024..4096),
+                ObjectValue::extent(32768, VOLUME_DATA_KEY_ID),
+            ),
+            Item::new(
+                ObjectKey::extent(0, 0, 16384..17408),
+                ObjectValue::extent(65536, VOLUME_DATA_KEY_ID),
+            ),
         ];
         let items = [
-            Item::new(ObjectKey::extent(0, 0, 0..2048), ObjectValue::extent(0)),
-            Item::new(ObjectKey::extent(0, 0, 2048..4096), ObjectValue::extent(33792)),
-            Item::new(ObjectKey::extent(0, 0, 16384..17408), ObjectValue::extent(65536)),
+            Item::new(ObjectKey::extent(0, 0, 0..2048), ObjectValue::extent(0, VOLUME_DATA_KEY_ID)),
+            Item::new(
+                ObjectKey::extent(0, 0, 2048..4096),
+                ObjectValue::extent(33792, VOLUME_DATA_KEY_ID),
+            ),
+            Item::new(
+                ObjectKey::extent(0, 0, 16384..17408),
+                ObjectValue::extent(65536, VOLUME_DATA_KEY_ID),
+            ),
         ];
         let layers: [Arc<dyn Layer<ObjectKey, ObjectValue>>; 2] =
             [write_layer(layer_0_items).await, write_layer(layer_1_items).await];

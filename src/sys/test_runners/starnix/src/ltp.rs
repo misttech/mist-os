@@ -8,7 +8,7 @@ use fidl::endpoints::create_proxy;
 use std::collections::HashMap;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
-    fidl_fuchsia_test as ftest, zx,
+    fidl_fuchsia_test as ftest,
 };
 
 pub async fn get_cases_list_for_ltp(
@@ -90,13 +90,13 @@ fn start_command(
         },
     ];
 
-    // Copy "environ", "uid", and "seclabel" from `base_start_info`.
+    // Copy "environ", "uid", "seclabel" and "fsseclabel" from `base_start_info`.
     if let Some(fidl_fuchsia_data::Dictionary { entries: Some(entries), .. }) =
         base_start_info.program.as_ref()
     {
         for entry in entries {
             match entry.key.as_str() {
-                "environ" | "uid" | "seclabel" => {
+                "environ" | "uid" | "seclabel" | "fsseclabel" => {
                     program_entries.push(entry.clone());
                 }
                 _ => (),

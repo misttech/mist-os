@@ -16,7 +16,7 @@ use iquery::commands::ShowCommand;
 async fn test_show_no_parameters() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd = ShowCommand { manifest: None, selectors: vec![], accessor: None };
+    let cmd = ShowCommand { manifest: None, selectors: vec![], accessor: None, name: None };
     let mut inspects = make_inspects();
     let inspect_data =
         inspect_accessor_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
@@ -43,6 +43,7 @@ async fn test_show_unknown_manifest() {
         manifest: Some(String::from("some-bad-moniker")),
         selectors: vec![],
         accessor: None,
+        name: None,
     };
     let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
@@ -67,8 +68,12 @@ async fn test_show_unknown_manifest() {
 async fn test_show_with_manifest_that_exists() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd =
-        ShowCommand { manifest: Some(String::from("moniker1")), selectors: vec![], accessor: None };
+    let cmd = ShowCommand {
+        manifest: Some(String::from("moniker1")),
+        selectors: vec![],
+        accessor: None,
+        name: None,
+    };
     let lifecycle_data = inspect_accessor_data(
         ClientSelectorConfiguration::SelectAll(true),
         make_inspects_for_lifecycle(),
@@ -79,9 +84,9 @@ async fn test_show_with_manifest_that_exists() {
         make_inspect_with_length("test/moniker1", 6, 30),
     ];
     let inspect_data = inspect_accessor_data(
-        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
-            "test/moniker1:root",
-        ))]),
+        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::StructuredSelector(
+            selectors::parse_verbose("test/moniker1:root").unwrap(),
+        )]),
         inspects.clone(),
     );
     run_command(
@@ -104,6 +109,7 @@ async fn test_show_with_selectors_with_no_data() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ShowCommand {
+        name: None,
         manifest: None,
         selectors: vec![String::from("test/moniker1:name:hello_not_real")],
         accessor: None,
@@ -113,9 +119,9 @@ async fn test_show_with_selectors_with_no_data() {
         make_inspects_for_lifecycle(),
     );
     let inspect_data = inspect_accessor_data(
-        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
-            "test/moniker1:name:hello_not_real",
-        ))]),
+        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::StructuredSelector(
+            selectors::parse_verbose("test/moniker1:name:hello_not_real").unwrap(),
+        )]),
         vec![],
     );
     run_command(
@@ -137,6 +143,7 @@ async fn test_show_with_selectors_with_data() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ShowCommand {
+        name: None,
         manifest: None,
         selectors: vec![String::from("test/moniker1:name:hello_6")],
         accessor: None,
@@ -147,9 +154,9 @@ async fn test_show_with_selectors_with_data() {
     );
     let mut inspects = vec![make_inspect_with_length("test/moniker1", 6, 30)];
     let inspect_data = inspect_accessor_data(
-        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
-            "test/moniker1:name:hello_6",
-        ))]),
+        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::StructuredSelector(
+            selectors::parse_verbose("test/moniker1:name:hello_6").unwrap(),
+        )]),
         inspects.clone(),
     );
     run_command(

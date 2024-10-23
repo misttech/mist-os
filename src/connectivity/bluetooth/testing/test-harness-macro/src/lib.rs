@@ -10,7 +10,7 @@
 
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, AttributeArgs, Error, Lit, Meta, NestedMeta, Visibility};
+use syn::{parse_macro_input, Error, Lit, Visibility};
 
 fn validate_item_fn(sig: &syn::Signature, vis: &syn::Visibility) -> Result<(), syn::Error> {
     // Disallow const, unsafe or abi linkage, generics etc
@@ -31,7 +31,7 @@ fn validate_item_fn(sig: &syn::Signature, vis: &syn::Visibility) -> Result<(), s
     }
     if sig.inputs.len() != 1 {
         return Err(Error::new(
-            sig.paren_token.span,
+            sig.paren_token.span.join(),
             "test-harness tests take exactly one argument, which must `impl TestHarness`",
         ));
     }
@@ -46,8 +46,7 @@ fn validate_item_fn(sig: &syn::Signature, vis: &syn::Visibility) -> Result<(), s
     // to which they are applied. As such, they should not be applied to `pub` fns, which would
     // indicate that the client plans to use them elsewhere.
     if let Some(token_span) = match vis {
-        Visibility::Public(pub_vis) => Some(pub_vis.pub_token.span),
-        Visibility::Crate(crate_vis) => Some(crate_vis.crate_token.span),
+        Visibility::Public(pub_token) => Some(pub_token.span),
         Visibility::Restricted(restricted_vis) => Some(restricted_vis.pub_token.span),
         Visibility::Inherited => None,
     } {
@@ -71,20 +70,18 @@ fn validate_item_fn(sig: &syn::Signature, vis: &syn::Visibility) -> Result<(), s
 ///     ```
 #[proc_macro_attribute]
 pub fn run_singlethreaded_test(args: TokenStream, item: TokenStream) -> TokenStream {
-    let attr_args = parse_macro_input!(args as AttributeArgs);
     let mut test_component: Option<String> = None;
-    for arg in attr_args {
-        match arg {
-            NestedMeta::Meta(Meta::NameValue(nv)) => {
-                if nv.path.is_ident("test_component") {
-                    if let Lit::Str(lit_str) = nv.lit {
-                        test_component = Some(lit_str.value());
-                    }
+    let component_parser = syn::meta::parser(|meta| {
+        if meta.path.is_ident("test_component") {
+            if let Ok(value) = meta.value() {
+                if let Ok(Lit::Str(lit_str)) = value.parse() {
+                    test_component = Some(lit_str.value());
                 }
             }
-            _ => {}
         }
-    }
+        Ok(())
+    });
+    parse_macro_input!(args with component_parser);
     let test_component = match test_component {
         Some(component) => quote! {
             Some(String::from(#component))

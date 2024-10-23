@@ -14,7 +14,7 @@ use usb_fastboot_discovery::FastbootEvent;
 use fidl_fuchsia_developer_ffx as ffx;
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum FastbootConnectionState {
     Usb,
     Tcp(Vec<TargetAddr>),
@@ -33,7 +33,7 @@ impl Display for FastbootConnectionState {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct FastbootTargetState {
     pub serial_number: String,
     pub connection_state: FastbootConnectionState,
@@ -45,7 +45,7 @@ impl Display for FastbootTargetState {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum TargetState {
     Unknown,
     Product(Vec<TargetAddr>),
@@ -66,7 +66,7 @@ impl Display for TargetState {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TargetHandle {
     pub node_name: Option<String>,
     pub state: TargetState,

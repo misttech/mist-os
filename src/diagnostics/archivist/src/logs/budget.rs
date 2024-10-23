@@ -137,7 +137,7 @@ mod tests {
     use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsData, Severity};
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
+    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
     use fidl_fuchsia_diagnostics::StreamMode;
     use fuchsia_trace as ftrace;
     use futures::{Stream, StreamExt};
@@ -203,16 +203,16 @@ mod tests {
 
     fn fake_message_bytes(timestamp: zx::BootInstant) -> StoredMessage {
         let record = Record {
-            timestamp: timestamp.into_nanos(),
+            timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
-                Argument { name: "pid".to_string(), value: Value::UnsignedInt(123) },
-                Argument { name: "tid".to_string(), value: Value::UnsignedInt(456) },
+                Argument::pid(zx::Koid::from_raw(123)),
+                Argument::tid(zx::Koid::from_raw(456)),
             ],
         };
         let mut buffer = Cursor::new(vec![0u8; 1024]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        encoder.write_record(&record).unwrap();
+        encoder.write_record(record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
         StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }

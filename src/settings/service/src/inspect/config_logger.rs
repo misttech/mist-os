@@ -3,19 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{clock, config};
-use fuchsia_inspect::{self as inspect, component, NumericProperty, Property};
+use fuchsia_inspect::{self as inspect, Node, NumericProperty, Property};
 use fuchsia_inspect_derive::Inspect;
-use futures::lock::Mutex;
-use lazy_static::lazy_static;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
-use std::sync::Arc;
 
 const CONFIG_INSPECT_NODE_NAME: &str = "config_loads";
 
 pub struct InspectConfigLogger {
-    /// The inspector, stored for access in tests.
-    pub inspector: &'static inspect::Inspector,
-
     /// The saved information about each load.
     config_load_values: ManagedInspectMap<ConfigInspectInfo>,
 }
@@ -42,19 +36,12 @@ struct ConfigInspectInfo {
     result_counts: ManagedInspectMap<inspect::UintProperty>,
 }
 
-lazy_static! {
-    pub(crate) static ref INSPECT_CONFIG_LOGGER: Arc<Mutex<InspectConfigLogger>> =
-        Arc::new(Mutex::new(InspectConfigLogger::new()));
-}
-
 impl InspectConfigLogger {
     /// Creates a new [InspectConfigLogger] that writes to the default
     /// [fuchsia_inspect::component::inspector()].
-    fn new() -> Self {
-        let inspector = component::inspector();
-        let config_inspect_node = inspector.root().create_child(CONFIG_INSPECT_NODE_NAME);
+    pub fn new(node: &Node) -> Self {
+        let config_inspect_node = node.create_child(CONFIG_INSPECT_NODE_NAME);
         Self {
-            inspector,
             config_load_values: ManagedInspectMap::<ConfigInspectInfo>::with_node(
                 config_inspect_node,
             ),
@@ -85,27 +72,12 @@ impl InspectConfigLogger {
     }
 }
 
-pub struct InspectConfigLoggerHandle {
-    pub logger: Arc<Mutex<InspectConfigLogger>>,
-}
-
-impl InspectConfigLoggerHandle {
-    pub fn new() -> Self {
-        Self { logger: INSPECT_CONFIG_LOGGER.clone() }
-    }
-}
-
-impl Default for InspectConfigLoggerHandle {
-    fn default() -> Self {
-        InspectConfigLoggerHandle::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::base::ConfigLoadStatus;
     use diagnostics_assertions::assert_data_tree;
+    use fuchsia_inspect::component;
     use zx::MonotonicInstant;
 
     #[fuchsia::test]
@@ -113,7 +85,8 @@ mod tests {
         // Set clock for consistent timestamps.
         clock::mock::set(MonotonicInstant::from_nanos(0));
 
-        let mut logger = InspectConfigLogger::new();
+        let inspector = component::inspector();
+        let mut logger = InspectConfigLogger::new(inspector.root());
 
         logger.write_config_load_to_inspect(
             "test_path".to_string(),
@@ -123,7 +96,7 @@ mod tests {
             },
         );
 
-        assert_data_tree!(logger.inspector, root: {
+        assert_data_tree!(inspector, root: {
             config_loads: {
                 "test_path": {
                     "count": 1u64,
@@ -142,7 +115,8 @@ mod tests {
         // Set clock for consistent timestamps.
         clock::mock::set(MonotonicInstant::from_nanos(0));
 
-        let mut logger = InspectConfigLogger::new();
+        let inspector = component::inspector();
+        let mut logger = InspectConfigLogger::new(inspector.root());
 
         logger.write_config_load_to_inspect(
             "test_path".to_string(),
@@ -173,7 +147,7 @@ mod tests {
             },
         );
 
-        assert_data_tree!(logger.inspector, root: {
+        assert_data_tree!(inspector, root: {
             config_loads: {
                 "test_path": {
                     "count": 4u64,

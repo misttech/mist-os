@@ -50,7 +50,7 @@ class SdmmcRootDevice : public fdf::DriverBase {
   }
 
  protected:
-  virtual zx_status_t Init(fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata);
+  virtual zx_status_t Init(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata);
 
   std::variant<std::monostate, std::unique_ptr<SdioControllerDevice>,
                std::unique_ptr<SdmmcBlockDevice>>
@@ -59,13 +59,12 @@ class SdmmcRootDevice : public fdf::DriverBase {
  private:
   // Returns the SDMMC metadata with default values for any fields that are not present (or if the
   // metadata itself is not present). Returns an error if the metadata could not be decoded.
-  zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>> GetMetadata(
-      fidl::AnyArena& arena);
+  zx::result<fuchsia_hardware_sdmmc::SdmmcMetadata> GetMetadata();
 
   template <class DeviceType>
   zx::result<std::unique_ptr<SdmmcDevice>> MaybeAddDevice(
       const std::string& name, std::unique_ptr<SdmmcDevice> sdmmc,
-      const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata);
+      const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata);
 
   sdmmc_config::Config config_;
 

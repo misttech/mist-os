@@ -496,7 +496,7 @@ fn convert_wmm_ac_params(
 fn convert_band_cap(cap: fidl_fullmac::WlanFullmacBandCapability) -> fidl_mlme::BandCapability {
     fidl_mlme::BandCapability {
         band: cap.band,
-        basic_rates: cap.basic_rate_list[..cap.basic_rate_count as usize].to_vec(),
+        basic_rates: cap.basic_rates,
         ht_cap: if cap.ht_supported {
             Some(Box::new(fidl_ieee80211::HtCapabilities { bytes: cap.ht_caps.bytes }))
         } else {
@@ -843,8 +843,7 @@ mod tests {
     fn test_convert_band_cap() {
         let fullmac = fidl_fullmac::WlanFullmacBandCapability {
             band: fidl_common::WlanBand::FiveGhz,
-            basic_rate_count: 3,
-            basic_rate_list: [123; 12],
+            basic_rates: vec![123; 3],
             ht_supported: true,
             ht_caps: fidl_ieee80211::HtCapabilities { bytes: [8; 26] },
             vht_supported: true,
@@ -869,8 +868,7 @@ mod tests {
     fn test_convert_band_cap_no_ht_vht_become_none() {
         let fullmac = fidl_fullmac::WlanFullmacBandCapability {
             band: fidl_common::WlanBand::FiveGhz,
-            basic_rate_count: 3,
-            basic_rate_list: [123; 12],
+            basic_rates: vec![123; 3],
             ht_supported: false,
             ht_caps: fidl_ieee80211::HtCapabilities { bytes: [8; 26] },
             vht_supported: false,

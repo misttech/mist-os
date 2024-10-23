@@ -3,18 +3,20 @@
 // found in the LICENSE file.
 
 use crate::logs::utils::Listener;
+use crate::puppet::PuppetProxyExt;
 use crate::test_topology;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Severity};
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy};
-use fuchsia_component::client;
 use futures::channel::mpsc;
 use futures::{Stream, StreamExt};
 use tracing::{info, warn};
 use {
     fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync,
-    fuchsia_syslog_listener as syslog_listener, zx,
+    fuchsia_syslog_listener as syslog_listener,
 };
+
+const PUPPET_NAME: &str = "puppet";
 
 fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
     let options = LogFilterOptions {
@@ -39,13 +41,22 @@ fn run_listener(tag: &str, proxy: LogProxy) -> impl Stream<Item = LogMessage> {
     recv_logs
 }
 
-#[fuchsia::test(logging = false)]
+#[fuchsia::test]
 async fn listen_for_syslog() {
-    let random = rand::random::<u16>();
-    let tag = "logger_integration_rust".to_string() + &random.to_string();
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default().tags(&[&tag])).unwrap();
-    let log_proxy = client::connect_to_protocol::<LogMarker>().unwrap();
-    let incoming = run_listener(&tag, log_proxy);
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new(PUPPET_NAME).into()]),
+        ..Default::default()
+    })
+    .await
+    .expect("create realm");
+
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
+    puppet
+        .log_messages(vec![(Severity::Info, "my msg: 10"), (Severity::Warn, "log crate: 20")])
+        .await;
+
+    let log_proxy = realm_proxy.connect_to_protocol::<LogMarker>().await.unwrap();
+    let incoming = run_listener(PUPPET_NAME, log_proxy);
     info!("my msg: {}", 10);
     warn!("log crate: {}", 20);
 
@@ -55,11 +66,11 @@ async fn listen_for_syslog() {
     logs.sort_by(|a, b| a.time.cmp(&b.time));
     assert_eq!(2, logs.len());
     assert_eq!(logs[1].tags.len(), 1);
-    assert_eq!(logs[0].tags[0], tag);
+    assert_eq!(logs[0].tags[0], PUPPET_NAME);
     assert_eq!(logs[0].severity, LogLevelFilter::Info as i32);
     assert_eq!(logs[0].msg, "my msg: 10");
     assert_eq!(logs[1].tags.len(), 1);
-    assert_eq!(logs[1].tags[0], tag);
+    assert_eq!(logs[1].tags[0], PUPPET_NAME);
     assert_eq!(logs[1].severity, LogLevelFilter::Warn as i32);
     assert_eq!(logs[1].msg, "log crate: 20");
 }
@@ -91,7 +102,7 @@ async fn listen_for_klog() {
 #[fuchsia::test]
 async fn listen_for_syslog_routed_stdio() {
     let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
-        puppets: Some(vec![test_topology::PuppetDeclBuilder::new("stdio-puppet").into()]),
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new(PUPPET_NAME).into()]),
         ..Default::default()
     })
     .await
@@ -112,7 +123,7 @@ async fn listen_for_syslog_routed_stdio() {
         }
     });
 
-    let puppet = test_topology::connect_to_puppet(&realm_proxy, "stdio-puppet").await.unwrap();
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
     info!("Connected to puppet");
 
     // Ensure the component already started by waiting for its initial interest change.

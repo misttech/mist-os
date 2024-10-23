@@ -44,7 +44,7 @@ use vfs::ToObjectRequest;
 use {
     fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_inspect as inspect, zx,
+    fuchsia_inspect as inspect,
 };
 
 // TODO(https://fxbug.dev/42140194): remove type aliases once the routing_test_helpers lib has a stable

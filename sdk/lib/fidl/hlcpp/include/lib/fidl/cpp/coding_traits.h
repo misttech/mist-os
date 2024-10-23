@@ -104,6 +104,19 @@ struct CodingTraits<fidl::basic_time<kClockId>> {
   }
 };
 
+template <zx_clock_t kClockId>
+struct CodingTraits<fidl::basic_ticks<kClockId>> {
+  static constexpr size_t kInlineSize = sizeof(zx_ticks_t);
+  static void Encode(Encoder* encoder, fidl::basic_ticks<kClockId>* value, size_t offset,
+                     cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
+    ZX_DEBUG_ASSERT(maybe_handle_info == cpp17::nullopt);
+    *encoder->template GetPtr<zx_ticks_t>(offset) = value->get();
+  }
+  static void Decode(Decoder* decoder, fidl::basic_ticks<kClockId>* value, size_t offset) {
+    *value = fidl::basic_ticks<kClockId>(*decoder->template GetPtr<zx_ticks_t>(offset));
+  }
+};
+
 template <typename T>
 struct CodingTraits<std::unique_ptr<T>, typename std::enable_if<!IsFidlXUnion<T>::value>::type> {
   static constexpr size_t kInlineSize = sizeof(uintptr_t);

@@ -171,6 +171,7 @@ impl FsNodeOps for Arc<StaticDirectory> {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,

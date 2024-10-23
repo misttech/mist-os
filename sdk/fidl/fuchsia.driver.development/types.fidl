@@ -82,6 +82,11 @@ type NodeInfo = table {
     /// Component offers to the node.
     @available(added=18)
     9: offer_list vector<fuchsia.component.decl.Offer>:MAX;
+
+    /// Whether the node is in a quarantined state. That is, the |bound_driver_url| has failed to
+    /// start, and the node is no longer running its driver instance.
+    @available(added=NEXT)
+    10: quarantined bool;
 };
 
 /// Information about a node binding to either a driver or a composite.

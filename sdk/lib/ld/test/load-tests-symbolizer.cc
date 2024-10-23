@@ -33,7 +33,9 @@ std::string TestModuleMarkup(const TestElfObject& module, size_t idx, std::strin
          ":elf:" + std::string(module.build_id_hex) + "}}}";
 }
 
-TYPED_TEST(LdLoadTests, SymbolizerMarkup) {
+// TODO(https://fxbug.dev/374053770): An apparent incremental build bug makes
+// this appear to be flaky. Re-enable this when the build bug is fixed.
+TYPED_TEST(LdLoadTests, DISABLED_SymbolizerMarkup) {
   if constexpr (!TestFixture::kCanCollectLog) {
     GTEST_SKIP() << "test requires log capture";
   }

@@ -16,3 +16,7 @@ primary node "gpio" {
 node "i2c" {
   fuchsia.hardware.i2c.Service == fuchsia.hardware.i2c.Service.ZirconTransport;
 }
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}

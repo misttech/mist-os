@@ -233,8 +233,10 @@ size_t GetFunctionPrologueSize(const LineTable& line_table, const Function* func
 
   // There can be compiler-generated code immediately following the prologue annotated by "line 0".
   // Count this as prologue also.
-  while (prologue_end_index < found.sequence.size() && found.sequence[prologue_end_index].Line == 0)
+  while (prologue_end_index + 1 < found.sequence.size() &&
+         found.sequence[prologue_end_index].Line == 0) {
     prologue_end_index++;
+  }
 
   // Sanity check: None of those previous operations should have left us outside of the function's
   // code or outside of a known instruction (there's an end_sequence marker). If it did, this line

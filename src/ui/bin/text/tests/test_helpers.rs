@@ -8,7 +8,7 @@ use futures::stream::{self, StreamExt, TryStreamExt};
 use futures::FutureExt;
 use {
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input as ui_input,
-    fidl_fuchsia_ui_input3 as ui_input3, zx,
+    fidl_fuchsia_ui_input3 as ui_input3,
 };
 
 pub fn default_state() -> ui_input::TextInputState {

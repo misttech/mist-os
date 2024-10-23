@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex as StdMutex, Weak};
 use tracing::warn;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
-    fidl_fuchsia_io as fio, zx,
+    fidl_fuchsia_io as fio,
 };
 
 pub trait HasEventType {

@@ -466,6 +466,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.development/NodeInfo.quarantined",
+        "ordinal": "10",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.development/NodeInfo.versioned_info",
         "ordinal": "6",
         "type": "fuchsia.driver.development/VersionedNodeInfo"

@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.acpi.tables") {
-  sdk_category = "internal"
   sources = [ "tables.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

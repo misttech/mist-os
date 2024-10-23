@@ -5,7 +5,7 @@
 use crate::assert_eq;
 use crate::test::new_isolate;
 use anyhow::*;
-use fuchsia_async::Duration;
+use fuchsia_async::MonotonicDuration;
 use nix::sys::signal;
 use nix::unistd::Pid;
 use std::path::PathBuf;
@@ -83,7 +83,7 @@ pub(crate) async fn test_config_flag() -> Result<()> {
     // targets, so since we don't do host tests on the mac with targets, this
     // should be a non-issue on mac builders, at least for now.)
     if cfg!(target_os = "macos") {
-        fuchsia_async::Timer::new(Duration::from_millis(500)).await;
+        fuchsia_async::Timer::new(MonotonicDuration::from_millis(500)).await;
         let _ = isolate.ffx(&["daemon", "stop", "-t", "3000"]).await?;
     }
 

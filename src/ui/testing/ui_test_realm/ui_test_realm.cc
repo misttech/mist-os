@@ -336,6 +336,7 @@ void UITestRealm::ConfigureScenic() {
               component_testing::Config{.name = "fuchsia.scenic.MinDisplayVerticalResolutionPx"},
               component_testing::Config{.name = "fuchsia.scenic.PointerAutoFocus"},
               component_testing::Config{.name = "fuchsia.scenic.Renderer"},
+              component_testing::Config{.name = "fuchsia.ui.VisualDebuggingLevel"},
           },
       .source = component_testing::ChildRef{"config"},
       .targets = {component_testing::ChildRef{kScenicName}},

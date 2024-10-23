@@ -20,11 +20,17 @@ if (is_fuchsia) {
     package_name = "empty-pkg"
   }
 
-  config_data("empty_config") {
-    for_pkg = "empty-pkg"
-    sources = [ "empty_config" ]
-    outputs = [ "empty/{{source_file_part}}" ]
-  }
+  _base_packages = [
+    {
+      package_target = ":empty-pkg"
+      config_data = [
+        {
+          source = "empty_config"
+          destination = "empty/empty_config"
+        },
+      ]
+    },
+  ]
 
   board_configuration("board_config") {
     name = "test"
@@ -38,6 +44,7 @@ if (is_fuchsia) {
   }
 
   product_assembly_configuration("product_config") {
+    testonly = true
     platform = {
       build_type = "eng"
       feature_set_level = "bootstrap"
@@ -55,11 +62,11 @@ if (is_fuchsia) {
         }
       }
     }
-    product = {
-    }
+    base_packages = _base_packages
   }
 
   product_assembly_configuration("product_config_recovery") {
+    testonly = true
     platform = {
       build_type = "eng"
       feature_set_level = "bootstrap"
@@ -78,8 +85,7 @@ if (is_fuchsia) {
         }
       }
     }
-    product = {
-    }
+    base_packages = _base_packages
   }
 
   # `assembled_system` builds a zbi and blob.blk for consumption by the test.
@@ -89,11 +95,6 @@ if (is_fuchsia) {
     product_assembly_config_label = ":product_config"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
-    bootfs_labels = []
-    base_packages = [
-      ":empty-pkg",
-      ":empty_config",
-    ]
   }
 
   # `assembled_system` builds a zbi, specifying `ramdisk_in_zbi = true`
@@ -105,12 +106,7 @@ if (is_fuchsia) {
     product_assembly_config_label = ":product_config_recovery"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
-    bootfs_labels = []
     ramdisk_in_zbi = true
-    base_packages = [
-      ":empty-pkg",
-      ":empty_config",
-    ]
   }
 }
 

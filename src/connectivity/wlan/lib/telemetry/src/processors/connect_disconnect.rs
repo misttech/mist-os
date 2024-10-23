@@ -27,7 +27,7 @@ use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    wlan_legacy_metrics_registry as metrics, zx,
+    wlan_legacy_metrics_registry as metrics,
 };
 
 const INSPECT_CONNECT_EVENTS_LIMIT: usize = 10;

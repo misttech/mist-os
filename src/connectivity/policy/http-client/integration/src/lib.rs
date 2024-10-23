@@ -13,7 +13,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::pin;
 use test_case::test_case;
-use {fidl_fuchsia_net_http as http, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_net_http as http, fuchsia_async as fasync};
 
 const ROOT_DOCUMENT: &str = "Root document\n";
 
@@ -609,7 +609,7 @@ async fn test_http_client_never_stops(behavior: &str) {
         );
         select! {
             event = &mut stop_event => panic!("Unexpected stop event {event:?}"),
-            _ = fasync::Timer::new(fasync::Duration::from_millis(200)).fuse() => {},
+            _ = fasync::Timer::new(fasync::MonotonicDuration::from_millis(200)).fuse() => {},
         };
     })
     .await
@@ -652,7 +652,7 @@ async fn test_fetch_http_long_start_call_blocks_stop(behavior: &str) {
         );
         select! {
             event = &mut stop_event => panic!("Unexpected stop event {event:?}"),
-            _ = fasync::Timer::new(fasync::Duration::from_millis(200)).fuse() => {},
+            _ = fasync::Timer::new(fasync::MonotonicDuration::from_millis(200)).fuse() => {},
         };
 
         // `http-client` should still respond to connection requests. This would hang if the
@@ -679,7 +679,7 @@ async fn test_fetch_http_many_requests_at_different_intervals(behavior: &str) {
         // so we exercise request delays around that range.
         for delay in 990..1010 {
             check_loader_http(loader.clone(), addr).await;
-            fasync::Timer::new(fasync::Duration::from_micros(delay)).await;
+            fasync::Timer::new(fasync::MonotonicDuration::from_micros(delay)).await;
         }
     })
     .await
@@ -702,7 +702,7 @@ async fn test_fetch_http_many_concurrent_connections_at_different_intervals(beha
             }
 
             let () = tasks.collect().await;
-            fasync::Timer::new(fasync::Duration::from_micros(delay)).await;
+            fasync::Timer::new(fasync::MonotonicDuration::from_micros(delay)).await;
         }
     })
     .await

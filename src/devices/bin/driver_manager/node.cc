@@ -464,6 +464,11 @@ const std::string& Node::driver_url() const {
   if (driver_component_) {
     return driver_component_->driver_url;
   }
+
+  if (quarantine_driver_url_) {
+    return quarantine_driver_url_.value();
+  }
+
   return kUnboundUrl;
 }
 
@@ -515,6 +520,11 @@ void Node::Kill(KillCompleter::Sync& completer) {
 void Node::CompleteBind(zx::result<> result) {
   if (result.is_error()) {
     LOGF(WARNING, "Bind failed for node '%s'", MakeComponentMoniker().c_str());
+    if (GetNodeState() == NodeState::kRunning) {
+      LOGF(DEBUG, "Quarantining node '%s'", MakeComponentMoniker().c_str());
+      QuarantineNode();
+    }
+
     driver_component_.reset();
   }
 
@@ -575,15 +585,21 @@ void Node::FinishShutdown(fit::callback<void()> shutdown_callback) {
   ZX_ASSERT_MSG(GetNodeState() == NodeState::kWaitingOnDriverComponent,
                 "FinishShutdown called in invalid node state: %s",
                 GetShutdownHelper().NodeStateAsString());
-  LOGF(INFO, "Node: %s finishing shutdown", name().c_str());
-
   if (shutdown_intent() == ShutdownIntent::kRestart) {
+    LOGF(DEBUG, "Node: %s finishing restart", name().c_str());
     shutdown_callback();
     FinishRestart();
     return;
   }
 
-  LOGF(DEBUG, "Node: %s unbinding and resetting", name().c_str());
+  if (shutdown_intent() == ShutdownIntent::kQuarantine) {
+    LOGF(DEBUG, "Node: %s finishing quarantine", name().c_str());
+    shutdown_callback();
+    FinishQuarantine();
+    return;
+  }
+
+  LOGF(DEBUG, "Node: %s finishing shutdown", name().c_str());
   CloseIfExists(controller_ref_);
   CloseIfExists(node_ref_);
   devfs_device_.unpublish();
@@ -640,6 +656,20 @@ void Node::FinishRestart() {
   }
 }
 
+void Node::FinishQuarantine() {
+  ZX_ASSERT_MSG(shutdown_intent() == ShutdownIntent::kQuarantine,
+                "FinishQuarantine called when node is not quarantining.");
+
+  GetShutdownHelper().ResetShutdown();
+
+  // |QuarantineNode()| sets this.
+  ZX_ASSERT_MSG(quarantine_driver_url_.has_value(), "Node::quarantine_driver_url_ was not set");
+
+  // Perform cleanups for previous driver.
+  driver_component_.reset();
+  CloseIfExists(node_ref_);
+}
+
 void Node::ClearHostDriver() {
   if (driver_component_) {
     driver_component_->driver = {};
@@ -670,6 +700,15 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
 
 void Node::RestartNode() {
   GetShutdownHelper().set_shutdown_intent(ShutdownIntent::kRestart);
+  Remove(RemovalSet::kAll, nullptr);
+}
+
+void Node::QuarantineNode() {
+  // Store previous url before we reset the driver_component_.
+  std::string prev_url = driver_url();
+  quarantine_driver_url_.emplace(std::move(prev_url));
+
+  GetShutdownHelper().set_shutdown_intent(ShutdownIntent::kQuarantine);
   Remove(RemovalSet::kAll, nullptr);
 }
 
@@ -722,6 +761,11 @@ std::shared_ptr<BindResultTracker> Node::CreateBindResultTracker() {
         // to complete, which will only occur after the successful bind. The remaining flow will
         // be similar to the RestartNode flow.
         if (info.count() < 1) {
+          // Failed binding attempt should make the node have an unbound url. Reset this in case
+          // there was a previous driver on this node that had failed to start and was stored
+          // in quarantine_driver_url_ as part of the node quarantining.
+          self->quarantine_driver_url_.reset();
+
           self->CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
         } else if (info.count() > 1) {
           LOGF(ERROR, "Unexpectedly bound multiple drivers to a single node");
@@ -937,11 +981,9 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
                                    fidl::kIgnoreBindingClosure);
   }
   if (node.is_valid()) {
-    child->node_ref_.emplace(dispatcher_, std::move(node), child.get(), [](Node* node, auto) {
-      node->node_ref_.reset();
-      LOGF(WARNING, "Removing node %s because of binding closed", node->name().c_str());
-      node->Remove(RemovalSet::kAll, nullptr);
-    });
+    child->node_ref_.emplace(
+        dispatcher_, std::move(node), child.get(),
+        [](Node* node, fidl::UnbindInfo info) { node->OnNodeServerUnbound(info); });
   } else {
     // We don't care about tracking binds here, sending nullptr is fine.
     (*node_manager_)->Bind(*child, nullptr);
@@ -1010,7 +1052,7 @@ void Node::OnNodeServerUnbound(fidl::UnbindInfo info) {
   }
 
   // IF the driver fails to bind to the node, don't remove the node.
-  if (driver_component_->state == DriverState::kBinding) {
+  if (driver_component_.has_value() && driver_component_->state == DriverState::kBinding) {
     LOGF(WARNING, "The driver for node %s failed to bind.", name().c_str());
     return;
   }
@@ -1241,6 +1283,10 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
   auto driver_endpoints = fidl::Endpoints<fuchsia_driver_host::Driver>::Create();
+
+  // Starting a new driver. Reset the quarantine url if we had one.
+  quarantine_driver_url_.reset();
+
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints.client));
   driver_host_.value()->Start(std::move(client_end), name_, properties_, symbols,
@@ -1257,8 +1303,6 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
                                 if (result.is_error()) {
                                   LOGF(WARNING, "Failed to start driver host for %s",
                                        node_ptr->MakeComponentMoniker().c_str());
-                                  node_ptr->driver_component_.reset();
-                                  node_ptr->GetShutdownHelper().CheckNodeState();
                                 }
                                 cb(result);
 
@@ -1275,6 +1319,10 @@ void Node::StartDriverWithDynamicLinker(
                     [](Node* node, fidl::UnbindInfo info) { node->OnNodeServerUnbound(info); });
 
   auto driver_endpoints = fidl::Endpoints<fuchsia_driver_host::Driver>::Create();
+
+  // Starting a new driver. Reset the quarantine url if we had one.
+  quarantine_driver_url_.reset();
+
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints.client));
   driver_host_.value()->StartWithDynamicLinker(std::move(client_end), name_, std::move(load_args),

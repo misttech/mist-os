@@ -24,6 +24,7 @@ use crate::vfs::{
 };
 use extended_pstate::ExtendedPstateState;
 use fuchsia_inspect_contrib::profile_duration;
+use starnix_sync::LockEqualOrBefore;
 use zx::sys::zx_thread_state_general_regs_t;
 
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
@@ -489,7 +490,7 @@ impl CurrentTask {
     {
         context.update_for_path(path);
         let mut parent_content = context.with(SymlinkMode::Follow);
-        let (parent, basename) = self.lookup_parent(&mut parent_content, dir, path)?;
+        let (parent, basename) = self.lookup_parent(locked, &mut parent_content, dir, path)?;
         context.remaining_follows = parent_content.remaining_follows;
 
         let must_create = flags.contains(OpenFlags::CREAT) && flags.contains(OpenFlags::EXCL);
@@ -498,7 +499,7 @@ impl CurrentTask {
         let mut child_context = context.with(SymlinkMode::NoFollow);
         child_context.must_be_directory = false;
 
-        match parent.lookup_child(self, &mut child_context, basename) {
+        match parent.lookup_child(locked, self, &mut child_context, basename) {
             Ok(name) => {
                 if name.entry.node.is_lnk() {
                     if flags.contains(OpenFlags::PATH)
@@ -757,14 +758,18 @@ impl CurrentTask {
     /// this task. Relative paths are resolve relative to dir_fd. To resolve
     /// relative to the current working directory, pass FdNumber::AT_FDCWD for
     /// dir_fd.
-    pub fn lookup_parent_at<'a>(
+    pub fn lookup_parent_at<'a, L>(
         &self,
+        locked: &mut Locked<'_, L>,
         context: &mut LookupContext,
         dir_fd: FdNumber,
         path: &'a FsStr,
-    ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
+    ) -> Result<(NamespaceNode, &'a FsStr), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let (dir, path) = self.resolve_dir_fd(dir_fd, path, ResolveFlags::empty())?;
-        self.lookup_parent(context, &dir, path)
+        self.lookup_parent(locked, context, &dir, path)
     }
 
     /// Lookup the parent of a namespace node.
@@ -781,19 +786,24 @@ impl CurrentTask {
     /// returned along with the parent.
     ///
     /// The returned parent might not be a directory.
-    pub fn lookup_parent<'a>(
+    pub fn lookup_parent<'a, L>(
         &self,
+        locked: &mut Locked<'_, L>,
         context: &mut LookupContext,
         dir: &NamespaceNode,
         path: &'a FsStr,
-    ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
+    ) -> Result<(NamespaceNode, &'a FsStr), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         context.update_for_path(path);
 
         let mut current_node = dir.clone();
         let mut it = path.split(|c| *c == b'/').filter(|p| !p.is_empty()).map(<&FsStr>::from);
         let mut current_path_component = it.next().unwrap_or_default();
         for next_path_component in it {
-            current_node = current_node.lookup_child(self, context, current_path_component)?;
+            current_node =
+                current_node.lookup_child(locked, self, context, current_path_component)?;
             current_path_component = next_path_component;
         }
         Ok((current_node, current_path_component))
@@ -805,22 +815,33 @@ impl CurrentTask {
     /// calling this function directly.
     ///
     /// This function resolves the component of the given path.
-    pub fn lookup_path(
+    pub fn lookup_path<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         context: &mut LookupContext,
         dir: NamespaceNode,
         path: &FsStr,
-    ) -> Result<NamespaceNode, Errno> {
-        let (parent, basename) = self.lookup_parent(context, &dir, path)?;
-        parent.lookup_child(self, context, basename)
+    ) -> Result<NamespaceNode, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let (parent, basename) = self.lookup_parent(locked, context, &dir, path)?;
+        parent.lookup_child(locked, self, context, basename)
     }
 
     /// Lookup a namespace node starting at the root directory.
     ///
     /// Resolves symlinks.
-    pub fn lookup_path_from_root(&self, path: &FsStr) -> Result<NamespaceNode, Errno> {
+    pub fn lookup_path_from_root<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        path: &FsStr,
+    ) -> Result<NamespaceNode, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let mut context = LookupContext::default();
-        self.lookup_path(&mut context, self.fs().root(), path)
+        self.lookup_path(locked, &mut context, self.fs().root(), path)
     }
 
     pub fn exec<L>(

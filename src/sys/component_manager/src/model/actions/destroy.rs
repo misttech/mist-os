@@ -145,10 +145,10 @@ pub mod tests {
     };
     use crate::model::testing::test_hook::Lifecycle;
     use cm_rust_testing::*;
+    use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::StreamExt;
     use moniker::{ChildName, Moniker};
-    use {fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     async fn destroy_one_component() {

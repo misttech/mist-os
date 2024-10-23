@@ -128,6 +128,7 @@ mod test {
     use super::*;
     use event_queue::{ClosedClient, Event};
     use fidl_fuchsia_update_ext::random_version_available;
+    use fuchsia_async as fasync;
     use fuchsia_sync::Mutex;
     use futures::channel::mpsc;
     use futures::future::BoxFuture;
@@ -135,7 +136,6 @@ mod test {
     use futures::task::Poll;
     use proptest::prelude::*;
     use std::sync::Arc;
-    use {fuchsia_async as fasync, zx};
 
     const VERSION_AVAILABLE: &str = "fake-version-available";
 

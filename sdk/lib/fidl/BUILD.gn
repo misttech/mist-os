@@ -12,7 +12,6 @@ import("//build/cpp/sdk_source_set.gni")
 # functions will be linked to the final binary.
 sdk_source_set("fidl") {
   category = "partner"
-  api = "//sdk/lib/fidl/fidl.api"
   sdk_name = "fidl"
 
   # TODO(https://fxbug.dev/42172264): We should represent the library as a

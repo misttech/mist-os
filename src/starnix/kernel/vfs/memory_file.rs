@@ -72,7 +72,6 @@ impl FsNodeOps for MemoryFileNode {
         }
 
         // Produce a VMO handle with rights reduced to those requested in |flags|.
-        // TODO(b/319240806): Accumulate required rights, rather than starting from `DEFAULT`.
         let mut desired_rights = zx::Rights::VMO_DEFAULT | zx::Rights::RESIZE;
         if !flags.can_read() {
             desired_rights.remove(zx::Rights::READ);

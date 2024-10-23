@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::resolved_driver::ResolvedDriver;
+use fuchsia_async as fasync;
 use futures::SinkExt;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
-use {fuchsia_async as fasync, zx};
 
 pub struct Session {
     sender: futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,

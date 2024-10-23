@@ -445,7 +445,7 @@ mod tests {
         let foobar_address = foobar.as_ptr() as u64;
         let foobar_size = foobar.len() as u64;
         let foobar_stack_trace = generate_fake_long_stack_trace();
-        let foobar_timestamp = 123456789;
+        let foobar_timestamp = zx::MonotonicInstant::from_nanos(123456789);
         let foobar_thread_info_key =
             resources_writer.insert_thread_info(FAKE_THREAD_KOID, &FAKE_THREAD_NAME).unwrap();
         let (foobar_stack_trace_key, _) = resources_writer
@@ -518,7 +518,8 @@ mod tests {
         const FAKE_ALLOCATION_ADDRESS: u64 = 8888;
         const FAKE_ALLOCATION_SIZE: u64 = 120;
         const FAKE_ALLOCATION_STACK_TRACE: [u64; 2] = [12345, 67890];
-        const FAKE_ALLOCATION_TIMESTAMP: i64 = 1122334455;
+        const FAKE_ALLOCATION_TIMESTAMP: zx::MonotonicInstant =
+            zx::MonotonicInstant::from_nanos(1122334455);
         let thread_info_key =
             resources_writer.insert_thread_info(FAKE_THREAD_KOID, &FAKE_THREAD_NAME).unwrap();
         let (stack_trace_key, _) = resources_writer

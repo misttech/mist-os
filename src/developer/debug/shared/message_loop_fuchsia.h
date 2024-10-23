@@ -92,6 +92,11 @@ class MessageLoopFuchsia : public MessageLoop {
     std::string job_name;
     zx_handle_t job_handle;
     zx_koid_t job_koid;
+    // When true, use the "JobDebugger" exception channel. The "JobDebugger" channel registers for
+    // additional notifications such as process starting events, but not for fatal exceptions that
+    // are traveling up the job tree. When false, use the "normal" exception channel, which will be
+    // delivered fatal exception notifications for this job.
+    bool use_debugger_channel;
     ZirconExceptionWatcher* watcher;
   };
   virtual zx_status_t WatchJobExceptions(WatchJobConfig config, WatchHandle* out);

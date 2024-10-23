@@ -6,7 +6,7 @@ use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_config_schema::board_config::SerialMode;
 use assembly_config_schema::platform_config::kernel_config::{
-    OOMBehavior, OOMRebootTimeout, PlatformKernelConfig,
+    MemoryReclamationStrategy, OOMBehavior, OOMRebootTimeout, PlatformKernelConfig,
 };
 use assembly_util::{BootfsDestination, FileEntry};
 use camino::Utf8PathBuf;
@@ -118,6 +118,15 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             }
         }
 
+        match kernel_config.memory_reclamation_strategy {
+            MemoryReclamationStrategy::Balanced => {
+                // Use the kernel defaults.
+            }
+            MemoryReclamationStrategy::Eager => {
+                builder.platform_bundle("kernel_page_scanner_aging_fast");
+            }
+        }
+
         if context.board_info.kernel.halt_on_panic {
             anyhow::ensure!(
                 context.build_type == &BuildType::Eng,
@@ -128,6 +137,11 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
 
         if let Some(aslr_entropy_bits) = kernel_config.aslr_entropy_bits {
             let kernel_arg = format!("aslr.entropy_bits={}", aslr_entropy_bits);
+            builder.kernel_arg(kernel_arg);
+        }
+
+        if let Some(memory_limit_mb) = kernel_config.memory_limit_mb {
+            let kernel_arg = format!("kernel.memory-limit-mb={}", memory_limit_mb);
             builder.kernel_arg(kernel_arg);
         }
 
@@ -156,9 +170,11 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
 mod test {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
+    use crate::CompletedConfiguration;
 
-    #[test]
-    fn test_define_configuration() {
+    fn build_with_platform_kernel_config(
+        platform_kernel_config: PlatformKernelConfig,
+    ) -> CompletedConfiguration {
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
@@ -167,47 +183,40 @@ mod test {
             resource_dir: Default::default(),
             developer_only_options: Default::default(),
         };
-        let platform_kernel_config: PlatformKernelConfig = Default::default();
         let mut builder: ConfigurationBuilderImpl = Default::default();
         let result =
             KernelSubsystem::define_configuration(&context, &platform_kernel_config, &mut builder);
         assert!(result.is_ok());
-        assert!(builder.build().kernel_args.is_empty());
+        builder.build()
+    }
+
+    #[test]
+    fn test_define_configuration() {
+        let completed_config = build_with_platform_kernel_config(Default::default());
+        assert!(completed_config.kernel_args.is_empty());
     }
 
     #[test]
     fn test_define_configuration_aslr() {
-        let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
-            build_type: &BuildType::Eng,
-            board_info: &Default::default(),
-            gendir: Default::default(),
-            resource_dir: Default::default(),
-            developer_only_options: Default::default(),
-        };
-        let platform_kernel_config =
-            PlatformKernelConfig { aslr_entropy_bits: Some(12), ..Default::default() };
-        let mut builder: ConfigurationBuilderImpl = Default::default();
-        let result =
-            KernelSubsystem::define_configuration(&context, &platform_kernel_config, &mut builder);
-        assert!(result.is_ok());
-        assert!(builder.build().kernel_args.contains("aslr.entropy_bits=12"));
+        let completed_config = build_with_platform_kernel_config(PlatformKernelConfig {
+            aslr_entropy_bits: Some(12),
+            ..Default::default()
+        });
+        assert!(completed_config.kernel_args.contains("aslr.entropy_bits=12"));
     }
 
     #[test]
     fn test_define_configuration_no_aslr() {
-        let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Standard,
-            build_type: &BuildType::Eng,
-            board_info: &Default::default(),
-            gendir: Default::default(),
-            resource_dir: Default::default(),
-            developer_only_options: Default::default(),
-        };
-        let mut builder: ConfigurationBuilderImpl = Default::default();
-        let result =
-            KernelSubsystem::define_configuration(&context, &Default::default(), &mut builder);
-        assert!(result.is_ok());
-        assert!(builder.build().kernel_args.is_empty());
+        let completed_config = build_with_platform_kernel_config(Default::default());
+        assert!(completed_config.kernel_args.is_empty());
+    }
+
+    #[test]
+    fn test_define_memory_limit() {
+        let completed_config = build_with_platform_kernel_config(PlatformKernelConfig {
+            memory_limit_mb: Some(12),
+            ..Default::default()
+        });
+        assert!(completed_config.kernel_args.contains("kernel.memory-limit-mb=12"));
     }
 }

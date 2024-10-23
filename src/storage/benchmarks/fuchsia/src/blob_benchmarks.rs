@@ -4,6 +4,7 @@
 
 use async_trait::async_trait;
 use delivery_blob::CompressionMode;
+use fidl_fuchsia_io as fio;
 use fuchsia_pkg_testing::PackageBuilder;
 use fuchsia_storage_benchmarks_lib::filesystems::{BlobFilesystem, DeliveryBlob, PkgDirInstance};
 use futures::stream::{self, StreamExt};
@@ -16,7 +17,6 @@ use std::ops::Range;
 use storage_benchmarks::{
     Benchmark, CacheClearableFilesystem as _, OperationDuration, OperationTimer,
 };
-use {fidl_fuchsia_io as fio, zx};
 
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
 

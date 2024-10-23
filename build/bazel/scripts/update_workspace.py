@@ -908,12 +908,14 @@ common --enable_bzlmod=false
 
     # Content hash file for @fuchsia_sdk.
     sdk_root = os.path.join(gn_output_dir, "sdk", "exported")
-    all_fuchsia_idk_metas = all_sdk_metas(
-        os.path.join(sdk_root, "bazel_fuchsia_sdk_idk")
+    all_in_tree_idk_metas = all_sdk_metas(
+        os.path.join(sdk_root, "bazel_in_tree_idk")
     )
 
     # Content hash file for @internal_sdk
-    all_internal_part_metas = all_sdk_metas(os.path.join(sdk_root, "platform"))
+    all_internal_only_idk_metas = all_sdk_metas(
+        os.path.join(sdk_root, "bazel_internal_only_idk")
+    )
 
     # Content hash file for @prebuilt_clang, fuchsia_clang, keep in sync with
     # generate_prebuilt_clang_toolchain_repository() in
@@ -1057,22 +1059,22 @@ common --enable_bzlmod=false
     # LINT.ThenChange(//build/info/info.gni)
 
     # LINT.IfChange
-    generated_repositories_inputs["fuchsia_sdk"] = all_fuchsia_idk_metas
+    generated_repositories_inputs["fuchsia_sdk"] = all_in_tree_idk_metas
     # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
-    generated_repositories_inputs["fuchsia_idk"] = all_fuchsia_idk_metas
+    generated_repositories_inputs["fuchsia_in_tree_idk"] = all_in_tree_idk_metas
     # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
     generated_repositories_inputs["bazel_rules_fuchsia"] = list(
         rules_fuchsia_files
     )
-    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
-    generated_repositories_inputs["internal_sdk"] = all_internal_part_metas
-    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+    generated_repositories_inputs["internal_sdk"] = all_internal_only_idk_metas
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # TODO: support content hash file in fuchsia_clang_repository() definition
     # This is already supported by generate_prebuilt_clang_repository()
@@ -1084,19 +1086,19 @@ common --enable_bzlmod=false
     generated_repositories_inputs["prebuilt_clang"] = [
         str(file) for file in clang_content_files
     ]
-    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
     generated_repositories_inputs["prebuilt_python"] = list(
         python_content_files
     )
-    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
     generated_repositories_inputs[
         "com_google_googletest"
     ] = googletest_content_files
-    # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
     generated_repositories_inputs[

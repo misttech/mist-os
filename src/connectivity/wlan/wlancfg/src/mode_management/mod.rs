@@ -25,6 +25,8 @@ mod iface_manager_types;
 pub mod phy_manager;
 pub mod recovery;
 
+pub const DEFECT_CHANNEL_SIZE: usize = 100;
+
 pub fn create_iface_manager(
     phy_manager: Arc<Mutex<dyn phy_manager::PhyManagerApi + Send>>,
     client_update_sender: listener::ClientListenerMessageSender,
@@ -34,13 +36,14 @@ pub fn create_iface_manager(
     connection_selection_requester: ConnectionSelectionRequester,
     roam_manager: RoamManager,
     telemetry_sender: TelemetrySender,
+    defect_sender: mpsc::Sender<Defect>,
+    defect_receiver: mpsc::Receiver<Defect>,
     recovery_receiver: recovery::RecoveryActionReceiver,
     node: fuchsia_inspect::Node,
 ) -> (Arc<Mutex<iface_manager_api::IfaceManager>>, impl Future<Output = Result<Infallible, Error>>)
 {
     let (sender, receiver) = mpsc::channel(0);
     let iface_manager_sender = Arc::new(Mutex::new(iface_manager_api::IfaceManager { sender }));
-    let (defect_sender, defect_receiver) = mpsc::unbounded();
     let iface_manager = iface_manager::IfaceManagerService::new(
         phy_manager,
         client_update_sender,

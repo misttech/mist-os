@@ -6,8 +6,6 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.pointerinjector.configuration") {
   # This library is only intended to be used by platform components.
-  sdk_category = "internal"
-
   sources = [ "setup.fidl" ]
 
   public_deps = [

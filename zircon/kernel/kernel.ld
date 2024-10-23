@@ -303,7 +303,35 @@ SECTIONS
         PROVIDE_HIDDEN(__start___llvm_prf_cnts = .);
         *(__llvm_prf_cnts)
         PROVIDE_HIDDEN(__stop___llvm_prf_cnts = .);
+
+        /*
+         * As described above (in .data), this will have no effect on . when
+         * this section is empty (uninstrumented kernel)--then . will always
+         * already be aligned to 8.  However, when there is __llvm_prf_cnts
+         * data, it can be of an odd size.  In that case, aligning up here adds
+         * padding to the output section such that __data_end (see below) will
+         * get this alignment.  The image.S layout will place fixup code
+         * immediately after this image, with the call to that fixup code using
+         * __data_end to find the right entry point.  On AArch64, code must be
+         * aligned to 4 bytes (other machines need less).
+         */
+        . = ALIGN(4);
     }
+    __llvm_prf_bits : {
+        PROVIDE_HIDDEN(__start___llvm_prf_bits = .);
+        *(__llvm_prf_bits)
+        PROVIDE_HIDDEN(__stop___llvm_prf_bits = .);
+
+        /*
+         * This has the same issue just described for __llvm_prf_cnts,
+         * and the same solution.
+         */
+        . = ALIGN(4);
+    }
+    /*
+     * The __sancov_guards section always either is entirely absent or is
+     * already an aligned size.
+     */
     __sancov_guards : ALIGN(4) {
         PROVIDE_HIDDEN(__start___sancov_guards = .);
         *(__sancov_guards)

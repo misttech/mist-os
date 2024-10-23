@@ -16,7 +16,7 @@ use std::pin::Pin;
 use tracing::{debug, info, warn};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp as fidl_hfp,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 use crate::config::HandsFreeFeatureSupport;
@@ -26,8 +26,8 @@ use crate::peer::Peer;
 mod tests;
 
 pub const SEARCH_RESULT_CONNECT_DELAY_SECONDS: i64 = 1;
-const SEARCH_RESULT_CONNECT_DELAY_DURATION: fasync::Duration =
-    fasync::Duration::from_seconds(SEARCH_RESULT_CONNECT_DELAY_SECONDS);
+const SEARCH_RESULT_CONNECT_DELAY_DURATION: fasync::MonotonicDuration =
+    fasync::MonotonicDuration::from_seconds(SEARCH_RESULT_CONNECT_DELAY_SECONDS);
 
 type SearchResultTimer = Pin<Box<dyn Future<Output = (PeerId, Option<Vec<ProtocolDescriptor>>)>>>;
 

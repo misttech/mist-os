@@ -11,7 +11,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics_types as fdiagnostics,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 /// Wrapper around the `ComponentControllerProxy` with utilities for handling events.

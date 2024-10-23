@@ -6,12 +6,12 @@ use crate::filesystems::{BlobFilesystem, DeliveryBlob, FsManagementFilesystemIns
 use async_trait::async_trait;
 use blob_writer::BlobWriter;
 use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobCreatorProxy, BlobReaderMarker, BlobReaderProxy};
+use fidl_fuchsia_io as fio;
 use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 use std::path::Path;
 use storage_benchmarks::{
     BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem, FilesystemConfig,
 };
-use {fidl_fuchsia_io as fio, zx};
 
 /// Config object for starting Fxblob instances.
 #[derive(Clone)]

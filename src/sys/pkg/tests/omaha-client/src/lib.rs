@@ -52,7 +52,7 @@ use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics,
     fidl_fuchsia_paver as fpaver, fidl_fuchsia_update_installer as finstaller,
     fidl_fuchsia_update_installer_ext as installer, fidl_fuchsia_update_verify as fupdate_verify,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 const OMAHA_CLIENT_CML: &str = "#meta/omaha-client-service.cm";
@@ -1531,8 +1531,8 @@ async fn test_omaha_client_installation_deferred() {
             .paver(
                 MockPaverServiceBuilder::new()
                     .insert_hook(throttle_hook)
-                    .insert_hook(mphooks::config_status(move |_| {
-                        Ok(*config_status_response.lock().as_ref().unwrap())
+                    .insert_hook(mphooks::config_status_and_boot_attempts(move |_| {
+                        Ok((*config_status_response.lock().as_ref().unwrap(), Some(1)))
                     }))
                     .build(),
             )
@@ -1545,7 +1545,9 @@ async fn test_omaha_client_installation_deferred() {
     // few enough to guarantee the commit is still pending.
     let () = throttler.emit_next_paver_events(&[
         PaverEvent::QueryCurrentConfiguration,
-        PaverEvent::QueryConfigurationStatus { configuration: fpaver::Configuration::A },
+        PaverEvent::QueryConfigurationStatusAndBootAttempts {
+            configuration: fpaver::Configuration::A,
+        },
     ]);
 
     // The update attempt should start, but the install should be deferred b/c we're pending commit.

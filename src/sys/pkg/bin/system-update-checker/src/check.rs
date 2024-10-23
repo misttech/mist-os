@@ -14,7 +14,7 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_hash::Hash;
 use std::io;
 use tracing::{error, info, warn};
-use {fidl_fuchsia_mem as fmem, fidl_fuchsia_space as fspace, zx};
+use {fidl_fuchsia_mem as fmem, fidl_fuchsia_space as fspace};
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum SystemUpdateStatus {

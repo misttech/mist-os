@@ -21,32 +21,19 @@ namespace media_audio {
 namespace fad = fuchsia_audio_device;
 namespace fha = fuchsia_hardware_audio;
 
-namespace {
-
-struct DeviceNodeSpecifier {
-  const char* path;
-  fad::DeviceType device_type;
-};
-
-constexpr DeviceNodeSpecifier kAudioDevNodes[] = {
-    {.path = "/dev/class/audio-composite", .device_type = fad::DeviceType::kComposite},
-    {.path = "/dev/class/audio-input", .device_type = fad::DeviceType::kInput},
-    {.path = "/dev/class/audio-output", .device_type = fad::DeviceType::kOutput},
-    {.path = "/dev/class/codec", .device_type = fad::DeviceType::kCodec},
-};
-
-}  // namespace
-
-zx::result<std::shared_ptr<DeviceDetector>> DeviceDetector::Create(DeviceDetectionHandler handler,
-                                                                   async_dispatcher_t* dispatcher) {
+zx::result<std::shared_ptr<DeviceDetector>> DeviceDetector::Create(
+    DeviceDetectionHandler handler, DeviceDetectionIdleHandler idle_handler,
+    async_dispatcher_t* dispatcher) {
   // The constructor is private, forcing clients to use DeviceDetector::Create().
   class MakePublicCtor : public DeviceDetector {
    public:
-    MakePublicCtor(DeviceDetectionHandler handler, async_dispatcher_t* dispatcher)
-        : DeviceDetector(std::move(handler), dispatcher) {}
+    MakePublicCtor(DeviceDetectionHandler handler, DeviceDetectionIdleHandler idle_handler,
+                   async_dispatcher_t* dispatcher)
+        : DeviceDetector(std::move(handler), std::move(idle_handler), dispatcher) {}
   };
 
-  auto detector = std::make_shared<MakePublicCtor>(std::move(handler), dispatcher);
+  auto detector =
+      std::make_shared<MakePublicCtor>(std::move(handler), std::move(idle_handler), dispatcher);
 
   if (auto status = detector->StartDeviceWatchers(); status != ZX_OK) {
     return zx::error(status);
@@ -62,7 +49,7 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
   FX_CHECK(dispatcher_);
 
   for (const auto& dev_node : kAudioDevNodes) {
-    auto watcher = fsl::DeviceWatcher::Create(
+    auto watcher = fsl::DeviceWatcher::CreateWithIdleCallback(
         dev_node.path,
         [this, device_type = dev_node.device_type](
             const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
@@ -81,6 +68,9 @@ zx_status_t DeviceDetector::StartDeviceWatchers() {
             Inspector::Singleton()->RecordDetectionFailureUnsupported();
             return;
           }
+        },
+        [this, device_type = dev_node.device_type]() {
+          DeviceTypeCompletedInitialDetection(device_type);
         },
         dispatcher_);
 
@@ -160,6 +150,21 @@ void DeviceDetector::DriverClientFromDevFs(const fidl::ClientEnd<fuchsia_io::Dir
   ADR_LOG_METHOD(kLogDeviceDetection)
       << "Detected and connected to " << device_type << " '" << name << "'";
   handler_(name, device_type, std::move(*driver_client));
+}
+
+void DeviceDetector::DeviceTypeCompletedInitialDetection(
+    fuchsia_audio_device::DeviceType device_type) {
+  ADR_LOG_METHOD(kLogDeviceDetection) << device_type;
+  FX_DCHECK(device_type != fuchsia_audio_device::DeviceType::Unknown());
+  FX_DCHECK(!initial_detection_complete_);
+  initial_detection_complete_by_device_type_[device_type] = true;
+
+  if (std::ranges::all_of(initial_detection_complete_by_device_type_.begin(),
+                          initial_detection_complete_by_device_type_.end(),
+                          [](auto map_entry) { return map_entry.second; })) {
+    idle_handler_();
+    initial_detection_complete_ = true;
+  }
 }
 
 }  // namespace media_audio

@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_library("lib") {
   with_unit_tests = true
@@ -109,10 +108,6 @@ rustc_binary("auto-brightness_bin") {
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [ "//third_party/rust_crates:futures" ]
-}
-
-core_shard("auto-brightness_core_shard") {
-  shard_file = "meta/auto-brightness.core_shard.cml"
 }
 
 fuchsia_package_with_single_component("auto-brightness") {

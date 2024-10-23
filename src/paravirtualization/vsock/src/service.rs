@@ -46,6 +46,7 @@ use fidl_fuchsia_vsock::{
     ConnectorRequest, ConnectorRequestStream, ListenerControlHandle, ListenerRequest,
     ListenerRequestStream, SIGNAL_STREAM_INCOMING,
 };
+use fuchsia_async as fasync;
 use futures::channel::{mpsc, oneshot};
 use futures::{future, select, Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
 use std::cell::{Ref, RefCell, RefMut};
@@ -56,7 +57,6 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
 use thiserror::Error;
-use {fuchsia_async as fasync, zx};
 
 const ZXIO_SIGNAL_INCOMING: zx::Signals =
     const_unwrap_option(zx::Signals::from_bits(SIGNAL_STREAM_INCOMING));

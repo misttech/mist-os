@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
@@ -362,7 +362,9 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
   bool AddObserver(const std::shared_ptr<Device>& device) { return notify()->AddObserver(device); }
   bool SetControl(const std::shared_ptr<Device>& device) { return notify()->SetControl(device); }
-  bool DropControl(const std::shared_ptr<Device>& device) { return notify()->DropControl(device); }
+  static bool DropControl(const std::shared_ptr<Device>& device) {
+    return NotifyStub::DropControl(device);
+  }
 
   static bool device_plugged_state(const std::shared_ptr<Device>& device) {
     return *device->plug_state_->plugged();
@@ -709,4 +711,4 @@ class StreamConfigTest : public DeviceTestBase {
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_

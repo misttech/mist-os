@@ -17,7 +17,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_data as fdata, fidl_fuchsia_diagnostics_types as fdiagnostics,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
 };
 
 mod component_controller;

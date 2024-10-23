@@ -150,6 +150,9 @@ struct ClientSettings {
 
     static const char* kRecursive;
     static const char* kRecursiveDescription;
+
+    static const char* kJobOnly;
+    static const char* kJobOnlyDescription;
   };
 };
 

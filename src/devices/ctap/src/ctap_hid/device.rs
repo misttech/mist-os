@@ -11,6 +11,7 @@ use bitfield::bitfield;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_fido_report::{CtapHidCommand, SecurityKeyDeviceMarker};
+use fidl_fuchsia_io as fio;
 use fuchsia_async::{MonotonicInstant, TimeoutExt};
 use futures::lock::Mutex;
 use futures::TryFutureExt;
@@ -20,7 +21,6 @@ use rand::Rng;
 use std::io::Read;
 use std::path::PathBuf;
 use tracing::{info, warn};
-use {fidl_fuchsia_io as fio, zx};
 
 /// The broadcast channel to use for the initial init request, as defined in the CTAP HID spec.
 const INIT_CHANNEL: u32 = 0xffffffff;

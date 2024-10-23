@@ -1662,7 +1662,7 @@ OBJECT_GET_INFO_PROCESS_VMOS_DISPLAY_TEST(
   constexpr size_t kVmoBytes = 8000;                                                       \
   constexpr size_t kMmuOverheadBytes = 200;                                                \
   constexpr size_t kOtherBytes = 50;                                                       \
-  zx_info_kmem_stats_t buffer;                                                             \
+  zx_info_kmem_stats_t buffer = {};                                                        \
   buffer.total_bytes = kTotalBytes;                                                        \
   buffer.free_bytes = kFreeBytes;                                                          \
   buffer.wired_bytes = kWiredBytes;                                                        \
@@ -1692,18 +1692,29 @@ OBJECT_GET_INFO_KMEM_STATS_DISPLAY_TEST(
     "zx_object_get_info("
     "handle: \x1B[32mhandle\x1B[0m = \x1B[31mcefa1db0\x1B[0m, "
     "topic: \x1B[32mzx.object_info_topic\x1B[0m = \x1B[34mZX_INFO_KMEM_STATS\x1B[0m, "
-    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m72\x1B[0m)\n"
+    "buffer_size: \x1B[32msize\x1B[0m = \x1B[34m152\x1B[0m)\n"
     "\x1B[32m0.000000\x1B[0m "
     "  -> \x1B[32mZX_OK\x1B[0m\n"
     "    info: \x1B[32mzx_info_kmem_stats_t\x1B[0m = {\n"
     "      total_bytes: \x1B[32msize\x1B[0m = \x1B[34m16384\x1B[0m\n"
     "      free_bytes: \x1B[32msize\x1B[0m = \x1B[34m6334\x1B[0m\n"
+    "      free_loaned_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
     "      wired_bytes: \x1B[32msize\x1B[0m = \x1B[34m1000\x1B[0m\n"
     "      total_heap_bytes: \x1B[32msize\x1B[0m = \x1B[34m800\x1B[0m\n"
     "      free_heap_bytes: \x1B[32msize\x1B[0m = \x1B[34m100\x1B[0m\n"
     "      vmo_bytes: \x1B[32msize\x1B[0m = \x1B[34m8000\x1B[0m\n"
     "      mmu_overhead_bytes: \x1B[32msize\x1B[0m = \x1B[34m200\x1B[0m\n"
+    "      ipc_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "      cache_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "      slab_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "      zram_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
     "      other_bytes: \x1B[32msize\x1B[0m = \x1B[34m50\x1B[0m\n"
+    "      vmo_reclaim_total_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "      vmo_reclaim_newest_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "      vmo_reclaim_oldest_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "      vmo_reclaim_disabled_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "      vmo_discardable_locked_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
+    "      vmo_discardable_unlocked_bytes: \x1B[32msize\x1B[0m = \x1B[34m0\x1B[0m\n"
     "    }\n")
 
 #define OBJECT_GET_INFO_RESOURCE_DISPLAY_TEST_CONTENT(result, expected)                       \

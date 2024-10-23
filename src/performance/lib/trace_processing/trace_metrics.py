@@ -16,9 +16,19 @@ import enum
 import json
 import logging
 import pathlib
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence, TypeAlias
 
 from trace_processing import trace_model
+
+JsonType: TypeAlias = (
+    Mapping[str, "JsonType"]
+    | Sequence["JsonType"]
+    | str
+    | int
+    | float
+    | bool
+    | None
+)
 
 _LOGGER: logging.Logger = logging.getLogger("Performance")
 
@@ -113,15 +123,17 @@ class MetricsProcessor(abc.ABC):
 
     ... gather traces, start and stop the power sampler, create the model ...
 
-    processor.process_and_save(model, output_path="my_test.fuchsiaperf.json")
+    TestCaseResult.write_fuchsiaperf_json(
+        processor.process_metrics(model), test_suite_name, output_path
+    )
     ```
+    NB: `output_path` must end in `fuchsiaperf.json`
     """
 
     @property
     def name(self) -> str:
         return self.__class__.__name__
 
-    @abc.abstractmethod
     def process_metrics(
         self, model: trace_model.Model
     ) -> Sequence[TestCaseResult]:
@@ -133,56 +145,39 @@ class MetricsProcessor(abc.ABC):
         Returns:
             list[TestCaseResult]: The generated metrics.
         """
+        return []
 
-    def process_and_save_metrics(
-        self,
-        model: trace_model.Model,
-        test_suite: str,
-        output_path: pathlib.Path,
-    ) -> None:
-        """Convenience method for processing a model and saving the output into a fuchsiaperf.json file.
+    def process_freeform_metrics(self, model: trace_model.Model) -> JsonType:
+        """Computes freeform metrics as JSON.
+
+        This can output structured data, as opposite to `process_metrics` which return as list.
+        These metrics are in addition to those produced by process_metrics()
 
         Args:
-            model: A model to process metrics from.
-            test_suite: A test suite name to embed in the json.
-                E.g. "fuchsia.uiperf.my_metric".
-            output_path: Output file path, must end with ".fuchsiaperf.json".
+            model: trace events to be processed.
+
+        Returns:
+            JsonType: structure holding aggregated metrics, or None if not supported.
         """
-        results = self.process_metrics(model)
-        TestCaseResult.write_fuchsiaperf_json(
-            results, test_suite=test_suite, output_path=output_path
-        )
+        return None
 
 
 class ConstantMetricsProcessor(MetricsProcessor):
-    """A metrics processor that return a constant list of result."""
+    """A metrics processor that returns constant results."""
 
-    def __init__(self, results: Sequence[TestCaseResult]):
+    # TODO(b/373899149): rename `result` into metrics.
+    def __init__(
+        self,
+        results: Sequence[TestCaseResult] = (),
+        freeform_metrics: JsonType = None,
+    ):
         self.results = results
+        self.freeform_metrics = freeform_metrics
 
     def process_metrics(
         self, model: trace_model.Model
     ) -> Sequence[TestCaseResult]:
         return self.results
 
-
-class MetricsProcessorsSet(MetricsProcessor):
-    """A processor that aggregates N sub-processors."""
-
-    def __init__(self, sub_processors: Sequence[MetricsProcessor]):
-        self.sub_processors = sub_processors
-
-    def process_metrics(
-        self, model: trace_model.Model
-    ) -> Sequence[TestCaseResult]:
-        results: list[TestCaseResult] = []
-        _LOGGER.info(
-            f"Combining metrics from {len(self.sub_processors)} subprocessors..."
-        )
-        for sub_proc in self.sub_processors:
-            sub_results = sub_proc.process_metrics(model)
-            _LOGGER.info(
-                f"Got {len(sub_results)} results from subprocessor {sub_proc.name}"
-            )
-            results.extend(sub_results)
-        return results
+    def process_freeform_metrics(self, model: trace_model.Model) -> JsonType:
+        return self.freeform_metrics

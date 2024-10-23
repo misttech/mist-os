@@ -19,6 +19,8 @@ const TEST_STRING: &'static str = "Hello, world!";
 // existing callers that depend on the legacy io1 behavior allowing no flags to be specified for
 // this case. We should either relax this restriction, or work to migrate callers, after which we
 // can update this test accordingly.
+// TODO(https://fxbug.dev/346585458): Either require that connections have the CONNECT right or
+// remove that right from fuchsia.io.
 #[fuchsia::test]
 async fn open_service() {
     let harness = TestHarness::new().await;

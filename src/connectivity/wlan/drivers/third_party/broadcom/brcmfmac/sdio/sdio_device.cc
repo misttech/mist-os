@@ -109,9 +109,9 @@ zx_status_t SdioDevice::BusInit() {
   }
   fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX] =
       fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(client_end.value()));
-  if (!fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->GetName().ok()) {
+  if (!fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->Read().ok()) {
     fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX] = {};
-    BRCMF_ERR("OOB IRQ GPIO GetName() failed");
+    BRCMF_ERR("OOB IRQ GPIO Read() failed");
     return ZX_ERR_INTERNAL;
   }
 
@@ -122,7 +122,7 @@ zx_status_t SdioDevice::BusInit() {
   } else {
     fidl_gpios[DEBUG_GPIO_INDEX] =
         fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(client_end.value()));
-    if (!fidl_gpios[DEBUG_GPIO_INDEX]->GetName().ok()) {
+    if (!fidl_gpios[DEBUG_GPIO_INDEX]->Read().ok()) {
       fidl_gpios[DEBUG_GPIO_INDEX] = {};
     }
   }

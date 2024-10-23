@@ -22,6 +22,8 @@
             protocol: [
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.routes.admin.RouteTableProviderV4",
+                "fuchsia.net.routes.admin.RouteTableProviderV6",
                 "fuchsia.net.routes.admin.RouteTableV4",
                 "fuchsia.net.routes.admin.RouteTableV6",
                 "fuchsia.net.routes.StateV4",
@@ -167,9 +169,9 @@
             to: "#starnix_runner",
         },
         {
+            config: "fuchsia.starnix.runner.EnableDataCollection",
             from: "parent",
             to: "#starnix_runner",
-            config: "fuchsia.starnix.runner.EnableDataCollection",
         },
     ],
     expose: [

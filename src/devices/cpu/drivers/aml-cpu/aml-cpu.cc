@@ -363,9 +363,9 @@ void AmlCpu::SetCpuInfo(uint32_t cpu_version_packed) {
   FDF_LOG(INFO, "minor revision number: 0x%x", minor_revision);
   FDF_LOG(INFO, "cpu package id number: 0x%x", cpu_package_id);
 
-  cpu_info_.CreateUint("cpu_major_revision", major_revision, &inspector_);
-  cpu_info_.CreateUint("cpu_minor_revision", minor_revision, &inspector_);
-  cpu_info_.CreateUint("cpu_package_id", cpu_package_id, &inspector_);
+  inspect_major_revision_ = cpu_info_.CreateUint("cpu_major_revision", major_revision);
+  inspect_minor_revision_ = cpu_info_.CreateUint("cpu_minor_revision", minor_revision);
+  inspect_package_id_ = cpu_info_.CreateUint("cpu_package_id", cpu_package_id);
 }
 
 void AmlCpu::GetOperatingPointInfo(GetOperatingPointInfoRequestView request,

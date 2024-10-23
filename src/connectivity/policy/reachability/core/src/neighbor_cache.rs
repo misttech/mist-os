@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use tracing::error;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_neighbor as fnet_neighbor,
-    fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext, zx,
+    fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext,
 };
 
 use super::Id;

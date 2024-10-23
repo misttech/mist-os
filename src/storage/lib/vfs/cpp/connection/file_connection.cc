@@ -172,7 +172,7 @@ void FileConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
   completer.Reply(Connection::NodeUpdateAttributes(update).status_value());
 }
 
-void FileConnection::GetAttributes(fio::wire::Node2GetAttributesRequest* request,
+void FileConnection::GetAttributes(fio::wire::NodeGetAttributesRequest* request,
                                    GetAttributesCompleter::Sync& completer) {
   internal::NodeAttributeBuilder builder;
   zx::result attrs = builder.Build(*vnode(), request->query);

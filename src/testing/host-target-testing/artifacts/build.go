@@ -358,7 +358,9 @@ func (b *ArtifactsBuild) GetPackageRepository(
 		packagesDir,
 		&proxyBlobStore{
 			b:        b,
+			ffx:      ffx,
 			blobsDir: b.blobsDir,
+			blobType: blobType,
 		},
 		ffx,
 		blobType,
@@ -373,7 +375,9 @@ func (b *ArtifactsBuild) GetPackageRepository(
 
 type proxyBlobStore struct {
 	b        *ArtifactsBuild
+	ffx      *ffx.FFXTool
 	blobsDir string
+	blobType *int
 }
 
 func (fs *proxyBlobStore) PrefetchBlobs(
@@ -423,6 +427,25 @@ func (fs *proxyBlobStore) BlobPath(ctx context.Context, deliveryBlobType *int, m
 	// First, try to read the blob from the directory
 	if _, err := os.Stat(path); err == nil {
 		return path, nil
+	}
+
+	// Decompress delivery blob if possible.
+	if deliveryBlobType == nil && fs.blobType != nil && fs.ffx.SupportsPackageBlob(ctx) {
+		deliveryBlobPath := filepath.Join(fs.blobsDir, strconv.Itoa(*fs.blobType), merkle.String())
+		_, err := os.Stat(deliveryBlobPath)
+		if err != nil {
+			err = fs.PrefetchBlobs(ctx, fs.blobType, []pmBuild.MerkleRoot{merkle})
+			if err != nil {
+				logger.Errorf(ctx, "failed to prefetch type %d blob %s: %v", *fs.blobType, merkle, err)
+			}
+		}
+		if err == nil {
+			err = fs.ffx.DecompressBlobs(ctx, []string{deliveryBlobPath}, fs.blobsDir)
+			if err == nil {
+				return path, nil
+			}
+			logger.Errorf(ctx, "failed to decompress blob %s: %v", deliveryBlobPath, err)
+		}
 	}
 
 	if err := fs.PrefetchBlobs(ctx, deliveryBlobType, []pmBuild.MerkleRoot{merkle}); err != nil {

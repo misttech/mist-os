@@ -659,10 +659,10 @@ mod tests {
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
     use crate::{make_test_config, make_test_config_with_delay};
     use fidl_fuchsia_time_external::{self as ftexternal, Status};
+    use fuchsia_async as fasync;
     use lazy_static::lazy_static;
     use std::pin::pin;
     use test_util::{assert_geq, assert_gt, assert_leq, assert_lt, assert_near};
-    use {fuchsia_async as fasync, zx};
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
     const TEST_ROLE: Role = Role::Primary;
@@ -1061,12 +1061,12 @@ mod tests {
         let _ = executor.run_until_stalled(&mut fut);
 
         // Half a second in, nothing to wake.
-        executor.set_fake_time(start_time + fasync::Duration::from_millis(550));
+        executor.set_fake_time(start_time + fasync::MonotonicDuration::from_millis(550));
         let _ = executor.run_until_stalled(&mut fut);
         assert_eq!(false, executor.wake_expired_timers());
 
         // One second in, there is something to wake.
-        executor.set_fake_time(start_time + fasync::Duration::from_millis(1050));
+        executor.set_fake_time(start_time + fasync::MonotonicDuration::from_millis(1050));
         assert_eq!(true, executor.wake_expired_timers());
     }
 

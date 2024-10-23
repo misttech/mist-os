@@ -37,7 +37,9 @@ use wlancfg_lib::config_management::{SavedNetworksManager, SavedNetworksManagerA
 use wlancfg_lib::legacy::{self, IfaceRef};
 use wlancfg_lib::mode_management::iface_manager_api::IfaceManagerApi;
 use wlancfg_lib::mode_management::phy_manager::PhyManager;
-use wlancfg_lib::mode_management::{create_iface_manager, device_monitor, recovery};
+use wlancfg_lib::mode_management::{
+    create_iface_manager, device_monitor, recovery, DEFECT_CHANNEL_SIZE,
+};
 use wlancfg_lib::regulatory_manager::RegulatoryManager;
 use wlancfg_lib::telemetry::{
     connect_to_metrics_logger_factory, create_metrics_logger, serve_telemetry, TelemetrySender,
@@ -45,7 +47,7 @@ use wlancfg_lib::telemetry::{
 use wlancfg_lib::util;
 use {
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync,
-    fuchsia_trace_provider as ftrace_provider, wlan_trace as wtrace, zx,
+    fuchsia_trace_provider as ftrace_provider, wlan_trace as wtrace,
 };
 
 const REGULATORY_LISTENER_TIMEOUT_SEC: i64 = 30;
@@ -270,6 +272,7 @@ async fn run_all_futures() -> Result<(), Error> {
     };
 
     let external_inspect_node = component::inspector().root().create_child("external");
+    let (defect_sender, defect_receiver) = mpsc::channel(DEFECT_CHANNEL_SIZE);
     let (telemetry_sender, telemetry_fut) = serve_telemetry(
         monitor_svc.clone(),
         cobalt_1dot1_proxy,
@@ -285,6 +288,7 @@ async fn run_all_futures() -> Result<(), Error> {
         component::inspector().root().create_child("client_stats"),
         external_inspect_node.create_child("client_stats"),
         persistence_req_sender.clone(),
+        defect_sender.clone(),
     );
     component::inspector().root().record(external_inspect_node);
 
@@ -351,6 +355,8 @@ async fn run_all_futures() -> Result<(), Error> {
         connection_selection_requester,
         roam_manager,
         telemetry_sender.clone(),
+        defect_sender,
+        defect_receiver,
         recovery_receiver,
         component::inspector().root().create_child("iface_manager"),
     );

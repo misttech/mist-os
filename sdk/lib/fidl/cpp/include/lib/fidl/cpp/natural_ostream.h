@@ -188,6 +188,23 @@ struct Formatter<fidl::basic_time<ZX_CLOCK_BOOT>> {
   }
 };
 
+template <>
+struct Formatter<fidl::basic_ticks<ZX_CLOCK_MONOTONIC>> {
+  static std::ostream& Format(std::ostream& os,
+                              const fidl::basic_ticks<ZX_CLOCK_MONOTONIC>& value) {
+    auto time_value = static_cast<zx_ticks_t>(value.get());
+    return os << "monotonic_ticks(" << time_value << ")";
+  }
+};
+
+template <>
+struct Formatter<fidl::basic_ticks<ZX_CLOCK_BOOT>> {
+  static std::ostream& Format(std::ostream& os, const fidl::basic_ticks<ZX_CLOCK_BOOT>& value) {
+    auto time_value = static_cast<zx_ticks_t>(value.get());
+    return os << "boot_ticks(" << time_value << ")";
+  }
+};
+
 template <typename T>
 struct Formatter<std::vector<T>> {
   static std::ostream& Format(std::ostream& os, const std::vector<T>& value) {

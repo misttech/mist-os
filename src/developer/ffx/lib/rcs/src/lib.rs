@@ -214,7 +214,10 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
     };
 
     let knock_client = fuchsia_async::Channel::from_channel(knock_client);
-    let knock_client = fidl::client::Client::new(knock_client, "knock_client");
+    let knock_client = fidl::client::Client::<fidl::encoding::DefaultFuchsiaResourceDialect>::new(
+        knock_client,
+        "knock_client",
+    );
     let mut event_receiver = knock_client.take_event_receiver();
     let res = timeout(RCS_KNOCK_TIMEOUT, event_receiver.next()).await;
     match res {

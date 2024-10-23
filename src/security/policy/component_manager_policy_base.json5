@@ -208,6 +208,13 @@
                 ],
             },
             {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.pkg.PackageResolver-boot",
+                capability: "protocol",
+                target_monikers: [],
+            },
+            {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
                 source_name: "blob",

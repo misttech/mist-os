@@ -719,9 +719,7 @@ def verify_unknown_gn_targets(
     missing_ninja_packages = set()
     build_dirs: Set[str] = set()
     for error_line in build_files_error:
-        if not (
-            error_line.startswith("ERROR:") and "@gn_targets//" in error_line
-        ):
+        if not ("ERROR: " in error_line and "@gn_targets//" in error_line):
             continue
 
         pos = error_line.find("@@gn_targets//")
@@ -817,19 +815,6 @@ Then ensure that the GN target depends on them transitively.
         )
 
     print(_ERROR, file=sys.stderr)
-    print(
-        "=================== ORIGINAL BAZEL ERROR MESSAGE ================",
-        file=sys.stderr,
-    )
-    max_error_lines = 10
-    for line in build_files_error[:max_error_lines]:
-        print(line, file=sys.stderr)
-    if len(build_files_error) > max_error_lines:
-        print("...", file=sys.stderr)
-    print(
-        "--------------------- END OF BAZEL ERROR MESSAGE ----------------\n",
-        file=sys.stderr,
-    )
     return 1
 
 
@@ -1265,7 +1250,9 @@ def main() -> int:
     if _DEBUG:
         debug("BUILD_CMD: " + " ".join(shlex.quote(c) for c in cmd))
 
-    ret = subprocess.run(cmd, capture_output=True, text=True)
+    # NOTE: It is important to NOT capture output from this subprocess, to make
+    # sure console output from Bazel are correctly printed out by Ninja.
+    ret = subprocess.run(cmd)
     if ret.returncode != 0:
         # Detect the error message corresponding to a Bazel target
         # referencing a @gn_targets//<dir>:<name> label
@@ -1273,17 +1260,19 @@ def main() -> int:
         # fails to depend on the proper bazel_input_file() or
         # bazel_input_directory() dependency.
         #
-        # (There is no need to add these to the global list though).
-        if verify_unknown_gn_targets(
-            ret.stderr.splitlines(),
-            args.gn_target_label,
-            args.bazel_targets,
-        ):
-            return 1
+        # NOTE: Path to command.log should be stable, because we explicitly set
+        # output_base. See https://bazel.build/run/scripts#command-log.
+        with open(os.path.join(bazel_output_base_dir, "command.log"), "r") as f:
+            if verify_unknown_gn_targets(
+                f.read().splitlines(),
+                args.gn_target_label,
+                args.bazel_targets,
+            ):
+                return 1
 
         # This is a different error, just print it as is.
         print(
-            "ERROR when calling Bazel. To reproduce, run this in the Ninja output directory:\n\n  %s\n"
+            "\nERROR when calling Bazel. To reproduce, run this in the Ninja output directory:\n\n  %s\n"
             % " ".join(shlex.quote(c) for c in cmd),
             file=sys.stderr,
         )

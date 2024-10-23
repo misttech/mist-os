@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.vreg") {
-  sdk_category = "internal"
   sources = [
     "metadata.fidl",
     "vreg.fidl",

@@ -123,13 +123,14 @@ cc_source_library://pkg/virtgralloc_headers
 cc_source_library://pkg/zbi-format
 cc_source_library://pkg/zx
 companion_host_tool://tools/x64/aemu_internal
+companion_host_tool://tools/x64/crosvm_internal
 companion_host_tool://tools/x64/qemu_internal
 companion_host_tool://tools/x64/qemu_uefi_internal
 dart_library://dart/sl4f
 data://data/config/symbol_index
 data://pkg/driver_component/driver_component.json
 data://pkg/heapdump_instrumentation/heapdump_instrumentation_shard.json
-data://pkg/inspect/inspect.json
+data://pkg/inspect/inspect_sdk.json
 data://pkg/sys/component/realm_builder_shard_sdk.json
 data://pkg/sys/testing/testing_sdk.json
 data://pkg/syslog/syslog_sdk.json
@@ -390,6 +391,7 @@ host_tool://tools/arm64/bootserver
 host_tool://tools/arm64/cmc
 host_tool://tools/arm64/configc
 host_tool://tools/arm64/device-finder
+host_tool://tools/arm64/gen-android-starnix-container
 host_tool://tools/arm64/fake-omaha-client
 host_tool://tools/arm64/far
 host_tool://tools/arm64/ffx
@@ -399,8 +401,6 @@ host_tool://tools/arm64/fidlcat
 host_tool://tools/arm64/fidlgen_cpp
 host_tool://tools/arm64/fidlgen_hlcpp
 host_tool://tools/arm64/fidlgen_rust
-host_tool://tools/arm64/fpublish
-host_tool://tools/arm64/fserve
 host_tool://tools/arm64/fssh
 host_tool://tools/arm64/fuchsia-sdk-run
 host_tool://tools/arm64/funnel
@@ -419,6 +419,7 @@ host_tool://tools/x64/bootserver
 host_tool://tools/x64/cmc
 host_tool://tools/x64/configc
 host_tool://tools/x64/device-finder
+host_tool://tools/x64/gen-android-starnix-container
 host_tool://tools/x64/fake-omaha-client
 host_tool://tools/x64/far
 host_tool://tools/x64/ffx
@@ -428,8 +429,6 @@ host_tool://tools/x64/fidlcat
 host_tool://tools/x64/fidlgen_cpp
 host_tool://tools/x64/fidlgen_hlcpp
 host_tool://tools/x64/fidlgen_rust
-host_tool://tools/x64/fpublish
-host_tool://tools/x64/fserve
 host_tool://tools/x64/fssh
 host_tool://tools/x64/fuchsia-sdk-run
 host_tool://tools/x64/funnel

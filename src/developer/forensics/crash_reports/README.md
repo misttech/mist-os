@@ -21,19 +21,11 @@ have it enabled.
 
 ### Developer overrides
 
-First, define developer overrides in `//local/BUILD.gn`. This file is
-Git-ignored so you can add it once and only use/modify as needed:
+First, define one or more developer overrides in `//local/BUILD.gn`. This file
+is Git-ignored so you can add it once and only use/modify as needed:
 
 ```
 import("//build/assembly/developer_overrides.gni")
-
-assembly_developer_overrides("feedback_upload_config") {
-  developer_only_options = {
-    forensics_options = {
-      build_type_override = "eng_with_upload"
-    }
-  }
-}
 
 assembly_developer_overrides("feedback_userdebug_config") {
   developer_only_options = {
@@ -42,23 +34,26 @@ assembly_developer_overrides("feedback_userdebug_config") {
     }
   }
 }
+```
 
-assembly_developer_overrides("feedback_user_config") {
+You can apply an override via `fx set` using a label from `//local/BUILD.gn`,
+such as:
+`product_assembly_overrides_label = "//local:feedback_userdebug_config"`.
+
+Alternatively, overrides can be specified in-line in args.gn:
+
+```
+product_assembly_overrides_contents = {
   developer_only_options = {
     forensics_options = {
-      build_type_override = "user"
+      build_type_override = "userdebug"
     }
   }
 }
 ```
 
-You can apply an override via `fx set` using
-`--assembly-override <assembly_target_pattern>=<overrides_target>`. Note that
-the "assembly_target_pattern" will be different for most products:
-
-```sh
-(host)$ fx set core.x64 --assembly-override //build/images/fuchsia/*=//local:feedback_userdebug_config
-```
+Valid options for `build_type_override` are `user`, `userdebug` and
+`eng_with_upload`.
 
 Note, the above overrides only work for eng builds and product assembly will fail
 if used on user/userdebug builds.

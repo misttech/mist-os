@@ -485,20 +485,6 @@ impl CapabilityBuilder {
         self
     }
 
-    pub fn source_dictionary(
-        mut self,
-        source: cm_rust::DictionarySource,
-        source_dictionary: &str,
-    ) -> Self {
-        assert_matches!(self.type_, CapabilityTypeName::Dictionary);
-        self.dictionary_source = Some(source);
-        self.source_dictionary = Some(source_dictionary.parse().unwrap());
-        if self.path.is_some() {
-            panic!("source_dictionary is incompatible with path");
-        }
-        self
-    }
-
     pub fn backing_dir(mut self, backing_dir: &str) -> Self {
         assert_matches!(self.type_, CapabilityTypeName::Storage);
         self.backing_dir = Some(backing_dir.parse().unwrap());
@@ -561,8 +547,6 @@ impl CapabilityBuilder {
             CapabilityTypeName::Dictionary => {
                 cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl {
                     name: self.name.expect("name not set"),
-                    source: self.dictionary_source,
-                    source_dictionary: self.source_dictionary,
                     source_path: self.path,
                 })
             }

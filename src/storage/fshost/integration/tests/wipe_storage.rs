@@ -13,7 +13,7 @@ use fidl_fuchsia_hardware_block_partition::PartitionMarker;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
 use fshost_test_fixture::disk_builder::VolumesSpec;
 use fshost_test_fixture::{write_test_blob, write_test_blob_fxblob};
-use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, zx};
+use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
 pub mod config;
 use config::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec};
@@ -248,7 +248,7 @@ async fn data_unformatted() {
         .await
         .expect("get topo path fidl failed")
         .expect("get topo path returned error");
-    let dev_class = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
+    let dev_class = fixture.dir("dev-topological/class/block", fio::Flags::empty());
     let matcher = PartitionMatcher {
         parent_device: Some(test_disk_path),
         labels: Some(vec!["data".to_string()]),

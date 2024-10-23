@@ -6,6 +6,8 @@ import("//build/fidl/toolchain.gni")
 import("//build/sdk/sdk_molecule.gni")
 
 # The list of FIDLs to include in the core IDK.
+# When removing a library from all such lists, delete all of its history files:
+#   git rm sdk/history/*/<library_name>.api_summary.json
 sdk_fidl_targets = [
   # keep-sorted: begin
   "//sdk/fidl/fuchsia.accessibility.gesture:fuchsia.accessibility.gesture",
@@ -258,6 +260,8 @@ group("sdk_partner_libs") {
 # category. This is to create the "sdk_partner_internal_libs" group below,
 # this group is used to ensure that we run the FIDL API compatibility tests on
 # these libraries.
+# When removing a library from all such lists, delete all of its history files:
+#   git rm sdk/history/*/<library_name>.api_summary.json
 _sdk_partner_internal_fidl_libraries = [
   # keep-sorted: begin
   "fuchsia.audio",
@@ -292,7 +296,6 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.test.manager",
   "fuchsia.testing.harness",
   "fuchsia.vulkan.loader",
-  "fuchsia.wm",
 
   # keep-sorted: end
 ]

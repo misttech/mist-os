@@ -16,7 +16,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use wlan_common::channel::Cbw;
 use wlan_common::RadioConfig;
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy, zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 pub mod state_machine;
 pub mod types;

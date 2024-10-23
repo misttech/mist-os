@@ -117,25 +117,23 @@ closed protocol Job {
     /// A *topic* of `ZX_JOB_POL_BASIC_V2` indicates that *policy* is an array of *count*
     /// entries of:
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_policy_basic {
     ///     uint32_t condition;
     ///     uint32_t action;
     ///     uint32_t flags;
     /// } zx_policy_basic_v2_t;
-    ///
     /// ```
     ///
     /// A *topic* of `ZX_JOB_POL_BASIC_V1` indicates that *policy* is an array of *count*
     /// entries of:
     ///
-    /// ```
+    /// ```c
     /// // Deprecated. Use zx_policy_basic_v2_t.
     /// typedef struct zx_policy_basic {
     ///     uint32_t condition;
     ///     uint32_t policy;
     /// } zx_policy_basic_v1_t;
-    ///
     /// ```
     ///
     /// Where *condition* is one of
@@ -210,12 +208,11 @@ closed protocol Job {
     ///
     /// A *topic* of `ZX_JOB_POL_TIMER_SLACK` indicates that *policy* is:
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_policy_timer_slack {
     ///     zx_duration_t min_slack;
     ///     uint32_t default_mode;
     /// } zx_policy_timer_slack_t;
-    ///
     /// ```
     ///
     /// *min_slack* specifies the minimum amount of slack applied to timers and

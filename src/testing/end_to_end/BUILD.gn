@@ -131,6 +131,7 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
+    "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_stable_tests",
   ]
 }
@@ -164,6 +165,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
+    "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_non_starnix($host_toolchain)",
     "honeydew/tests/functional_tests:workbench_vim3_stable_tests",
   ]
 }
@@ -201,8 +203,11 @@ group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
 group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_without_duration_check($host_toolchain)",
+    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
+    # "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume($host_toolchain)",
+    # "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_without_duration_check($host_toolchain)",
+    # "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_starnix($host_toolchain)",
+
     "honeydew/tests/functional_tests:starnix_vim3_unstable_tests",
   ]
 }
@@ -232,8 +237,12 @@ group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
   public_deps = [
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_without_duration_check($host_toolchain)",
+
+    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
+    # "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume($host_toolchain)",
+    # "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_without_duration_check($host_toolchain)",
+    # "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_starnix($host_toolchain)",
+
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_unstable_tests",

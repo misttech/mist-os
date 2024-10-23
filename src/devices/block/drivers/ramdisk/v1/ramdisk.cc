@@ -241,6 +241,8 @@ zx_status_t Ramdisk::BlockPartitionGetName(char* out_name, size_t capacity) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
+zx_status_t Ramdisk::BlockPartitionGetFlags(uint64_t* out_flags) { return ZX_ERR_NOT_SUPPORTED; }
+
 void Ramdisk::ProcessRequests() {
   block::BorrowedOperationQueue<> deferred_list;
   std::random_device random;

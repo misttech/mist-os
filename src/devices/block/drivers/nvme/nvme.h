@@ -7,6 +7,8 @@
 
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/sync/completion.h>
@@ -17,9 +19,8 @@
 
 #include <mutex>
 
-#include <ddktl/device.h>
-
 #include "src/devices/block/drivers/nvme/commands.h"
+#include "src/devices/block/drivers/nvme/namespace.h"
 #include "src/devices/block/drivers/nvme/queue-pair.h"
 #include "src/devices/block/drivers/nvme/registers.h"
 
@@ -42,27 +43,16 @@ struct IoCommand {
   list_node_t node;
 };
 
-class Nvme;
-using DeviceType = ddk::Device<Nvme, ddk::Initializable>;
-class Nvme : public DeviceType {
+class Nvme : public fdf::DriverBase {
  public:
   static constexpr char kDriverName[] = "nvme";
 
-  Nvme(zx_device_t* parent, ddk::Pci pci, fdf::MmioBuffer mmio,
-       fuchsia_hardware_pci::InterruptMode irq_mode, zx::interrupt irq, zx::bti bti)
-      : DeviceType(parent),
-        pci_(std::move(pci)),
-        mmio_(std::move(mmio)),
-        irq_mode_(irq_mode),
-        irq_(std::move(irq)),
-        bti_(std::move(bti)) {}
-  ~Nvme() = default;
+  Nvme(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
 
-  static zx_status_t Bind(void* ctx, zx_device_t* parent);
-  zx_status_t AddDevice();
+  zx::result<> Start() override;
 
-  void DdkInit(ddk::InitTxn txn);
-  void DdkRelease();
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // Perform an admin command synchronously (i.e., blocks for the command to complete or timeout).
   // Returns the command completion.
@@ -72,7 +62,7 @@ class Nvme : public DeviceType {
   // Queue an IO command to be performed asynchronously.
   void QueueIoCommand(IoCommand* io_cmd);
 
-  inspect::Inspector& inspector() { return inspector_; }
+  inspect::Inspector& inspect() { return inspector().inspector(); }
   inspect::Node& inspect_node() { return inspect_node_; }
 
   QueuePair* io_queue() const { return io_queue_.get(); }
@@ -80,6 +70,27 @@ class Nvme : public DeviceType {
   bool volatile_write_cache_enabled() const { return volatile_write_cache_enabled_; }
   uint16_t atomic_write_unit_normal() const { return atomic_write_unit_normal_; }
   uint16_t atomic_write_unit_power_fail() const { return atomic_write_unit_power_fail_; }
+
+  std::vector<std::unique_ptr<nvme::Namespace>>& namespaces() { return namespaces_; }
+
+  // Called by children device of this controller for invoking AddChild() or instantiating
+  // compat::DeviceServer.
+  fidl::WireSyncClient<fuchsia_driver_framework::Node>& root_node() { return root_node_; }
+  std::string_view driver_name() const { return name(); }
+  const std::shared_ptr<fdf::Namespace>& driver_incoming() const { return incoming(); }
+  std::shared_ptr<fdf::OutgoingDirectory>& driver_outgoing() { return outgoing(); }
+  const std::optional<std::string>& driver_node_name() const { return node_name(); }
+
+ protected:
+  // Returns a function for releasing the initialized resources. Override to inject dependency for
+  // unit testing.
+  virtual zx::result<fit::function<void()>> InitResources();
+
+  ddk::Pci pci_;
+  std::optional<fdf::MmioBuffer> mmio_;
+  fuchsia_hardware_pci::InterruptMode irq_mode_;
+  zx::interrupt irq_;
+  zx::bti bti_;
 
  private:
   friend class fake_nvme::FakeController;
@@ -95,12 +106,6 @@ class Nvme : public DeviceType {
   // Process pending IO completions. Called in the IoLoop().
   void ProcessIoCompletions();
 
-  ddk::Pci pci_;
-  fdf::MmioBuffer mmio_;
-  fuchsia_hardware_pci::InterruptMode irq_mode_;
-  zx::interrupt irq_;
-  zx::bti bti_;
-  inspect::Inspector inspector_;
   inspect::Node inspect_node_;
 
   std::mutex commands_lock_;
@@ -130,6 +135,12 @@ class Nvme : public DeviceType {
 
   uint16_t atomic_write_unit_normal_;
   uint16_t atomic_write_unit_power_fail_;
+
+  std::vector<std::unique_ptr<nvme::Namespace>> namespaces_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
 
 }  // namespace nvme

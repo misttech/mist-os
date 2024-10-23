@@ -678,27 +678,43 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
                       result.error_value().status_string());
             }
           });
-    } else {
-      if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
-        auto received_packet = fhbt::ReceivedPacket::WithAcl(fidl_vec);
+    } else if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
+      auto received_packet = fhbt::ReceivedPacket::WithAcl(fidl_vec);
+
+      if (hci_transport_binding_.has_value()) {
         fit::result<fidl::OneWayError> result =
-            fidl::SendEvent(*hci_transport_binding_)->OnReceive(received_packet);
+            fidl::SendEvent(hci_transport_binding_.value())->OnReceive(received_packet);
         if (result.is_error()) {
           FDF_LOG(ERROR, "Failed to send ACL packet to host: %s",
                   result.error_value().status_string());
         }
-      } else if (snoop_type == BT_HCI_SNOOP_TYPE_EVT) {
-        auto received_packet = fhbt::ReceivedPacket::WithEvent(fidl_vec);
+      } else {
+        // Note that this likely happens during system shutdown, when the other end of the channel
+        // has been shutdown but this driver haven't gotten into the PrepareStop() step. If it
+        // doesn't happen during shutdown, this might indicate a bug in either the driver or the
+        // other end of this FIDL connection.
+        FDF_LOG(INFO, "No HciTransport bindings available for sending up ACL packets");
+      }
+
+    } else if (snoop_type == BT_HCI_SNOOP_TYPE_EVT) {
+      auto received_packet = fhbt::ReceivedPacket::WithEvent(fidl_vec);
+      if (hci_transport_binding_.has_value()) {
         fit::result<fidl::OneWayError> result =
-            fidl::SendEvent(*hci_transport_binding_)->OnReceive(received_packet);
+            fidl::SendEvent(hci_transport_binding_.value())->OnReceive(received_packet);
 
         if (result.is_error()) {
           FDF_LOG(ERROR, "Failed to send event packet to host: %s",
                   result.error_value().status_string());
         }
       } else {
-        FDF_LOG(ERROR, "Unsupported packet type received");
+        // Note that this likely happens during system shutdown, when the other end of the channel
+        // has been shutdown but this driver haven't gotten into the PrepareStop() step. If it
+        // doesn't happen during shutdown, this might indicate a bug in either the driver or the
+        // other end of this FIDL connection.
+        FDF_LOG(INFO, "No HciTransport bindings available for sending up event packets.");
       }
+    } else {
+      FDF_LOG(ERROR, "Unsupported packet type received");
     }
 
     unacked_receive_packet_number_++;
@@ -1106,7 +1122,11 @@ zx_status_t BtTransportUart::ServeProtocols() {
               "Only one type of transport should be used.");
     }
     hci_transport_binding_.emplace(dispatcher_, std::move(server_end), this,
-                                   [this](fidl::UnbindInfo) { hci_transport_binding_.reset(); });
+                                   [this](fidl::UnbindInfo) {
+                                     hci_transport_binding_.reset();
+                                     FDF_LOG(INFO, "HciTransport server binding unbound.");
+                                   });
+    FDF_LOG(INFO, "HciTransport server binding emplaced.");
     queue_read_task_.Post(dispatcher_);
   };
   auto snoop_protocol = [this](fidl::ServerEnd<fhbt::Snoop> server_end) mutable {

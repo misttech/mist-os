@@ -9,7 +9,7 @@ use futures::stream::TryStreamExt;
 use ieee80211::MacAddrBytes;
 use measure_tape_for_scan_result::Measurable as _;
 use tracing::{debug, info};
-use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme, zx};
+use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme};
 
 // TODO(https://fxbug.dev/42160765): Remove this.
 // Size of FIDL message header and FIDL error-wrapped vector header
@@ -165,12 +165,12 @@ pub async fn send_scan_error_over_fidl(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fuchsia_async as fasync;
     use futures::task::Poll;
     use std::pin::pin;
     use wlan_common::scan::Compatibility;
     use wlan_common::security::SecurityDescriptor;
     use wlan_common::{assert_variant, random_fidl_bss_description};
-    use {fuchsia_async as fasync, zx};
 
     fn generate_test_fidl_data() -> Vec<fidl_policy::ScanResult> {
         const CENTER_FREQ_CHAN_1: u32 = 2412;

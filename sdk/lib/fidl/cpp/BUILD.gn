@@ -11,7 +11,6 @@ sdk_source_set("cpp_base") {
   category = "partner"
 
   # TODO(https://fxbug.dev/42055960): Rename SDK element to "fidl_cpp_base".
-  api = "fidl_cpp_base_v2.api"
   sdk_name = "fidl_cpp_base_v2"
   stable = true
 
@@ -57,7 +56,6 @@ if (is_fuchsia || is_mistos) {
     stable = true
 
     # TODO(https://fxbug.dev/42055960): Rename SDK element to "fidl_cpp".
-    api = "fidl_cpp_v2.api"
     sdk_name = "fidl_cpp_v2"
 
     # TODO(https://fxbug.dev/42172264): We should represent the library as a
@@ -93,7 +91,6 @@ if (is_fuchsia || is_mistos) {
 sdk_source_set("hlcpp_conversion") {
   category = "partner"
   stable = true
-  api = "fidl_cpp_hlcpp_conversion.api"
   sdk_name = "fidl_cpp_hlcpp_conversion"
   public = [ "include/lib/fidl/cpp/hlcpp_conversion.h" ]
   public_configs = [ ":cpp_base.headers" ]
@@ -107,7 +104,6 @@ sdk_source_set("hlcpp_conversion") {
 sdk_source_set("natural_ostream") {
   category = "partner"
   stable = true
-  api = "fidl_cpp_natural_ostream.api"
   sdk_name = "fidl_cpp_natural_ostream"
   public = [ "include/lib/fidl/cpp/natural_ostream.h" ]
   public_deps = [ "//sdk/lib/fidl/cpp:cpp_base" ]

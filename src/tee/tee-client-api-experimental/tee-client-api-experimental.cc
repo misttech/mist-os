@@ -19,6 +19,7 @@
 #include <zircon/process.h>
 #include <zircon/syscalls.h>
 
+#include <cstdint>
 #include <cstring>
 #include <mutex>
 #include <string_view>
@@ -27,6 +28,7 @@
 #include <utility>
 
 #include "src/lib/fxl/strings/string_printf.h"
+#include "tee-client-api/tee-client-types.h"
 
 // Explicit instantiation to enable std associative containers with a Uuid key
 // type.
@@ -447,8 +449,8 @@ TEEC_Result PreprocessOperation(fidl::AnyArena& allocator, const TEEC_Operation*
 TEEC_Result PostprocessValue(uint32_t param_type, const fuchsia_tee::wire::Parameter& zx_param,
                              TEEC_Value* out_teec_value) {
   ZX_DEBUG_ASSERT(out_teec_value);
-  ZX_DEBUG_ASSERT(param_type == TEEC_VALUE_INPUT || param_type == TEEC_VALUE_OUTPUT ||
-                  param_type == TEEC_VALUE_INOUT);
+  // Input parameters are expected to be ignored after a TA operation.
+  ZX_DEBUG_ASSERT(param_type == TEEC_VALUE_OUTPUT || param_type == TEEC_VALUE_INOUT);
 
   if (zx_param.Which() != fuchsia_tee::wire::Parameter::Tag::kValue) {
     return TEEC_ERROR_BAD_PARAMETERS;
@@ -460,10 +462,6 @@ TEEC_Result PostprocessValue(uint32_t param_type, const fuchsia_tee::wire::Param
   }
 
   // Validate that the direction of the returned parameter matches the expected.
-  if ((param_type == TEEC_VALUE_INPUT) &&
-      (zx_value.direction() != fuchsia_tee::wire::Direction::kInput)) {
-    return TEEC_ERROR_BAD_PARAMETERS;
-  }
   if ((param_type == TEEC_VALUE_OUTPUT) &&
       (zx_value.direction() != fuchsia_tee::wire::Direction::kOutput)) {
     return TEEC_ERROR_BAD_PARAMETERS;
@@ -490,8 +488,8 @@ TEEC_Result PostprocessTemporaryMemref(uint32_t param_type,
                                        const fuchsia_tee::wire::Parameter& zx_param,
                                        TEEC_TempMemoryReference* out_temp_memory_ref) {
   ZX_DEBUG_ASSERT(out_temp_memory_ref);
-  ZX_DEBUG_ASSERT(param_type == TEEC_MEMREF_TEMP_INPUT || param_type == TEEC_MEMREF_TEMP_OUTPUT ||
-                  param_type == TEEC_MEMREF_TEMP_INOUT);
+  // Input parameters are expected to be ignored after a TA operation.
+  ZX_DEBUG_ASSERT(param_type == TEEC_MEMREF_TEMP_OUTPUT || param_type == TEEC_MEMREF_TEMP_INOUT);
 
   if (zx_param.Which() != fuchsia_tee::wire::Parameter::Tag::kBuffer) {
     return TEEC_ERROR_BAD_PARAMETERS;
@@ -502,10 +500,6 @@ TEEC_Result PostprocessTemporaryMemref(uint32_t param_type,
     return TEEC_ERROR_BAD_PARAMETERS;
   }
 
-  if ((param_type == TEEC_MEMREF_TEMP_INPUT) &&
-      (zx_buffer.direction() != fuchsia_tee::wire::Direction::kInput)) {
-    return TEEC_ERROR_BAD_PARAMETERS;
-  }
   if ((param_type == TEEC_MEMREF_TEMP_OUTPUT) &&
       (zx_buffer.direction() != fuchsia_tee::wire::Direction::kOutput)) {
     return TEEC_ERROR_BAD_PARAMETERS;
@@ -567,8 +561,8 @@ TEEC_Result PostprocessPartialMemref(uint32_t param_type,
                                      const fuchsia_tee::wire::Parameter& zx_param,
                                      TEEC_RegisteredMemoryReference* out_memory_ref) {
   ZX_DEBUG_ASSERT(out_memory_ref);
-  ZX_DEBUG_ASSERT(param_type == TEEC_MEMREF_PARTIAL_INPUT ||
-                  param_type == TEEC_MEMREF_PARTIAL_OUTPUT ||
+  // Input parameters are expected to be ignored after a TA operation.
+  ZX_DEBUG_ASSERT(param_type == TEEC_MEMREF_PARTIAL_OUTPUT ||
                   param_type == TEEC_MEMREF_PARTIAL_INOUT);
 
   if (zx_param.Which() != fuchsia_tee::wire::Parameter::Tag::kBuffer) {
@@ -580,10 +574,6 @@ TEEC_Result PostprocessPartialMemref(uint32_t param_type,
     return TEEC_ERROR_BAD_PARAMETERS;
   }
 
-  if ((param_type == TEEC_MEMREF_PARTIAL_INPUT) &&
-      (zx_buffer.direction() != fuchsia_tee::wire::Direction::kInput)) {
-    return TEEC_ERROR_BAD_PARAMETERS;
-  }
   if ((param_type == TEEC_MEMREF_PARTIAL_OUTPUT) &&
       (zx_buffer.direction() != fuchsia_tee::wire::Direction::kOutput)) {
     return TEEC_ERROR_BAD_PARAMETERS;
@@ -610,30 +600,33 @@ TEEC_Result PostprocessOperation(
     return TEEC_SUCCESS;
   }
 
-  size_t num_params = CountOperationParameters(*out_operation);
+  // The runtime is supposed to ignore returned input parameters, so the
+  // returned list of parameter structures may be less than those originally
+  // be provided to the operation (e.g., in stripping trailing input
+  // parameters). At least check that this number isn't somehow now greater.
+  if (parameter_set.count() > CountOperationParameters(*out_operation)) {
+    return TEEC_ERROR_BAD_PARAMETERS;
+  }
 
   TEEC_Result rc = TEEC_SUCCESS;
-  for (size_t i = 0; i < num_params; i++) {
+  for (size_t i = 0; i < parameter_set.count(); i++) {
     uint32_t param_type = GetParamTypeForIndex(out_operation->paramTypes, i);
 
-    // This check catches the case where we did not receive all the parameters we expected.
-    if (i >= parameter_set.count() && param_type != TEEC_NONE) {
-      rc = TEEC_ERROR_BAD_PARAMETERS;
-      break;
-    }
-
     switch (param_type) {
+      // Input parameters are expected to be ignored after a TA operation.
+      case TEEC_VALUE_INPUT:
+      case TEEC_MEMREF_TEMP_INPUT:
+      case TEEC_MEMREF_PARTIAL_INPUT:
+        break;
       case TEEC_NONE:
         if (parameter_set[i].Which() != fuchsia_tee::wire::Parameter::Tag::kNone) {
           rc = TEEC_ERROR_BAD_PARAMETERS;
         }
         break;
-      case TEEC_VALUE_INPUT:
       case TEEC_VALUE_OUTPUT:
       case TEEC_VALUE_INOUT:
         rc = PostprocessValue(param_type, parameter_set[i], &out_operation->params[i].value);
         break;
-      case TEEC_MEMREF_TEMP_INPUT:
       case TEEC_MEMREF_TEMP_OUTPUT:
       case TEEC_MEMREF_TEMP_INOUT:
         rc = PostprocessTemporaryMemref(param_type, parameter_set[i],
@@ -642,7 +635,6 @@ TEEC_Result PostprocessOperation(
       case TEEC_MEMREF_WHOLE:
         rc = PostprocessWholeMemref(parameter_set[i], &out_operation->params[i].memref);
         break;
-      case TEEC_MEMREF_PARTIAL_INPUT:
       case TEEC_MEMREF_PARTIAL_OUTPUT:
       case TEEC_MEMREF_PARTIAL_INOUT:
         rc = PostprocessPartialMemref(param_type, parameter_set[i],
@@ -654,13 +646,6 @@ TEEC_Result PostprocessOperation(
 
     if (rc != TEEC_SUCCESS) {
       break;
-    }
-  }
-
-  // This check catches the case where we received more parameters than we expected.
-  for (size_t i = num_params; i < parameter_set.count(); i++) {
-    if (parameter_set[i].Which() != fuchsia_tee::wire::Parameter::Tag::kNone) {
-      return TEEC_ERROR_BAD_PARAMETERS;
     }
   }
 

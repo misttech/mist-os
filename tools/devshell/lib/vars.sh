@@ -66,7 +66,7 @@ fi
 
 # This wrapper script collects system CPU/mem/IO info while
 # another process is running.
-readonly vmstat_wrap="${FUCHSIA_DIR}/build/profile/vmstat_wrap.sh"
+readonly profile_wrap="${FUCHSIA_DIR}/build/profile/profile_wrap.sh"
 
 # For commands whose subprocesses may use reclient for RBE, prefix those
 # commands conditioned on 'if fx-rbe-enabled' (function).
@@ -1048,7 +1048,7 @@ function fx-run-ninja {
     envs+=("FUCHSIA_BAZEL_JOB_COUNT=${concurrency}")
   fi
 
-  local profile_wrap=()
+  local profile_wrapper=()
   if [[ "$BUILD_PROFILE_ENABLED" == 1 ]]
   then
     # Collect system profile data while build is running.
@@ -1056,13 +1056,20 @@ function fx-run-ninja {
     # Note: this profile dir will get cleaned by 'fx clean'
     local profile_dir="${FUCHSIA_BUILD_DIR}/.build_profile"
     mkdir -p "$profile_dir"
-    local profile_log="$(env TMPDIR="$profile_dir" mktemp -t "vmstat.$date.XXXX.log")"
-    local profile_wrap=( "$vmstat_wrap" -o "$profile_log" -t 2 -- )
+    local vmstat_log="$(env TMPDIR="$profile_dir" mktemp -t "vmstat.$date.XXXX.log")"
+    local ifconfig_log="$(env TMPDIR="$profile_dir" mktemp -t "ifconfig.$date.XXXX.log")"
+    profile_wrapper=(
+      "$profile_wrap"
+      --vmstat-log "$vmstat_log"
+      --ifconfig-log "$ifconfig_log"
+      -n 2
+      --
+    )
   fi
 
   full_cmdline=(
     env -i "${envs[@]}"
-    "${profile_wrap[@]}"
+    "${profile_wrapper[@]}"
     "${rbe_wrapper[@]}"
     "$cmd"
     "${args[@]}"

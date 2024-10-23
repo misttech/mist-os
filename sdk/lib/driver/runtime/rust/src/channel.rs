@@ -101,7 +101,13 @@ impl<T: ?Sized + 'static> Channel<T> {
                 handles_ptr,
                 handles_count,
             )
-        })
+        })?;
+
+        // SAFETY: this is the valid-by-contruction arena we were passed in through the [`Message`]
+        // object, and now that we have completed `fdf_channel_write` it is safe to drop our copy
+        // of it.
+        unsafe { fdf_arena_drop_ref(arena.as_ptr()) };
+        Ok(())
     }
 
     /// Shorthand for calling [`Self::write`] with the result of [`Message::new_with`]

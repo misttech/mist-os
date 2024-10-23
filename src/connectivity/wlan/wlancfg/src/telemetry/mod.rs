@@ -8,6 +8,7 @@ mod inspect_time_series;
 mod windowed_stats;
 
 use crate::client;
+use crate::mode_management::{Defect, IfaceFailure};
 use crate::telemetry::inspect_time_series::TimeSeriesStats;
 use crate::telemetry::windowed_stats::WindowedStats;
 use crate::util::historical_list::{HistoricalList, Timestamped};
@@ -26,7 +27,6 @@ use fuchsia_inspect_contrib::log::{InspectBytes, InspectList};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log, make_inspect_loggable};
 use fuchsia_sync::Mutex;
-
 use futures::channel::{mpsc, oneshot};
 use futures::future::BoxFuture;
 use futures::{select, Future, FutureExt, StreamExt};
@@ -520,6 +520,7 @@ pub fn serve_telemetry(
     inspect_node: InspectNode,
     external_inspect_node: InspectNode,
     persistence_req_sender: auto_persist::PersistenceReqSender,
+    defect_sender: mpsc::Sender<Defect>,
 ) -> (TelemetrySender, impl Future<Output = ()>) {
     let (sender, mut receiver) = mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
     let sender = TelemetrySender::new(sender);
@@ -541,6 +542,7 @@ pub fn serve_telemetry(
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
+            defect_sender.clone(),
         );
         loop {
             select! {
@@ -705,9 +707,11 @@ fn inspect_record_connection_status(inspect_node: &InspectNode, telemetry_sender
 fn inspect_record_external_data(
     external_inspect_node: &ExternalInspectNode,
     telemetry_sender: TelemetrySender,
+    defect_sender: mpsc::Sender<Defect>,
 ) {
     external_inspect_node.node.record_lazy_child("connection_status", move || {
         let telemetry_sender = telemetry_sender.clone();
+        let mut defect_sender = defect_sender.clone();
         async move {
             let inspector = Inspector::default();
             let (sender, receiver) = oneshot::channel();
@@ -720,7 +724,7 @@ fn inspect_record_external_data(
                 }
             };
 
-            if let ConnectionStateInfo::Connected { ap_state, telemetry_proxy, .. } = info {
+            if let ConnectionStateInfo::Connected { ap_state, telemetry_proxy, iface_id } = info {
                 inspect_insert!(inspector.root(), connected_network: {
                     rssi_dbm: ap_state.tracked.signal.rssi_dbm,
                     snr_db: ap_state.tracked.signal.snr_db,
@@ -736,6 +740,15 @@ fn inspect_record_external_data(
                     match proxy.get_histogram_stats()
                         .on_timeout(GET_IFACE_STATS_TIMEOUT, || {
                             warn!("Timed out waiting for histogram stats");
+
+                            if let Err(e) = defect_sender
+                                .try_send(Defect::Iface(IfaceFailure::Timeout {
+                                    iface_id,
+                                    source: TimeoutSource::GetHistogramStats,
+                                })) {
+                                    warn!("Failed to report histogram stats defect: {:?}", e)
+                                }
+
                             Ok(Err(zx::Status::TIMED_OUT.into_raw()))
                         })
                         .await {
@@ -943,6 +956,7 @@ pub struct Telemetry {
     // connections off and on again. None if a command to turn off client connections has never
     // been sent or if client connections are on.
     last_disabled_client_connections: Option<fasync::MonotonicInstant>,
+    defect_sender: mpsc::Sender<Defect>,
 }
 
 impl Telemetry {
@@ -954,6 +968,7 @@ impl Telemetry {
         inspect_node: InspectNode,
         external_inspect_node: InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
+        defect_sender: mpsc::Sender<Defect>,
     ) -> Self {
         let stats_logger = StatsLogger::new(cobalt_1dot1_proxy, &inspect_node);
         inspect_record_connection_status(&inspect_node, telemetry_sender.clone());
@@ -962,7 +977,11 @@ impl Telemetry {
         let connect_events = inspect_node.create_child("connect_events");
         let disconnect_events = inspect_node.create_child("disconnect_events");
         let external_inspect_node = ExternalInspectNode::new(external_inspect_node);
-        inspect_record_external_data(&external_inspect_node, telemetry_sender);
+        inspect_record_external_data(
+            &external_inspect_node,
+            telemetry_sender,
+            defect_sender.clone(),
+        );
         Self {
             monitor_svc_proxy,
             new_cobalt_1dot1_proxy,
@@ -995,6 +1014,7 @@ impl Telemetry {
             experiments: experiment::Experiments::new(),
             last_enabled_client_connections: None,
             last_disabled_client_connections: None,
+            defect_sender,
         }
     }
 
@@ -1014,6 +1034,16 @@ impl Telemetry {
                         .get_counter_stats()
                         .on_timeout(GET_IFACE_STATS_TIMEOUT, || {
                             warn!("Timed out waiting for counter stats");
+
+                            if let Err(e) =
+                                self.defect_sender.try_send(Defect::Iface(IfaceFailure::Timeout {
+                                    iface_id: state.iface_id,
+                                    source: TimeoutSource::GetCounterStats,
+                                }))
+                            {
+                                warn!("Failed to report counter stats timeout: {:?}", e)
+                            }
+
                             Ok(Err(zx::Status::TIMED_OUT.into_raw()))
                         })
                         .await
@@ -4409,6 +4439,7 @@ mod tests {
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload};
     use fidl_fuchsia_wlan_common as fidl_common;
+    use fuchsia_inspect::reader;
     use futures::stream::FusedStream;
     use futures::task::Poll;
     use futures::TryStreamExt;
@@ -4505,6 +4536,143 @@ mod tests {
                 is_driver_unresponsive: true,
             }
         });
+    }
+
+    #[fuchsia::test]
+    fn test_histogram_stats_timeout() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let inspector = Inspector::default();
+        let external_node = inspector.root().create_child("external");
+        let external_inspect_node = ExternalInspectNode::new(external_node);
+
+        let (telemetry_sender, mut telemetry_receiver) =
+            mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
+        let (defect_sender, mut defect_receiver) = mpsc::channel(100);
+
+        // Setup the lazy child node.  When the inspect node is read, it will snapshot current
+        // interface state.
+        inspect_record_external_data(
+            &external_inspect_node,
+            TelemetrySender::new(telemetry_sender),
+            defect_sender,
+        );
+
+        // Initiate a read of the inspect node.  This will run the future that was constructed.
+        let fut = reader::read(&inspector);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // First, inspect will query the current state from the telemetry event loop.  In order to
+        // get to the point of querying histograms, we need to reply that we are in the connected
+        // state.
+        let (telemetry_proxy, _telemetry_server) =
+            fidl::endpoints::create_proxy::<fidl_sme::TelemetryMarker>()
+                .expect("failed to create telemetry proxy");
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::QueryStatus {sender})) => {
+                sender.send(QueryStatusResult {
+                    connection_state: ConnectionStateInfo::Connected {
+                        iface_id: 0,
+                        ap_state: random_bss_description!(Wpa2).into(),
+                        telemetry_proxy: Some(telemetry_proxy)
+                    }
+                }).expect("failed to send query status result")
+            }
+        );
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // The future should block on getting the histogram stats until the timer expires.
+        assert!(exec.wake_next_timer().is_some());
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(_));
+
+        // We should get a timeout defect.
+        assert_variant!(
+            defect_receiver.try_next(),
+            Ok(Some(Defect::Iface(IfaceFailure::Timeout {
+                iface_id: 0,
+                source: TimeoutSource::GetHistogramStats,
+            })))
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_telemetry_timeout() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Boilerplate for creating a Telemetry struct
+        let (sender, _receiver) = mpsc::channel::<TelemetryEvent>(TELEMETRY_EVENT_BUFFER_SIZE);
+        let (monitor_svc_proxy, _monitor_svc_stream) =
+            create_proxy_and_stream::<fidl_fuchsia_wlan_device_service::DeviceMonitorMarker>()
+                .expect("failed to create DeviceMonitor proxy");
+        let (cobalt_1dot1_proxy, _cobalt_1dot1_stream) =
+            create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
+                .expect("failed to create MetricsEventLogger proxy");
+        let inspector = Inspector::default();
+        let inspect_node = inspector.root().create_child("stats");
+        let external_inspect_node = inspector.root().create_child("external");
+        let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
+        let (defect_sender, mut defect_receiver) = mpsc::channel(100);
+
+        let mut telemetry = Telemetry::new(
+            TelemetrySender::new(sender),
+            monitor_svc_proxy,
+            cobalt_1dot1_proxy.clone(),
+            Box::new(move |_experiments| {
+                let cobalt_1dot1_proxy = cobalt_1dot1_proxy.clone();
+                async move { Ok(cobalt_1dot1_proxy) }.boxed()
+            }),
+            inspect_node,
+            external_inspect_node,
+            persistence_req_sender,
+            defect_sender,
+        );
+
+        // Setup the Telemetry struct so that it thinks that it is connected.
+        let (telemetry_proxy, _telemetry_server) =
+            fidl::endpoints::create_proxy::<fidl_sme::TelemetryMarker>()
+                .expect("failed to create telemetry proxy");
+        telemetry.connection_state = ConnectionState::Connected(ConnectedState {
+            iface_id: 0,
+            ap_state: random_bss_description!(Wpa2).into(),
+            telemetry_proxy: Some(telemetry_proxy),
+
+            // The rest of the fields don't matter for this test case.
+            new_connect_start_time: None,
+            prev_counters: None,
+            multiple_bss_candidates: false,
+            network_is_likely_hidden: false,
+            last_signal_report: fasync::MonotonicInstant::now(),
+            num_consecutive_get_counter_stats_failures: InspectableU64::new(
+                0,
+                &telemetry.inspect_node,
+                "num_consecutive_get_counter_stats_failures",
+            ),
+            is_driver_unresponsive: InspectableBool::new(
+                false,
+                &telemetry.inspect_node,
+                "is_driver_unresponsive",
+            ),
+        });
+
+        // Call handle_periodic_telemetry.
+        let fut = telemetry.handle_periodic_telemetry();
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Have the executor trigger the timeout.
+        assert!(exec.wake_next_timer().is_some());
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify that the timeout has been received.
+        assert_variant!(
+            defect_receiver.try_next(),
+            Ok(Some(Defect::Iface(IfaceFailure::Timeout {
+                iface_id: 0,
+                source: TimeoutSource::GetCounterStats,
+            })))
+        );
     }
 
     #[fuchsia::test]
@@ -9634,6 +9802,7 @@ mod tests {
         /// As requests to Cobalt are responded to via `self.drain_cobalt_events()`,
         /// their payloads are drained to this HashMap
         cobalt_events: Vec<MetricEvent>,
+        _defect_receiver: mpsc::Receiver<Defect>,
 
         // Note: keep the executor field last in the struct so it gets dropped last.
         exec: fasync::TestExecutor,
@@ -9970,6 +10139,7 @@ mod tests {
         let inspect_node = inspector.root().create_child("stats");
         let external_inspect_node = inspector.root().create_child("external");
         let (persistence_req_sender, persistence_stream) = create_inspect_persistence_channel();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let (telemetry_sender, test_fut) = serve_telemetry(
             monitor_svc_proxy,
             cobalt_1dot1_proxy.clone(),
@@ -9980,6 +10150,7 @@ mod tests {
             inspect_node,
             external_inspect_node.create_child("stats"),
             persistence_req_sender,
+            defect_sender,
         );
         inspector.root().record(external_inspect_node);
         let mut test_fut = Box::pin(test_fut);
@@ -9995,6 +10166,7 @@ mod tests {
             persistence_stream,
             counter_stats_resp: None,
             cobalt_events: vec![],
+            _defect_receiver,
             exec,
         };
         (test_helper, test_fut)
@@ -10115,9 +10287,9 @@ mod tests {
         let mut error_logger = ThrottledErrorLogger::new(MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS);
 
         // Set the fake time to 61 minutes past 0 time to ensure that messages will be logged.
-        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_minutes(
-            MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1,
-        )));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            fasync::MonotonicDuration::from_minutes(MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1),
+        ));
 
         // Log an error and verify that no record of it was retained (ie: the error was emitted
         // immediately).
@@ -10130,9 +10302,9 @@ mod tests {
 
         // Advance time again and log another error to verify that the counter resets (ie: log was
         // emitted).
-        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_minutes(
-            MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1,
-        )));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            fasync::MonotonicDuration::from_minutes(MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1),
+        ));
         error_logger.throttle_error(Err(format_err!("")));
         assert!(!error_logger.suppressed_errors.contains_key(&String::from("")));
 

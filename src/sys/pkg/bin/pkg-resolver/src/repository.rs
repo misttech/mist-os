@@ -25,9 +25,7 @@ use tuf::pouf::Pouf1;
 use tuf::repository::{
     EphemeralRepository, HttpRepositoryBuilder, RepositoryProvider, RepositoryStorageProvider,
 };
-use {
-    cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg, zx,
-};
+use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg};
 
 mod updating_tuf_client;
 use updating_tuf_client::UpdateResult;

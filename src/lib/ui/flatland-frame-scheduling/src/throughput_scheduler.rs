@@ -7,9 +7,9 @@ use crate::{
 };
 use async_trait::async_trait;
 use fuchsia_async::MonotonicInstant as fasync_time;
+use fuchsia_trace as trace;
 use std::cell::{Cell, RefCell};
 use std::task::Waker;
-use {fuchsia_trace as trace, zx};
 
 // Scheduler for maximum throughput. Tries to schedule a frame at each on_next_frame_begin, if
 // there's something to draw (i.e. request_present() has been called). Presents are always

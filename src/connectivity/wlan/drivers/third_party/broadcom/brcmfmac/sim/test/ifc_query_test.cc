@@ -55,13 +55,13 @@ TEST_F(SimTest, ClientIfcQuery) {
                 band_cap->band == wlan_common::WlanBand::kFiveGhz);
 
     if (band_cap->band == wlan_common::WlanBand::kTwoGhz) {
-      ASSERT_EQ(band_cap->basic_rate_count, std::size(kExpectedBasic2gRates));
-      ASSERT_EQ(0, std::memcmp(band_cap->basic_rate_list.data(), kExpectedBasic2gRates,
-                               band_cap->basic_rate_count));
+      ASSERT_EQ(band_cap->basic_rates.count(), std::size(kExpectedBasic2gRates));
+      ASSERT_EQ(0, std::memcmp(band_cap->basic_rates.data(), kExpectedBasic2gRates,
+                               band_cap->basic_rates.count()));
     } else {
-      ASSERT_EQ(band_cap->basic_rate_count, std::size(kExpectedBasic5gRates));
-      ASSERT_EQ(0, std::memcmp(band_cap->basic_rate_list.data(), kExpectedBasic5gRates,
-                               band_cap->basic_rate_count));
+      ASSERT_EQ(band_cap->basic_rates.count(), std::size(kExpectedBasic5gRates));
+      ASSERT_EQ(0, std::memcmp(band_cap->basic_rates.data(), kExpectedBasic5gRates,
+                               band_cap->basic_rates.count()));
     }
   }
 }

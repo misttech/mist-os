@@ -80,11 +80,11 @@ mod tests {
         DeviceMonitorMarker, DeviceMonitorRequest, DeviceMonitorRequestStream,
     };
     use fidl_fuchsia_wlan_sme::{ApSmeMarker, ApSmeRequest, ApSmeRequestStream, StartApResultCode};
+    use fuchsia_async as fasync;
     use futures::stream::{StreamExt, StreamFuture};
     use futures::task::Poll;
     use ieee80211::Ssid;
     use std::pin::pin;
-    use {fuchsia_async as fasync, zx};
 
     use wlan_common::assert_variant;
 

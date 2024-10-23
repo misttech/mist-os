@@ -6,4 +6,5 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "attestation_signer_fidl",
     "generated_fidl",
+    "meta.json",
 ])

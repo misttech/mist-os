@@ -7,5 +7,4 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.clock.measure") {
   public_deps = [ "//zircon/vdso/zx" ]
   sources = [ "measure.fidl" ]
-  sdk_category = "internal"
 }

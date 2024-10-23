@@ -7,10 +7,9 @@
 //! This library contains the Diagnostics data schema used for inspect and logs . This is
 //! the data that the Archive returns on `fuchsia.diagnostics.ArchiveAccessor` reads.
 
-use anyhow::format_err;
 use chrono::{Local, TimeZone, Utc};
 use diagnostics_hierarchy::HierarchyMatcher;
-use fidl_fuchsia_diagnostics::{DataType, Selector, Severity as FidlSeverity};
+use fidl_fuchsia_diagnostics::{DataType, Selector};
 use fidl_fuchsia_inspect as finspect;
 use flyweights::FlyStr;
 use itertools::Itertools;
@@ -30,6 +29,7 @@ use termion::{color, style};
 use thiserror::Error;
 
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
+pub use diagnostics_log_types_serde::Severity;
 pub use moniker::ExtendedMoniker;
 
 #[cfg(target_os = "fuchsia")]
@@ -309,6 +309,7 @@ pub struct LogsMetadata {
     pub timestamp: Timestamp,
 
     /// Severity of the message.
+    #[serde(with = "diagnostics_log_types_serde::severity")]
     pub severity: Severity,
 
     /// Raw severity if any. This will typically be unset unless the log message carries a severity
@@ -361,177 +362,6 @@ impl LogsMetadata {
             Some(s) => s,
             None => self.severity as u8,
         }
-    }
-}
-
-/// Severities a log message can have, often called the log's "level".
-// NOTE: this is only duplicated because we can't get Serialize/Deserialize on the FIDL type
-// LINT.IfChange
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-#[repr(u8)]
-pub enum Severity {
-    /// Trace records include detailed information about program execution.
-    #[serde(rename = "TRACE", alias = "Trace", alias = "trace")]
-    Trace = 0x10,
-
-    /// Debug records include development-facing information about program execution.
-    #[serde(rename = "DEBUG", alias = "Debug", alias = "debug")]
-    Debug = 0x20,
-
-    /// Info records include general information about program execution. (default)
-    #[serde(rename = "INFO", alias = "Info", alias = "info")]
-    Info = 0x30,
-
-    /// Warning records include information about potentially problematic operations.
-    #[serde(rename = "WARN", alias = "Warn", alias = "warn")]
-    Warn = 0x40,
-
-    /// Error records include information about failed operations.
-    #[serde(rename = "ERROR", alias = "Error", alias = "error")]
-    Error = 0x50,
-
-    /// Fatal records convey information about operations which cause a program's termination.
-    #[serde(rename = "FATAL", alias = "Fatal", alias = "fatal")]
-    Fatal = 0x60,
-}
-// LINT.ThenChange(/src/lib/assembly/config_schema/src/platform_config/diagnostics_config.rs)
-
-impl Severity {
-    /// Returns a severity and also the raw severity if it's  not an exact match of a severity value.
-    pub fn parse_exact(raw_severity: u8) -> (Option<u8>, Severity) {
-        if raw_severity == Severity::Trace as u8 {
-            (None, Severity::Trace)
-        } else if raw_severity == Severity::Debug as u8 {
-            (None, Severity::Debug)
-        } else if raw_severity == Severity::Info as u8 {
-            (None, Severity::Info)
-        } else if raw_severity == Severity::Warn as u8 {
-            (None, Severity::Warn)
-        } else if raw_severity == Severity::Error as u8 {
-            (None, Severity::Error)
-        } else if raw_severity == Severity::Fatal as u8 {
-            (None, Severity::Fatal)
-        } else {
-            (Some(raw_severity), Severity::from(raw_severity))
-        }
-    }
-}
-
-impl From<u8> for Severity {
-    fn from(value: u8) -> Severity {
-        match value {
-            0x00..=0x10 => Severity::Trace,
-            0x11..=0x20 => Severity::Debug,
-            0x21..=0x30 => Severity::Info,
-            0x31..=0x40 => Severity::Warn,
-            0x41..=0x50 => Severity::Error,
-            0x51.. => Severity::Fatal,
-        }
-    }
-}
-
-impl From<i8> for Severity {
-    fn from(value: i8) -> Severity {
-        match value {
-            0x00..=0x10 => Severity::Trace,
-            0x11..=0x20 => Severity::Debug,
-            0x21..=0x30 => Severity::Info,
-            0x31..=0x40 => Severity::Warn,
-            0x41..=0x50 => Severity::Error,
-            0x51.. => Severity::Fatal,
-            _ => Severity::Trace,
-        }
-    }
-}
-
-impl From<i32> for Severity {
-    fn from(value: i32) -> Severity {
-        match value {
-            0x00..=0x10 => Severity::Trace,
-            0x11..=0x20 => Severity::Debug,
-            0x21..=0x30 => Severity::Info,
-            0x31..=0x40 => Severity::Warn,
-            0x41..=0x50 => Severity::Error,
-            0x51.. => Severity::Fatal,
-            _ => Severity::Trace,
-        }
-    }
-}
-
-impl fmt::Display for Severity {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let repr = match self {
-            Severity::Trace => "TRACE",
-            Severity::Debug => "DEBUG",
-            Severity::Info => "INFO",
-            Severity::Warn => "WARN",
-            Severity::Error => "ERROR",
-            Severity::Fatal => "FATAL",
-        };
-        write!(f, "{}", repr)
-    }
-}
-
-impl FromStr for Severity {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.to_lowercase();
-        match s.as_str() {
-            "trace" => Ok(Severity::Trace),
-            "debug" => Ok(Severity::Debug),
-            "info" => Ok(Severity::Info),
-            "warn" | "warning" => Ok(Severity::Warn),
-            "error" => Ok(Severity::Error),
-            "fatal" => Ok(Severity::Fatal),
-            other => Err(format_err!("invalid severity: {}", other)),
-        }
-    }
-}
-
-impl From<FidlSeverity> for Severity {
-    fn from(severity: FidlSeverity) -> Self {
-        match severity {
-            FidlSeverity::Trace => Severity::Trace,
-            FidlSeverity::Debug => Severity::Debug,
-            FidlSeverity::Info => Severity::Info,
-            FidlSeverity::Warn => Severity::Warn,
-            FidlSeverity::Error => Severity::Error,
-            FidlSeverity::Fatal => Severity::Fatal,
-        }
-    }
-}
-
-impl From<Severity> for FidlSeverity {
-    fn from(severity: Severity) -> Self {
-        match severity {
-            Severity::Trace => FidlSeverity::Trace,
-            Severity::Debug => FidlSeverity::Debug,
-            Severity::Info => FidlSeverity::Info,
-            Severity::Warn => FidlSeverity::Warn,
-            Severity::Error => FidlSeverity::Error,
-            Severity::Fatal => FidlSeverity::Fatal,
-        }
-    }
-}
-
-impl PartialEq<FidlSeverity> for Severity {
-    fn eq(&self, other: &FidlSeverity) -> bool {
-        match (self, other) {
-            (Severity::Trace, FidlSeverity::Trace)
-            | (Severity::Debug, FidlSeverity::Debug)
-            | (Severity::Info, FidlSeverity::Info)
-            | (Severity::Warn, FidlSeverity::Warn)
-            | (Severity::Error, FidlSeverity::Error)
-            | (Severity::Fatal, FidlSeverity::Fatal) => true,
-            _ => false,
-        }
-    }
-}
-
-impl PartialOrd<FidlSeverity> for Severity {
-    fn partial_cmp(&self, other: &FidlSeverity) -> Option<Ordering> {
-        PartialOrd::<Severity>::partial_cmp(self, &Severity::from(*other))
     }
 }
 
@@ -1218,7 +1048,7 @@ impl LogTextColor {
 }
 
 /// Options for the timezone associated to the timestamp of a log line.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Timezone {
     /// Display a timestamp in terms of the local timezone as reported by the operating system.
     Local,

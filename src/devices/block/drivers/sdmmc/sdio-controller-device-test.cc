@@ -4,14 +4,10 @@
 
 #include "sdio-controller-device.h"
 
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/internal/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/sdio/hw.h>
 #include <lib/zx/vmo.h>
@@ -20,10 +16,11 @@
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/sdio/cpp/bind.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "fake-sdmmc-device.h"
 #include "sdmmc-root-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -49,8 +46,7 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
       : SdmmcRootDevice(std::move(start_args), std::move(dispatcher)) {}
 
  protected:
-  zx_status_t Init(
-      fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata) override {
+  zx_status_t Init(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) override {
     zx_status_t status;
     auto sdmmc = std::make_unique<SdmmcDevice>(this, sdmmc_.GetClient());
     if (status = sdmmc->RefreshHostInfo(); status != ZX_OK) {
@@ -65,7 +61,7 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
         status != ZX_OK) {
       return status;
     }
-    if (status = sdio_controller_device->Probe(*metadata); status != ZX_OK) {
+    if (status = sdio_controller_device->Probe(metadata); status != ZX_OK) {
       return status;
     }
     if (status = sdio_controller_device->AddDevice(); status != ZX_OK) {
@@ -78,20 +74,38 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
 
 FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
 
-struct IncomingNamespace {
-  fdf_testing::TestNode node{"root"};
-  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
-  compat::DeviceServer device_server;
+class Environment : public fdf_testing::Environment {
+ public:
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    fit::result metadata =
+        fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena_).Build());
+    if (!metadata.is_ok()) {
+      return zx::error(metadata.error_value().status());
+    }
+
+    device_server_.Init(component::kDefaultInstance, "root");
+    zx_status_t status =
+        device_server_.AddMetadata(DEVICE_METADATA_SDMMC, metadata->data(), metadata->size());
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::make_result(
+        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
+  }
+
+ private:
+  fidl::Arena<> arena_;
+  compat::DeviceServer device_server_;
 };
 
-// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
-// library.
-class SdioControllerDeviceTest : public zxtest::Test {
+class TestConfig final {
  public:
-  SdioControllerDeviceTest()
-      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        incoming_(env_dispatcher_->async_dispatcher(), std::in_place) {}
+  using DriverType = TestSdmmcRootDevice;
+  using EnvironmentType = Environment;
+};
 
+class SdioControllerDeviceTest : public ::testing::Test {
+ public:
   void SetUp() override {
     sdmmc_.Reset();
 
@@ -123,77 +137,36 @@ class SdioControllerDeviceTest : public zxtest::Test {
     sdmmc_.set_host_info({
         .caps = 0,
         .max_transfer_size = 1,
-        .max_transfer_size_non_dma = 1,
     });
   }
 
   void TearDown() override {
-    if (sdio_controller_device_) {
-      sdio_controller_device_->StopSdioIrqDispatcher();
-    }
+    // SdmmcRootDevice::PrepareStop() invokes SdioControllerDevice::StopSdioIrqDispatcher().
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_OK(result);
   }
 
   zx_status_t StartDriver() {
-    // Initialize driver test environment.
-    fuchsia_driver_framework::DriverStartArgs start_args;
-    fidl::Arena<> arena;
-    fit::result metadata =
-        fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena).Build());
-    if (!metadata.is_ok()) {
-      return metadata.error_value().status();
-    }
-    incoming_.SyncCall([&](IncomingNamespace* incoming) mutable {
-      auto start_args_result = incoming->node.CreateStartArgsAndServe();
-      ASSERT_TRUE(start_args_result.is_ok());
-      start_args = std::move(start_args_result->start_args);
-      outgoing_directory_client_ = std::move(start_args_result->outgoing_directory_client);
-
-      ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
-
-      incoming->device_server.Init("default", "");
-      // Serve metadata.
-      ASSERT_OK(incoming->device_server.AddMetadata(DEVICE_METADATA_SDMMC, metadata->data(),
-                                                    metadata->size()));
-      ASSERT_OK(incoming->device_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                              &incoming->env.incoming_directory()));
-    });
-
-    {
-      sdmmc_config::Config fake_config;
-      fake_config.enable_suspend() = false;
-      start_args.config(fake_config.ToVmo());
-    }
-
-    // Start dut_.
-    auto result = runtime_.RunToCompletion(dut_.Start(std::move(start_args)));
-    if (!result.is_ok()) {
+    zx::result<> result =
+        driver_test().StartDriverWithCustomStartArgs([](fdf::DriverStartArgs& start_args) mutable {
+          sdmmc_config::Config fake_config;
+          fake_config.enable_suspend() = false;
+          start_args.config(fake_config.ToVmo());
+        });
+    if (result.is_error()) {
       return result.status_value();
     }
-
-    const std::unique_ptr<SdioControllerDevice>* sdio_controller_device =
-        std::get_if<std::unique_ptr<SdioControllerDevice>>(&dut_->child_device());
-    if (sdio_controller_device == nullptr) {
-      return ZX_ERR_BAD_STATE;
-    }
-    sdio_controller_device_ = sdio_controller_device->get();
     return ZX_OK;
   }
+
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
 
  protected:
   fidl::WireClient<fuchsia_hardware_sdio::Device> ConnectDeviceClient(uint8_t function) {
     char instance[15];
     snprintf(instance, sizeof(instance), "sdmmc-sdio-%u", function);
 
-    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    zx_status_t status = fdio_open_at(outgoing_directory_client_.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      server_end.TakeChannel().release());
-    if (status != ZX_OK) {
-      return {};
-    }
-
-    auto sdio_client_end = component::ConnectAtMember<fuchsia_hardware_sdio::Service::Device>(
-        client_end.borrow(), instance);
+    auto sdio_client_end = driver_test().Connect<fuchsia_hardware_sdio::Service::Device>(instance);
     if (sdio_client_end.is_error()) {
       return {};
     }
@@ -203,14 +176,9 @@ class SdioControllerDeviceTest : public zxtest::Test {
   }
 
   FakeSdmmcDevice& sdmmc_ = TestSdmmcRootDevice::sdmmc_;
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
 
  private:
-  fdf_testing::internal::DriverUnderTest<TestSdmmcRootDevice> dut_;
-  SdioControllerDevice* sdio_controller_device_;
-  fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
 };
 
 class SdioScatterGatherTest : public SdioControllerDeviceTest {
@@ -242,7 +210,6 @@ class SdioScatterGatherTest : public SdioControllerDeviceTest {
     sdmmc_.set_host_info({
         .caps = 0,
         .max_transfer_size = 1024,
-        .max_transfer_size_non_dma = 1024,
     });
 
     ASSERT_OK(StartDriver());
@@ -254,7 +221,7 @@ class SdioScatterGatherTest : public SdioControllerDeviceTest {
       ASSERT_TRUE(result.ok());
       EXPECT_TRUE(result->is_ok());
     });
-    runtime_.RunUntilIdle();
+    driver_test().runtime().RunUntilIdle();
 
     sdmmc_.requests().clear();
 
@@ -282,7 +249,7 @@ class SdioScatterGatherTest : public SdioControllerDeviceTest {
           ASSERT_TRUE(result.ok());
           EXPECT_TRUE(result->is_ok());
         });
-    runtime_.RunUntilIdle();
+    driver_test().runtime().RunUntilIdle();
   }
 
  protected:
@@ -373,7 +340,7 @@ TEST_F(SdioControllerDeviceTest, MultiplexInterrupts) {
   client2->GetInBandIntr().ThenExactlyOnce(set_interrupt(&interrupt2));
   client4->GetInBandIntr().ThenExactlyOnce(set_interrupt(&interrupt4));
   client7->GetInBandIntr().ThenExactlyOnce(set_interrupt(&interrupt7));
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   ASSERT_OK(interrupt1.bind(port, 1, 0));
   ASSERT_OK(interrupt2.bind(port, 2, 0));
@@ -385,70 +352,70 @@ TEST_F(SdioControllerDeviceTest, MultiplexInterrupts) {
 
   zx_port_packet_t packet;
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 1);
+  EXPECT_EQ(packet.key, uint64_t{1});
   EXPECT_OK(interrupt1.ack());
   EXPECT_TRUE(client1->AckInBandIntr().ok());
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b1111'1110}, 0);
   sdmmc_.TriggerInBandInterrupt();
 
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 1);
+  EXPECT_EQ(packet.key, uint64_t{1});
   EXPECT_OK(interrupt1.ack());
   EXPECT_TRUE(client1->AckInBandIntr().ok());
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 2);
+  EXPECT_EQ(packet.key, uint64_t{2});
   EXPECT_OK(interrupt2.ack());
   EXPECT_TRUE(client2->AckInBandIntr().ok());
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 4);
+  EXPECT_EQ(packet.key, uint64_t{4});
   EXPECT_OK(interrupt4.ack());
   EXPECT_TRUE(client4->AckInBandIntr().ok());
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 7);
+  EXPECT_EQ(packet.key, uint64_t{7});
   EXPECT_OK(interrupt7.ack());
   EXPECT_TRUE(client7->AckInBandIntr().ok());
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b1010'0010}, 0);
   sdmmc_.TriggerInBandInterrupt();
 
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 1);
+  EXPECT_EQ(packet.key, uint64_t{1});
   EXPECT_OK(interrupt1.ack());
   EXPECT_TRUE(client1->AckInBandIntr().ok());
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 7);
+  EXPECT_EQ(packet.key, uint64_t{7});
   EXPECT_OK(interrupt7.ack());
   EXPECT_TRUE(client7->AckInBandIntr().ok());
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b0011'0110}, 0);
   sdmmc_.TriggerInBandInterrupt();
 
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 1);
+  EXPECT_EQ(packet.key, uint64_t{1});
   EXPECT_OK(interrupt1.ack());
   EXPECT_TRUE(client1->AckInBandIntr().ok());
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 2);
+  EXPECT_EQ(packet.key, uint64_t{2});
   EXPECT_OK(interrupt2.ack());
   EXPECT_TRUE(client2->AckInBandIntr().ok());
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   EXPECT_OK(port.wait(zx::time::infinite(), &packet));
-  EXPECT_EQ(packet.key, 4);
+  EXPECT_EQ(packet.key, uint64_t{4});
   EXPECT_OK(interrupt4.ack());
 }
 
@@ -467,7 +434,6 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 16,
-      .max_transfer_size_non_dma = 16,
   });
 
   ASSERT_OK(StartDriver());
@@ -485,7 +451,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
     ASSERT_TRUE(result->is_ok());
     EXPECT_EQ(result->value()->cur_blk_size, 8);
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   constexpr uint8_t kTestData[52] = {
       0xff, 0x7c, 0xa6, 0x24, 0x6f, 0x69, 0x7a, 0x39, 0x63, 0x68, 0xef, 0x28, 0xf3,
@@ -518,15 +484,20 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
-  ASSERT_EQ(sdmmc_.requests().size(), 5);
+  ASSERT_EQ(sdmmc_.requests().size(), size_t{5});
 
-  EXPECT_EQ(sdmmc_.requests()[0].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
-  EXPECT_EQ(sdmmc_.requests()[1].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
-  EXPECT_EQ(sdmmc_.requests()[2].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
-  EXPECT_EQ(sdmmc_.requests()[3].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
-  EXPECT_EQ(sdmmc_.requests()[4].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
+  EXPECT_EQ(sdmmc_.requests()[0].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests()[1].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests()[2].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests()[3].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests()[4].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
 
   sdmmc_.requests().clear();
 
@@ -534,8 +505,8 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   // a FIFO write, meaning the data will get overwritten each time. Verify the final state of the
   // device.
   const std::vector<uint8_t> read_data = sdmmc_.Read(0x1ab08, 16, 3);
-  EXPECT_BYTES_EQ(read_data.data(), kTestData + sizeof(kTestData) - 4, 4);
-  EXPECT_BYTES_EQ(read_data.data() + 4, kTestData + sizeof(kTestData) - 8, 4);
+  EXPECT_EQ(0, memcmp(read_data.data(), kTestData + sizeof(kTestData) - 4, 4));
+  EXPECT_EQ(0, memcmp(read_data.data() + 4, kTestData + sizeof(kTestData) - 8, 4));
 
   sdmmc_.Write(0x12308, cpp20::span<const uint8_t>(kTestData, sizeof(kTestData)), 3);
 
@@ -559,18 +530,23 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
-  ASSERT_EQ(sdmmc_.requests().size(), 5);
+  ASSERT_EQ(sdmmc_.requests().size(), size_t{5});
 
-  EXPECT_EQ(sdmmc_.requests()[0].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
-  EXPECT_EQ(sdmmc_.requests()[1].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
-  EXPECT_EQ(sdmmc_.requests()[2].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
-  EXPECT_EQ(sdmmc_.requests()[3].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
-  EXPECT_EQ(sdmmc_.requests()[4].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK), 0);
+  EXPECT_EQ(sdmmc_.requests()[0].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests()[1].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests()[2].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests()[3].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
+  EXPECT_EQ(sdmmc_.requests()[4].cmd_flags & (SDMMC_CMD_BLKCNT_EN | SDMMC_CMD_MULTI_BLK),
+            uint32_t{0});
 
   EXPECT_OK(vmo.read(buffer, 0, sizeof(buffer)));
-  EXPECT_BYTES_EQ(buffer + 16, kTestData, 36);
+  EXPECT_EQ(0, memcmp(buffer + 16, kTestData, 36));
 }
 
 TEST_F(SdioControllerDeviceTest, SdioDoRwTxnMultiBlock) {
@@ -588,7 +564,6 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxnMultiBlock) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 32,
-      .max_transfer_size_non_dma = 32,
   });
 
   ASSERT_OK(StartDriver());
@@ -606,7 +581,7 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxnMultiBlock) {
     ASSERT_TRUE(result->is_ok());
     EXPECT_EQ(result->value()->cur_blk_size, 8);
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   constexpr uint8_t kTestData[132] = {
       // clang-format off
@@ -648,13 +623,13 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxnMultiBlock) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   uint8_t buffer[sizeof(kTestData)];
   EXPECT_OK(vmo.read(buffer, 0, sizeof(buffer)));
 
-  EXPECT_BYTES_EQ(buffer + 64, kTestData, 64);
-  EXPECT_BYTES_EQ(buffer + 128, kTestData, 4);
+  EXPECT_EQ(0, memcmp(buffer + 64, kTestData, 64));
+  EXPECT_EQ(0, memcmp(buffer + 128, kTestData, 4));
 
   EXPECT_OK(vmo.write(kTestData, 0, sizeof(kTestData)));
 
@@ -675,9 +650,9 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxnMultiBlock) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
-  EXPECT_BYTES_EQ(sdmmc_.Read(0x12308, 68, 7).data(), kTestData + 64, 68);
+  EXPECT_EQ(0, memcmp(sdmmc_.Read(0x12308, 68, 7).data(), kTestData + 64, 68));
 }
 
 TEST_F(SdioControllerDeviceTest, SdioIntrPending) {
@@ -713,31 +688,31 @@ TEST_F(SdioControllerDeviceTest, SdioIntrPending) {
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b0011'0010}, 0);
   client4->IntrPending().ThenExactlyOnce(expect_pending(true));
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b0010'0010}, 0);
   client4->IntrPending().ThenExactlyOnce(expect_pending(false));
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b1000'0000}, 0);
   client7->IntrPending().ThenExactlyOnce(expect_pending(true));
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b0000'0000}, 0);
   client7->IntrPending().ThenExactlyOnce(expect_pending(false));
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b0000'1110}, 0);
   client1->IntrPending().ThenExactlyOnce(expect_pending(true));
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b0000'1110}, 0);
   client2->IntrPending().ThenExactlyOnce(expect_pending(true));
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.Write(SDIO_CIA_CCCR_INTx_INTR_PEN_ADDR, std::vector<uint8_t>{0b0000'1110}, 0);
   client3->IntrPending().ThenExactlyOnce(expect_pending(true));
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioControllerDeviceTest, EnableDisableFnIntr) {
@@ -760,14 +735,14 @@ TEST_F(SdioControllerDeviceTest, EnableDisableFnIntr) {
     EXPECT_TRUE(result->is_ok());
     EXPECT_EQ(sdmmc_.Read(0x04, 1, 0)[0], 0b0001'0001);
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   client7->EnableFnIntr().ThenExactlyOnce([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
     EXPECT_EQ(sdmmc_.Read(0x04, 1, 0)[0], 0b1001'0001);
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   client4->EnableFnIntr().ThenExactlyOnce([&](auto& result) {
     ASSERT_TRUE(result.ok());
@@ -780,7 +755,7 @@ TEST_F(SdioControllerDeviceTest, EnableDisableFnIntr) {
     EXPECT_TRUE(result->is_ok());
     EXPECT_EQ(sdmmc_.Read(0x04, 1, 0)[0], 0b1000'0001);
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   client7->DisableFnIntr().ThenExactlyOnce([&](auto& result) {
     ASSERT_TRUE(result.ok());
@@ -792,7 +767,7 @@ TEST_F(SdioControllerDeviceTest, EnableDisableFnIntr) {
     ASSERT_TRUE(result.ok());
     EXPECT_FALSE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioControllerDeviceTest, ProcessCccrWithCaps) {
@@ -823,7 +798,7 @@ TEST_F(SdioControllerDeviceTest, ProcessCccrWithCaps) {
                   SdioDeviceCapabilities::kUhsDdr50 | SdioDeviceCapabilities::kTypeA |
                   SdioDeviceCapabilities::kTypeB | SdioDeviceCapabilities::kTypeD);
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioControllerDeviceTest, ProcessCccrWithNoCaps) {
@@ -849,7 +824,7 @@ TEST_F(SdioControllerDeviceTest, ProcessCccrWithNoCaps) {
     ASSERT_TRUE(result->is_ok());
     EXPECT_EQ(result->value()->hw_info.dev_hw_info.caps, SdioDeviceCapabilities{0});
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioControllerDeviceTest, ProcessCccrRevisionError1) {
@@ -863,7 +838,7 @@ TEST_F(SdioControllerDeviceTest, ProcessCccrRevisionError1) {
   sdmmc_.Write(0x14, std::vector<uint8_t>{0x00}, 0);
   sdmmc_.Write(0x15, std::vector<uint8_t>{0x00}, 0);
 
-  EXPECT_NOT_OK(StartDriver());
+  EXPECT_NE(StartDriver(), ZX_OK);
 }
 
 TEST_F(SdioControllerDeviceTest, ProcessCccrRevisionError2) {
@@ -877,7 +852,7 @@ TEST_F(SdioControllerDeviceTest, ProcessCccrRevisionError2) {
   sdmmc_.Write(0x14, std::vector<uint8_t>{0x00}, 0);
   sdmmc_.Write(0x15, std::vector<uint8_t>{0x00}, 0);
 
-  EXPECT_NOT_OK(StartDriver());
+  EXPECT_NE(StartDriver(), ZX_OK);
 }
 
 TEST_F(SdioControllerDeviceTest, ProcessCis) {
@@ -911,11 +886,11 @@ TEST_F(SdioControllerDeviceTest, ProcessCis) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
 
-    EXPECT_EQ(result->value()->hw_info.func_hw_info.max_blk_size, 256);
-    EXPECT_EQ(result->value()->hw_info.func_hw_info.manufacturer_id, 0xc001);
-    EXPECT_EQ(result->value()->hw_info.func_hw_info.product_id, 0xface);
+    EXPECT_EQ(result->value()->hw_info.func_hw_info.max_blk_size, uint32_t{256});
+    EXPECT_EQ(result->value()->hw_info.func_hw_info.manufacturer_id, uint32_t{0xc001});
+    EXPECT_EQ(result->value()->hw_info.func_hw_info.product_id, uint32_t{0xface});
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioControllerDeviceTest, ProcessCisFunction0) {
@@ -926,7 +901,6 @@ TEST_F(SdioControllerDeviceTest, ProcessCisFunction0) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 1024,
-      .max_transfer_size_non_dma = 1024,
   });
 
   sdmmc_.Write(0x0000'0000, std::vector<uint8_t>{0x43}, 0);  // CCCR/SDIO version 3.
@@ -958,12 +932,12 @@ TEST_F(SdioControllerDeviceTest, ProcessCisFunction0) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
 
-    EXPECT_EQ(result->value()->hw_info.dev_hw_info.num_funcs, 6);
-    EXPECT_EQ(result->value()->hw_info.dev_hw_info.sdio_vsn, SDIO_SDIO_VER_3);
-    EXPECT_EQ(result->value()->hw_info.dev_hw_info.cccr_vsn, SDIO_CCCR_FORMAT_VER_3);
-    EXPECT_EQ(result->value()->hw_info.dev_hw_info.max_tran_speed, 25000);
+    EXPECT_EQ(result->value()->hw_info.dev_hw_info.num_funcs, uint32_t{6});
+    EXPECT_EQ(result->value()->hw_info.dev_hw_info.sdio_vsn, uint32_t{SDIO_SDIO_VER_3});
+    EXPECT_EQ(result->value()->hw_info.dev_hw_info.cccr_vsn, uint32_t{SDIO_CCCR_FORMAT_VER_3});
+    EXPECT_EQ(result->value()->hw_info.dev_hw_info.max_tran_speed, uint32_t{25000});
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioControllerDeviceTest, ProcessFbr) {
@@ -994,29 +968,29 @@ TEST_F(SdioControllerDeviceTest, ProcessFbr) {
   client1->GetDevHwInfo().ThenExactlyOnce([](auto& result) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
-    EXPECT_EQ(result->value()->hw_info.dev_hw_info.num_funcs, 8);
-    EXPECT_EQ(result->value()->hw_info.func_hw_info.fn_intf_code, 0x03);
+    EXPECT_EQ(result->value()->hw_info.dev_hw_info.num_funcs, uint32_t{8});
+    EXPECT_EQ(result->value()->hw_info.func_hw_info.fn_intf_code, uint8_t{0x03});
   });
 
   client5->GetDevHwInfo().ThenExactlyOnce([](auto& result) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
-    EXPECT_EQ(result->value()->hw_info.func_hw_info.fn_intf_code, 0x00);
+    EXPECT_EQ(result->value()->hw_info.func_hw_info.fn_intf_code, uint8_t{0x00});
   });
 
   client6->GetDevHwInfo().ThenExactlyOnce([](auto& result) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
-    EXPECT_EQ(result->value()->hw_info.func_hw_info.fn_intf_code, 0xab);
+    EXPECT_EQ(result->value()->hw_info.func_hw_info.fn_intf_code, uint8_t{0xab});
   });
 
   client7->GetDevHwInfo().ThenExactlyOnce([](auto& result) {
     ASSERT_TRUE(result.ok());
     ASSERT_TRUE(result->is_ok());
-    EXPECT_EQ(result->value()->hw_info.func_hw_info.fn_intf_code, 0x0e);
+    EXPECT_EQ(result->value()->hw_info.func_hw_info.fn_intf_code, uint8_t{0x0e});
   });
 
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioControllerDeviceTest, ProbeFail) {
@@ -1028,7 +1002,7 @@ TEST_F(SdioControllerDeviceTest, ProbeFail) {
   // to fail.
   sdmmc_.Write(0x0309, std::vector<uint8_t>{0x00, 0x00, 0x00}, 0);
 
-  EXPECT_NOT_OK(StartDriver());
+  EXPECT_NE(StartDriver(), ZX_OK);
 }
 
 TEST_F(SdioControllerDeviceTest, ProbeSdr104) {
@@ -1042,14 +1016,13 @@ TEST_F(SdioControllerDeviceTest, ProbeSdr104) {
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 | SDMMC_HOST_CAP_SDR50 |
               SDMMC_HOST_CAP_DDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
-  EXPECT_EQ(sdmmc_.bus_freq(), 208'000'000);
+  EXPECT_EQ(sdmmc_.bus_freq(), uint32_t{208'000'000});
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_SDR104);
 }
 
@@ -1063,14 +1036,13 @@ TEST_F(SdioControllerDeviceTest, ProbeSdr50LimitedByHost) {
   sdmmc_.set_host_info({
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
-  EXPECT_EQ(sdmmc_.bus_freq(), 100'000'000);
+  EXPECT_EQ(sdmmc_.bus_freq(), uint32_t{100'000'000});
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_SDR50);
 }
 
@@ -1085,14 +1057,13 @@ TEST_F(SdioControllerDeviceTest, ProbeSdr50LimitedByCard) {
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 | SDMMC_HOST_CAP_SDR50 |
               SDMMC_HOST_CAP_DDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
-  EXPECT_EQ(sdmmc_.bus_freq(), 100'000'000);
+  EXPECT_EQ(sdmmc_.bus_freq(), uint32_t{100'000'000});
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_SDR50);
 }
 
@@ -1109,14 +1080,13 @@ TEST_F(SdioControllerDeviceTest, ProbeFallBackToHs) {
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 | SDMMC_HOST_CAP_SDR50 |
               SDMMC_HOST_CAP_DDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
-  EXPECT_EQ(sdmmc_.bus_freq(), 50'000'000);
+  EXPECT_EQ(sdmmc_.bus_freq(), uint32_t{50'000'000});
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HS);
 }
 
@@ -1171,26 +1141,26 @@ TEST_F(SdioControllerDeviceTest, IoAbortSetsAbortFlag) {
   ASSERT_TRUE(client.is_valid());
 
   sdmmc_.set_command_callback(SDIO_IO_RW_DIRECT, [](const sdmmc_req_t& req) -> void {
-    EXPECT_EQ(req.cmd_idx, SDIO_IO_RW_DIRECT);
+    EXPECT_EQ(req.cmd_idx, uint32_t{SDIO_IO_RW_DIRECT});
     EXPECT_FALSE(req.cmd_flags & SDMMC_CMD_TYPE_ABORT);
-    EXPECT_EQ(req.arg, 0xb024'68ab);
+    EXPECT_EQ(req.arg, uint32_t{0xb024'68ab});
   });
   client->DoRwByte(true, 0x1234, 0xab).ThenExactlyOnce([](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   sdmmc_.set_command_callback(SDIO_IO_RW_DIRECT, [](const sdmmc_req_t& req) -> void {
-    EXPECT_EQ(req.cmd_idx, SDIO_IO_RW_DIRECT);
+    EXPECT_EQ(req.cmd_idx, uint32_t{SDIO_IO_RW_DIRECT});
     EXPECT_TRUE(req.cmd_flags & SDMMC_CMD_TYPE_ABORT);
-    EXPECT_EQ(req.arg, 0x8000'0c03);
+    EXPECT_EQ(req.arg, uint32_t{0x8000'0c03});
   });
   client->IoAbort().ThenExactlyOnce([](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioControllerDeviceTest, DifferentManufacturerProductIds) {
@@ -1296,8 +1266,8 @@ TEST_F(SdioControllerDeviceTest, DifferentManufacturerProductIds) {
       },
   };
 
-  incoming_.SyncCall([&](IncomingNamespace* incoming) {
-    fdf_testing::TestNode& sdmmc_node = incoming->node.children().at("sdmmc");
+  driver_test().RunInNodeContext([&](fdf_testing::TestNode& node) {
+    fdf_testing::TestNode& sdmmc_node = node.children().at("sdmmc");
     fdf_testing::TestNode& controller_node = sdmmc_node.children().at("sdmmc-sdio");
     EXPECT_EQ(controller_node.children().size(), std::size(kExpectedProps));
 
@@ -1325,7 +1295,7 @@ TEST_F(SdioControllerDeviceTest, FunctionZeroInvalidBlockSize) {
 
   sdmmc_.Write(0x0009, std::vector<uint8_t>{0x00, 0x20, 0x00}, 0);
 
-  EXPECT_NOT_OK(StartDriver());
+  EXPECT_NE(StartDriver(), ZX_OK);
 }
 
 TEST_F(SdioControllerDeviceTest, IOFunctionInvalidBlockSize) {
@@ -1338,7 +1308,7 @@ TEST_F(SdioControllerDeviceTest, IOFunctionInvalidBlockSize) {
 
   sdmmc_.Write(0x0209, std::vector<uint8_t>{0x00, 0x30, 0x00}, 0);
 
-  EXPECT_NOT_OK(StartDriver());
+  EXPECT_NE(StartDriver(), ZX_OK);
 }
 
 TEST_F(SdioControllerDeviceTest, FunctionZeroNoBlockSize) {
@@ -1350,7 +1320,7 @@ TEST_F(SdioControllerDeviceTest, FunctionZeroNoBlockSize) {
 
   sdmmc_.Write(0x0009, std::vector<uint8_t>{0x00, 0x30, 0x00}, 0);
 
-  EXPECT_NOT_OK(StartDriver());
+  EXPECT_NE(StartDriver(), ZX_OK);
 }
 
 TEST_F(SdioControllerDeviceTest, IOFunctionNoBlockSize) {
@@ -1362,7 +1332,7 @@ TEST_F(SdioControllerDeviceTest, IOFunctionNoBlockSize) {
 
   sdmmc_.Write(0x0209, std::vector<uint8_t>{0x00, 0x30, 0x00}, 0);
 
-  EXPECT_NOT_OK(StartDriver());
+  EXPECT_NE(StartDriver(), ZX_OK);
 }
 
 TEST_F(SdioControllerDeviceTest, UpdateBlockSizeMultiBlock) {
@@ -1379,7 +1349,6 @@ TEST_F(SdioControllerDeviceTest, UpdateBlockSizeMultiBlock) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 2048,
-      .max_transfer_size_non_dma = 2048,
   });
 
   sdmmc_.Write(0x210, std::vector<uint8_t>{0x00, 0x00}, 0);
@@ -1440,7 +1409,7 @@ TEST_F(SdioControllerDeviceTest, UpdateBlockSizeMultiBlock) {
     ASSERT_TRUE(result.ok());
     EXPECT_FALSE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioControllerDeviceTest, UpdateBlockSizeNoMultiBlock) {
@@ -1457,7 +1426,6 @@ TEST_F(SdioControllerDeviceTest, UpdateBlockSizeNoMultiBlock) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 2048,
-      .max_transfer_size_non_dma = 2048,
   });
 
   // Placeholder value that should not get written or returned.
@@ -1524,7 +1492,7 @@ TEST_F(SdioControllerDeviceTest, UpdateBlockSizeNoMultiBlock) {
     EXPECT_FALSE(result->is_ok());
   });
 
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 TEST_F(SdioScatterGatherTest, ScatterGatherByteMode) {
@@ -1552,31 +1520,31 @@ TEST_F(SdioScatterGatherTest, ScatterGatherByteMode) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   std::vector<uint8_t> actual = sdmmc_.Read(0x1000, 6, 3);
-  EXPECT_BYTES_EQ(actual.data(), kTestData1 + 8, 2);
-  EXPECT_BYTES_EQ(actual.data() + 2, kTestData2 + 4, 1);
-  EXPECT_BYTES_EQ(actual.data() + 3, kTestData3 + 8, 2);
+  EXPECT_EQ(0, memcmp(actual.data(), kTestData1 + 8, 2));
+  EXPECT_EQ(0, memcmp(actual.data() + 2, kTestData2 + 4, 1));
+  EXPECT_EQ(0, memcmp(actual.data() + 3, kTestData3 + 8, 2));
   EXPECT_EQ(actual[5], 0xff);
 
-  ASSERT_EQ(sdmmc_.requests().size(), 2);
+  ASSERT_EQ(sdmmc_.requests().size(), size_t{2});
 
   const SdioCmd53 req1 = SdioCmd53::FromArg(sdmmc_.requests()[0].arg);
-  EXPECT_EQ(req1.blocks_or_bytes, 4);
-  EXPECT_EQ(req1.address, 0x1000);
-  EXPECT_EQ(req1.op_code, 1);
-  EXPECT_EQ(req1.block_mode, 0);
-  EXPECT_EQ(req1.function_number, 3);
-  EXPECT_EQ(req1.rw_flag, 1);
+  EXPECT_EQ(req1.blocks_or_bytes, uint32_t{4});
+  EXPECT_EQ(req1.address, uint32_t{0x1000});
+  EXPECT_EQ(req1.op_code, uint32_t{1});
+  EXPECT_EQ(req1.block_mode, uint32_t{0});
+  EXPECT_EQ(req1.function_number, uint32_t{3});
+  EXPECT_EQ(req1.rw_flag, uint32_t{1});
 
   const SdioCmd53 req2 = SdioCmd53::FromArg(sdmmc_.requests()[1].arg);
-  EXPECT_EQ(req2.blocks_or_bytes, 1);
-  EXPECT_EQ(req2.address, 0x1000 + 4);
-  EXPECT_EQ(req2.op_code, 1);
-  EXPECT_EQ(req2.block_mode, 0);
-  EXPECT_EQ(req2.function_number, 3);
-  EXPECT_EQ(req2.rw_flag, 1);
+  EXPECT_EQ(req2.blocks_or_bytes, uint32_t{1});
+  EXPECT_EQ(req2.address, uint32_t{0x1000 + 4});
+  EXPECT_EQ(req2.op_code, uint32_t{1});
+  EXPECT_EQ(req2.block_mode, uint32_t{0});
+  EXPECT_EQ(req2.function_number, uint32_t{3});
+  EXPECT_EQ(req2.rw_flag, uint32_t{1});
 }
 
 TEST_F(SdioScatterGatherTest, ScatterGatherBlockMode) {
@@ -1602,29 +1570,29 @@ TEST_F(SdioScatterGatherTest, ScatterGatherBlockMode) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
-  EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper1_.start()) + 8, kTestData1, 7);
-  EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper2_.start()) + 4, kTestData1 + 7, 3);
-  EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper3_.start()) + 18, kTestData1 + 10, 2);
+  EXPECT_EQ(0, memcmp(static_cast<uint8_t*>(mapper1_.start()) + 8, kTestData1, 7));
+  EXPECT_EQ(0, memcmp(static_cast<uint8_t*>(mapper2_.start()) + 4, kTestData1 + 7, 3));
+  EXPECT_EQ(0, memcmp(static_cast<uint8_t*>(mapper3_.start()) + 18, kTestData1 + 10, 2));
 
-  ASSERT_EQ(sdmmc_.requests().size(), 2);
+  ASSERT_EQ(sdmmc_.requests().size(), size_t{2});
 
   const SdioCmd53 req1 = SdioCmd53::FromArg(sdmmc_.requests()[0].arg);
-  EXPECT_EQ(req1.blocks_or_bytes, 3);
-  EXPECT_EQ(req1.address, 0x5000);
-  EXPECT_EQ(req1.op_code, 0);
-  EXPECT_EQ(req1.block_mode, 1);
-  EXPECT_EQ(req1.function_number, 3);
-  EXPECT_EQ(req1.rw_flag, 0);
+  EXPECT_EQ(req1.blocks_or_bytes, uint32_t{3});
+  EXPECT_EQ(req1.address, uint32_t{0x5000});
+  EXPECT_EQ(req1.op_code, uint32_t{0});
+  EXPECT_EQ(req1.block_mode, uint32_t{1});
+  EXPECT_EQ(req1.function_number, uint32_t{3});
+  EXPECT_EQ(req1.rw_flag, uint32_t{0});
 
   const SdioCmd53 req2 = SdioCmd53::FromArg(sdmmc_.requests()[1].arg);
-  EXPECT_EQ(req2.blocks_or_bytes, 3);
-  EXPECT_EQ(req2.address, 0x5000);
-  EXPECT_EQ(req2.op_code, 0);
-  EXPECT_EQ(req2.block_mode, 0);
-  EXPECT_EQ(req2.function_number, 3);
-  EXPECT_EQ(req2.rw_flag, 0);
+  EXPECT_EQ(req2.blocks_or_bytes, uint32_t{3});
+  EXPECT_EQ(req2.address, uint32_t{0x5000});
+  EXPECT_EQ(req2.op_code, uint32_t{0});
+  EXPECT_EQ(req2.block_mode, uint32_t{0});
+  EXPECT_EQ(req2.function_number, uint32_t{3});
+  EXPECT_EQ(req2.rw_flag, uint32_t{0});
 }
 
 TEST_F(SdioScatterGatherTest, ScatterGatherBlockModeNoMultiBlock) {
@@ -1652,47 +1620,47 @@ TEST_F(SdioScatterGatherTest, ScatterGatherBlockModeNoMultiBlock) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   std::vector<uint8_t> actual = sdmmc_.Read(0x1000, 16, 5);
-  EXPECT_BYTES_EQ(actual.data(), kTestData1 + 8, 7);
-  EXPECT_BYTES_EQ(actual.data() + 7, kTestData2 + 4, 3);
-  EXPECT_BYTES_EQ(actual.data() + 10, kTestData3 + 8, 5);
+  EXPECT_EQ(0, memcmp(actual.data(), kTestData1 + 8, 7));
+  EXPECT_EQ(0, memcmp(actual.data() + 7, kTestData2 + 4, 3));
+  EXPECT_EQ(0, memcmp(actual.data() + 10, kTestData3 + 8, 5));
   EXPECT_EQ(actual[15], 0xff);
 
-  ASSERT_EQ(sdmmc_.requests().size(), 4);
+  ASSERT_EQ(sdmmc_.requests().size(), size_t{4});
 
   const SdioCmd53 req1 = SdioCmd53::FromArg(sdmmc_.requests()[0].arg);
-  EXPECT_EQ(req1.blocks_or_bytes, 4);
-  EXPECT_EQ(req1.address, 0x1000);
-  EXPECT_EQ(req1.op_code, 1);
-  EXPECT_EQ(req1.block_mode, 0);
-  EXPECT_EQ(req1.function_number, 5);
-  EXPECT_EQ(req1.rw_flag, 1);
+  EXPECT_EQ(req1.blocks_or_bytes, uint32_t{4});
+  EXPECT_EQ(req1.address, uint32_t{0x1000});
+  EXPECT_EQ(req1.op_code, uint32_t{1});
+  EXPECT_EQ(req1.block_mode, uint32_t{0});
+  EXPECT_EQ(req1.function_number, uint32_t{5});
+  EXPECT_EQ(req1.rw_flag, uint32_t{1});
 
   const SdioCmd53 req2 = SdioCmd53::FromArg(sdmmc_.requests()[1].arg);
-  EXPECT_EQ(req2.blocks_or_bytes, 4);
-  EXPECT_EQ(req2.address, 0x1000 + 4);
-  EXPECT_EQ(req2.op_code, 1);
-  EXPECT_EQ(req2.block_mode, 0);
-  EXPECT_EQ(req2.function_number, 5);
-  EXPECT_EQ(req2.rw_flag, 1);
+  EXPECT_EQ(req2.blocks_or_bytes, uint32_t{4});
+  EXPECT_EQ(req2.address, uint32_t{0x1000 + 4});
+  EXPECT_EQ(req2.op_code, uint32_t{1});
+  EXPECT_EQ(req2.block_mode, uint32_t{0});
+  EXPECT_EQ(req2.function_number, uint32_t{5});
+  EXPECT_EQ(req2.rw_flag, uint32_t{1});
 
   const SdioCmd53 req3 = SdioCmd53::FromArg(sdmmc_.requests()[2].arg);
-  EXPECT_EQ(req3.blocks_or_bytes, 4);
-  EXPECT_EQ(req3.address, 0x1000 + 8);
-  EXPECT_EQ(req3.op_code, 1);
-  EXPECT_EQ(req3.block_mode, 0);
-  EXPECT_EQ(req3.function_number, 5);
-  EXPECT_EQ(req3.rw_flag, 1);
+  EXPECT_EQ(req3.blocks_or_bytes, uint32_t{4});
+  EXPECT_EQ(req3.address, uint32_t{0x1000 + 8});
+  EXPECT_EQ(req3.op_code, uint32_t{1});
+  EXPECT_EQ(req3.block_mode, uint32_t{0});
+  EXPECT_EQ(req3.function_number, uint32_t{5});
+  EXPECT_EQ(req3.rw_flag, uint32_t{1});
 
   const SdioCmd53 req4 = SdioCmd53::FromArg(sdmmc_.requests()[3].arg);
-  EXPECT_EQ(req4.blocks_or_bytes, 3);
-  EXPECT_EQ(req4.address, 0x1000 + 12);
-  EXPECT_EQ(req4.op_code, 1);
-  EXPECT_EQ(req4.block_mode, 0);
-  EXPECT_EQ(req4.function_number, 5);
-  EXPECT_EQ(req4.rw_flag, 1);
+  EXPECT_EQ(req4.blocks_or_bytes, uint32_t{3});
+  EXPECT_EQ(req4.address, uint32_t{0x1000 + 12});
+  EXPECT_EQ(req4.op_code, uint32_t{1});
+  EXPECT_EQ(req4.block_mode, uint32_t{0});
+  EXPECT_EQ(req4.function_number, uint32_t{5});
+  EXPECT_EQ(req4.rw_flag, uint32_t{1});
 }
 
 TEST_F(SdioScatterGatherTest, ScatterGatherBlockModeMultipleFinalBuffers) {
@@ -1719,30 +1687,30 @@ TEST_F(SdioScatterGatherTest, ScatterGatherBlockModeMultipleFinalBuffers) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
-  EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper1_.start()) + 8, kTestData1, 7);
-  EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper2_.start()) + 4, kTestData1 + 7, 3);
-  EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper3_.start()) + 8, kTestData1 + 10, 3);
-  EXPECT_BYTES_EQ(static_cast<uint8_t*>(mapper1_.start()), kTestData1 + 13, 2);
+  EXPECT_EQ(0, memcmp(static_cast<uint8_t*>(mapper1_.start()) + 8, kTestData1, 7));
+  EXPECT_EQ(0, memcmp(static_cast<uint8_t*>(mapper2_.start()) + 4, kTestData1 + 7, 3));
+  EXPECT_EQ(0, memcmp(static_cast<uint8_t*>(mapper3_.start()) + 8, kTestData1 + 10, 3));
+  EXPECT_EQ(0, memcmp(static_cast<uint8_t*>(mapper1_.start()), kTestData1 + 13, 2));
 
-  ASSERT_EQ(sdmmc_.requests().size(), 2);
+  ASSERT_EQ(sdmmc_.requests().size(), size_t{2});
 
   const SdioCmd53 req1 = SdioCmd53::FromArg(sdmmc_.requests()[0].arg);
-  EXPECT_EQ(req1.blocks_or_bytes, 3);
-  EXPECT_EQ(req1.address, 0x3000);
-  EXPECT_EQ(req1.op_code, 1);
-  EXPECT_EQ(req1.block_mode, 1);
-  EXPECT_EQ(req1.function_number, 1);
-  EXPECT_EQ(req1.rw_flag, 0);
+  EXPECT_EQ(req1.blocks_or_bytes, uint32_t{3});
+  EXPECT_EQ(req1.address, uint32_t{0x3000});
+  EXPECT_EQ(req1.op_code, uint32_t{1});
+  EXPECT_EQ(req1.block_mode, uint32_t{1});
+  EXPECT_EQ(req1.function_number, uint32_t{1});
+  EXPECT_EQ(req1.rw_flag, uint32_t{0});
 
   const SdioCmd53 req2 = SdioCmd53::FromArg(sdmmc_.requests()[1].arg);
-  EXPECT_EQ(req2.blocks_or_bytes, 3);
-  EXPECT_EQ(req2.address, 0x3000 + 12);
-  EXPECT_EQ(req2.op_code, 1);
-  EXPECT_EQ(req2.block_mode, 0);
-  EXPECT_EQ(req2.function_number, 1);
-  EXPECT_EQ(req2.rw_flag, 0);
+  EXPECT_EQ(req2.blocks_or_bytes, uint32_t{3});
+  EXPECT_EQ(req2.address, uint32_t{0x3000 + 12});
+  EXPECT_EQ(req2.op_code, uint32_t{1});
+  EXPECT_EQ(req2.block_mode, uint32_t{0});
+  EXPECT_EQ(req2.function_number, uint32_t{1});
+  EXPECT_EQ(req2.rw_flag, uint32_t{0});
 }
 
 TEST_F(SdioScatterGatherTest, ScatterGatherBlockModeLastAligned) {
@@ -1770,31 +1738,31 @@ TEST_F(SdioScatterGatherTest, ScatterGatherBlockModeLastAligned) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   std::vector<uint8_t> actual = sdmmc_.Read(0x1000, 16, 3);
-  EXPECT_BYTES_EQ(actual.data(), kTestData1 + 8, 7);
-  EXPECT_BYTES_EQ(actual.data() + 7, kTestData2 + 4, 5);
-  EXPECT_BYTES_EQ(actual.data() + 12, kTestData3 + 8, 3);
+  EXPECT_EQ(0, memcmp(actual.data(), kTestData1 + 8, 7));
+  EXPECT_EQ(0, memcmp(actual.data() + 7, kTestData2 + 4, 5));
+  EXPECT_EQ(0, memcmp(actual.data() + 12, kTestData3 + 8, 3));
   EXPECT_EQ(actual[15], 0xff);
 
-  ASSERT_EQ(sdmmc_.requests().size(), 2);
+  ASSERT_EQ(sdmmc_.requests().size(), size_t{2});
 
   const SdioCmd53 req1 = SdioCmd53::FromArg(sdmmc_.requests()[0].arg);
-  EXPECT_EQ(req1.blocks_or_bytes, 3);
-  EXPECT_EQ(req1.address, 0x1000);
-  EXPECT_EQ(req1.op_code, 1);
-  EXPECT_EQ(req1.block_mode, 1);
-  EXPECT_EQ(req1.function_number, 3);
-  EXPECT_EQ(req1.rw_flag, 1);
+  EXPECT_EQ(req1.blocks_or_bytes, uint32_t{3});
+  EXPECT_EQ(req1.address, uint32_t{0x1000});
+  EXPECT_EQ(req1.op_code, uint32_t{1});
+  EXPECT_EQ(req1.block_mode, uint32_t{1});
+  EXPECT_EQ(req1.function_number, uint32_t{3});
+  EXPECT_EQ(req1.rw_flag, uint32_t{1});
 
   const SdioCmd53 req2 = SdioCmd53::FromArg(sdmmc_.requests()[1].arg);
-  EXPECT_EQ(req2.blocks_or_bytes, 3);
-  EXPECT_EQ(req2.address, 0x1000 + 12);
-  EXPECT_EQ(req2.op_code, 1);
-  EXPECT_EQ(req2.block_mode, 0);
-  EXPECT_EQ(req2.function_number, 3);
-  EXPECT_EQ(req2.rw_flag, 1);
+  EXPECT_EQ(req2.blocks_or_bytes, uint32_t{3});
+  EXPECT_EQ(req2.address, uint32_t{0x1000 + 12});
+  EXPECT_EQ(req2.op_code, uint32_t{1});
+  EXPECT_EQ(req2.block_mode, uint32_t{0});
+  EXPECT_EQ(req2.function_number, uint32_t{3});
+  EXPECT_EQ(req2.rw_flag, uint32_t{1});
 }
 
 TEST_F(SdioScatterGatherTest, ScatterGatherOnlyFullBlocks) {
@@ -1822,23 +1790,23 @@ TEST_F(SdioScatterGatherTest, ScatterGatherOnlyFullBlocks) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   std::vector<uint8_t> actual = sdmmc_.Read(0x1000, 17, 3);
-  EXPECT_BYTES_EQ(actual.data(), kTestData1 + 8, 7);
-  EXPECT_BYTES_EQ(actual.data() + 7, kTestData2 + 4, 5);
-  EXPECT_BYTES_EQ(actual.data() + 12, kTestData3 + 8, 4);
+  EXPECT_EQ(0, memcmp(actual.data(), kTestData1 + 8, 7));
+  EXPECT_EQ(0, memcmp(actual.data() + 7, kTestData2 + 4, 5));
+  EXPECT_EQ(0, memcmp(actual.data() + 12, kTestData3 + 8, 4));
   EXPECT_EQ(actual[16], 0xff);
 
-  ASSERT_EQ(sdmmc_.requests().size(), 1);
+  ASSERT_EQ(sdmmc_.requests().size(), size_t{1});
 
   const SdioCmd53 req1 = SdioCmd53::FromArg(sdmmc_.requests()[0].arg);
-  EXPECT_EQ(req1.blocks_or_bytes, 4);
-  EXPECT_EQ(req1.address, 0x1000);
-  EXPECT_EQ(req1.op_code, 1);
-  EXPECT_EQ(req1.block_mode, 1);
-  EXPECT_EQ(req1.function_number, 3);
-  EXPECT_EQ(req1.rw_flag, 1);
+  EXPECT_EQ(req1.blocks_or_bytes, uint32_t{4});
+  EXPECT_EQ(req1.address, uint32_t{0x1000});
+  EXPECT_EQ(req1.op_code, uint32_t{1});
+  EXPECT_EQ(req1.block_mode, uint32_t{1});
+  EXPECT_EQ(req1.function_number, uint32_t{3});
+  EXPECT_EQ(req1.rw_flag, uint32_t{1});
 }
 
 TEST_F(SdioScatterGatherTest, ScatterGatherOverMaxTransferSize) {
@@ -1866,33 +1834,33 @@ TEST_F(SdioScatterGatherTest, ScatterGatherOverMaxTransferSize) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
-  ASSERT_EQ(sdmmc_.requests().size(), 3);
+  ASSERT_EQ(sdmmc_.requests().size(), size_t{3});
 
   const SdioCmd53 req1 = SdioCmd53::FromArg(sdmmc_.requests()[0].arg);
-  EXPECT_EQ(req1.blocks_or_bytes, 511);
-  EXPECT_EQ(req1.address, 0x1000);
-  EXPECT_EQ(req1.op_code, 1);
-  EXPECT_EQ(req1.block_mode, 1);
-  EXPECT_EQ(req1.function_number, 3);
-  EXPECT_EQ(req1.rw_flag, 1);
+  EXPECT_EQ(req1.blocks_or_bytes, uint32_t{511});
+  EXPECT_EQ(req1.address, uint32_t{0x1000});
+  EXPECT_EQ(req1.op_code, uint32_t{1});
+  EXPECT_EQ(req1.block_mode, uint32_t{1});
+  EXPECT_EQ(req1.function_number, uint32_t{3});
+  EXPECT_EQ(req1.rw_flag, uint32_t{1});
 
   const SdioCmd53 req2 = SdioCmd53::FromArg(sdmmc_.requests()[1].arg);
-  EXPECT_EQ(req2.blocks_or_bytes, 511);
-  EXPECT_EQ(req2.address, 0x1000 + (511 * 4));
-  EXPECT_EQ(req2.op_code, 1);
-  EXPECT_EQ(req2.block_mode, 1);
-  EXPECT_EQ(req2.function_number, 3);
-  EXPECT_EQ(req2.rw_flag, 1);
+  EXPECT_EQ(req2.blocks_or_bytes, uint32_t{511});
+  EXPECT_EQ(req2.address, uint32_t{0x1000 + (511 * 4)});
+  EXPECT_EQ(req2.op_code, uint32_t{1});
+  EXPECT_EQ(req2.block_mode, uint32_t{1});
+  EXPECT_EQ(req2.function_number, uint32_t{3});
+  EXPECT_EQ(req2.rw_flag, uint32_t{1});
 
   const SdioCmd53 req3 = SdioCmd53::FromArg(sdmmc_.requests()[2].arg);
-  EXPECT_EQ(req3.blocks_or_bytes, 103);
-  EXPECT_EQ(req3.address, 0x1000 + (511 * 4 * 2));
-  EXPECT_EQ(req3.op_code, 1);
-  EXPECT_EQ(req3.block_mode, 1);
-  EXPECT_EQ(req3.function_number, 3);
-  EXPECT_EQ(req3.rw_flag, 1);
+  EXPECT_EQ(req3.blocks_or_bytes, uint32_t{103});
+  EXPECT_EQ(req3.address, uint32_t{0x1000 + (511 * 4 * 2)});
+  EXPECT_EQ(req3.op_code, uint32_t{1});
+  EXPECT_EQ(req3.block_mode, uint32_t{1});
+  EXPECT_EQ(req3.function_number, uint32_t{3});
+  EXPECT_EQ(req3.rw_flag, uint32_t{1});
 }
 
 TEST_F(SdioControllerDeviceTest, RequestCardReset) {
@@ -1906,7 +1874,6 @@ TEST_F(SdioControllerDeviceTest, RequestCardReset) {
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 | SDMMC_HOST_CAP_SDR50 |
               SDMMC_HOST_CAP_DDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
@@ -1916,18 +1883,18 @@ TEST_F(SdioControllerDeviceTest, RequestCardReset) {
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
-  EXPECT_EQ(sdmmc_.bus_freq(), 208'000'000);
+  EXPECT_EQ(sdmmc_.bus_freq(), uint32_t{208'000'000});
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_SDR104);
 
   client->RequestCardReset().ThenExactlyOnce([](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   });
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
   EXPECT_EQ(sdmmc_.bus_width(), SDMMC_BUS_WIDTH_FOUR);
-  EXPECT_EQ(sdmmc_.bus_freq(), 208'000'000);
+  EXPECT_EQ(sdmmc_.bus_freq(), uint32_t{208'000'000});
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_SDR104);
 }
 
@@ -1938,7 +1905,6 @@ TEST_F(SdioControllerDeviceTest, PerformTuning) {
   sdmmc_.set_host_info({
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
@@ -1951,7 +1917,7 @@ TEST_F(SdioControllerDeviceTest, PerformTuning) {
     EXPECT_TRUE(result->is_ok());
   });
 
-  runtime_.RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 }
 
 }  // namespace sdmmc

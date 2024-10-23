@@ -202,8 +202,8 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         let size = file_to_flash.metadata().map_err(FlashError::from)?.len();
         let size = u32::try_from(size).map_err(|e| FlashError::InvalidFileSize(e))?;
         //timeout rate is in mb per seconds
-        let min_timeout: i64 = get(MIN_FLASH_TIMEOUT).await.map_err(FlashError::from)?;
-        let timeout_rate: i64 = get(FLASH_TIMEOUT_RATE).await.map_err(FlashError::from)?;
+        let min_timeout: i64 = get(MIN_FLASH_TIMEOUT).map_err(FlashError::from)?;
+        let timeout_rate: i64 = get(FLASH_TIMEOUT_RATE).map_err(FlashError::from)?;
         let megabytes = (size / 1000000) as i64;
         let mut timeout = megabytes / timeout_rate;
         timeout = std::cmp::max(timeout, min_timeout);

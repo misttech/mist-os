@@ -12,7 +12,7 @@ use wlan_common::mac::BeaconHdr;
 use wlan_common::timer::EventId;
 use wlan_common::{ie, TimeUnit};
 use zerocopy::SplitByteSlice;
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
 
 pub trait ChannelActions {
     fn switch_channel(
@@ -97,7 +97,7 @@ impl ChannelState {
     fn channel_switch_time_from_count(&self, channel_switch_count: u8) -> fasync::MonotonicInstant {
         let beacon_interval =
             self.beacon_interval.clone().unwrap_or(TimeUnit::DEFAULT_BEACON_INTERVAL);
-        let beacon_duration = fasync::Duration::from(beacon_interval);
+        let beacon_duration = fasync::MonotonicDuration::from(beacon_interval);
         let duration = beacon_duration * channel_switch_count;
         let now = fasync::MonotonicInstant::now();
         let mut last_beacon =
@@ -896,7 +896,7 @@ mod tests {
         assert!(actions.actions.is_empty());
 
         // CSA action frame arrives some time between beacons.
-        exec.set_fake_time(bcn_time - fasync::Duration::from_micros(500));
+        exec.set_fake_time(bcn_time - fasync::MonotonicDuration::from_micros(500));
         {
             let mut bound_channel_state = channel_state.test_bind(&mut actions);
             let elements = csa_bytes(0, NEW_CHANNEL, 1);
@@ -961,7 +961,7 @@ mod tests {
         exec.set_fake_time(
             fasync::MonotonicInstant::from_nanos(0)
                 + bcn_header.beacon_interval.into()
-                + fasync::Duration::from_micros(500),
+                + fasync::MonotonicDuration::from_micros(500),
         );
 
         // CSA action frame arrives after the missed beacon.

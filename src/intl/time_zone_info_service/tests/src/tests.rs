@@ -10,10 +10,10 @@ mod tests {
         self as fintl, CivilTime, CivilToAbsoluteTimeOptions, DayOfWeek, Month,
         RepeatedTimeConversion, SkippedTimeConversion, TimeZoneId, TimeZoneInfo, TimeZonesProxy,
     };
+    use fuchsia_async as fasync;
     use fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
     };
-    use {fuchsia_async as fasync, zx};
 
     static SVC_URL: &str =
         "fuchsia-pkg://fuchsia.com/time-zone-info-service-test#meta/time-zone-info-service.cm";

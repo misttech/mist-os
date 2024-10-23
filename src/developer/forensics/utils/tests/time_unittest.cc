@@ -137,26 +137,26 @@ TEST(TimeTest, FormatDuration_NegativeRandomNSec) {
 TEST(TimeTest, CurrentUtcTimeRaw) {
   timekeeper::TestClock clock;
 
-  clock.Set(kTime1);
+  clock.SetUtc(kTime1);
   EXPECT_EQ(CurrentUtcTimeRaw(&clock), kTime1);
 
-  clock.Set(kTime2);
+  clock.SetUtc(kTime2);
   EXPECT_EQ(CurrentUtcTimeRaw(&clock), kTime2);
 
-  clock.Set(kTime3);
+  clock.SetUtc(kTime3);
   EXPECT_EQ(CurrentUtcTimeRaw(&clock), kTime3);
 }
 
 TEST(TimeTest, CurrentUtcTime) {
   timekeeper::TestClock clock;
 
-  clock.Set(kTime1);
+  clock.SetUtc(kTime1);
   EXPECT_EQ(CurrentUtcTime(&clock), kTime1Str);
 
-  clock.Set(kTime2);
+  clock.SetUtc(kTime2);
   EXPECT_EQ(CurrentUtcTime(&clock), kTime2Str);
 
-  clock.Set(kTime3);
+  clock.SetUtc(kTime3);
   EXPECT_EQ(CurrentUtcTime(&clock), kTime3Str);
 }
 

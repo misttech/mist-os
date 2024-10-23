@@ -53,13 +53,7 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items>,
 
   // fuchsia_boot::Items methods
   void Get(GetRequestView request, GetCompleter::Sync& completer) override {
-    zx::vmo vmo;
-    uint32_t length = 0;
-    zx_status_t status = GetBootItem(request->type, request->extra, &vmo, &length);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to get boot items", zx_status_get_string(status);
-    }
-    completer.Reply(std::move(vmo), length);
+    completer.Reply({}, 0);
   }
 
   void Get2(Get2RequestView request, Get2Completer::Sync& completer) override {
@@ -91,7 +85,20 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items>,
       completer.ReplySuccess(
           fidl::VectorView<fuchsia_boot::wire::RetrievedItems>::FromExternal(result));
     } else {
-      completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+      zx::vmo vmo;
+      uint32_t length = 0;
+      uint32_t extra = 0;
+
+      zx_status_t status = GetBootItem(request->type, extra, &vmo, &length);
+      if (status != ZX_OK) {
+        completer.Reply(zx::error(status));
+        return;
+      }
+      std::vector<fuchsia_boot::wire::RetrievedItems> result;
+      fuchsia_boot::wire::RetrievedItems items = {std::move(vmo), length, extra};
+      result.emplace_back(std::move(items));
+      completer.ReplySuccess(
+          fidl::VectorView<fuchsia_boot::wire::RetrievedItems>::FromExternal(result));
     }
   }
 
@@ -142,7 +149,7 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items>,
         break;
       }
       default:
-        break;
+        return ZX_ERR_NOT_FOUND;
     }
     *out = std::move(vmo);
     return ZX_OK;

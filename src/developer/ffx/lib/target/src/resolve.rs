@@ -17,10 +17,12 @@ use futures::future::join_all;
 use futures::{FutureExt, StreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::time::Duration;
 
 use crate::connection::Connection;
@@ -219,7 +221,7 @@ async fn try_get_target_info(
 impl RetrievedTargetInfo {
     async fn get(context: &EnvironmentContext, addrs: &[addr::TargetAddr]) -> Result<Self> {
         let ssh_timeout: u64 =
-            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
         let ssh_timeout = Duration::from_millis(ssh_timeout);
         for addr in addrs {
             // Ensure there's a port
@@ -352,9 +354,107 @@ impl Default for QueryResolver {
     }
 }
 
+/// Return a stream of handles matching the query. If a target
+/// matches the query exactly (i.e. the query is the full name
+/// of the target, not a substring), return the handle immediately
+/// and close the stream. Otherwise, run until the timeout
+/// (default 2 seconds, configurable via "discovery.timeout").
+/// The contents of the stream can be filtered by USB and mDNS.
+pub async fn get_discovery_stream(
+    query: TargetInfoQuery,
+    usb: bool,
+    mdns: bool,
+    ctx: &EnvironmentContext,
+) -> Result<impl futures::Stream<Item = Result<TargetHandle>>> {
+    let mut sources =
+        DiscoverySources::MANUAL | DiscoverySources::EMULATOR | DiscoverySources::FASTBOOT_FILE;
+    if usb {
+        sources = sources | DiscoverySources::USB;
+    }
+    if mdns {
+        sources = sources | DiscoverySources::MDNS;
+    }
+    // Get nodename, in case we're trying to find an exact match
+    QueryResolver::new(sources).get_discovery_stream(query, ctx).await
+}
+
 impl QueryResolver {
     fn new(sources: DiscoverySources) -> Self {
         Self { sources }
+    }
+
+    async fn get_discovery_stream(
+        &self,
+        query: TargetInfoQuery,
+        ctx: &EnvironmentContext,
+    ) -> Result<impl futures::Stream<Item = Result<TargetHandle>>> {
+        let query_clone = query.clone();
+        let filter = move |handle: &TargetHandle| {
+            let description = handle_to_description(handle);
+            query_clone.match_description(&description)
+        };
+        let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)?;
+        let fastboot_file_path: Option<PathBuf> =
+            ctx.get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
+        let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).unwrap_or(2000);
+        let delay = Duration::from_millis(discovery_delay);
+        let stream = discovery::wait_for_devices(
+            filter,
+            Some(emu_instance_root),
+            fastboot_file_path,
+            true,
+            false,
+            self.sources,
+        )
+        .await?;
+
+        // This is tricky. We want the stream to complete immediately if we find
+        // a target whose name/serial matches the query exactly. Otherwise, run
+        // until the timer fires.
+        // We can't use `Stream::take_until()`, because that would require us
+        // to return true for the found item, and false for the _next_ item.
+        // But there may be no next item, so the stream would end up waiting
+        // for the timer anyway. Instead, we create two futures: the timer, and
+        // one that is ready when we find the target we're looking for. Then we
+        // use `Stream::take_until()`, waiting until _either_ of those futures
+        // is ready (by using `race()`). The only remaining tricky part is that
+        // we need to examine each event to determine if it matches what we're
+        // looking for -- so we interpose a closure via `Stream::map()` that
+        // examines each item, before returning them unmodified.
+        // We could stop the race early in case of failure by using the same
+        // technique, I suppose.
+        let timer = fuchsia_async::Timer::new(delay).fuse();
+        let found_target_event = async_utils::event::Event::new();
+        let found_it = found_target_event.wait().fuse();
+        // We can see the same handle multiple times (e.g. if it produces multiple
+        // mDNS events during our timeout period). "seen" lets us dedup those
+        // handles.
+        let seen = Rc::new(RefCell::new(HashSet::new()));
+        Ok(stream
+            .filter_map(move |ev| {
+                let found_ev = found_target_event.clone();
+                let q_clone = query.clone();
+                let seen = seen.clone();
+                async move {
+                    match ev {
+                        Ok(TargetEvent::Added(ref h)) => {
+                            if seen.borrow().contains(h) {
+                                None
+                            } else {
+                                if query_matches_handle(&q_clone, h) {
+                                    found_ev.signal();
+                                }
+                                seen.borrow_mut().insert(h.clone());
+                                Some(Ok((*h).clone()))
+                            }
+                        }
+                        // We've only asked for Added events
+                        Ok(_) => unreachable!(),
+                        Err(e) => Some(Err(e)),
+                    }
+                }
+            })
+            .take_until(futures_lite::future::race(timer, found_it)))
     }
 }
 
@@ -417,83 +517,12 @@ impl QueryResolverT for QueryResolver {
         query: TargetInfoQuery,
         ctx: &EnvironmentContext,
     ) -> Result<Vec<TargetHandle>> {
-        // Get nodename, in case we're trying to find an exact match
-        let query_clone = query.clone();
-        let filter = move |handle: &TargetHandle| {
-            let description = handle_to_description(handle);
-            query_clone.match_description(&description)
-        };
-        let emu_instance_root: PathBuf = ctx.get(emulator_instance::EMU_INSTANCE_ROOT_DIR)?;
-        let fastboot_file_path: Option<PathBuf> =
-            ctx.get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
-        let stream = discovery::wait_for_devices(
-            filter,
-            Some(emu_instance_root),
-            fastboot_file_path,
-            true,
-            false,
-            self.sources,
-        )
-        .await?;
-        let discovery_delay = ctx.get(CONFIG_LOCAL_DISCOVERY_TIMEOUT).unwrap_or(2000);
-        let delay = Duration::from_millis(discovery_delay);
-
-        // This is tricky. We want the stream to complete immediately if we find
-        // a target whose name/serial matches the query exactly. Otherwise, run
-        // until the timer fires.
-        // We can't use `Stream::wait_until()`, because that would require us
-        // to return true for the found item, and false for the _next_ item.
-        // But there may be no next item, so the stream would end up waiting
-        // for the timer anyway. Instead, we create two futures: the timer, and
-        // one that is ready when we find the target we're looking for. Then we
-        // use `Stream::take_until()`, waiting until _either_ of those futures
-        // is ready (by using `race()`). The only remaining tricky part is that
-        // we need to examine each event to determine if it matches what we're
-        // looking for -- so we interpose a closure via `Stream::map()` that
-        // examines each item, before returning them unmodified.
-        // Oh, and once we've got a set of results, if any of them are Err,
-        // cause the whole thing to be an Err.  We could stop the race early in
-        // case of failure by using the same technique, I suppose.
-        let target_events: Result<Vec<TargetEvent>> = {
-            let timer = fuchsia_async::Timer::new(delay).fuse();
-            let found_target_event = async_utils::event::Event::new();
-            let found_it = found_target_event.wait().fuse();
-            let results: Vec<Result<_>> = stream
-                .map(move |ev| {
-                    if let Ok(TargetEvent::Added(ref h)) = ev {
-                        if query_matches_handle(&query, h) {
-                            found_target_event.signal();
-                        }
-                        ev
-                    } else {
-                        unreachable!()
-                    }
-                })
-                .take_until(futures_lite::future::race(timer, found_it))
-                .collect()
-                .await;
-            // Fail if any results are Err
-            tracing::debug!("target events results: {results:?}");
-            let r: Result<Vec<_>> = results.into_iter().collect();
-            r
-        };
-
-        // Extract handles from Added events
-        let added_handles: Vec<_> = target_events?
-            .into_iter()
-            .map(|e| {
-                if let discovery::TargetEvent::Added(handle) = e {
-                    handle
-                } else {
-                    unreachable!()
-                }
-            })
-            .collect();
-
-        // Sometimes libdiscovery returns multiple Added events for the same target (I think always
-        // user emulators). The information is always the same, let's just extract the unique entries.
-        let unique_handles = added_handles.into_iter().collect::<HashSet<_>>();
-        Ok(unique_handles.into_iter().collect())
+        let results: Vec<Result<_>> = self.get_discovery_stream(query, ctx).await?.collect().await;
+        // Fail if any results are Err
+        tracing::debug!("target events results: {results:?}");
+        // If any of the results in the stream are Err, cause the whole thing to
+        // be an Err.
+        results.into_iter().collect()
     }
 
     #[allow(async_fn_in_trait)]
@@ -506,7 +535,7 @@ impl QueryResolverT for QueryResolver {
         // environment context for locating manual targets.
         let finder = manual_targets::Config::default();
         let ssh_timeout: u64 =
-            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
         let ssh_timeout = Duration::from_millis(ssh_timeout);
         let mut res = None;
         for t in manual_targets::watcher::parse_manual_targets(&finder).await.into_iter() {

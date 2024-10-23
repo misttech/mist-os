@@ -2,15 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::config::SshConfig;
-use crate::parse::ParseSshConnectionError;
 use anyhow::{anyhow, Context as _, Result};
 use ffx_config::EnvironmentContext;
-use fuchsia_async::TimeoutExt;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::Command;
-use std::time::Duration;
-use tokio::io::AsyncRead;
 
 const SSH_PRIV: &str = "ssh.priv";
 
@@ -77,27 +73,6 @@ impl From<&str> for SshError {
     }
 }
 
-pub async fn extract_ssh_error<R: AsyncRead + Unpin>(
-    stderr_reader: &mut R,
-    logtofile: bool,
-    ctx: &EnvironmentContext,
-) -> SshError {
-    // Flush any remaining lines, but let's not wait more than one second
-    let mut lb = crate::parse::LineBuffer::new();
-    let mut last_line = "".to_string();
-    while let Ok(line) = crate::parse::read_ssh_line(&mut lb, stderr_reader)
-        .on_timeout(Duration::from_secs(1), || Err(ParseSshConnectionError::Timeout))
-        .await
-    {
-        if logtofile {
-            crate::parse::write_ssh_log("E", &line, ctx).await;
-        }
-        tracing::error!("SSH stderr: {line}");
-        last_line = line;
-    }
-    SshError::from(last_line)
-}
-
 #[cfg(not(test))]
 pub async fn get_ssh_key_paths() -> Result<Vec<String>> {
     use anyhow::Context;
@@ -123,7 +98,7 @@ async fn get_ssh_key_paths() -> Result<Vec<String>> {
 
 async fn apply_auth_sock(cmd: &mut Command) {
     const SSH_AUTH_SOCK: &str = "ssh.auth-sock";
-    if let Ok(path) = ffx_config::get::<String, _>(SSH_AUTH_SOCK).await {
+    if let Ok(path) = ffx_config::get::<String, _>(SSH_AUTH_SOCK) {
         cmd.env("SSH_AUTH_SOCK", path);
     }
 }

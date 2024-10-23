@@ -101,7 +101,7 @@ mod tests {
         result
     }
 
-    const FAKE_TIMESTAMP: i64 = 12345678;
+    const FAKE_TIMESTAMP: fidl::MonotonicInstant = fidl::MonotonicInstant::from_nanos(12345678);
     const FAKE_THREAD_KOID: u64 = 8989;
     const FAKE_THREAD_NAME: &str = "fake-thread-name";
     const FAKE_THREAD_KEY: u64 = 1212;

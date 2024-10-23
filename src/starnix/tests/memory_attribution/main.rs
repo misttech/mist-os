@@ -18,7 +18,7 @@ use zx::{MapDetails, MapInfo, MappingDetails};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_starnix_container as fcontainer, fidl_fuchsia_sys2 as fsys2, zx,
+    fidl_fuchsia_starnix_container as fcontainer, fidl_fuchsia_sys2 as fsys2,
 };
 
 const PROGRAM_COLLECTION: &str = "debian_programs";

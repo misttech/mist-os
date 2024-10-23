@@ -11,6 +11,8 @@ use serde::de::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::str::FromStr;
 
+pub use diagnostics_log_types::Severity;
+
 /// Diagnostics configuration options for the diagnostics area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -160,7 +162,7 @@ pub struct ComponentInitialInterest {
     /// The URL or moniker for the component which should receive the initial interest.
     pub component: UrlOrMoniker,
     /// The log severity the initial interest should specify.
-    pub log_severity: LogSeverity,
+    pub log_severity: Severity,
 }
 // LINT.ThenChange(/src/diagnostics/archivist/src/logs/repository.rs)
 
@@ -207,32 +209,6 @@ impl<'de> Deserialize<'de> for UrlOrMoniker {
                 "Expected a moniker or url. {} was neither",
                 variant
             )))
-        }
-    }
-}
-
-// LINT.IfChange
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum LogSeverity {
-    Trace,
-    Debug,
-    Info,
-    Warning,
-    Error,
-    Fatal,
-}
-// LINT.ThenChange(/src/lib/diagnostics/data/rust/src/lib.rs)
-
-impl std::fmt::Display for LogSeverity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Trace => write!(f, "trace"),
-            Self::Debug => write!(f, "debug"),
-            Self::Info => write!(f, "info"),
-            Self::Warning => write!(f, "warn"),
-            Self::Error => write!(f, "error"),
-            Self::Fatal => write!(f, "fatal"),
         }
     }
 }
@@ -369,18 +345,18 @@ mod tests {
                         component: UrlOrMoniker::Url(
                             "fuchsia-boot:///driver_host#meta/driver_host.cm".to_string()
                         ),
-                        log_severity: LogSeverity::Debug,
+                        log_severity: Severity::Debug,
                     },
                     ComponentInitialInterest {
                         component: UrlOrMoniker::Url(
                             "fuchsia-pkg://fuchsia.com/trace_manager#meta/trace_manager.cm"
                                 .to_string()
                         ),
-                        log_severity: LogSeverity::Error,
+                        log_severity: Severity::Error,
                     },
                     ComponentInitialInterest {
                         component: UrlOrMoniker::Moniker("/bootstrap/driver_manager".to_string()),
-                        log_severity: LogSeverity::Fatal,
+                        log_severity: Severity::Fatal,
                     },
                 ],
                 ..Default::default()
@@ -395,18 +371,18 @@ mod tests {
                 component: UrlOrMoniker::Url(
                     "fuchsia-boot:///driver_host#meta/driver_host.cm".to_string()
                 ),
-                log_severity: LogSeverity::Debug,
+                log_severity: Severity::Debug,
             })
             .unwrap(),
-            "\"fuchsia-boot:///driver_host#meta/driver_host.cm:debug\""
+            "\"fuchsia-boot:///driver_host#meta/driver_host.cm:DEBUG\""
         );
         assert_eq!(
             serde_json::to_string(&ComponentInitialInterest {
                 component: UrlOrMoniker::Moniker("/bootstrap/driver_manager".to_string()),
-                log_severity: LogSeverity::Fatal,
+                log_severity: Severity::Fatal,
             })
             .unwrap(),
-            "\"/bootstrap/driver_manager:fatal\"",
+            "\"/bootstrap/driver_manager:FATAL\"",
         );
     }
 }

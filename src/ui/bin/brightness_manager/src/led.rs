@@ -6,15 +6,15 @@ use anyhow::{Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_light::{Info, LightError, LightMarker, LightProxy};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
-use fuchsia_fs::directory::open_in_namespace_deprecated;
-use fuchsia_fs::OpenFlags;
+use fuchsia_fs::directory::open_in_namespace;
+use fuchsia_fs::PERM_READABLE;
 use futures::TryStreamExt;
 
 async fn open_light() -> Result<LightProxy, Error> {
     eprintln!("Opening light");
     // Wait for the first node.
     const LIGHT_PATH: &str = "/dev/class/light";
-    let dir = open_in_namespace_deprecated(LIGHT_PATH, OpenFlags::empty())
+    let dir = open_in_namespace(LIGHT_PATH, PERM_READABLE)
         .with_context(|| format!("Opening {}", LIGHT_PATH))?;
     let path = device_watcher::watch_for_files(&dir)
         .await

@@ -13,7 +13,7 @@ use realm_client::{extend_namespace, InstalledNamespace};
 use tracing::info;
 use {
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_driver_testing as ftest, fidl_fuchsia_io as fio,
-    fidl_fuchsia_nodegroup_test as ft, fuchsia_async as fasync, zx,
+    fidl_fuchsia_nodegroup_test as ft, fuchsia_async as fasync,
 };
 
 async fn run_waiter_server(mut stream: ft::WaiterRequestStream, mut sender: mpsc::Sender<()>) {

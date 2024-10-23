@@ -6,7 +6,7 @@ use crate::attribution_client::AttributionState;
 use std::collections::{HashMap, HashSet};
 use {
     fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_memory_attribution_plugin as fplugin, zx,
+    fidl_fuchsia_memory_attribution_plugin as fplugin,
 };
 
 /// A structure containing a set of kernel resources (jobs, processes, VMOs), indexed by KOIDs.

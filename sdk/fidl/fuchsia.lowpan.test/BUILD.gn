@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.lowpan.test") {
-  sdk_category = "internal"
-
   sources = [ "device_test.fidl" ]
 
   public_deps = [

@@ -54,6 +54,9 @@ open protocol Manager {
         /// The event that will be signaled when a message appears on `container_channel` while the
         /// container is suspended.
         4: resume_event zx.Handle:EVENTPAIR;
+
+        /// The name of the proxy, used for debugging purposes.
+        5: name string:zx.MAX_NAME_LEN;
     });
 };
 

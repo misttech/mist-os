@@ -3,32 +3,51 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_library.gni")
 
-executable("shutdown-shim") {
-  sources = [ "main.cc" ]
+rustc_library("lib") {
+  name = "shutdown-shim"
+  edition = "2021"
 
+  sources = [ "src/lib.rs" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
-    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
-    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
-    "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
-    "//sdk/lib/async-default",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fit",
-    "//src/storage/lib/vfs/cpp",
-    "//src/sys/lib/stdout-to-debuglog/cpp",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+  ]
+}
+
+rustc_binary("bin") {
+  output_name = "shutdown-shim"
+  edition = "2021"
+
+  configs += [ "//build/config/rust:bootfs" ]
+
+  sources = [ "src/main.rs" ]
+  deps = [
+    ":lib",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-runtime",
   ]
 }
 
 fuchsia_component("component") {
   component_name = "shutdown-shim"
   manifest = "meta/shutdown-shim.cml"
-  deps = [ ":shutdown-shim" ]
+
+  deps = [ ":bin" ]
 
   # shutdown-shim uses the boot log.
   # The includes checker wants the syslog shard because console gets the

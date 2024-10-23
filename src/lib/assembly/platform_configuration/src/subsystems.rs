@@ -384,7 +384,7 @@ fn configure_subsystems(
 
     session::SessionConfig::define_configuration(
         &context_base.for_subsystem("session"),
-        &(&platform.session, &product.session_url),
+        &(&platform.session, &product.session, &product.session_url),
         builder,
     )
     .context("Configuring the 'session' subsystem")?;
@@ -505,8 +505,7 @@ fn configure_subsystems(
 
 /// Check ffx config for whether we should execute example code.
 fn should_configure_example() -> bool {
-    futures::executor::block_on(ffx_config::get::<bool, _>(EXAMPLE_ENABLED_FLAG))
-        .unwrap_or_default()
+    ffx_config::get::<bool, _>(EXAMPLE_ENABLED_FLAG).unwrap_or_default()
 }
 
 #[cfg(test)]

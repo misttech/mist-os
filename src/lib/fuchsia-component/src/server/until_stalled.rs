@@ -19,7 +19,7 @@ use vfs::directory::immutable::Simple;
 use vfs::execution_scope::{ActiveGuard, ExecutionScope};
 use vfs::ToObjectRequest;
 use zx::MonotonicDuration;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 use super::{ServiceFs, ServiceObjTrait};
 

@@ -7,6 +7,7 @@ use crate::fuchsia::pager::{
 };
 use crate::fuchsia::volume::FxVolume;
 use anyhow::{ensure, Context, Error};
+use fidl_fuchsia_io as fio;
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::MAX_FILE_SIZE;
 use fxfs::log::*;
@@ -24,7 +25,6 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 use storage_device::buffer::{Buffer, BufferFuture};
 use vfs::temp_clone::{unblock, TempClonable};
-use {fidl_fuchsia_io as fio, zx};
 
 /// How much data each sync transaction in a given flush will cover.
 const FLUSH_BATCH_SIZE: u64 = 524_288;
@@ -1139,7 +1139,7 @@ mod tests {
     use storage_device::{buffer, DeviceHolder};
     use test_util::{assert_geq, assert_lt};
     use vfs::path::Path;
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     const BLOCK_SIZE: u32 = 512;
     const BLOCK_COUNT: u64 = 16384;

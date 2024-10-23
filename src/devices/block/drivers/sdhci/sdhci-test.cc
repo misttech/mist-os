@@ -65,7 +65,7 @@ class TestSdhci : public Sdhci {
     return ret;
   }
 
-  void* iobuf_virt() const { return iobuf_.virt(); }
+  void* iobuf_virt() const { return iobuf_->virt(); }
 
   void TriggerCardInterrupt() { card_interrupt_ = true; }
   void InjectTransferError() { inject_error_ = true; }

@@ -5,6 +5,7 @@
 use crate::root_dir::RootDir;
 use anyhow::anyhow;
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
 use std::sync::Arc;
 use tracing::error;
 use vfs::common::send_on_open_with_error;
@@ -16,7 +17,6 @@ use vfs::path::Path as VfsPath;
 use vfs::{
     immutable_attributes, CreationMode, ObjectRequestRef, ProtocolsExt as _, ToObjectRequest,
 };
-use {fidl_fuchsia_io as fio, zx};
 
 pub(crate) struct NonMetaSubdir<S: crate::NonMetaStorage> {
     root_dir: Arc<RootDir<S>>,

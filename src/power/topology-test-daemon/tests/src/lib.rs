@@ -12,7 +12,7 @@ use fuchsia_component_test::{
 use tracing::*;
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
-    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync, zx,
+    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync,
 };
 
 // Report prolonged match delay after this many loops.
@@ -287,9 +287,6 @@ async fn test_system_activity_control() -> Result<()> {
                 application_activity: {
                     power_level: 1u64,
                 },
-                full_wake_handling: {
-                    power_level: 0u64,
-                },
                 wake_handling: {
                     power_level: 0u64,
                 },
@@ -325,9 +322,6 @@ async fn test_system_activity_control() -> Result<()> {
                     power_level: 1u64,
                 },
                 application_activity: {
-                    power_level: 0u64,
-                },
-                full_wake_handling: {
                     power_level: 0u64,
                 },
                 wake_handling: {

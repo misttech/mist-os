@@ -13,9 +13,7 @@ use std::sync::Mutex;
 use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
 use zx::AsHandleRef;
-use {
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync, zx,
-};
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 use super::start::Start;
 use crate::bedrock::program::EscrowRequest;
@@ -286,6 +284,7 @@ mod tests {
 
     use assert_matches::assert_matches;
     use async_trait::async_trait;
+    use fidl_fuchsia_io as fio;
     use fuchsia_async::{self as fasync, TaskGroup, TestExecutor};
     use futures::channel::mpsc;
     use futures::lock::Mutex;
@@ -294,7 +293,6 @@ mod tests {
     use vfs::directory::entry::OpenRequest;
     use vfs::execution_scope::ExecutionScope;
     use vfs::ToObjectRequest;
-    use {fidl_fuchsia_io as fio, zx};
 
     use crate::bedrock::program::EscrowRequest;
     use crate::framework::controller;

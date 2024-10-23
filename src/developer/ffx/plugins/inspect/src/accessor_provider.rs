@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
-use async_trait::async_trait;
 use diagnostics_data::Data;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::ClientSelectorConfiguration::{SelectAll, Selectors};
@@ -84,27 +83,24 @@ impl HostArchiveReader {
     pub async fn snapshot_diagnostics_data<D>(
         &self,
         accessor: &Option<String>,
-        selectors: &[String],
+        selectors: impl IntoIterator<Item = Selector>,
     ) -> Result<Vec<Data<D>>, Error>
     where
         D: diagnostics_data::DiagnosticsData,
     {
-        let selectors = if selectors.is_empty() {
+        let mut selectors = selectors.into_iter().peekable();
+        let selectors = if selectors.peek().is_none() {
             SelectAll(true)
         } else {
-            Selectors(selectors.iter().cloned().map(|s| SelectorArgument::RawSelector(s)).collect())
+            Selectors(selectors.map(|s| SelectorArgument::StructuredSelector(s)).collect())
         };
 
         let accessor = match accessor {
             Some(ref s) => {
                 let s = add_host_before_last_dot(s)?;
-                let selector =
-                    selectors::parse_selector::<selectors::VerboseError>(&s).map_err(|e| {
-                        Error::ParseSelector(
-                            "unable to parse selector".to_owned(),
-                            anyhow!("{:?}", e),
-                        )
-                    })?;
+                let selector = selectors::parse_verbose(&s).map_err(|e| {
+                    Error::ParseSelector("unable to parse selector".to_owned(), anyhow!("{:?}", e))
+                })?;
                 let moniker_and_protocol = MonikerAndProtocol::try_from(selector)?;
 
                 let (client, server) = fidl::endpoints::create_endpoints::<ArchiveAccessorMarker>();
@@ -157,12 +153,11 @@ impl HostArchiveReader {
     }
 }
 
-#[async_trait]
 impl DiagnosticsProvider for HostArchiveReader {
     async fn snapshot<D>(
         &self,
         accessor_path: &Option<String>,
-        selectors: &[String],
+        selectors: impl IntoIterator<Item = Selector>,
     ) -> Result<Vec<Data<D>>, Error>
     where
         D: diagnostics_data::DiagnosticsData,

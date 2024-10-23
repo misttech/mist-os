@@ -7,7 +7,7 @@
 
 #include <fuchsia/hardware/sdhci/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
-#include <lib/ddk/io-buffer.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sdmmc/hw.h>
 #include <lib/sync/completion.h>
@@ -148,7 +148,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   fdf::MmioBuffer regs_mmio_buffer_;
 
   // DMA descriptors, visible for testing
-  ddk::IoBuffer iobuf_ = {};
+  std::unique_ptr<dma_buffer::ContiguousBuffer> iobuf_ = {};
 
  private:
   struct OwnedVmoInfo {

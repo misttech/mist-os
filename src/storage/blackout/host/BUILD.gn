@@ -60,9 +60,10 @@ group("blackout_workbench_vim3_unstable") {
 group("blackout_starnix_vim3_unstable") {
   testonly = true
   deps = [
+    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
     # Fxfs tests
-    ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
-    "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
+    # ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
+    # "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
   ]
 }
 
@@ -74,9 +75,10 @@ group("blackout_starnix_vim3_stable") {
 group("blackout_starnix_arm64_unstable") {
   testonly = true
   deps = [
+    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
     # Fxfs tests
-    ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
-    "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
+    # ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
+    # "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
   ]
 }
 
@@ -110,7 +112,7 @@ if (is_host) {
       component_url = "fuchsia-pkg://fuchsia.com/blackout-integration#meta/blackout-integration-component.cm"
       device_label = "test_label"
       device_path = "test_path"
-      test_duration = 5
+      load_generation_duration = 5
 
       # test case revive args
       test_case_revive = true
@@ -132,7 +134,7 @@ if (is_host) {
       component_url = "fuchsia-pkg://fuchsia.com/blackout-integration#meta/blackout-integration-component.cm"
       device_label = "loop"
       device_path = "loop"
-      test_duration = 5
+      load_generation_duration = 5
 
       # test case revive args
       test_case_revive = true
@@ -154,7 +156,7 @@ if (is_host) {
       component_url = "fuchsia-pkg://fuchsia.com/blackout-integration#meta/blackout-integration-component.cm"
       device_label = "fail"
       device_path = "fail"
-      test_duration = 0
+      load_generation_duration = 0
 
       # test case revive args
       test_case_revive = true
@@ -173,7 +175,7 @@ if (is_host) {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"
       component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
-      test_duration = 30
+      load_generation_duration = 30
 
       # TODO(https://fxbug.dev/338452001): the vim3 bootloader currently resets the gpt partition
       # table if it isn't the exact hard-coded partition table it expects, so we use the label of a
@@ -187,6 +189,7 @@ if (is_host) {
       fuchsia_device_operation = "Soft-Reboot"
     }
     environments = [ vim3_env ]
+    timeout_secs = 360
   }
 
   python_mobly_test("blackout_fxfs_tree_hard_reboot") {
@@ -200,7 +203,7 @@ if (is_host) {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"
       component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
-      test_duration = 30
+      load_generation_duration = 30
 
       # TODO(https://fxbug.dev/338452001): the vim3 bootloader currently resets the gpt partition
       # table if it isn't the exact hard-coded partition table it expects, so we use the label of a
@@ -214,6 +217,7 @@ if (is_host) {
       fuchsia_device_operation = "Hard-Reboot"
     }
     environments = [ vim3_env ]
+    timeout_secs = 360
   }
 
   python_mobly_test("blackout_fxfs_tree_idle_suspend_timer_resume") {
@@ -227,7 +231,7 @@ if (is_host) {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"
       component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
-      test_duration = 30
+      load_generation_duration = 30
 
       # The load generation for blackout normally continues forever, because the purpose is to test
       # reboot scenarios, but in suspend/resume, the storage driver will continue responding to

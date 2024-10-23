@@ -103,10 +103,13 @@
             // Routed to session-manager via core realm shards.
             // These protocols are not available on all products.
             protocol: [
+                "fuchsia.bluetooth.bredr.Profile",
                 "fuchsia.bluetooth.gatt.Server",
+                "fuchsia.bluetooth.gatt2.Server",
                 "fuchsia.bluetooth.le.Central",
                 "fuchsia.bluetooth.le.Peripheral",
                 "fuchsia.bluetooth.sys.Access",
+                "fuchsia.bluetooth.sys.HostWatcher",
                 "fuchsia.bluetooth.sys.Pairing",
                 "fuchsia.camera3.DeviceWatcher",
                 "fuchsia.cobalt.SystemDataUpdater",
@@ -554,6 +557,17 @@
         {
             protocol: "fuchsia.session.power.Handoff",
             from: "self",
+            to: "#session",
+        },
+
+        // Window manager configs.
+        {
+            config: [
+                "fuchsia.session.window.Collection",
+                "fuchsia.session.window.InitialElementUrl",
+                "fuchsia.session.window.InitialViewIdAnnotation",
+            ],
+            from: "parent",
             to: "#session",
         },
     ],

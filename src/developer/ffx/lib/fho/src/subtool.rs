@@ -11,12 +11,10 @@ use ffx_command::{
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
-use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use std::fs::File;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::ExitStatus;
-use std::sync::Arc;
 
 /// The main trait for defining an ffx tool. This is not intended to be implemented directly
 /// by the user, but instead derived via `#[derive(FfxTool)]`.
@@ -158,28 +156,12 @@ impl<T: FfxTool> FhoTool<T> {
         check_strict_constraints(&ffx.global)?;
 
         let is_machine_output = ffx.global.machine.is_some();
-        let build_info = context.build_info();
-        let injector = Injection::initialize_overnet(
-            context.clone(),
-            None,
-            DaemonVersionCheck::SameVersionInfo(build_info),
-        )
-        .await?;
+        let env = FhoEnvironment::new(context, &ffx).await?;
         let redacted_args = match send_enhanced_analytics().await {
             false => ffx.redact_subcmd(&tool),
             true => ffx.unredacted_args_for_analytics(),
         };
-        let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
-        #[allow(deprecated)] // injector field.
-        let env = FhoEnvironment {
-            behavior: crate::from_env::connection_behavior(&ffx, &injector, &context).await?,
-            ffx,
-            context: context.clone(),
-            injector,
-            lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
-        };
         let main = T::from_env(env.clone(), tool).await?;
-
         if !main.supports_machine_output() && is_machine_output {
             return Err(Error::User(anyhow::anyhow!(
                 "The machine flag is not supported for this subcommand"

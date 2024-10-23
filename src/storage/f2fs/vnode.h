@@ -22,11 +22,6 @@ enum class FAdvise {
   kCold = 1,
 };
 
-struct LockedPagesAndAddrs {
-  std::vector<block_t> block_addrs;  // Allocated block address
-  std::vector<LockedPage> pages;     // Pages matched with block address
-};
-
 // Used to track orphans and modified dirs
 enum class VnodeSet {
   kOrphan = 0,
@@ -116,7 +111,11 @@ class VnodeF2fs : public fs::PagedVnode,
   void ReleasePagedVmoUnsafe() __TA_REQUIRES(mutex_);
   void ReleasePagedVmo() __TA_EXCLUDES(mutex_);
 
-  zx::result<LockedPage> NewInodePage() __TA_EXCLUDES(mutex_);
+  virtual zx_status_t InitInodeMetadata() __TA_EXCLUDES(mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  virtual zx_status_t InitInodeMetadataUnsafe() __TA_REQUIRES(mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx::result<LockedPage> NewInodePage();
   zx_status_t RemoveInodePage();
   void UpdateInodePage(LockedPage &inode_page, bool checkpoint = false) __TA_EXCLUDES(mutex_);
 
@@ -136,20 +135,11 @@ class VnodeF2fs : public fs::PagedVnode,
       __TA_EXCLUDES(f2fs::GetGlobalLock());
   void TruncateToSize() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   void EvictVnode() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  // Caller ensures that this data page is never allocated.
   zx_status_t GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   zx_status_t ReserveNewBlock(LockedPage &node_page, size_t ofs_in_node);
-
-  zx::result<block_t> FindDataBlkAddr(pgoff_t index);
-  // This function returns block addresses and LockedPages for requested offsets. If there is no
-  // node page of a offset or the block address is not assigned, this function adds null LockedPage
-  // and kNullAddr to LockedPagesAndAddrs struct. A caller should consider the null LockedPage and
-  // kNullAddr.
-  zx::result<LockedPagesAndAddrs> FindDataBlockAddrsAndPages(const pgoff_t start,
-                                                             const pgoff_t end);
-  zx_status_t GetLockedDataPage(pgoff_t index, LockedPage *out);
-  zx::result<std::vector<LockedPage>> GetLockedDataPages(pgoff_t start, pgoff_t end);
 
   // It returns block addrs for file data blocks at |indices|. |read_only| is used to determine
   // whether it allocates a new addr if a block of |indices| has not been assigned a valid addr.
@@ -317,10 +307,6 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->GetLockedPages(start, end);
   }
 
-  zx::result<std::vector<LockedPage>> GrabLockedPages(const std::vector<pgoff_t> &page_offsets) {
-    return file_cache_->GetLockedPages(page_offsets);
-  }
-
   size_t GetPageCount() { return file_cache_->GetSize(); }
 
   pgoff_t Writeback(WritebackOperation &operation) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
@@ -346,6 +332,7 @@ class VnodeF2fs : public fs::PagedVnode,
   nid_t XattrNid() const { return xattr_nid_; }
 
   // for testing
+  FileCache &GetFileCache() { return *file_cache_; }
   void ResetFileCache() { file_cache_->Reset(); }
   ExtentTree &GetExtentTree() { return *extent_tree_; }
   uint8_t GetDirLevel() TA_NO_THREAD_SAFETY_ANALYSIS { return dir_level_; }

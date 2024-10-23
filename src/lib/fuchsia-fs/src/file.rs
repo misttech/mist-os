@@ -164,9 +164,8 @@ mod fuchsia {
     {
         async {
             let flags =
-                fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::TRUNCATE;
-            // TODO(https://fxbug.dev/361450366): Use [`open_in_namespace`].
-            let file = open_in_namespace_deprecated(path, flags)?;
+                fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::FILE_TRUNCATE | fio::Flags::PERM_WRITE;
+            let file = open_in_namespace(path, flags)?;
 
             write(&file, data).await?;
 
@@ -195,12 +194,11 @@ mod fuchsia {
     /// absolute path.
     pub async fn read_in_namespace(path: &str) -> Result<Vec<u8>, ReadNamedError> {
         async {
-            // TODO(https://fxbug.dev/361450366): Use [`open_in_namespace`].
-            let file = open_in_namespace_deprecated(
+            let file = open_in_namespace(
                 path,
-                fio::OpenFlags::DESCRIBE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
+                fio::Flags::FLAG_SEND_REPRESENTATION
+                    | fio::Flags::PERM_READ
+                    | fio::Flags::PROTOCOL_FILE,
             )?;
             read_file_with_on_open_event(file).await
         }
@@ -289,7 +287,7 @@ mod fuchsia {
     }
 
     /// Reads the contents of `file` into a Vec. `file` must have been opened with either `DESCRIBE`
-    /// or `GET_REPRESENTATION` and the event must not have been read yet.
+    /// or `SEND_REPRESENTATION` and the event must not have been read yet.
     pub(crate) async fn read_file_with_on_open_event(
         file: fio::FileProxy,
     ) -> Result<Vec<u8>, ReadError> {

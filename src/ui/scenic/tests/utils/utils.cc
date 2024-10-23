@@ -172,7 +172,7 @@ Screenshot TakeScreenshot(const fuchsia::ui::composition::ScreenshotSyncPtr& scr
   if (format == ScreenshotFormat::PNG) {
     return Screenshot(response.vmo());
   }
-  return Screenshot(response.vmo(), width, height, display_rotation);
+  return Screenshot(response.vmo(), width, height, display_rotation, format);
 }
 
 Screenshot TakeFileScreenshot(const fuchsia::ui::composition::ScreenshotSyncPtr& screenshotter,
@@ -209,7 +209,7 @@ Screenshot TakeFileScreenshot(const fuchsia::ui::composition::ScreenshotSyncPtr&
   if (format == ScreenshotFormat::PNG) {
     return Screenshot(vmo_from_file);
   }
-  return Screenshot(vmo_from_file, width, height, display_rotation);
+  return Screenshot(vmo_from_file, width, height, display_rotation, format);
 }
 
 }  // namespace integration_tests

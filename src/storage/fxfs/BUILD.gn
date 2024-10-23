@@ -16,6 +16,7 @@ import("//tools/cmc/build/expect_includes.gni")
 fxfs_deps = [
   ":fxfs_macros",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+  "//sdk/rust/zx-status",
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/fuchsia-async",
   "//src/lib/mundane",
@@ -28,6 +29,7 @@ fxfs_deps = [
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:async-trait",
+  "//third_party/rust_crates:base64",
   "//third_party/rust_crates:bincode",
   "//third_party/rust_crates:bit-vec",
   "//third_party/rust_crates:byteorder",
@@ -133,10 +135,7 @@ rustc_macro("fxfs_macros") {
   deps = [
     "//third_party/rust_crates:proc-macro2",
     "//third_party/rust_crates:quote",
-
-    # FIXME(https://fxbug.dev/332277415): Please update to syn 2.x.
-    # "//third_party/rust_crates:syn",
-    "//third_party/rust_crates:syn-v1_0_98",
+    "//third_party/rust_crates:syn",
   ]
   source_root = "macros/macros.rs"
   sources = [ "macros/macros.rs" ]

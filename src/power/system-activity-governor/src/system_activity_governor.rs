@@ -10,8 +10,7 @@ use fidl_fuchsia_hardware_suspend::{
     self as fhsuspend, SuspenderSuspendResponse as SuspendResponse,
 };
 use fidl_fuchsia_power_system::{
-    self as fsystem, ApplicationActivityLevel, CpuLevel, ExecutionStateLevel,
-    FullWakeHandlingLevel, WakeHandlingLevel,
+    self as fsystem, ApplicationActivityLevel, CpuLevel, ExecutionStateLevel, WakeHandlingLevel,
 };
 use fuchsia_inspect::{
     ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
@@ -506,8 +505,6 @@ pub struct SystemActivityGovernor {
     execution_state: PowerElementContext,
     /// The context used to manage the application activity power element.
     application_activity: PowerElementContext,
-    /// The context used to manage the full wake handling power element.
-    full_wake_handling: PowerElementContext,
     /// The context used to manage the wake handling power element.
     wake_handling: PowerElementContext,
     /// Resume latency information, if available.
@@ -620,34 +617,6 @@ impl SystemActivityGovernor {
             ],
         ));
 
-        let full_wake_handling = PowerElementContext::builder(
-            topology,
-            "full_wake_handling",
-            &[
-                FullWakeHandlingLevel::Inactive.into_primitive(),
-                FullWakeHandlingLevel::Active.into_primitive(),
-            ],
-        )
-        .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Assertive,
-            dependent_level: FullWakeHandlingLevel::Active.into_primitive(),
-            requires_token: execution_state
-                .assertive_dependency_token()
-                .expect("token not registered"),
-            requires_level_by_preference: vec![ExecutionStateLevel::Suspending.into_primitive()],
-        }])
-        .build()
-        .await
-        .expect("PowerElementContext encountered error while building full_wake_handling");
-
-        element_power_level_names.push(generate_element_power_level_names(
-            "full_wake_handling",
-            vec![
-                (FullWakeHandlingLevel::Inactive.into_primitive(), "Inactive".to_string()),
-                (FullWakeHandlingLevel::Active.into_primitive(), "Active".to_string()),
-            ],
-        ));
-
         let wake_handling = PowerElementContext::builder(
             topology,
             "wake_handling",
@@ -739,7 +708,6 @@ impl SystemActivityGovernor {
             inspect_root,
             execution_state,
             application_activity,
-            full_wake_handling,
             wake_handling,
             resume_latency_ctx,
             suspend_stats,
@@ -760,7 +728,6 @@ impl SystemActivityGovernor {
         tracing::info!("Handling power elements");
 
         self.run_execution_state(&elements_node);
-        self.run_full_wake_handling(&elements_node);
         self.run_wake_handling(&elements_node);
         self.run_execution_resume_latency(&elements_node);
 
@@ -909,23 +876,6 @@ impl SystemActivityGovernor {
         .detach();
     }
 
-    fn run_full_wake_handling(self: &Rc<Self>, inspect_node: &INode) {
-        let full_wake_handling_node = inspect_node.create_child("full_wake_handling");
-        let this = self.clone();
-
-        fasync::Task::local(async move {
-            run_power_element(
-                &this.full_wake_handling.name(),
-                &this.full_wake_handling.required_level,
-                FullWakeHandlingLevel::Inactive.into_primitive(),
-                Some(full_wake_handling_node),
-                basic_update_fn_factory(&this.full_wake_handling),
-            )
-            .await;
-        })
-        .detach();
-    }
-
     fn run_wake_handling(self: &Rc<Self>, inspect_node: &INode) {
         let wake_handling_node = inspect_node.create_child("wake_handling");
         let this = self.clone();
@@ -962,12 +912,6 @@ impl SystemActivityGovernor {
         register_element_status_endpoint(
             "application_activity",
             &self.application_activity,
-            &mut endpoints,
-        );
-
-        register_element_status_endpoint(
-            "full_wake_handling",
-            &self.full_wake_handling,
             &mut endpoints,
         );
 
@@ -1013,14 +957,6 @@ impl SystemActivityGovernor {
                         application_activity: Some(fsystem::ApplicationActivity {
                             assertive_dependency_token: Some(
                                 self.application_activity
-                                    .assertive_dependency_token()
-                                    .expect("token not registered"),
-                            ),
-                            ..Default::default()
-                        }),
-                        full_wake_handling: Some(fsystem::FullWakeHandling {
-                            assertive_dependency_token: Some(
-                                self.full_wake_handling
                                     .assertive_dependency_token()
                                     .expect("token not registered"),
                             ),

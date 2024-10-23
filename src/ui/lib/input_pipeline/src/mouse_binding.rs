@@ -7,13 +7,13 @@ use crate::utils::Position;
 use crate::{metrics, mouse_model_database};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
+use fidl_fuchsia_input_report as fidl_input_report;
 use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport};
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::ArrayProperty;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use metrics_registry::*;
 use std::collections::HashSet;
-use {fidl_fuchsia_input_report as fidl_input_report, zx};
 
 pub type MouseButton = u8;
 

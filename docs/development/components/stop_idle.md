@@ -284,18 +284,7 @@ framework via the `fuchsia.process.lifecycle/Lifecycle.OnEscrow` FIDL event:
   send the event using `send_on_escrow`:
 
   ```rust
-  let lifecycle =
-      fuchsia_runtime::take_startup_handle(HandleInfo::new(HandleType::Lifecycle, 0)).unwrap();
-  let lifecycle: zx::Channel = lifecycle.into();
-  let lifecycle: ServerEnd<flifecycle::LifecycleMarker> = lifecycle.into();
-  let (mut lifecycle_request_stream, lifecycle_control_handle) =
-      lifecycle.into_stream_and_control_handle().unwrap();
-
-  // Later, when `ServiceFs` has stalled and we have an `outgoing_dir`.
-  let outgoing_dir = Some(outgoing_dir);
-  lifecycle_control_handle
-      .send_on_escrow(flifecycle::LifecycleOnEscrowRequest { outgoing_dir, ..Default::default() })
-      .unwrap();
+        {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/lifecycle.rs" region_tag="escrow_listening" adjust_indentation="auto" %}
   ```
 
   Once your component has sent the `OnEscrow` event, it will not be able to
@@ -312,24 +301,20 @@ an `escrowed_dictionary client_end:fuchsia.component.sandbox.Dictionary` which
 is a reference to a `Dictionary` object. [Dictionaries][dictionaries] are
 key-value maps that may hold data or capabilities.
 
-- You may create a `Dictionary` by using `fuchsia.component.sandbox.Factory`
-  from framework, and calling `CreateDictionary` on the `Factory` protocol:
+- You may create a `DictionaryRef` by using `fuchsia.component.sandbox.CapabilityStore`
+  from framework, and calling `DictionaryCreate` on the `Factory` protocol:
 
   ```json5
   use: [
       {
-          protocol: "fuchsia.component.sandbox.Factory",
+          protocol: "fuchsia.component.sandbox.CapabilityStore",
           from: "framework",
       }
   ]
   ```
 
   ```rust
-  let factory =
-      fuchsia_component::client::connect_to_protocol::<
-          fidl_fuchsia_component_sandbox::FactoryMarker
-      >().unwrap();
-  let dictionary = factory.create_dictionary().await?;
+        {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/lifecycle.rs" region_tag="escrow_create_dictionary" adjust_indentation="auto" %}
   ```
 
 - You may add some data (e.g. a vector of bytes) to the `Dictionary` by calling
@@ -338,46 +323,19 @@ key-value maps that may hold data or capabilities.
   other methods:
 
   ```rust
-  let bytes = vec![...];
-  let data = fidl_fuchsia_component_sandbox::Data::Bytes(bytes);
-  let dictionary = dictionary.into_proxy().unwrap();
-  dictionary
-      .insert(
-          "my_data",
-          fidl_fuchsia_component_sandbox::Capability::Data(data)
-      )
-      .await??;
+        {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/lifecycle.rs" region_tag="escrow_populate_dictionary" adjust_indentation="auto" %}
   ```
 
 - Before exiting, send the `Dictionary` client endpoint in `send_on_escrow`:
 
   ```rust
-  lifecycle
-      .control_handle()
-      .send_on_escrow(flifecycle::LifecycleOnEscrowRequest {
-          outgoing_dir: Some(outgoing_dir),
-          escrowed_dictionary: Some(dictionary.into_channel().unwrap().into_zx_channel().into()),
-          ..Default::default()
-      })?;
+        {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/lifecycle.rs" region_tag="escrow_send_dictionary" adjust_indentation="auto" %}
   ```
 
 - On next start, you may obtain this dictionary from the startup handles:
 
   ```rust
-  if let Some(dictionary) = fuchsia_runtime::take_startup_handle(
-      HandleInfo::new(HandleType::EscrowedDictionary, 0)
-  ) {
-      let dictionary = dictionary.into_proxy()?;
-      let capability = dictionary.get("my_data").await??;
-      match capability {
-          fidl_fuchsia_component_sandbox::Capability::Data(
-              fidl_fuchsia_component_sandbox::Data::Bytes(data)
-          ) => {
-              // Do something with the data...
-          },
-          capability @ _ => warn!("unexpected {capability:?}"),
-      }
-  }
+        {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/lifecycle.rs" region_tag="escrow_receive_dictionary" adjust_indentation="auto" %}
   ```
 
 The `Dictionary` object supports a variety of item data types. If your

@@ -184,3 +184,15 @@ void threads_test_wait_event_fn(void* typeless_arg) {
   auto arg = reinterpret_cast<syscall_suspended_reg_state_test_arg*>(typeless_arg);
   arg->status = zx_object_wait_one(arg->event, ZX_USER_SIGNAL_0, ZX_TIME_INFINITE, &arg->observed);
 }
+
+void threads_test_wait_loop(void* arg) {
+  zx_handle_t event = *(zx_handle_t*)arg;
+  zx_object_signal(event, 0u, ZX_USER_SIGNAL_0);
+  for (;;) {
+    zx_status_t wait_result =
+        zx_object_wait_one(event, ZX_USER_SIGNAL_1, ZX_TIME_INFINITE_PAST, nullptr);
+    if (wait_result != ZX_ERR_TIMED_OUT) {
+      break;
+    }
+  }
+}

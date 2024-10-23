@@ -10,54 +10,80 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
-#include <ddktl/device.h>
 #include <hwreg/bitfields.h>
 
 #include "src/devices/block/drivers/nvme/commands/identify.h"
 #include "src/devices/block/drivers/nvme/nvme.h"
 #include "src/devices/block/drivers/nvme/queue-pair.h"
-#include "src/devices/block/lib/common/include/common-dfv1.h"
+#include "src/devices/block/lib/common/include/common.h"
 
 namespace nvme {
 
-zx_status_t Namespace::AddNamespace() { return DdkAdd(NamespaceName().c_str()); }
+zx_status_t Namespace::AddNamespace() {
+  {
+    const std::string path_from_parent = std::string(controller_->driver_name()) + "/";
+    compat::DeviceServer::BanjoConfig banjo_config;
+    banjo_config.callbacks[ZX_PROTOCOL_BLOCK_IMPL] = block_impl_server_.callback();
 
-zx_status_t Namespace::Bind(Nvme* controller, uint32_t namespace_id) {
-  if (namespace_id == 0 || namespace_id == ~0u) {
-    zxlogf(ERROR, "Attempted to create namespace with invalid id %u.", namespace_id);
-    return ZX_ERR_INVALID_ARGS;
+    auto result = compat_server_.Initialize(
+        controller_->driver_incoming(), controller_->driver_outgoing(),
+        controller_->driver_node_name(), NamespaceName(), compat::ForwardMetadata::None(),
+        std::move(banjo_config), path_from_parent);
+    if (result.is_error()) {
+      return result.status_value();
+    }
   }
 
-  fbl::AllocChecker ac;
-  auto ns = fbl::make_unique_checked<Namespace>(&ac, controller->zxdev(), controller, namespace_id);
-  if (!ac.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for namespace %u.", namespace_id);
-    return ZX_ERR_NO_MEMORY;
-  }
+  auto [controller_client_end, controller_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
 
-  zx_status_t status = ns->AddNamespace();
-  if (status != ZX_OK) {
-    return status;
-  }
+  node_controller_.Bind(std::move(controller_client_end));
 
-  // The DDK takes ownership of the device.
-  [[maybe_unused]] auto placeholder = ns.release();
+  fidl::Arena arena;
+
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
+  properties[0] = fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL,
+                                    static_cast<uint32_t>(ZX_PROTOCOL_BLOCK_IMPL));
+
+  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
+
+  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                        .name(arena, NamespaceName())
+                        .offers2(arena, std::move(offers))
+                        .properties(properties)
+                        .Build();
+
+  auto result = controller_->root_node()->AddChild(args, std::move(controller_server_end), {});
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child Namespace: %s", result.status_string());
+    return result.status();
+  }
   return ZX_OK;
 }
 
-void Namespace::DdkRelease() {
-  zxlogf(DEBUG, "Releasing driver.");
-  delete this;
-}
-
-void Namespace::DdkInit(ddk::InitTxn txn) {
-  // The driver initialization has numerous error conditions. Wrap the initialization here to ensure
-  // we always call txn.Reply() in any outcome.
-  zx_status_t status = Init();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Driver initialization failed: %s", zx_status_get_string(status));
+zx::result<std::unique_ptr<Namespace>> Namespace::Bind(Nvme* controller, uint32_t namespace_id) {
+  if (namespace_id == 0 || namespace_id == ~0u) {
+    FDF_LOG(ERROR, "Attempted to create namespace with invalid id %u.", namespace_id);
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  txn.Reply(status);
+
+  fbl::AllocChecker ac;
+  auto ns = fbl::make_unique_checked<Namespace>(&ac, controller, namespace_id);
+  if (!ac.check()) {
+    FDF_LOG(ERROR, "Failed to allocate memory for namespace %u.", namespace_id);
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  zx_status_t status = ns->Init();
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  status = ns->AddNamespace();
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(ns));
 }
 
 static void PopulateNamespaceInspect(const IdentifyNvmeNamespace& ns,
@@ -103,14 +129,14 @@ zx_status_t Namespace::Init() {
   const uint32_t kPageSize = zx_system_get_page_size();
   zx_status_t status = zx::vmo::create(kPageSize, 0, &admin_data);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create vmo: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to create vmo: %s", zx_status_get_string(status));
     return status;
   }
 
   fzl::VmoMapper mapper;
   status = mapper.Map(admin_data);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map vmo: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map vmo: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -121,7 +147,8 @@ zx_status_t Namespace::Init() {
   zx::result<Completion> completion =
       controller_->DoAdminCommandSync(identify_ns, admin_data.borrow());
   if (completion.is_error()) {
-    zxlogf(ERROR, "Failed to identify namespace %u: %s", namespace_id_, completion.status_string());
+    FDF_LOG(ERROR, "Failed to identify namespace %u: %s", namespace_id_,
+            completion.status_string());
     return completion.status_value();
   }
 
@@ -133,13 +160,13 @@ zx_status_t Namespace::Init() {
   block_info_.block_size = fmt.lba_data_size_bytes();
 
   if (fmt.metadata_size_bytes()) {
-    zxlogf(ERROR, "NVMe drive uses LBA format with metadata (%u bytes), which we do not support.",
-           fmt.metadata_size_bytes());
+    FDF_LOG(ERROR, "NVMe drive uses LBA format with metadata (%u bytes), which we do not support.",
+            fmt.metadata_size_bytes());
     return ZX_ERR_NOT_SUPPORTED;
   }
   // The NVMe spec only mentions a lower bound. The upper bound may be a false requirement.
   if ((block_info_.block_size < 512) || (block_info_.block_size > 32768)) {
-    zxlogf(ERROR, "Cannot handle LBA size of %u.", block_info_.block_size);
+    FDF_LOG(ERROR, "Cannot handle LBA size of %u.", block_info_.block_size);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -167,7 +194,7 @@ zx_status_t Namespace::Init() {
   PopulateNamespaceInspect(*ns, NamespaceName(), controller_->atomic_write_unit_normal(),
                            controller_->atomic_write_unit_power_fail(), max_transfer_bytes,
                            block_info_.block_size, &controller_->inspect_node(),
-                           &controller_->inspector());
+                           &controller_->inspect());
 
   return ZX_OK;
 }
@@ -188,17 +215,17 @@ void Namespace::BlockImplQueue(block_op_t* op, block_impl_queue_callback callbac
     case BLOCK_OPCODE_READ:
     case BLOCK_OPCODE_WRITE:
       if (zx_status_t status =
-              block::CheckIoRange(op->rw, block_info_.block_count, max_transfer_blocks_);
+              block::CheckIoRange(op->rw, block_info_.block_count, max_transfer_blocks_, logger());
           status != ZX_OK) {
         io_cmd->Complete(status);
         return;
       }
-      zxlogf(TRACE, "Block IO: %s: %u blocks @ LBA %zu",
-             op->command.opcode == BLOCK_OPCODE_WRITE ? "wr" : "rd", op->rw.length,
-             op->rw.offset_dev);
+      FDF_LOG(TRACE, "Block IO: %s: %u blocks @ LBA %zu",
+              op->command.opcode == BLOCK_OPCODE_WRITE ? "wr" : "rd", op->rw.length,
+              op->rw.offset_dev);
       break;
     case BLOCK_OPCODE_FLUSH:
-      zxlogf(TRACE, "Block IO: flush");
+      FDF_LOG(TRACE, "Block IO: flush");
       break;
     default:
       io_cmd->Complete(ZX_ERR_NOT_SUPPORTED);
@@ -207,5 +234,7 @@ void Namespace::BlockImplQueue(block_op_t* op, block_impl_queue_callback callbac
 
   controller_->QueueIoCommand(io_cmd);
 }
+
+fdf::Logger& Namespace::logger() { return controller_->logger(); }
 
 }  // namespace nvme

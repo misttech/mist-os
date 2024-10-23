@@ -263,6 +263,8 @@
 //src/devices/tests/v2/replace-driver/composite-replacement:driver
 //src/devices/tests/v2/replace-driver/target-1-replacement:driver
 //src/devices/tests/v2/replace-driver/target-2-replacement:driver
+//src/devices/tests/v2/replace-failed-driver:driver
+//src/devices/tests/v2/replace-failed-driver:replacement-driver
 //src/devices/tests/v2/restart-on-crash/driver:driver
 //src/devices/tests/v2/runtime-dispatcher:leaf-driver
 //src/devices/tests/v2/runtime-dispatcher:root-driver

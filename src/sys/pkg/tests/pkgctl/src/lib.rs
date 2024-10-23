@@ -33,7 +33,7 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use vfs::directory::entry_container::Directory;
 use zx::Status;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_space as fidl_space, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_space as fidl_space, fuchsia_async as fasync};
 
 const BINARY_PATH: &str = "/pkg/bin/pkgctl";
 

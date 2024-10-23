@@ -171,6 +171,10 @@ impl Pipe {
         }
     }
 
+    fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
+
     fn capacity(&self) -> usize {
         self.messages.capacity()
     }
@@ -202,7 +206,7 @@ impl Pipe {
     }
 
     fn is_readable(&self) -> bool {
-        !self.messages.is_empty() || (self.writer_count == 0 && self.had_writer)
+        !self.is_empty() || (self.writer_count == 0 && self.had_writer)
     }
 
     /// Returns whether the pipe can accommodate at least part of a message of length `data_size`.
@@ -257,7 +261,7 @@ impl Pipe {
 
         if flags.can_read() && self.is_readable() {
             let writer_closed = self.writer_count == 0 && self.had_writer;
-            let has_data = !self.messages.is_empty();
+            let has_data = !self.is_empty();
             if writer_closed {
                 events |= FdEvents::POLLHUP;
             }
@@ -314,12 +318,8 @@ impl Pipe {
         }
     }
 
-    fn notify_read(&self) {
-        self.waiters.notify_fd_events(FdEvents::POLLOUT);
-    }
-
-    fn notify_write(&self) {
-        self.waiters.notify_fd_events(FdEvents::POLLIN);
+    fn notify_fd_events(&self, events: FdEvents) {
+        self.waiters.notify_fd_events(events);
     }
 
     /// Splice from the `from` pipe to the `to` pipe.
@@ -327,6 +327,7 @@ impl Pipe {
         if len == 0 {
             return Ok(0);
         }
+        let to_was_empty = to.is_empty();
         let mut bytes_transferred = 0;
         loop {
             let limit = std::cmp::min(len - bytes_transferred, to.messages.available_capacity());
@@ -347,8 +348,12 @@ impl Pipe {
             to.messages.write_message(message);
         }
         if bytes_transferred > 0 {
-            from.notify_read();
-            to.notify_write();
+            if from.is_empty() {
+                from.notify_fd_events(FdEvents::POLLOUT);
+            }
+            if to_was_empty {
+                to.notify_fd_events(FdEvents::POLLIN);
+            }
         }
         return Ok(bytes_transferred);
     }
@@ -358,6 +363,7 @@ impl Pipe {
         if len == 0 {
             return Ok(0);
         }
+        let to_was_empty = to.is_empty();
         let mut bytes_transferred = 0;
         for message in from.messages.peek_queue().iter() {
             let limit = std::cmp::min(len - bytes_transferred, to.messages.available_capacity());
@@ -368,8 +374,8 @@ impl Pipe {
             bytes_transferred += message.len();
             to.messages.write_message(message);
         }
-        if bytes_transferred > 0 {
-            to.notify_write();
+        if bytes_transferred > 0 && to_was_empty {
+            to.notify_fd_events(FdEvents::POLLIN);
         }
         return Ok(bytes_transferred);
     }
@@ -442,8 +448,8 @@ impl FileOps for PipeFileObject {
         file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             let mut pipe = self.pipe.lock();
             let actual = pipe.read(data)?;
-            if actual > 0 {
-                pipe.notify_read();
+            if actual > 0 && pipe.is_empty() {
+                pipe.notify_fd_events(FdEvents::POLLOUT);
             }
             Ok(actual)
         })
@@ -462,11 +468,12 @@ impl FileOps for PipeFileObject {
 
         let result = file.blocking_op(locked, current_task, FdEvents::POLLOUT, None, |_| {
             let mut pipe = self.pipe.lock();
+            let was_empty = pipe.is_empty();
             let offset_before = data.bytes_read();
             let bytes_written = pipe.write(current_task, data)?;
             debug_assert!(data.bytes_read() - offset_before == bytes_written);
-            if bytes_written > 0 {
-                pipe.notify_write();
+            if bytes_written > 0 && was_empty {
+                pipe.notify_fd_events(FdEvents::POLLIN);
             }
             if data.available() > 0 {
                 return error!(EAGAIN);
@@ -562,8 +569,11 @@ impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
         }?;
         let bytes_len = bytes.len();
         if bytes_len > 0 {
+            let was_empty = self.pipe.is_empty();
             self.pipe.messages.write_message(PipeMessageData::from(bytes).into());
-            self.pipe.notify_write();
+            if was_empty {
+                self.pipe.notify_fd_events(FdEvents::POLLIN);
+            }
             self.available -= bytes_len;
         }
         Ok(bytes_len)
@@ -581,8 +591,11 @@ impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
         let bytes = vec![0; self.available];
         let len = bytes.len();
         if len > 0 {
+            let was_empty = self.pipe.is_empty();
             self.pipe.messages.write_message(PipeMessageData::from(bytes).into());
-            self.pipe.notify_write();
+            if was_empty {
+                self.pipe.notify_fd_events(FdEvents::POLLIN);
+            }
             self.available -= len;
         }
         Ok(len)
@@ -671,7 +684,9 @@ impl<'a> InputBuffer for SpliceInputBuffer<'a> {
             }
             length -= message.len();
             if length == 0 {
-                self.pipe.notify_read();
+                if self.pipe.is_empty() {
+                    self.pipe.notify_fd_events(FdEvents::POLLOUT);
+                }
                 return Ok(());
             }
         }
@@ -698,7 +713,7 @@ impl PipeFileObject {
                 if pipe.reader_count > 0 {
                     events |= FdEvents::POLLHUP;
                 }
-                if !pipe.messages.is_empty() {
+                if !pipe.is_empty() {
                     events |= FdEvents::POLLIN;
                 }
             }
@@ -922,6 +937,7 @@ impl PipeFileObject {
             return error!(EPIPE);
         }
 
+        let was_empty = pipe.is_empty();
         let mut remaining = std::cmp::min(available, pipe.messages.available_capacity());
 
         let mut bytes_transferred = 0;
@@ -937,8 +953,8 @@ impl PipeFileObject {
                 break;
             }
         }
-        if bytes_transferred > 0 {
-            pipe.notify_write();
+        if bytes_transferred > 0 && was_empty {
+            pipe.notify_fd_events(FdEvents::POLLIN);
         }
         Ok(bytes_transferred)
     }

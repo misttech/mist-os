@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_wlan_tap as wlantap, zx};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_wlan_tap as wlantap};
 
 pub struct Wlantap {
     proxy: wlantap::WlantapCtlProxy,

@@ -111,7 +111,23 @@ impl DevicePrinter for DFv2Node {
         let (_, name) = moniker.rsplit_once('.').unwrap_or(("", &moniker));
         println!("{0: <9}: {1}", "Name", name);
         println!("{0: <9}: {1}", "Moniker", moniker);
-        println!("{0: <9}: {1}", "Driver", self.0.bound_driver_url.as_deref().unwrap_or("None"));
+
+        if self.0.quarantined == Some(true)
+            && self.0.bound_driver_url != Some("unbound".to_string())
+        {
+            println!(
+                "{0: <9}: {1} (quarantined)",
+                "Driver",
+                self.0.bound_driver_url.as_deref().unwrap_or("None")
+            );
+        } else {
+            println!(
+                "{0: <9}: {1}",
+                "Driver",
+                self.0.bound_driver_url.as_deref().unwrap_or("None")
+            );
+        }
+
         if let Some(ref node_property_list) = v2_info.node_property_list {
             println!("{} Properties", node_property_list.len());
             for i in 0..node_property_list.len() {

@@ -257,6 +257,19 @@ void BlockDevice::GetName(GetNameCompleter::Sync& completer) {
                   status == ZX_OK ? fidl::StringView::FromExternal(name) : fidl::StringView{});
 }
 
+void BlockDevice::GetFlags(GetFlagsCompleter::Sync& completer) {
+  if (!parent_partition_protocol_.is_valid()) {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+  uint64_t flags = 0;
+  if (zx_status_t status = parent_partition_protocol_.GetFlags(&flags); status != ZX_OK) {
+    completer.ReplyError(status);
+  } else {
+    completer.ReplySuccess(flags);
+  }
+}
+
 void BlockDevice::QuerySlices(QuerySlicesRequestView request,
                               QuerySlicesCompleter::Sync& completer) {
   if (!parent_volume_protocol_.is_valid()) {

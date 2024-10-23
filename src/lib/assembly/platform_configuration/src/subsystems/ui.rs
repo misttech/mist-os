@@ -209,6 +209,12 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             Config::new(ConfigValueType::Uint16, power_off_display_millis.into()),
         )?;
 
+        let visual_debugging_level: u8 = ui_config.visual_debugging_level.clone().into();
+        builder.set_config_capability(
+            "fuchsia.ui.VisualDebuggingLevel",
+            Config::new(ConfigValueType::Uint8, visual_debugging_level.into()),
+        )?;
+
         Ok(())
     }
 }

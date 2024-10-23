@@ -16,41 +16,65 @@ use fnet_routes_ext::rules::{
 use fnet_routes_ext::Responder;
 use futures::channel::{mpsc, oneshot};
 use futures::TryStreamExt as _;
-use net_types::ip::{Ip, Subnet};
+use net_types::ip::Ip;
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
-use crate::bindings::util::TaskWaitGroupSpawner;
+use crate::bindings::util::{TaskWaitGroupSpawner, TryFromFidl, TryIntoCore as _};
 use crate::bindings::{routes, Ctx};
+pub(super) use witness::AddableMatcher;
 
-#[derive(Debug, Clone, Default)]
-pub(super) struct AddableMatcher<I: Ip> {
-    /// Matches whether the source address of the packet is from the subnet.
-    from: Option<Subnet<I::Addr>>,
-    /// Matches the packet iff the packet was locally generated.
-    locally_generated: Option<bool>,
-    /// Matches the packet iff the socket that was bound to the device using
-    /// `SO_BINDTODEVICE`.
-    bound_device: Option<fnet_routes_ext::rules::InterfaceMatcher>,
-    /// The matcher for the MARK_1 domain.
-    mark_1: Option<MarkMatcher>,
-    /// The matcher for the MARK_2 domain.
-    mark_2: Option<MarkMatcher>,
-}
+impl<I: Ip> TryFromFidl<RuleMatcher<I>> for netstack3_core::routes::RuleMatcher<I> {
+    type Error = fnet_routes_admin::RuleSetError;
 
-impl<I: Ip> From<RuleMatcher<I>> for AddableMatcher<I> {
-    fn from(matcher: RuleMatcher<I>) -> Self {
+    fn try_from_fidl(matcher: RuleMatcher<I>) -> Result<Self, Self::Error> {
         let RuleMatcher { from, locally_generated, bound_device, mark_1, mark_2 } = matcher;
-        Self { from, locally_generated, bound_device, mark_1, mark_2 }
-    }
-}
+        let traffic_origin_matcher = match (locally_generated, bound_device) {
+            (None, None) => None,
+            (None, Some(fnet_routes_ext::rules::InterfaceMatcher::DeviceName(name))) => {
+                Some(netstack3_core::routes::TrafficOriginMatcher::Local {
+                    bound_device_matcher: Some(netstack3_core::device::DeviceNameMatcher(name)),
+                })
+            }
+            (Some(true), None) => Some(netstack3_core::routes::TrafficOriginMatcher::Local {
+                bound_device_matcher: None,
+            }),
+            (Some(false), None) => Some(netstack3_core::routes::TrafficOriginMatcher::NonLocal),
+            (Some(true), Some(fnet_routes_ext::rules::InterfaceMatcher::DeviceName(name))) => {
+                Some(netstack3_core::routes::TrafficOriginMatcher::Local {
+                    bound_device_matcher: Some(netstack3_core::device::DeviceNameMatcher(name)),
+                })
+            }
+            (Some(false), Some(_)) => return Err(fnet_routes_admin::RuleSetError::InvalidMatcher),
+        };
 
-impl<I: Ip> From<AddableMatcher<I>> for RuleMatcher<I> {
-    fn from(matcher: AddableMatcher<I>) -> Self {
-        let AddableMatcher { from, locally_generated, bound_device, mark_1, mark_2 } = matcher;
-        Self { from, locally_generated, bound_device, mark_1, mark_2 }
+        fn to_core_mark_matcher(matcher: MarkMatcher) -> netstack3_core::routes::MarkMatcher {
+            match matcher {
+                MarkMatcher::Unmarked => netstack3_core::routes::MarkMatcher::Unmarked,
+                MarkMatcher::Marked { mask, between } => {
+                    netstack3_core::routes::MarkMatcher::Marked {
+                        mask,
+                        start: *between.start(),
+                        end: *between.end(),
+                    }
+                }
+            }
+        }
+
+        Ok(netstack3_core::routes::RuleMatcher {
+            source_address_matcher: from.map(netstack3_core::ip::SubnetMatcher),
+            traffic_origin_matcher,
+            mark_matchers: netstack3_core::routes::MarkMatchers::new(
+                mark_1
+                    .into_iter()
+                    .map(|m| (netstack3_core::routes::MarkDomain::Mark1, to_core_mark_matcher(m)))
+                    .chain(mark_2.into_iter().map(|m| {
+                        (netstack3_core::routes::MarkDomain::Mark2, to_core_mark_matcher(m))
+                    })),
+            ),
+        })
     }
 }
 
@@ -88,10 +112,10 @@ pub(super) enum RuleWorkItem<I: Ip> {
     },
 }
 
-#[derive(Debug)]
-struct Rule<I: Ip> {
-    matcher: AddableMatcher<I>,
-    action: RuleAction,
+#[derive(Debug, Clone)]
+pub(super) struct Rule<I: Ip> {
+    pub(super) matcher: AddableMatcher<I>,
+    pub(super) action: RuleAction,
 }
 
 #[derive(Debug, Default)]
@@ -178,6 +202,39 @@ impl<I: Ip> RuleTable<I> {
             BTreeEntry::Vacant(_entry) => Err(fnet_routes_admin::RuleSetError::RuleDoesNotExist),
         }
     }
+
+    pub(super) fn handle_table_removed(
+        &mut self,
+        removed_table_id: routes::TableId<I>,
+    ) -> Vec<InstalledRule<I>> {
+        // TODO(https://github.com/rust-lang/rust/issues/70530): Use `extract_if`.
+        let mut removed = Vec::new();
+        for (priority, set) in self.rule_sets.iter_mut() {
+            set.rules.retain(|index, Rule { matcher, action }| {
+                let table_id = match action {
+                    RuleAction::Unreachable => None,
+                    RuleAction::Lookup(id) => Some(*id),
+                };
+
+                if table_id.is_some_and(|id| id == u32::from(removed_table_id)) {
+                    removed.push(InstalledRule {
+                        priority: *priority,
+                        index: *index,
+                        matcher: matcher.clone().into(),
+                        action: *action,
+                    });
+                    false
+                } else {
+                    true
+                }
+            })
+        }
+        removed
+    }
+
+    pub(super) fn iter(&self) -> impl Iterator<Item = &'_ Rule<I>> + '_ {
+        self.rule_sets.values().flat_map(|set| set.rules.values())
+    }
 }
 
 struct UserRuleSet<I: Ip> {
@@ -223,7 +280,7 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
         matcher: RuleMatcher<I>,
         action: RuleAction,
     ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::RuleSetError>> {
-        let matcher = AddableMatcher::from(matcher);
+        let matcher = AddableMatcher::try_from(matcher)?;
         if let RuleAction::Lookup(table_id) = action {
             let table_id = routes::TableId::new(table_id)
                 .ok_or(fnet_routes_admin::RuleSetError::Unauthenticated)?;
@@ -386,4 +443,101 @@ pub(crate) async fn serve_rule_table<I: FidlRuleAdminIpExt>(
         }
     }
     Ok(())
+}
+
+mod witness {
+    use super::*;
+
+    /// Witness type for validated matchers that can be added to the Core.
+    ///
+    /// Because FIDL matchers and Core matchers don't match to each other 1:1,
+    /// we also store a copy of the FIDL matcher that we can use to respond
+    /// to FIDL requests.
+    #[derive(Debug, Clone)]
+    pub(in crate::bindings::routes) struct AddableMatcher<I: Ip> {
+        core: netstack3_core::routes::RuleMatcher<I>,
+        fidl: RuleMatcher<I>,
+    }
+
+    impl<I: Ip> Default for AddableMatcher<I> {
+        fn default() -> Self {
+            Self {
+                core: netstack3_core::routes::RuleMatcher::match_all_packets(),
+                fidl: Default::default(),
+            }
+        }
+    }
+
+    impl<I: Ip> TryFrom<RuleMatcher<I>> for AddableMatcher<I> {
+        type Error = fnet_routes_admin::RuleSetError;
+
+        fn try_from(matcher: RuleMatcher<I>) -> Result<Self, Self::Error> {
+            let core = matcher.clone().try_into_core()?;
+            Ok(Self { core, fidl: matcher })
+        }
+    }
+
+    impl<I: Ip> From<AddableMatcher<I>> for RuleMatcher<I> {
+        fn from(matcher: AddableMatcher<I>) -> Self {
+            let AddableMatcher { core: _, fidl } = matcher;
+            fidl
+        }
+    }
+
+    impl<I: Ip> From<AddableMatcher<I>> for netstack3_core::routes::RuleMatcher<I> {
+        fn from(matcher: AddableMatcher<I>) -> Self {
+            let AddableMatcher { core, fidl: _ } = matcher;
+            core
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use net_types::ip::Ipv4;
+    use netstack3_core::device::DeviceNameMatcher;
+    use netstack3_core::routes::{RuleMatcher as CoreRuleMatcher, TrafficOriginMatcher};
+    use test_case::test_case;
+
+    use super::*;
+
+    #[test_case(None, false => Ok(CoreRuleMatcher {
+        traffic_origin_matcher: None,
+        ..CoreRuleMatcher::match_all_packets()
+    }))]
+    #[test_case(None, true => Ok(CoreRuleMatcher {
+        traffic_origin_matcher: Some(TrafficOriginMatcher::Local {
+            bound_device_matcher: Some(DeviceNameMatcher("lo".into())),
+        }),
+        ..CoreRuleMatcher::match_all_packets()
+    }))]
+    #[test_case(Some(true), true => Ok(CoreRuleMatcher {
+        traffic_origin_matcher: Some(TrafficOriginMatcher::Local {
+            bound_device_matcher: Some(DeviceNameMatcher("lo".into())),
+        }),
+        ..CoreRuleMatcher::match_all_packets()
+    }))]
+    #[test_case(Some(false), true => Err(fnet_routes_admin::RuleSetError::InvalidMatcher))]
+    #[test_case(Some(true), false => Ok(CoreRuleMatcher {
+        traffic_origin_matcher: Some(TrafficOriginMatcher::Local {
+            bound_device_matcher: None,
+        }),
+        ..CoreRuleMatcher::match_all_packets()
+    }))]
+    #[test_case(Some(false), false => Ok(CoreRuleMatcher {
+        traffic_origin_matcher: Some(TrafficOriginMatcher::NonLocal),
+        ..CoreRuleMatcher::match_all_packets()
+    }))]
+    fn convert_to_core_matcher(
+        locally_generated: Option<bool>,
+        has_bound_device_matcher: bool,
+    ) -> Result<CoreRuleMatcher<Ipv4>, fnet_routes_admin::RuleSetError> {
+        let fidl = RuleMatcher {
+            locally_generated,
+            bound_device: has_bound_device_matcher
+                .then_some(fnet_routes_ext::rules::InterfaceMatcher::DeviceName("lo".into())),
+            ..Default::default()
+        };
+        fidl.try_into_core()
+    }
 }

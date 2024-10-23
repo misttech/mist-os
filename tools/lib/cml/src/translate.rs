@@ -1992,17 +1992,8 @@ pub fn translate_capabilities(
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             {
-                let (source, source_dictionary) = match capability.extends.as_ref() {
-                    Some(extends) => {
-                        let (s, d) = any_ref_to_decl(options, extends.into(), None, None)?;
-                        (Some(s), d)
-                    }
-                    None => (None, None),
-                };
                 out_capabilities.push(fdecl::Capability::Dictionary(fdecl::Dictionary {
                     name: Some(n.clone().into()),
-                    source,
-                    source_dictionary,
                     source_path: capability.path.clone().map(Into::into),
                     ..Default::default()
                 }));
@@ -4743,7 +4734,6 @@ mod tests {
                 "capabilities": [
                     {
                         "dictionary": "dict",
-                        "extends": "parent/dict/3",
                     },
                 ],
             }),
@@ -4800,8 +4790,6 @@ mod tests {
                     fdecl::Capability::Dictionary (
                         fdecl::Dictionary {
                             name: Some("dict".into()),
-                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            source_dictionary: Some("dict/3".into()),
                             ..Default::default()
                         }
                     )
@@ -4984,10 +4972,6 @@ mod tests {
                         "dictionary": "dict2",
                         "path": "/in/a",
                     },
-                    {
-                        "dictionary": "dict3",
-                        "extends": "#minfs/b",
-                    },
                 ],
                 "children": [
                     {
@@ -5086,17 +5070,6 @@ mod tests {
                             source: None,
                             source_dictionary: None,
                             source_path: Some("/in/a".into()),
-                            ..Default::default()
-                        }
-                    ),
-                    fdecl::Capability::Dictionary (
-                        fdecl::Dictionary {
-                            name: Some("dict3".into()),
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "minfs".into(),
-                                collection: None,
-                            })),
-                            source_dictionary: Some("b".into()),
                             ..Default::default()
                         }
                     ),

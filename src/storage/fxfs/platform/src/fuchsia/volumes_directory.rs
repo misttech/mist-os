@@ -376,7 +376,8 @@ impl VolumesDirectory {
             }
             let this = self.clone();
             let timer_task = fasync::Task::spawn(async move {
-                fasync::Timer::new(fasync::Duration::from_seconds(duration_secs.into())).await;
+                fasync::Timer::new(fasync::MonotonicDuration::from_seconds(duration_secs.into()))
+                    .await;
                 this.stop_profile_tasks().await;
             });
             *state = Some((name, timer_task));

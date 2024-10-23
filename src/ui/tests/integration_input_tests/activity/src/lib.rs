@@ -5,7 +5,7 @@
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_input_interaction::{NotifierMarker, NotifierProxy, State};
-use fidl_fuchsia_input_interaction_observation::{AggregatorMarker, HandoffWakeError};
+use fidl_fuchsia_input_interaction_observation::AggregatorMarker;
 use fidl_fuchsia_input_report::{ConsumerControlButton, KeyboardInputReport};
 use fidl_fuchsia_logger::LogSinkMarker;
 use fidl_fuchsia_math::Vec_;
@@ -386,105 +386,6 @@ async fn enters_active_state_with_media_buttons(suspend_enabled: bool) {
             .unwrap(),
         State::Active
     );
-
-    // Shut down input pipeline before dropping mocks, so that input pipeline
-    // doesn't log errors about channels being closed.
-    realm.destroy().await.expect("Failed to shut down realm.");
-}
-
-#[fuchsia::test]
-async fn does_not_enter_active_state_with_handoff_wake_suspend_disabled() {
-    let realm = assemble_realm(/* suspend_enabled*/ false).await;
-
-    // Subscribe to activity state, which serves "Active" initially.
-    let notifier_proxy = realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
-        .expect("Failed to connect to fuchsia.input.interaction.Notifier.");
-    let mut watch_state_stream = HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
-    assert_eq!(
-        watch_state_stream
-            .next()
-            .await
-            .expect("Expected initial state from watch_state()")
-            .unwrap(),
-        State::Active
-    );
-
-    // Do nothing. Activity service transitions to idle state in one minute.
-    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
-    match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
-        future::Either::Left((result, _)) => {
-            assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
-        }
-        future::Either::Right(_) => panic!("Timer expired before state transitioned."),
-    }
-
-    // Call HandoffWake
-    let aggregator = realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<AggregatorMarker>()
-        .expect("Failed to connect to fuchsia.input.interaction.observation.Aggregator.");
-    assert_eq!(
-        aggregator.handoff_wake().await.expect("Failed to call handoff wake."),
-        Err(HandoffWakeError::PowerNotAvailable)
-    );
-
-    // Activity service does not transition to active state.
-    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
-    match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
-        future::Either::Left((result, _)) => {
-            panic!("Activity should not have changed, received new state: {:?}", result);
-        }
-        future::Either::Right(_) => {}
-    }
-
-    // Shut down input pipeline before dropping mocks, so that input pipeline
-    // doesn't log errors about channels being closed.
-    realm.destroy().await.expect("Failed to shut down realm.");
-}
-
-#[fuchsia::test]
-async fn enters_active_state_with_handoff_wake_suspend_enabled() {
-    let realm = assemble_realm(/* suspend_enabled*/ true).await;
-
-    // Subscribe to activity state, which serves "Active" initially.
-    let notifier_proxy = realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
-        .expect("Failed to connect to fuchsia.input.interaction.Notifier.");
-    let mut watch_state_stream = HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
-    assert_eq!(
-        watch_state_stream
-            .next()
-            .await
-            .expect("Expected initial state from watch_state()")
-            .unwrap(),
-        State::Active
-    );
-
-    // Do nothing. Activity service transitions to idle state in one minute.
-    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
-    match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
-        future::Either::Left((result, _)) => {
-            assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
-        }
-        future::Either::Right(_) => panic!("Timer expired before state transitioned."),
-    }
-
-    // Activity service should transition to active state as a result of the
-    // handoff_wake() request.
-    let aggregator = realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<AggregatorMarker>()
-        .expect("Failed to connect to fuchsia.input.interaction.observation.Aggregator.");
-    let (watch_state_result, handoff_wake_result) =
-        future::join(watch_state_stream.next(), aggregator.handoff_wake()).await;
-    assert_eq!(
-        watch_state_result.expect("Expected updated state from watch_state()").unwrap(),
-        State::Active
-    );
-    assert_eq!(handoff_wake_result.expect("Failed to call handoff wake."), Ok(()));
 
     // Shut down input pipeline before dropping mocks, so that input pipeline
     // doesn't log errors about channels being closed.

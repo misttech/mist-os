@@ -813,8 +813,11 @@ mod testutil {
         type SocketState = ();
     }
 
-    impl<TimerId: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State>
-        DeviceLayerStateTypes for FakeBindingsCtx<TimerId, Event, State, ()>
+    impl<
+            TimerId: Debug + PartialEq + Clone + Send + Sync + 'static,
+            Event: Debug + 'static,
+            State: 'static,
+        > DeviceLayerStateTypes for FakeBindingsCtx<TimerId, Event, State, ()>
     {
         type EthernetDeviceState = ();
         type LoopbackDeviceState = ();

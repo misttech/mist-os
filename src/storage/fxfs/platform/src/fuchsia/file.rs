@@ -17,7 +17,7 @@ use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
-use fxfs::object_store::{DataObjectHandle, ObjectDescriptor};
+use fxfs::object_store::{DataObjectHandle, ObjectDescriptor, FSCRYPT_KEY_ID};
 use fxfs_macros::ToWeakNode;
 use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -221,6 +221,16 @@ impl FxFile {
             });
         }
     }
+
+    async fn fscrypt_wrapping_key_id(&self) -> Result<Option<[u8; 16]>, zx::Status> {
+        if !self.handle.store().is_encrypted() {
+            return Ok(None);
+        } else {
+            let wrapped_keys =
+                self.handle.store().get_keys(self.object_id()).await.map_err(map_to_status)?;
+            Ok(wrapped_keys.get_wrapping_key_with_id(FSCRYPT_KEY_ID))
+        }
+    }
 }
 
 impl Drop for FxFile {
@@ -291,6 +301,7 @@ impl vfs::node::Node for FxFile {
                     .get_inline_selinux_context()
                     .await
                     .map_err(map_to_status)?,
+                wrapping_key_id: self.fscrypt_wrapping_key_id().await?,
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,

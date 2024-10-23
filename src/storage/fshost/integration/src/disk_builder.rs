@@ -673,54 +673,42 @@ impl DiskBuilder {
     ///   |   |- config (directory, empty)
     ///   |- problems (directory, empty (no problems))
     async fn write_test_data(&self, root: &fio::DirectoryProxy) {
-        fuchsia_fs::directory::open_file_deprecated(
+        fuchsia_fs::directory::open_file(
             root,
             ".testdata",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::CREATE,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE,
         )
         .await
         .unwrap();
 
-        let ssh_dir = fuchsia_fs::directory::create_directory_deprecated(
+        let ssh_dir = fuchsia_fs::directory::create_directory(
             root,
             "ssh",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .await
         .unwrap();
-        let authorized_keys = fuchsia_fs::directory::open_file_deprecated(
+        let authorized_keys = fuchsia_fs::directory::open_file(
             &ssh_dir,
             "authorized_keys",
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .await
         .unwrap();
         fuchsia_fs::file::write(&authorized_keys, "public key!").await.unwrap();
-        fuchsia_fs::directory::create_directory_deprecated(
-            &ssh_dir,
-            "config",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
+        fuchsia_fs::directory::create_directory(&ssh_dir, "config", fio::PERM_READABLE)
+            .await
+            .unwrap();
 
-        fuchsia_fs::directory::create_directory_deprecated(
-            &root,
-            "problems",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
+        fuchsia_fs::directory::create_directory(&root, "problems", fio::PERM_READABLE)
+            .await
+            .unwrap();
 
         if let Some(content) = &self.fs_switch {
-            let fs_switch = fuchsia_fs::directory::open_file_deprecated(
+            let fs_switch = fuchsia_fs::directory::open_file(
                 &root,
                 "fs_switch",
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::CREATE,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .await
             .unwrap();

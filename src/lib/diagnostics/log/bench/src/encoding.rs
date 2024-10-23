@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_log_encoding::encode::{
-    Argument, Encoder, EncoderOpts, TracingEvent, Value, WriteEventParams,
+    Encoder, EncoderOpts, TracingEvent, WriteArgumentValue, WriteEventParams,
 };
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
@@ -15,21 +15,23 @@ use tracing_subscriber::Registry;
 
 mod common;
 
+type TestBuffer = Cursor<[u8; MAX_DATAGRAM_LEN_BYTES as usize]>;
+type TestEncoder = Encoder<TestBuffer>;
+
 #[inline]
-fn encoder() -> Encoder<Cursor<[u8; MAX_DATAGRAM_LEN_BYTES as usize]>> {
+fn encoder() -> TestEncoder {
     let buffer = [0u8; MAX_DATAGRAM_LEN_BYTES as usize];
     Encoder::new(Cursor::new(buffer), EncoderOpts::default())
 }
 
-fn bench_argument(
-    value: impl Into<Value<'static>>,
-) -> impl FnMut(&mut criterion::Bencher) + 'static {
-    let value = value.into();
+fn bench_argument<T>(value: T) -> impl FnMut(&mut criterion::Bencher) + 'static
+where
+    T: WriteArgumentValue<TestBuffer> + Copy + 'static,
+{
     move |b: &mut criterion::Bencher| {
-        let arg = Argument { name: "foo", value: value.clone() };
         b.iter_batched_ref(
             || encoder(),
-            |encoder| encoder.write_argument(&arg),
+            |encoder| encoder.write_raw_argument("foo", value),
             criterion::BatchSize::SmallInput,
         );
     }

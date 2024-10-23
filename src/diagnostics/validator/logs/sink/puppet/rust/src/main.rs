@@ -2,17 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_log::{OnInterestChanged, TestRecord};
-use fidl_fuchsia_diagnostics::Severity;
+use diagnostics_log::{OnInterestChanged, Severity, TestRecord};
 use fidl_fuchsia_validate_logs::{
     LogSinkPuppetRequest, LogSinkPuppetRequestStream, PuppetInfo, RecordSpec,
 };
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_runtime as rt;
 use futures::prelude::*;
 use tracing::*;
 use zx::{self as zx, AsHandleRef};
+use {diagnostics_log_validator_utils as utils, fuchsia_runtime as rt};
 
 #[fuchsia::main(always_log_file_line = true)]
 async fn main() {
@@ -34,7 +33,7 @@ async fn main() {
 struct Listener {}
 
 impl OnInterestChanged for Listener {
-    fn on_changed(&self, severity: &Severity) {
+    fn on_changed(&self, severity: Severity) {
         match severity {
             Severity::Trace => {
                 trace!("Changed severity");
@@ -81,13 +80,14 @@ async fn run_puppet(mut requests: LogSinkPuppetRequestStream) {
             }
             LogSinkPuppetRequest::EmitLog {
                 responder,
-                spec: RecordSpec { file, line, mut record },
+                spec: RecordSpec { file, line, record },
             } => {
+                let mut record = utils::fidl_to_record(record);
                 // tracing 0.2 will let us to emit non-'static events directly, no downcasting
                 tracing::dispatcher::get_default(|dispatcher| {
                     let publisher: &diagnostics_log::Publisher = dispatcher.downcast_ref().unwrap();
-                    if record.timestamp == 0 {
-                        record.timestamp = zx::BootInstant::get().into_nanos();
+                    if record.timestamp == zx::BootInstant::ZERO {
+                        record.timestamp = zx::BootInstant::get();
                     }
                     let test_record = TestRecord::from(&file, line, &record);
                     publisher.event_for_testing(test_record);

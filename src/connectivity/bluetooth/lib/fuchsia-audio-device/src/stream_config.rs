@@ -40,7 +40,10 @@ impl StreamConfigOrTask {
 }
 
 /// Number of frames within the duration.  This includes frames that end at exactly the duration.
-pub(crate) fn frames_from_duration(frames_per_second: usize, duration: fasync::Duration) -> usize {
+pub(crate) fn frames_from_duration(
+    frames_per_second: usize,
+    duration: fasync::MonotonicDuration,
+) -> usize {
     assert!(
         duration >= zx::MonotonicDuration::from_nanos(0),
         "frames_from_duration is not defined for negative durations"

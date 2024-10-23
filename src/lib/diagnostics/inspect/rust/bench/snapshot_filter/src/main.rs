@@ -61,11 +61,12 @@ fn main() {
     let mut bench = criterion::Benchmark::new(format!("SnapshotAndSelect/10"), move |b| {
         snapshot_and_select_bench(b, 10usize);
     });
-    for size in 2..=5 {
+    for exponent in 2..=5 {
         // This benchmark takes a snapshot of a seedable randomly generated
         // inspect hierarchy in a vmo and then applies the given selectors
         // to the snapshot to filter it down.
-        bench = bench.with_function(format!("SnapshotAndSelect/{}", 10i32.pow(size)), move |b| {
+        let size = 10i32.pow(exponent);
+        bench = bench.with_function(format!("SnapshotAndSelect/{}", size), move |b| {
             snapshot_and_select_bench(b, size as usize);
         });
     }

@@ -24,8 +24,6 @@ struct WriteSubState {
 
 // Contains information specific to when a GPIO has been configured for input.
 struct ReadSubState {
-  fuchsia_hardware_gpio::GpioFlags flags;
-
   bool operator==(const ReadSubState& other) const;
 };
 
@@ -67,16 +65,10 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   FakeGpio();
 
   // fidl::testing::WireTestBase<fuchsia_hardware_gpu::Gpio>
-  void GetInterrupt2(GetInterrupt2RequestView request,
-                     GetInterrupt2Completer::Sync& completer) override;
   void GetInterrupt(GetInterruptRequestView request,
                     GetInterruptCompleter::Sync& completer) override;
   void ConfigureInterrupt(ConfigureInterruptRequestView request,
                           ConfigureInterruptCompleter::Sync& completer) override;
-  void SetAltFunction(SetAltFunctionRequestView request,
-                      SetAltFunctionCompleter::Sync& completer) override;
-  void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override;
-  void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override;
   void SetBufferMode(SetBufferModeRequestView request,
                      SetBufferModeCompleter::Sync& completer) override;
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override;
@@ -95,10 +87,6 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   // Return the value being written by the gpio. Will fail if the current state
   // isn't `Write`.
   uint8_t GetWriteValue() const;
-
-  // Return the read flags set by `ConfigIn`. Will fail if the current state
-  // isn't `Read`.
-  fuchsia_hardware_gpio::GpioFlags GetReadFlags() const;
 
   // Return the most recent mode set by `GetInterrupt` or
   // `ConfigureInterrupt`. Will fail if there is not a current state.

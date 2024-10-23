@@ -72,11 +72,8 @@ async fn main() -> Result<(), Error> {
             vec![Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand))
                 as Box<dyn WatchSource>];
         sources.extend(
-            fuchsia_fs::directory::open_in_namespace_deprecated(
-                VOLUME_SERVICE_PATH,
-                fio::OpenFlags::empty(),
-            )
-            .map(|d| Box::new(DirSource::new(d)) as Box<dyn WatchSource>),
+            fuchsia_fs::directory::open_in_namespace(VOLUME_SERVICE_PATH, fio::Flags::empty())
+                .map(|d| Box::new(DirSource::new(d)) as Box<dyn WatchSource>),
         );
         sources
     } else {

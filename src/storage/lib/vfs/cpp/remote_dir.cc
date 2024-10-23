@@ -38,7 +38,7 @@ void RemoteDir::OpenRemote(fio::OpenFlags flags, fio::ModeType mode, fidl::Strin
                         ", response=", status.FormatDescription());
 }
 
-void RemoteDir::OpenRemote(fuchsia_io::wire::Directory2Open3Request request) const {
+void RemoteDir::OpenRemote(fuchsia_io::wire::DirectoryOpen3Request request) const {
   // We consume the |request| channel when making the wire call to the remote end, so on failure
   // there isn't anywhere for us to propagate the error.
   [[maybe_unused]] auto status =

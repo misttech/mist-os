@@ -17,6 +17,7 @@ pub struct ProcessCommand {
 #[argh(subcommand)]
 pub enum Args {
     List(ListArg),
+    Tree(TreeArg),
     Filter(FilterArg),
     GenerateFuchsiaMap(GenerateFuchsiaMapArg),
     Kill(KillArg),
@@ -35,6 +36,13 @@ pub struct ListArg {
         description = "outputs all processes and the kernel objects owned by each of them"
     )]
     pub verbose: bool,
+}
+
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
+#[argh(subcommand, name = "tree", description = "outputs the tree of all tasks in the system")]
+pub struct TreeArg {
+    #[argh(switch, description = "include threads")]
+    pub threads: bool,
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]

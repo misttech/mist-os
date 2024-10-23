@@ -584,8 +584,10 @@ func isZirconIdentifier(ci fidlgen.CompoundIdentifier) bool {
 }
 
 var zirconAlias = map[fidlgen.EncodedCompoundIdentifier]string{
-	"zx/InstantMono": "fidl::MonotonicInstant",
-	"zx/InstantBoot": "fidl::BootInstant",
+	"zx/InstantMono":      "fidl::MonotonicInstant",
+	"zx/InstantBoot":      "fidl::BootInstant",
+	"zx/InstantMonoTicks": "fidl::MonotonicTicks",
+	"zx/InstantBootTicks": "fidl::BootTicks",
 }
 
 // We special case references to declarations from //zircon/vdso/zx:zx, since we

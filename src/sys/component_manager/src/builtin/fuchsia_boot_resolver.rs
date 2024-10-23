@@ -5,12 +5,10 @@
 use crate::capability::{BuiltinCapability, CapabilityProvider, InternalCapabilityProvider};
 use crate::model::component::WeakComponentInstance;
 use crate::model::resolver::Resolver;
-use anyhow::{format_err, Error};
+use anyhow::{anyhow, Context as _, Error};
 use async_trait::async_trait;
 use fidl::endpoints::{ClientEnd, Proxy, ServerEnd};
-use fuchsia_pkg::PackagePath;
 use fuchsia_url::boot_url::BootUrl;
-use fuchsia_url::{PackageName, PackageVariant};
 use futures::TryStreamExt;
 use routing::capability_source::InternalCapability;
 use routing::resolving::{self, ComponentAddress, ResolvedComponent, ResolverError};
@@ -21,7 +19,7 @@ use system_image::{Bootfs, PathHashMapping};
 use version_history::AbiRevision;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_io as fio, zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
 };
 
 pub const SCHEME: &str = "fuchsia-boot";
@@ -48,14 +46,17 @@ static BOOTFS_BLOB_DIR: &str = "blob";
 #[derive(Clone, Debug)]
 pub struct FuchsiaBootResolver {
     boot_proxy: fio::DirectoryProxy,
-    boot_package_resolver: Option<Arc<BootPackageResolver>>,
+    boot_package_resolver: Option<Arc<FuchsiaBootPackageResolver>>,
 }
 
 impl FuchsiaBootResolver {
-    /// Create a new FuchsiaBootResolver. This first checks whether the path passed in is present in
-    /// the namespace, and returns Ok(None) if not present. For unit and integration tests, this
-    /// path may point to /pkg.
-    pub async fn new(path: &'static str) -> Result<Option<Self>, Error> {
+    /// Create a new FuchsiaBootResolver and its associated FuchsiaBootPackageResolver.
+    ///
+    /// This first checks whether the path passed in is present in the namespace, and returns
+    /// Ok(None) if not present. For unit and integration tests, this path may point to /pkg.
+    pub async fn new(
+        path: &'static str,
+    ) -> Result<Option<(Self, Option<Arc<FuchsiaBootPackageResolver>>)>, Error> {
         let bootfs_dir = Path::new(path);
 
         // TODO(97517): Remove this check if there is never a case for starting component manager
@@ -69,13 +70,15 @@ impl FuchsiaBootResolver {
             fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         )?;
 
-        Ok(Some(Self::new_from_directory(boot_proxy).await?))
+        let component_resolver = Self::new_from_directory(boot_proxy).await?;
+        let package_resolver = component_resolver.boot_package_resolver.clone();
+        Ok(Some((component_resolver, package_resolver)))
     }
 
     /// Create a new FuchsiaBootResolver that resolves URLs within the given directory. Used for
     /// injection in unit tests.
     async fn new_from_directory(proxy: fio::DirectoryProxy) -> Result<Self, Error> {
-        let boot_package_resolver = BootPackageResolver::try_instantiate(&proxy).await?;
+        let boot_package_resolver = FuchsiaBootPackageResolver::try_instantiate(&proxy).await?;
 
         Ok(Self { boot_proxy: proxy, boot_package_resolver })
     }
@@ -112,16 +115,28 @@ impl FuchsiaBootResolver {
         let canonicalized_package_path = fuchsia_fs::canonicalize_path(boot_url.path());
         match &self.boot_package_resolver {
             Some(boot_package_resolver) => {
-                let package_dir_proxy =
-                    boot_package_resolver.setup_package_dir(canonicalized_package_path).await?;
-                // TODO(97517): when all bootfs components are packaged, abi_revision setting can be moved
-                // into `construct_component()`.
+                let (proxy, server) = fidl::endpoints::create_proxy().unwrap();
+                let () = boot_package_resolver
+                    .resolve_name(
+                        fuchsia_url::PackageName::from_str(canonicalized_package_path).map_err(
+                            |e| {
+                                tracing::warn!(?boot_url, source=?e, "invalid url");
+                                fresolution::ResolverError::InvalidArgs
+                            },
+                        )?,
+                        server,
+                    )
+                    .await
+                    .map_err(package_to_component_error)?;
+
+                // TODO(https://fxbug.dev/42179754): when all bootfs components are packaged,
+                // abi_revision setting can be moved into `construct_component()`.
                 let abi_revision = fidl_fuchsia_component_abi_ext::read_abi_revision_optional(
-                    &package_dir_proxy,
+                    &proxy,
                     AbiRevision::PATH,
                 )
                 .await?;
-                self.construct_component(package_dir_proxy, boot_url, abi_revision).await
+                self.construct_component(proxy, boot_url, abi_revision).await
             }
             _ => {
                 tracing::warn!(
@@ -264,7 +279,7 @@ impl InternalCapabilityProvider for ComponentResolverCapabilityProvider {
 }
 
 #[derive(Debug)]
-struct BootPackageResolver {
+pub struct FuchsiaBootPackageResolver {
     // Blobfs client exposing the bootfs
     // /boot/blob directory to package-directory interface.
     // TODO(97517): Refactor to an impl of NonMetaStorage.
@@ -273,8 +288,8 @@ struct BootPackageResolver {
     boot_package_index: PathHashMapping<Bootfs>,
 }
 
-impl BootPackageResolver {
-    // Attempts to instantiate a BootPackageResolver.
+impl FuchsiaBootPackageResolver {
+    // Attempts to instantiate a FuchsiaBootPackageResolver.
     //
     // - The absence of a /boot/blob dir implies that there are no packages in the BootFS,
     // and boot resolver setup should still succeed.
@@ -294,17 +309,17 @@ impl BootPackageResolver {
             BOOTFS_BLOB_DIR,
             fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         )
-        .map_err(|err| format_err!("Bootfs blob directory existed, but converting it into a blob client for package resolution failed: {:?}", err))?;
+        .map_err(|err| anyhow!("Bootfs blob directory existed, but converting it into a blob client for package resolution failed: {:?}", err))?;
 
         let boot_package_index =
-            BootPackageResolver::extract_bootfs_index(&proxy).await.map_err(|err| {
-                format_err!(
+            FuchsiaBootPackageResolver::extract_bootfs_index(&proxy).await.map_err(|err| {
+                anyhow!(
                     "Failed to extract a package index from a bootfs that contains packages: {:?}",
                     err
                 )
             })?;
 
-        Ok(Some(Arc::new(BootPackageResolver { boot_blob_storage, boot_package_index })))
+        Ok(Some(Arc::new(FuchsiaBootPackageResolver { boot_blob_storage, boot_package_index })))
     }
 
     /// Load `data/bootfs_packages` from /boot, if present.
@@ -320,30 +335,48 @@ impl BootPackageResolver {
         let bootfs_package_contents = fuchsia_fs::file::read(&bootfs_package_index).await?;
 
         PathHashMapping::<Bootfs>::deserialize(&(*bootfs_package_contents))
-            .map_err(|e| format_err!("Parsing bootfs index failed: {:?}", e))
+            .map_err(|e| anyhow!("Parsing bootfs index failed: {:?}", e))
     }
 
-    async fn setup_package_dir(
+    async fn resolve_url(
         &self,
-        canonicalized_package_path: &str,
-    ) -> Result<fio::DirectoryProxy, fresolution::ResolverError> {
-        let package_path = match PackageName::from_str(canonicalized_package_path) {
-            Ok(package_name) => {
-                PackagePath::from_name_and_variant(package_name, PackageVariant::zero())
-            }
-            Err(e) => {
-                tracing::warn!("Bootfs package paths should be a single named segment: {:?}", e);
-                return Err(fresolution::ResolverError::InvalidArgs);
-            }
-        };
+        url: &str,
+        dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
+    ) -> Result<(), fpkg::ResolveError> {
+        let url = BootUrl::parse(url).map_err(|e| {
+            tracing::warn!(?url, "invalid boot url: {:#}", anyhow!(e));
+            fpkg::ResolveError::InvalidUrl
+        })?;
+        if url.resource().is_some() {
+            tracing::warn!(?url, "package urls must not have a resource");
+            return Err(fpkg::ResolveError::InvalidUrl);
+        }
+        self.resolve_name(
+            fuchsia_url::PackageName::from_str(fuchsia_fs::canonicalize_path(url.path())).map_err(
+                |e| {
+                    tracing::warn!(?url, source=?e, "bootfs package urls must have a single segment name");
+                    fpkg::ResolveError::InvalidUrl
+                },
+            )?,
+            dir,
+        )
+        .await
+    }
+
+    async fn resolve_name(
+        &self,
+        name: fuchsia_url::PackageName,
+        dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
+    ) -> Result<(), fpkg::ResolveError> {
+        let package_path = fuchsia_pkg::PackagePath::from_name_and_variant(
+            name,
+            fuchsia_url::PackageVariant::zero(),
+        );
 
         let meta_hash = self
             .boot_package_index
             .hash_for_package(&package_path)
-            .ok_or(fresolution::ResolverError::PackageNotFound)?;
-
-        let (proxy, server) = fidl::endpoints::create_proxy()
-            .map_err(|_| fresolution::ResolverError::InvalidManifest)?;
+            .ok_or(fpkg::ResolveError::PackageNotFound)?;
 
         let blob_proxy = fuchsia_fs::directory::clone_no_describe(&self.boot_blob_storage, None)
             .map_err(|e| {
@@ -351,7 +384,7 @@ impl BootPackageResolver {
                     "Creating duplicate connection to /boot/blob directory failed: {:?}",
                     e
                 );
-                fresolution::ResolverError::Internal
+                fpkg::ResolveError::Internal
             })?;
 
         let () = package_directory::serve(
@@ -360,12 +393,64 @@ impl BootPackageResolver {
             blob_proxy,
             meta_hash,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            server,
+            dir,
         )
         .await
-        .map_err(|_| fresolution::ResolverError::Internal)?;
+        .map_err(|e| {
+            tracing::warn!(source=?e, "serving the package directory");
+            fpkg::ResolveError::Internal
+        })?;
 
-        Ok(proxy)
+        Ok(())
+    }
+
+    pub async fn serve(
+        &self,
+        mut stream: fpkg::PackageResolverRequestStream,
+    ) -> Result<(), anyhow::Error> {
+        static EMPTY_CONTEXT: fpkg::ResolutionContext = fpkg::ResolutionContext { bytes: vec![] };
+        while let Some(request) = stream.try_next().await? {
+            match request {
+                fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
+                    let () = responder
+                        .send(self.resolve_url(&package_url, dir).await.map(|()| &EMPTY_CONTEXT))?;
+                }
+                fpkg::PackageResolverRequest::ResolveWithContext {
+                    package_url,
+                    context,
+                    dir,
+                    responder,
+                } => {
+                    if !context.bytes.is_empty() {
+                        tracing::error!(
+                            %package_url,
+                            "bootfs resolver implementation of \
+                            fuchsia.pkg/PackageResolver.ResolveWithContext does not support \
+                            subpackages (context must be empty)",
+                        );
+                        let () = responder
+                            .send(Err(fpkg::ResolveError::Internal))
+                            .context("sending fuchsia.pkg/PackageResolver.GetHash response")?;
+                    } else {
+                        let () = responder.send(
+                            self.resolve_url(&package_url, dir).await.map(|()| &EMPTY_CONTEXT),
+                        )?;
+                    }
+                }
+                // GetHash was added to support a CLI tool for investigating the state of ephemeral
+                // packages and should otherwise not be used.
+                fpkg::PackageResolverRequest::GetHash { package_url, responder } => {
+                    tracing::error!(
+                        "unsupported fuchsia.pkg/PackageResolver.GetHash called with {:?}",
+                        package_url
+                    );
+                    let () = responder
+                        .send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
+                        .context("sending fuchsia.pkg/PackageResolver.GetHash response")?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -383,7 +468,7 @@ impl Resolver for FuchsiaBootResolver {
         let resolved_url = url.unwrap();
         let decl = decl.ok_or_else(|| {
             ResolverError::ManifestInvalid(
-                anyhow::format_err!("missing manifest from resolved component").into(),
+                anyhow!("missing manifest from resolved component").into(),
             )
         })?;
         let decl = resolving::read_and_validate_manifest(&decl)?;
@@ -400,6 +485,22 @@ impl Resolver for FuchsiaBootResolver {
             config_values,
             abi_revision: abi_revision.map(Into::into),
         })
+    }
+}
+
+fn package_to_component_error(e: fpkg::ResolveError) -> fresolution::ResolverError {
+    match e {
+        fpkg::ResolveError::Internal => fresolution::ResolverError::Internal,
+        fpkg::ResolveError::AccessDenied => fresolution::ResolverError::Internal,
+        fpkg::ResolveError::Io => fresolution::ResolverError::Io,
+        fpkg::ResolveError::BlobNotFound => fresolution::ResolverError::Internal,
+        fpkg::ResolveError::PackageNotFound => fresolution::ResolverError::PackageNotFound,
+        fpkg::ResolveError::RepoNotFound => fresolution::ResolverError::Internal,
+        fpkg::ResolveError::NoSpace => fresolution::ResolverError::NoSpace,
+        fpkg::ResolveError::UnavailableBlob => fresolution::ResolverError::Internal,
+        fpkg::ResolveError::UnavailableRepoMetadata => fresolution::ResolverError::Internal,
+        fpkg::ResolveError::InvalidUrl => fresolution::ResolverError::InvalidArgs,
+        fpkg::ResolveError::InvalidContext => fresolution::ResolverError::InvalidArgs,
     }
 }
 

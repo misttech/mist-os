@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bedrock::lazy_get::LazyGet;
 use crate::error::RoutingError;
 use async_trait::async_trait;
 use cm_types::{IterablePath, RelativePath};
@@ -10,6 +9,7 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
 use sandbox::{Capability, Dict, Request, Routable, Router};
+use std::fmt::Debug;
 
 #[async_trait]
 pub trait DictExt {
@@ -88,6 +88,7 @@ impl DictExt for Dict {
         struct ErrorRouter {
             not_found_error: RouterError,
         }
+
         #[async_trait]
         impl Routable for ErrorRouter {
             async fn route(
@@ -96,6 +97,48 @@ impl DictExt for Dict {
                 _debug: bool,
             ) -> Result<Capability, RouterError> {
                 Err(self.not_found_error.clone())
+            }
+        }
+
+        /// This uses the same algorithm as [LazyGet], but that is implemented for
+        /// [SpecificRouter<Dict>] while this is implemented for [Router]. This duplication will go
+        /// away once [Router] is replaced with [SpecificRouter].
+        #[derive(Debug)]
+        struct ScopedDictRouter<P: IterablePath + Debug + 'static> {
+            router: Router,
+            path: P,
+            not_found_error: RoutingError,
+        }
+
+        #[async_trait]
+        impl<P: IterablePath + Debug + 'static> Routable for ScopedDictRouter<P> {
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<Capability, RouterError> {
+                // If `debug` is true, that should only apply to the capability at `path`.
+                // Here we're looking up the containing dictionary, so set `debug = false`, to
+                // obtain the actual Dict and not its debug info.
+                let init_request = request.as_ref().map(|r| r.try_clone()).transpose()?;
+                match self.router.route(init_request, false).await? {
+                    Capability::Dictionary(dict) => {
+                        let request = request.as_ref().map(|r| r.try_clone()).transpose()?;
+                        let maybe_capability = dict
+                            .get_with_request(
+                                self.not_found_error.clone(),
+                                &self.path,
+                                request,
+                                debug,
+                            )
+                            .await?;
+                        maybe_capability.ok_or_else(|| self.not_found_error.clone().into())
+                    }
+                    _ => Err(RoutingError::BedrockMemberAccessUnsupported {
+                        moniker: self.not_found_error.clone().into(),
+                    }
+                    .into()),
+                }
             }
         }
 
@@ -109,7 +152,8 @@ impl DictExt for Dict {
         let mut segments = path.iter_segments();
         let _ = segments.next().unwrap();
         let path = RelativePath::from(segments.map(|s| s.clone()).collect::<Vec<_>>());
-        router.lazy_get(path, not_found_error)
+
+        Router::new(ScopedDictRouter { router, path, not_found_error: not_found_error.into() })
     }
 
     fn insert_capability(

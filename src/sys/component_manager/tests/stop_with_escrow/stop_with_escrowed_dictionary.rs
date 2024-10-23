@@ -11,7 +11,7 @@ use futures::{StreamExt, TryStreamExt};
 use std::pin::pin;
 use {
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_process_lifecycle as flifecycle,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 /// See the `stop_with_escrowed_dictionary` test case.
@@ -68,7 +68,7 @@ async fn read_counter_from_dictionary(
 
 async fn handle_trigger(mut counter: u64, stream: TriggerRequestStream) -> u64 {
     let (mut stream, stalled) =
-        detect_stall::until_stalled(stream, fasync::Duration::from_micros(1));
+        detect_stall::until_stalled(stream, fasync::MonotonicDuration::from_micros(1));
     let mut stream = pin!(stream);
     while let Ok(Some(request)) = stream.try_next().await {
         match request {

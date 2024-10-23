@@ -586,6 +586,17 @@ void Session::HandleException(ThreadImpl* thread, const debug_ipc::NotifyExcepti
   info.exception_record = notify.exception;
   info.timestamp = notify.timestamp;
 
+  if (settings.notify_only) {
+    // At this point there is no more live thread on the target. We cannot query for any more stack,
+    // and we cannot ask to load modules. There should be no breakpoints since this implies we were
+    // only attached to the parent job of the process that this excepting thread is running within.
+    // We also don't need to worry about continuation, since the backend immediately releases the
+    // exception in this path.
+    FX_DCHECK(notify.hit_breakpoints.empty());
+    thread->OnException(info);
+    return;
+  }
+
   ProcessImpl* process = thread->process();
   process->SetMemoryBlocks(thread->GetKoid(), notify.memory_blocks);
 
@@ -645,6 +656,16 @@ void Session::DispatchNotifyException(const debug_ipc::NotifyException& notify, 
 
   if (thread->process()->HasLoadedSymbols()) {
     // Normal case, just handle the exception.
+    HandleException(thread, notify, settings);
+    return;
+  }
+
+  // This came from the notification traveling up the job tree, rather than because we were attached
+  // to this process directly. In this configuration we need to dispatch the exception notification,
+  // but not load modules or unwind the stack on the target, since the backend is not holding the
+  // exception for us after sending this notification.
+  if (notify.job_only) {
+    settings.notify_only = true;
     HandleException(thread, notify, settings);
     return;
   }
@@ -720,11 +741,9 @@ void Session::DispatchNotifyProcessStarting(const debug_ipc::NotifyProcessStarti
   auto matched_filter = system().GetFilterForId(notify.filter_id);
 
   // If the notification is coming from a weak filter, defer fetching modules until later.
-  if (matched_filter && matched_filter->weak()) {
-    return;
+  if (matched_filter && !matched_filter->ShouldDeferModuleLoading()) {
+    found_target->process()->GetModules(true, [](const Err&, std::vector<debug_ipc::Module>) {});
   }
-
-  found_target->process()->GetModules(true, [](const Err&, std::vector<debug_ipc::Module>) {});
 }
 
 void Session::DispatchNotifyProcessExiting(const debug_ipc::NotifyProcessExiting& notify) {
@@ -773,6 +792,7 @@ void Session::DispatchNotifyComponentDiscovered(
   filter->SetJobKoid(notify.filter.job_koid);
   filter->SetWeak(notify.filter.config.weak);
   filter->SetRecursive(notify.filter.config.recursive);
+  filter->SetJobOnly(notify.filter.config.job_only);
 }
 
 void Session::DispatchNotifyComponentStarting(const debug_ipc::NotifyComponentStarting& notify) {

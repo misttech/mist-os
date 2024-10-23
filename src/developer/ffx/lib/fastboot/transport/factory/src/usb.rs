@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use ffx_fastboot_interface::interface_factory::{
     InterfaceFactory, InterfaceFactoryBase, InterfaceFactoryError,
 };
-use fuchsia_async::Duration;
+use fuchsia_async::MonotonicDuration;
 use futures::channel::oneshot::{channel, Sender};
 use usb_bulk::AsyncInterface;
 use usb_fastboot_discovery::{
@@ -116,7 +116,7 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
             // This tester will not attempt to talk to the USB devices to extract version info, it
             // only inspects the USB interface
             UnversionedFastbootUsbTester {},
-            Duration::from_secs(1),
+            MonotonicDuration::from_secs(1),
         );
 
         rx.await.map_err(|e| {
@@ -130,7 +130,7 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
             "Rediscovered device with serial {}. Waiting for it to be live",
             self.serial,
         );
-        wait_for_live(self.serial.as_str(), &mut tester, Duration::from_millis(500)).await;
+        wait_for_live(self.serial.as_str(), &mut tester, MonotonicDuration::from_millis(500)).await;
 
         Ok(())
     }

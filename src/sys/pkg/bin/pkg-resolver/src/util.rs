@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Context as _;
+use fidl_fuchsia_io as fio;
 use futures::Future;
-use {fidl_fuchsia_io as fio, zx};
 
 /// Creates `temp_filename` under the `dir_proxy`, overwrite it if already exists, call the callback
 /// with the opened file proxy, and then atomically rename it to `permanent_filename`.

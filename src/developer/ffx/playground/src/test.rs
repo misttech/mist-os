@@ -18,6 +18,7 @@ use crate::value::{PlaygroundValue, Value, ValueExt};
 async fn test_interpreter(
     with_fidl: bool,
     with_dirs: Option<ClientEnd<fio::DirectoryMarker>>,
+    with_test_cmds: bool,
 ) -> Interpreter {
     let mut ns = lib::Namespace::new();
     if with_fidl {
@@ -26,6 +27,20 @@ async fn test_interpreter(
     }
     let fs_root = with_dirs.unwrap_or_else(|| fidl::endpoints::create_endpoints().0);
     let (interpreter, fut) = Interpreter::new(ns, fs_root).await;
+    if with_test_cmds {
+        interpreter
+            .add_command("test_cmd_yield_union", |args, _underscore| {
+                assert!(args.is_empty());
+                async move {
+                    Ok(Value::Union(
+                        "test.fidlcodec.examples/U8U16Union".into(),
+                        "variant_u8".into(),
+                        Box::new(Value::U8(42)),
+                    ))
+                }
+            })
+            .await;
+    }
     fuchsia_async::Task::spawn(fut).detach();
 
     interpreter
@@ -111,18 +126,25 @@ impl vfs::directory::entry::GetEntryInfo for TestSymlink {
 pub struct Test<T> {
     test: T,
     with_fidl: bool,
+    with_test_cmds: bool,
     with_dirs: Option<fidl::endpoints::ClientEnd<fio::DirectoryMarker>>,
 }
 
 impl<T: AsRef<str>> Test<T> {
     /// Create a new test which will run the given Playground code.
     pub fn test(test: T) -> Self {
-        Test { test, with_fidl: false, with_dirs: None }
+        Test { test, with_fidl: false, with_test_cmds: false, with_dirs: None }
     }
 
     /// Load the FIDL test data into the interpreter before this test runs.
     pub fn with_fidl(mut self) -> Self {
         self.with_fidl = true;
+        self
+    }
+
+    /// Add special test commands to the interpreter.
+    pub fn with_test_cmds(mut self) -> Self {
+        self.with_test_cmds = true;
         self
     }
 
@@ -160,7 +182,7 @@ impl<T: AsRef<str>> Test<T> {
     /// Run this test, check the output with the given closure.
     pub async fn check(self, eval: impl Fn(Value)) {
         eval(
-            test_interpreter(self.with_fidl, self.with_dirs)
+            test_interpreter(self.with_fidl, self.with_dirs, self.with_test_cmds)
                 .await
                 .run(self.test.as_ref())
                 .await
@@ -171,7 +193,7 @@ impl<T: AsRef<str>> Test<T> {
     /// Run this test, check the output with the given closure, which may be a future.
     pub async fn check_async<F: std::future::Future<Output = ()>>(self, eval: impl Fn(Value) -> F) {
         eval(
-            test_interpreter(self.with_fidl, self.with_dirs)
+            test_interpreter(self.with_fidl, self.with_dirs, self.with_test_cmds)
                 .await
                 .run(self.test.as_ref())
                 .await
@@ -916,7 +938,7 @@ async fn subtract() {
 
 #[fuchsia::test]
 async fn complex_global_usage_interleaving() {
-    let interpreter = test_interpreter(false, None).await;
+    let interpreter = test_interpreter(false, None, false).await;
 
     assert!(matches!(interpreter.run("def a { 5 }").await.unwrap(), Value::Null));
     assert!(matches!(interpreter.run("def b { $_ + 2 }").await.unwrap(), Value::Null));
@@ -1107,6 +1129,40 @@ async fn string_interpolation() {
             panic!();
         };
         assert_eq!("My guy is Jim and he is 10 years old", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn union_idx_integer() {
+    Test::test(
+        r#"
+    test_cmd_yield_union | $_[0]
+    "#,
+    )
+    .with_test_cmds()
+    .check(|value| {
+        let Value::U8(value) = value else {
+            panic!();
+        };
+        assert_eq!(42, value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn union_idx_string() {
+    Test::test(
+        r#"
+    test_cmd_yield_union | $_["variant_u8"]
+    "#,
+    )
+    .with_test_cmds()
+    .check(|value| {
+        let Value::U8(value) = value else {
+            panic!();
+        };
+        assert_eq!(42, value);
     })
     .await;
 }

@@ -31,7 +31,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_async as fasync};
 
 /// Responsible for initializing an `Archivist` instance. Supports multiple configurations by
 /// either calling or not calling methods on the builder like `serve_test_controller_protocol`.

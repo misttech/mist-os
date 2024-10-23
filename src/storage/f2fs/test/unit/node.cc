@@ -233,7 +233,7 @@ TEST_F(NodeManagerTest, FreeNid) {
   ASSERT_EQ(nid, static_cast<nid_t>(5));
 }
 
-TEST_F(NodeManagerTest, NodePage) {
+TEST_F(NodeManagerTest, NodePage) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Alloc Inode
   fbl::RefPtr<VnodeF2fs> vnode;
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, vnode);
@@ -354,7 +354,7 @@ TEST_F(NodeManagerTest, NodePage) {
   vnode.reset();
 }
 
-TEST_F(NodeManagerTest, NodePageExceptionCase) {
+TEST_F(NodeManagerTest, NodePageExceptionCase) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Alloc Inode
   fbl::RefPtr<VnodeF2fs> vnode;
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, vnode);
@@ -454,7 +454,7 @@ TEST_F(NodeManagerTest, NodePageExceptionCase) {
   vnode.reset();
 }
 
-TEST_F(NodeManagerTest, TruncateDoubleIndirect) {
+TEST_F(NodeManagerTest, TruncateDoubleIndirect) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Alloc Inode
   fbl::RefPtr<VnodeF2fs> vnode;
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, vnode);
@@ -521,7 +521,7 @@ TEST_F(NodeManagerTest, TruncateDoubleIndirect) {
   vnode.reset();
 }
 
-TEST_F(NodeManagerTest, TruncateIndirect) {
+TEST_F(NodeManagerTest, TruncateIndirect) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Alloc Inode
   fbl::RefPtr<VnodeF2fs> vnode;
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, vnode);
@@ -593,7 +593,7 @@ TEST_F(NodeManagerTest, TruncateIndirect) {
   vnode.reset();
 }
 
-TEST_F(NodeManagerTest, TruncateExceptionCase) {
+TEST_F(NodeManagerTest, TruncateExceptionCase) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Alloc Inode
   fbl::RefPtr<VnodeF2fs> vnode;
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, vnode);
@@ -685,7 +685,7 @@ TEST_F(NodeManagerTest, TruncateExceptionCase) {
   vnode.reset();
 }
 
-TEST_F(NodeManagerTest, NodeFooter) {
+TEST_F(NodeManagerTest, NodeFooter) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Alloc Inode
   fbl::RefPtr<VnodeF2fs> vnode;
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, vnode);
@@ -740,7 +740,7 @@ TEST_F(NodeManagerTest, NodeFooter) {
   vnode.reset();
 }
 
-TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
+TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Alloc inode
   fbl::RefPtr<VnodeF2fs> file_vnode;
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, file_vnode);
@@ -860,7 +860,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   vnode.reset();
 }
 
-TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
+TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Alloc inode
   fbl::RefPtr<VnodeF2fs> file_vnode;
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, file_vnode);
@@ -996,7 +996,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   vnode.reset();
 }
 
-TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
+TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Alloc inode
   fbl::RefPtr<VnodeF2fs> file_vnode;
   FileTester::VnodeWithoutParent(fs_.get(), S_IFREG, file_vnode);

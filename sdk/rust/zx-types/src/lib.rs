@@ -695,6 +695,7 @@ pub const ZX_RSRC_FLAG_EXCLUSIVE: zx_rsrc_flags_t = 0x00010000;
 // Topics for CPU performance info syscalls
 pub const ZX_CPU_PERF_SCALE: u32 = 1;
 pub const ZX_CPU_DEFAULT_PERF_SCALE: u32 = 2;
+pub const ZX_CPU_POWER_LIMIT: u32 = 3;
 
 // Cache policy flags.
 pub const ZX_CACHE_POLICY_CACHED: u32 = 0;
@@ -1560,7 +1561,7 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_PROCESS_VMOS               = info_topic(14, 2); // zx_info_vmo_t[n]
     ZX_INFO_THREAD_STATS               = 15; // zx_info_thread_stats_t[1]
     ZX_INFO_CPU_STATS                  = 16; // zx_info_cpu_stats_t[n]
-    ZX_INFO_KMEM_STATS                 = 17; // zx_info_kmem_stats_t[1]
+    ZX_INFO_KMEM_STATS                 = info_topic(17, 1); // zx_info_kmem_stats_t[1]
     ZX_INFO_RESOURCE                   = 18; // zx_info_resource_t[1]
     ZX_INFO_HANDLE_COUNT               = 19; // zx_info_handle_count_t[1]
     ZX_INFO_BTI                        = 20; // zx_info_bti_t[1]
@@ -1777,13 +1778,23 @@ struct_decl_macro! {
     pub struct <zx_info_kmem_stats_t> {
         pub total_bytes: u64,
         pub free_bytes: u64,
+        pub free_loaned_bytes: u64,
         pub wired_bytes: u64,
         pub total_heap_bytes: u64,
         pub free_heap_bytes: u64,
         pub vmo_bytes: u64,
         pub mmu_overhead_bytes: u64,
         pub ipc_bytes: u64,
+        pub cache_bytes: u64,
+        pub slab_bytes: u64,
+        pub zram_bytes: u64,
         pub other_bytes: u64,
+        pub vmo_reclaim_total_bytes: u64,
+        pub vmo_reclaim_newest_bytes: u64,
+        pub vmo_reclaim_oldest_bytes: u64,
+        pub vmo_reclaim_disabled_bytes: u64,
+        pub vmo_discardable_locked_bytes: u64,
+        pub vmo_discardable_unlocked_bytes: u64,
     }
 }
 
@@ -2182,6 +2193,14 @@ pub struct zx_cpu_performance_scale_t {
 pub struct zx_cpu_performance_info_t {
     pub logical_cpu_number: u32,
     pub performance_scale: zx_cpu_performance_scale_t,
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub struct zx_cpu_power_limit_t {
+    pub logical_cpu_number: u32,
+    pub padding1: [PadByte; 4],
+    pub max_power_nw: u64,
 }
 
 #[repr(C)]

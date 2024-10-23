@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.kms") {
-  sdk_category = "internal"
-
   sources = [
     "key_manager.fidl",
     "key_manager_stateless.fidl",

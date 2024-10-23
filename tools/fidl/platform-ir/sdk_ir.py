@@ -62,12 +62,10 @@ def main():
     ]
 
     def patch_path(path: str, api_level: str) -> str:
-        """Modify a path a the platform build FIDL IR to be the one for a specific API level."""
+        """Return the path for the specified `api_level` corresponding to the
+        `path` for the "PLATFORM" build ."""
         d, f = os.path.split(path)
-        new_ending = f"_compile_{api_level}.fidl.json"
-        f = f.replace(".fidl.json", new_ending, 1)
         # Make sure that worked as expected
-        assert f.endswith(new_ending)
         return os.path.join(d, api_level, f)
 
     # If we're targeting a stable API level, tinker with the paths

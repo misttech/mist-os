@@ -9,12 +9,12 @@ rustc_library("openthread") {
   edition = "2021"
   with_unit_tests = true
   deps = [
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.lowpan.thread:fuchsia.lowpan.thread_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/rust/zx",
     "//sdk/rust/zx-status",
     "//src/connectivity/lowpan/lib/openthread_sys",
+    "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bitflags",

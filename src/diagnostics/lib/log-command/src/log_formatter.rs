@@ -9,7 +9,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use diagnostics_data::{
     Data, LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, Logs,
-    LogsData, LogsDataBuilder, Severity, Timezone,
+    LogsData, LogsDataBuilder, LogsField, LogsProperty, Severity, Timezone,
 };
 use ffx_writer::ToolIO;
 use futures_util::future::Either;
@@ -107,7 +107,7 @@ where
     symbolizer.symbolize(entry).await
 }
 
-fn generate_timestamp_message() -> LogEntry {
+fn generate_timestamp_message(boot_timestamp: Timestamp) -> LogEntry {
     LogEntry {
         data: LogData::TargetLog(
             LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -116,7 +116,15 @@ fn generate_timestamp_message() -> LogEntry {
                 component_url: Some("ffx".into()),
                 severity: Severity::Info,
             })
-            .set_message(format!("UTC time now: {}", chrono::Utc::now().to_rfc3339()))
+            .set_message(format!("Logging started"))
+            .add_key(LogsProperty::String(
+                LogsField::Other("utc_time_now".into()),
+                chrono::Utc::now().to_rfc3339(),
+            ))
+            .add_key(LogsProperty::Int(
+                LogsField::Other("current_boot_timestamp".to_string()),
+                boot_timestamp.into_nanos(),
+            ))
             .build(),
         ),
         timestamp: Timestamp::from_nanos(0),
@@ -137,8 +145,8 @@ where
     let boot_ts = formatter.get_boot_timestamp();
     let mut decoder = Box::pin(LogsDataStream::new(socket).fuse());
     let mut symbolize_pending = FuturesUnordered::new();
-    if include_timestamp {
-        formatter.push_log(generate_timestamp_message()).await?;
+    if include_timestamp && !formatter.is_utc_time_format() {
+        formatter.push_log(generate_timestamp_message(formatter.get_boot_timestamp())).await?;
     }
     while let Some(value) = select! {
         res = decoder.next() => Some(Either::Left(res)),
@@ -278,6 +286,13 @@ where
         };
 
         Ok(LogProcessingResult::Continue)
+    }
+
+    fn is_utc_time_format(&self) -> bool {
+        self.options.display.iter().any(|options| match options.time_format {
+            LogTimeDisplayFormat::Original => false,
+            LogTimeDisplayFormat::WallTime { tz, offset: _ } => tz == Timezone::Utc,
+        })
     }
 }
 
@@ -431,6 +446,9 @@ impl Symbolize for NoOpSymbolizer {
 pub trait LogFormatter {
     /// Formats a log entry and writes it to the output.
     async fn push_log(&mut self, log_entry: LogEntry) -> Result<LogProcessingResult, LogError>;
+
+    /// Returns true if the formatter is configured to output in UTC time format.
+    fn is_utc_time_format(&self) -> bool;
 }
 
 #[cfg(test)]
@@ -447,19 +465,27 @@ mod test {
 
     struct FakeFormatter {
         logs: Vec<LogEntry>,
+        boot_timestamp: Timestamp,
+        is_utc_time_format: bool,
     }
 
     impl FakeFormatter {
         fn new() -> Self {
-            Self { logs: Vec::new() }
+            Self {
+                logs: Vec::new(),
+                boot_timestamp: Timestamp::from_nanos(0),
+                is_utc_time_format: false,
+            }
         }
     }
 
     impl BootTimeAccessor for FakeFormatter {
-        fn set_boot_timestamp(&mut self, _boot_ts_nanos: Timestamp) {}
+        fn set_boot_timestamp(&mut self, boot_ts_nanos: Timestamp) {
+            self.boot_timestamp = boot_ts_nanos;
+        }
 
         fn get_boot_timestamp(&self) -> Timestamp {
-            Timestamp::from_nanos(0)
+            self.boot_timestamp
         }
     }
 
@@ -468,6 +494,10 @@ mod test {
         async fn push_log(&mut self, log_entry: LogEntry) -> Result<LogProcessingResult, LogError> {
             self.logs.push(log_entry);
             Ok(LogProcessingResult::Continue)
+        }
+
+        fn is_utc_time_format(&self) -> bool {
+            self.is_utc_time_format
         }
     }
 
@@ -581,9 +611,9 @@ mod test {
 
     #[fuchsia::test]
     async fn test_format_utc_timestamp() {
-        let start_text = "UTC time now: ";
         let symbolizer = NoOpSymbolizer {};
         let mut formatter = FakeFormatter::new();
+        formatter.set_boot_timestamp(Timestamp::from_nanos(DEFAULT_TS_NANOS as i64));
         let (_, receiver) = zx::Socket::create_stream();
         super::dump_logs_from_socket(
             fuchsia_async::Socket::from_socket(receiver),
@@ -593,8 +623,37 @@ mod test {
         )
         .await
         .unwrap();
-        let output = formatter.logs[0].data.as_target_log().unwrap().msg().unwrap().to_string();
-        chrono::DateTime::parse_from_rfc3339(&output[start_text.len()..]).unwrap();
+        let target_log = formatter.logs[0].data.as_target_log().unwrap();
+        let properties = target_log.payload_keys().unwrap();
+        assert_eq!(target_log.msg().unwrap(), "Logging started");
+
+        // Ensure the end has a valid timestamp
+        chrono::DateTime::parse_from_rfc3339(
+            properties.get_property("utc_time_now").unwrap().string().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            properties.get_property("current_boot_timestamp").unwrap().int().unwrap(),
+            DEFAULT_TS_NANOS as i64
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_format_utc_timestamp_does_not_print_if_utc_time() {
+        let symbolizer = NoOpSymbolizer {};
+        let mut formatter = FakeFormatter::new();
+        formatter.is_utc_time_format = true;
+        formatter.set_boot_timestamp(Timestamp::from_nanos(DEFAULT_TS_NANOS as i64));
+        let (_, receiver) = zx::Socket::create_stream();
+        super::dump_logs_from_socket(
+            fuchsia_async::Socket::from_socket(receiver),
+            &mut formatter,
+            &symbolizer,
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(formatter.logs.len(), 0);
     }
 
     #[fuchsia::test]

@@ -7,6 +7,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_vsock::{
     Addr, CallbacksMarker, CallbacksProxy, DeviceRequest, DeviceRequestStream, VMADDR_CID_LOCAL,
 };
+use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
@@ -15,7 +16,6 @@ use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
 use thiserror::Error;
-use {fuchsia_async as fasync, zx};
 
 #[derive(Error, Debug)]
 enum Error {

@@ -148,19 +148,24 @@ zx::result<> Fusb302Device::Start() {
     }
 
     gpio = std::move(result.value());
-    if (auto result = fidl::WireCall(gpio)->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullUp);
+
+    fidl::Arena arena;
+    auto interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                                .mode(fuchsia_hardware_gpio::InterruptMode::kLevelLow)
+                                .Build();
+    if (auto result = fidl::WireCall(gpio)->ConfigureInterrupt(interrupt_config);
         !result.ok() || result->is_error()) {
-      FDF_LOG(ERROR, "GPIO ConfigIn() failed: %s",
+      FDF_LOG(ERROR, "GPIO ConfigureInterrupt() failed: %s",
               result.ok() ? zx_status_get_string(result->error_value())
                           : result.FormatDescription().c_str());
     }
-    if (auto result = fidl::WireCall(gpio)->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW);
-        !result.ok() || result->is_error()) {
+
+    if (auto result = fidl::WireCall(gpio)->GetInterrupt({}); !result.ok() || result->is_error()) {
       FDF_LOG(ERROR, "GPIO GetInterrupt() failed: %s",
               result.ok() ? zx_status_get_string(result->error_value())
                           : result.FormatDescription().c_str());
     } else {
-      irq = std::move(result->value()->irq);
+      irq = std::move(result->value()->interrupt);
     }
   }
 

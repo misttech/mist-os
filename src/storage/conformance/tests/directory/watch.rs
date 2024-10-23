@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
 use futures::StreamExt;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
 use std::path::PathBuf;
-use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn watch_dir_existing() {

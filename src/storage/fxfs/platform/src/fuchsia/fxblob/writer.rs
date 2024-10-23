@@ -97,6 +97,7 @@ impl DeliveryBlobWriter {
             // Checksums are redundant for blobs, which are already content-verified.
             HandleOptions { skip_checksums: true, ..Default::default() },
             None,
+            None,
         )
         .await
         .context("Failed to create object.")?;
@@ -400,7 +401,8 @@ impl DeliveryBlobWriter {
 
         // Write payload to disk and update Merkle tree.
         if !self.buffer.is_empty() {
-            self.write_payload().await?;
+            // This ends up being a large future, so we box it.
+            Box::pin(self.write_payload()).await?;
         }
         Ok(())
     }

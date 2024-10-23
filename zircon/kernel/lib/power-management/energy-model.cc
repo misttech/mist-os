@@ -39,6 +39,19 @@ static constexpr bool HasOverlappingCpu(const uint64_t (&a)[N], const uint64_t (
 zx::result<PowerModel> PowerModel::Create(
     cpp20::span<const zx_processor_power_level_t> levels,
     cpp20::span<const zx_processor_power_level_transition_t> transitions) {
+  // Allocations below would be UB.
+  if (levels.size() < 1) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  if (transitions.size() < 1) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  if (transitions.size() > levels.size() * levels.size()) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
   // Validate that transitions are to and from valid levels.
   for (const auto& transition : transitions) {
     if (transition.from >= levels.size()) {
@@ -81,9 +94,14 @@ zx::result<PowerModel> PowerModel::Create(
   }
 
   size_t idle_levels = 0;
+  // We assert below, because all the space required for these operation has been preallocated.
   for (size_t i = 0; i < levels.size(); ++i) {
-    power_levels.push_back(PowerLevel(static_cast<uint8_t>(i), levels[i]));
-    power_levels_lookup.push_back(i);
+    power_levels.push_back(PowerLevel(static_cast<uint8_t>(i), levels[i]), &ac);
+    // These were preallocated above.
+    ZX_ASSERT(ac.check());
+    power_levels_lookup.push_back(i, &ac);
+    // These were preallocated above.
+    ZX_ASSERT(ac.check());
     if (power_levels[i].type() == PowerLevel::kIdle) {
       idle_levels++;
     }
@@ -193,6 +211,48 @@ zx::result<> PowerDomainRegistry::UpdateRegistry(
   }
 
   domains_.push_front(std::move(power_domain));
+  return zx::ok();
+}
+
+zx::result<> PowerDomainRegistry::RemoveFromRegistry(
+    uint32_t domain_id, fit::inline_function<void(size_t)> clear_domain) {
+  std::optional<decltype(domains_)::iterator> power_domain_prev;
+  std::optional<decltype(domains_)::iterator> prev_it = std::nullopt;
+
+  fbl::RefPtr<PowerDomain> power_domain = nullptr;
+  bool existing_id = false;
+  for (auto it = domains_.begin(); it != domains_.end(); ++it) {
+    auto& entry = *it;
+    if (entry.id() == domain_id) {
+      power_domain_prev = prev_it;
+      existing_id = true;
+      break;
+    }
+    prev_it = it;
+  }
+
+  // Now remove power_domain from the list, and update the domain's generation number.
+  if (existing_id) {
+    if (!power_domain_prev) {
+      power_domain = domains_.pop_front();
+    } else {
+      power_domain = domains_.erase_next(*power_domain_prev);
+    }
+  } else {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  for (size_t i = 0; i < kBuckets; ++i) {
+    const size_t bucket_offset = i * kBitsPerBucket;
+    for (size_t j = 0; j < kBitsPerBucket; ++j) {
+      const uint64_t bit_mask = 1ull << j;
+      const size_t num_cpu = bucket_offset + j;
+      if ((power_domain->cpus().mask[i] & bit_mask) != 0) {
+        clear_domain(num_cpu);
+      }
+    }
+  }
+
   return zx::ok();
 }
 

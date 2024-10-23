@@ -4,10 +4,10 @@
 
 use block_client::{BlockClient, RemoteBlockClient, VmoId};
 use event_listener::Event;
+use fuchsia_async as fasync;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex, Weak};
-use {fuchsia_async as fasync, zx};
 
 pub type Device = DeviceImpl<RemoteBlockClient>;
 

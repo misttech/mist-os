@@ -808,6 +808,7 @@ mod tests {
     use alloc::vec;
     use core::marker::PhantomData;
 
+    use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_types::ip::Ipv4;
@@ -1291,7 +1292,7 @@ mod tests {
         assert_eq!(conn.external_data().destination.get().copied(), Some(true));
         assert_eq!(conn.external_data().source.get().copied(), None);
 
-        let inserted = conntrack
+        let (inserted, _weak) = conntrack
             .finalize_connection(&mut bindings_ctx, conn)
             .expect("connection should not conflict");
         assert!(inserted);
@@ -1549,9 +1550,12 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &reply)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        assert!(conntrack
-            .finalize_connection(&mut bindings_ctx, conn)
-            .expect("connection should not conflict"));
+        assert_matches!(
+            conntrack
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection should not conflict"),
+            (true, Some(_))
+        );
 
         // Now, configure Masquerade NAT for a new connection that conflicts with the
         // existing one, but do not specify a port range to which the source port should
@@ -1643,9 +1647,12 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        assert!(table
-            .finalize_connection(&mut bindings_ctx, conn)
-            .expect("connection should not conflict"));
+        assert_matches!(
+            table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection should not conflict"),
+            (true, Some(_))
+        );
 
         let mut tuple = tuple_with_port(which, LOCAL_PORT.get());
         let verdict = rewrite_tuple_port(
@@ -1674,9 +1681,12 @@ mod tests {
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
                 .expect("packet should be valid")
                 .expect("packet should be trackable");
-            assert!(table
-                .finalize_connection(&mut bindings_ctx, conn)
-                .expect("connection should not conflict"));
+            assert_matches!(
+                table
+                    .finalize_connection(&mut bindings_ctx, conn)
+                    .expect("connection should not conflict"),
+                (true, Some(_))
+            );
         }
 
         // If the port is in the specified range, but results in a non-unique tuple,

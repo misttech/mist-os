@@ -24,7 +24,6 @@ rustc_library("rust") {
 
   deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
     "//sdk/rust/zx",
     "//third_party/rust_crates:bitfield",
     "//third_party/rust_crates:log",
@@ -49,6 +48,7 @@ rustc_library("rust") {
   ]
 
   sources = [
+    "src/constants.rs",
     "src/encode.rs",
     "src/lib.rs",
     "src/parse.rs",

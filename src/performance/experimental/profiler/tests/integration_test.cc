@@ -33,6 +33,9 @@
 #include <gtest/gtest.h>
 #include <src/lib/fsl/socket/strings.h>
 
+namespace fprofiler = fuchsia_cpu_profiler;
+
+namespace {
 void MakeWork() {
   for (;;) {
     // We need to have at least some side effect producing code or a release build will elide the
@@ -75,8 +78,87 @@ std::pair<std::set<zx_koid_t>, std::set<zx_koid_t>> GetOutputKoids(zx::socket so
   return std::make_pair(std::move(pids), std::move(tids));
 }
 
+// Sample the callstack via frame pointer at 100hz.
+std::vector<fprofiler::SamplingConfig> default_sample_configs() {
+  return std::vector{fprofiler::SamplingConfig{{
+      .period = 10'000'000,
+      .timebase = fprofiler::Counter::WithPlatformIndependent(fprofiler::CounterId::kNanoseconds),
+      .sample = fprofiler::Sample{{
+          .callgraph =
+              fprofiler::CallgraphConfig{{.strategy = fprofiler::CallgraphStrategy::kFramePointer}},
+          .counters = std::vector<fprofiler::Counter>{},
+      }},
+  }}};
+}
+
+// Launch a component as a dynamic child in the tests's launchpad collection.
+// This will Create, Resolve, and Start the requested instance.
+zx::result<fidl::ClientEnd<fuchsia_component::Binder>> RunInstance(
+    const fidl::SyncClient<fuchsia_sys2::LifecycleController>& lifecycle_client,
+    const std::string& name, const std::string& url, const std::string& moniker) {
+  auto [client, server] = fidl::Endpoints<fuchsia_component::Binder>::Create();
+
+  if (auto create_res = lifecycle_client->CreateInstance({{
+          .parent_moniker = ".",
+          .collection = {"launchpad"},
+          .decl = {{
+              .name = name,
+              .url = url,
+              .startup = fuchsia_component_decl::StartupMode::kLazy,
+          }},
+      }});
+      create_res.is_error()) {
+    FX_LOGS(ERROR) << create_res.error_value();
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  if (auto resolve_res = lifecycle_client->ResolveInstance({{
+          .moniker = moniker,
+      }});
+      resolve_res.is_error()) {
+    FX_LOGS(ERROR) << resolve_res.error_value();
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  if (auto start_res = lifecycle_client->StartInstance({{
+          .moniker = moniker,
+          .binder = std::move(server),
+      }});
+      start_res.is_error()) {
+    FX_LOGS(ERROR) << start_res.error_value();
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  return zx::ok(std::move(client));
+}
+
+// Tear down a child component in the tests's launchpad collection.
+// This will Stop and Destroy the requested instance.
+zx::result<> TearDownInstance(
+    const fidl::SyncClient<fuchsia_sys2::LifecycleController>& lifecycle_client,
+    const std::string& name, const std::string& moniker) {
+  if (auto stop_res = lifecycle_client->StopInstance({{
+          .moniker = moniker,
+      }});
+      stop_res.is_error()) {
+    FX_LOGS(ERROR) << stop_res.error_value();
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  if (auto destroy_res = lifecycle_client->DestroyInstance({{.parent_moniker = ".",
+                                                             .child = {{
+                                                                 .name = name,
+                                                                 .collection = "launchpad",
+                                                             }}}});
+      destroy_res.is_error()) {
+    FX_LOGS(ERROR) << destroy_res.error_value();
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  return zx::ok();
+}
+}  // namespace
+
 TEST(ProfilerIntegrationTest, EndToEnd) {
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
@@ -99,33 +181,21 @@ TEST(ProfilerIntegrationTest, EndToEnd) {
   res = child_handle->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   ASSERT_EQ(ZX_OK, res);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
-
-  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
-      std::vector{fuchsia_cpu_profiler::Task::WithThread(info.koid)});
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::TargetConfig target_config =
+      fprofiler::TargetConfig::WithTasks(std::vector{fprofiler::Task::WithThread(info.koid)});
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
 
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
   // Get Some samples
   sleep(1);
 
@@ -134,14 +204,13 @@ TEST(ProfilerIntegrationTest, EndToEnd) {
   ASSERT_TRUE(stop_response.value().samples_collected().has_value());
   EXPECT_GT(stop_response.value().samples_collected().value(), size_t{10});
 
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
 }
 
 // Monitor ourself and check that if we start new threads after the profiling session starts, that
 // one or more of them show up in the samples we take.
 TEST(ProfilerIntegrationTest, NewThreads) {
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
@@ -156,35 +225,23 @@ TEST(ProfilerIntegrationTest, NewThreads) {
       self->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   ASSERT_EQ(ZX_OK, info_result);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
-
   // We'll sample ourself.
-  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
-      std::vector{fuchsia_cpu_profiler::Task::WithProcess(info.koid)});
+  fprofiler::TargetConfig target_config =
+      fprofiler::TargetConfig::WithTasks(std::vector{fprofiler::Task::WithProcess(info.koid)});
 
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
   // Start some threads;
   std::thread t1{MakeWork};
   std::thread t2{MakeWork};
@@ -201,8 +258,7 @@ TEST(ProfilerIntegrationTest, NewThreads) {
   EXPECT_GT(stop_response.value().samples_collected().value(), size_t{10});
   auto [pids, tids] = GetOutputKoids(std::move(in_socket));
 
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
 
   // We should only have one pid
   EXPECT_EQ(size_t{1}, pids.size());
@@ -213,7 +269,7 @@ TEST(ProfilerIntegrationTest, NewThreads) {
 
 // Monitor ourself via our job id
 TEST(ProfilerIntegrationTest, OwnJobId) {
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
@@ -228,34 +284,22 @@ TEST(ProfilerIntegrationTest, OwnJobId) {
       self->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   ASSERT_EQ(ZX_OK, info_result);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
-
   // We'll sample ourself by our job id
-  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
-      std::vector{fuchsia_cpu_profiler::Task::WithJob(info.koid)});
+  fprofiler::TargetConfig target_config =
+      fprofiler::TargetConfig::WithTasks(std::vector{fprofiler::Task::WithJob(info.koid)});
 
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
-
-  auto start_response = client->Start({{.buffer_results = true}});
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
   std::thread t1{MakeWork};
   std::thread t2{MakeWork};
@@ -263,7 +307,6 @@ TEST(ProfilerIntegrationTest, OwnJobId) {
   t1.detach();
   t2.detach();
   t3.detach();
-  ASSERT_TRUE(start_response.is_ok());
   // Get Some samples
   sleep(1);
 
@@ -272,8 +315,7 @@ TEST(ProfilerIntegrationTest, OwnJobId) {
   ASSERT_TRUE(stop_response.value().samples_collected().has_value());
   ASSERT_GT(stop_response.value().samples_collected().value(), size_t{10});
   auto [pids, tids] = GetOutputKoids(std::move(in_socket));
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
 
   // We should only have one pid
   EXPECT_EQ(size_t{1}, pids.size());
@@ -289,7 +331,7 @@ TEST(ProfilerIntegrationTest, OwnJobId) {
 // Monitor ourself via our job id and then launch a process as part of our job and check that it
 // gets added to the profiling set
 TEST(ProfilerIntegrationTest, LaunchedProcess) {
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
@@ -304,24 +346,12 @@ TEST(ProfilerIntegrationTest, LaunchedProcess) {
       self->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   ASSERT_EQ(ZX_OK, info_result);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
-
   // We'll sample ourself by our job id
-  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
-      std::vector{fuchsia_cpu_profiler::Task::WithJob(info.koid)});
+  fprofiler::TargetConfig target_config =
+      fprofiler::TargetConfig::WithTasks(std::vector{fprofiler::Task::WithJob(info.koid)});
 
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
@@ -335,14 +365,14 @@ TEST(ProfilerIntegrationTest, LaunchedProcess) {
   self->get_info(ZX_INFO_JOB_PROCESSES, nullptr, 0, nullptr, &num_processes);
   ASSERT_EQ(num_processes, size_t{2});
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
 
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
   // Launch a thread in our process to ensure we get samples that aren't
   // just this process sleeping
@@ -364,8 +394,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcess) {
   ASSERT_TRUE(stop_response.value().samples_collected().has_value());
   ASSERT_GT(stop_response.value().samples_collected().value(), size_t{10});
   auto [pids, tids] = GetOutputKoids(std::move(in_socket));
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
 
   // We should three pids, our pid, the pid of process1, and the pid of process2
   zx_info_handle_basic_t pid_info;
@@ -389,7 +418,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcess) {
 // Monitor ourself via our job id and then launch a process as part of our job and check that it we
 // see the threads it spawns
 TEST(ProfilerIntegrationTest, LaunchedProcessThreadSpawner) {
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
@@ -404,35 +433,23 @@ TEST(ProfilerIntegrationTest, LaunchedProcessThreadSpawner) {
       self->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   ASSERT_EQ(ZX_OK, info_result);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
-
   // We'll sample ourself by our job id
-  fuchsia_cpu_profiler::TargetConfig target_config = fuchsia_cpu_profiler::TargetConfig::WithTasks(
-      std::vector{fuchsia_cpu_profiler::Task::WithJob(info.koid)});
+  fprofiler::TargetConfig target_config =
+      fprofiler::TargetConfig::WithTasks(std::vector{fprofiler::Task::WithJob(info.koid)});
 
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
 
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
   // Launch the thread spawner process after starting
   zx::process process;
@@ -448,8 +465,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcessThreadSpawner) {
   ASSERT_TRUE(stop_response.value().samples_collected().has_value());
   ASSERT_GT(stop_response.value().samples_collected().value(), size_t{10});
   auto [pids, tids] = GetOutputKoids(std::move(in_socket));
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
 
   // We should have many sampled threads
   EXPECT_GT(tids.size(), size_t{10});
@@ -460,7 +476,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcessThreadSpawner) {
 // Monitor a component via moniker. Since we're running in the test realm, we only have access to
 // our children components.
 TEST(ProfilerIntegrationTest, ComponentByMoniker) {
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
@@ -468,36 +484,22 @@ TEST(ProfilerIntegrationTest, ComponentByMoniker) {
   zx::socket outgoing_socket;
 
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
 
-  fuchsia_cpu_profiler::TargetConfig target_config =
-      fuchsia_cpu_profiler::TargetConfig::WithComponent(
-          fuchsia_cpu_profiler::AttachConfig::WithAttachToComponentMoniker("demo_target"));
+  fprofiler::TargetConfig target_config = fprofiler::TargetConfig::WithComponent(
+      fprofiler::AttachConfig::WithAttachToComponentMoniker("demo_target"));
 
-  fuchsia_cpu_profiler::Config demo_target_config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config demo_target_config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(demo_target_config),
-  }});
-
-  ASSERT_TRUE(config_response.is_ok());
-
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(demo_target_config),
+                  }})
+                  .is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
   // Get Some samples
   sleep(1);
@@ -507,8 +509,7 @@ TEST(ProfilerIntegrationTest, ComponentByMoniker) {
   ASSERT_TRUE(stop_response.value().samples_collected().has_value());
   ASSERT_GT(stop_response.value().samples_collected().value(), size_t{10});
   auto [pids, tids] = GetOutputKoids(std::move(in_socket));
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
 
   // We should have only one thread and one process
   EXPECT_EQ(tids.size(), size_t{1});
@@ -516,45 +517,31 @@ TEST(ProfilerIntegrationTest, ComponentByMoniker) {
 }
 
 TEST(ProfilerIntegrationTest, LaunchedComponent) {
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
   zx::socket in_socket, outgoing_socket;
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
+  fprofiler::TargetConfig target_config =
+      fprofiler::TargetConfig::WithComponent(fprofiler::AttachConfig::WithLaunchComponent({{
+          .url = "demo_target#meta/demo_target.cm",
+          .moniker = "./launchpad:demo_target",
+      }}));
 
-  fuchsia_cpu_profiler::TargetConfig target_config =
-      fuchsia_cpu_profiler::TargetConfig::WithComponent(
-          fuchsia_cpu_profiler::AttachConfig::WithLaunchComponent({{
-              .url = "demo_target#meta/demo_target.cm",
-              .moniker = "./launchpad:demo_target",
-          }}));
-
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
-
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
   // Get Some samples
   sleep(1);
 
@@ -563,50 +550,36 @@ TEST(ProfilerIntegrationTest, LaunchedComponent) {
   ASSERT_TRUE(stop_response.value().samples_collected().has_value());
   EXPECT_GT(stop_response.value().samples_collected().value(), size_t{10});
 
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
 }
 
 TEST(ProfilerIntegrationTest, ChildComponents) {
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
   zx::socket in_socket, outgoing_socket;
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
+  fprofiler::TargetConfig target_config =
+      fprofiler::TargetConfig::WithComponent(fprofiler::AttachConfig::WithLaunchComponent({{
+          .url = "component_with_children#meta/component_with_children.cm",
+          .moniker = "./launchpad:component_with_children",
+      }}));
 
-  fuchsia_cpu_profiler::TargetConfig target_config =
-      fuchsia_cpu_profiler::TargetConfig::WithComponent(
-          fuchsia_cpu_profiler::AttachConfig::WithLaunchComponent({{
-              .url = "component_with_children#meta/component_with_children.cm",
-              .moniker = "./launchpad:component_with_children",
-          }}));
-
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
 
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
   // Get Some samples
   sleep(1);
 
@@ -620,8 +593,7 @@ TEST(ProfilerIntegrationTest, ChildComponents) {
   EXPECT_EQ(tids.size(), size_t{4});
   EXPECT_EQ(pids.size(), size_t{4});
 
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
 }
 
 TEST(ProfilerIntegrationTest, ChildComponentsByMoniker) {
@@ -630,80 +602,35 @@ TEST(ProfilerIntegrationTest, ChildComponentsByMoniker) {
   ASSERT_TRUE(lifecycle_client_end.is_ok());
 
   fidl::SyncClient lifecycle_client{std::move(*lifecycle_client_end)};
-  fidl::Result<fuchsia_sys2::LifecycleController::CreateInstance> create_res =
-      lifecycle_client->CreateInstance({{
-          .parent_moniker = ".",
-          .collection = {"launchpad"},
-          .decl = {{
-              .name = "component_with_children",
-              .url = "component_with_children#meta/component_with_children.cm",
-              .startup = fuchsia_component_decl::StartupMode::kLazy,
-          }},
-      }});
-  if (create_res.is_error()) {
-    FX_LOGS(ERROR) << "Create_res: " << create_res.error_value();
-  }
 
-  fidl::Result<fuchsia_sys2::LifecycleController::ResolveInstance> resolve_res =
-      lifecycle_client->ResolveInstance({{
-          .moniker = "./launchpad:component_with_children",
-      }});
-  if (resolve_res.is_error()) {
-    FX_LOGS(ERROR) << "resolve_res: " << resolve_res.error_value();
-  }
+  const std::string name = "component_with_children";
+  const std::string url = "component_with_children#meta/component_with_children.cm";
+  const std::string moniker = "./launchpad:" + name;
+  ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
 
-  ASSERT_TRUE(create_res.is_ok());
-  zx::result<fidl::Endpoints<fuchsia_component::Binder>> binder_endpoints =
-      fidl::CreateEndpoints<fuchsia_component::Binder>();
-  ASSERT_TRUE(binder_endpoints.is_ok());
-
-  fidl::Result<fuchsia_sys2::LifecycleController::StartInstance> start_res =
-      lifecycle_client->StartInstance({{
-          .moniker = "./launchpad:component_with_children",
-          .binder = std::move(binder_endpoints->server),
-      }});
-  if (start_res.is_error()) {
-    FX_LOGS(ERROR) << "start_res: " << start_res.error_value();
-  }
-  ASSERT_TRUE(start_res.is_ok());
-
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
   zx::socket in_socket, outgoing_socket;
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
+  fprofiler::TargetConfig target_config = fprofiler::TargetConfig::WithComponent(
+      fprofiler::AttachConfig::WithAttachToComponentMoniker(moniker));
 
-  fuchsia_cpu_profiler::TargetConfig target_config =
-      fuchsia_cpu_profiler::TargetConfig::WithComponent(
-          fuchsia_cpu_profiler::AttachConfig::WithAttachToComponentMoniker(
-              "./launchpad:component_with_children"));
-
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
 
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
   // Get Some samples
   sleep(1);
 
@@ -717,104 +644,45 @@ TEST(ProfilerIntegrationTest, ChildComponentsByMoniker) {
   EXPECT_EQ(tids.size(), size_t{4});
   EXPECT_EQ(pids.size(), size_t{4});
 
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
-
-  fidl::Result<fuchsia_sys2::LifecycleController::StopInstance> stop_res =
-      lifecycle_client->StopInstance({{
-          .moniker = "./launchpad:component_with_children",
-      }});
-  ASSERT_TRUE(stop_res.is_ok());
-  fidl::Result<fuchsia_sys2::LifecycleController::DestroyInstance> destroy_res =
-      lifecycle_client->DestroyInstance({{.parent_moniker = ".",
-                                          .child = {{
-                                              .name = "component_with_children",
-                                              .collection = "launchpad",
-                                          }}}});
-  ASSERT_TRUE(destroy_res.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
+  ASSERT_TRUE(TearDownInstance(lifecycle_client, name, moniker).is_ok());
 }
 
 TEST(ProfilerIntegrationTest, DelayedConnectByMoniker) {
   // Start profiling targeting a moniker and check that we attach if it's launched after profiling
   // started
-  auto lifecycle_client_end = component::Connect<fuchsia_sys2::LifecycleController>();
-  ASSERT_TRUE(lifecycle_client_end.is_ok());
-
-  fidl::SyncClient lifecycle_client{std::move(*lifecycle_client_end)};
-
-  zx::result<fidl::Endpoints<fuchsia_component::Binder>> binder_endpoints =
-      fidl::CreateEndpoints<fuchsia_component::Binder>();
-  ASSERT_TRUE(binder_endpoints.is_ok());
-
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
   zx::socket in_socket, outgoing_socket;
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
+  const std::string name = "demo_target";
+  const std::string url = "demo_target#meta/demo_target.cm";
+  const std::string moniker = "./launchpad:demo_target";
 
-  fuchsia_cpu_profiler::TargetConfig target_config =
-      fuchsia_cpu_profiler::TargetConfig::WithComponent(
-          fuchsia_cpu_profiler::AttachConfig::WithAttachToComponentMoniker(
-              "./launchpad:demo_target"));
+  fprofiler::TargetConfig target_config = fprofiler::TargetConfig::WithComponent(
+      fprofiler::AttachConfig::WithAttachToComponentMoniker(moniker));
 
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
+  auto lifecycle_client_end = component::Connect<fuchsia_sys2::LifecycleController>();
+  ASSERT_TRUE(lifecycle_client_end.is_ok());
+  fidl::SyncClient lifecycle_client{std::move(*lifecycle_client_end)};
 
-  fidl::Result<fuchsia_sys2::LifecycleController::CreateInstance> create_res =
-      lifecycle_client->CreateInstance({{
-          .parent_moniker = ".",
-          .collection = {"launchpad"},
-          .decl = {{
-              .name = "demo_target",
-              .url = "demo_target#meta/demo_target.cm",
-              .startup = fuchsia_component_decl::StartupMode::kLazy,
-          }},
-      }});
-  if (create_res.is_error()) {
-    FX_LOGS(ERROR) << "Create_res: " << create_res.error_value();
-  }
-  ASSERT_TRUE(create_res.is_ok());
-
-  fidl::Result<fuchsia_sys2::LifecycleController::ResolveInstance> resolve_res =
-      lifecycle_client->ResolveInstance({{
-          .moniker = "./launchpad:demo_target",
-      }});
-  if (resolve_res.is_error()) {
-    FX_LOGS(ERROR) << "resolve_res: " << resolve_res.error_value();
-  }
-  fidl::Result<fuchsia_sys2::LifecycleController::StartInstance> start_res =
-      lifecycle_client->StartInstance({{
-          .moniker = "./launchpad:demo_target",
-          .binder = std::move(binder_endpoints->server),
-      }});
-  if (start_res.is_error()) {
-    FX_LOGS(ERROR) << "start_res: " << start_res.error_value();
-  }
-  ASSERT_TRUE(start_res.is_ok());
+  ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
 
   // Get Some samples
   sleep(1);
@@ -829,104 +697,45 @@ TEST(ProfilerIntegrationTest, DelayedConnectByMoniker) {
   EXPECT_EQ(tids.size(), size_t{1});
   EXPECT_EQ(pids.size(), size_t{1});
 
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
-
-  fidl::Result<fuchsia_sys2::LifecycleController::StopInstance> stop_res =
-      lifecycle_client->StopInstance({{
-          .moniker = "./launchpad:demo_target",
-      }});
-  ASSERT_TRUE(stop_res.is_ok());
-  fidl::Result<fuchsia_sys2::LifecycleController::DestroyInstance> destroy_res =
-      lifecycle_client->DestroyInstance({{.parent_moniker = ".",
-                                          .child = {{
-                                              .name = "demo_target",
-                                              .collection = "launchpad",
-                                          }}}});
-  ASSERT_TRUE(destroy_res.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
+  ASSERT_TRUE(TearDownInstance(lifecycle_client, name, moniker).is_ok());
 }
 
 TEST(ProfilerIntegrationTest, DelayedConnectByUrl) {
   // Start profiling targeting a moniker and check that we attach if it's launched after profiling
   // started
-  auto lifecycle_client_end = component::Connect<fuchsia_sys2::LifecycleController>();
-  ASSERT_TRUE(lifecycle_client_end.is_ok());
 
-  fidl::SyncClient lifecycle_client{std::move(*lifecycle_client_end)};
-
-  zx::result<fidl::Endpoints<fuchsia_component::Binder>> binder_endpoints =
-      fidl::CreateEndpoints<fuchsia_component::Binder>();
-  ASSERT_TRUE(binder_endpoints.is_ok());
-
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
   zx::socket in_socket, outgoing_socket;
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
+  const std::string name = "demo_target";
+  const std::string url = "demo_target#meta/demo_target.cm";
+  const std::string moniker = "./launchpad:demo_target";
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
+  fprofiler::TargetConfig target_config = fprofiler::TargetConfig::WithComponent(
+      fprofiler::AttachConfig::WithAttachToComponentUrl(url));
 
-  fuchsia_cpu_profiler::TargetConfig target_config =
-      fuchsia_cpu_profiler::TargetConfig::WithComponent(
-          fuchsia_cpu_profiler::AttachConfig::WithAttachToComponentUrl(
-              "demo_target#meta/demo_target.cm"));
-
-  fuchsia_cpu_profiler::Config config{{
-      .configs = std::vector{sampling_config},
+  fprofiler::Config config{{
+      .configs = default_sample_configs(),
       .target = std::move(target_config),
   }};
 
-  auto config_response = client->Configure({{
-      .output = std::move(outgoing_socket),
-      .config = std::move(config),
-  }});
-  ASSERT_TRUE(config_response.is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{
+                      .output = std::move(outgoing_socket),
+                      .config = std::move(config),
+                  }})
+                  .is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
-  auto start_response = client->Start({{.buffer_results = true}});
-  ASSERT_TRUE(start_response.is_ok());
+  auto lifecycle_client_end = component::Connect<fuchsia_sys2::LifecycleController>();
+  ASSERT_TRUE(lifecycle_client_end.is_ok());
+  fidl::SyncClient lifecycle_client{std::move(*lifecycle_client_end)};
 
-  fidl::Result<fuchsia_sys2::LifecycleController::CreateInstance> create_res =
-      lifecycle_client->CreateInstance({{
-          .parent_moniker = ".",
-          .collection = {"launchpad"},
-          .decl = {{
-              .name = "demo_target",
-              .url = "demo_target#meta/demo_target.cm",
-              .startup = fuchsia_component_decl::StartupMode::kLazy,
-          }},
-      }});
-  if (create_res.is_error()) {
-    FX_LOGS(ERROR) << "Create_res: " << create_res.error_value();
-  }
-  ASSERT_TRUE(create_res.is_ok());
-
-  fidl::Result<fuchsia_sys2::LifecycleController::ResolveInstance> resolve_res =
-      lifecycle_client->ResolveInstance({{
-          .moniker = "./launchpad:demo_target",
-      }});
-  if (resolve_res.is_error()) {
-    FX_LOGS(ERROR) << "resolve_res: " << resolve_res.error_value();
-  }
-  fidl::Result<fuchsia_sys2::LifecycleController::StartInstance> start_res =
-      lifecycle_client->StartInstance({{
-          .moniker = "./launchpad:demo_target",
-          .binder = std::move(binder_endpoints->server),
-      }});
-  if (start_res.is_error()) {
-    FX_LOGS(ERROR) << "start_res: " << start_res.error_value();
-  }
-  ASSERT_TRUE(start_res.is_ok());
+  ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
 
   // Get Some samples
   sleep(1);
@@ -941,21 +750,8 @@ TEST(ProfilerIntegrationTest, DelayedConnectByUrl) {
   EXPECT_EQ(tids.size(), size_t{1});
   EXPECT_EQ(pids.size(), size_t{1});
 
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
-
-  fidl::Result<fuchsia_sys2::LifecycleController::StopInstance> stop_res =
-      lifecycle_client->StopInstance({{
-          .moniker = "./launchpad:demo_target",
-      }});
-  ASSERT_TRUE(stop_res.is_ok());
-  fidl::Result<fuchsia_sys2::LifecycleController::DestroyInstance> destroy_res =
-      lifecycle_client->DestroyInstance({{.parent_moniker = ".",
-                                          .child = {{
-                                              .name = "demo_target",
-                                              .collection = "launchpad",
-                                          }}}});
-  ASSERT_TRUE(destroy_res.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
+  ASSERT_TRUE(TearDownInstance(lifecycle_client, name, moniker).is_ok());
 }
 
 // If a process exits from underneath us, we should still be able to return the samples we got
@@ -964,82 +760,36 @@ TEST(ProfilerIntegrationTest, ExitedProcess) {
   ASSERT_TRUE(lifecycle_client_end.is_ok());
   const fidl::SyncClient lifecycle_client{std::move(*lifecycle_client_end)};
 
-  auto [binder_client, binder_server] = fidl::Endpoints<fuchsia_component::Binder>::Create();
-
-  zx::result client_end = component::Connect<fuchsia_cpu_profiler::Session>();
+  zx::result client_end = component::Connect<fprofiler::Session>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
   zx::socket in_socket, outgoing_socket;
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
 
-  fuchsia_cpu_profiler::SamplingConfig sampling_config{{
-      .period = 10'000'000,
-      .timebase = fuchsia_cpu_profiler::Counter::WithPlatformIndependent(
-          fuchsia_cpu_profiler::CounterId::kNanoseconds),
-      .sample = fuchsia_cpu_profiler::Sample{{
-          .callgraph =
-              fuchsia_cpu_profiler::CallgraphConfig{
-                  {.strategy = fuchsia_cpu_profiler::CallgraphStrategy::kFramePointer}},
-          .counters = std::vector<fuchsia_cpu_profiler::Counter>{},
-      }},
-  }};
+  const std::string name = "demo_target";
+  const std::string url = "demo_target#meta/demo_target.cm";
+  const std::string moniker = "./launchpad:demo_target";
 
-  fuchsia_cpu_profiler::TargetConfig target_config =
-      fuchsia_cpu_profiler::TargetConfig::WithComponent(
-          fuchsia_cpu_profiler::AttachConfig::WithAttachToComponentMoniker(
-              "./launchpad:demo_target"));
+  fprofiler::TargetConfig target_config = fprofiler::TargetConfig::WithComponent(
+      fprofiler::AttachConfig::WithAttachToComponentMoniker(moniker));
 
   ASSERT_TRUE(client
                   ->Configure({{.output = std::move(outgoing_socket),
-                                .config = fuchsia_cpu_profiler::Config{{
-                                    .configs = std::vector{sampling_config},
+                                .config = fprofiler::Config{{
+                                    .configs = default_sample_configs(),
                                     .target = std::move(target_config),
                                 }}}})
                   .is_ok());
 
   ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
 
-  ASSERT_TRUE(lifecycle_client
-                  ->CreateInstance({{
-                      .parent_moniker = ".",
-                      .collection = {"launchpad"},
-                      .decl = {{
-                          .name = "demo_target",
-                          .url = "demo_target#meta/demo_target.cm",
-                          .startup = fuchsia_component_decl::StartupMode::kLazy,
-                      }},
-                  }})
-                  .is_ok());
-
-  ASSERT_TRUE(lifecycle_client
-                  ->ResolveInstance({{
-                      .moniker = "./launchpad:demo_target",
-                  }})
-                  .is_ok());
-
-  ASSERT_TRUE(lifecycle_client
-                  ->StartInstance({{
-                      .moniker = "./launchpad:demo_target",
-                      .binder = std::move(binder_server),
-                  }})
-                  .is_ok());
+  ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
   // Get Some samples
   sleep(1);
 
   // Destroy the target before the profiler stops
-  ASSERT_TRUE(lifecycle_client
-                  ->StopInstance({{
-                      .moniker = "./launchpad:demo_target",
-                  }})
-                  .is_ok());
-  ASSERT_TRUE(lifecycle_client
-                  ->DestroyInstance({{.parent_moniker = ".",
-                                      .child = {{
-                                          .name = "demo_target",
-                                          .collection = "launchpad",
-                                      }}}})
-                  .is_ok());
+  ASSERT_TRUE(TearDownInstance(lifecycle_client, name, moniker).is_ok());
 
   auto stop_response = client->Stop();
   if (stop_response.is_error()) {
@@ -1058,6 +808,40 @@ TEST(ProfilerIntegrationTest, ExitedProcess) {
   EXPECT_EQ(stop_response->missing_process_mappings()->size(), size_t{1});
   EXPECT_TRUE(pids.contains(stop_response->missing_process_mappings().value()[0]));
 
-  auto reset_response = client->Reset();
-  ASSERT_TRUE(reset_response.is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
+}
+
+TEST(ProfilerIntegrationTest, ExitedAfterConfigure) {
+  auto lifecycle_client_end = component::Connect<fuchsia_sys2::LifecycleController>();
+  ASSERT_TRUE(lifecycle_client_end.is_ok());
+  const fidl::SyncClient lifecycle_client{std::move(*lifecycle_client_end)};
+
+  zx::result client_end = component::Connect<fprofiler::Session>();
+  ASSERT_TRUE(client_end.is_ok());
+  const fidl::SyncClient client{std::move(*client_end)};
+
+  zx::socket in_socket, outgoing_socket;
+  ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
+
+  const std::string name = "demo_target";
+  const std::string url = "demo_target#meta/demo_target.cm";
+  const std::string moniker = "./launchpad:demo_target";
+
+  fprofiler::TargetConfig target_config = fprofiler::TargetConfig::WithComponent(
+      fprofiler::AttachConfig::WithAttachToComponentMoniker(moniker));
+
+  ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{.output = std::move(outgoing_socket),
+                                .config = fprofiler::Config{{
+                                    .configs = default_sample_configs(),
+                                    .target = std::move(target_config),
+                                }}}})
+                  .is_ok());
+  // Destroy the instance after configuring, but before starting. We should still be able to run the
+  // profiler, though we may not get any samples.
+  ASSERT_TRUE(TearDownInstance(lifecycle_client, name, moniker).is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
+  ASSERT_TRUE(client->Stop().is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
 }

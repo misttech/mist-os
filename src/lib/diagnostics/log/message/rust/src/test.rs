@@ -471,27 +471,24 @@ fn legacy_message_severity() {
 fn test_raw_severity_parsing_and_conversions() {
     let raw_severity: u8 = 0x30 - 2; // INFO-2=DEBUG
     let record = Record {
-        timestamp: 72,
+        timestamp: zx::BootInstant::from_nanos(72),
         severity: raw_severity,
         arguments: vec![
-            Argument {
-                name: FILE_PATH_LABEL.to_string(),
-                value: Value::Text("some_file.cc".to_string()),
-            },
-            Argument { name: LINE_NUMBER_LABEL.to_string(), value: Value::UnsignedInt(420) },
-            Argument { name: "arg1".to_string(), value: Value::SignedInt(-23) },
-            Argument { name: "arg2".to_string(), value: Value::Boolean(true) },
-            Argument { name: PID_LABEL.to_string(), value: Value::UnsignedInt(43) },
-            Argument { name: TID_LABEL.to_string(), value: Value::UnsignedInt(912) },
-            Argument { name: DROPPED_LABEL.to_string(), value: Value::UnsignedInt(2) },
-            Argument { name: TAG_LABEL.to_string(), value: Value::Text("tag".to_string()) },
-            Argument { name: MESSAGE_LABEL.to_string(), value: Value::Text("msg".to_string()) },
+            Argument::file("some_file.cc"),
+            Argument::line(420),
+            Argument::new("arg1", -23),
+            Argument::new("arg2", true),
+            Argument::pid(zx::Koid::from_raw(43)),
+            Argument::tid(zx::Koid::from_raw(912)),
+            Argument::dropped(2),
+            Argument::tag("tag"),
+            Argument::message("msg"),
         ],
     };
 
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
     let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-    encoder.write_record(&record).unwrap();
+    encoder.write_record(record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let mut parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
     parsed.sort_payload();
@@ -534,27 +531,24 @@ fn test_raw_severity_parsing_and_conversions() {
 #[fuchsia::test]
 fn test_from_structured() {
     let record = Record {
-        timestamp: 72,
-        severity: StreamSeverity::Error.into_primitive(),
+        timestamp: zx::BootInstant::from_nanos(72),
+        severity: Severity::Error as u8,
         arguments: vec![
-            Argument {
-                name: FILE_PATH_LABEL.to_string(),
-                value: Value::Text("some_file.cc".to_string()),
-            },
-            Argument { name: LINE_NUMBER_LABEL.to_string(), value: Value::UnsignedInt(420) },
-            Argument { name: "arg1".to_string(), value: Value::SignedInt(-23) },
-            Argument { name: "arg2".to_string(), value: Value::Boolean(true) },
-            Argument { name: PID_LABEL.to_string(), value: Value::UnsignedInt(43) },
-            Argument { name: TID_LABEL.to_string(), value: Value::UnsignedInt(912) },
-            Argument { name: DROPPED_LABEL.to_string(), value: Value::UnsignedInt(2) },
-            Argument { name: TAG_LABEL.to_string(), value: Value::Text("tag".to_string()) },
-            Argument { name: MESSAGE_LABEL.to_string(), value: Value::Text("msg".to_string()) },
+            Argument::file("some_file.cc"),
+            Argument::line(420),
+            Argument::new("arg1", -23),
+            Argument::new("arg2", true),
+            Argument::pid(zx::Koid::from_raw(43)),
+            Argument::tid(zx::Koid::from_raw(912)),
+            Argument::dropped(2),
+            Argument::tag("tag"),
+            Argument::message("msg"),
         ],
     };
 
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
     let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-    encoder.write_record(&record).unwrap();
+    encoder.write_record(record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
     assert_eq!(
@@ -593,17 +587,13 @@ fn test_from_structured() {
 
     // multiple tags
     let record = Record {
-        timestamp: 72,
-        severity: StreamSeverity::Error.into_primitive(),
-        arguments: vec![
-            Argument { name: TAG_LABEL.to_string(), value: Value::Text("tag1".to_string()) },
-            Argument { name: TAG_LABEL.to_string(), value: Value::Text("tag2".to_string()) },
-            Argument { name: TAG_LABEL.to_string(), value: Value::Text("tag3".to_string()) },
-        ],
+        timestamp: zx::BootInstant::from_nanos(72),
+        severity: StreamSeverity::Error as u8,
+        arguments: vec![Argument::tag("tag1"), Argument::tag("tag2"), Argument::tag("tag3")],
     };
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
     let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-    encoder.write_record(&record).unwrap();
+    encoder.write_record(record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
     assert_eq!(
@@ -622,13 +612,13 @@ fn test_from_structured() {
 
     // empty record
     let record = Record {
-        timestamp: 72,
-        severity: StreamSeverity::Error.into_primitive(),
+        timestamp: zx::BootInstant::from_nanos(72),
+        severity: Severity::Error as u8,
         arguments: vec![],
     };
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
     let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-    encoder.write_record(&record).unwrap();
+    encoder.write_record(record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
     assert_eq!(

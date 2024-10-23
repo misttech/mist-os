@@ -29,11 +29,22 @@ pub enum OOMRebootTimeout {
     Low,
 }
 
+/// Sets the memory reclamation strategy of the device's kernel.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MemoryReclamationStrategy {
+    /// Default strategy that balances memory with performance.
+    #[default]
+    Balanced,
+    /// Try hard to reclaim memory, even recently-used pages.
+    Eager,
+}
+
 /// Platform configuration options for the kernel area.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformKernelConfig {
-    // What should happen if the device runs out-of-memory.
+    /// What should happen if the device runs out-of-memory.
     #[serde(default)]
     pub oom_behavior: OOMBehavior,
     #[serde(default)]
@@ -51,4 +62,11 @@ pub struct PlatformKernelConfig {
     /// address space and uses more memory for page tables. Valid values range
     /// from 0-36. Default value is 30.
     pub aslr_entropy_bits: Option<u8>,
+    /// Upper-bound in megabytes for the system memory.
+    /// It simulates a system with less physical memory than it actually has.
+    pub memory_limit_mb: Option<u64>,
+
+    /// Configuration for the kernel memory reclamation strategy.
+    #[serde(default)]
+    pub memory_reclamation_strategy: MemoryReclamationStrategy,
 }

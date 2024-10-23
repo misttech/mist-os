@@ -28,12 +28,27 @@
       "short": null,
       "description": "monitor for state update.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--product-bundle",
+      "short": null,
+      "description": "use the product bundle to use as the source of the update.",
+      "hidden": false
     }
   ],
   "notes": [
     "Triggers an update check operation and performs the update if available.\nInterfaces using the 'fuchsia.update Manager' protocol with the system\nupdate service on the target.\n\nThe command takes in an optional `--monitor` switch to watch the progress\nof the update. The output is displayed in `stdout`.\n\nThe command also takes an optional `--service-initiated` switch to indicate\na separate service has initiated a check for update."
   ],
   "commands": [],
-  "positionals": [],
+  "positionals": [
+    {
+      "name": "product_bundle_path",
+      "description": "optionally specify the product bundle to use as the source of the update when `--product-bundle` is set. The default is to use the product bundle configured with `product.path`.",
+      "optionality": "optional",
+      "hidden": false
+    }
+  ],
   "error_codes": []
 }

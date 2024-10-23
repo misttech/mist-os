@@ -19,31 +19,29 @@ UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watch
 
 UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watcher,
                                  timekeeper::Clock* clock,
-                                 PreviousBootFile utc_monotonic_difference_file)
-    : UtcTimeProvider(utc_clock_ready_watcher, clock,
-                      std::optional(utc_monotonic_difference_file)) {}
+                                 PreviousBootFile utc_boot_difference_file)
+    : UtcTimeProvider(utc_clock_ready_watcher, clock, std::optional(utc_boot_difference_file)) {}
 
 UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watcher,
                                  timekeeper::Clock* clock,
-                                 std::optional<PreviousBootFile> utc_monotonic_difference_file)
+                                 std::optional<PreviousBootFile> utc_boot_difference_file)
     : clock_(clock),
-      utc_monotonic_difference_file_(std::move(utc_monotonic_difference_file)),
-      previous_boot_utc_monotonic_difference_(std::nullopt),
+      utc_boot_difference_file_(std::move(utc_boot_difference_file)),
+      previous_boot_utc_boot_difference_(std::nullopt),
       utc_clock_ready_watcher_(utc_clock_ready_watcher) {
   utc_clock_ready_watcher->OnClockReady(
       fit::bind_member<&UtcTimeProvider::OnClockLoggingQuality>(this));
 
-  if (!utc_monotonic_difference_file_.has_value()) {
+  if (!utc_boot_difference_file_.has_value()) {
     return;
   }
 
   std::string buf;
-  if (!files::ReadFileToString(utc_monotonic_difference_file_.value().PreviousBootPath(), &buf)) {
+  if (!files::ReadFileToString(utc_boot_difference_file_.value().PreviousBootPath(), &buf)) {
     return;
   }
 
-  previous_boot_utc_monotonic_difference_ =
-      zx::duration(strtoll(buf.c_str(), nullptr, /*base*/ 10));
+  previous_boot_utc_boot_difference_ = zx::duration(strtoll(buf.c_str(), nullptr, /*base*/ 10));
 }
 
 std::optional<timekeeper::time_utc> UtcTimeProvider::CurrentTime() const {
@@ -54,34 +52,33 @@ std::optional<timekeeper::time_utc> UtcTimeProvider::CurrentTime() const {
   return CurrentUtcTimeRaw(clock_);
 }
 
-std::optional<zx::duration> UtcTimeProvider::CurrentUtcMonotonicDifference() const {
+std::optional<zx::duration> UtcTimeProvider::CurrentUtcBootDifference() const {
   if (!utc_clock_ready_watcher_->IsUtcClockReady()) {
     return std::nullopt;
   }
 
   const timekeeper::time_utc current_utc_time = CurrentUtcTimeRaw(clock_);
-  const zx::duration utc_monotonic_difference(current_utc_time.get() -
-                                              clock_->MonotonicNow().get());
-  if (utc_monotonic_difference_file_.has_value()) {
-    // Write the most recent UTC-monotonic difference in case either clock has been adjusted.
-    files::WriteFile(utc_monotonic_difference_file_.value().CurrentBootPath(),
-                     std::to_string(utc_monotonic_difference.get()));
+
+  const zx::duration utc_boot_difference(current_utc_time.get() - clock_->BootNow().get());
+  if (utc_boot_difference_file_.has_value()) {
+    // Write the most recent UTC-boot difference in case either clock has been adjusted.
+    files::WriteFile(utc_boot_difference_file_.value().CurrentBootPath(),
+                     std::to_string(utc_boot_difference.get()));
   }
-  return utc_monotonic_difference;
+  return utc_boot_difference;
 }
 
-std::optional<zx::duration> UtcTimeProvider::PreviousBootUtcMonotonicDifference() const {
-  return previous_boot_utc_monotonic_difference_;
+std::optional<zx::duration> UtcTimeProvider::PreviousBootUtcBootDifference() const {
+  return previous_boot_utc_boot_difference_;
 }
 
 void UtcTimeProvider::OnClockLoggingQuality() {
-  // Write the current difference between the UTC and monotonic clocks.
-  if (utc_monotonic_difference_file_.has_value()) {
+  // Write the current difference between the UTC and boot clocks.
+  if (utc_boot_difference_file_.has_value()) {
     const timekeeper::time_utc current_utc_time = CurrentUtcTimeRaw(clock_);
-    const zx::duration utc_monotonic_difference(current_utc_time.get() -
-                                                clock_->MonotonicNow().get());
-    files::WriteFile(utc_monotonic_difference_file_.value().CurrentBootPath(),
-                     std::to_string(utc_monotonic_difference.get()));
+    const zx::duration utc_boot_difference(current_utc_time.get() - clock_->BootNow().get());
+    files::WriteFile(utc_boot_difference_file_.value().CurrentBootPath(),
+                     std::to_string(utc_boot_difference.get()));
   }
 }
 

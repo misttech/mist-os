@@ -91,6 +91,12 @@ zx_status_t Clone(const fidl::basic_time<kClockId>& value, fidl::basic_time<kClo
   return ZX_OK;
 }
 
+template <zx_clock_t kClockId>
+zx_status_t Clone(const fidl::basic_ticks<kClockId>& value, fidl::basic_ticks<kClockId>* result) {
+  *result = value;
+  return ZX_OK;
+}
+
 zx_status_t Clone(const StringPtr& value, StringPtr* result);
 zx_status_t Clone(const ::std::string& value, std::string* result);
 

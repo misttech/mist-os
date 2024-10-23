@@ -18,7 +18,7 @@ pub mod raw {
     ///     (https://fxbug.dev/42138321), so the value is calculated
     ///     by the process_explorer component.
     ///     See more details about its implementation at
-    ///     src/developer/process_explorer/utils.h
+    ///     src/developer/process_explorer/process_data.h
     #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Debug)]
     pub struct KernelObject {
         /// The object type: channel, event, socket, etc.
@@ -64,6 +64,26 @@ pub mod raw {
     pub struct ProcessesData {
         /// Processes data
         pub processes: Vec<Process>,
+    }
+
+    /// A structure containing information about a task.
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    pub struct Task {
+        pub depth: i32,
+        pub koid: zx_koid_t,
+        pub parent_koid: zx_koid_t,
+        #[serde(rename = "type")]
+        pub task_type: String,
+        pub name: String,
+    }
+
+    /// Task Hierarchy Data exported by `ProcessExplorer`.
+    /// This corresponds to the schema of the data that is transferred
+    /// by `ProcessExplorerQuery::WriteJsonTaskHierarchyData`'s API.
+    #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct TasksData {
+        pub tasks: Vec<Task>,
     }
 }
 

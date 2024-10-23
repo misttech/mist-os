@@ -50,7 +50,7 @@ impl AllocationsTable {
         size: u64,
         thread_info_key: ResourceKey,
         stack_trace_key: ResourceKey,
-        timestamp: i64,
+        timestamp: zx::MonotonicInstant,
     ) -> bool {
         self.writer
             .insert_allocation(address, size, thread_info_key, stack_trace_key, timestamp)
@@ -63,7 +63,7 @@ impl AllocationsTable {
         size: u64,
         thread_info_key: ResourceKey,
         stack_trace_key: ResourceKey,
-        timestamp: i64,
+        timestamp: zx::MonotonicInstant,
     ) -> u64 {
         if let Some(old_size) = self
             .writer

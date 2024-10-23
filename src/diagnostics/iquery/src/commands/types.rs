@@ -3,25 +3,27 @@
 // found in the LICENSE file.
 
 use crate::types::Error;
-use async_trait::async_trait;
 use diagnostics_data::{Data, DiagnosticsData};
+use fidl_fuchsia_diagnostics::Selector;
 use serde::Serialize;
 use std::fmt::Display;
+use std::future::Future;
 
-#[async_trait]
 pub trait Command {
     type Result: Serialize + Display;
-    async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error>;
+    fn execute<P: DiagnosticsProvider>(
+        self,
+        provider: &P,
+    ) -> impl Future<Output = Result<Self::Result, Error>>;
 }
 
-#[async_trait]
 pub trait DiagnosticsProvider: Send + Sync {
-    async fn snapshot<D: DiagnosticsData>(
+    fn snapshot<D: DiagnosticsData>(
         &self,
         accessor: &Option<String>,
-        selectors: &[String],
-    ) -> Result<Vec<Data<D>>, Error>;
+        selectors: impl IntoIterator<Item = Selector>,
+    ) -> impl Future<Output = Result<Vec<Data<D>>, Error>>;
 
     /// Lists all ArchiveAccessor selectors.
-    async fn get_accessor_paths(&self) -> Result<Vec<String>, Error>;
+    fn get_accessor_paths(&self) -> impl Future<Output = Result<Vec<String>, Error>>;
 }

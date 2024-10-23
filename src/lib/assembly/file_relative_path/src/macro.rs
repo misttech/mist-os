@@ -167,7 +167,7 @@ fn handle_named_fields(fields: &FieldsNamed, operation: Operation) -> TokenStrea
             }
           }
 
-        } else if field.attrs.iter().any(|a| a.path.is_ident("file_relative_paths")) {
+        } else if field.attrs.iter().any(|a| a.path().is_ident("file_relative_paths")) {
           // Fields marked with '#[file_relative_paths]' implement the trait:
           match operation {
             Operation::Resolve => {
@@ -224,7 +224,7 @@ fn handle_unnamed_fields(fields: &FieldsUnnamed, operation: Operation) -> TokenS
           }
         }
 
-      } else if field.attrs.iter().any(|a| a.path.is_ident("file_relative_paths")) {
+      } else if field.attrs.iter().any(|a| a.path().is_ident("file_relative_paths")) {
         // Fields marked with '#[file_relative_paths]' implement the trait:
         match operation {
           Operation::Resolve => {

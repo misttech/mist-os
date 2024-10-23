@@ -12,9 +12,9 @@ rustc_binary("rust-puppet") {
   sources = [ "src/main.rs" ]
 
   deps = [
-    "../../fidl:sink-puppet_rust",
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/rust/zx",
+    "//src/diagnostics/validator/logs/fidl:fuchsia.validate.logs_rust",
+    "//src/diagnostics/validator/logs/rust/utils",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -23,6 +23,7 @@ rustc_binary("rust-puppet") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("component") {

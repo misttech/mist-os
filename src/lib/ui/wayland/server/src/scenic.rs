@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_ui_composition::{ContentId, FlatlandProxy, PresentArgs, TransformId};
+use fuchsia_trace as ftrace;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use {fuchsia_trace as ftrace, zx};
 
 pub type FlatlandInstanceId = usize;
 

@@ -325,7 +325,7 @@ impl fidl::endpoints::ControlHandle for FirstProtocolControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -645,7 +645,7 @@ impl fidl::endpoints::ControlHandle for SecondProtocolControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 

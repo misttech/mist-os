@@ -153,7 +153,7 @@ zx::result<> AmlHrtimer::Start() {
       dispatcher(), std::move(*mmio_buffer), std::move(element_control), std::move(lessor),
       std::move(current_level), std::move(required_level), std::move(sag), std::move(irqs[0]),
       std::move(irqs[1]), std::move(irqs[2]), std::move(irqs[3]), std::move(irqs[4]),
-      std::move(irqs[5]), std::move(irqs[6]), std::move(irqs[7]));
+      std::move(irqs[5]), std::move(irqs[6]), std::move(irqs[7]), inspector());
 
   auto result_dev = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_hrtimer::Device>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),

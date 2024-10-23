@@ -11,11 +11,11 @@ use anyhow::{anyhow, Context as _, Error};
 use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
 use fidl::AsHandleRef;
+use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::open_file_deprecated;
 use futures::StreamExt;
 use std::cmp;
 use std::convert::TryFrom as _;
-use {fidl_fuchsia_io as fio, zx};
 
 const TEST_PKG_HASH: &str = "44e7704720706ffd287bf0d27133cec7d609581547095ab6c6fee94f83a5bcbc";
 

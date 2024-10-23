@@ -183,6 +183,11 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // node from the topology but instead bind the node again.
   void RestartNode();
 
+  // Begins the process of quarantining the node. This is basically performing a Remove,
+  // but instead of removing the node from the topology, we keep it in a stopped state so that it
+  // can be orphaned if its driver is ever disabled. That way new drivers can be bound to the node.
+  void QuarantineNode();
+
   void RemoveCompositeNodeForRebind(fit::callback<void(zx::result<>)> completer);
 
   // Restarting a node WithRematch, means that instead of re-using the currently bound driver,
@@ -259,6 +264,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   }
 
   const std::string& driver_url() const;
+
+  bool quarantined() const {
+    return !driver_component_.has_value() && quarantine_driver_url_.has_value();
+  }
 
   const std::vector<std::weak_ptr<Node>>& parents() const { return parents_; }
 
@@ -390,6 +399,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Start the node's driver back up.
   void FinishRestart();
 
+  // Called to wrap things up before going to the quarantine state.
+  void FinishQuarantine();
+
   // Clear out the values associated with the driver on the driver host.
   void ClearHostDriver();
 
@@ -483,6 +495,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   fit::callback<void()> remove_complete_callback_;
 
   std::optional<DriverComponent> driver_component_;
+  std::optional<std::string> quarantine_driver_url_;
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_ref_;
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_ref_;
 

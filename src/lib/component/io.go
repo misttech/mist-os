@@ -141,8 +141,8 @@ func (*Service) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
 	return connectionInfo, nil
 }
 
-func (*Service) Sync(fidl.Context) (io.Node2SyncResult, error) {
-	return io.Node2SyncResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*Service) Sync(fidl.Context) (io.NodeSyncResult, error) {
+	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*Service) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
@@ -157,31 +157,31 @@ func (*Service) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) 
 	return int32(zx.ErrNotSupported), nil
 }
 
-func (*Service) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2GetAttributesResult, error) {
+func (*Service) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.NodeGetAttributesResult, error) {
 	attrs := io.NodeAttributes2{}
 	attrs.ImmutableAttributes.SetProtocols(io.NodeProtocolKindsConnector)
 	attrs.ImmutableAttributes.SetAbilities(io.OperationsConnect)
-	return io.Node2GetAttributesResultWithResponse(attrs), nil
+	return io.NodeGetAttributesResultWithResponse(attrs), nil
 }
 
-func (*Service) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
-	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*Service) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.NodeUpdateAttributesResult, error) {
+	return io.NodeUpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*Service) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
 	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
 }
 
-func (*Service) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtendedAttributeResult, error) {
-	return io.Node2GetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*Service) GetExtendedAttribute(fidl.Context, []uint8) (io.NodeGetExtendedAttributeResult, error) {
+	return io.NodeGetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*Service) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue, io.SetExtendedAttributeMode) (io.Node2SetExtendedAttributeResult, error) {
-	return io.Node2SetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*Service) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue, io.SetExtendedAttributeMode) (io.NodeSetExtendedAttributeResult, error) {
+	return io.NodeSetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*Service) RemoveExtendedAttribute(fidl.Context, []uint8) (io.Node2RemoveExtendedAttributeResult, error) {
-	return io.Node2RemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*Service) RemoveExtendedAttribute(fidl.Context, []uint8) (io.NodeRemoveExtendedAttributeResult, error) {
+	return io.NodeRemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*Service) GetFlags(fidl.Context) (int32, io.OpenFlags, error) {
@@ -327,8 +327,8 @@ func (*directoryState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error
 	return connectionInfo, nil
 }
 
-func (*directoryState) Sync(fidl.Context) (io.Node2SyncResult, error) {
-	return io.Node2SyncResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) Sync(fidl.Context) (io.NodeSyncResult, error) {
+	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*directoryState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
@@ -343,31 +343,31 @@ func (*directoryState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttri
 	return int32(zx.ErrNotSupported), nil
 }
 
-func (*directoryState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2GetAttributesResult, error) {
+func (*directoryState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.NodeGetAttributesResult, error) {
 	attrs := io.NodeAttributes2{}
 	attrs.ImmutableAttributes.SetProtocols(io.NodeProtocolKindsDirectory)
 	attrs.ImmutableAttributes.SetAbilities(io.RStarDir)
-	return io.Node2GetAttributesResultWithResponse(attrs), nil
+	return io.NodeGetAttributesResultWithResponse(attrs), nil
 }
 
-func (*directoryState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
-	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.NodeUpdateAttributesResult, error) {
+	return io.NodeUpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*directoryState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
 	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
 }
 
-func (*directoryState) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtendedAttributeResult, error) {
-	return io.Node2GetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) GetExtendedAttribute(fidl.Context, []uint8) (io.NodeGetExtendedAttributeResult, error) {
+	return io.NodeGetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*directoryState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue, io.SetExtendedAttributeMode) (io.Node2SetExtendedAttributeResult, error) {
-	return io.Node2SetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue, io.SetExtendedAttributeMode) (io.NodeSetExtendedAttributeResult, error) {
+	return io.NodeSetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*directoryState) RemoveExtendedAttribute(fidl.Context, []uint8) (io.Node2RemoveExtendedAttributeResult, error) {
-	return io.Node2RemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) RemoveExtendedAttribute(fidl.Context, []uint8) (io.NodeRemoveExtendedAttributeResult, error) {
+	return io.NodeRemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 const dot = "."
@@ -432,12 +432,12 @@ func (dirState *directoryState) Open3(ctx fidl.Context, path string, flags io.Fl
 	return CloseWithEpitaph(channel, zx.ErrNotFound)
 }
 
-func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.Directory2UnlinkResult, error) {
-	return io.Directory2UnlinkResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.DirectoryUnlinkResult, error) {
+	return io.DirectoryUnlinkResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*directoryState) CreateSymlink(fidl.Context, string, []uint8, io.SymlinkWithCtxInterfaceRequest) (io.Directory2CreateSymlinkResult, error) {
-	return io.Directory2CreateSymlinkResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) CreateSymlink(fidl.Context, string, []uint8, io.SymlinkWithCtxInterfaceRequest) (io.DirectoryCreateSymlinkResult, error) {
+	return io.DirectoryCreateSymlinkResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (dirState *directoryState) ReadDirents(ctx fidl.Context, maxOut uint64) (int32, []uint8, error) {
@@ -509,8 +509,8 @@ func (*directoryState) GetToken(fidl.Context) (int32, zx.Handle, error) {
 	return int32(zx.ErrNotSupported), zx.HandleInvalid, nil
 }
 
-func (*directoryState) Rename(fidl.Context, string, zx.Event, string) (io.Directory2RenameResult, error) {
-	return io.Directory2RenameResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*directoryState) Rename(fidl.Context, string, zx.Event, string) (io.DirectoryRenameResult, error) {
+	return io.DirectoryRenameResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*directoryState) Link(fidl.Context, string, zx.Handle, string) (int32, error) {
@@ -736,8 +736,8 @@ func (fState *fileState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, err
 	return connectionInfo, nil
 }
 
-func (*fileState) Sync(fidl.Context) (io.Node2SyncResult, error) {
-	return io.Node2SyncResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*fileState) Sync(fidl.Context) (io.NodeSyncResult, error) {
+	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (fState *fileState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
@@ -753,31 +753,31 @@ func (*fileState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes
 	return int32(zx.ErrNotSupported), nil
 }
 
-func (*fileState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2GetAttributesResult, error) {
+func (*fileState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.NodeGetAttributesResult, error) {
 	attrs := io.NodeAttributes2{}
 	attrs.ImmutableAttributes.SetProtocols(io.NodeProtocolKindsFile)
 	attrs.ImmutableAttributes.SetAbilities(io.OperationsReadBytes | io.OperationsGetAttributes)
-	return io.Node2GetAttributesResultWithResponse(attrs), nil
+	return io.NodeGetAttributesResultWithResponse(attrs), nil
 }
 
-func (*fileState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
-	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*fileState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.NodeUpdateAttributesResult, error) {
+	return io.NodeUpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*fileState) ListExtendedAttributes(_ fidl.Context, request io.ExtendedAttributeIteratorWithCtxInterfaceRequest) error {
 	return CloseWithEpitaph(request.Channel, zx.ErrNotSupported)
 }
 
-func (*fileState) GetExtendedAttribute(fidl.Context, []uint8) (io.Node2GetExtendedAttributeResult, error) {
-	return io.Node2GetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*fileState) GetExtendedAttribute(fidl.Context, []uint8) (io.NodeGetExtendedAttributeResult, error) {
+	return io.NodeGetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*fileState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue, io.SetExtendedAttributeMode) (io.Node2SetExtendedAttributeResult, error) {
-	return io.Node2SetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*fileState) SetExtendedAttribute(fidl.Context, []uint8, io.ExtendedAttributeValue, io.SetExtendedAttributeMode) (io.NodeSetExtendedAttributeResult, error) {
+	return io.NodeSetExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*fileState) RemoveExtendedAttribute(fidl.Context, []uint8) (io.Node2RemoveExtendedAttributeResult, error) {
-	return io.Node2RemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
+func (*fileState) RemoveExtendedAttribute(fidl.Context, []uint8) (io.NodeRemoveExtendedAttributeResult, error) {
+	return io.NodeRemoveExtendedAttributeResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*fileState) Allocate(fidl.Context, uint64, uint64, io.AllocateMode) (io.FileAllocateResult, error) {

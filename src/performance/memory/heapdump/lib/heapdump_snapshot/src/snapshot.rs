@@ -32,7 +32,7 @@ pub struct Allocation {
     pub stack_trace: Rc<StackTrace>,
 
     /// Allocation timestamp, in nanoseconds.
-    pub timestamp: i64,
+    pub timestamp: fidl::MonotonicInstant,
 
     /// Memory dump of this block's contents.
     pub contents: Option<Vec<u8>>,
@@ -96,7 +96,7 @@ impl Snapshot {
     pub async fn receive_from(
         mut stream: fheapdump_client::SnapshotReceiverRequestStream,
     ) -> Result<Snapshot, Error> {
-        let mut allocations: HashMap<u64, (u64, u64, u64, i64)> = HashMap::new();
+        let mut allocations: HashMap<u64, (u64, u64, u64, fidl::MonotonicInstant)> = HashMap::new();
         let mut thread_infos: HashMap<u64, Rc<ThreadInfo>> = HashMap::new();
         let mut stack_traces: HashMap<u64, Vec<u64>> = HashMap::new();
         let mut executable_regions: HashMap<u64, ExecutableRegion> = HashMap::new();
@@ -236,11 +236,13 @@ mod tests {
     // Constants used by some of the tests below:
     const FAKE_ALLOCATION_1_ADDRESS: u64 = 1234;
     const FAKE_ALLOCATION_1_SIZE: u64 = 8;
-    const FAKE_ALLOCATION_1_TIMESTAMP: i64 = 888888888;
+    const FAKE_ALLOCATION_1_TIMESTAMP: fidl::MonotonicInstant =
+        fidl::MonotonicInstant::from_nanos(888888888);
     const FAKE_ALLOCATION_1_CONTENTS: [u8; FAKE_ALLOCATION_1_SIZE as usize] = *b"12345678";
     const FAKE_ALLOCATION_2_ADDRESS: u64 = 5678;
     const FAKE_ALLOCATION_2_SIZE: u64 = 4;
-    const FAKE_ALLOCATION_2_TIMESTAMP: i64 = -777777777; // test negative value too
+    const FAKE_ALLOCATION_2_TIMESTAMP: fidl::MonotonicInstant =
+        fidl::MonotonicInstant::from_nanos(-777777777); // test negative value too
     const FAKE_THREAD_1_KOID: u64 = 1212;
     const FAKE_THREAD_1_NAME: &str = "fake-thread-1-name";
     const FAKE_THREAD_1_KEY: u64 = 4567;

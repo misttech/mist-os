@@ -28,6 +28,7 @@ use tracing::{error, info};
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable as _;
 use vfs::remote::remote_dir;
+use vfs::ObjectRequest;
 use {
     cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_inspect as finspect,
@@ -190,9 +191,9 @@ async fn main_inner() -> Result<(), Error> {
     let cobalt_fut = Task::spawn(cobalt_fut);
 
     let (root_dir_factory, open_packages) = root_dir::new(
-        fuchsia_fs::directory::open_in_namespace_deprecated(
+        fuchsia_fs::directory::open_in_namespace(
             "/bootfs-blobs",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
+            fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         )
         .context("open bootfs blobs dir")?,
         blobfs.clone(),
@@ -394,16 +395,15 @@ async fn main_inner() -> Result<(), Error> {
     let _inspect_server_task =
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
-    let () = out_dir.open(
-        scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-        vfs::path::Path::dot(),
+    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE;
+    ObjectRequest::new3(
+        flags,
+        &fio::Options::default(),
         fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::DirectoryRequest.into())
             .context("taking startup handle")?
             .into(),
-    );
+    )
+    .handle(|request| out_dir.open3(scope.clone(), vfs::path::Path::dot(), flags, request));
 
     let () = scope.wait().await;
     cobalt_fut.await;

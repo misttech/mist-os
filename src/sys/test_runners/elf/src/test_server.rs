@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use fidl_fuchsia_test::{
     self as ftest, Invocation, Result_ as TestResult, RunListenerProxy, Status,
 };
+use fuchsia_async as fasync;
 use futures::future::{abortable, AbortHandle};
 use futures::prelude::*;
 use futures::TryStreamExt;
@@ -16,7 +17,6 @@ use test_runners_lib::elf::{Component, EnumeratedTestCases, FidlError, KernelErr
 use test_runners_lib::errors::*;
 use test_runners_lib::logs::SocketLogWriter;
 use tracing::{debug, error};
-use {fuchsia_async as fasync, zx};
 
 /// Implements `fuchsia.test.Suite` and runs provided test.
 #[derive(Default)]

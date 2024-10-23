@@ -36,7 +36,7 @@ use zx_types::zx_time_t;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
 const DEFAULT_NETWORK_NAME: &str = "net1";

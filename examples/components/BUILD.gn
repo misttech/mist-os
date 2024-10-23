@@ -11,7 +11,7 @@ group("components") {
     "config_from_parent",
     "dictionaries:dictionary-examples",
     "echo:echo-example",
-    "lifecycle:lifecycle-example",
+    "lifecycle",
 
     # TODO(https://fxbug.dev/299358404): Uncomment once it's possible to build fuchsia
     # and pigweed together in CQ.

@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.acpi") {
-  sdk_category = "internal"
   sources = [
     "address_space.fidl",
     "device.fidl",

@@ -6,7 +6,7 @@ use futures::lock::Mutex;
 use moniker::Moniker;
 use std::sync::Arc;
 use tracing::*;
-use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 /// Any stored data is removed after this amount of time
 const CLEANUP_DEADLINE_SECONDS: i64 = 600;

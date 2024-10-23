@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
+use fidl_fuchsia_ui_input as ui_input;
 use fidl_fuchsia_ui_input3::{self as ui_input3, KeyMeaning, NonPrintableKey};
 use futures::{TryFutureExt, TryStreamExt};
-use {fidl_fuchsia_ui_input as ui_input, zx};
 
 use fidl_fuchsia_ui_keyboard_focus as fidl_focus;
 

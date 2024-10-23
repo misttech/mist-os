@@ -106,7 +106,9 @@ fuchsia_elf_sizes(
 fuchsia_virtual_device(
     name = "workbench_emu",
     arch = ARCH.X64,
+    audio_model = "hda",
     device_name = "workbench_emu",
+    input_device = "touch",
     window_height_px = 1200,
     window_width_px = 720,
 )
@@ -114,7 +116,9 @@ fuchsia_virtual_device(
 fuchsia_virtual_device(
     name = "workbench_emu.arm64",
     arch = ARCH.ARM64,
+    audio_model = "hda",
     device_name = "workbench_emu.arm64",
+    input_device = "touch",
     window_height_px = 1200,
     window_width_px = 720,
 )

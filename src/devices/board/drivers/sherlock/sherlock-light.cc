@@ -33,6 +33,13 @@ namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
 zx_status_t Sherlock::LightInit() {
+  gpio_init_steps_.push_back(GpioPull(GPIO_LIGHT_INTERRUPT, fuchsia_hardware_pin::Pull::kNone));
+  gpio_init_steps_.push_back(fuchsia_hardware_pinimpl::InitStep::WithCall({{
+      .pin = GPIO_LIGHT_INTERRUPT,
+      .call = fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+          fuchsia_hardware_gpio::BufferMode::kInput),
+  }}));
+
   metadata::LightSensorParams params = {};
   // TODO(kpt): Insert the right parameters here.
   params.integration_time_us = 711'680;
@@ -77,6 +84,13 @@ zx_status_t Sherlock::LightInit() {
       fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LIGHT_INTERRUPT),
   };
 
+  const auto kGpioInitBindRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const auto kGpioInitProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+
   auto kTcs3400LightParents = std::vector{
       fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kI2cBindRules,
@@ -85,6 +99,10 @@ zx_status_t Sherlock::LightInit() {
       fuchsia_driver_framework::ParentSpec{{
           .bind_rules = kGpioLightInterruptRules,
           .properties = kGpioLightInterruptProperties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kGpioInitBindRules,
+          .properties = kGpioInitProperties,
       }},
   };
 
@@ -200,14 +218,6 @@ zx_status_t Sherlock::LightInit() {
                         bind_fuchsia_pwm::PWM_ID_FUNCTION_GREEN_LED),
   };
 
-  auto gpio_init_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-  };
-
-  auto gpio_init_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-  };
-
   auto parents = std::vector{
       fuchsia_driver_framework::ParentSpec{{
           .bind_rules = amber_led_gpio_bind_rules,
@@ -226,8 +236,8 @@ zx_status_t Sherlock::LightInit() {
           .properties = green_led_pwm_properties,
       }},
       fuchsia_driver_framework::ParentSpec{{
-          .bind_rules = gpio_init_bind_rules,
-          .properties = gpio_init_properties,
+          .bind_rules = kGpioInitBindRules,
+          .properties = kGpioInitProperties,
       }},
   };
 

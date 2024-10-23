@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
 
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -37,8 +37,11 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   explicit AudioDeviceRegistry(std::shared_ptr<FidlThread> server_thread);
   ~AudioDeviceRegistry() override;
 
-  // Kick off device-detection. Devices auto-initialize and call one of the methods below.
+  // Kick off device-detection. After AddDevice, the device auto-initializes and then calls one of
+  // DeviceIsReady, DeviceHasError or DeviceIsRemoved.
   zx_status_t StartDeviceDetection();
+  void InitialDeviceDetectionComplete();
+
   zx_status_t RegisterAndServeOutgoing();
 
   // Device support
@@ -48,10 +51,11 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   const std::unordered_set<std::shared_ptr<Device>>& unhealthy_devices() {
     return unhealthy_devices_;
   }
+
   // Add a newly-constructed Device object to our "initializing" list.
   void AddDevice(const std::shared_ptr<Device>& initializing_device);
 
-  enum class DevicePresence { Unknown, Active, Error };
+  enum class DevicePresence : uint8_t { Unknown, Active, Error };
   std::pair<DevicePresence, std::shared_ptr<Device>> FindDeviceByTokenId(TokenId token_id);
 
   static bool ClaimDeviceForControl(const std::shared_ptr<Device>& device,
@@ -94,12 +98,19 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
  private:
   static inline const std::string_view kClassName = "AudioDeviceRegistry";
 
+  void DeviceDetected(std::string_view name, fuchsia_audio_device::DeviceType device_type,
+                      fuchsia_audio_device::DriverClient driver_client);
+  void MaybeNotifyInitialDevicesAvailable();
   void NotifyRegistriesOfDeviceRemoval(TokenId removed_device_id);
 
   std::shared_ptr<DeviceDetector> device_detector_;
 
-  // These devices are in the process of being initialized.
+  // These devices are in the process of being initialized. A device should never be in both sets.
+  std::unordered_set<std::shared_ptr<Device>> initial_pending_devices_;
   std::unordered_set<std::shared_ptr<Device>> pending_devices_;
+  bool initial_device_detection_complete_ = false;
+  bool all_initial_devices_ready_ = false;
+
   // The list of operational devices, provided to clients (via Registry/WatchDevicesAdded).
   std::unordered_set<std::shared_ptr<Device>> devices_;
   // These devices have encountered an error or have self-reported as unhealthy. They have been
@@ -116,4 +127,4 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_

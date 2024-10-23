@@ -365,7 +365,7 @@ pub async fn main() {
         LogMetrics,
     }
 
-    let metrics_logging_interval = fuchsia_async::Duration::from_hours(1);
+    let metrics_logging_interval = fuchsia_async::MonotonicDuration::from_hours(1);
     let mut stream = futures::stream::select(
         // Always log metrics once on startup then periodically log new values so
         // the aggregation window always contains one sample of the current

@@ -13,7 +13,7 @@ use zwp_linux_dmabuf_v1_server_protocol::{
     ZwpLinuxDmabufV1Request,
 };
 use zx::{EventPair, Handle, HandleBased};
-use {fidl_fuchsia_ui_composition as composition, fuchsia_wayland_core as wl, zx};
+use {fidl_fuchsia_ui_composition as composition, fuchsia_wayland_core as wl};
 
 const DRM_FORMAT_ARGB8888: u32 = 0x34325241;
 const DRM_FORMAT_ABGR8888: u32 = 0x34324241;

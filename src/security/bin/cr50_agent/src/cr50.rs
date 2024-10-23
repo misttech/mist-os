@@ -27,10 +27,10 @@ use fidl_fuchsia_tpm_cr50::{
     PinWeaverError, PinWeaverRequest, PinWeaverRequestStream, TryAuthFailed, TryAuthRateLimited,
     TryAuthResponse, TryAuthSuccess, WpState,
 };
+use fuchsia_async as fasync;
 use futures::TryStreamExt;
 use std::sync::Arc;
 use tracing::warn;
-use {fuchsia_async as fasync, zx};
 
 pub struct Cr50 {
     proxy: TpmDeviceProxy,

@@ -67,7 +67,7 @@ func TestMain(t *testing.T) {
 			expectedSSHArgs:        "",
 			expectedSSHConfig:      filepath.Join(dataDir, "sshconfig"),
 			expectedPrivateKey:     "",
-			ffxTargetList:          `[{"nodename":"some-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":["::1f"]}]`,
+			ffxTargetList:          `[{"nodename":"some-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":[{"ip":"::1f", "ssh_port":22}]}]`,
 			ffxTargetGetSSHAddress: `[::1f]:22`,
 		},
 		{
@@ -79,8 +79,8 @@ func TestMain(t *testing.T) {
 			expectedSSHArgs:    "",
 			expectedSSHConfig:  filepath.Join(dataDir, "sshconfig"),
 			expectedPrivateKey: "",
-			ffxTargetList: `[{"nodename":"test-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":["::1f"]},
-			{"nodename":"random-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":["::2f"]}]`,
+			ffxTargetList: `[{"nodename":"test-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":[{"ip":"::1f", "ssh_port":22}]},
+			{"nodename":"random-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":[{"ip":"::2f", "ssh_port":22}]}]`,
 			ffxTargetGetSSHAddress: `[::1f]:22`,
 		},
 		{
@@ -98,8 +98,8 @@ func TestMain(t *testing.T) {
 			}
 			}`,
 			ffxTargetGetSSHAddress: `[::1f]:2202`,
-			ffxTargetList: `[{"nodename":"remote-target-name","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":["::1f"]},
-		{"nodename":"random-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":["::2f"]}]`,
+			ffxTargetList: `[{"nodename":"remote-target-name","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":[{"ip":"::1f", "ssh_port":22}]},
+		{"nodename":"random-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":[{"ip":"::2f", "ssh_port":22}]}]`,
 			ffxTargetDefault:   "remote-target-name",
 			expectedIPAddress:  "::1f",
 			expectedPort:       "2202",
@@ -130,8 +130,8 @@ func TestMain(t *testing.T) {
 			}
 			}`,
 			ffxTargetDefault: "remote-target-name",
-			ffxTargetList: `[{"nodename":"remote-target-name","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":["::1f"]},
-			{"nodename":"random-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":["::2f"]}]`,
+			ffxTargetList: `[{"nodename":"remote-target-name","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":[{"ip":"::1f", "ssh_port":22}]},
+			{"nodename":"random-device","rcs_state":"N","serial":"<unknown>","target_type":"Unknown","target_state":"Product","addresses":[{"ip":"::2f", "ssh_port":22}]}]`,
 			ffxTargetGetSSHAddress: `[::1f]:2202`,
 			expectedIPAddress:      "::2f",
 			expectedPort:           "8022",

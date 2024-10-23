@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.media.tuning") {
-  sdk_category = "internal"
-
   sources = [ "audio_tuner.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]

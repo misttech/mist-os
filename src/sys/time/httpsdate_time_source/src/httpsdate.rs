@@ -12,6 +12,7 @@ use crate::Config;
 use anyhow::Error;
 use async_trait::async_trait;
 use fidl_fuchsia_time_external::{Properties, Status, TimeSample, Urgency};
+use fuchsia_async as fasync;
 use futures::channel::mpsc::Sender;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
@@ -20,7 +21,6 @@ use httpdate_hyper::{HttpsDateError, HttpsDateErrorType};
 use push_source::Update;
 use rand::Rng;
 use tracing::{debug, error, info};
-use {fuchsia_async as fasync, zx};
 
 /// A definition of how long an algorithm should wait between polls. Defines fixed wait durations
 /// following successful poll attempts, and a capped exponential backoff following failed poll

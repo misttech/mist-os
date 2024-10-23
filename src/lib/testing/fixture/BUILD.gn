@@ -12,10 +12,7 @@ rustc_macro("fixture") {
 
   deps = [
     "//third_party/rust_crates:quote",
-
-    # FIXME(https://fxbug.dev/332277415): Please update to syn 2.x.
-    # "//third_party/rust_crates:syn",
-    "//third_party/rust_crates:syn-v1_0_98",
+    "//third_party/rust_crates:syn",
   ]
 
   sources = [ "src/lib.rs" ]

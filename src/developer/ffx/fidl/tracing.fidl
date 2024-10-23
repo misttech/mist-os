@@ -110,7 +110,7 @@ closed protocol Tracing {
     ///
     /// Examples:
     ///
-    /// ```
+    /// ```rust
     /// proxy.start_recording(
     ///     target_query: TargetQuery { string_matcher: "foo"},
     ///     output_file: "output_file.fxt",

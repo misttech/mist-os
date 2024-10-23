@@ -24,6 +24,14 @@
       "short": null,
       "description": "automatically trigger a reboot into the new system",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--product-bundle",
+      "short": null,
+      "description": "use the product bundle to use as the source of the update.",
+      "hidden": false
     }
   ],
   "notes": [
@@ -35,6 +43,12 @@
       "name": "update_pkg_url",
       "description": "the url of the update package describing the update to install",
       "optionality": "required",
+      "hidden": false
+    },
+    {
+      "name": "product_bundle_path",
+      "description": "optionally specify the product bundle to use as the source of the update when `--product-bundle` is set. The default is to use the product bundle configured with `product.path`.",
+      "optionality": "optional",
       "hidden": false
     }
   ],

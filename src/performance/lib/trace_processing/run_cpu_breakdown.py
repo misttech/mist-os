@@ -11,7 +11,6 @@ import argparse
 import json
 import pathlib
 import sys
-from typing import Any, Dict, List
 
 from trace_processing import hardware_configs, trace_importing, trace_model
 from trace_processing.metrics import agg_cpu_breakdown, cpu_breakdown
@@ -122,7 +121,7 @@ def RunCpuBreakdown(args: argparse.Namespace, trace_path_json: str) -> None:
         model, args.percent_cutoff
     )
 
-    breakdown: List[Dict[str, Any]] = processor.process_metrics()
+    breakdown = processor.process_freeform_metrics(model)
 
     if args.group_processes:
         breakdown = processor.group_by_process_name(breakdown)
@@ -139,11 +138,11 @@ def RunAggBreakdown(args: argparse.Namespace, trace_path_json: str) -> None:
     )
     (breakdown, total_time) = cpu_breakdown.CpuBreakdownMetricsProcessor(
         model, args.percent_cutoff
-    ).process_metrics_and_get_total_time()
+    ).process_metrics_and_get_total_time(model)
     hardware_profile = hardware_configs.configs[args.hardware_profile]
     agg_breakdown = agg_cpu_breakdown.AggCpuBreakdownMetricsProcessor(
-        breakdown, hardware_profile, total_time, args.percent_cutoff
-    ).aggregate_metrics()
+        hardware_profile, total_time, args.percent_cutoff
+    ).aggregate_metrics(breakdown)
 
     with open(args.output_path, "w") as json_file:
         json.dump(agg_breakdown, json_file)

@@ -23,6 +23,10 @@
 // This header is the top-level #include for the zircon channel wire messaging layer.
 
 namespace fidl {
+// Class template argument deduction (CTAD) guide.
+template <typename Result>
+WireResponse(Result) -> WireResponse<typename Result::FidlMethod>;
+
 #ifdef __Fuchsia__
 
 template <typename FidlMethod>

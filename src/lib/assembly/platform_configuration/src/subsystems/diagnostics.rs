@@ -7,7 +7,7 @@ use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::diagnostics_config::{
-    ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, LogSeverity, PipelineType,
+    ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, PipelineType, Severity,
 };
 use assembly_util::{read_config, BootfsPackageDestination, FileEntry, PackageSetDestination};
 use sampler_config::ComponentIdInfoList;
@@ -135,9 +135,9 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         )?;
 
         if *context.build_type == BuildType::User
-            && component_log_initial_interests.iter().any(|interest| {
-                matches!(interest.log_severity, LogSeverity::Debug | LogSeverity::Trace)
-            })
+            && component_log_initial_interests
+                .iter()
+                .any(|interest| matches!(interest.log_severity, Severity::Debug | Severity::Trace))
         {
             return Err(anyhow!(
                 "Component log severity cannot be below info when build type is set to user"

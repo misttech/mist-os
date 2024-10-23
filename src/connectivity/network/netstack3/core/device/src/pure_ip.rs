@@ -17,7 +17,7 @@ use netstack3_base::{
     RecvFrameContext, RecvIpFrameMeta, ResourceCounterContext, SendFrameError,
     SendFrameErrorReason, SendableFrameMeta, TimerContext, WeakDeviceIdentifier,
 };
-use netstack3_ip::IpPacketDestination;
+use netstack3_ip::{DeviceIpLayerMetadata, IpPacketDestination};
 use packet::{Buf, BufferMut, Serializer};
 
 use crate::internal::base::{
@@ -156,8 +156,8 @@ impl DeviceSocketSendTypes for PureIpDevice {
 impl<CC, BC> ReceivableFrameMeta<CC, BC> for PureIpDeviceReceiveFrameMetadata<CC::DeviceId>
 where
     CC: DeviceIdContext<PureIpDevice>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv4>, BC>
-        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, Ipv6>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata, Ipv4>, BC>
+        + RecvFrameContext<RecvIpFrameMeta<CC::DeviceId, DeviceIpLayerMetadata, Ipv6>, BC>
         + ResourceCounterContext<CC::DeviceId, DeviceCounters>
         + DeviceSocketHandler<PureIpDevice, BC>,
 {
@@ -187,7 +187,11 @@ where
                 });
                 core_ctx.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv4>::new(device_id, None),
+                    RecvIpFrameMeta::<_, _, Ipv4>::new(
+                        device_id,
+                        None,
+                        DeviceIpLayerMetadata::default(),
+                    ),
                     buffer,
                 )
             }
@@ -197,7 +201,11 @@ where
                 });
                 core_ctx.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv6>::new(device_id, None),
+                    RecvIpFrameMeta::<_, _, Ipv6>::new(
+                        device_id,
+                        None,
+                        DeviceIpLayerMetadata::default(),
+                    ),
                     buffer,
                 )
             }

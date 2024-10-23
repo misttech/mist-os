@@ -8,8 +8,9 @@ use anyhow::{anyhow, bail, Context, Error, Result};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use fidl_fuchsia_diagnostics::Selector;
 use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
+use moniker::ExtendedMoniker;
 use regex::Regex;
-use selectors::VerboseError;
+use selectors::{SelectorExt, VerboseError};
 use serde::Serialize;
 use serde_derive::Deserialize;
 use serde_json::map::Map as JsonMap;
@@ -204,13 +205,16 @@ impl TryFrom<String> for SelectorString {
 #[derive(Debug)]
 pub struct ComponentInspectInfo {
     processed_data: DiagnosticsHierarchy,
-    moniker: Vec<String>,
+    moniker: ExtendedMoniker,
     tree_name: String,
 }
 
 impl ComponentInspectInfo {
-    fn matches_selector(&self, selector: &Selector) -> Result<bool, anyhow::Error> {
-        selectors::match_component_and_tree_name(&self.moniker, &self.tree_name, selector)
+    fn matches_selector(&self, selector: &Selector) -> bool {
+        self.moniker
+            .match_against_selectors_and_tree_name(&self.tree_name, Some(selector))
+            .next()
+            .is_some()
     }
 }
 
@@ -317,15 +321,15 @@ impl TryFrom<Vec<JsonValue>> for InspectFetcher {
             component.get(key).ok_or_else(|| anyhow!("'{}' not found in Inspect component", key))
         }
 
-        fn moniker_from(component: &JsonValue) -> Result<Vec<String>, Error> {
+        fn moniker_from(component: &JsonValue) -> Result<ExtendedMoniker, anyhow::Error> {
             let value = extract_json_value(component, "moniker")
                 .or_else(|_| bail!("'moniker' not found in Inspect component"))?;
-            Ok(value
-                .as_str()
-                .ok_or_else(|| anyhow!("Inspect component path wasn't a valid string"))?
-                .split("/")
-                .map(|s| s.to_owned())
-                .collect())
+            let moniker = ExtendedMoniker::parse_str(
+                value
+                    .as_str()
+                    .ok_or_else(|| anyhow!("Inspect component path wasn't a valid string"))?,
+            )?;
+            Ok(moniker)
         }
 
         let components: Vec<_> = component_vec
@@ -354,7 +358,7 @@ impl TryFrom<Vec<JsonValue>> for InspectFetcher {
                         serde_json::from_value(raw_contents.clone()).with_context(|| {
                             format!(
                                 "Unable to deserialize Inspect contents for {} to node hierarchy",
-                                moniker.join("/")
+                                moniker,
                             )
                         })?
                     }
@@ -389,7 +393,7 @@ impl InspectFetcher {
         let mut properties = Vec::new();
         let mut found_component = false;
         for component in self.components.iter() {
-            if !component.matches_selector(&selector_string.parsed_selector)? {
+            if !component.matches_selector(&selector_string.parsed_selector) {
                 continue;
             }
             found_component = true;

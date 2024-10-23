@@ -379,10 +379,6 @@ class TestDevice : public fidl::WireServer<fuchsia_driver_compat::Device> {
   explicit TestDevice(std::unordered_map<uint32_t, MockProtocol> banjo_protocols = {})
       : banjo_protocols_(std::move(banjo_protocols)) {}
 
-  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
-    completer.Reply("/dev/test/my-device");
-  }
-
   void GetBanjoProtocol(GetBanjoProtocolRequestView request,
                         GetBanjoProtocolCompleter::Sync& completer) override {
     auto iter = banjo_protocols_.find(request->proto_id);
@@ -415,6 +411,10 @@ class TestDevice : public fidl::WireServer<fuchsia_driver_compat::Device> {
 
     completer.ReplySuccess(fidl::VectorView<fuchsia_driver_compat::wire::Metadata>::FromExternal(
         metadata.data(), metadata.size()));
+  }
+
+  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
+    completer.Reply(fidl::StringView::FromExternal("SHOULD_NOT_BE_USED"));
   }
 
  private:
@@ -917,9 +917,6 @@ TEST_F(DriverTest, Start_CheckCompatService) {
 
   // Verify that v1_test.so has added a child device.
   WaitForChildDeviceAdded();
-
-  // Check topological path.
-  ASSERT_STREQ(driver->GetDevice().topological_path().data(), "/dev/test/my-device");
 
   // Check metadata.
   std::array<uint8_t, 3> expected_metadata;

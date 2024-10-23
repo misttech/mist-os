@@ -4755,16 +4755,10 @@ static void brcmf_dump_if_band_cap(fuchsia_wlan_fullmac_wire::WlanFullmacBandCap
   }
   BRCMF_DBG_UNFILTERED("   band: %s", band_str);
 
-  if (band_cap->basic_rate_count > fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES) {
-    BRCMF_DBG_UNFILTERED("Number of rates reported (%u) exceeds limit (%du), truncating",
-                         band_cap->basic_rate_count,
-                         fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES);
-    band_cap->basic_rate_count = fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES;
-  }
   char rates_str[fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES * 6 + 1];
   char* str = rates_str;
-  for (unsigned i = 0; i < band_cap->basic_rate_count; i++) {
-    str += sprintf(str, "%s%d", i > 0 ? " " : "", band_cap->basic_rate_list.data()[i]);
+  for (unsigned i = 0; i < band_cap->basic_rates.count(); i++) {
+    str += sprintf(str, "%s%d", i > 0 ? " " : "", band_cap->basic_rates[i]);
   }
   BRCMF_DBG_UNFILTERED("     basic_rates: %s", rates_str);
 
@@ -4804,7 +4798,8 @@ static void brcmf_dump_if_query_info(fuchsia_wlan_fullmac_wire::WlanFullmacQuery
   }
 }
 
-void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info) {
+void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info,
+                    fdf::Arena& arena) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct wireless_dev* wdev = ndev_to_wdev(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
@@ -4866,17 +4861,29 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQuer
     fuchsia_wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &info->band_cap_list[i - 1];
     if (bandlist[i] == WLC_BAND_2G) {
       band_cap->band = fuchsia_wlan_common::WlanBand::kTwoGhz;
-      band_cap->basic_rate_count =
+
+      constexpr uint8_t kNumSupported2GRates =
           std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_g_rates_size);
-      memcpy(band_cap->basic_rate_list.data(), wl_g_rates,
-             band_cap->basic_rate_count * sizeof(*band_cap->basic_rate_list.data()));
+      band_cap->basic_rates.Allocate(arena, kNumSupported2GRates);
+
+      // Ensure that element sizes are identical because we will memcpy them.
+      static_assert(sizeof(band_cap->basic_rates[0]) == sizeof(wl_g_rates[0]));
+
+      memcpy(band_cap->basic_rates.data(), wl_g_rates,
+             kNumSupported2GRates * sizeof(band_cap->basic_rates[0]));
       band_cap_2ghz = band_cap;
     } else if (bandlist[i] == WLC_BAND_5G) {
       band_cap->band = fuchsia_wlan_common::WlanBand::kFiveGhz;
-      band_cap->basic_rate_count =
+
+      constexpr uint8_t kNumSupported5GRates =
           std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_a_rates_size);
-      memcpy(band_cap->basic_rate_list.data(), wl_a_rates,
-             band_cap->basic_rate_count * sizeof(*band_cap->basic_rate_list.data()));
+      band_cap->basic_rates.Allocate(arena, kNumSupported5GRates);
+
+      // Ensure that element sizes are identical because we will memcpy them.
+      static_assert(sizeof(band_cap->basic_rates[0]) == sizeof(wl_a_rates[0]));
+
+      memcpy(band_cap->basic_rates.data(), wl_a_rates,
+             kNumSupported5GRates * sizeof(band_cap->basic_rates[0]));
       band_cap_5ghz = band_cap;
     }
   }

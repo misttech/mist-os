@@ -4,6 +4,7 @@
 
 use anyhow::{format_err, Error};
 use diagnostics_log_encoding::encode::{Encoder, EncoderOpts, EncodingError};
+use diagnostics_log_validator_utils as utils;
 use fidl_fuchsia_mem::Buffer;
 use fidl_fuchsia_validate_logs::{EncodingPuppetRequest, EncodingPuppetRequestStream, PuppetError};
 use fuchsia_component::server::ServiceFs;
@@ -21,7 +22,8 @@ async fn run_encoding_service(mut stream: EncodingPuppetRequestStream) -> Result
 
         let mut buffer = Cursor::new(vec![0u8; BUFFER_SIZE]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        match encoder.write_record(&record) {
+        let record = utils::fidl_to_record(record);
+        match encoder.write_record(record) {
             Ok(()) => {
                 let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
                 let vmo = Vmo::create(BUFFER_SIZE as u64)?;

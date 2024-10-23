@@ -31,7 +31,7 @@ use std::sync::Arc;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_element as felement,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_starnix_container as fstarcontainer, zx,
+    fidl_fuchsia_starnix_container as fstarcontainer,
 };
 #[cfg(feature = "starnix_lite")]
 use {
@@ -263,7 +263,7 @@ async fn connect_to_vsock(
         if let Ok(socket) = system_task.kernel().default_abstract_vsock_namespace.lookup(&port) {
             break socket;
         };
-        fasync::Timer::new(fasync::Duration::from_millis(100).after_now()).await;
+        fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
     };
 
     let pipe =

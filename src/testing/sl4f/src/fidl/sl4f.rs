@@ -199,12 +199,12 @@ mod tests {
     use super::*;
     use anyhow::format_err;
     use fidl_fuchsia_testing_sl4f::FacadeProviderMarker;
+    use fuchsia_async as fasync;
     use serde_json::json;
     use std::cell::RefCell;
     use std::collections::HashMap;
     use std::pin::pin;
     use std::task::Poll;
-    use {fuchsia_async as fasync, zx};
 
     /// TestFacade provides a trivial Facade implementation which supports commands to interact
     /// with the state.

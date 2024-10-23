@@ -10,6 +10,8 @@ use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::num::NonZeroU16;
 use std::pin::pin;
+use std::sync::atomic::{AtomicU16, Ordering};
+use std::time::Duration;
 
 use fidl_fuchsia_net_ext::IntoExt as _;
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
@@ -22,7 +24,7 @@ use {
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_netemul_network as fnetemul_network, zx,
+    fidl_fuchsia_netemul_network as fnetemul_network,
 };
 
 use anyhow::Context as _;
@@ -1918,155 +1920,284 @@ async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(n
     .await;
 }
 
+#[derive(Clone)]
 struct MasqueradeTestSetup {
-    client_ip: std::net::IpAddr,
-    client_subnet: fnet::Subnet,
-    client_gateway: fnet::IpAddress,
+    client1_ip: std::net::IpAddr,
+    client1_subnet: fnet::Subnet,
+    client1_gateway: fnet::IpAddress,
+    client2_ip: std::net::IpAddr,
+    client2_subnet: fnet::Subnet,
+    client2_gateway: fnet::IpAddress,
     server_ip: std::net::IpAddr,
     server_subnet: fnet::Subnet,
     server_gateway: fnet::IpAddress,
     router_ip: std::net::IpAddr,
-    router_client_ip: fnet::Subnet,
+    router_client1_ip: fnet::Subnet,
+    router_client2_ip: fnet::Subnet,
     router_server_ip: fnet::Subnet,
     router_if_config: fnet_interfaces_admin::Configuration,
+}
+
+impl MasqueradeTestSetup {
+    fn ipv4() -> Self {
+        MasqueradeTestSetup {
+            client1_ip: std_ip!("192.168.1.2"),
+            client1_subnet: fidl_subnet!("192.168.1.2/24"),
+            client1_gateway: fidl_ip!("192.168.1.1"),
+            client2_ip: std_ip!("192.168.2.2"),
+            client2_subnet: fidl_subnet!("192.168.2.2/24"),
+            client2_gateway: fidl_ip!("192.168.2.1"),
+            server_ip: std_ip!("192.168.0.2"),
+            server_subnet: fidl_subnet!("192.168.0.2/24"),
+            server_gateway: fidl_ip!("192.168.0.1"),
+            router_ip: std_ip!("192.168.0.1"),
+            router_client1_ip: fidl_subnet!("192.168.1.1/24"),
+            router_client2_ip: fidl_subnet!("192.168.2.1/24"),
+            router_server_ip: fidl_subnet!("192.168.0.1/24"),
+            router_if_config: fnet_interfaces_admin::Configuration {
+                ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                    unicast_forwarding: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        }
+    }
+
+    fn ipv6() -> Self {
+        MasqueradeTestSetup {
+            client1_ip: std_ip!("fd00:0:0:1::2"),
+            client1_subnet: fidl_subnet!("fd00:0:0:1::2/64"),
+            client1_gateway: fidl_ip!("fd00:0:0:1::1"),
+            client2_ip: std_ip!("fd00:0:0:2::2"),
+            client2_subnet: fidl_subnet!("fd00:0:0:2::2/64"),
+            client2_gateway: fidl_ip!("fd00:0:0:2::1"),
+            server_ip: std_ip!("fd00:0:0:0::2"),
+            server_subnet: fidl_subnet!("fd00:0:0:0::2/64"),
+            server_gateway: fidl_ip!("fd00:0:0:0::1"),
+            router_ip: std_ip!("fd00:0:0:0::1"),
+            router_client1_ip: fidl_subnet!("fd00:0:0:1::1/64"),
+            router_client2_ip: fidl_subnet!("fd00:0:0:2::1/64"),
+            router_server_ip: fidl_subnet!("fd00:0:0:0::1/64"),
+            router_if_config: fnet_interfaces_admin::Configuration {
+                ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                    unicast_forwarding: Some(true),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        }
+    }
+
+    async fn build<'a, N: Netstack>(
+        self,
+        sandbox: &'a netemul::TestSandbox,
+        name: &str,
+    ) -> MasqueradeTestResources<'a> {
+        let MasqueradeTestSetup {
+            client1_ip: _,
+            client1_subnet,
+            client1_gateway,
+            client2_ip: _,
+            client2_subnet,
+            client2_gateway,
+            server_ip: _,
+            server_subnet,
+            server_gateway,
+            router_ip: _,
+            router_client1_ip,
+            router_client2_ip,
+            router_server_ip,
+            router_if_config,
+        } = self;
+
+        let client1_net = sandbox.create_network("client1").await.expect("create network");
+        let client2_net = sandbox.create_network("client2").await.expect("create network");
+        let server_net = sandbox.create_network("server").await.expect("create network");
+        let client1 = sandbox
+            .create_netstack_realm::<N, _>(format!("{}_client1", name))
+            .expect("create realm");
+        let client2 = sandbox
+            .create_netstack_realm::<N, _>(format!("{}_client2", name))
+            .expect("create realm");
+        let server = sandbox
+            .create_netstack_realm::<N, _>(format!("{}_server", name))
+            .expect("create realm");
+        let router = sandbox
+            .create_netstack_realm_with::<N, _, _>(
+                format!("{name}_router"),
+                [
+                    KnownServiceProvider::Manager {
+                        agent: ManagementAgent::NetCfg(NetCfgVersion::Advanced),
+                        config: ManagerConfig::Empty,
+                        use_dhcp_server: false,
+                        use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
+                    },
+                    KnownServiceProvider::DnsResolver,
+                    KnownServiceProvider::FakeClock,
+                ]
+                .into_iter()
+                .chain(
+                    N::USE_OUT_OF_STACK_DHCP_CLIENT
+                        .then_some(KnownServiceProvider::DhcpClient)
+                        .into_iter(),
+                ),
+            )
+            .expect("create host netstack realm");
+
+        let client1_iface = client1
+            .join_network(&client1_net, "client1-ep")
+            .await
+            .expect("install interface in client1 netstack");
+        client1_iface
+            .add_address_and_subnet_route(client1_subnet)
+            .await
+            .expect("configure address");
+        client1_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+        let client2_iface = client2
+            .join_network(&client2_net, "client2-ep")
+            .await
+            .expect("install interface in client2 netstack");
+        client2_iface
+            .add_address_and_subnet_route(client2_subnet)
+            .await
+            .expect("configure address");
+        client2_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+
+        let server_iface = server
+            .join_network(&server_net, "server-ep")
+            .await
+            .expect("install interface in server nestack");
+        server_iface.add_address_and_subnet_route(server_subnet).await.expect("configure address");
+        server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+
+        let router_client1_iface = router
+            .join_network(&client1_net, "client1-router-ep")
+            .await
+            .expect("router joins client1 network");
+        router_client1_iface
+            .add_address_and_subnet_route(router_client1_ip)
+            .await
+            .expect("configure address");
+        router_client1_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+        let router_client2_iface = router
+            .join_network(&client2_net, "client2-router-ep")
+            .await
+            .expect("router joins client2 network");
+        router_client2_iface
+            .add_address_and_subnet_route(router_client2_ip)
+            .await
+            .expect("configure address");
+        router_client2_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+
+        let router_server_iface = router
+            .join_network(&server_net, "server-router-ep")
+            .await
+            .expect("router joins server network");
+        router_server_iface
+            .add_address_and_subnet_route(router_server_ip)
+            .await
+            .expect("configure address");
+        router_server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+
+        client1_iface.add_default_route(client1_gateway).await.expect("add default route");
+        client2_iface.add_default_route(client2_gateway).await.expect("add default route");
+        server_iface.add_default_route(server_gateway).await.expect("add default route");
+
+        async fn enable_forwarding(
+            interface: &fnet_interfaces_ext::admin::Control,
+            config: &fnet_interfaces_admin::Configuration,
+        ) {
+            let _prev_config: fnet_interfaces_admin::Configuration = interface
+                .set_configuration(config)
+                .await
+                .expect("call set configuration")
+                .expect("set interface configuration");
+        }
+        enable_forwarding(router_client1_iface.control(), &router_if_config).await;
+        enable_forwarding(router_client2_iface.control(), &router_if_config).await;
+        enable_forwarding(router_server_iface.control(), &router_if_config).await;
+        MasqueradeTestResources {
+            _client1_net: client1_net,
+            _client2_net: client2_net,
+            _server_net: server_net,
+            client1,
+            client2,
+            server,
+            router,
+            _client1_iface: client1_iface,
+            _client2_iface: client2_iface,
+            _server_iface: server_iface,
+            _router_client1_iface: router_client1_iface,
+            _router_client2_iface: router_client2_iface,
+            router_server_iface,
+        }
+    }
+}
+
+struct MasqueradeTestResources<'a> {
+    _client1_net: netemul::TestNetwork<'a>,
+    _client2_net: netemul::TestNetwork<'a>,
+    _server_net: netemul::TestNetwork<'a>,
+    client1: netemul::TestRealm<'a>,
+    client2: netemul::TestRealm<'a>,
+    server: netemul::TestRealm<'a>,
+    router: netemul::TestRealm<'a>,
+    _client1_iface: netemul::TestInterface<'a>,
+    _client2_iface: netemul::TestInterface<'a>,
+    _server_iface: netemul::TestInterface<'a>,
+    _router_client1_iface: netemul::TestInterface<'a>,
+    _router_client2_iface: netemul::TestInterface<'a>,
+    router_server_iface: netemul::TestInterface<'a>,
+}
+
+async fn get_src_ip(
+    sockaddr: SocketAddr,
+    client_realm: &netemul::TestRealm<'_>,
+    server_realm: &netemul::TestRealm<'_>,
+) -> std::net::IpAddr {
+    let client = async {
+        let mut stream = fuchsia_async::net::TcpStream::connect_in_realm(client_realm, sockaddr)
+            .await
+            .expect("connect to server");
+
+        // Write some data to ensure that the connection stays open long
+        // enough for the server to accept.
+        stream.write_all(&"data".as_bytes()).await.expect("failed to write to stream");
+        stream.flush().await.expect("flush stream");
+    };
+
+    let listener = fuchsia_async::net::TcpListener::listen_in_realm(server_realm, sockaddr)
+        .await
+        .expect("bind to address");
+    let server = async {
+        let (_listener, _stream, remote) =
+            listener.accept().await.expect("accept incoming connection");
+        remote.ip()
+    };
+
+    let ((), source_ip) = futures_util::future::join(client, server).await;
+    source_ip
 }
 
 #[netstack_test]
 #[variant(N, Netstack)]
 #[variant(M, Manager)]
-#[test_case(
-    MasqueradeTestSetup {
-        client_ip: std_ip!("192.168.1.2"),
-        client_subnet: fidl_subnet!("192.168.1.2/24"),
-        client_gateway: fidl_ip!("192.168.1.1"),
-        server_ip: std_ip!("192.168.0.2"),
-        server_subnet: fidl_subnet!("192.168.0.2/24"),
-        server_gateway: fidl_ip!("192.168.0.1"),
-        router_ip: std_ip!("192.168.0.1"),
-        router_client_ip: fidl_subnet!("192.168.1.1/24"),
-        router_server_ip: fidl_subnet!("192.168.0.1/24"),
-        router_if_config: fnet_interfaces_admin::Configuration {
-            ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                unicast_forwarding: Some(true),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    };
-    "ipv4"
-)]
-#[test_case(
-    MasqueradeTestSetup {
-        client_ip: std_ip!("fd00:0:0:1::2"),
-        client_subnet: fidl_subnet!("fd00:0:0:1::2/64"),
-        client_gateway: fidl_ip!("fd00:0:0:1::1"),
-        server_ip: std_ip!("fd00:0:0:2::2"),
-        server_subnet: fidl_subnet!("fd00:0:0:2::2/64"),
-        server_gateway: fidl_ip!("fd00:0:0:2::1"),
-        router_ip: std_ip!("fd00:0:0:2::1"),
-        router_client_ip: fidl_subnet!("fd00:0:0:1::1/64"),
-        router_server_ip: fidl_subnet!("fd00:0:0:2::1/64"),
-        router_if_config: fnet_interfaces_admin::Configuration {
-            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                unicast_forwarding: Some(true),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
-    };
-    "ipv6"
-)]
+#[test_case(MasqueradeTestSetup::ipv4(); "ipv4")]
+#[test_case(MasqueradeTestSetup::ipv6(); "ipv6")]
 async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeTestSetup) {
-    let MasqueradeTestSetup {
-        client_ip,
-        client_subnet,
-        client_gateway,
-        server_ip,
-        server_subnet,
-        server_gateway,
-        router_ip,
-        router_client_ip,
-        router_server_ip,
-        router_if_config,
-    } = setup;
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
 
-    let client_net = sandbox.create_network("client").await.expect("create network");
-    let server_net = sandbox.create_network("server").await.expect("create network");
-    let client =
-        sandbox.create_netstack_realm::<N, _>(format!("{}_client", name)).expect("create realm");
-    let server =
-        sandbox.create_netstack_realm::<N, _>(format!("{}_server", name)).expect("create realm");
-    let router = sandbox
-        .create_netstack_realm_with::<N, _, _>(
-            format!("{name}_router"),
-            [
-                KnownServiceProvider::Manager {
-                    agent: ManagementAgent::NetCfg(NetCfgVersion::Advanced),
-                    config: ManagerConfig::Empty,
-                    use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: N::USE_OUT_OF_STACK_DHCP_CLIENT,
-                },
-                KnownServiceProvider::DnsResolver,
-                KnownServiceProvider::FakeClock,
-            ]
-            .into_iter()
-            .chain(
-                N::USE_OUT_OF_STACK_DHCP_CLIENT
-                    .then_some(KnownServiceProvider::DhcpClient)
-                    .into_iter(),
-            ),
-        )
-        .expect("create host netstack realm");
-
-    let client_iface = client
-        .join_network(&client_net, "client-ep")
-        .await
-        .expect("install interface in client netstack");
-    client_iface.add_address_and_subnet_route(client_subnet).await.expect("configure address");
-    client_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
-    let server_iface = server
-        .join_network(&server_net, "server-ep")
-        .await
-        .expect("install interface in server nestack");
-    server_iface.add_address_and_subnet_route(server_subnet).await.expect("configure address");
-    server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
-
-    let router_client_iface = router
-        .join_network(&client_net, "client-router-ep")
-        .await
-        .expect("router joins client network");
-    router_client_iface
-        .add_address_and_subnet_route(router_client_ip)
-        .await
-        .expect("configure address");
-    router_client_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
-    let router_server_iface = router
-        .join_network(&server_net, "server-router-ep")
-        .await
-        .expect("router joins server network");
-    router_server_iface
-        .add_address_and_subnet_route(router_server_ip)
-        .await
-        .expect("configure address");
-    router_server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
-
-    client_iface.add_default_route(client_gateway).await.expect("add default route");
-    server_iface.add_default_route(server_gateway).await.expect("add default route");
-
-    async fn enable_forwarding(
-        interface: &fnet_interfaces_ext::admin::Control,
-        config: &fnet_interfaces_admin::Configuration,
-    ) {
-        let _prev_config: fnet_interfaces_admin::Configuration = interface
-            .set_configuration(config)
-            .await
-            .expect("call set configuration")
-            .expect("set interface configuration");
-    }
-    enable_forwarding(router_client_iface.control(), &router_if_config).await;
-    enable_forwarding(router_server_iface.control(), &router_if_config).await;
+    let MasqueradeTestSetup {
+        client1_ip: client_ip,
+        server_ip,
+        router_ip,
+        router_client1_ip: router_client_ip,
+        ..
+    } = setup.clone();
+    let resources = setup.build::<N>(&sandbox, name).await;
+    let MasqueradeTestResources { client1: client, server, router, router_server_iface, .. } =
+        &resources;
 
     let masq = router
         .connect_to_protocol::<fnet_masquerade::FactoryMarker>()
@@ -2086,46 +2217,192 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
     .expect("masq create fidl")
     .expect("masq create");
 
-    async fn check_source_ip(
-        expected_ip: std::net::IpAddr,
-        sockaddr: SocketAddr,
-        client_realm: &netemul::TestRealm<'_>,
-        server_realm: &netemul::TestRealm<'_>,
-    ) {
-        let client = async {
-            let mut stream =
-                fuchsia_async::net::TcpStream::connect_in_realm(client_realm, sockaddr)
-                    .await
-                    .expect("connect to server");
-
-            // Write some data to ensure that the connection stays open long
-            // enough for the server to accept.
-            stream.write_all(&"data".as_bytes()).await.expect("failed to write to stream");
-            stream.flush().await.expect("flush stream");
-        };
-
-        let listener = fuchsia_async::net::TcpListener::listen_in_realm(server_realm, sockaddr)
-            .await
-            .expect("bind to address");
-        let server = async {
-            let (_listener, _stream, remote) =
-                listener.accept().await.expect("accept incoming connection");
-            assert_eq!(remote.ip(), expected_ip, "Encountered unexpected ip on connect");
-        };
-
-        futures_util::future::join(client, server).await;
-    }
-
     // Before masquerade, the source IP should be the client IP.
-    check_source_ip(client_ip, SocketAddr::from((server_ip, 8080)), &client, &server).await;
+    assert_eq!(client_ip, get_src_ip(SocketAddr::from((server_ip, 8080)), client, server).await);
 
     // Once masquerade is enabled, the source IP should appear to be router_ip instead.
     assert!(!masq_control.set_enabled(true).await.expect("set enabled fidl").expect("set enabled"));
-    check_source_ip(router_ip, SocketAddr::from((server_ip, 8081)), &client, &server).await;
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8081)), client, server).await);
 
     // Ensure that we can turn off masquerade again.
     assert!(masq_control.set_enabled(false).await.expect("set enabled fidl").expect("set enabled"));
-    check_source_ip(client_ip, SocketAddr::from((server_ip, 8082)), &client, &server).await;
+    assert_eq!(client_ip, get_src_ip(SocketAddr::from((server_ip, 8082)), client, server).await);
+}
+
+// Verify that the masquerade configuration is associated with the lifetime of
+// the underlying FIDL connection.
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(M, Manager)]
+#[test_case(MasqueradeTestSetup::ipv4(); "ipv4")]
+#[test_case(MasqueradeTestSetup::ipv6(); "ipv6")]
+async fn test_masquerade_lifetime<N: Netstack, M: Manager>(name: &str, setup: MasqueradeTestSetup) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+
+    let MasqueradeTestSetup {
+        client1_ip: client_ip,
+        server_ip,
+        router_ip,
+        router_client1_ip: router_client_ip,
+        ..
+    } = setup.clone();
+    let resources = setup.build::<N>(&sandbox, name).await;
+    let MasqueradeTestResources { client1: client, server, router, router_server_iface, .. } =
+        &resources;
+
+    let masq = router
+        .connect_to_protocol::<fnet_masquerade::FactoryMarker>()
+        .expect("connect to fuchsia.net.masquerade/Factory server");
+    let (masq_control, server_end) =
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
+            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+
+    masq.create(
+        &fnet_masquerade::ControlConfig {
+            src_subnet: router_client_ip,
+            output_interface: router_server_iface.id(),
+        },
+        server_end,
+    )
+    .await
+    .expect("masq create fidl")
+    .expect("masq create");
+
+    // Before masquerade, the source IP should be the client IP.
+    assert_eq!(client_ip, get_src_ip(SocketAddr::from((server_ip, 8080)), client, server).await);
+
+    // Once masquerade is enabled, the source IP should appear to be router_ip instead.
+    assert!(!masq_control.set_enabled(true).await.expect("set enabled fidl").expect("set enabled"));
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8081)), client, server).await);
+
+    // Drop the control handle, and verify that the masquerade config is removed.
+    // Note that we don't have a synchronization mechanism to wait for the
+    // config to be removed.  Instead, repeatedly check the source IP with a
+    // timeout until we observe the client IP again.
+    std::mem::drop(masq_control);
+    const MAX_ATTEMPTS: usize = 60;
+    const WAIT: Duration = Duration::from_secs(1);
+    // Ensure each attempt gets a unique port.
+    let port = AtomicU16::new(8082);
+    fuchsia_backoff::retry_or_last_error(std::iter::repeat(WAIT).take(MAX_ATTEMPTS), || async {
+        let port = port.fetch_add(1, Ordering::Relaxed);
+        let actual_ip = get_src_ip(SocketAddr::from((server_ip, port)), &client, &server).await;
+        if actual_ip == client_ip {
+            Ok(())
+        } else {
+            Err(actual_ip)
+        }
+    })
+    .await
+    .expect("IP does not match client")
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(M, Manager)]
+#[test_case(MasqueradeTestSetup::ipv4(); "ipv4")]
+#[test_case(MasqueradeTestSetup::ipv6(); "ipv6")]
+async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
+    name: &str,
+    setup: MasqueradeTestSetup,
+) {
+    // Verify that two masquerade controllers can operate independently of one another.
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+
+    let MasqueradeTestSetup {
+        client1_ip,
+        client2_ip,
+        server_ip,
+        router_ip,
+        router_client1_ip,
+        router_client2_ip,
+        ..
+    } = setup.clone();
+    let resources = setup.build::<N>(&sandbox, name).await;
+    let MasqueradeTestResources { client1, client2, server, router, router_server_iface, .. } =
+        &resources;
+
+    // Creating the first controller should succeed.
+    let masq = router
+        .connect_to_protocol::<fnet_masquerade::FactoryMarker>()
+        .expect("connect to fuchsia.net.masquerade/Factory server");
+    let (masq_control1, server_end1) =
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
+            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+    masq.create(
+        &fnet_masquerade::ControlConfig {
+            src_subnet: router_client1_ip,
+            output_interface: router_server_iface.id(),
+        },
+        server_end1,
+    )
+    .await
+    .expect("masq create fidl")
+    .expect("masq create");
+
+    // Verify the first masquerade configuration.
+    assert_eq!(client1_ip, get_src_ip(SocketAddr::from((server_ip, 8080)), client1, server).await);
+    assert!(!masq_control1
+        .set_enabled(true)
+        .await
+        .expect("set enabled fidl")
+        .expect("set enabled"));
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8081)), client1, server).await);
+
+    // Creating a second controller with the same configuration should get
+    // rejected.
+    let (_masq_control2, server_end2) =
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
+            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+    let result = masq
+        .create(
+            &fnet_masquerade::ControlConfig {
+                src_subnet: router_client1_ip,
+                output_interface: router_server_iface.id(),
+            },
+            server_end2,
+        )
+        .await
+        .expect("masq create fidl");
+    assert_eq!(result, Err(fnet_masquerade::Error::AlreadyExists));
+
+    // The first masquerade configuration should be unaffected.
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8082)), client1, server).await);
+
+    // Create a second controller with different configuration.
+    let (masq_control2, server_end2) =
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
+            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+    masq.create(
+        &fnet_masquerade::ControlConfig {
+            src_subnet: router_client2_ip,
+            output_interface: router_server_iface.id(),
+        },
+        server_end2,
+    )
+    .await
+    .expect("masq create fidl")
+    .expect("masq create");
+
+    // Verify the second masquerade configuration.
+    assert_eq!(client2_ip, get_src_ip(SocketAddr::from((server_ip, 8083)), client2, server).await);
+    assert!(!masq_control2
+        .set_enabled(true)
+        .await
+        .expect("set enabled fidl")
+        .expect("set enabled"));
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8084)), client2, server).await);
+
+    // Disable the first masquerade configuration.
+    assert!(masq_control1
+        .set_enabled(false)
+        .await
+        .expect("set enabled fidl")
+        .expect("set enabled"));
+    assert_eq!(client1_ip, get_src_ip(SocketAddr::from((server_ip, 8085)), client1, server).await);
+
+    // Verify the second masquerade configuration is unaffected.
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8086)), client2, server).await);
 }
 
 #[fuchsia::test]

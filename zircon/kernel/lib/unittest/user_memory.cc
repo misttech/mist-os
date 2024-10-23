@@ -8,8 +8,6 @@
 #include <lib/unittest/unittest.h>
 #include <lib/unittest/user_memory.h>
 
-#include <object/process_dispatcher.h>
-
 namespace testing {
 
 UserMemory::~UserMemory() {

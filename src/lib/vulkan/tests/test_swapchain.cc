@@ -107,10 +107,19 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
 
     status = buffer_collection->Release();
     EXPECT_EQ(status, ZX_OK);
+
+    callback(fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result::WithResponse({}));
   }
 
   // |fuchsia::ui::composition::testing::Flatland|
   void SetDebugName(std::string debug_name) override {
+    // Do nothing.
+  }
+
+  // |fuchsia::ui::composition::testing::Flatland|
+  void CreateView(fuchsia::ui::views::ViewCreationToken token,
+                  fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
+                      parent_viewport_watcher) override {
     // Do nothing.
   }
 

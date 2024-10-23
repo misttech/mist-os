@@ -10,6 +10,7 @@
 
 namespace debug_agent {
 
+class DebuggedJob;
 class MockThread;
 
 // Meant to be used by tests for having light-weight processes that don't talk
@@ -22,6 +23,7 @@ class MockProcess : public DebuggedProcess {
 
   // The contained process handle must be a |MockProcessHandle|.
   MockProcess(DebugAgent* debug_agent, DebuggedProcessCreateInfo info);
+
   ~MockProcess();
 
   MockProcessHandle& mock_process_handle() {

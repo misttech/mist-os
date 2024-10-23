@@ -1153,8 +1153,6 @@ pub struct EventStreamDecl {
 #[fidl_decl(fidl_table = "fdecl::Dictionary")]
 pub struct DictionaryDecl {
     pub name: Name,
-    pub source: Option<DictionarySource>,
-    pub source_dictionary: Option<RelativePath>,
     pub source_path: Option<Path>,
 }
 
@@ -3211,19 +3209,11 @@ mod tests {
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dict1".to_string()),
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_dictionary: Some("in/other".to_string()),
                         ..Default::default()
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dict2".to_string()),
                         source_path: Some("/in/other".to_string()),
-                        ..Default::default()
-                    }),
-                    fdecl::Capability::Dictionary(fdecl::Dictionary {
-                        name: Some("dict3".to_string()),
-                        source: None,
-                        source_dictionary: None,
                         ..Default::default()
                     }),
                 ]),
@@ -3608,21 +3598,11 @@ mod tests {
                         }),
                         CapabilityDecl::Dictionary(DictionaryDecl {
                             name: "dict1".parse().unwrap(),
-                            source: Some(DictionarySource::Parent),
-                            source_dictionary: Some("in/other".parse().unwrap()),
                             source_path: None,
                         }),
                         CapabilityDecl::Dictionary(DictionaryDecl {
                             name: "dict2".parse().unwrap(),
-                            source: None,
-                            source_dictionary: None,
                             source_path: Some("/in/other".parse().unwrap()),
-                        }),
-                        CapabilityDecl::Dictionary(DictionaryDecl {
-                            name: "dict3".parse().unwrap(),
-                            source: None,
-                            source_dictionary: None,
-                            source_path: None,
                         }),
                     ],
                     children: vec![

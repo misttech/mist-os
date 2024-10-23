@@ -12,13 +12,13 @@ use netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializa
 use netlink_packet_generic::GenlMessage;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_telemetry::{self, TelemetryEvent, TelemetrySender};
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync, fuchsia_inspect, zx,
+    fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync, fuchsia_inspect,
 };
 
 mod bss_scorer;
@@ -1061,7 +1061,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 .context("Failed to send scan results")?;
         }
         Nl80211Cmd::GetStation => {
-            info!("Nl80211Cmd::GetStation");
+            debug!("Nl80211Cmd::GetStation");
             use crate::nl80211::Nl80211StaInfoAttr;
             // GetStation also has a MAC address attribute. We don't check whether it
             // matches the connected network BSSID and simply assume that it does.

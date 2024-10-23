@@ -133,11 +133,11 @@ mod tests {
     use super::*;
     use crate::watchable_map;
     use fidl::endpoints::create_proxy;
+    use fuchsia_async as fasync;
     use fuchsia_inspect::{Inspector, InspectorConfig};
     use futures::task::Poll;
     use wlan_common::assert_variant;
     use wlan_common::test_utils::ExpectWithin;
-    use {fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     fn test_serve_phys_exits_when_watching_devices_fails() {

@@ -30,7 +30,7 @@ use tracing::{error, info, warn};
 use {
     fidl_fuchsia_element as felement, fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as fapp,
     fidl_fuchsia_ui_composition as fland, fidl_fuchsia_ui_pointer as fptr,
-    fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync, fuchsia_trace as trace, zx,
+    fidl_fuchsia_ui_views as fviews, fuchsia_async as fasync, fuchsia_trace as trace,
 };
 
 const IMAGE_COUNT: usize = 3;

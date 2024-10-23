@@ -9,9 +9,9 @@
 
 use anyhow::{Context, Error};
 use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_io as fio;
 use std::sync::Arc;
 use zx::AsHandleRef as _;
-use {fidl_fuchsia_io as fio, zx};
 
 /// A trait for opening filesystem nodes.
 pub trait Directory {

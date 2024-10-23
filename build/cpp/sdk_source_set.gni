@@ -24,10 +24,11 @@ import("//build/sdk/sdk_atom.gni")
 #     See //build/sdk/sdk_atom.gni.
 #
 #   api (optional)
-#     Path to the file representing the API of this library.
+#     Override path for the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
-#     explicitly acknowledged. It is mandatory for stable == true.
-#     Defaults to "<SDK name>.api".
+#     explicitly acknowledged.
+#     If not specified, the path will be "<sdk_name>.api".
+#     Not allowed when `stable` is false.
 #
 #   sdk_name (required for non-internal libraries)
 #     Name of the library in the SDK.
@@ -205,10 +206,7 @@ template("sdk_source_set") {
       deps += [ "//build/sdk:partner_idk_unstable_source_sets_allowlist" ]
     }
 
-    # TODO(https://fxbug.dev/42079584): Fix failures and remove exception.
-    if (invoker.category != "internal") {
-      configs += [ "//build/config:sdk_extra_warnings" ]
-    }
+    configs += [ "//build/config:sdk_extra_warnings" ]
 
     metadata = {
       if (defined(invoker.metadata)) {
@@ -401,6 +399,9 @@ template("sdk_source_set") {
     if (is_stable) {
       api = "${sdk_name}.api"
       if (defined(invoker.api)) {
+        assert(
+            rebase_path(invoker.api, "//") != rebase_path(api, "//"),
+            "The specified `api` file (`${invoker.api}`) matches the default. `api` only needs to be specified when overriding the default.")
         api = invoker.api
       }
 

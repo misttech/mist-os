@@ -5,7 +5,6 @@
 #![cfg(test)]
 
 use std::borrow::Cow;
-use std::convert::TryFrom as _;
 use std::pin::pin;
 
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
@@ -196,11 +195,10 @@ pub async fn setup_masquerade_nat_network<'a>(
     let updates = &[fnetfilter::Nat {
         proto: *nat_proto,
         src_subnet: *nat_src_subnet,
-        outgoing_nic: u32::try_from(match nat_outgoing_nic {
+        outgoing_nic: match nat_outgoing_nic {
             NatNic::RouterNic1 => router_ep1.id(),
             NatNic::RouterNic2 => router_ep2.id(),
-        })
-        .expect("NIC ID should fit in a u32"),
+        },
     }];
 
     let router_filter = router_realm

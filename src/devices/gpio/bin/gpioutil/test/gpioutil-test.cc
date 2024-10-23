@@ -80,16 +80,6 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     FAIL("Unknown method ordinal 0x%016lx", metadata.method_ordinal);
   }
 
-  void GetPin(GetPinCompleter::Sync& completer) override {
-    mock_get_pin_.Call();
-    completer.ReplySuccess(pin_);
-  }
-  void GetName(GetNameCompleter::Sync& completer) override {
-    mock_get_name_.Call();
-    completer.ReplySuccess(::fidl::StringView::FromExternal(name_));
-  }
-  void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override {}
-  void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override {}
   void Read(ReadCompleter::Sync& completer) override { completer.ReplySuccess(mock_read_.Call()); }
   void SetBufferMode(SetBufferModeRequestView request,
                      SetBufferModeCompleter::Sync& completer) override {
@@ -97,11 +87,8 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     completer.ReplySuccess();
   }
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {}
-  void SetDriveStrength(SetDriveStrengthRequestView request,
-                        SetDriveStrengthCompleter::Sync& completer) override {}
-  void GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) override {}
-  void GetInterrupt2(GetInterrupt2RequestView request,
-                     GetInterrupt2Completer::Sync& completer) override {
+  void GetInterrupt(GetInterruptRequestView request,
+                    GetInterruptCompleter::Sync& completer) override {
     if (client_got_interrupt_) {
       return completer.ReplyError(ZX_ERR_ALREADY_BOUND);
     }
@@ -122,8 +109,6 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     mock_get_interrupt_.Call();
     completer.ReplySuccess(std::move(interrupt));
   }
-  void GetInterrupt(GetInterruptRequestView request,
-                    GetInterruptCompleter::Sync& completer) override {}
   void ConfigureInterrupt(fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
                           ConfigureInterruptCompleter::Sync& completer) override {
     ASSERT_TRUE(request->config.has_mode());
@@ -138,8 +123,6 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     mock_release_interrupt_.Call();
     completer.ReplySuccess();
   }
-  void SetAltFunction(SetAltFunctionRequestView request,
-                      SetAltFunctionCompleter::Sync& completer) override {}
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
     FAIL("Unknown method ordinal 0x%016lx", metadata.method_ordinal);

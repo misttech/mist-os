@@ -246,12 +246,15 @@ load(
     "fuchsia_idk_repository",
 )
 
+# A repository that wraps //sdk:bazel_in_tree_idk in the Bazel graph.
+# This is not used at the moment, but prepares for a future CL where
+# this will become the input of @fuchsia_idk.
 fuchsia_idk_repository(
-    name = "fuchsia_idk",
-    idk_export_dir = "%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir,
+    name = "fuchsia_in_tree_idk",
+    idk_export_dir = "%s/sdk/exported/bazel_in_tree_idk" % ninja_output_dir,
     ninja_build_dir = ninja_output_dir,
     python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
-    content_hash_file = "//:fuchsia_build_generated/fuchsia_idk.hash",
+    content_hash_file = "//:fuchsia_build_generated/fuchsia_in_tree_idk.hash",
 )
 
 # buildifier: disable=load-on-top
@@ -265,7 +268,7 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
-    local_paths = ["%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir],
+    local_paths = ["%s/sdk/exported/bazel_in_tree_idk" % ninja_output_dir],
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_sdk.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
@@ -273,14 +276,17 @@ fuchsia_sdk_repository(
     buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
 )
 
+# A repository used to expose SDK atoms that are not yet ready to be
+# distributed to partners, but required by some Fuchsia in-tree targets.
+# TODO(https://fxbug.dev/333907192): Remove this
 fuchsia_sdk_repository(
     name = "internal_sdk",
-    local_paths = ["%s/sdk/exported/platform" % ninja_output_dir],
+    local_paths = ["%s/sdk/exported/bazel_internal_only_idk" % ninja_output_dir],
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/internal_sdk.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
     parent_sdk = "@fuchsia_sdk",
-    parent_sdk_local_paths = ["%s/sdk/exported/bazel_fuchsia_sdk_idk" % ninja_output_dir],
+    parent_sdk_local_paths = ["%s/sdk/exported/bazel_in_tree_idk" % ninja_output_dir],
     fuchsia_api_level_override = "HEAD",
 )
 

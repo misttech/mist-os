@@ -6,7 +6,6 @@ use crate::commands::types::*;
 use crate::commands::utils;
 use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
-use async_trait::async_trait;
 use diagnostics_data::{Inspect, InspectData};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use serde::Serialize;
@@ -42,11 +41,10 @@ pub struct SelectorsCommand {
     pub accessor: Option<String>,
 }
 
-#[async_trait]
 impl Command for SelectorsCommand {
     type Result = SelectorsResult;
 
-    async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
+    async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
         if self.selectors.is_empty() && self.manifest.is_none() {
             return Err(Error::invalid_arguments("Expected 1 or more selectors. Got zero."));
         }
@@ -57,9 +55,10 @@ impl Command for SelectorsCommand {
             provider,
         )
         .await?;
-        let selectors = utils::expand_selectors(selectors)?;
+        let selectors = utils::expand_selectors(selectors, None)?;
 
-        let mut results = provider.snapshot::<Inspect>(&self.accessor, &selectors).await?;
+        let mut results =
+            provider.snapshot::<Inspect>(&self.accessor, selectors.into_iter()).await?;
         for result in results.iter_mut() {
             if let Some(hierarchy) = &mut result.payload {
                 hierarchy.sort();

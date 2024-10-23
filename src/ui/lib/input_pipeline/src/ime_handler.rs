@@ -215,7 +215,7 @@ mod tests {
     use test_case::test_case;
     use {
         fidl_fuchsia_input as fidl_input, fidl_fuchsia_ui_input3 as fidl_ui_input3,
-        fuchsia_async as fasync, zx,
+        fuchsia_async as fasync,
     };
 
     fn handle_events(

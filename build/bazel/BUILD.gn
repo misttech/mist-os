@@ -69,12 +69,12 @@ action("generate_main_workspace") {
   ]
 
   # This dependency is needed to properly populate the @fuchsia_sdk repository.
-  deps = [ "//build/bazel/bazel_sdk:idk" ]
+  deps = [ "//sdk:bazel_in_tree_idk" ]
 
-  # This dependency is needed to properly populate the @internal_sdk repository
-  # used experimentally to migrate non-SDK GN targets to Bazel
+  # This dependency is needed to properly populate the @internal_sdk repository.
   # (see https://fxbug.dev/42063353).
-  deps += [ "//sdk:platform" ]
+  # TODO(https://fxbug.dev/333907192): Remove this.
+  deps += [ "//sdk:bazel_internal_only_idk" ]
 
   depfile = "${target_gen_dir}/${target_name}.d"
 
@@ -151,6 +151,32 @@ action("generate_fuchsia_sdk_repository") {
       },
     ]
   }
+
+  # This script invokes Bazel directly. Use console pool to prevent
+  # concurrent bazel invocations.
+  pool = "//:console($default_toolchain)"
+
+  # This cannot be hermetic as well since it creates a ton of
+  # files in the output base that cannot be listed in advance.
+  hermetic_deps = false
+}
+
+# Generate a symlink that points to the final version of the in-tree IDK
+# Nothing should depend on this directly, as it should only be used
+# to run the Bazel SDK Test suite, see //build/bazel_sdk/tests/README.md
+action("generate_final_fuchsia_in_tree_idk") {
+  script = "//build/bazel/scripts/generate-fuchsia-idk-symlink.py"
+  outputs = [ "$bazel_main_top_dir/fuchsia_in_tree_idk" ]
+  inputs = [ "${bazel_main_top_dir}/bazel" ]
+  deps = [ ":generate_main_workspace" ]
+  args = [
+    "--bazel-launcher",
+    rebase_path(inputs[0], root_build_dir),
+    "--target-label",
+    "@fuchsia_in_tree_idk//:final_idk",
+    "--output-symlink",
+    rebase_path(outputs[0], root_build_dir),
+  ]
 
   # This script invokes Bazel directly. Use console pool to prevent
   # concurrent bazel invocations.
@@ -298,6 +324,7 @@ group("bazel_action_allowlist") {
     "//src/devices/gpio/drivers/aml-gpio:bazel_package.bazel_build",
     "//src/devices/i2c/drivers/aml-i2c:aml-i2c-test-package.bazel_build",
     "//src/devices/i2c/drivers/aml-i2c:bazel_package.bazel_build",
+    "//src/devices/spmi/lib/hwreg-spmi:spmi-hwreg-test.bazel_build",
     "//src/devices/usb/drivers/aml-usb-phy:aml-usb-phy-test-package.bazel_build",
     "//src/devices/usb/drivers/aml-usb-phy:bazel_package.bazel_build",
     "//src/diagnostics/archivist/tests/pipeline_test:pipeline_test.bazel_build",

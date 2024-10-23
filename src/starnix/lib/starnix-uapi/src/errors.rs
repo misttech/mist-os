@@ -563,7 +563,7 @@ pub trait SourceContext<T, E> {
     /// Example:
     ///
     ///     let mount_point = system_task
-    ///         .lookup_path_from_root(mount_point)
+    ///         .lookup_path_from_root(locked, mount_point)
     ///         .with_source_context(|| {
     ///             format!("lookup path from root: {}", String::from_utf8_lossy(mount_point))
     ///         })?;

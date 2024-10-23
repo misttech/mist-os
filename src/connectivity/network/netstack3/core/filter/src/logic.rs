@@ -12,7 +12,7 @@ use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer};
 use packet_formats::ip::IpExt;
 
-use crate::conntrack::GetConnectionError;
+use crate::conntrack::{Connection, FinalizeConnectionError, GetConnectionError};
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext};
 use crate::matchers::InterfaceProperties;
 use crate::packets::{IpPacket, MaybeTransportPacket};
@@ -337,15 +337,21 @@ where
     {
         let Self(this) = self;
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
-            // There isn't going to be an existing connection in the metadata
-            // before this hook, so we don't have to look.
-            let conn =
-                match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
-                    Ok(c) => c,
-                    // TODO(https://fxbug.dev/328064909): Support configurable
-                    // dropping of invalid packets.
-                    Err(GetConnectionError::InvalidPacket(c)) => Some(c),
-                };
+            // There usually isn't going to be an existing connection in the metadata before
+            // this hook, but it's possible in the case of looped-back packets, so check for
+            // one first before looking in the conntrack table.
+            let conn = match metadata.take_conntrack_connection() {
+                Some(c) => Some(c),
+                None => {
+                    match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
+                    {
+                        Ok(c) => c,
+                        // TODO(https://fxbug.dev/328064909): Support configurable dropping of
+                        // invalid packets.
+                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                    }
+                }
+            };
 
             let mut verdict = match check_routines_for_ingress(
                 &state.installed_routines.get().ip.ingress,
@@ -410,8 +416,8 @@ where
                     match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
                     {
                         Ok(c) => c,
-                        // TODO(https://fxbug.dev/328064909): Support
-                        // configurable dropping of invalid packets.
+                        // TODO(https://fxbug.dev/328064909): Support configurable dropping of
+                        // invalid packets.
                         Err(GetConnectionError::InvalidPacket(c)) => Some(c),
                     }
                 }
@@ -444,10 +450,12 @@ where
                 }
 
                 match state.conntrack.finalize_connection(bindings_ctx, conn) {
-                    Ok(_) => {}
-                    // TODO(https://fxbug.dev/318717702): When implementing
-                    // NAT, errors should be handled.
-                    Err(_) => {}
+                    Ok((_inserted, _weak_conn)) => {}
+                    // If finalizing the connection would result in a conflict in the connection
+                    // tracking table, or if the table is at capacity, drop the packet.
+                    Err(FinalizeConnectionError::Conflict | FinalizeConnectionError::TableFull) => {
+                        return Verdict::Drop;
+                    }
                 }
             }
 
@@ -494,8 +502,8 @@ where
             let conn =
                 match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
                     Ok(c) => c,
-                    // TODO(https://fxbug.dev/328064909): Support configurable
-                    // dropping of invalid packets.
+                    // TODO(https://fxbug.dev/328064909): Support configurable dropping of invalid
+                    // packets.
                     Err(GetConnectionError::InvalidPacket(c)) => Some(c),
                 };
 
@@ -545,62 +553,69 @@ where
         M: FilterIpMetadata<I, BC>,
     {
         let Self(this) = self;
-        (
-            this.with_filter_state_and_nat_ctx(|state, core_ctx| {
-                let conn = match metadata.take_conntrack_connection() {
-                    Some(c) => Some(c),
-                    // It's possible that there won't be a connection in the metadata by this point;
-                    // this could be, for example, because the packet is for a protocol not tracked
-                    // by conntrack.
-                    None => {
-                        match state
-                            .conntrack
-                            .get_connection_for_packet_and_update(bindings_ctx, packet)
-                        {
-                            Ok(c) => c,
-                            // TODO(https://fxbug.dev/328064909): Support
-                            // configurable dropping of invalid packets.
-                            Err(GetConnectionError::InvalidPacket(c)) => Some(c),
-                        }
+        let verdict = this.with_filter_state_and_nat_ctx(|state, core_ctx| {
+            let conn = match metadata.take_conntrack_connection() {
+                Some(c) => Some(c),
+                // It's possible that there won't be a connection in the metadata by this point;
+                // this could be, for example, because the packet is for a protocol not tracked
+                // by conntrack.
+                None => {
+                    match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
+                    {
+                        Ok(c) => c,
+                        // TODO(https://fxbug.dev/328064909): Support configurable dropping of
+                        // invalid packets.
+                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
                     }
-                };
+                }
+            };
 
-                let verdict = match check_routines_for_hook(
-                    &state.installed_routines.get().ip.egress,
+            let verdict = match check_routines_for_hook(
+                &state.installed_routines.get().ip.egress,
+                packet,
+                Interfaces { ingress: None, egress: Some(interface) },
+            ) {
+                Verdict::Drop => return Verdict::Drop,
+                Verdict::Accept => Verdict::Accept,
+            };
+
+            if let Some(mut conn) = conn {
+                // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
+                // post-NAT, but in the same hook. Currently all filter routines are run before
+                // all NAT routines in the same hook.
+                match nat::perform_nat::<nat::EgressHook, _, _, _, _>(
+                    core_ctx,
+                    bindings_ctx,
+                    &state.conntrack,
+                    &mut conn,
+                    &state.installed_routines.get().nat.egress,
                     packet,
                     Interfaces { ingress: None, egress: Some(interface) },
                 ) {
                     Verdict::Drop => return Verdict::Drop,
-                    Verdict::Accept => Verdict::Accept,
-                };
-
-                if let Some(mut conn) = conn {
-                    // TODO(https://fxbug.dev/343683914): provide a way to run filter routines
-                    // post-NAT, but in the same hook. Currently all filter routines are run before
-                    // all NAT routines in the same hook.
-                    match nat::perform_nat::<nat::EgressHook, _, _, _, _>(
-                        core_ctx,
-                        bindings_ctx,
-                        &state.conntrack,
-                        &mut conn,
-                        &state.installed_routines.get().nat.egress,
-                        packet,
-                        Interfaces { ingress: None, egress: Some(interface) },
-                    ) {
-                        Verdict::Drop => return Verdict::Drop,
-                        Verdict::Accept => {}
-                    }
-
-                    match state.conntrack.finalize_connection(bindings_ctx, conn) {
-                        Ok(_) => {}
-                        // TODO(https://fxbug.dev/333419001): When implementing
-                        // NAT, errors should be handled.
-                        Err(_) => {}
-                    }
+                    Verdict::Accept => {}
                 }
 
-                verdict
-            }),
+                match state.conntrack.finalize_connection(bindings_ctx, conn) {
+                    Ok((_inserted, conn)) => {
+                        if let Some(conn) = conn {
+                            let res =
+                                metadata.replace_conntrack_connection(Connection::Shared(conn));
+                            debug_assert!(res.is_none());
+                        }
+                    }
+                    // If finalizing the connection would result in a conflict in the connection
+                    // tracking table, or if the table is at capacity, drop the packet.
+                    Err(FinalizeConnectionError::Conflict | FinalizeConnectionError::TableFull) => {
+                        return Verdict::Drop;
+                    }
+                }
+            }
+
+            verdict
+        });
+        (
+            verdict,
             ProofOfEgressCheck { _private_field_to_prevent_construction_outside_of_module: () },
         )
     }
@@ -740,23 +755,32 @@ pub mod testutil {
 
 #[cfg(test)]
 mod tests {
+    use alloc::collections::HashMap;
+    use alloc::sync::Arc;
     use alloc::vec;
     use alloc::vec::Vec;
+
+    use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
+    use derivative::Derivative;
     use ip_test_macro::ip_test;
     use net_types::ip::Ipv4;
-    use netstack3_base::SegmentHeader;
+    use netstack3_base::{IpDeviceAddr, SegmentHeader};
     use test_case::test_case;
 
     use super::*;
+    use crate::conntrack::Tuple;
     use crate::context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass};
     use crate::logic::nat::NatConfig;
     use crate::matchers::testutil::{ethernet_interface, wlan_interface, FakeDeviceId};
-    use crate::matchers::{InterfaceMatcher, PacketMatcher, PortMatcher, TransportProtocolMatcher};
-    use crate::packets::testutil::internal::{
-        ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt, TransportPacketExt,
+    use crate::matchers::{
+        AddressMatcher, AddressMatcherType, InterfaceMatcher, PacketMatcher, PortMatcher,
+        TransportProtocolMatcher,
     };
-    use crate::state::{IpRoutines, UninstalledRoutine};
+    use crate::packets::testutil::internal::{
+        ArbitraryValue, FakeIpPacket, FakeTcpSegment, FakeUdpPacket, TestIpExt, TransportPacketExt,
+    };
+    use crate::state::{IpRoutines, NatRoutines, UninstalledRoutine};
 
     impl<I: IpExt> Rule<I, FakeDeviceClass, ()> {
         pub(crate) fn new(
@@ -801,18 +825,35 @@ mod tests {
 
     struct NullMetadata {}
 
-    impl<I: IpExt, BC: FilterBindingsContext> FilterIpMetadata<I, BC> for NullMetadata {
-        fn take_conntrack_connection(
-            &mut self,
-        ) -> Option<crate::conntrack::Connection<I, BC, NatConfig>> {
+    impl<I: IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT> for NullMetadata {
+        fn take_conntrack_connection(&mut self) -> Option<Connection<I, BT, NatConfig>> {
             None
         }
 
         fn replace_conntrack_connection(
             &mut self,
-            _conn: crate::conntrack::Connection<I, BC, NatConfig>,
-        ) -> Option<crate::conntrack::Connection<I, BC, NatConfig>> {
+            _conn: Connection<I, BT, NatConfig>,
+        ) -> Option<Connection<I, BT, NatConfig>> {
             None
+        }
+    }
+
+    #[derive(Derivative)]
+    #[derivative(Default(bound = ""))]
+    struct PacketMetadata<I: IpExt, BT: FilterBindingsTypes>(Option<Connection<I, BT, NatConfig>>);
+
+    impl<I: IpExt, BT: FilterBindingsTypes> FilterIpMetadata<I, BT> for PacketMetadata<I, BT> {
+        fn take_conntrack_connection(&mut self) -> Option<Connection<I, BT, NatConfig>> {
+            let Self(inner) = self;
+            inner.take()
+        }
+
+        fn replace_conntrack_connection(
+            &mut self,
+            conn: Connection<I, BT, NatConfig>,
+        ) -> Option<Connection<I, BT, NatConfig>> {
+            let Self(inner) = self;
+            inner.replace(conn)
         }
     }
 
@@ -1306,5 +1347,119 @@ mod tests {
             &interface,
             &mut NullMetadata {},
         )
+    }
+
+    #[test]
+    fn ingress_reuses_cached_connection_when_available() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        let mut core_ctx = FakeCtx::new(&mut bindings_ctx);
+
+        // When a connection is finalized in the EGRESS hook, it should stash a shared
+        // reference to the connection in the packet metadata.
+        let mut packet = FakeIpPacket::<Ipv4, FakeUdpPacket>::arbitrary_value();
+        let mut metadata = PacketMetadata::default();
+        let (verdict, _proof) = FilterImpl(&mut core_ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut packet,
+            &ethernet_interface(),
+            &mut metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept);
+
+        // The stashed reference should point to the connection that is in the table.
+        let stashed =
+            metadata.take_conntrack_connection().expect("metadata should include connection");
+        let tuple = Tuple::from_packet(&packet).expect("packet should be trackable");
+        let table = core_ctx
+            .conntrack()
+            .get_connection(&tuple)
+            .expect("packet should be inserted in table");
+        assert_matches!(
+            (table, stashed),
+            (Connection::Shared(table), Connection::Shared(stashed)) => {
+                assert!(Arc::ptr_eq(&table, &stashed));
+            }
+        );
+
+        // Provided with the connection, the INGRESS hook should reuse it rather than
+        // creating a new one.
+        let verdict = FilterImpl(&mut core_ctx).ingress_hook(
+            &mut bindings_ctx,
+            &mut packet,
+            &ethernet_interface(),
+            &mut metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept.into());
+
+        // As a result, rather than there being a new connection in the packet metadata,
+        // it should contain the same connection that is still in the table.
+        let after_ingress =
+            metadata.take_conntrack_connection().expect("metadata should include connection");
+        let table = core_ctx
+            .conntrack()
+            .get_connection(&tuple)
+            .expect("packet should be inserted in table");
+        assert_matches!(
+            (table, after_ingress),
+            (Connection::Shared(before), Connection::Shared(after)) => {
+                assert!(Arc::ptr_eq(&before, &after));
+            }
+        );
+    }
+
+    #[ip_test(I)]
+    fn drop_packet_on_finalize_connection_failure<I: TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        let mut ctx = FakeCtx::with_nat_routines_and_device_addrs(
+            &mut bindings_ctx,
+            NatRoutines {
+                egress: Hook {
+                    routines: vec![Routine {
+                        rules: vec![Rule::new(
+                            PacketMatcher {
+                                src_address: Some(AddressMatcher {
+                                    matcher: AddressMatcherType::Range(I::SRC_IP_2..=I::SRC_IP_2),
+                                    invert: false,
+                                }),
+                                ..Default::default()
+                            },
+                            Action::Masquerade { src_port: None },
+                        )],
+                    }],
+                },
+                ..Default::default()
+            },
+            HashMap::from([(ethernet_interface(), IpDeviceAddr::new(I::SRC_IP).unwrap())]),
+        );
+
+        // Simulate a forwarded packet, originally from I::SRC_IP_2, that is masqueraded
+        // to be from I::SRC_IP. The packet should have had SNAT performed.
+        let mut packet = FakeIpPacket {
+            src_ip: I::SRC_IP_2,
+            dst_ip: I::DST_IP,
+            body: FakeUdpPacket::arbitrary_value(),
+        };
+        let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut packet,
+            &ethernet_interface(),
+            &mut NullMetadata {},
+        );
+        assert_eq!(verdict, Verdict::Accept);
+        assert_eq!(packet.src_ip, I::SRC_IP);
+
+        // Now simulate a locally-generated packet that conflicts with this flow; it is
+        // from I::SRC_IP to I::DST_IP and has the same source and destination ports.
+        // Finalizing the connection should fail and the packet should be dropped.
+        //
+        // TODO(https://fxbug.dev/372543214): once we remap source ports for locally-
+        // generated traffic, finalizing the connection should succeed.
+        let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value(),
+            &ethernet_interface(),
+            &mut NullMetadata {},
+        );
+        assert_eq!(verdict, Verdict::Drop);
     }
 }

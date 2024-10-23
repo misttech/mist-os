@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/testing/cc_test_executable.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
   testonly = true

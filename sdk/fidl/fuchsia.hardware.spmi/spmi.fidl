@@ -10,6 +10,10 @@ const MAX_SPMI_NAME_LEN uint32 = 64;
 /// The maximum number of bytes that can be read or written in a single Extended Long SPMI command.
 const MAX_EXTENDED_LONG_TRANSFER_SIZE uint32 = 8;
 
+/// An arbitrary limit on the number of register writes that can be returned to
+/// `WatchControllerWriteCommands()`.
+const MAX_CONTROLLER_WRITE_COMMANDS uint32 = 256;
+
 /// Errors that this driver may return.
 type DriverError = flexible enum {
     /// The driver encountered an otherwise unspecified error while performing the operation.
@@ -28,6 +32,18 @@ type DriverError = flexible enum {
     /// The device returned a NACK (negative Acknowledgment).
     /// The client may retry the operation after a NACK was sent for instance due to a parity error.
     IO_REFUSED = 5;
+
+    /// The hanging-get method was canceled.
+    CANCELED = 6;
+
+    /// No pending hanging-get method was found for the given arguments.
+    NOT_FOUND = 7;
+};
+
+/// A single register read from or written to with an SPMI command that uses an 8-bit address.
+type Register8 = struct {
+    address uint8;
+    data uint8;
 };
 
 /// Each instance of `Device` represents a target/secondary SPMI device on a SPMI bus.
@@ -66,6 +82,27 @@ open protocol Device {
         /// Optional.
         2: name string:MAX_SPMI_NAME_LEN;
     });
+
+    /// Hanging-get method to receive controller write commands from the device. `address` and
+    /// `size` specify the register range to monitor for commands. Multiple overlapping calls to
+    /// this method are not allowed.
+    /// Returns `INVALID_ARGS` if `address` or `size` are invalid, or `BAD_STATE` if another call
+    /// is pending for this register range. Returns `CANCELED` if
+    /// `CancelWatchControllerWriteCommands()` was called for this register range.
+    flexible WatchControllerWriteCommands(struct {
+        address uint8;
+        size uint16;
+    }) -> (struct {
+        writes vector<Register8>:MAX_CONTROLLER_WRITE_COMMANDS;
+    }) error DriverError;
+
+    /// Cancels an pending call to `WatchControllerWriteCommands`. `address` and `size` must
+    /// exactly match a previous call to `WatchControllerWriteCommands()`, otherwise `NOT_FOUND`
+    /// is returned.
+    flexible CancelWatchControllerWriteCommands(struct {
+        address uint8;
+        size uint16;
+    }) -> () error DriverError;
 };
 
 /// This service represents an SPMI target device. Clients have access to the entire SPMI register

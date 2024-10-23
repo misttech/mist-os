@@ -6,9 +6,12 @@
 //! internal representation of the configuration data found in
 //! `/config/data/display_configuration.json`.
 
+use std::sync::{Arc, Mutex};
+
 use serde::{Deserialize, Serialize};
 
 use crate::config::default_settings::DefaultSetting;
+use crate::inspect::config_logger::InspectConfigLogger;
 
 /// Possible theme modes that can be found in
 /// `/config/data/display_configuration.json`.
@@ -39,17 +42,22 @@ pub struct ThemeConfiguration {
     pub theme_type: ConfigurationThemeType,
 }
 
-pub fn build_display_default_settings() -> DefaultSetting<DisplayConfiguration, &'static str> {
-    DefaultSetting::new(None, "/config/data/display_configuration.json")
+pub fn build_display_default_settings(
+    config_logger: Arc<Mutex<InspectConfigLogger>>,
+) -> DefaultSetting<DisplayConfiguration, &'static str> {
+    DefaultSetting::new(None, "/config/data/display_configuration.json", config_logger)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use fuchsia_inspect::component;
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_display_configuration() {
-        let default_value = build_display_default_settings()
+        let config_logger =
+            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+        let default_value = build_display_default_settings(config_logger)
             .load_default_value()
             .expect("Invalid display configuration")
             .expect("Unable to parse configuration");

@@ -15,6 +15,7 @@
 namespace debug_agent {
 
 class DebugAgent;
+class DebuggedProcess;
 
 struct DebuggedJobCreateInfo {
   explicit DebuggedJobCreateInfo(std::unique_ptr<JobHandle> handle);
@@ -39,7 +40,16 @@ class DebuggedJob : public JobExceptionObserver {
     return *job_handle_;
   }
 
+  JobHandle& job_handle() {
+    FX_DCHECK(job_handle_);
+    return *job_handle_;
+  }
+
+  DebugAgent* debug_agent() const { return debug_agent_; }
+
   zx_koid_t koid() const { return job_handle_->GetKoid(); }
+
+  JobExceptionChannelType type() const { return type_; }
 
  private:
   // For access to the private JobExceptionObserver implementation below.
@@ -51,6 +61,8 @@ class DebuggedJob : public JobExceptionObserver {
   void OnUnhandledException(std::unique_ptr<ExceptionHandle> exception) override;
 
   std::unique_ptr<JobHandle> job_handle_ = nullptr;
+
+  JobExceptionChannelType type_;
 
   DebugAgent* debug_agent_ = nullptr;
 

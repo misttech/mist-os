@@ -12,7 +12,8 @@
 #include <inspector/inspector.h>
 #include <task-utils/walker.h>
 
-#include "src/developer/process_explorer/utils.h"
+#include "src/developer/process_explorer/process_data.h"
+#include "src/developer/process_explorer/task_hierarchy_data.h"
 #include "src/lib/fsl/socket/strings.h"
 
 namespace process_explorer {
@@ -87,6 +88,68 @@ zx_status_t GetProcessesData(std::vector<Process>* processes_data) {
   return ZX_OK;
 }
 
+class TaskHierachyWalker : public TaskEnumerator {
+ public:
+  TaskHierachyWalker() = default;
+  ~TaskHierachyWalker() = default;
+
+  zx_status_t WalkTaskHierachy(std::vector<Task>* tasks) {
+    FX_CHECK(tasks_.empty());
+
+    if (auto status = WalkRootJobTree(); status != ZX_OK) {
+      FX_LOGS(ERROR) << "Unable to walk job tree: " << zx_status_get_string(status);
+      return status;
+    }
+
+    *tasks = std::move(tasks_);
+    tasks_.clear();
+    return ZX_OK;
+  }
+
+  zx_status_t OnTask(int depth, zx_handle_t task_handle, zx_koid_t koid, zx_koid_t parent_koid,
+                     TaskType type) {
+    zx::unowned_handle task(task_handle);
+    char name[ZX_MAX_NAME_LEN];
+
+    if (auto status = task->get_property(ZX_PROP_NAME, &name, sizeof(name)); status != ZX_OK) {
+      FX_LOGS(ERROR) << "Unable to get task name: " << zx_status_get_string(status);
+      return status;
+    }
+
+    tasks_.push_back({depth, koid, parent_koid, type, std::string(name)});
+    return ZX_OK;
+  }
+
+  zx_status_t OnJob(int depth, zx_handle_t job, zx_koid_t koid, zx_koid_t parent_koid) override {
+    return OnTask(depth, job, koid, parent_koid, TaskType::Job);
+  }
+  zx_status_t OnProcess(int depth, zx_handle_t process, zx_koid_t koid,
+                        zx_koid_t parent_koid) override {
+    return OnTask(depth, process, koid, parent_koid, TaskType::Process);
+  }
+  zx_status_t OnThread(int depth, zx_handle_t thread, zx_koid_t koid,
+                       zx_koid_t parent_koid) override {
+    return OnTask(depth, thread, koid, parent_koid, TaskType::Thread);
+  }
+
+ protected:
+  bool has_on_job() const override { return true; }
+  bool has_on_process() const override { return true; }
+  bool has_on_thread() const override { return true; }
+
+ private:
+  std::vector<Task> tasks_;
+};
+
+zx_status_t GetTaskHierarchyData(std::vector<Task>* tasks_data) {
+  TaskHierachyWalker process_walker;
+  if (auto status = process_walker.WalkTaskHierachy(tasks_data); status != ZX_OK) {
+    FX_LOGS(ERROR) << "Unable to get task hierarchy data: " << zx_status_get_string(status);
+    return status;
+  }
+  return ZX_OK;
+}
+
 }  // namespace
 
 Explorer::Explorer(async_dispatcher_t* dispatcher, component::OutgoingDirectory& outgoing) {
@@ -112,6 +175,21 @@ void Explorer::WriteJsonProcessesData(WriteJsonProcessesDataRequest& request,
   }
 
   const std::string json_string = WriteProcessesDataAsJson(std::move(processes_data));
+
+  // TODO(https://fxbug.dev/42059896): change to asynchronous
+  fsl::BlockingCopyFromString(json_string, request.socket());
+}
+
+void Explorer::WriteJsonTaskHierarchyData(WriteJsonTaskHierarchyDataRequest& request,
+                                          WriteJsonTaskHierarchyDataCompleter::Sync& completer) {
+  std::vector<Task> tasks_data;
+  if (auto status = GetTaskHierarchyData(&tasks_data); status != ZX_OK) {
+    // Returning immediately. Nothing will have been written on the socket which will let the client
+    // know an error has occurred.
+    return;
+  }
+
+  const std::string json_string = WriteTaskHierarchyDataAsJson(std::move(tasks_data));
 
   // TODO(https://fxbug.dev/42059896): change to asynchronous
   fsl::BlockingCopyFromString(json_string, request.socket());
@@ -279,5 +357,13 @@ void Explorer::KillTask(KillTaskRequest& request, KillTaskCompleter::Sync& compl
   }
   completer.Reply(walker.KillTask(task));
 }
+
+void Explorer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_process_explorer::Query> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {}
+
+void Explorer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_process_explorer::ProcessExplorer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {}
 
 }  // namespace process_explorer

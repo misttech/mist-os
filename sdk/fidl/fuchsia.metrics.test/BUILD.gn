@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.metrics.test") {
-  sdk_category = "internal"
-
   sources = [ "query.test.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.metrics" ]

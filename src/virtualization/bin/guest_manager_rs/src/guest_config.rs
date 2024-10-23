@@ -10,10 +10,10 @@ use fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd};
 use fidl_fuchsia_virtualization::{
     BlockFormat, BlockMode, BlockSpec, GuestConfig, KernelType, MAX_BLOCK_DEVICE_ID,
 };
-use fuchsia_fs::{file, OpenFlags};
+use fuchsia_fs::{file, Flags};
 use serde::{de, Deserialize};
 use std::path::Path;
-use {fidl_fuchsia_io as fio, static_assertions as sa, zx};
+use {fidl_fuchsia_io as fio, static_assertions as sa};
 
 // Memory is specified by a string containing either a plain u64 value in bytes, or a u64
 // followed by an optional unit suffix.
@@ -83,9 +83,9 @@ struct JsonConfig<'a> {
 
 fn open_as_client_end<M: ProtocolMarker>(path: &str) -> Result<ClientEnd<M>, Error> {
     let (client_end, server_end) = fidl::Channel::create();
-    file::open_channel_in_namespace_deprecated(
+    file::open_channel_in_namespace(
         path,
-        OpenFlags::RIGHT_READABLE,
+        Flags::PERM_READ,
         ServerEnd::<fio::FileMarker>::new(server_end),
     )?;
     Ok(ClientEnd::<M>::new(client_end))
@@ -269,9 +269,9 @@ mod tests {
         let kernel_content = "this is not a kernel";
         let cfg = format!(r#"{{"linux": "kernel.img"}}"#,);
         // Create file to ensure error comes from missing directory.
-        let flinux = file::open_in_namespace_deprecated(
+        let flinux = file::open_in_namespace(
             linux.to_str().unwrap(),
-            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+            Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
         )
         .unwrap();
         flinux.write(kernel_content.as_bytes()).await.unwrap().unwrap();
@@ -312,9 +312,9 @@ mod tests {
         let fcontent = "hello, this is a test";
         let tmpdir = tempdir().unwrap();
         let fpath = tmpdir.path().join(&fname);
-        let tmpfile = file::open_in_namespace_deprecated(
+        let tmpfile = file::open_in_namespace(
             fpath.to_str().unwrap(),
-            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+            Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
         )?;
         tmpfile.write(fcontent.as_bytes()).await?.unwrap();
 
@@ -343,9 +343,9 @@ mod tests {
     "cpus": {cpus}}}"#,
         );
 
-        let flinux = file::open_in_namespace_deprecated(
+        let flinux = file::open_in_namespace(
             tmpdir.path().join(linux).to_str().unwrap(),
-            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+            Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
         )?;
         flinux.write(kernel_content.as_bytes()).await?.unwrap();
 
@@ -371,9 +371,9 @@ mod tests {
             .map(|fs| tmpdir.path().join(fs))
             .collect::<Vec<PathBuf>>();
         for fs in fss.iter() {
-            file::open_in_namespace_deprecated(
+            file::open_in_namespace(
                 fs.to_str().unwrap(),
-                OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+                Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
             )?;
         }
         let block1 = format!("{},ro,file", fss[0].to_str().unwrap());
@@ -398,9 +398,9 @@ mod tests {
         // Merge two configs without repeated fields.
         let tmpdir = tempdir().unwrap();
         let kernel = "kernel.img";
-        file::open_in_namespace_deprecated(
+        file::open_in_namespace(
             tmpdir.path().join(kernel).to_str().unwrap(),
-            OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+            Flags::PERM_WRITE | Flags::FLAG_MAYBE_CREATE,
         )?;
 
         let cfgbase = GuestConfig {

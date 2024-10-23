@@ -89,18 +89,18 @@ struct MsgHeader {
     return len;
   }
 
-  void Init(LogBuffer* buffer, FuchsiaLogSeverity severity) {
-    this->severity = severity;
+  void Init(LogBuffer* log_buffer, FuchsiaLogSeverity log_severity) {
+    this->severity = log_severity;
     user_tag = nullptr;
-    offset = reinterpret_cast<char*>(buffer->data());
+    offset = reinterpret_cast<char*>(log_buffer->data());
     first_tag = true;
     has_msg = false;
     first_kv = true;
     terminated = false;
   }
 
-  static MsgHeader* CreatePtr(LogBuffer* buffer) {
-    return reinterpret_cast<MsgHeader*>(buffer->record_state());
+  static MsgHeader* CreatePtr(LogBuffer* log_buffer) {
+    return reinterpret_cast<MsgHeader*>(log_buffer->record_state());
   }
 };
 

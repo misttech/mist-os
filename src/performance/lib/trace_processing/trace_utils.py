@@ -299,7 +299,7 @@ def adjust_to_common_process_start(
 
 
 def standard_metrics_set(
-    values: List[float],
+    values: List[int | float],
     label_prefix: str,
     unit: trace_metrics.Unit,
     percentiles: tuple[int, int, int, int, int] = (5, 25, 50, 75, 95),

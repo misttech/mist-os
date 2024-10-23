@@ -23,7 +23,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, trace, warn};
 use {
     fidl_fuchsia_location_sensor as fidl_location_sensor, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme, zx,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
 };
 
 mod fidl_conversion;
@@ -468,7 +468,7 @@ mod tests {
     use wlan_common::test_utils::fake_frames::fake_unknown_rsne;
     use wlan_common::test_utils::fake_stas::IesOverrides;
     use wlan_common::{assert_variant, fake_bss_description, random_fidl_bss_description};
-    use {fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync};
 
     fn active_sme_req(ssids: Vec<&str>, channels: Vec<u8>) -> fidl_sme::ScanRequest {
         fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
@@ -484,13 +484,13 @@ mod tests {
     struct FakeIfaceManager {
         pub sme_proxy: fidl_fuchsia_wlan_sme::ClientSmeProxy,
         pub wpa3_capable: bool,
-        pub defect_sender: mpsc::UnboundedSender<Defect>,
-        pub defect_receiver: mpsc::UnboundedReceiver<Defect>,
+        pub defect_sender: mpsc::Sender<Defect>,
+        pub defect_receiver: mpsc::Receiver<Defect>,
     }
 
     impl FakeIfaceManager {
         pub fn new(proxy: fidl_fuchsia_wlan_sme::ClientSmeProxy) -> Self {
-            let (defect_sender, defect_receiver) = mpsc::unbounded();
+            let (defect_sender, defect_receiver) = mpsc::channel(100);
             FakeIfaceManager {
                 sme_proxy: proxy,
                 wpa3_capable: true,
@@ -741,7 +741,7 @@ mod tests {
     fn sme_scan_with_passive_request() {
         let mut exec = fasync::TestExecutor::new();
         let (sme_proxy, mut sme_stream) = exec.run_singlethreaded(create_sme_proxy());
-        let (defect_sender, _) = mpsc::unbounded();
+        let (defect_sender, _) = mpsc::channel(100);
         let sme_proxy = SmeForScan::new(sme_proxy, 0, defect_sender);
 
         // Issue request to scan.
@@ -783,7 +783,7 @@ mod tests {
     fn sme_scan_with_active_request() {
         let mut exec = fasync::TestExecutor::new();
         let (sme_proxy, mut sme_stream) = exec.run_singlethreaded(create_sme_proxy());
-        let (defect_sender, _) = mpsc::unbounded();
+        let (defect_sender, _) = mpsc::channel(100);
         let sme_proxy = SmeForScan::new(sme_proxy, 0, defect_sender);
 
         // Issue request to scan.
@@ -831,7 +831,7 @@ mod tests {
     fn sme_channel_closed_while_awaiting_scan_results() {
         let mut exec = fasync::TestExecutor::new();
         let (sme_proxy, mut sme_stream) = exec.run_singlethreaded(create_sme_proxy());
-        let (defect_sender, _) = mpsc::unbounded();
+        let (defect_sender, _) = mpsc::channel(100);
         let sme_proxy = SmeForScan::new(sme_proxy, 0, defect_sender);
 
         // Issue request to scan.

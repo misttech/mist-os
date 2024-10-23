@@ -8,7 +8,7 @@ mod metrics;
 use anyhow::{bail, Error};
 use diagnostics::RequestId;
 use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
-use fasync::Duration;
+use fasync::MonotonicDuration;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker, ClientSelectorConfiguration,
     DataType, Format, SelectorArgument, StreamMode, StreamParameters,
@@ -27,7 +27,7 @@ use std::sync::LazyLock;
 use std::time::Instant;
 use tracing::{debug, error, info};
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
-use {fidl_fuchsia_test as ftest, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_test as ftest, fuchsia_async as fasync};
 
 // Ensure that only a single operation is running at a time.
 // Running multiple tests in parallel will give noisy benchmark results.
@@ -180,7 +180,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
         .add_selector(format!("{}:root", moniker))
         .retry(RetryConfig::never())
         .with_archive(proxy)
-        .with_timeout(Duration::from_seconds(15))
+        .with_timeout(MonotonicDuration::from_seconds(15))
         .snapshot::<Inspect>()
         .await?
     {
@@ -316,7 +316,7 @@ async fn get_test_cases(rid: RequestId) -> Result<Vec<ftest::Case>, Error> {
     for value in ArchiveReader::new()
         .retry(RetryConfig::never())
         .with_archive(proxy)
-        .with_timeout(Duration::from_seconds(60))
+        .with_timeout(MonotonicDuration::from_seconds(60))
         .snapshot::<Inspect>()
         .await?
     {

@@ -38,7 +38,7 @@ use starnix_uapi::user_address::{UserAddress, UserRef};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use {
     fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
-    fidl_fuchsia_ui_composition as fuicomp, vk_sys as vk, zx,
+    fidl_fuchsia_ui_composition as fuicomp, vk_sys as vk,
 };
 
 /// Reads a magma command and its type from user space.

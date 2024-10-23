@@ -7,15 +7,272 @@
 #![warn(missing_docs)]
 
 use bitfield::bitfield;
-use fidl_fuchsia_diagnostics_stream::RawSeverity;
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 use tracing::{Level, Metadata};
 
 pub use fidl_fuchsia_diagnostics::Severity;
-pub use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value, ValueUnknown};
 
+mod constants;
 pub mod encode;
 pub mod parse;
+
+/// A raw severity.
+pub type RawSeverity = u8;
+
+/// A log record.
+#[derive(Debug, PartialEq)]
+pub struct Record<'a> {
+    /// Time at which the log was emitted.
+    pub timestamp: zx::BootInstant,
+    /// The severity of the log.
+    pub severity: RawSeverity,
+    /// Arguments associated with the log.
+    pub arguments: Vec<Argument<'a>>,
+}
+
+impl Record<'_> {
+    /// Consumes the current value and returns one in the static lifetime.
+    pub fn into_owned(self) -> Record<'static> {
+        Record {
+            timestamp: self.timestamp,
+            severity: self.severity,
+            arguments: self.arguments.into_iter().map(|arg| arg.into_owned()).collect(),
+        }
+    }
+}
+
+/// An argument of the log record identified by a name and with an associated value.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Argument<'a> {
+    /// Process ID
+    Pid(zx::Koid),
+    /// Thread ID
+    Tid(zx::Koid),
+    /// A log tag
+    Tag(Cow<'a, str>),
+    /// Number of dropped logs
+    Dropped(u64),
+    /// A filename
+    File(Cow<'a, str>),
+    /// A log message
+    Message(Cow<'a, str>),
+    /// A line number in a file
+    Line(u64),
+    /// A custom argument with a given name and value
+    Other {
+        /// The name of the argument.
+        name: Cow<'a, str>,
+        /// The value of the argument.
+        value: Value<'a>,
+    },
+}
+
+impl<'a> Argument<'a> {
+    /// Creates a new argument given its name and a value.
+    pub fn new(name: impl Into<Cow<'a, str>>, value: impl Into<Value<'a>>) -> Self {
+        let name: Cow<'a, str> = name.into();
+        match (name.as_ref(), value.into()) {
+            (constants::PID, Value::UnsignedInt(pid)) => Self::pid(zx::Koid::from_raw(pid)),
+            (constants::TID, Value::UnsignedInt(pid)) => Self::tid(zx::Koid::from_raw(pid)),
+            (constants::TAG, Value::Text(tag)) => Self::tag(tag),
+            (constants::NUM_DROPPED, Value::UnsignedInt(dropped)) => Self::dropped(dropped),
+            (constants::FILE, Value::Text(file)) => Self::file(file),
+            (constants::LINE, Value::UnsignedInt(line)) => Self::line(line),
+            (constants::MESSAGE, Value::Text(msg)) => Self::message(msg),
+            (_, value) => Self::other(name, value),
+        }
+    }
+
+    #[inline]
+    /// Creates a new argument for a process id.
+    pub fn pid(koid: zx::Koid) -> Self {
+        Argument::Pid(koid)
+    }
+
+    #[inline]
+    /// Creates a new argument for a thread id.
+    pub fn tid(koid: zx::Koid) -> Self {
+        Argument::Tid(koid)
+    }
+
+    #[inline]
+    /// Creates a new argument for a log message.
+    pub fn message(message: impl Into<Cow<'a, str>>) -> Self {
+        Argument::Message(message.into())
+    }
+
+    #[inline]
+    /// Creates a new argument for a tag.
+    pub fn tag(value: impl Into<Cow<'a, str>>) -> Self {
+        Argument::Tag(value.into())
+    }
+
+    #[inline]
+    /// Creates a new argument for the number of dropped logs.
+    pub fn dropped(value: u64) -> Self {
+        Argument::Dropped(value)
+    }
+
+    #[inline]
+    /// Creates a new argument for a file.
+    pub fn file(value: impl Into<Cow<'a, str>>) -> Self {
+        Argument::File(value.into())
+    }
+
+    #[inline]
+    /// Creates a new argument for a line number.
+    pub fn line(value: u64) -> Self {
+        Argument::Line(value)
+    }
+
+    // We keep this private for the places where we know we don't need to interpret as a known
+    // field.
+    #[inline]
+    pub(crate) fn other(name: impl Into<Cow<'a, str>>, value: impl Into<Value<'a>>) -> Self {
+        Argument::Other { name: name.into(), value: value.into() }
+    }
+
+    /// Consumes the current value and returns one in the static lifetime.
+    pub fn into_owned(self) -> Argument<'static> {
+        match self {
+            Self::Pid(pid) => Argument::Pid(pid),
+            Self::Tid(tid) => Argument::Tid(tid),
+            Self::Tag(tag) => Argument::Tag(Cow::Owned(tag.into_owned())),
+            Self::Dropped(dropped) => Argument::Dropped(dropped),
+            Self::File(file) => Argument::File(Cow::Owned(file.into_owned())),
+            Self::Line(line) => Argument::Line(line),
+            Self::Message(msg) => Argument::Message(Cow::Owned(msg.into_owned())),
+            Self::Other { name, value } => {
+                Argument::Other { name: Cow::Owned(name.into_owned()), value: value.into_owned() }
+            }
+        }
+    }
+
+    /// Returns the name of the argument.
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Pid(_) => constants::PID,
+            Self::Tid(_) => constants::TID,
+            Self::Tag(_) => constants::TAG,
+            Self::Dropped(_) => constants::NUM_DROPPED,
+            Self::File(_) => constants::FILE,
+            Self::Line(_) => constants::LINE,
+            Self::Message(_) => constants::MESSAGE,
+            Self::Other { name, .. } => name.borrow(),
+        }
+    }
+
+    /// Returns the value of the argument.
+    pub fn value(&'a self) -> Value<'a> {
+        match self {
+            Self::Pid(pid) => Value::UnsignedInt(pid.raw_koid()),
+            Self::Tid(tid) => Value::UnsignedInt(tid.raw_koid()),
+            Self::Tag(tag) => Value::Text(Cow::Borrowed(tag.as_ref())),
+            Self::Dropped(num_dropped) => Value::UnsignedInt(*num_dropped),
+            Self::File(file) => Value::Text(Cow::Borrowed(file.as_ref())),
+            Self::Message(msg) => Value::Text(Cow::Borrowed(msg.as_ref())),
+            Self::Line(line) => Value::UnsignedInt(*line),
+            Self::Other { value, .. } => value.clone_borrowed(),
+        }
+    }
+}
+
+/// The value of a logging argument.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Value<'a> {
+    /// A signed integer value for a logging argument.
+    SignedInt(i64),
+    /// An unsigned integer value for a logging argument.
+    UnsignedInt(u64),
+    /// A floating point value for a logging argument.
+    Floating(f64),
+    /// A boolean value for a logging argument.
+    Boolean(bool),
+    /// A string value for a logging argument.
+    Text(Cow<'a, str>),
+}
+
+impl<'a> Value<'a> {
+    fn into_owned(self) -> Value<'static> {
+        match self {
+            Self::Text(s) => Value::Text(Cow::Owned(s.into_owned())),
+            Self::SignedInt(n) => Value::SignedInt(n),
+            Self::UnsignedInt(n) => Value::UnsignedInt(n),
+            Self::Floating(n) => Value::Floating(n),
+            Self::Boolean(n) => Value::Boolean(n),
+        }
+    }
+
+    fn clone_borrowed(&'a self) -> Value<'a> {
+        match self {
+            Self::Text(s) => Self::Text(Cow::Borrowed(s.as_ref())),
+            Self::SignedInt(n) => Self::SignedInt(*n),
+            Self::UnsignedInt(n) => Self::UnsignedInt(*n),
+            Self::Floating(n) => Self::Floating(*n),
+            Self::Boolean(n) => Self::Boolean(*n),
+        }
+    }
+}
+
+impl From<i32> for Value<'_> {
+    fn from(number: i32) -> Value<'static> {
+        Value::SignedInt(number as i64)
+    }
+}
+
+impl From<i64> for Value<'_> {
+    fn from(number: i64) -> Value<'static> {
+        Value::SignedInt(number)
+    }
+}
+
+impl From<u64> for Value<'_> {
+    fn from(number: u64) -> Value<'static> {
+        Value::UnsignedInt(number)
+    }
+}
+
+impl From<u32> for Value<'_> {
+    fn from(number: u32) -> Value<'static> {
+        Value::UnsignedInt(number as u64)
+    }
+}
+
+impl From<zx::Koid> for Value<'_> {
+    fn from(koid: zx::Koid) -> Value<'static> {
+        Value::UnsignedInt(koid.raw_koid())
+    }
+}
+
+impl From<f64> for Value<'_> {
+    fn from(number: f64) -> Value<'static> {
+        Value::Floating(number)
+    }
+}
+
+impl<'a> From<&'a str> for Value<'a> {
+    fn from(text: &'a str) -> Value<'a> {
+        Value::Text(Cow::Borrowed(text))
+    }
+}
+
+impl From<String> for Value<'static> {
+    fn from(text: String) -> Value<'static> {
+        Value::Text(Cow::Owned(text))
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for Value<'a> {
+    fn from(text: Cow<'a, str>) -> Value<'a> {
+        Value::Text(text)
+    }
+}
+
+impl From<bool> for Value<'static> {
+    fn from(boolean: bool) -> Value<'static> {
+        Value::Boolean(boolean)
+    }
+}
 
 /// The tracing format supports many types of records, we're sneaking in as a log message.
 const TRACING_FORMAT_LOG_RECORD_TYPE: u8 = 9;
@@ -108,46 +365,6 @@ impl TryFrom<u8> for ArgType {
     }
 }
 
-#[derive(Clone)]
-enum StringRef<'a> {
-    Empty,
-    Inline(Cow<'a, str>),
-}
-
-impl<'a> StringRef<'a> {
-    fn mask(&self) -> u16 {
-        match self {
-            StringRef::Empty => 0,
-            StringRef::Inline(s) => (s.len() as u16) | (1 << 15),
-        }
-    }
-
-    fn for_str(string: &'a str) -> Self {
-        match string.len() {
-            0 => StringRef::Empty,
-            _ => StringRef::Inline(Cow::Borrowed(string)),
-        }
-    }
-}
-
-impl<'a> From<StringRef<'a>> for String {
-    fn from(string: StringRef<'a>) -> String {
-        match string {
-            StringRef::Empty => String::new(),
-            StringRef::Inline(s) => s.to_string(),
-        }
-    }
-}
-
-impl std::fmt::Display for StringRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            StringRef::Empty => write!(f, ""),
-            StringRef::Inline(s) => write!(f, "{s}"),
-        }
-    }
-}
-
 /// A type which has a `Severity`.
 pub trait SeverityExt {
     /// Return the severity of this value.
@@ -219,34 +436,45 @@ impl FromSeverity for log::LevelFilter {
 mod tests {
     use super::*;
     use crate::encode::{Encoder, EncoderOpts, EncodingError, MutableBuffer};
-    use crate::parse::{parse_argument, try_parse_record, ParseResult};
-
+    use crate::parse::try_parse_record;
     use std::fmt::Debug;
     use std::io::Cursor;
 
+    fn parse_argument<'a>(bytes: &'a [u8]) -> (&'a [u8], Argument<'static>) {
+        let (remaining, decoded_from_full) =
+            nom::error::dbg_dmp(&crate::parse::parse_argument, "roundtrip")(bytes).unwrap();
+        (remaining, decoded_from_full.into_owned())
+    }
+
+    fn parse_record<'a>(bytes: &'a [u8]) -> (&'a [u8], Record<'static>) {
+        let (remaining, decoded_from_full) =
+            nom::error::dbg_dmp(&crate::parse::try_parse_record, "roundtrip")(bytes).unwrap();
+        (remaining, decoded_from_full.into_owned())
+    }
+
     const BUF_LEN: usize = 1024;
 
-    pub(crate) fn assert_roundtrips<T>(
+    pub(crate) fn assert_roundtrips<T, F>(
         val: T,
         encoder_method: impl Fn(&mut Encoder<Cursor<Vec<u8>>>, &T) -> Result<(), EncodingError>,
-        parser: impl Fn(&[u8]) -> ParseResult<'_, T>,
+        parser: F,
         canonical: Option<&[u8]>,
     ) where
         T: Debug + PartialEq,
+        F: Fn(&[u8]) -> (&[u8], T),
     {
         let mut encoder = Encoder::new(Cursor::new(vec![0; BUF_LEN]), EncoderOpts::default());
         encoder_method(&mut encoder, &val).unwrap();
 
         // next we'll parse the record out of a buf with padding after the record
-        let (_, decoded_from_full) =
-            nom::error::dbg_dmp(&parser, "roundtrip")(encoder.buf.get_ref()).unwrap();
+        let (_, decoded_from_full) = parser(encoder.buf.get_ref());
         assert_eq!(val, decoded_from_full, "decoded version with trailing padding must match");
 
         if let Some(canonical) = canonical {
             let recorded = encoder.buf.get_ref().split_at(canonical.len()).0;
             assert_eq!(canonical, recorded, "encoded repr must match the canonical value provided");
 
-            let (zero_buf, decoded) = nom::error::dbg_dmp(&parser, "roundtrip")(recorded).unwrap();
+            let (zero_buf, decoded) = parser(recorded);
             assert_eq!(val, decoded, "decoded version must match what we tried to encode");
             assert_eq!(zero_buf.len(), 0, "must parse record exactly out of provided buffer");
         }
@@ -272,13 +500,13 @@ mod tests {
     #[fuchsia::test]
     fn no_args_roundtrip() {
         let mut expected_record = MINIMAL_LOG_HEADER.to_le_bytes().to_vec();
-        let timestamp = 5_000_000i64;
-        expected_record.extend(timestamp.to_le_bytes());
+        let timestamp = zx::BootInstant::from_nanos(5_000_000i64);
+        expected_record.extend(timestamp.into_nanos().to_le_bytes());
 
         assert_roundtrips(
             Record { timestamp, severity: Severity::Info.into_primitive(), arguments: vec![] },
-            Encoder::write_record,
-            try_parse_record,
+            |encoder, val| encoder.write_record(val),
+            parse_record,
             Some(&expected_record),
         );
     }
@@ -286,8 +514,8 @@ mod tests {
     #[fuchsia::test]
     fn signed_arg_roundtrip() {
         assert_roundtrips(
-            Argument { name: String::from("signed"), value: Value::SignedInt(-1999) },
-            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
+            Argument::other("signed", -1999),
+            |encoder, val| encoder.write_argument(val),
             parse_argument,
             None,
         );
@@ -296,8 +524,8 @@ mod tests {
     #[fuchsia::test]
     fn unsigned_arg_roundtrip() {
         assert_roundtrips(
-            Argument { name: String::from("unsigned"), value: Value::UnsignedInt(42) },
-            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
+            Argument::other("unsigned", 42),
+            |encoder, val| encoder.write_argument(val),
             parse_argument,
             None,
         );
@@ -306,8 +534,8 @@ mod tests {
     #[fuchsia::test]
     fn text_arg_roundtrip() {
         assert_roundtrips(
-            Argument { name: String::from("stringarg"), value: Value::Text(String::from("owo")) },
-            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
+            Argument::other("stringarg", "owo"),
+            |encoder, val| encoder.write_argument(val),
             parse_argument,
             None,
         );
@@ -316,8 +544,8 @@ mod tests {
     #[fuchsia::test]
     fn float_arg_roundtrip() {
         assert_roundtrips(
-            Argument { name: String::from("float"), value: Value::Floating(3.25) },
-            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
+            Argument::other("float", 3.25),
+            |encoder, val| encoder.write_argument(val),
             parse_argument,
             None,
         );
@@ -326,8 +554,8 @@ mod tests {
     #[fuchsia::test]
     fn bool_arg_roundtrip() {
         assert_roundtrips(
-            Argument { name: String::from("bool"), value: Value::Boolean(false) },
-            |encoder, val| encoder.write_argument(crate::encode::Argument::from(val)),
+            Argument::other("bool", false),
+            |encoder, val| encoder.write_argument(val),
             parse_argument,
             None,
         );
@@ -337,21 +565,18 @@ mod tests {
     fn arg_of_each_type_roundtrips() {
         assert_roundtrips(
             Record {
-                timestamp: zx::BootInstant::get().into_nanos(),
+                timestamp: zx::BootInstant::get(),
                 severity: Severity::Warn.into_primitive(),
                 arguments: vec![
-                    Argument { name: String::from("signed"), value: Value::SignedInt(-10) },
-                    Argument { name: String::from("unsigned"), value: Value::SignedInt(7) },
-                    Argument { name: String::from("float"), value: Value::Floating(3.25) },
-                    Argument { name: String::from("bool"), value: Value::Boolean(true) },
-                    Argument {
-                        name: String::from("msg"),
-                        value: Value::Text(String::from("test message one")),
-                    },
+                    Argument::other("signed", -10),
+                    Argument::other("unsigned", 7),
+                    Argument::other("float", 3.25),
+                    Argument::other("bool", true),
+                    Argument::other("msg", "test message one"),
                 ],
             },
-            Encoder::write_record,
-            try_parse_record,
+            |encoder, val| encoder.write_record(val),
+            parse_record,
             None,
         );
     }
@@ -360,25 +585,16 @@ mod tests {
     fn multiple_string_args() {
         assert_roundtrips(
             Record {
-                timestamp: zx::BootInstant::get().into_nanos(),
+                timestamp: zx::BootInstant::get(),
                 severity: Severity::Trace.into_primitive(),
                 arguments: vec![
-                    Argument {
-                        name: String::from("msg"),
-                        value: Value::Text(String::from("test message one")),
-                    },
-                    Argument {
-                        name: String::from("msg2"),
-                        value: Value::Text(String::from("test message two")),
-                    },
-                    Argument {
-                        name: String::from("msg3"),
-                        value: Value::Text(String::from("test message three")),
-                    },
+                    Argument::other("msg", "test message one"),
+                    Argument::other("msg", "test message two"),
+                    Argument::other("msg", "test message three"),
                 ],
             },
-            Encoder::write_record,
-            try_parse_record,
+            |encoder, val| encoder.write_record(val),
+            parse_record,
             None,
         );
     }
@@ -392,13 +608,7 @@ mod tests {
         header.set_size_words(0); // invalid, should be at least 2 as header and time are included
         encoder.buf.put_u64_le(header.0).unwrap();
         encoder.buf.put_i64_le(zx::BootInstant::get().into_nanos()).unwrap();
-        encoder
-            .write_argument(crate::encode::Argument {
-                name: "msg",
-                value: crate::encode::Value::Text("test message one"),
-            })
-            .unwrap();
-
+        encoder.write_argument(Argument::other("msg", "test message one")).unwrap();
         assert!(try_parse_record(encoder.buf.get_ref()).is_err());
     }
 }

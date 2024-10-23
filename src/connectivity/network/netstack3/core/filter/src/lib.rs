@@ -23,7 +23,9 @@ use logic::nat::NatConfig;
 pub type ConntrackConnection<I, BT> = conntrack::Connection<I, BT, NatConfig>;
 
 pub use api::FilterApi;
-pub use conntrack::{Table, Tuple};
+pub use conntrack::{
+    Table, TransportProtocol, Tuple, WeakConnection as WeakConntrackConnection, WeakConnectionError,
+};
 pub use context::{
     FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext, NatContext,
 };

@@ -12,16 +12,14 @@ use fidl_fuchsia_device::ControllerProxy;
 use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerProxy};
 use fidl_fuchsia_hardware_block_volume::VolumeProxy;
+use fidl_fuchsia_io as fio;
 use fs_management::filesystem::BlockConnector;
 use fs_management::format::DiskFormat;
-use {fidl_fuchsia_io as fio, zx};
 
 /// Fetches a FIDL proxy for accessing zxcrypt management protocol for a given Device.
 async fn device_to_device_manager_proxy(device: &dyn Device) -> Result<DeviceManagerProxy, Error> {
-    let controller = fuchsia_fs::directory::open_in_namespace_deprecated(
-        device.topological_path(),
-        fio::OpenFlags::empty(),
-    )?;
+    let controller =
+        fuchsia_fs::directory::open_in_namespace(device.topological_path(), fio::Flags::empty())?;
     let zxcrypt = recursive_wait_and_open::<DeviceManagerMarker>(&controller, "zxcrypt")
         .await
         .context("waiting for zxcrypt device")?;

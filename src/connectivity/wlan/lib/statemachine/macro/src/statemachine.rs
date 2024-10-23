@@ -9,7 +9,6 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Error, Formatter};
 use syn::parse::{Parse, ParseBuffer};
-use syn::parse_macro_input::parse;
 use syn::punctuated::Punctuated;
 use syn::{
     bracketed, parenthesized, token, AngleBracketedGenericArguments, Attribute, GenericArgument,
@@ -227,7 +226,7 @@ fn merge_generic_args(state_list: &[&StateArgs]) -> TokenStream2 {
 // TODO: Transitions can be specified multiple times
 pub fn process(input: TokenStream) -> TokenStream {
     // Parse macro input.
-    let args: StateMachineArgs = parse(input).expect("error processing macro");
+    let args = syn::parse_macro_input!(input as StateMachineArgs);
 
     // Ensure that each state uses only one set of generic parameters.
     let mut generics = BTreeMap::<Ident, StateArgs>::new();

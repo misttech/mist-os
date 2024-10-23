@@ -858,32 +858,6 @@ promise<void, zx_status_t> Driver::GetDeviceInfo() {
 
   std::vector<promise<void, zx_status_t>> promises;
 
-  // Get our topological path from our default parent.
-  bridge<void, zx_status_t> topo_bridge;
-  parent_client_->GetTopologicalPath().Then(
-      [this, completer = std::move(topo_bridge.completer)](
-          fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetTopologicalPath>&
-              result) mutable {
-        if (!result.ok()) {
-          FDF_LOGL(ERROR, *logger_, "Failed to get topo path %s",
-                   zx_status_get_string(result.status()));
-          return;
-        }
-        auto* response = result.Unwrap();
-        auto topological_path = std::string(response->path.data(), response->path.size());
-        // If we are a composite then we have to add the name of our composite device
-        // to our primary parent. The composite device's name is the node_name handed
-        // to us.
-        if (IsComposite()) {
-          topological_path.append("/");
-          topological_path.append(node_name().value());
-        }
-        device_.set_topological_path(std::move(topological_path));
-        completer.complete_ok();
-      });
-
-  promises.push_back(topo_bridge.consumer.promise_or(error(ZX_ERR_INTERNAL)));
-
   // Get our metadata from our fragments if we are a composite,
   // or our primary parent.
   if (IsComposite()) {

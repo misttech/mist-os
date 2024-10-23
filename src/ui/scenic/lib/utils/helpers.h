@@ -12,6 +12,8 @@
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/zx/event.h>
 
+#include "fuchsia/images2/cpp/fidl.h"
+
 namespace utils {
 
 using SysmemTokens = struct {
@@ -54,9 +56,9 @@ fuchsia::sysmem2::AllocatorSyncPtr CreateSysmemAllocatorSyncPtr(
 SysmemTokens CreateSysmemTokens(fuchsia::sysmem2::Allocator_Sync* sysmem_allocator);
 
 // Creates default constraints for |buffer_collection|
-fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints(uint32_t buffer_count,
-                                                                       uint32_t kWidth,
-                                                                       uint32_t kHeight);
+fuchsia::sysmem2::BufferCollectionConstraints CreateDefaultConstraints(
+    uint32_t buffer_count, uint32_t kWidth, uint32_t kHeight,
+    fuchsia::images2::PixelFormat format = fuchsia::images2::PixelFormat::B8G8R8A8);
 
 // Accounts for floating point rounding errors.
 bool RectFContainsPoint(const fuchsia::math::RectF& rect, float x, float y);

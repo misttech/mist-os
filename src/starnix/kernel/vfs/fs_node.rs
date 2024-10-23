@@ -602,6 +602,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// initialize is called.
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -1034,6 +1035,7 @@ macro_rules! fs_node_impl_not_dir {
     () => {
         fn lookup(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
             _name: &starnix_core::vfs::FsStr,
@@ -1370,19 +1372,24 @@ impl FsNode {
         }
     }
 
-    pub fn lookup(
+    pub fn lookup<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.check_access(
             current_task,
             mount,
             Access::EXEC,
             CheckAccessReason::InternalPermissionChecks,
         )?;
-        self.ops().lookup(self, current_task, name)
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().lookup(&mut locked, self, current_task, name)
     }
 
     pub fn mknod<L>(
@@ -1405,13 +1412,26 @@ impl FsNode {
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,
         )?;
+        if mode.is_reg() {
+            security::check_fs_node_create_access(current_task, self, mode)?;
+        } else if mode.is_dir() {
+            // Even though the man page for mknod(2) says that mknod "cannot be used to create
+            // directories" in starnix the mkdir syscall (`sys_mkdirat`) ends up calling mknod.
+            security::check_fs_node_mkdir_access(current_task, self, mode)?;
+        } else if !matches!(
+            mode.fmt(),
+            FileMode::IFCHR | FileMode::IFBLK | FileMode::IFIFO | FileMode::IFSOCK
+        ) {
+            security::check_fs_node_mknod_access(current_task, self, mode, dev)?;
+        }
+
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
 
         let new_node = if mode.is_dir() {
             let mut locked = locked.cast_locked::<FileOpsCore>();
             self.ops().mkdir(&mut locked, self, current_task, name, mode, owner)?
         } else {
-            // https://man7.org/linux/man-pages/man2/mknod.2.html says:
+            // https://man7.org/linux/man-pages/man2/mknod.2.html says on error EPERM:
             //
             //   mode requested creation of something other than a regular
             //   file, FIFO (named pipe), or UNIX domain socket, and the
@@ -1450,6 +1470,8 @@ impl FsNode {
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,
         )?;
+        security::check_fs_node_symlink_access(current_task, self, target)?;
+
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let new_node =
             self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)?;

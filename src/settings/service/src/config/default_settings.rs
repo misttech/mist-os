@@ -3,18 +3,16 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use fuchsia_async as fasync;
-use futures::lock::Mutex;
 use serde::de::DeserializeOwned;
 use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::config;
 use crate::config::base::ConfigLoadInfo;
-use crate::inspect::config_logger::{InspectConfigLogger, InspectConfigLoggerHandle};
+use crate::inspect::config_logger::InspectConfigLogger;
 
 pub struct DefaultSetting<T, P>
 where
@@ -32,14 +30,12 @@ where
     T: DeserializeOwned + Clone + std::fmt::Debug,
     P: AsRef<Path> + Display,
 {
-    pub fn new(default_value: Option<T>, config_file_path: P) -> Self {
-        let inspect_config_logger_handle = InspectConfigLoggerHandle::new();
-        DefaultSetting {
-            default_value,
-            config_file_path,
-            cached_value: None,
-            config_logger: inspect_config_logger_handle.logger,
-        }
+    pub fn new(
+        default_value: Option<T>,
+        config_file_path: P,
+        config_logger: Arc<Mutex<InspectConfigLogger>>,
+    ) -> Self {
+        DefaultSetting { default_value, config_file_path, cached_value: None, config_logger }
     }
 
     /// Returns the value of this setting. Loads the value from storage if it hasn't been loaded
@@ -119,11 +115,7 @@ where
         path: String,
         config_load_info: config::base::ConfigLoadInfo,
     ) {
-        let config_logger = self.config_logger.clone();
-        fasync::Task::spawn(async move {
-            config_logger.lock().await.write_config_load_to_inspect(path, config_load_info);
-        })
-        .detach();
+        self.config_logger.lock().unwrap().write_config_load_to_inspect(path, config_load_info);
     }
 }
 
@@ -137,6 +129,7 @@ pub(crate) mod testing {
     use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_async::TestExecutor;
+    use fuchsia_inspect::component;
     use serde::Deserialize;
     use zx::MonotonicInstant;
 
@@ -150,6 +143,7 @@ pub(crate) mod testing {
         let mut setting = DefaultSetting::new(
             Some(TestConfigData { value: 3 }),
             "/config/data/fake_config_data.json",
+            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
         );
 
         assert_eq!(
@@ -163,13 +157,18 @@ pub(crate) mod testing {
         let mut setting = DefaultSetting::new(
             Some(TestConfigData { value: 3 }),
             "/config/data/fake_invalid_config_data.json",
+            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
         );
         assert!(setting.load_default_value().is_err());
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_load_invalid_config_file_path() {
-        let mut setting = DefaultSetting::new(Some(TestConfigData { value: 3 }), "nuthatch");
+        let mut setting = DefaultSetting::new(
+            Some(TestConfigData { value: 3 }),
+            "nuthatch",
+            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
+        );
 
         assert_eq!(
             setting.load_default_value().expect("Failed to get default value").unwrap().value,
@@ -179,14 +178,22 @@ pub(crate) mod testing {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_load_default_none() {
-        let mut setting = DefaultSetting::<TestConfigData, &str>::new(None, "nuthatch");
+        let mut setting = DefaultSetting::<TestConfigData, &str>::new(
+            None,
+            "nuthatch",
+            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
+        );
 
         assert!(setting.load_default_value().expect("Failed to get default value").is_none());
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_no_inspect_write() {
-        let mut setting = DefaultSetting::<TestConfigData, &str>::new(None, "nuthatch");
+        let mut setting = DefaultSetting::<TestConfigData, &str>::new(
+            None,
+            "nuthatch",
+            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
+        );
 
         assert!(setting.load_default_value().expect("Failed to get default value").is_none());
     }
@@ -197,7 +204,12 @@ pub(crate) mod testing {
 
         let mut executor = TestExecutor::new_with_fake_time();
 
-        let mut setting = DefaultSetting::new(Some(TestConfigData { value: 3 }), "nuthatch");
+        let inspector = component::inspector();
+        let mut setting = DefaultSetting::new(
+            Some(TestConfigData { value: 3 }),
+            "nuthatch",
+            Arc::new(Mutex::new(InspectConfigLogger::new(inspector.root()))),
+        );
         let load_result = move_executor_forward_and_get(
             &mut executor,
             async { setting.load_default_value() },
@@ -205,15 +217,6 @@ pub(crate) mod testing {
         );
 
         assert_matches!(load_result, Ok(Some(TestConfigData { value: 3 })));
-
-        let logger_handle = InspectConfigLoggerHandle::new();
-        let lock_future = logger_handle.logger.lock();
-        let inspector = move_executor_forward_and_get(
-            &mut executor,
-            lock_future,
-            "Couldn't get inspect logger lock",
-        )
-        .inspector;
         assert_data_tree!(inspector, root: {
             config_loads: {
                 "nuthatch": {

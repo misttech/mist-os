@@ -14,13 +14,13 @@ use fidl_fuchsia_net_filter_ext::{
 use fuchsia_async::DurationExt as _;
 use {
     fidl_fuchsia_net_filter as fnet_filter,
-    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated, zx,
+    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
 };
 
 use anyhow::{bail, Context as _};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
-use crate::{exit_with_fidl_error, FilterConfig, InterfaceType};
+use crate::{exit_with_fidl_error, FilterConfig, InterfaceId, InterfaceType};
 
 // A container to dispatch filtering functions depending on the
 // filtering API present.
@@ -202,7 +202,7 @@ fn generate_initial_filter_changes(
 fn generate_updated_filter_rules(
     uninstalled_ip_routines: &netfilter::parser::FilterRoutines,
     installed_ip_routines: &netfilter::parser::FilterRoutines,
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     current_installed_rule_index: u32,
 ) -> Vec<fnet_filter_ext::Rule> {
     let netfilter::parser::FilterRoutines {
@@ -248,17 +248,22 @@ fn generate_updated_filter_rules(
 fn create_interface_matching_jump_rule(
     routine_id: RoutineId,
     index: u32,
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     hook: IpHook,
     target_routine_name: &str,
 ) -> fnet_filter_ext::Rule {
     // Some matchers cannot be used on all `IpHook`s.
     let (in_interface, out_interface) = match hook {
-        IpHook::LocalIngress | IpHook::Ingress => (Some(InterfaceMatcher::Id(interface_id)), None),
-        IpHook::LocalEgress | IpHook::Egress => (None, Some(InterfaceMatcher::Id(interface_id))),
-        IpHook::Forwarding => {
-            (Some(InterfaceMatcher::Id(interface_id)), Some(InterfaceMatcher::Id(interface_id)))
+        IpHook::LocalIngress | IpHook::Ingress => {
+            (Some(InterfaceMatcher::Id(interface_id.into())), None)
         }
+        IpHook::LocalEgress | IpHook::Egress => {
+            (None, Some(InterfaceMatcher::Id(interface_id.into())))
+        }
+        IpHook::Forwarding => (
+            Some(InterfaceMatcher::Id(interface_id.into())),
+            Some(InterfaceMatcher::Id(interface_id.into())),
+        ),
     };
 
     // Full path qualification is preferred where types can get mistaken
@@ -369,14 +374,33 @@ async fn update_filters_deprecated(
     Ok(())
 }
 
+#[derive(Debug)]
+struct MasqueradeCounter(NonZeroU64);
+
+impl MasqueradeCounter {
+    fn new() -> Self {
+        Self(NonZeroU64::new(1).unwrap())
+    }
+
+    fn increment(&mut self) {
+        *self = Self(self.0.checked_add(1).expect("integer_overflow on u64"));
+    }
+
+    fn decrement(&self) -> Option<Self> {
+        NonZeroU64::new(self.0.get() - 1).map(Self)
+    }
+}
+
 #[derive(Debug, Default)]
 pub(super) struct FilterEnabledState {
     interface_types: HashSet<InterfaceType>,
-    masquerade_enabled_interface_ids: HashSet<NonZeroU64>,
+    // A map of interface ID to the number of active masquerade configurations
+    // applied on that interface.
+    masquerade_enabled_interface_ids: HashMap<InterfaceId, MasqueradeCounter>,
     // Indexed by interface id and stores `RuleId`s inserted for that interface.
     // All rules for an interface should be removed upon interface removal.
     // Vec will always be empty when using filter.deprecated.
-    currently_enabled_interfaces: HashMap<NonZeroU64, Vec<RuleId>>,
+    currently_enabled_interfaces: HashMap<InterfaceId, Vec<RuleId>>,
 }
 
 impl FilterEnabledState {
@@ -393,7 +417,7 @@ impl FilterEnabledState {
     pub(super) async fn maybe_update(
         &mut self,
         interface_type: Option<InterfaceType>,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         filter: &mut FilterControl,
     ) -> Result<(), anyhow::Error> {
         match filter {
@@ -412,7 +436,7 @@ impl FilterEnabledState {
     >(
         &mut self,
         interface_type: Option<InterfaceType>,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         filter: &Filter,
     ) -> Result<(), fnet_filter_deprecated::EnableDisableInterfaceError> {
         let should_be_enabled = self.should_enable(interface_type, interface_id);
@@ -425,7 +449,7 @@ impl FilterEnabledState {
                     .await
                     .unwrap_or_else(|err| exit_with_fidl_error(err))
                 {
-                    error!("failed to enable interface {interface_id}: {e:?}");
+                    warn!("failed to enable interface {interface_id}: {e:?}");
                     return Err(e);
                 }
                 let _ = entry.insert(vec![]);
@@ -436,7 +460,7 @@ impl FilterEnabledState {
                     .await
                     .unwrap_or_else(|err| exit_with_fidl_error(err))
                 {
-                    error!("failed to disable interface {interface_id}: {e:?}");
+                    warn!("failed to disable interface {interface_id}: {e:?}");
                     return Err(e);
                 }
                 let _ = entry.remove();
@@ -452,7 +476,7 @@ impl FilterEnabledState {
     pub(super) async fn maybe_update_current(
         &mut self,
         interface_type: Option<InterfaceType>,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         filter: &mut FilterState,
     ) -> Result<(), anyhow::Error> {
         let should_be_enabled = self.should_enable(interface_type, interface_id);
@@ -542,7 +566,7 @@ impl FilterEnabledState {
     fn should_enable(
         &self,
         interface_type: Option<InterfaceType>,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
     ) -> bool {
         interface_type
             .as_ref()
@@ -557,15 +581,34 @@ impl FilterEnabledState {
                 }
             })
             .unwrap_or(false)
-            || self.masquerade_enabled_interface_ids.contains(&interface_id)
+            || self.masquerade_enabled_interface_ids.contains_key(&interface_id)
     }
 
-    pub(crate) fn enable_masquerade_interface_id(&mut self, interface_id: NonZeroU64) {
-        let _: bool = self.masquerade_enabled_interface_ids.insert(interface_id);
+    pub(crate) fn increment_masquerade_count_on_interface(&mut self, interface_id: InterfaceId) {
+        match self.masquerade_enabled_interface_ids.entry(interface_id) {
+            Entry::Vacant(entry) => {
+                let _new_count = entry.insert(MasqueradeCounter::new());
+            }
+            Entry::Occupied(mut entry) => entry.get_mut().increment(),
+        }
     }
 
-    pub(crate) fn disable_masquerade_interface_id(&mut self, interface_id: NonZeroU64) {
-        let _: bool = self.masquerade_enabled_interface_ids.remove(&interface_id);
+    pub(crate) fn decrement_masquerade_count_on_interface(&mut self, interface_id: InterfaceId) {
+        match self.masquerade_enabled_interface_ids.entry(interface_id) {
+            Entry::Vacant(_) => panic!(
+                "asked to decrement the masquerade count for a non-configured interface: {}",
+                interface_id
+            ),
+            Entry::Occupied(mut entry) => match entry.get().decrement() {
+                // Subtraction made the count 0; remove it.
+                None => {
+                    let _old_count = entry.remove();
+                }
+                Some(count) => {
+                    let _old_count = entry.insert(count);
+                }
+            },
+        }
     }
 }
 
@@ -579,7 +622,7 @@ mod tests {
 
     use super::*;
 
-    const INTERFACE_ID: NonZeroU64 = const_unwrap_option(NonZeroU64::new(1));
+    const INTERFACE_ID: InterfaceId = const_unwrap_option(InterfaceId::new(1));
     const LOCAL_INGRESS: &str = "local_ingress";
     const UNINSTALLED_LOCAL_INGRESS: &str = "local_ingress_uninstalled";
     const LOCAL_EGRESS: &str = "local_egress";
@@ -761,7 +804,7 @@ mod tests {
             [InterfaceType::WlanClient].iter().cloned().collect();
         let types_ap: HashSet<InterfaceType> = [InterfaceType::WlanAp].iter().cloned().collect();
 
-        let id = const_unwrap_option(NonZeroU64::new(10));
+        let id = const_unwrap_option(InterfaceId::new(10));
 
         let make_info = |device_class| DeviceInfoRef {
             device_class,
@@ -773,12 +816,12 @@ mod tests {
         let wlan_ap_info = make_info(DeviceClass::WlanAp);
         let ethernet_info = make_info(DeviceClass::Ethernet);
 
-        let mut fes = FilterEnabledState::new(types_empty);
+        let mut fes = FilterEnabledState::new(types_empty.clone());
         assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), false);
         assert_eq!(fes.should_enable(Some(wlan_ap_info.interface_type()), id), false);
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), false);
 
-        fes.enable_masquerade_interface_id(id);
+        fes.increment_masquerade_count_on_interface(id);
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
 
         let mut fes = FilterEnabledState::new(types_ethernet);
@@ -786,7 +829,7 @@ mod tests {
         assert_eq!(fes.should_enable(Some(wlan_ap_info.interface_type()), id), false);
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
 
-        fes.enable_masquerade_interface_id(id);
+        fes.increment_masquerade_count_on_interface(id);
         assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), true);
 
         let mut fes = FilterEnabledState::new(types_wlan);
@@ -794,7 +837,7 @@ mod tests {
         assert_eq!(fes.should_enable(Some(wlan_ap_info.interface_type()), id), true);
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), false);
 
-        fes.enable_masquerade_interface_id(id);
+        fes.increment_masquerade_count_on_interface(id);
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
 
         let mut fes = FilterEnabledState::new(types_ap);
@@ -802,8 +845,20 @@ mod tests {
         assert_eq!(fes.should_enable(Some(wlan_ap_info.interface_type()), id), true);
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), false);
 
-        fes.enable_masquerade_interface_id(id);
+        fes.increment_masquerade_count_on_interface(id);
         assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), true);
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
+
+        // Verify that the count can be decremented while keeping filtering enabled.
+        let mut fes = FilterEnabledState::new(types_empty);
+        for _ in 0..3 {
+            fes.increment_masquerade_count_on_interface(id);
+        }
+        for expect_enabled in [true, true, false] {
+            fes.decrement_masquerade_count_on_interface(id);
+            assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), expect_enabled);
+            assert_eq!(fes.should_enable(Some(wlan_ap_info.interface_type()), id), expect_enabled);
+            assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), expect_enabled);
+        }
     }
 }

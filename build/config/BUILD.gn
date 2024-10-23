@@ -832,9 +832,9 @@ config("default_warnings") {
 config("sdk_extra_warnings") {
   cflags_cc = [
     "-Wnon-virtual-dtor",
+    "-Wshadow",
     "-Wctad-maybe-unsupported",
   ]
-  # TODO(https://fxbug.dev/42071929): Add -Wshadow
 }
 
 # Same as `sdk_extra_warnings`, but intended to be added to the configuration of

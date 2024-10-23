@@ -283,7 +283,7 @@ pub async fn conformance(
     cmd: ConformanceCommand,
     driver_connector: &dyn DriverConnector,
 ) -> Result<()> {
-    match ffx_config::get("test.driver_conformance_testing").await {
+    match ffx_config::get("test.driver_conformance_testing") {
         Ok(true) => {}
         Ok(false) | Err(_) => {
             ffx_bail!(

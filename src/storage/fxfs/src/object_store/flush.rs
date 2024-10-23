@@ -196,6 +196,7 @@ impl ObjectStore {
             &mut transaction,
             HandleOptions { skip_journal_checks: true, ..Default::default() },
             self.crypt().as_deref(),
+            None,
         )
         .await?;
         let writer = DirectWriter::new(&new_object_tree_layer, txn_options).await;
@@ -322,6 +323,7 @@ impl ObjectStore {
                 parent_store,
                 &mut transaction,
                 HandleOptions { skip_journal_checks: true, ..Default::default() },
+                None,
                 None,
             )
             .await?;

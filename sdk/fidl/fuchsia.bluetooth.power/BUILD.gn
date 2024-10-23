@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.bluetooth.power") {
-  sdk_category = "internal"
-
   sources = [ "report.fidl" ]
 
   public_deps = [

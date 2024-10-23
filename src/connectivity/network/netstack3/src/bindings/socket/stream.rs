@@ -1289,13 +1289,13 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     u32::try_from(millis).map_err(|_: TryFromIntError| fposix::Errno::Einval);
                 responder.send(result).unwrap_or_log("failed to respond");
             }
-            fposix_socket::StreamSocketRequest::SetMark { domain: _, mark: _, responder } => {
-                // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
+            fposix_socket::StreamSocketRequest::SetMark { domain, mark, responder } => {
+                self.ctx.api().tcp().set_mark(&self.data.id, domain.into_core(), mark.into_core());
+                responder.send(Ok(())).unwrap_or_log("failed to respond")
             }
-            fposix_socket::StreamSocketRequest::GetMark { domain: _, responder } => {
-                // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
+            fposix_socket::StreamSocketRequest::GetMark { domain, responder } => {
+                let mark = self.ctx.api().tcp().get_mark(&self.data.id, domain.into_core());
+                responder.send(Ok(&mark.into_fidl())).unwrap_or_log("failed to respond")
             }
         }
         ControlFlow::Continue(None)

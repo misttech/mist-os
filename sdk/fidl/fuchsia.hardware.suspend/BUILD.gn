@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.suspend") {
-  sdk_category = "internal"
   sources = [ "suspend.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true

@@ -5,6 +5,7 @@
 composite brcmfmac_sdio;
 
 using fuchsia.broadcom.platform;
+using fuchsia.gpio;
 using fuchsia.hardware.gpio;
 using fuchsia.hardware.sdio;
 using fuchsia.platform;
@@ -37,4 +38,8 @@ node "pdev" {
     }
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.broadcom.platform.BIND_PLATFORM_DEV_DID.WIFI;
   }
+}
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

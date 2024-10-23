@@ -837,6 +837,7 @@ impl Allocator {
             self.object_id(),
             HandleOptions::default(),
             None,
+            None,
         )
         .await?;
         Ok(())
@@ -2001,6 +2002,7 @@ impl<'a> Flusher<'a> {
             &root_store,
             &mut transaction,
             HandleOptions { skip_journal_checks: true, ..Default::default() },
+            None,
             None,
         )
         .await?;

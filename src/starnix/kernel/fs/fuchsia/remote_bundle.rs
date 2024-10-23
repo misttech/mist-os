@@ -386,6 +386,7 @@ impl FsNodeOps for DirectoryObject {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -517,12 +518,12 @@ mod test {
         DirectoryEntryType, DirentSink, FileSystemOptions, FsStr, LookupContext, Namespace,
         SymlinkMode, SymlinkTarget,
     };
+    use fidl_fuchsia_io as fio;
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::{AccessCheck, FileMode};
     use starnix_uapi::open_flags::OpenFlags;
     use starnix_uapi::{ino_t, off_t};
     use std::collections::{HashMap, HashSet};
-    use {fidl_fuchsia_io as fio, zx};
 
     #[::fuchsia::test]
     async fn test_read_image() {
@@ -541,11 +542,12 @@ mod test {
         let root = ns.root();
         let mut context = LookupContext::default().with(SymlinkMode::NoFollow);
 
-        let test_dir =
-            root.lookup_child(&current_task, &mut context, "foo".into()).expect("lookup failed");
+        let test_dir = root
+            .lookup_child(&mut locked, &current_task, &mut context, "foo".into())
+            .expect("lookup failed");
 
         let test_file = test_dir
-            .lookup_child(&current_task, &mut context, "file".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "file".into())
             .expect("lookup failed")
             .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())
             .expect("open failed");
@@ -593,7 +595,7 @@ mod test {
         }
 
         let test_symlink = test_dir
-            .lookup_child(&current_task, &mut context, "symlink".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "symlink".into())
             .expect("lookup failed");
 
         if let SymlinkTarget::Path(target) =

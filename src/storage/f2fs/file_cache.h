@@ -302,12 +302,6 @@ class FileCache {
   // It returns a locked Page corresponding to |index| from |page_tree_|.
   // If there is no Page, it creates and returns a locked Page.
   zx_status_t GetLockedPage(pgoff_t index, LockedPage *out) __TA_EXCLUDES(tree_lock_);
-  // It returns locked pages corresponding to |page_offsets| from |page_tree_|.
-  // If kInvalidPageOffset is included in |page_offsets|, the corresponding Page will be a null
-  // page.
-  // If there is no corresponding Page in |page_tree_|, it creates a new Page.
-  zx::result<std::vector<LockedPage>> GetLockedPages(const std::vector<pgoff_t> &page_offsets)
-      __TA_EXCLUDES(tree_lock_);
   // It returns locked Pages corresponding to [start - end) from |page_tree_|.
   zx::result<std::vector<LockedPage>> GetLockedPages(pgoff_t start, pgoff_t end)
       __TA_EXCLUDES(tree_lock_);
@@ -369,12 +363,6 @@ class FileCache {
   // If there is no corresponding Page in page_tree_, the Page will not be included in the returned
   // vector. Therefore, returned vector's size could be smaller than |end - start|.
   std::vector<LockedPage> FindLockedPagesUnsafe(pgoff_t start = 0, pgoff_t end = kPgOffMax)
-      __TA_REQUIRES(tree_lock_);
-  // It returns all Pages from |page_tree_| corresponds to |page_offsets|.
-  // If there is no corresponding Page in page_tree_ or if page_offset is kInvalidPageOffset,
-  // the corresponding page will be null LockedPage in the returned vector.
-  // The returned vector's size is the same as |page_offsets.size()|.
-  std::vector<LockedPage> FindLockedPagesUnsafe(const std::vector<pgoff_t> &page_offsets)
       __TA_REQUIRES(tree_lock_);
   std::vector<fbl::RefPtr<Page>> FindPagesUnsafe(pgoff_t start = 0, pgoff_t end = kPgOffMax)
       __TA_REQUIRES(tree_lock_);

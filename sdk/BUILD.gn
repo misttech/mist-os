@@ -607,6 +607,7 @@ if (is_host) {
       "//src/developer/ffx/plugins/wlan:sdk",
       "//src/developer/ffx/tools/starnix:sdk",
       "//src/performance/trace2json:bin_sdk",
+      "//src/starnix/tools/gen_android_starnix_container:gen_android_starnix_container_sdk",
       "//src/storage/bin/fvm:fvm_sdk",
       "//src/storage/blobfs/tools:blobfs_sdk",
       "//src/storage/minfs/tools:minfs_sdk",
@@ -627,8 +628,6 @@ if (is_host) {
       "//tools/fuchsia-sdk-run:fuchsia-sdk-run_sdk",
       "//tools/funnel:funnel_sdk",
       "//tools/net/device-finder:device-finder_sdk",
-      "//tools/sdk-tools/fpublish:fpublish_sdk",
-      "//tools/sdk-tools/fserve:fserve_sdk",
       "//tools/sdk-tools/fssh:fssh_sdk",
       "//tools/symbolizer:sdk",
       "//zircon/tools/merkleroot:merkleroot_sdk",
@@ -636,6 +635,7 @@ if (is_host) {
 
       # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
       "//src/developer/ffx/plugins/emulator:aemu_internal",
+      "//src/developer/ffx/plugins/emulator:crosvm_internal",
       "//src/developer/ffx/plugins/emulator:qemu_internal",
     ]
   }
@@ -736,7 +736,7 @@ sdk_molecule("core_data") {
     # TODO(ddorwin): Rename these to make it clear that they are data (e.g., _shards).
     "//sdk/lib/driver_component:driver_component",
     "//sdk/lib/heapdump_instrumentation:heapdump_instrumentation_shard",
-    "//sdk/lib/inspect",
+    "//sdk/lib/inspect/shards:inspect_sdk",
     "//sdk/lib/sys/component:realm_builder_shard_sdk",
     "//sdk/lib/syslog/shards:syslog_sdk",
     "//sdk/lib/vulkan",
@@ -859,51 +859,152 @@ sdk_molecule("core_licenses") {
 }
 
 #
-# BEGIN @internal_sdk
-# DO NOT ADD anything here! This will soon be removed.
-# See https://fxbug.dev/333907192.
+# BEGIN @fuchsia_sdk
 #
-
-# This SDK molecule is a collection of libraries only available to the in-tree
-# Bazel build. See //sdk:platform.
-sdk_molecule("platform_libs") {
-  visibility += [ ":platform" ]
-  category = "internal"
-  deps = [
-    ":version_history_sdk($default_toolchain)",
-    "//sdk/lib/driver/devicetree/manager:manager_sdk",
-    "//sdk/lib/driver/devicetree/testing:board-test-helper_sdk",
-    "//sdk/lib/driver/devicetree/visitors:driver-visitor_sdk",
-    "//sdk/lib/driver/devicetree/visitors:load-visitors_sdk",
-    "//sdk/lib/driver/devicetree/visitors:registration_sdk",
-    "//sdk/lib/driver/devicetree/visitors/default:default_sdk",
-    "//sdk/lib/driver/devicetree/visitors/drivers:all-driver-visitors_sdk",
-    "//sdk/lib/driver/platform-device/cpp:cpp_sdk",
-    "//src/devices/lib/mmio:test_helper_sdk",
-    "//src/devices/registers/testing/mock-registers:mock-registers_sdk",
-    "//src/devices/testing/fake-bti:fake-bti_sdk",
-    "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
-    "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
-    "//zircon/system/ulib/fzl:fzl_sdk",
-  ]
-}
-
-# A collection of SDK atoms used to populate the @internal_sdk Bazel
-# repository. Only used for the GN > Bazel migration of the build system.
-# Content are bound to change a lot. Nothing else should rely on this.
-# See https://fxrev.dev/737558 and https://fxbug.dev/42064359.
-sdk_collection("platform") {
-  visibility += [ "//build/bazel/*" ]
-
-  category = "internal"
-  id = sdk_id
-
-  deps = [ ":platform_libs" ]
-}
-
+# The following is relevant to the Ninja-generated IDK used to
+# populate the @fuchsia_sdk repository for the in-tree Bazel
+# workspace.
 #
-# END @internal_sdk
-#
+# This only contains the targets necessary to generate this IDK,
+# as validation is performed in both Ninja and Bazel targets
+# defined in //build/bazel/bazel_sdk/BUILD.gn
+
+if (current_toolchain == default_toolchain) {
+  # The list of target cpu architectures supported by //sdk:bazel_in_tree_idk
+  if (bazel_fuchsia_sdk_all_cpus) {
+    _bazel_in_tree_idk_cpus = idk_target_cpus
+  } else {
+    _bazel_in_tree_idk_cpus = [ target_cpu ]
+  }
+
+  # An IDK used to expose the SDK atoms in the partner category
+  # to the in-tree Bazel workspace's `@fuchsia_sdk` repository.
+  #
+  # This exposes the same set of atoms as the `core` collection,
+  # but by default only provides binaries for the current target_cpu
+  # architecture, and the HEAD API level.
+  #
+  idk("bazel_in_tree_idk") {
+    visibility += [
+      "//build/bazel:*",
+      "//build/bazel/bazel_sdk:*",
+    ]
+    output_name = "bazel_in_tree_idk"
+    sdk_collection_label = "//sdk:core"
+
+    # Ensure sub-builds are shared with the "core' IDK (https://fxbug.dev/342695881)
+    # since they use the same set of atoms, but for different sets of
+    # (target_cpu, api_level) combos.
+    idk_subbuilds_label = "//sdk:core_idk_subbuilds"
+
+    target_cpus = _bazel_in_tree_idk_cpus
+
+    api_levels = []
+    if (bazel_fuchsia_sdk_all_api_levels) {
+      api_levels = platform_version.idk_buildable_api_levels
+    }
+
+    # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
+    # are too slow to enable this setting, and therefore the mac IDK won't have
+    # per-api-level prebuilts.
+    if (host_os == "mac") {
+      api_levels = []
+    }
+  }
+
+  # Run the Bazel SDK test suite against the content of
+  # //sdk:bazel_in_tree_idk. This is only useful for development,
+  # as the content of the @fuchsia_sdk repository, populated
+  # from the same IDK, is already checked by a different suite
+  # of tests defined under //build/bazel/bazel_sdk.
+
+  foreach(cpu, _bazel_in_tree_idk_cpus) {
+    run_fuchsia_bazel_sdk_tests("bazel_in_tree_idk_tests_${cpu}") {
+      target_cpu = cpu
+      idk_exported_target = "//sdk:bazel_in_tree_idk"
+      idk_exported_path = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
+    }
+  }
+
+  group("bazel_in_tree_idk_tests") {
+    testonly = true
+    deps = []
+    foreach(cpu, _bazel_in_tree_idk_cpus) {
+      deps += [ ":bazel_in_tree_idk_tests_${cpu}" ]
+    }
+
+    # For now, nothing should depend on this except
+    # //:root_targets to ensure it can be launched manually
+    # with  `fx build //sdk:bazel_in_tree_idk_tests`
+    visibility = []
+    visibility = [ "//:root_targets" ]
+  }
+
+  #
+  # END @fuchsia_sdk
+
+  #
+  # BEGIN @internal_sdk
+  # DO NOT ADD anything here! This will soon be removed.
+  # See https://fxbug.dev/333907192.
+  #
+
+  # This SDK molecule is a collection of libraries only available to the in-tree
+  # Bazel build. See //sdk:bazel_internal_only
+  sdk_molecule("bazel_internal_only_libs") {
+    category = "internal"
+    deps = [
+      ":version_history_sdk($default_toolchain)",
+      "//sdk/lib/driver/devicetree/manager:manager_sdk",
+      "//sdk/lib/driver/devicetree/testing:board-test-helper_sdk",
+      "//sdk/lib/driver/devicetree/visitors:driver-visitor_sdk",
+      "//sdk/lib/driver/devicetree/visitors:load-visitors_sdk",
+      "//sdk/lib/driver/devicetree/visitors:registration_sdk",
+      "//sdk/lib/driver/devicetree/visitors/default:default_sdk",
+      "//sdk/lib/driver/devicetree/visitors/drivers:all-driver-visitors_sdk",
+      "//sdk/lib/driver/platform-device/cpp:cpp_sdk",
+      "//src/devices/lib/mmio:test_helper_sdk",
+      "//src/devices/registers/testing/mock-registers:mock-registers_sdk",
+      "//src/devices/testing/fake-bti:fake-bti_sdk",
+      "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
+      "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
+      "//zircon/system/ulib/fzl:fzl_sdk",
+    ]
+  }
+
+  # A collection of SDK atoms used to populate the @internal_sdk Bazel
+  # repository. Only used internally to expose atoms that are not ready
+  # to be moved to the partner category, but still must be visible
+  # from the Bazel graph. See https://fxbug.dev/333907192.
+  #
+  # Content are bound to change a lot.
+  # TODO(https://fxbug.dev/333907192): Remove this.
+  sdk_collection("bazel_internal_only") {
+    category = "internal"
+    id = sdk_id
+
+    deps = [ ":bazel_internal_only_libs" ]
+  }
+
+  # An IDK used to expose the bazel_internal_only collection for the
+  # @internal_sdk repository of the platform build's Bazel workspace.
+  # TODO(https://fxbug.dev/333907192): Remove this.
+  idk("bazel_internal_only_idk") {
+    visibility += [ "//build/bazel/*" ]
+    output_name = "bazel_internal_only_idk"
+    sdk_collection_label = ":bazel_internal_only"
+    idk_subbuilds_label = ":internal_only_idk_subbuilds"
+
+    # Only build this for the current target_cpu, and the HEAD
+    # API level. This ensures no sub-builds will be launched.
+    target_cpus = [ target_cpu ]
+    api_levels = []
+  }
+
+  #
+  # END @internal_sdk
+  #
+}  # current_toolchain == default_toolchain
 
 if (is_host) {
   # A collection that only contains host tools that are used by the

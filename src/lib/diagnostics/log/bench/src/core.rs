@@ -4,6 +4,7 @@
 
 use diagnostics_log::{Publisher, PublisherOptions};
 use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
+use fuchsia_async as fasync;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use futures::StreamExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -11,7 +12,6 @@ use std::sync::Once;
 use std::time::Duration;
 use tracing::{span, Event, Metadata, Subscriber};
 use tracing_log::LogTracer;
-use {fuchsia_async as fasync, zx};
 
 async fn setup_publisher() -> (zx::Socket, Publisher) {
     let (proxy, mut requests) =

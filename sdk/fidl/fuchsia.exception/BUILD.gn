@@ -4,7 +4,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.exception") {
-  sdk_category = "internal"
   sources = [
     "handler.fidl",
     "process_limbo.fidl",

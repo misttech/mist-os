@@ -12,8 +12,7 @@ use std::ops;
 #[repr(transparent)]
 pub struct MonotonicInstant(zx::MonotonicInstant);
 
-// TODO(https://fxbugdev/328306129): fix this.
-pub use zx::MonotonicDuration as Duration;
+pub use zx::MonotonicDuration;
 
 impl MonotonicInstant {
     /// Return the current time according to the global executor.

@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::sync::Arc;
 use tracing::{info, warn};
-use {bt_avdtp as avdtp, fuchsia_async as fasync, zx};
+use {bt_avdtp as avdtp, fuchsia_async as fasync};
 
 use crate::codec::CodecNegotiation;
 use crate::peer::Peer;

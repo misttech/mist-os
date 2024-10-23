@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::component_instance::ComponentInstanceForAnalyzer;
+use ::routing::bedrock::program_output_dict;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_policy_check::WithPolicyCheck;
 use ::routing::bedrock::with_porcelain_type::WithPorcelainType;
@@ -23,7 +24,10 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::{future, FutureExt};
 use moniker::{ChildName, ExtendedMoniker};
 use router_error::RouterError;
-use sandbox::{Capability, Dict, Request, Routable, Router};
+use sandbox::{
+    CapabilityBound, Connector, Data, Dict, DirEntry, Request, Router, SpecificRoutable,
+    SpecificRouter, SpecificRouterResponse,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use {
@@ -31,18 +35,20 @@ use {
     fidl_fuchsia_sys2 as fsys,
 };
 
-fn new_debug_only_router(source: CapabilitySource) -> Router {
+fn new_debug_only_specific_router<T>(source: CapabilitySource) -> SpecificRouter<T>
+where
+    T: CapabilityBound,
+{
     let moniker = source.source_moniker();
-    let cap: Capability =
-        source.try_into().expect("failed to convert capability source to dictionary");
-    Router::new(move |_request: Option<Request>, debug: bool| {
+    let data: Data = source.try_into().expect("failed to convert capability source to Data");
+    SpecificRouter::<T>::new(move |_request: Option<Request>, debug: bool| {
         if !debug {
             future::ready(Err(RouterError::NotFound(Arc::new(
                 RoutingError::NonDebugRoutesUnsupported { moniker: moniker.clone() },
             ))))
             .boxed()
         } else {
-            future::ready(Ok(cap.try_clone().unwrap())).boxed()
+            future::ready(Ok(SpecificRouterResponse::<T>::Debug(data.clone()))).boxed()
         }
     })
 }
@@ -124,15 +130,16 @@ pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>)
         "fuchsia.sys2.RealmExplorer",
     ] {
         let name = cm_types::Name::new(*protocol_name).unwrap();
+        let router = new_debug_only_specific_router::<Connector>(CapabilitySource::Framework(
+            FrameworkSource {
+                capability: InternalCapability::Protocol(name.clone()),
+                moniker: component.moniker().clone(),
+            },
+        ));
+        // Specific -> general router
+        let router = Router::from(router);
         framework_dict
-            .insert_capability(
-                &name,
-                new_debug_only_router(CapabilitySource::Framework(FrameworkSource {
-                    capability: InternalCapability::Protocol(name.clone()),
-                    moniker: component.moniker().clone(),
-                }))
-                .into(),
-            )
+            .insert_capability(&name, router.into())
             .expect("failed to insert framework capability into dictionary");
     }
     framework_dict
@@ -145,64 +152,79 @@ pub fn build_capability_sourced_capabilities_dictionary(
     let output = Dict::new();
     for capability in &decl.capabilities {
         if let cm_rust::CapabilityDecl::Storage(storage_decl) = capability {
+            let router = new_debug_only_specific_router::<Connector>(CapabilitySource::Capability(
+                CapabilityToCapabilitySource {
+                    source_capability: ComponentCapability::Storage(storage_decl.clone()),
+                    moniker: component.moniker().clone(),
+                },
+            ));
+            // Specific -> general router
+            let router = Router::from(router);
             output
-                .insert_capability(
-                    &storage_decl.name,
-                    new_debug_only_router(CapabilitySource::Capability(
-                        CapabilityToCapabilitySource {
-                            source_capability: ComponentCapability::Storage(storage_decl.clone()),
-                            moniker: component.moniker().clone(),
-                        },
-                    ))
-                    .into(),
-                )
+                .insert_capability(&storage_decl.name, router.into())
                 .expect("failed to insert capability backed capability into dictionary");
         }
     }
     output
 }
 
-pub fn new_program_router(
-    component: WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
-    _relative_path: Path,
-    capability: ComponentCapability,
-) -> Router {
-    let capability_source = CapabilitySource::Component(ComponentSource {
-        capability,
-        moniker: component.moniker.clone(),
-    });
-    Router::new_ok(
-        Capability::try_from(capability_source)
-            .expect("failed to convert capability source to dictionary"),
-    )
-}
+pub struct ProgramOutputGenerator {}
 
-pub fn new_outgoing_dir_router(
-    component: &Arc<ComponentInstanceForAnalyzer>,
-    _decl: &cm_rust::ComponentDecl,
-    capability: &cm_rust::CapabilityDecl,
-) -> Router {
-    new_debug_only_router(CapabilitySource::Component(ComponentSource {
-        capability: ComponentCapability::from(capability.clone()),
-        moniker: component.moniker().clone(),
-    }))
+impl program_output_dict::ProgramOutputGenerator<ComponentInstanceForAnalyzer>
+    for ProgramOutputGenerator
+{
+    fn new_program_dictionary_router(
+        &self,
+        component: WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
+        _relative_path: Path,
+        capability: ComponentCapability,
+    ) -> SpecificRouter<Dict> {
+        new_debug_only_specific_router::<Dict>(CapabilitySource::Component(ComponentSource {
+            capability,
+            moniker: component.moniker.clone(),
+        }))
+    }
+
+    fn new_outgoing_dir_connector_router(
+        &self,
+        component: &Arc<ComponentInstanceForAnalyzer>,
+        _decl: &cm_rust::ComponentDecl,
+        capability: &cm_rust::CapabilityDecl,
+    ) -> SpecificRouter<Connector> {
+        new_debug_only_specific_router::<Connector>(CapabilitySource::Component(ComponentSource {
+            capability: ComponentCapability::from(capability.clone()),
+            moniker: component.moniker().clone(),
+        }))
+    }
+
+    fn new_outgoing_dir_dir_entry_router(
+        &self,
+        component: &Arc<ComponentInstanceForAnalyzer>,
+        _decl: &cm_rust::ComponentDecl,
+        capability: &cm_rust::CapabilityDecl,
+    ) -> SpecificRouter<DirEntry> {
+        new_debug_only_specific_router::<DirEntry>(CapabilitySource::Component(ComponentSource {
+            capability: ComponentCapability::from(capability.clone()),
+            moniker: component.moniker().clone(),
+        }))
+    }
 }
 
 pub(crate) fn static_children_component_output_dictionary_routers(
     component: &Arc<ComponentInstanceForAnalyzer>,
     decl: &ComponentDecl,
-) -> HashMap<ChildName, Router> {
+) -> HashMap<ChildName, SpecificRouter<Dict>> {
     struct ChildrenComponentOutputRouters {
         weak_component: WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
         child_name: ChildName,
     }
     #[async_trait]
-    impl Routable for ChildrenComponentOutputRouters {
+    impl SpecificRoutable<Dict> for ChildrenComponentOutputRouters {
         async fn route(
             &self,
             _request: Option<Request>,
             _debug: bool,
-        ) -> Result<Capability, RouterError> {
+        ) -> Result<SpecificRouterResponse<Dict>, RouterError> {
             let component =
                 self.weak_component.upgrade().expect("part of component tree was dropped");
             let child = component
@@ -219,7 +241,7 @@ pub(crate) fn static_children_component_output_dictionary_routers(
                     ),
                 )))?;
             let component_output_dict = child.sandbox.component_output_dict.clone();
-            Ok(component_output_dict.into())
+            Ok(SpecificRouterResponse::<Dict>::Capability(component_output_dict))
         }
     }
 
@@ -229,7 +251,7 @@ pub(crate) fn static_children_component_output_dictionary_routers(
         let child_name = ChildName::new(child_decl.name.clone(), None);
         output.insert(
             child_name.clone(),
-            Router::new(ChildrenComponentOutputRouters {
+            SpecificRouter::<Dict>::new(ChildrenComponentOutputRouters {
                 weak_component: weak_component.clone(),
                 child_name,
             }),

@@ -444,7 +444,7 @@ mod tests {
     use std::cell::Cell;
     use std::ops::Add;
     use test_util::{assert_gt, assert_lt, assert_near};
-    use {fuchsia_async as fasync, fuchsia_inspect, zx};
+    use {fuchsia_async as fasync, fuchsia_inspect};
 
     const COUNTS_PER_MM: f32 = 12.0;
     const DEVICE_DESCRIPTOR: input_device::InputDeviceDescriptor =

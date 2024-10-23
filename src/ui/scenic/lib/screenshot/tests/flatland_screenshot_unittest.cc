@@ -157,6 +157,7 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
 INSTANTIATE_TEST_SUITE_P(
     ParameterizedFlatlandScreenshotTest, FlatlandScreenshotTest,
     ::testing::Combine(::testing::Values(fuchsia_ui_composition::ScreenshotFormat::kBgraRaw,
+                                         fuchsia_ui_composition::ScreenshotFormat::kRgbaRaw,
                                          fuchsia_ui_composition::ScreenshotFormat::kPng),
                        ::testing::Values(0, 90, 180, 270)));
 

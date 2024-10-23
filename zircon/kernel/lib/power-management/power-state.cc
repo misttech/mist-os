@@ -10,7 +10,6 @@
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
-#include <atomic>
 #include <optional>
 
 #include <fbl/ref_ptr.h>
@@ -18,7 +17,7 @@
 namespace power_management {
 
 fbl::RefPtr<PowerDomain> PowerState::SetOrUpdateDomain(fbl::RefPtr<PowerDomain> domain) {
-  if (domain_ && domain->id() != domain_->id()) {
+  if (!domain || (domain_ && domain->id() != domain_->id())) {
     idle_power_level_ = std::nullopt;
     active_power_level_ = std::nullopt;
     desired_active_power_level_ = std::nullopt;
@@ -49,6 +48,7 @@ std::optional<PowerLevelUpdateRequest> PowerState::RequestTransition(uint32_t cp
   auto level = domain_->model().levels()[power_level];
 
   PowerLevelUpdateRequest transition = {
+      .domain_id = domain_->id(),
       .target_id = domain_->id(),
       .control = level.control(),
       .control_argument = level.control_argument(),

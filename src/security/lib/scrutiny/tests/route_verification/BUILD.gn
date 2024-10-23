@@ -16,8 +16,6 @@ import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/developer/ffx/config.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
-import("//src/sys/core/build/core.gni")
-import("//src/sys/core/build/core_shard.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
 if (is_fuchsia) {

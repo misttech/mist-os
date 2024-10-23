@@ -65,7 +65,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         self.fastboot_task.replace(Task::local(async move {
             loop {
                 let fastboot_file_path: Option<PathBuf> =
-                    get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                    get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
                 let mut device_stream = wait_for_devices(
                     |_: &_| true,
                     None,

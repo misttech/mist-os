@@ -18,7 +18,6 @@ rustc_test("bin") {
     "//sdk/rust/zx",
     "//src/diagnostics/archivist:lib",
     "//src/lib/diagnostics/data/rust",
-    "//src/lib/diagnostics/log/rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/diagnostics/selectors",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
@@ -83,10 +82,5 @@ fuchsia_component("archivist_integration_test_cases_component") {
 fuchsia_package("pkg") {
   testonly = true
   package_name = "archivist_integration_test_cases"
-  deps = [
-    ":archivist_integration_test_cases_component",
-    "../realm_factory:archivist_component",
-    "../realm_factory:archivist_config",
-  ]
-  subpackages = [ "../realm_factory:pkg" ]
+  deps = [ ":archivist_integration_test_cases_component" ]
 }

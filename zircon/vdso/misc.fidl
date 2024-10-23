@@ -30,7 +30,7 @@ closed protocol Misc {
     /// To sleep for a duration, use [`zx_deadline_after()`] and the
     /// `ZX_\<time-unit\>` helpers:
     ///
-    /// ```
+    /// ```c
     /// #include <zircon/syscalls.h> // zx_deadline_after, zx_nanosleep
     /// #include <zircon/types.h> // ZX_MSEC et al.
     ///
@@ -207,7 +207,7 @@ closed protocol Misc {
     ///
     /// ## EXAMPLES
     ///
-    /// ```
+    /// ```c
     /// zx_ticks_t ticks_per_second = zx_ticks_per_second();
     /// zx_instant_mono_ticks_t ticks_start = zx_ticks_get();
     ///
@@ -215,7 +215,6 @@ closed protocol Misc {
     ///
     /// zx_instant_mono_ticks_t ticks_end = zx_ticks_get();
     /// double elapsed_seconds = (ticks_end - ticks_start) / (double)ticks_per_second;
-    ///
     /// ```
     ///
     /// ## See also
@@ -262,7 +261,7 @@ closed protocol Misc {
     ///
     /// ## EXAMPLES
     ///
-    /// ```
+    /// ```c
     /// // Sleep 50 milliseconds
     /// zx_instant_mono_t deadline = zx_deadline_after(ZX_MSEC(50));
     /// zx_nanosleep(deadline);

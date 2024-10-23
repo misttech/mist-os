@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.bluetooth.deviceid") {
-  sdk_category = "internal"
-
   sources = [ "device_id.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]

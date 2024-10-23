@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"golang.org/x/exp/slices"
 
@@ -23,12 +22,10 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/proto"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
-	"go.fuchsia.dev/fuchsia/tools/lib/flagmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/hostplatform"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 
 	"google.golang.org/protobuf/encoding/prototext"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func usage() {
@@ -39,28 +36,14 @@ Shards tests produced by a build.
 }
 
 type testsharderFlags struct {
-	buildDir                       string
-	outputFile                     string
-	modifiersPath                  string
-	affectedTestsPath              string
-	affectedTestsMaxAttempts       int
-	affectedTestsMultiplyThreshold int
-	affectedOnly                   bool
-	skipUnaffected                 bool
-
-	testsharderParamsFile   string
-	tags                    flagmisc.StringsValue
-	targetTestCount         int
-	targetDurationSecs      int
-	perTestTimeoutSecs      int
-	maxShardsPerEnvironment int
-	maxShardSize            int
-	hermeticDeps            bool
-	imageDeps               bool
-	pave                    bool
-	perShardPackageRepos    bool
-	cacheTestPackages       bool
-	productBundleName       string
+	buildDir                 string
+	outputFile               string
+	modifiersPath            string
+	affectedTestsPath        string
+	affectedTestsMaxAttempts int
+	affectedOnly             bool
+	skipUnaffected           bool
+	testsharderParamsFile    string
 }
 
 func parseFlags() testsharderFlags {
@@ -72,28 +55,7 @@ func parseFlags() testsharderFlags {
 	flag.IntVar(&flags.affectedTestsMaxAttempts, "affected-tests-max-attempts", 2, "maximum attempts for each affected test. Only applied to tests that are not multiplied")
 	flag.BoolVar(&flags.affectedOnly, "affected-only", false, "whether to create test shards for only the affected tests found in either the modifiers file or the affected-tests file.")
 	flag.BoolVar(&flags.skipUnaffected, "skip-unaffected", false, "whether the shards should ignore hermetic, unaffected tests")
-
 	flag.StringVar(&flags.testsharderParamsFile, "params-file", "", "path to the testsharder params file")
-	// TODO(https://fxbug.dev/372309464): Remove below flags once they are passed through the params file.
-	flag.Var(&flags.tags, "tag", "environment tags on which to filter; only the tests that match all tags will be sharded")
-	flag.IntVar(&flags.targetDurationSecs, "target-duration-secs", 0, "approximate duration that each shard should run in")
-	flag.IntVar(&flags.maxShardsPerEnvironment, "max-shards-per-env", 8, "maximum shards allowed per environment. If <= 0, no max will be set")
-	flag.IntVar(&flags.maxShardSize, "max-shard-size", 0, "target max number of tests per shard. It will only have effect if used with target-duration-secs to further "+
-		"limit the number of tests per shard if the calculated average tests per shard would exceed max-shard-size after sharding by duration. This is only a soft "+
-		"maximum and is used to make the average shard size not exceed the max size, but ultimately the shards will be sharded by duration, so some shards may have "+
-		"more than the max number of tests while others will have less. However, if max-shards-per-env is set, that will take precedence over max-shard-size, which "+
-		"may result in all shards exceeding the max size in order to fit within the max number of shards per environment.")
-	// TODO(https://fxbug.dev/42055729): Support different timeouts for different tests.
-	flag.IntVar(&flags.perTestTimeoutSecs, "per-test-timeout-secs", 0, "per-test timeout, applied to all tests. If <= 0, no timeout will be set")
-	flag.IntVar(&flags.targetTestCount, "target-test-count", 0, "target number of tests per shard. If <= 0, will be ignored. Otherwise, tests will be placed into more, smaller shards")
-	flag.IntVar(&flags.affectedTestsMultiplyThreshold, "affected-tests-multiply-threshold", 0, "if there are <= this many tests in -affected-tests, they may be multplied "+
-		"(modified to run many times in a separate shard), but only be multiplied if allowed by certain constraints designed to minimize false rejections and bot demand.")
-	flag.BoolVar(&flags.hermeticDeps, "hermetic-deps", false, "whether to add all the images and blobs used by the shard as dependencies")
-	flag.BoolVar(&flags.imageDeps, "image-deps", false, "whether to add all the images used by the shard as dependencies")
-	flag.BoolVar(&flags.pave, "pave", false, "whether the shards generated should pave or netboot fuchsia")
-	flag.BoolVar(&flags.perShardPackageRepos, "per-shard-package-repos", false, "whether to construct a local package repo for each shard")
-	flag.BoolVar(&flags.cacheTestPackages, "cache-test-packages", false, "whether the test packages should be cached on disk in the local package repo")
-	flag.StringVar(&flags.productBundleName, "product-bundle-name", "", "name of product bundle to use")
 
 	flag.Usage = usage
 
@@ -118,24 +80,6 @@ func ReadParams(path string) (*proto.Params, error) {
 	return &message, nil
 }
 
-func getParamsFromFlags(flags testsharderFlags) *proto.Params {
-	return &proto.Params{
-		EnvironmentTags:                flags.tags,
-		TargetDuration:                 durationpb.New(time.Duration(flags.targetDurationSecs) * time.Second),
-		MaxShardsPerEnv:                int32(flags.maxShardsPerEnvironment),
-		MaxShardSize:                   int32(flags.maxShardSize),
-		PerTestTimeout:                 durationpb.New(time.Duration(flags.perTestTimeoutSecs) * time.Second),
-		TargetTestCount:                int32(flags.targetTestCount),
-		AffectedTestsMultiplyThreshold: int32(flags.affectedTestsMultiplyThreshold),
-		HermeticDeps:                   flags.hermeticDeps,
-		ImageDeps:                      flags.imageDeps,
-		Pave:                           flags.pave,
-		PerShardPackageRepos:           flags.perShardPackageRepos,
-		CacheTestPackages:              flags.cacheTestPackages,
-		ProductBundleName:              flags.productBundleName,
-	}
-}
-
 func main() {
 	l := logger.NewLogger(logger.ErrorLevel, color.NewColor(color.ColorAuto), os.Stdout, os.Stderr, "")
 	// testsharder is expected to complete quite quickly, so it's generally not
@@ -152,15 +96,13 @@ func main() {
 
 func mainImpl(ctx context.Context) error {
 	flags := parseFlags()
-	var params *proto.Params
-	if flags.testsharderParamsFile != "" {
-		var err error
-		params, err = ReadParams(flags.testsharderParamsFile)
-		if err != nil {
-			return err
-		}
-	} else {
-		params = getParamsFromFlags(flags)
+	if flags.testsharderParamsFile == "" {
+		return fmt.Errorf("must provide a -params-file")
+
+	}
+	params, err := ReadParams(flags.testsharderParamsFile)
+	if err != nil {
+		return err
 	}
 
 	if flags.buildDir == "" {

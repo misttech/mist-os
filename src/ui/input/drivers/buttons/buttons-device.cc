@@ -467,7 +467,7 @@ zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
       (gpio.config.flags & BUTTONS_GPIO_FLAG_WAKE_VECTOR) ? ZX_INTERRUPT_WAKE_VECTOR : 0;
 
   fidl::WireResult interrupt_result =
-      gpio.client->GetInterrupt2(static_cast<fuchsia_hardware_gpio::InterruptOptions>(flags));
+      gpio.client->GetInterrupt(static_cast<fuchsia_hardware_gpio::InterruptOptions>(flags));
   if (!interrupt_result.ok()) {
     FDF_LOG(ERROR, "Failed to send GetInterrupt request to gpio %u: %s", idx,
             interrupt_result.status_string());

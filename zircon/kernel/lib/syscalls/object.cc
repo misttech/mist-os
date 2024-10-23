@@ -787,7 +787,8 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       return ZX_OK;
     }
     case ZX_INFO_KMEM_STATS:
-    case ZX_INFO_KMEM_STATS_EXTENDED: {
+    case ZX_INFO_KMEM_STATS_EXTENDED:
+    case ZX_INFO_KMEM_STATS_V1: {
       auto status =
           validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_INFO_BASE, 1);
       if (status != ZX_OK)
@@ -816,9 +817,12 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       // be greater than the total because per-state counts are approximate.
       uint64_t sum_bytes = 0;
 
-      stats.free_bytes = state_count[VmPageStateIndex(vm_page_state::FREE)] * PAGE_SIZE +
-                         state_count[VmPageStateIndex(vm_page_state::FREE_LOANED)] * PAGE_SIZE;
+      stats.free_bytes = state_count[VmPageStateIndex(vm_page_state::FREE)] * PAGE_SIZE;
       sum_bytes += stats.free_bytes;
+
+      stats.free_loaned_bytes =
+          state_count[VmPageStateIndex(vm_page_state::FREE_LOANED)] * PAGE_SIZE;
+      sum_bytes += stats.free_loaned_bytes;
 
       stats.wired_bytes = state_count[VmPageStateIndex(vm_page_state::WIRED)] * PAGE_SIZE;
       sum_bytes += stats.wired_bytes;
@@ -830,16 +834,22 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       stats.vmo_bytes = state_count[VmPageStateIndex(vm_page_state::OBJECT)] * PAGE_SIZE;
       sum_bytes += stats.vmo_bytes;
 
-      stats.mmu_overhead_bytes = state_count[VmPageStateIndex(vm_page_state::MMU)] * PAGE_SIZE;
+      stats.mmu_overhead_bytes = (state_count[VmPageStateIndex(vm_page_state::MMU)] +
+                                  state_count[VmPageStateIndex(vm_page_state::IOMMU)]) *
+                                 PAGE_SIZE;
       sum_bytes += stats.mmu_overhead_bytes;
 
       stats.ipc_bytes = state_count[VmPageStateIndex(vm_page_state::IPC)] * PAGE_SIZE;
       sum_bytes += stats.ipc_bytes;
 
-      // TODO(https://fxbug.dev/42147338): Extend zx_info_kmem_stats_t and
-      // zx_info_kmem_stats_extended_t with SLAB and CACHE fields.
+      stats.cache_bytes = state_count[VmPageStateIndex(vm_page_state::CACHE)] * PAGE_SIZE;
       sum_bytes += state_count[VmPageStateIndex(vm_page_state::CACHE)] * PAGE_SIZE;
+
+      stats.slab_bytes = state_count[VmPageStateIndex(vm_page_state::SLAB)] * PAGE_SIZE;
       sum_bytes += state_count[VmPageStateIndex(vm_page_state::SLAB)] * PAGE_SIZE;
+
+      stats.zram_bytes = state_count[VmPageStateIndex(vm_page_state::ZRAM)] * PAGE_SIZE;
+      sum_bytes += state_count[VmPageStateIndex(vm_page_state::ZRAM)] * PAGE_SIZE;
 
       // Is there unaccounted memory?
       if (stats.total_bytes > sum_bytes) {
@@ -850,14 +860,41 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
         stats.other_bytes = 0;
       }
 
+      PageQueues::ReclaimCounts reclaim_counts = pmm_page_queues()->GetReclaimQueueCounts();
+      PageQueues::Counts queue_counts = pmm_page_queues()->QueueCounts();
+
+      stats.vmo_reclaim_total_bytes = reclaim_counts.total * PAGE_SIZE;
+      stats.vmo_reclaim_newest_bytes = reclaim_counts.newest * PAGE_SIZE;
+      stats.vmo_reclaim_oldest_bytes = reclaim_counts.oldest * PAGE_SIZE;
+      stats.vmo_reclaim_disabled_bytes = queue_counts.high_priority;
+
+      DiscardableVmoTracker::DiscardablePageCounts discardable_counts =
+          DiscardableVmoTracker::DebugDiscardablePageCounts();
+
+      stats.vmo_discardable_locked_bytes = discardable_counts.locked * PAGE_SIZE;
+      stats.vmo_discardable_unlocked_bytes = discardable_counts.unlocked * PAGE_SIZE;
+
       if (topic == ZX_INFO_KMEM_STATS) {
         return single_record_result(_buffer, buffer_size, _actual, _avail, stats);
       }
+      if (topic == ZX_INFO_KMEM_STATS_V1) {
+        zx_info_kmem_stats_v1 stats_v1 = {};
+        stats_v1.total_bytes = stats.total_bytes;
+        stats_v1.free_bytes = stats.free_bytes + stats.free_loaned_bytes;
+        stats_v1.wired_bytes = stats.wired_bytes;
+        stats_v1.total_heap_bytes = stats.total_heap_bytes;
+        stats_v1.free_heap_bytes = stats.free_heap_bytes;
+        stats_v1.vmo_bytes = stats.vmo_bytes;
+        stats_v1.mmu_overhead_bytes = stats.mmu_overhead_bytes;
+        stats_v1.ipc_bytes = stats.ipc_bytes;
+        stats_v1.other_bytes = stats.other_bytes;
+        return single_record_result(_buffer, buffer_size, _actual, _avail, stats_v1);
+      }
+      ASSERT(topic == ZX_INFO_KMEM_STATS_EXTENDED);
 
-      // Copy over the common counters from |stats| to |stats_ext|.
       zx_info_kmem_stats_extended_t stats_ext = {};
       stats_ext.total_bytes = stats.total_bytes;
-      stats_ext.free_bytes = stats.free_bytes;
+      stats_ext.free_bytes = stats.free_bytes + stats.free_loaned_bytes;
       stats_ext.wired_bytes = stats.wired_bytes;
       stats_ext.total_heap_bytes = stats.total_heap_bytes;
       stats_ext.free_heap_bytes = stats.free_heap_bytes;
@@ -865,21 +902,12 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       stats_ext.mmu_overhead_bytes = stats.mmu_overhead_bytes;
       stats_ext.ipc_bytes = stats.ipc_bytes;
       stats_ext.other_bytes = stats.other_bytes;
-
-      // Populate additional stats for the ZX_INFO_KMEM_STATS_EXTENDED topic, that are more
-      // expensive to compute than ZX_INFO_KMEM_STATS.
-      PageQueues::ReclaimCounts pager_counts = pmm_page_queues()->GetReclaimQueueCounts();
-      stats_ext.vmo_pager_total_bytes = pager_counts.total * PAGE_SIZE;
-      stats_ext.vmo_pager_newest_bytes = pager_counts.newest * PAGE_SIZE;
-      stats_ext.vmo_pager_oldest_bytes = pager_counts.oldest * PAGE_SIZE;
-
-      DiscardableVmoTracker::DiscardablePageCounts discardable_counts =
-          DiscardableVmoTracker::DebugDiscardablePageCounts();
-      stats_ext.vmo_discardable_locked_bytes = discardable_counts.locked * PAGE_SIZE;
-      stats_ext.vmo_discardable_unlocked_bytes = discardable_counts.unlocked * PAGE_SIZE;
-
-      PageQueues::Counts queue_counts = pmm_page_queues()->QueueCounts();
-      stats_ext.vmo_reclaim_disabled_bytes = queue_counts.high_priority;
+      stats_ext.vmo_pager_total_bytes = stats.vmo_reclaim_total_bytes;
+      stats_ext.vmo_pager_newest_bytes = stats.vmo_reclaim_newest_bytes;
+      stats_ext.vmo_pager_oldest_bytes = stats.vmo_reclaim_oldest_bytes;
+      stats_ext.vmo_discardable_locked_bytes = stats.vmo_discardable_locked_bytes;
+      stats_ext.vmo_discardable_unlocked_bytes = stats.vmo_discardable_unlocked_bytes;
+      stats_ext.vmo_reclaim_disabled_bytes = stats.vmo_reclaim_disabled_bytes;
 
       return single_record_result(_buffer, buffer_size, _actual, _avail, stats_ext);
     }

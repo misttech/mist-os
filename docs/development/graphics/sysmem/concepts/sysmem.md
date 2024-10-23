@@ -52,7 +52,7 @@ other to ensure synchronization.
 1. Those participants can also duplicate and send tokens, recursively, until
     all participants have received a token.
 1. Each participant [binds][bind] its token to get a buffer collection.
-1. Each participant [sets constraints][setconstraints] on the buffer collection
+1. Each participant [sets constraints][SetConstraints] on the buffer collection
 1. Sysmem chooses a format that can satisfy all the constraints. This can
     only happen after every participant has bound its token and set constraints
     on the collection.
@@ -83,6 +83,32 @@ accommodate a new participant with the same constraints.
 
 ## Buffer destruction
 
+Buffer destruction is asynchronous.
+
+To wait for old buffers of an old collection to fully delete (optionally with a
+deadline), see [AttachLifetimeTracking][AttachLifetimeTracking].
+
+The buffer destruction sequence begins when the buffer collection fails. In the
+normal/success case, this "failure" is typically triggered when a participant
+(often the initiator) closes any collection-specific channel without having sent
+[`Release`][Release] first. Currently, collection-specific channels are
+[`BufferCollectionToken`][BufferCollectionToken],
+[`BufferCollection`][BufferCollection], and
+[`BufferCollectionTokenGroup`][BufferCollectionTokenGroup] channels.
+
+When the collection enters the failed state, the sysmem server will close the
+server end of all the collection-specific channels. All the allocated VMOs
+remain usable until participants are done cleaning up (see list below).
+
+At this point all participants are expected to quickly notice (directly or
+indirectly via another sufficiently-trusted participant) the collection-specific
+channel server-side closure (`ZX_CHANNEL_PEER_CLOSED` signaled at client end).
+Each participant then ensures that the list of cleanup conditions below is met
+for as many of the buffers as possible. In rare cases keeping a low number of
+buffers around for a while longer can make sense, such as for keeping a last
+video frame on-screen until a new video frame using a new collection is
+available.
+
 All references to a buffer must be removed before sysmem will destroy it and
 allow the memory to be reused. These include:
 
@@ -90,7 +116,74 @@ allow the memory to be reused. These include:
 * [CPU mappings][map] of the VMO.
 * [Child VMOs][vmo_create_child] of the VMO.
 * [Pins][pmt] of the VMO for use by hardware.
-* [Channels][channel] to a Buffer Collection containing that VMOs.
+* [Channels][channel] to a Buffer Collection containing that VMOs. The sysmem
+  server will consider a channel closed whether the close was initiated by the
+  client or the server. This item does not apply to still-open channels that
+  sent [`SetWeak`][SetWeak] previously.
+
+Under a non-preferred and less common model, all participants may close all
+collection-specific channels (with or without a [`Release`][Release] first)
+shortly after allocation, which triggers collection failure early (due to zero
+collection-specific channels remaining), but then the participants may continue
+to use the VMOs for a while despite the collection having "failed". Then later
+they use a separate mechanism to know when they want to clean up the VMOs (see
+list above).
+
+The non-preferred model technically works, but it can make the collection
+lifetime less clear, and make the sysmem inspect data less clear / less helpful.
+Nonetheless, in some rare situations this non-preferred model may be useful to
+accommodate constraints imposed by other protocols / interfaces. If considering
+this model, first consider having a participant send [`Release`][Release] and
+close its collection-specific channel, then learn of collection failure
+indirectly via another (sufficiently-trusted) participant; this way the overall
+setup still conforms to the preferred model described above. If the only reason
+this model is being considered is to allow incremental buffer deallocation,
+consider [SetWeak][SetWeak] instead.
+
+## Advanced usage
+
+### Fallback constraints and/or optional participant(s)
+A [`BufferCollectionTokenGroup`][BufferCollectionTokenGroup] is used in more
+complicated situations where an entire participant is optional / best-effort, or
+if there are fallback less-strict constraints that differ from preferred
+more-strict constraints (such as for performance reasons).
+
+Only one child token directly under the group (along with the sub-tree starting
+at that token) is selected during allocation, with the first child token of the
+group preferred, etc.
+
+A group under a token under a group is permitted (etc).
+
+The total number of group child selection combinations attempted during
+allocation is capped; if hitting this cap, feel free to reach out to discuss
+alternatives.
+
+This is advanced usage that's not directly relevant to most participants. See
+docs of [`BufferCollectionTokenGroup`][BufferCollectionTokenGroup].
+
+### Failure isolation and/or late participant join
+The [`SetDispensable`][SetDispensable] and [`AttachToken`][AttachToken] messages
+can be used to create a failure-isolated sub-tree (defined by token duplication
+parentage) and potentially later replace the sub-tree with a new sub-tree
+instance after the original sub-tree instance fails, without failing the root.
+
+The first [token][BufferCollectionToken] created by the initiator is what
+creates the root; the [collection channel][BufferCollection] later created from
+that token is still considered the root node of the tree (different protocol,
+but same "node").
+
+When replacing the sub-tree, the new sub-tree participants see what looks like a
+normal allocation sequence, but really they're "joining" a buffer collection
+"already in progress".
+
+Use of [`AttachToken`][AttachToken] doesn't require prior use of
+[`SetDispensable`][SetDispensable].
+
+Currently [`AttachToken`][AttachToken] requires that the collection already have
+sufficient buffers to satisfy the newly attached participant instance(s).
+
+This is advanced usage that's not directly relevant to most participants. See
+docs of [`SetDispensable`][SetDispensable] and [`AttachToken`][AttachToken].
 
 ## Glossary
 
@@ -179,15 +272,19 @@ collection.
 [duplicates]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionToken.Duplicate
 [Allocator]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#Allocator
 [BufferCollectionToken]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionToken
+[BufferCollectionTokenGroup]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionTokenGroup
 [BufferCollection]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollection
 [channel]: /docs/reference/kernel_objects/channel.md
 [pmt]: /docs/reference/kernel_objects/pinned_memory_token.md
 [vmo_create_child]: /reference/syscalls/vmo_create_child.md
 [handles]: /docs/concepts/kernel/handles.md
 [bind]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#Allocator.BindSharedCollection
-[setconstraints]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollection.SetConstraints
+[SetConstraints]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollection.SetConstraints
 [fidl]: /docs/development/languages/fidl/README.md
 [map]: /reference/syscalls/vmar_map.md
 [constraints]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionConstraints
 [AttachToken]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollection.AttachToken
 [SetDispensable]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionToken.SetDispensable
+[AttachLifetimeTracking]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollection.AttachLifetimeTracking
+[SetWeak]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionToken.SetWeak
+[Release]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollection.Release

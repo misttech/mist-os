@@ -213,11 +213,20 @@ void F2fs::ScheduleWritebackAndReclaimPages() {
     auto promise = fpromise::make_promise([this]() __TA_EXCLUDES(writeback_mutex_) {
       std::lock_guard lock(writeback_mutex_);
       fs::SharedLock fs_lock(f2fs::GetGlobalLock());
-      while (!segment_manager_->HasNotEnoughFreeSecs() &&
+
+      // For each iteration, it tries writeback for kDefaultBlocksPerSegment blocks, which can yield
+      // n dirty node blocks in the worst case. So, the writeback is allowed only when free blocks
+      // are more than 2 * kDefaultBlocksPerSegment.
+      while (!segment_manager_->HasNotEnoughFreeSecs(kDefaultBlocksPerSegment * 2UL) &&
              GetMemoryStatus(MemoryStatus::kNeedWriteback)) {
         GetVCache().ForDirtyVnodesIf(
             [&](fbl::RefPtr<VnodeF2fs>& vnode) TA_NO_THREAD_SAFETY_ANALYSIS {
-              WritebackOperation op = {.bReclaim = true};
+              size_t num_data_blocks =
+                  std::min(vnode->GetDirtyPageCount(), kDefaultBlocksPerSegment);
+              if (segment_manager_->HasNotEnoughFreeSecs(num_data_blocks * 2UL)) {
+                return ZX_ERR_STOP;
+              }
+              WritebackOperation op = {.to_write = num_data_blocks, .bReclaim = true};
               vnode->Writeback(op);
               return ZX_OK;
             },

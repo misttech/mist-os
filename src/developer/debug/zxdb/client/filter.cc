@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include "lib/syslog/cpp/macros.h"
+#include "src/developer/debug/ipc/filter_utils.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/setting_schema.h"
@@ -46,6 +47,15 @@ const char* ClientSettings::Filter::kRecursiveDescription =
   option is only valid with component moniker filters.
   )";
 
+const char* ClientSettings::Filter::kJobOnly = "job-only";
+const char* ClientSettings::Filter::kJobOnlyDescription =
+    R"(  Whether or not this is a job-only filter. When matched, this filter
+  will only attach to the parent job of the match's (or matches') process.
+  This allows for processes to claim their own exception channels without
+  interference from the backend. Exceptions that are not handled by the
+  process's exception channel will be reported by the backend, but cannot be
+  interactively debugged.)";
+
 namespace {
 
 fxl::RefPtr<SettingSchema> CreateSchema() {
@@ -64,6 +74,7 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
   schema->AddBool(ClientSettings::Filter::kWeak, ClientSettings::Filter::kWeakDescription);
   schema->AddBool(ClientSettings::Filter::kRecursive,
                   ClientSettings::Filter::kRecursiveDescription);
+  schema->AddBool(ClientSettings::Filter::kJobOnly, ClientSettings::Filter::kJobOnlyDescription);
   return schema;
 }
 
@@ -93,6 +104,8 @@ SettingValue Filter::Settings::GetStorageValue(const std::string& key) const {
     return SettingValue(filter_->filter_.config.weak);
   if (key == ClientSettings::Filter::kRecursive)
     return SettingValue(filter_->filter_.config.recursive);
+  if (key == ClientSettings::Filter::kJobOnly)
+    return SettingValue(filter_->filter_.config.job_only);
   return SettingValue();
 }
 
@@ -112,6 +125,8 @@ Err Filter::Settings::SetStorageValue(const std::string& key, SettingValue value
     filter_->SetWeak(value.get_bool());
   } else if (key == ClientSettings::Filter::kRecursive) {
     filter_->SetRecursive(value.get_bool());
+  } else if (key == ClientSettings::Filter::kJobOnly) {
+    filter_->SetJobOnly(value.get_bool());
   }
   return Err();
 }
@@ -143,6 +158,15 @@ void Filter::SetWeak(bool weak) {
 void Filter::SetRecursive(bool recursive) {
   filter_.config.recursive = recursive;
   Sync();
+}
+
+void Filter::SetJobOnly(bool job_only) {
+  filter_.config.job_only = job_only;
+  Sync();
+}
+
+bool Filter::ShouldDeferModuleLoading() const {
+  return debug_ipc::FilterDefersModules(&filter_);
 }
 
 void Filter::Sync() { session()->system().SyncFilters(); }

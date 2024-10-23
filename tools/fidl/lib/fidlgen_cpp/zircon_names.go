@@ -36,6 +36,14 @@ var zirconTimes = map[string]zxName{
 		typeName: "fidl::basic_time<ZX_CLOCK_BOOT>",
 		prefix:   "",
 	},
+	"InstantMonoTicks": {
+		typeName: "fidl::basic_ticks<ZX_CLOCK_MONOTONIC>",
+		prefix:   "",
+	},
+	"InstantBootTicks": {
+		typeName: "fidl::basic_ticks<ZX_CLOCK_BOOT>",
+		prefix:   "",
+	},
 }
 
 func isZirconLibrary(li fidlgen.LibraryIdentifier) bool {

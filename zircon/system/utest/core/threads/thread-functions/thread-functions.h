@@ -84,4 +84,8 @@ struct syscall_suspended_reg_state_test_arg {
 // |arg| is a syscall_suspended_reg_state_test_arg.
 void threads_test_wait_event_fn(void* arg);
 
+// The arg is an event. It will first issue signal 0, then it will continuously check for signal 1.
+// On finding signal 1, it will return.
+void threads_test_wait_loop(void* arg);
+
 #endif  // ZIRCON_SYSTEM_UTEST_CORE_THREADS_THREAD_FUNCTIONS_THREAD_FUNCTIONS_H_

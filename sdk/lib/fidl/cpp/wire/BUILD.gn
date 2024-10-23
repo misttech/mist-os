@@ -23,7 +23,6 @@ wavl_tree_headers = [
 
 sdk_source_set("wire") {
   category = "partner"
-  api = "fidl_cpp_wire.api"
   sdk_name = "fidl_cpp_wire"
 
   # TODO(https://fxbug.dev/42172264): We should represent the library as a

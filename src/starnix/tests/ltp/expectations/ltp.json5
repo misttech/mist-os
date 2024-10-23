@@ -57,27 +57,38 @@
                 "cve-2020-11494",
                 "cve-2021-4034",
                 "cve-2022-2590",
-                "epoll_wait06",
+
+                // Requires SEEK_HOLE.
                 "fallocate04",
 
                 // Fails due to: "No supported filesystems"
                 "getxattr03",
 
-                // 24 requires F_SETLEASE, and does not run on tmpfs.
+                // Does not run on tmpfs.
                 "fcntl24",
                 "fcntl24_64",
+
+                // Does not run on tmpfs.
                 "fcntl25",
                 "fcntl25_64",
+
+                // Does not run on tmpfs.
                 "fcntl26",
                 "fcntl26_64",
 
                 // 31 requires F_SETSIG.
                 "fcntl31",
                 "fcntl31_64",
+
+                // Does not run on tmpfs.
                 "fcntl32",
                 "fcntl32_64",
+
+                // 33 requires F_GETSIG.
                 "fcntl33",
                 "fcntl33_64",
+
+                // Skipped with tmpfs.
                 "fdatasync03",
                 "fs_di",
                 "fsetxattr02",
@@ -112,7 +123,6 @@
                 "mlockall03",
                 "mmap12",
                 "mmap14",
-                "mmapstress07",
                 "mount02",
                 "mount04",
                 "mount06",
@@ -195,6 +205,10 @@
                 "timer_create01",
                 "timer_delete01",
                 "timer_settime02",
+
+                // TODO(https://fxbug.dev/374802310)
+                "inotify03",
+                "inotify12",
             ],
         },
         {
@@ -249,6 +263,10 @@
 
                 // TODO(https://fxbug.dev/) fix upstream test and enable
                 "mmap04",
+
+                // TODO(https://fxbug.dev/374984756) Crashes the kernel in debug builds
+                // (cycle in mutex deps).
+                "inotify08",
             ],
         },
     ],

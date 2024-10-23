@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 use {
     fidl_fuchsia_audio_device as audio_device, fidl_fuchsia_hardware_audio as audio,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 use super::{AudioControl, AudioControlEvent, AudioError, HF_INPUT_UUID};

@@ -84,6 +84,14 @@ const OBJECT_ID_HI_MASK: u64 = 0xffffffff00000000;
 // At time of writing, this threshold limits transactions that delete extents to about 10,000 bytes.
 const TRANSACTION_MUTATION_THRESHOLD: usize = 200;
 
+// Encrypted files and directories use the fscrypt key (identified by `FSCRYPT_KEY_ID`) to encrypt
+// file contents and filenames respectively. All non-fscrypt encrypted files otherwise default to
+// using the `VOLUME_DATA_KEY_ID` key. Note, the filesystem always uses the `VOLUME_DATA_KEY_ID`
+// key to encrypt large extended attributes. Thus, encrypted files and directories with large
+// xattrs will have both an fscrypt and volume data key.
+pub const VOLUME_DATA_KEY_ID: u64 = 0;
+pub const FSCRYPT_KEY_ID: u64 = 1;
+
 /// DataObjectHandle stores an owner that must implement this trait, which allows the handle to get
 /// back to an ObjectStore.
 pub trait HandleOwner: AsRef<ObjectStore> + Send + Sync + 'static {}
@@ -557,10 +565,12 @@ impl ObjectStore {
                 options.object_id,
                 HandleOptions::default(),
                 None,
+                None,
             )
             .await?
         } else {
-            ObjectStore::create_object(self, transaction, HandleOptions::default(), None).await?
+            ObjectStore::create_object(self, transaction, HandleOptions::default(), None, None)
+                .await?
         };
         let filesystem = self.filesystem();
         let store = if let Some(crypt) = options.crypt {
@@ -612,7 +622,7 @@ impl ObjectStore {
         let buf = {
             // Create a root directory and graveyard directory.
             let graveyard_directory_object_id = Graveyard::create(transaction, &self);
-            let root_directory = Directory::create(transaction, &self).await?;
+            let root_directory = Directory::create(transaction, &self, None).await?;
 
             let serialized_info = {
                 let mut store_info = self.store_info.lock().unwrap();
@@ -746,6 +756,10 @@ impl ObjectStore {
         self.store_info.lock().unwrap().as_ref().unwrap().object_count
     }
 
+    pub fn key_manager(&self) -> &KeyManager {
+        &self.key_manager
+    }
+
     /// Returns the crypt object for the store. Returns None if the store is unencrypted. This will
     /// panic if the store is locked.
     pub fn crypt(&self) -> Option<Arc<dyn Crypt>> {
@@ -781,7 +795,7 @@ impl ObjectStore {
         }
 
         // Need to create an internal directory.
-        let directory = Directory::create(&mut transaction, self).await?;
+        let directory = Directory::create(&mut transaction, self, None).await?;
 
         transaction.add(self.store_object_id, Mutation::CreateInternalDir(directory.object_id()));
         transaction.commit().await?;
@@ -899,7 +913,12 @@ impl ObjectStore {
         let permanent = if let Some(crypt) = crypt {
             store
                 .key_manager
-                .get_or_insert(obj_id, crypt, store.get_keys(obj_id), /* permanent: */ true)
+                .pre_fetch(
+                    obj_id,
+                    crypt.as_ref(),
+                    store.get_keys(obj_id),
+                    /* permanent: */ true,
+                )
                 .await?;
             true
         } else {
@@ -937,6 +956,7 @@ impl ObjectStore {
         mut object_id: u64,
         options: HandleOptions,
         mut crypt: Option<&dyn Crypt>,
+        wrapping_key_id: Option<u128>,
     ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
         if object_id == INVALID_OBJECT_ID {
@@ -959,16 +979,23 @@ impl ObjectStore {
                 ObjectValue::file(1, 0, now.clone(), now.clone(), now.clone(), now, 0, None),
             ),
         );
+        let key_id = if wrapping_key_id.is_some() { FSCRYPT_KEY_ID } else { VOLUME_DATA_KEY_ID };
         if let Some(crypt) = crypt {
-            let (key, unwrapped_key) = crypt.create_key(object_id, KeyPurpose::Data).await?;
+            let (key, unwrapped_key) = if let Some(wrapping_key_id) = wrapping_key_id {
+                crypt.create_key_with_id(object_id, wrapping_key_id).await?
+            } else {
+                crypt.create_key(object_id, KeyPurpose::Data).await?
+            };
             transaction.add(
                 store.store_object_id(),
                 Mutation::insert_object(
                     ObjectKey::keys(object_id),
-                    ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(0, key)]))),
+                    ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
+                        key_id, key,
+                    )]))),
                 ),
             );
-            store.key_manager.insert(object_id, &vec![(0, unwrapped_key)], permanent);
+            store.key_manager.insert(object_id, &vec![(key_id, Some(unwrapped_key))], permanent);
         }
         transaction.add(
             store.store_object_id(),
@@ -997,11 +1024,13 @@ impl ObjectStore {
     /// `crypt` is None, the default for the store is used (and prefer to pass None over passing the
     /// store's crypt service directly because the latter will end up using a permanent key that
     /// isn't purged when inactive).
+    /// TODO(https://fxbug.dev/364428824): Condense all optional arguments into a separate struct.
     pub async fn create_object<S: HandleOwner>(
         owner: &Arc<S>,
         mut transaction: &mut Transaction<'_>,
         options: HandleOptions,
         crypt: Option<&dyn Crypt>,
+        wrapping_key_id: Option<u128>,
     ) -> Result<DataObjectHandle<S>, Error> {
         ObjectStore::create_object_with_id(
             owner,
@@ -1009,6 +1038,7 @@ impl ObjectStore {
             INVALID_OBJECT_ID,
             options,
             crypt,
+            wrapping_key_id,
         )
         .await
     }
@@ -1954,7 +1984,7 @@ impl ObjectStore {
 
     /// Retrieves the wrapped keys for the given object.  The keys *should* be known to exist and it
     /// will be considered an inconsistency if they don't.
-    async fn get_keys(&self, object_id: u64) -> Result<WrappedKeys, Error> {
+    pub async fn get_keys(&self, object_id: u64) -> Result<WrappedKeys, Error> {
         match self.tree.find(&ObjectKey::keys(object_id)).await?.ok_or(FxfsError::Inconsistent)? {
             Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => Ok(keys),
             _ => Err(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys")),
@@ -2310,9 +2340,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         object1 = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
         let mut transaction = fs
@@ -2321,9 +2357,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object2 = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2335,9 +2377,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object3 = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2372,9 +2420,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
 
         transaction.add(
@@ -2426,9 +2480,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
 
         transaction.commit().await.unwrap();
@@ -2558,9 +2618,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2619,6 +2685,7 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
+                None,
             )
             .await
             .expect("create_object failed");
@@ -2651,10 +2718,15 @@ mod tests {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let child =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        let child = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
         assert!(store.key_manager.get(child.object_id()).await.unwrap().is_some());
         store
@@ -2679,6 +2751,7 @@ mod tests {
                 &root_store,
                 &mut transaction,
                 HandleOptions::default(),
+                None,
                 None,
             )
             .await

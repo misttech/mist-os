@@ -9,6 +9,7 @@ mod util;
 use crate::cr50::Cr50;
 use crate::power_button::PowerButton;
 use anyhow::{anyhow, Context, Error};
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_tpm::{TpmDeviceMarker, TpmDeviceProxy};
 use fidl_fuchsia_tpm_cr50::{Cr50RequestStream, PinWeaverRequestStream};
 use fuchsia_async::TimeoutExt;
@@ -21,7 +22,6 @@ use futures::prelude::*;
 use futures::stream::TryStreamExt;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
-use {fidl_fuchsia_io as fio, zx};
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.

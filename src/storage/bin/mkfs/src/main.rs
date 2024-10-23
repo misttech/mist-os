@@ -7,9 +7,9 @@ use argh::FromArgs;
 use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_device::ControllerMarker;
+use fidl_fuchsia_fs_realm as fs_realm;
 use fidl_fuchsia_sys2::RealmQueryMarker;
 use fuchsia_component::client::{connect_channel_to_protocol_at_path, connect_to_protocol_at_path};
-use {fidl_fuchsia_fs_realm as fs_realm, zx};
 
 #[derive(FromArgs)]
 #[argh(

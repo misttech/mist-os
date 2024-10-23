@@ -55,12 +55,7 @@ impl FileActor {
         // Write the file to disk
         let file = self
             .home_dir
-            .open_file(
-                &filename,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::CREATE_IF_ABSENT
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-            )
+            .open_file(&filename, fio::Flags::FLAG_MUST_CREATE | fio::PERM_WRITABLE)
             .await?;
         file.write(&data_bytes).await?;
         file.close().await

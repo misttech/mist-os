@@ -55,7 +55,7 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   // device present).
   std::unique_ptr<SdmmcDevice> TakeSdmmcDevice() { return std::move(sdmmc_); }
 
-  zx_status_t Probe(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata);
+  zx_status_t Probe(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata);
   zx_status_t AddDevice();
 
   zx_status_t SdioGetDevHwInfo(uint8_t fn_idx, sdio_hw_info_t* out_hw_info) TA_EXCL(lock_);

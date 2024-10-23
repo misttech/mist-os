@@ -25,8 +25,8 @@ use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::StreamExt;
 use recovery_ui_config::Config as UiConfig;
+use rive_rs as rive;
 use std::path::PathBuf;
-use {rive_rs as rive, zx};
 
 mod menu;
 use menu::{Key, MenuButtonType, MenuEvent, MenuState, MenuStateMachine};

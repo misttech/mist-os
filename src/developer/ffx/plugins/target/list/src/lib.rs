@@ -12,8 +12,7 @@ use ffx_target::{KnockError, TargetInfoQuery};
 use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::TimeoutExt;
-use futures::future::join_all;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use std::time::Duration;
 
 mod target_formatter;
@@ -121,7 +120,7 @@ async fn get_target_info(
     addrs: &[addr::TargetAddr],
 ) -> Result<(ffx::RemoteControlState, Option<String>, Option<String>)> {
     let ssh_timeout: u64 =
-        ffx_config::get("target.host_pipe_ssh_timeout").await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+        ffx_config::get("target.host_pipe_ssh_timeout").unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
     let ssh_timeout = Duration::from_millis(ssh_timeout);
     for addr in addrs {
         // An address is, conveniently, a valid target spec as well
@@ -151,6 +150,17 @@ async fn get_target_info(
     Ok((ffx::RemoteControlState::Down, None, None))
 }
 
+async fn handle_res_to_info(
+    context: &EnvironmentContext,
+    handle: Result<discovery::TargetHandle>,
+    connect_to_target: bool,
+) -> Result<ffx::TargetInfo> {
+    match handle {
+        Ok(h) => handle_to_info(context, h, connect_to_target).await,
+        Err(e) => async { Err(e) }.await,
+    }
+}
+
 async fn handle_to_info(
     context: &EnvironmentContext,
     handle: discovery::TargetHandle,
@@ -163,7 +173,7 @@ async fn handle_to_info(
         }
         discovery::TargetState::Fastboot(fts) => {
             let addresses = match fts.connection_state {
-                discovery::FastbootConnectionState::Usb => None,
+                discovery::FastbootConnectionState::Usb => Some(vec![]),
                 discovery::FastbootConnectionState::Tcp(addresses) => Some(addresses.to_vec()),
                 discovery::FastbootConnectionState::Udp(addresses) => Some(addresses.to_vec()),
             };
@@ -208,18 +218,31 @@ async fn local_list_targets(
     ctx: &EnvironmentContext,
     cmd: &ListCommand,
 ) -> Result<Vec<ffx::TargetInfo>> {
+    let connect = do_connect_to_target(ctx, cmd).await;
+    let stream = get_handle_stream(cmd, ctx).await?;
+    let targets = handles_to_infos(stream, ctx, connect).await?;
+    Ok(targets)
+}
+
+async fn handles_to_infos(
+    stream: impl futures::Stream<Item = Result<discovery::TargetHandle>>,
+    ctx: &EnvironmentContext,
+    connect: bool,
+) -> Result<Vec<fidl_fuchsia_developer_ffx::TargetInfo>> {
+    let info_futures = stream.then(|t| handle_res_to_info(ctx, t, connect));
+    let infos: Vec<Result<ffx::TargetInfo>> = info_futures.collect().await;
+    let targets = infos.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
+    Ok(targets)
+}
+
+async fn get_handle_stream(
+    cmd: &ListCommand,
+    ctx: &EnvironmentContext,
+) -> Result<impl futures::Stream<Item = Result<discovery::TargetHandle>>> {
     let name = cmd.nodename.clone();
     let query = TargetInfoQuery::from(name);
-    let handles =
-        ffx_target::resolve_target_query_with(query, ctx, !cmd.no_usb, !cmd.no_mdns).await?;
-    let connect = do_connect_to_target(ctx, cmd).await;
-    // Connect to all targets in parallel
-    let targets =
-        join_all(handles.into_iter().map(|t| async { handle_to_info(ctx, t, connect).await }))
-            .await;
-    // Fail if any results are Err
-    let targets = targets.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
-    Ok(targets)
+    let stream = ffx_target::get_discovery_stream(query, !cmd.no_usb, !cmd.no_mdns, ctx).await?;
+    Ok(stream)
 }
 
 async fn list_targets(
@@ -516,5 +539,22 @@ mod test {
         assert!(out[1].starts_with("a"));
         assert!(out[2].starts_with("z"));
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_serial_addresses() {
+        // USB targets should have an empty list of addresses, not None
+        let env = ffx_config::test_init().await.unwrap();
+        let handle = Ok(discovery::TargetHandle {
+            node_name: Some("nodename".to_string()),
+            state: discovery::TargetState::Fastboot(discovery::FastbootTargetState {
+                serial_number: "12345678".to_string(),
+                connection_state: discovery::FastbootConnectionState::Usb,
+            }),
+        });
+        let stream = futures::stream::once(async { handle });
+        let targets = handles_to_infos(stream, &env.context, true).await;
+        let targets = targets.unwrap();
+        assert_ne!(targets[0].addresses, None);
     }
 }

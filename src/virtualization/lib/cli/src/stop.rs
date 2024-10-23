@@ -178,7 +178,7 @@ async fn force_stop_guest(
     Ok(StopResult { status: StopStatus::Forced, stop_time_nanos })
 }
 
-fn get_time_nanos(duration: fasync::Duration) -> i64 {
+fn get_time_nanos(duration: fasync::MonotonicDuration) -> i64 {
     #[cfg(target_os = "fuchsia")]
     let nanos = duration.into_nanos();
 

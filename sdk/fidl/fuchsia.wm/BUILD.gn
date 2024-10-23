@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.wm") {
-  sdk_category = "internal"
   sdk_area = "View System"
 
   sources = [

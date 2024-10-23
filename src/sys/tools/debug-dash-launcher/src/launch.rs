@@ -8,7 +8,7 @@ use fidl::HandleBased;
 use fidl_fuchsia_dash::LauncherError;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_runtime::{HandleInfo as HandleId, HandleType};
-use {fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, zx};
+use {fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc};
 
 pub mod component;
 pub mod package;
@@ -28,7 +28,7 @@ async fn explore_over_handles(
     command: Option<String>,
     mut name_infos: Vec<fproc::NameInfo>,
     process_name: String,
-    package_resolver: &crate::package_resolver::PackageResolver,
+    package_resolver: &mut crate::package_resolver::PackageResolver,
 ) -> Result<zx::Process, LauncherError> {
     // In addition to tools binaries requested by the user, add the built-in binaries of the
     // debug-dash-launcher package, creating `#!resolve` trampolines for all.

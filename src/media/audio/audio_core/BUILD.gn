@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//src/media/audio/audio_core/package.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 audio_core_package("audio_core") {
   package_deps = [ "//src/media/audio/effects/passthrough:audio_effects" ]

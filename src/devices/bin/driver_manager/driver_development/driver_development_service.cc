@@ -85,6 +85,7 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
   v2_info_builder.moniker(fidl::StringView(allocator, node->MakeComponentMoniker()));
   device_info.moniker(fidl::StringView(allocator, node->MakeComponentMoniker()));
 
+  device_info.quarantined(node->quarantined());
   device_info.bound_driver_url(fidl::StringView(allocator, node->driver_url()));
 
   SetNodeInfoBuilderNodeProperties(allocator, *node, device_info, v2_info_builder);

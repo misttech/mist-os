@@ -682,7 +682,10 @@ fn handle_shortcut_unknown(
             ele.doc_line().file_name.clone(),
             &format!("Unknown reference link to [{}][{}]", text, link_url),
             &format!(
-                "making sure you added a matching [{}]: YOUR_LINK_HERE below this reference",
+                // TODO(https://fxbug.dev/373449734): Remove the second sentence when fixed.
+                "making sure you added a matching [{}]: YOUR_LINK_HERE below this reference. \
+                If this is in a triple tick code block, consider removing empty lines - see \
+                https://fxbug.dev/373449734.",
                 link_url
             ),
         ));
@@ -1181,7 +1184,7 @@ mod tests {
             "brackets which are not a link [your name here]",
             Some([DocCheckError::new_error_helpful(1, PathBuf::from("/docs/README.md"),
                 "Unknown reference link to [your name here][your name here]",
-                "making sure you added a matching [your name here]: YOUR_LINK_HERE below this reference")
+                "making sure you added a matching [your name here]: YOUR_LINK_HERE below this reference. If this is in a triple tick code block, consider removing empty lines - see https://fxbug.dev/373449734.")
             ].to_vec()),
         ),
         (
@@ -1190,7 +1193,7 @@ mod tests {
             "missing [text][link-to-text]",
             Some([DocCheckError::new_error_helpful(1, PathBuf::from("/docs/README.md"),
                 "Unknown reference link to [text][link-to-text]",
-                "making sure you added a matching [link-to-text]: YOUR_LINK_HERE below this reference"
+                "making sure you added a matching [link-to-text]: YOUR_LINK_HERE below this reference. If this is in a triple tick code block, consider removing empty lines - see https://fxbug.dev/373449734."
             )].to_vec())
         ),
         (

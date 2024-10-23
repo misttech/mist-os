@@ -10,7 +10,7 @@ use errors::ModelError;
 use fuchsia_inspect::{IntExponentialHistogramProperty, IntLinearHistogramProperty};
 use inspect::HistogramProperty;
 use moniker::Moniker;
-use {fuchsia_inspect as inspect, fuchsia_sync as fsync, zx};
+use {fuchsia_inspect as inspect, fuchsia_sync as fsync};
 
 use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
 

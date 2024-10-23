@@ -199,7 +199,7 @@ zx_status_t FtDevice::Init() {
     }
   }
 
-  fidl::WireResult interrupt = int_gpio_->GetInterrupt2({});
+  fidl::WireResult interrupt = int_gpio_->GetInterrupt({});
   if (!interrupt.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to int gpio: %s", interrupt.status_string());
     return interrupt.status();

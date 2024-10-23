@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use blackout_target::{Test, TestServer};
 use byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt};
+use fidl_fuchsia_io as fio;
 use fs_management::filesystem::Filesystem;
 use fs_management::Blobfs;
 use fuchsia_fs::directory::readdir;
@@ -15,7 +16,6 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::collections::HashMap;
 use std::sync::Arc;
-use {fidl_fuchsia_io as fio, zx};
 
 async fn write_blob(rng: &mut impl Rng, root: &fio::DirectoryProxy, i: u64) -> Result<String> {
     let mut data = vec![];

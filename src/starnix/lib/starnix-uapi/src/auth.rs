@@ -450,6 +450,7 @@ impl Credentials {
     }
 
     pub fn exec(&mut self, maybe_set: UserAndOrGroupId) {
+        let is_suid_or_sgid = maybe_set.is_some();
         // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
         //
         //   If the set-user-ID bit is set on the program file referred to by
@@ -470,26 +471,65 @@ impl Credentials {
         self.saved_uid = self.euid;
         self.saved_gid = self.egid;
 
-        // > Ambient capabilities are added to the permitted set and assigned to the effective set
-        // > when execve(2) is called.
-        // https://man7.org/linux/man-pages/man7/capabilities.7.html
+        // From <https://man7.org/linux/man-pages/man7/capabilities.7.html>:
+        //
+        //   During an execve(2), the kernel calculates the new capabilities
+        //   of the process using the following algorithm:
+        //   P'(ambient)     = (file is privileged) ? 0 : P(ambient)
+        //   P'(permitted)   = (P(inheritable) & F(inheritable)) |
+        //                     (F(permitted) & P(bounding)) | P'(ambient)
+        //   P'(effective)   = F(effective) ? P'(permitted) : P'(ambient)
+        //   P'(inheritable) = P(inheritable)    [i.e., unchanged]
+        //   P'(bounding)    = P(bounding)       [i.e., unchanged]
+        // where:
+        //   P()    denotes the value of a thread capability set before
+        //          the execve(2)
+        //   P'()   denotes the value of a thread capability set after the
+        //          execve(2)
+        //   F()    denotes a file capability set
 
-        // When a process with nonzero UIDs execve(2)s a set-user-ID-
-        // root program that does not have capabilities attached, or when a
-        // process whose real and effective UIDs are zero execve(2)s a
-        // program, the calculation of the process's new permitted
-        // capabilities simplifies to: inheritable | bounding.
-        if self.uid == 0 && self.euid == 0 {
-            self.cap_permitted = self.cap_inheritable | self.cap_bounding;
+        // a privileged file is one that has capabilities or
+        // has the set-user-ID or set-group-ID bit set.
+        // TODO(https://fxbug.dev/328629782): Add support for file capabilities.
+        let file_is_privileged = is_suid_or_sgid;
+
+        // After having performed any changes to the process effective ID
+        // that were triggered by the set-user-ID mode bit of the binary—
+        // e.g., switching the effective user ID to 0 (root) because a set-
+        // user-ID-root program was executed—the kernel calculates the file
+        // capability sets as follows:
+
+        // (1)  If the real or effective user ID of the process is 0 (root),
+        //  then the file inheritable and permitted sets are ignored;
+        //  instead they are notionally considered to be all ones (i.e.,
+        //  all capabilities enabled).
+        let (file_permitted, file_inheritable) = if self.uid == 0 || self.euid == 0 {
+            (Capabilities::all(), Capabilities::all())
         } else {
-            // TODO(https://fxbug.dev/328629782): This should take file capabilities into account.
-            // (inheritable & file.inheritable) | (file.permitted & bounding) | ambient
-            self.cap_permitted = self.cap_inheritable | self.cap_ambient;
-        }
+            (Capabilities::empty(), Capabilities::empty())
+        };
 
-        // TODO(https://fxbug.dev/328629782): This should take file capabilities into account.
-        // if file.effective { permitted | ambient } else { 0 }
-        self.cap_effective = self.cap_permitted;
+        // (2)  If the effective user ID of the process is 0 (root) or the
+        //  file effective bit is in fact enabled, then the file
+        //  effective bit is notionally defined to be one (enabled).
+        let file_effective = self.euid == 0;
+
+        // TODO(https://fxbug.dev/328629782): File capabilities are honored for set-user-ID-root
+        // binaries with capabilities executed by non-root users. See "Set-user-ID-root programs
+        // that have file capabilities" in the man page.
+
+        //   P'(ambient)     = (file is privileged) ? 0 : P(ambient)
+        self.cap_ambient =
+            if file_is_privileged { Capabilities::empty() } else { self.cap_ambient };
+
+        //   P'(permitted)   = (P(inheritable) & F(inheritable)) |
+        //                     (F(permitted) & P(bounding)) | P'(ambient)
+        self.cap_permitted = (self.cap_inheritable & file_inheritable)
+            | (file_permitted & self.cap_bounding)
+            | self.cap_ambient;
+
+        //   P'(effective)   = F(effective) ? P'(permitted) : P'(ambient)
+        self.cap_effective = if file_effective { self.cap_permitted } else { self.cap_ambient };
 
         self.securebits.remove(SecureBits::KEEP_CAPS);
     }

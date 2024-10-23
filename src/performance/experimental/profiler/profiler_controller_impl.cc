@@ -110,6 +110,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
 
     profiler::ProcessTarget process_target{std::move(process), pid,
                                            std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
+    FX_LOGS(DEBUG) << "Collecting process modules for process " << pid << ".";
     elf_search::ForEachModule(process_target.handle,
                               [&process_target](const elf_search::ModuleInfo& info) {
                                 process_target.unwinder_data->modules.emplace_back(
@@ -207,6 +208,7 @@ zx::result<zx_koid_t> MonikerToJobId(const std::string& moniker) {
 void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
                                                  ConfigureCompleter::Sync& completer) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  FX_LOGS(DEBUG) << "Configuring profiler.";
   if (state_ != ProfilingState::Unconfigured) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
     return;
@@ -331,8 +333,8 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
             moniker = "./core/ffx-laboratory:" + name;
           }
 
-          zx::result<std::unique_ptr<profiler::Component>> res =
-              profiler::Component::Create(dispatcher_, url, moniker);
+          zx::result<std::unique_ptr<profiler::ComponentTarget>> res =
+              profiler::ControlledComponent::Create(dispatcher_, url, moniker);
           if (res.is_error()) {
             FX_PLOGS(INFO, res.error_value())
                 << "No access to fuchsia.sys2.LifecycleController.root. Component launching and attaching is disabled";
@@ -365,8 +367,12 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
 
         case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentMoniker: {
           auto attach_moniker = attach_config->attach_to_component_moniker();
-          zx::result<std::unique_ptr<profiler::Component>> res =
+          zx::result<std::unique_ptr<profiler::ComponentTarget>> res =
               profiler::UnownedComponent::Create(dispatcher_, attach_moniker, std::nullopt);
+          if (res.is_error()) {
+            FX_PLOGS(ERROR, res.error_value())
+                << "Failed to attach to component: " << attach_moniker.value_or("<unspecified>");
+          }
           if (res.is_error()) {
             completer.Reply(
                 fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
@@ -377,7 +383,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
         }
         case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentUrl: {
           auto attach_url = attach_config->attach_to_component_url();
-          zx::result<std::unique_ptr<profiler::Component>> res =
+          zx::result<std::unique_ptr<profiler::ComponentTarget>> res =
               profiler::UnownedComponent::Create(dispatcher_, std::nullopt, attach_url);
           if (res.is_error()) {
             completer.Reply(
@@ -442,6 +448,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
 void profiler::ProfilerControllerImpl::Start(StartRequest& request,
                                              StartCompleter::Sync& completer) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  FX_LOGS(DEBUG) << "Starting profiler.";
   if (state_ != ProfilingState::Stopped) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionStartError::kBadState));
     return;
@@ -513,6 +520,7 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
 
 void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  FX_LOGS(DEBUG) << "Stopping profiler.";
   zx::result<profiler::SymbolizationContext> modules = sampler_->GetContexts();
   if (modules.is_error()) {
     FX_PLOGS(ERROR, modules.status_value()) << "Failed to get modules";
@@ -579,6 +587,7 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   // full socket.
   completer.Reply(std::move(stats));
 
+  FX_LOGS(DEBUG) << "Sending samples.";
   for (const auto& [pid, samples] : sampler_->GetSamples()) {
     if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::kReset, socket_)) {
       FX_LOGS(ERROR) << "Failed to write symbolizer markup to socket";

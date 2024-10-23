@@ -235,7 +235,7 @@ closed protocol Port {
     /// timely fashion can cause excessive kernel memory to be used, which might generate
     /// an exception. See [ipc limits](/docs/concepts/kernel/ipc_limits.md) for details.
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_port_packet {
     ///     uint64_t key;
     ///     uint32_t type;
@@ -245,20 +245,18 @@ closed protocol Port {
     ///         zx_packet_signal_t signal;
     ///     };
     /// } zx_port_packet_t;
-    ///
     /// ```
     ///
     /// In *packet* *type* should be `ZX_PKT_TYPE_USER` and only the `user`
     /// union element is considered valid:
     ///
-    /// ```
+    /// ```c
     /// typedef union zx_packet_user {
     ///     uint64_t u64[4];
     ///     uint32_t u32[8];
     ///     uint16_t u16[16];
     ///     uint8_t   c8[32];
     /// } zx_packet_user_t;
-    ///
     /// ```
     ///
     /// ## Rights
@@ -329,7 +327,7 @@ closed protocol Port {
     /// and packets queued by the kernel when objects a port is registered with change state. In both
     /// cases the packet is always of type `zx_port_packet_t`:
     ///
-    /// ```
+    /// ```c
     /// struct zx_port_packet_t {
     ///     uint64_t key;
     ///     uint32_t type;
@@ -352,7 +350,7 @@ closed protocol Port {
     /// `zx_port_packet_t` structure. Access to the packet data is provided by the *user* member, with
     /// type `zx_packet_user_t`:
     ///
-    /// ```
+    /// ```c
     /// typedef union zx_packet_user {
     ///     uint64_t u64[4];
     ///     uint32_t u32[8];

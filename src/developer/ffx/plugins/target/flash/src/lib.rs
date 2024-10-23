@@ -115,7 +115,7 @@ async fn preprocess_flash_cmd<W: Write>(
     }
 
     if cmd.product_bundle.is_none() && cmd.manifest_path.is_none() && cmd.manifest.is_none() {
-        let product_path: String = ffx_config::get("product.path").await?;
+        let product_path: String = ffx_config::get("product.path")?;
         writeln!(
             writer,
             "No product bundle or manifest passed. Inferring product bundle path from config: {}",
@@ -202,7 +202,7 @@ async fn flash_plugin_impl<W: Write>(
 
                 // Warn the user
                 if MonotonicInstant::now() - start
-                    > fuchsia_async::Duration::from_secs(WAIT_WARN_SECS)
+                    > fuchsia_async::MonotonicDuration::from_secs(WAIT_WARN_SECS)
                 {
                     once.call_once(|| {
                         let _ = writeln!(
@@ -262,7 +262,7 @@ Using address {} as node name",
                 };
                 let config = FastbootNetworkConnectionConfig::new_udp().await;
                 let fastboot_device_file_path: Option<PathBuf> =
-                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
                 let mut proxy =
                     udp_proxy(target_name, fastboot_device_file_path, &socket_addr, config).await?;
                 from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
@@ -294,7 +294,7 @@ Using address {} as node name",
                 };
                 let config = FastbootNetworkConnectionConfig::new_tcp().await;
                 let fastboot_device_file_path: Option<PathBuf> =
-                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
                 let mut proxy =
                     tcp_proxy(target_name, fastboot_device_file_path, &socket_addr, config).await?;
                 from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)

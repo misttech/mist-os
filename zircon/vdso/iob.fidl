@@ -87,7 +87,7 @@ closed protocol Iob {
     /// This memory object is only accessible through operations on, and mappings of,
     /// the owning IOB.
     ///
-    /// ```
+    /// ```c
     /// struct zx_iob_region_private_t {
     ///   uint64_t options;
     /// };

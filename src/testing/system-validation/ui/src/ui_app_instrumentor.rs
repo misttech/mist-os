@@ -23,8 +23,12 @@ struct RunTestCmd {
     trace_config: Vec<String>,
 
     /// number of seconds to run example app, default is 5 seconds
-    #[argh(option, default = "fasync::Duration::from_seconds(5)", from_str_fn(to_duration))]
-    run_duration_sec: fasync::Duration,
+    #[argh(
+        option,
+        default = "fasync::MonotonicDuration::from_seconds(5)",
+        from_str_fn(to_duration)
+    )]
+    run_duration_sec: fasync::MonotonicDuration,
 }
 
 // Note: Maybe we want to make this an argument.
@@ -81,8 +85,8 @@ async fn main() {
     }
 }
 
-fn to_duration(duration_sec: &str) -> Result<fasync::Duration, String> {
-    Ok(fasync::Duration::from_seconds(duration_sec.parse::<i64>().unwrap()))
+fn to_duration(duration_sec: &str) -> Result<fasync::MonotonicDuration, String> {
+    Ok(fasync::MonotonicDuration::from_seconds(duration_sec.parse::<i64>().unwrap()))
 }
 
 fn to_vector(configs: &str) -> Result<Vec<String>, String> {

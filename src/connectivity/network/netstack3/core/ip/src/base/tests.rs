@@ -75,6 +75,7 @@ impl<I: IpLayerIpExt, BC> IpDeviceSendContext<I, BC> for FakeCoreCtx<I> {
         _bindings_ctx: &mut BC,
         _device_id: &Self::DeviceId,
         _destination: IpPacketDestination<I, &Self::DeviceId>,
+        _ip_layer_metadata: DeviceIpLayerMetadata,
         body: S,
         _egress_proof: filter::ProofOfEgressCheck,
     ) -> Result<(), netstack3_base::SendFrameError<S>>

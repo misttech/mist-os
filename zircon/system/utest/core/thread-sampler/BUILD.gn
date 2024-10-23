@@ -9,11 +9,13 @@ source_set("thread-sampler") {
   sources = [ "thread-sampler.cc" ]
   deps = [
     "..:needs-next",
+    "//sdk/lib/fit",
     "//src/performance/lib/fxt",
     "//src/zircon/testing/standalone-test",
     "//zircon/system/ulib/runtime",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
+    "//zircon/system/utest/core/threads:thread-functions",
   ]
   configs += [ ":include_experimental_thread_sampler" ]
 }

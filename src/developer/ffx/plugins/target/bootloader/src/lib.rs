@@ -101,7 +101,7 @@ impl FfxMain for BootloaderTool {
                     }
 
                     if MonotonicInstant::now() - start
-                        > fuchsia_async::Duration::from_secs(WAIT_WARN_SECS)
+                        > fuchsia_async::MonotonicDuration::from_secs(WAIT_WARN_SECS)
                     {
                         once.call_once(|| {
                             let _ = writeln!(
@@ -158,7 +158,7 @@ Using address {} as node name",
                     };
                     let config = FastbootNetworkConnectionConfig::new_udp().await;
                     let fastboot_device_file_path: Option<PathBuf> =
-                        ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                        ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
                     let proxy =
                         udp_proxy(target_name, fastboot_device_file_path, &socket_addr, config)
                             .await?;
@@ -188,7 +188,7 @@ Using address {} as node name
                     };
                     let config = FastbootNetworkConnectionConfig::new_tcp().await;
                     let fastboot_device_file_path: Option<PathBuf> =
-                        ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                        ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
                     let proxy =
                         tcp_proxy(target_name, fastboot_device_file_path, &socket_addr, config)
                             .await?;

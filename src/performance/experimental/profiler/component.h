@@ -16,42 +16,74 @@
 
 namespace profiler {
 
-class Component {
+// A component moniker as specified in //docs/reference/components/moniker.md.
+struct Moniker {
+  std::optional<std::string> parent;
+  std::optional<std::string> collection;
+  std::string name;
+
+  std::string ToString() const {
+    std::string moniker_string;
+    if (parent.has_value()) {
+      moniker_string += *parent;
+      moniker_string += "/";
+    }
+    if (collection.has_value()) {
+      moniker_string += *collection;
+      moniker_string += ":";
+    }
+    moniker_string += name;
+    return moniker_string;
+  }
+  static zx::result<Moniker> Parse(std::string_view moniker);
+};
+
+// Given a moniker `moniker` and function `f`, call `f` on `moniker` and each child of `moniker`.
+//
+// The results are `and`ed together, short circuiting and returning early on any failure.
+zx::result<> TraverseRealm(const std::string& moniker,
+                           const fit::function<zx::result<>(const std::string& moniker)>& f);
+
+class ComponentTarget {
  public:
-  explicit Component(async_dispatcher_t* dispatcher) : component_watcher_(dispatcher) {}
-  // If on_start is specified, the callback will be called when it is successfully started via
-  // `StartComponents`
-  static zx::result<std::unique_ptr<Component>> Create(async_dispatcher_t* dispatcher,
-                                                       const std::string& url,
-                                                       const std::string& moniker);
+  // Do any required initialization for the component, and begin watching the component. Call
+  // on_start when the component (and any of its children) are ready to be profiled.
+  virtual zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start) = 0;
+  // Detach from the component -- stop emitting calls to on start.
+  virtual zx::result<> Stop() = 0;
+  // Tear down and clean up this component if needed.
+  virtual zx::result<> Destroy() = 0;
 
-  virtual zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start = nullptr);
-  virtual zx::result<> Stop();
-  virtual zx::result<> Destroy();
+  virtual ~ComponentTarget() = default;
+};
 
-  // Return the moniker the component was created at
-  std::string Moniker() { return moniker_; }
+class ControlledComponent : public ComponentTarget {
+ public:
+  explicit ControlledComponent(async_dispatcher_t* dispatcher, std::string url, Moniker moniker)
+      : ComponentTarget{},
+        url_{std::move(url)},
+        moniker_{std::move(moniker)},
+        component_watcher_(dispatcher) {}
+  static zx::result<std::unique_ptr<ControlledComponent>> Create(async_dispatcher_t* dispatcher,
+                                                                 const std::string& url,
+                                                                 const std::string& moniker);
 
-  virtual ~Component();
+  zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start) override;
+  zx::result<> Stop() override;
+  zx::result<> Destroy() override;
 
- protected:
-  // Recursively call f on each component in the realm specified by `moniker`
-  static zx::result<> TraverseRealm(
-      std::string moniker, const fit::function<zx::result<>(const std::string& moniker)>& f);
-  static zx::result<fidl::Box<fuchsia_component_decl::Component>> GetResolvedDeclaration(
-      const std::string& moniker);
-  std::optional<ComponentWatcher::ComponentEventHandler> on_start_;
-  std::string name_;
-  std::string collection_;
-  std::string parent_moniker_;
-  std::string moniker_;
-  std::string url_;
-  std::vector<Component> children_;
-
-  ComponentWatcher component_watcher_;
-  bool needs_destruction_ = true;
+  ~ControlledComponent() override;
 
  private:
+  std::optional<ComponentWatcher::ComponentEventHandler> on_start_;
+  std::string url_;
+  Moniker moniker_;
+
+  ComponentWatcher component_watcher_;
+  // Ensure that we only destroy this component once -- either explicitly through Destroy, or
+  // implicitly in ~ControlledComponent.
+  bool needs_destruction_ = true;
+
   fidl::SyncClient<fuchsia_sys2::LifecycleController> lifecycle_controller_client_;
 };
 

@@ -7,10 +7,10 @@ use block_client::RemoteBlockClientSync;
 use fidl::endpoints::{ClientEnd, Proxy as _};
 use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker};
+use fidl_fuchsia_io as fio;
 use fuchsia_fatfs::FatFs;
 use tracing::info;
 use vfs::execution_scope::ExecutionScope;
-use {fidl_fuchsia_io as fio, zx};
 
 const MICROSOFT_BASIC_DATA_GUID: [u8; 16] = [
     0xa2, 0xa0, 0xd0, 0xeb, 0xe5, 0xb9, 0x33, 0x44, 0x87, 0xc0, 0x68, 0xb6, 0xb7, 0x26, 0x99, 0xc7,
@@ -25,10 +25,7 @@ pub struct FatDevice {
 impl FatDevice {
     /// Try and create a new FatDevice, searching for partitions in /dev/class/block.
     pub async fn new() -> Result<Option<Self>, Error> {
-        let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-            BLOCK_DEVICE_DIR,
-            fio::OpenFlags::RIGHT_READABLE,
-        )?;
+        let dir = fuchsia_fs::directory::open_in_namespace(BLOCK_DEVICE_DIR, fio::PERM_READABLE)?;
         Self::new_at(dir).await
     }
 
@@ -223,13 +220,9 @@ pub mod test {
 
         let dir = local.into_proxy().expect("into proxy");
 
-        let dev_dir = fuchsia_fs::directory::open_directory_deprecated(
-            &dir,
-            "dev",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("open directory");
+        let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
+            .await
+            .expect("open directory");
 
         let result = FatDevice::get_guid_at(&dev_dir, "000").await.expect("get guid succeeds");
         assert_eq!(result.unwrap().value, MICROSOFT_BASIC_DATA_GUID);
@@ -249,13 +242,9 @@ pub mod test {
 
         let dir = local.into_proxy().expect("into proxy");
 
-        let dev_dir = fuchsia_fs::directory::open_directory_deprecated(
-            &dir,
-            "dev",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("open directory");
+        let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
+            .await
+            .expect("open directory");
 
         let result = FatDevice::find_fat_partition(&dev_dir).await;
         assert_eq!(result.expect("Find partition succeeds"), Some("002".to_owned()));
@@ -275,13 +264,9 @@ pub mod test {
 
         let dir = local.into_proxy().expect("into proxy");
 
-        let dev_dir = fuchsia_fs::directory::open_directory_deprecated(
-            &dir,
-            "dev",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("open directory");
+        let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
+            .await
+            .expect("open directory");
 
         let result = FatDevice::find_fat_partition(&dev_dir).await;
         assert_eq!(result.expect("Find partition succeeds"), None);

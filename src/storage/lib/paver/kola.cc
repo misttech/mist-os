@@ -31,9 +31,8 @@ using uuid::Uuid;
 zx::result<std::unique_ptr<DevicePartitioner>> KolaPartitioner::Initialize(
     const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  auto status = IsBoard(svc_root, "kola");
-  if (status.is_error()) {
-    return status.take_error();
+  if (IsBoard(svc_root, "kola").is_error() && IsBoard(svc_root, "sorrel").is_error()) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   auto gpt = GptDevicePartitioner::InitializeGpt(devices, svc_root, std::move(block_device));

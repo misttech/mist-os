@@ -19,6 +19,8 @@ rustc_test("config-validation") {
 
   source_root = "config_validation.rs"
   sources = [ "config_validation.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 # Test component for config validation.
@@ -57,6 +59,8 @@ rustc_test("integration-bin") {
     "test_topology.rs",
     "utils.rs",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("sampler-test-suite-component") {

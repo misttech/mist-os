@@ -117,7 +117,9 @@ mod tests {
     use cm_rust_testing::*;
     use cm_util::TaskGroup;
     use fidl::client::Client;
+    use fidl::encoding::DefaultFuchsiaResourceDialect;
     use fidl::handle::AsyncChannel;
+    use fidl_fuchsia_io as fio;
     use futures::lock::Mutex;
     use futures::StreamExt;
     use hooks::EventType;
@@ -127,7 +129,6 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path as VfsPath;
     use vfs::ToObjectRequest;
-    use {fidl_fuchsia_io as fio, zx};
 
     struct BinderCapabilityTestFixture {
         builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
@@ -246,7 +247,7 @@ mod tests {
         task_group.join().await;
 
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "binder_service");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "binder_service");
         let mut event_receiver = client.take_event_receiver();
         assert_matches!(
             event_receiver.next().await,

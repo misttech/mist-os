@@ -249,7 +249,7 @@ impl UinputDeviceFile {
                     None => return error!(EINVAL),
                 };
 
-                let open_files = Arc::new(Mutex::new(Vec::new()));
+                let open_files: OpenedFiles = Default::default();
 
                 let registered_device_id = match device_type {
                     DeviceType::Keyboard => {
@@ -550,13 +550,13 @@ mod test {
     fn make_kernel_objects<'l>(
         file: Arc<UinputDeviceFile>,
     ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, Locked<'l, Unlocked>) {
-        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let file_object = FileObject::new(
             Box::new(file),
             // The input node doesn't really live at the root of the filesystem.
             // But the test doesn't need to be 100% representative of production.
             current_task
-                .lookup_path_from_root(".".into())
+                .lookup_path_from_root(&mut locked, ".".into())
                 .expect("failed to get namespace node for root"),
             OpenFlags::empty(),
         )

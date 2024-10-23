@@ -85,11 +85,11 @@ import("//build/testing/host_test_data.gni")
 #    Type: list(string)
 #    Default: empty list
 #
-#   data_sources (optional)
-#     See build/python/python_binary.gni
+#  data_sources (optional)
+#    See build/python/python_binary.gni
 #
-#   data_package_name (required if |data_sources| is provided, else optional)
-#     See build/python/python_binary.gni
+#  data_package_name (required if |data_sources| is provided, else optional)
+#    See build/python/python_binary.gni
 #
 #  test_dir (optional)
 #    Path to where the test executes.
@@ -162,15 +162,15 @@ import("//build/testing/host_test_data.gni")
 #         }
 #       }
 #     }
-#   Note:
-#     Mobly-Driver on receiving this information from python_mobly_test, will update the dict with
-#     the following FFX related information:
+#    Note:
+#      Mobly-Driver on receiving this information from python_mobly_test, will update the dict with
+#      the following FFX related information:
 #         ffx = {
 #           bin_path =" <path>"  # Path where FFX binary can be found
 #           subtools_path = "<path>"  # Path where FFX subtools can be found
 #         }
-#     Even if these keys are present in the original user specified honeydew_config, they will be
-#     over written by mobly-driver with appropriate information.
+#      Even if these keys are present in the original user specified honeydew_config, they will be
+#      over written by mobly-driver with appropriate information.
 #
 #  ssh_path (optional)
 #    Path to the ssh binary to be used by Antlion connectivity testbeds for connecting
@@ -196,35 +196,35 @@ import("//build/testing/host_test_data.gni")
 #  timeout_secs (optional)
 #    [int] The infra timeout in seconds for the test.
 #
-#   isolated (optional)
-#     [bool] Whether the test needs to be run in isolation to other tests.
+#  isolated (optional)
+#    [bool] Whether the test needs to be run in isolation to other tests.
 #
-#   environments
+#  environments
 #    Optional: what environments this test should target. Only applies to host
 #    host tests. See //build/testing/test_spec.gni for more details.
 #    Type: list of scopes.
 #    Default: emu_env
 #
-#   enable_mypy (optional)
-#     If true, enable MyPy type checking on the target and respective deps.
-#     Type: boolean
-#     Default: true
+#  enable_mypy (optional)
+#    If true, enable MyPy type checking on the target and respective deps.
+#    Type: boolean
+#    Default: true
 #
-#   testonly (optional)
-#     GN Usual. Allow option to set to false for IDK inclusion.
-#     See https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/BUILD.gn;l=161-167;drc=aa7ba9d998556f7124fe8e2edc6604c9c1592d01
-#     Type: boolean
-#     Default: true
+#  testonly (optional)
+#    GN Usual. Allow option to set to false for IDK inclusion.
+#    See https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/BUILD.gn;l=161-167;drc=aa7ba9d998556f7124fe8e2edc6604c9c1592d01
+#    Type: boolean
+#    Default: true
 #
 #  deps
 #  visibility
 #
 # Metadata
 #
-#   hermetic_test_sources (if |enable_hermetic_exe| is set and for
-#     $target_name.binary_and_config targets only)
-#     List of scopes for each test-specific file including the name and path of
-#     the source (relative to root).
+#  hermetic_test_sources (if |enable_hermetic_exe| is set and for
+#    $target_name.binary_and_config targets only)
+#    List of scopes for each test-specific file including the name and path of
+#    the source (relative to root).
 
 template("python_mobly_test") {
   assert(defined(invoker.main_source), "main_source is required")

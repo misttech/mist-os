@@ -31,23 +31,19 @@
         },
     ],
     capabilities: [
-        {
-            extends: "#trigger_c/dict",
-            dictionary: "inner",
-        },
         { dictionary: "outer" },
     ],
     use: [
         {
-            protocol: "fidl.test.components.Trigger-a",
+            protocol: [
+                "fidl.test.components.Trigger-a",
+                "fidl.test.components.Trigger-b",
+                "fidl.test.components.Trigger-c",
+            ],
             from: "self/outer",
         },
         {
-            protocol: [
-                "fidl.test.components.Trigger-b",
-                "fidl.test.components.Trigger-c",
-                "fidl.test.components.Trigger-d",
-            ],
+            protocol: [ "fidl.test.components.Trigger-d" ],
             from: "self/outer/inner",
         },
     ],
@@ -71,12 +67,18 @@
             protocol: "fidl.test.components.Trigger",
             from: "#trigger_b",
             as: "fidl.test.components.Trigger-b",
-            to: "self/inner",
+            to: "self/outer",
         },
         {
-            from: "self",
+            protocol: "fidl.test.components.Trigger-c",
+            from: "#trigger_c/dict",
             to: "self/outer",
-            dictionary: "inner",
+        },
+        {
+            dictionary: "dynamic",
+            from: "#trigger_c",
+            as: "inner",
+            to: "self/outer",
         },
     ],
 }

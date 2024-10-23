@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_
 
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <fuchsia/hardware/audio/signalprocessing/cpp/fidl.h>
@@ -29,7 +29,7 @@ namespace media_audio {
 class FakeStreamConfig final : public fuchsia::hardware::audio::StreamConfig,
                                public fuchsia::hardware::audio::signalprocessing::SignalProcessing,
                                public fuchsia::hardware::audio::RingBuffer {
-  static inline constexpr bool kLogFakeStreamConfig = false;
+  static constexpr bool kLogFakeStreamConfig = false;
 
  public:
   FakeStreamConfig(zx::channel server_end, zx::channel client_end, async_dispatcher_t* dispatcher);
@@ -251,7 +251,7 @@ class FakeStreamConfig final : public fuchsia::hardware::audio::StreamConfig,
   std::vector<std::optional<std::vector<uint8_t>>> valid_bits_per_sample_;
   std::vector<std::optional<std::vector<uint32_t>>> frame_rates_;
 
-  static inline constexpr UniqueId kDefaultUniqueId{
+  static constexpr UniqueId kDefaultUniqueId{
       {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,  //
        0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10},
   };
@@ -302,4 +302,4 @@ class FakeStreamConfig final : public fuchsia::hardware::audio::StreamConfig,
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_FAKE_STREAM_CONFIG_H_

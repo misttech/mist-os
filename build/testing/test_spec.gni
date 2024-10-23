@@ -116,6 +116,8 @@ if (allowed_device_types == []) {
     allowed_device_types = [ "Atlas" ]
   } else if (board_name == "kola") {
     allowed_device_types = [ "Kola" ]
+  } else if (board_name == "sorrel") {
+    allowed_device_types = [ "Sorrel" ]
   }
 }
 

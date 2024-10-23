@@ -9,6 +9,7 @@ import("//build/rust/rustc_library.gni")
 
 iquery_deps = [
   "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+  "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
   "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
   "//src/lib/diagnostics/data/rust",
   "//src/lib/diagnostics/hierarchy/rust",
@@ -19,7 +20,6 @@ iquery_deps = [
   "//src/sys/lib/moniker",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:argh",
-  "//third_party/rust_crates:async-trait",
   "//third_party/rust_crates:derivative",
   "//third_party/rust_crates:either",
   "//third_party/rust_crates:nom",
@@ -32,7 +32,6 @@ iquery_deps = [
 
 if (is_fuchsia) {
   iquery_deps += [
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fuchsia-component",
@@ -82,6 +81,8 @@ rustc_library("lib") {
 
   sources = iquery_sources
   sources += [ "src/lib.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("bin") {
@@ -101,6 +102,8 @@ rustc_binary("bin") {
   ]
 
   sources = [ "src/main.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("test_iquery_lib_unittests") {
@@ -161,6 +164,8 @@ rustc_test("iquery_test") {
     "test_data/show_test.json",
     "test_data/show_test.text",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("iquery-test") {

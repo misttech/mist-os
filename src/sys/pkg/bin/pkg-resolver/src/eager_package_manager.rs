@@ -27,7 +27,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use system_image::CachePackages;
 use tracing::{error, warn};
-use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, zx};
+use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio};
 
 const EAGER_PACKAGE_PERSISTENT_FIDL_NAME: &str = "eager_packages.pf";
 
@@ -693,6 +693,7 @@ mod tests {
         BlobInfoIteratorRequest, NeededBlobsRequest, PackageCacheMarker, PackageCacheRequest,
         PackageCacheRequestStream,
     };
+    use fuchsia_async as fasync;
     use omaha_client::cup_ecdsa::test_support::{
         make_default_public_key_for_test, make_default_public_key_id_for_test,
         make_default_public_keys_for_test, make_expected_signature_for_test, make_keys_for_test,
@@ -700,7 +701,6 @@ mod tests {
     };
     use omaha_client::cup_ecdsa::{Cupv2RequestHandler, PublicKeyAndId, PublicKeyId};
     use omaha_client::protocol::request::Request;
-    use {fuchsia_async as fasync, zx};
 
     const TEST_URL: &str = "fuchsia-pkg://example.com/package";
     const TEST_HASH: &str = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef";

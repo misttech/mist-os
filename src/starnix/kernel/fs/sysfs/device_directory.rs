@@ -70,6 +70,7 @@ impl FsNodeOps for DeviceDirectory {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -142,6 +143,7 @@ impl FsNodeOps for BlockDeviceDirectory {
 
     fn lookup(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -157,7 +159,7 @@ impl FsNodeOps for BlockDeviceDirectory {
                 BlockDeviceSizeFile::new_node(self.block_info.clone()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
-            _ => self.base_dir.lookup(node, current_task, name),
+            _ => self.base_dir.lookup(locked, node, current_task, name),
         }
     }
 }
@@ -203,6 +205,7 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,

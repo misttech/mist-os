@@ -26,7 +26,7 @@ use fidl::encoding::{
     FlexibleType, FrameworkErr, NoHandleResourceDialect, ResultType, TransactionMessage,
     TransactionMessageType, TypeMarker, ValueTypeMarker,
 };
-use fidl::{new_empty, Error, HandleDisposition};
+use fidl::{new_empty, Error};
 
 /// A trait for types that can be a FIDL request/response body.
 /// This is implemented for `()` and FIDL structs, tables, and unions.
@@ -177,7 +177,7 @@ fn encode<T: TypeMarker>(
 ) -> Result<Vec<u8>, Error> {
     let msg = TransactionMessage { header, body };
     let mut combined_bytes = Vec::<u8>::new();
-    let mut handles = Vec::<HandleDisposition<'static>>::new();
+    let mut handles = Vec::new();
     Encoder::encode::<TransactionMessageType<T>>(&mut combined_bytes, &mut handles, msg)?;
     debug_assert!(handles.is_empty(), "value type contains handles");
     Ok(combined_bytes)

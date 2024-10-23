@@ -163,6 +163,7 @@ group("non_hermetic_deps") {
     "//src/devices/clock/drivers/vim3-clk:*",
     "//src/devices/gpio/drivers/aml-gpio:*",
     "//src/devices/i2c/drivers/aml-i2c:*",
+    "//src/devices/spmi/lib/hwreg-spmi:*",
     "//src/devices/usb/drivers/aml-usb-phy:*",
     "//src/media/audio/drivers/aml-g12-tdm:*",
     "//src/starnix/kernel/device/gpu/gfxstream/*",
@@ -498,19 +499,6 @@ group("config_data_template_allowlist") {
 group("core_realm_shards_allowlist") {
   visibility = []
 
-  # Used by recovery images
-  visibility += [
-    "//src/diagnostics/realm:core_shard",
-    "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
-    "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
-    "//src/performance/memory/attribution/monitor:memory_monitor2_core_shard",
-    "//src/recovery/system:system_recovery_core_shard",
-    "//src/recovery/system:system_recovery_fdr_core_shard",
-    "//src/recovery/system:system_recovery_installer_core_shard",
-    "//src/settings/service:setui_service_core_shard_migration",
-    "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
-  ]
-
   # Used by in-tree tests
   visibility +=
       [ "//src/security/lib/scrutiny/tests/structured_config:core_shard" ]
@@ -529,14 +517,11 @@ group("legacy_bundle_allowlist") {
   # These are all tests that should ideally not be using a legacy bundle.
   visibility += [
     "//build/testing/boot_tests:*",
-    "//src/developer/ffx/tools/power/system-activity/application-activity:*",
     "//src/power/testing/system-integration/msd-arm-mali/custom-product:*",
     "//src/power/testing/system-integration/storage/custom-product:*",
     "//src/security/lib/scrutiny/collector:*",
-    "//src/security/lib/scrutiny/tests/route_verification:*",
     "//src/security/lib/scrutiny/tests/structured_config:*",
     "//src/security/tests/pkg_test/tests:*",
-    "//src/security/tests/scrutiny_ffx_integration:*",
     "//src/sys/component_manager/tests/bootfs_launching_benchmark:*",
     "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
     "//src/tests/early-boot-coverage/*",

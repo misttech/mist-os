@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
+#include <fidl/fuchsia.hardware.pin/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
@@ -219,31 +220,47 @@ class FakeClock : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clo
   fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> bindings_;
 };
 
-class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio> {
+class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>,
+                 public fidl::testing::WireTestBase<fuchsia_hardware_pin::Pin> {
  public:
   FakeGpio() = default;
 
-  fuchsia_hardware_gpio::Service::InstanceHandler GetInstanceHandler() {
+  fuchsia_hardware_gpio::Service::InstanceHandler GetGpioInstanceHandler() {
     return fuchsia_hardware_gpio::Service::InstanceHandler({
-        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                          fidl::kIgnoreBindingClosure),
+        .device = gpio_bindings_.CreateHandler(
+            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
     });
   }
+
+  fuchsia_hardware_pin::Service::InstanceHandler GetPinInstanceHandler() {
+    return fuchsia_hardware_pin::Service::InstanceHandler({
+        .device = pin_bindings_.CreateHandler(
+            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
+    });
+  }
+
   bool IsFakeGpioSetToSclk() { return set_to_sclk_; }
 
  protected:
-  void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override {
-    completer.Reply(zx::ok());
+  void SetBufferMode(SetBufferModeRequestView request,
+                     SetBufferModeCompleter::Sync& completer) override {
+    completer.ReplySuccess();
   }
-  void SetAltFunction(SetAltFunctionRequestView request,
-                      SetAltFunctionCompleter::Sync& completer) override {
-    set_to_sclk_ = request->function == 1;  // function is SCLK.
-    completer.Reply(zx::ok());
-  }
-  void GetName(GetNameCompleter::Sync& completer) override { completer.ReplySuccess("Test"); }
+  void Read(ReadCompleter::Sync& completer) override { completer.ReplySuccess(0); }
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
     FAIL() << "unknown method (Gpio) ordinal " << metadata.method_ordinal;
+  }
+
+  void Configure(ConfigureRequestView request, ConfigureCompleter::Sync& completer) override {
+    if (request->config.has_function()) {
+      set_to_sclk_ = request->config.function() == 1;  // function is SCLK.
+    }
+    completer.ReplySuccess({});
+  }
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Pin> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL() << "unknown method (Pin) ordinal " << metadata.method_ordinal;
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -252,7 +269,8 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
 
  private:
   bool set_to_sclk_ = false;  // Even though the board driver may set this, do not assume it is set.
-  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> gpio_bindings_;
+  fidl::ServerBindingGroup<fuchsia_hardware_pin::Pin> pin_bindings_;
 };
 
 struct IncomingNamespace {
@@ -297,20 +315,35 @@ class AmlG12CompositeTest : public testing::Test {
               clock_pll_server_.GetInstanceHandler(), "clock-pll");
       ASSERT_TRUE(add_clock_pll_result.is_ok());
 
-      auto add_sclk_tdm_a_result =
+      auto add_sclk_tdm_a_gpio_result =
           incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
-              sclk_tdm_a_server_.GetInstanceHandler(), "gpio-tdm-a-sclk");
-      ASSERT_TRUE(add_sclk_tdm_a_result.is_ok());
+              sclk_tdm_a_server_.GetGpioInstanceHandler(), "gpio-tdm-a-sclk");
+      ASSERT_TRUE(add_sclk_tdm_a_gpio_result.is_ok());
 
-      auto add_sclk_tdm_b_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
-              sclk_tdm_b_server_.GetInstanceHandler(), "gpio-tdm-b-sclk");
-      ASSERT_TRUE(add_sclk_tdm_b_result.is_ok());
+      auto add_sclk_tdm_a_pin_result =
+          incoming->env_.incoming_directory().AddService<fuchsia_hardware_pin::Service>(
+              sclk_tdm_a_server_.GetPinInstanceHandler(), "gpio-tdm-a-sclk");
+      ASSERT_TRUE(add_sclk_tdm_a_pin_result.is_ok());
 
-      auto add_sclk_tdm_c_result =
+      auto add_sclk_tdm_b_gpio_result =
           incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
-              sclk_tdm_c_server_.GetInstanceHandler(), "gpio-tdm-c-sclk");
-      ASSERT_TRUE(add_sclk_tdm_c_result.is_ok());
+              sclk_tdm_b_server_.GetGpioInstanceHandler(), "gpio-tdm-b-sclk");
+      ASSERT_TRUE(add_sclk_tdm_b_gpio_result.is_ok());
+
+      auto add_sclk_tdm_b_pin_result =
+          incoming->env_.incoming_directory().AddService<fuchsia_hardware_pin::Service>(
+              sclk_tdm_b_server_.GetPinInstanceHandler(), "gpio-tdm-b-sclk");
+      ASSERT_TRUE(add_sclk_tdm_b_pin_result.is_ok());
+
+      auto add_sclk_tdm_c_gpio_result =
+          incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
+              sclk_tdm_c_server_.GetGpioInstanceHandler(), "gpio-tdm-c-sclk");
+      ASSERT_TRUE(add_sclk_tdm_c_gpio_result.is_ok());
+
+      auto add_sclk_tdm_c_pin_result =
+          incoming->env_.incoming_directory().AddService<fuchsia_hardware_pin::Service>(
+              sclk_tdm_c_server_.GetPinInstanceHandler(), "gpio-tdm-c-sclk");
+      ASSERT_TRUE(add_sclk_tdm_c_pin_result.is_ok());
 
       driver_start_args = std::move(start_args_result->start_args);
     });

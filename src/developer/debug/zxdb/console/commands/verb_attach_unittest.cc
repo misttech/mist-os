@@ -196,6 +196,10 @@ TEST_F(VerbAttach, Filter) {
   EXPECT_EQ(debug_ipc::Filter::Type::kProcessName, GetLastFilter().type);
   EXPECT_EQ(kSuperLongName.substr(0, kZirconMaxNameLength), GetLastFilter().pattern);
   EXPECT_EQ(1234ull, GetLastFilter().job_koid);
+
+  console().ProcessInputLine("attach --job-only " + kComponentName);
+  EXPECT_EQ(debug_ipc::Filter::Type::kComponentName, GetLastFilter().type);
+  EXPECT_TRUE(GetLastFilter().config.job_only);
 }
 
 }  // namespace zxdb

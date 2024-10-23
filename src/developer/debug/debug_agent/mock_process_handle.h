@@ -44,8 +44,6 @@ class MockProcessHandle final : public ProcessHandle {
   // Value to return from Kill().
   void set_kill_status(debug::Status s) { kill_status_ = std::move(s); }
 
-  bool is_attached() const { return is_attached_; }
-
   // ProcessHandle implementation.
   const NativeProcessHandle& GetNativeHandle() const override { return null_handle_; }
   NativeProcessHandle& GetNativeHandle() override { return null_handle_; }
@@ -56,6 +54,7 @@ class MockProcessHandle final : public ProcessHandle {
   debug::Status Kill() override;
   int64_t GetReturnCode() const override;
   debug::Status Attach(ProcessHandleObserver* observer) override;
+  bool IsAttached() const override { return is_attached_; }
   void Detach() override;
   uint64_t GetLoaderBreakpointAddress() override;
   std::vector<debug_ipc::AddressRegion> GetAddressSpace(uint64_t address) const override;

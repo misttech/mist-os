@@ -31,6 +31,7 @@ struct SymbolizationContext {
   std::map<zx_koid_t, std::vector<Module>> process_contexts;
 };
 
-zx::result<std::vector<Module>> GetProcessModules(const zx::unowned_process& process);
+zx::result<std::vector<Module>> GetProcessModules(const zx::unowned_process& process,
+                                                  zx_koid_t pid);
 }  // namespace profiler
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_SYMBOLIZATION_CONTEXT_H_

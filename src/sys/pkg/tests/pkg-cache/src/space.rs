@@ -24,9 +24,11 @@ async fn gc_error_pending_commit() {
         .blobfs_from_system_image(&system_image_package)
         .await
         .paver_service_builder(
-            MockPaverServiceBuilder::new()
-                .insert_hook(throttle_hook)
-                .insert_hook(mphooks::config_status(|_| Ok(fpaver::ConfigurationStatus::Pending))),
+            MockPaverServiceBuilder::new().insert_hook(throttle_hook).insert_hook(
+                mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((fpaver::ConfigurationStatus::Pending, Some(1)))
+                }),
+            ),
         )
         .build()
         .await;
@@ -35,7 +37,9 @@ async fn gc_error_pending_commit() {
     // few enough to guarantee the commit is still pending.
     let () = throttler.emit_next_paver_events(&[
         PaverEvent::QueryCurrentConfiguration,
-        PaverEvent::QueryConfigurationStatus { configuration: fpaver::Configuration::A },
+        PaverEvent::QueryConfigurationStatusAndBootAttempts {
+            configuration: fpaver::Configuration::A,
+        },
     ]);
     assert_matches!(env.proxies.space_manager.gc().await, Ok(Err(ErrorCode::PendingCommit)));
 

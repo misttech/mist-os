@@ -12,7 +12,7 @@ use test::StressTest;
 use tracing::{error, info};
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_test as ftest,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 #[fuchsia::main]

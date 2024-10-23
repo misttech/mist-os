@@ -5,11 +5,10 @@
 //! Provides standalone FIDL encoding and decoding.
 
 use crate::encoding::{
-    AtRestFlags, Context, Decode, Decoder, DefaultFuchsiaResourceDialect, Depth, Encode, Encoder,
-    GenericMessage, GenericMessageType, NoHandleResourceDialect, ResourceDialect,
+    AtRestFlags, Context, Decode, Decoder, Depth, Encode, Encoder, GenericMessage,
+    GenericMessageType, HandleFor, NoHandleResourceDialect, ProxyChannelFor, ResourceDialect,
     ResourceTypeMarker, TypeMarker, ValueTypeMarker, WireFormatVersion, MAGIC_NUMBER_INITIAL,
 };
-use crate::handle::{HandleDisposition, HandleInfo};
 use crate::{Error, Result};
 
 /// Marker trait implemented for FIDL non-resource structs, tables, and unions.
@@ -145,33 +144,19 @@ where
 
 /// Encodes a FIDL object to bytes, handles, and wire metadata following
 /// RFC-0120. Must be a resource struct, table, or union.
+#[allow(clippy::type_complexity)]
 pub fn standalone_encode_resource<T: Standalone<D>, D: ResourceDialect>(
     mut body: T,
-) -> Result<(Vec<u8>, Vec<HandleDisposition<'static>>, WireMetadata)>
+) -> Result<(Vec<u8>, Vec<<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition>, WireMetadata)>
 where
-    for<'a> T::Borrowed<'a>: Encode<T, DefaultFuchsiaResourceDialect>,
+    for<'a> T::Borrowed<'a>: Encode<T, D>,
 {
-    // This helper is needed to convince rustc that &mut T implements Encode<T>.
-    #[allow(clippy::type_complexity)]
-    fn helper<T: ResourceTypeMarker>(
-        body: T::Borrowed<'_>,
-    ) -> Result<(Vec<u8>, Vec<HandleDisposition<'static>>, WireMetadata)>
-    where
-        for<'a> T::Borrowed<'a>: Encode<T, DefaultFuchsiaResourceDialect>,
-    {
-        let context = default_persistent_encode_context();
-        let metadata = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
-        let mut bytes = Vec::<u8>::new();
-        let mut handles = Vec::<_>::new();
-        Encoder::<DefaultFuchsiaResourceDialect>::encode_with_context::<T>(
-            context,
-            &mut bytes,
-            &mut handles,
-            body,
-        )?;
-        Ok((bytes, handles, metadata))
-    }
-    helper::<T>(&mut body)
+    let context = default_persistent_encode_context();
+    let metadata = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
+    let mut bytes = Vec::<u8>::new();
+    let mut handles = Vec::<_>::new();
+    Encoder::encode_with_context::<T>(context, &mut bytes, &mut handles, &mut body)?;
+    Ok((bytes, handles, metadata))
 }
 
 /// Decodes a FIDL object from bytes and wire metadata following RFC-0120. Must
@@ -186,7 +171,7 @@ pub fn standalone_decode_value<T: Persistable>(bytes: &[u8], metadata: &WireMeta
 /// RFC-0120. Must be a resource struct, table, or union.
 pub fn standalone_decode_resource<T: Standalone<D>, D: ResourceDialect>(
     bytes: &[u8],
-    handles: &mut [HandleInfo],
+    handles: &mut [<D::Handle as HandleFor<D>>::HandleInfo],
     metadata: &WireMetadata,
 ) -> Result<T> {
     let mut output = <T as TypeMarker>::Owned::new_empty();

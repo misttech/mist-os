@@ -6,10 +6,9 @@
 
 use crate::encoding::{
     decode_transaction_header, Decode, Decoder, DefaultFuchsiaResourceDialect, DynamicFlags,
-    Encode, Encoder, EpitaphBody, ResourceDialect, TransactionHeader, TransactionMessage,
-    TransactionMessageType, TypeMarker,
+    Encode, Encoder, EpitaphBody, MessageBufFor, ProxyChannelBox, ProxyChannelFor, ResourceDialect,
+    TransactionHeader, TransactionMessage, TransactionMessageType, TypeMarker,
 };
-use crate::handle::{AsyncChannel, HandleDisposition, MessageBufEtc};
 use crate::Error;
 use fuchsia_sync::Mutex;
 use futures::future::{self, FusedFuture, Future, FutureExt, Map, MaybeDone};
@@ -21,56 +20,55 @@ use std::collections::VecDeque;
 use std::mem;
 use std::ops::ControlFlow;
 use std::pin::Pin;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use std::task::{RawWaker, RawWakerVTable};
 use zx_status;
 
 /// Decodes the body of `buf` as the FIDL type `T`.
 #[doc(hidden)] // only exported for use in macros or generated code
 pub fn decode_transaction_body<T: TypeMarker, D: ResourceDialect, const EXPECTED_ORDINAL: u64>(
-    mut buf: MessageBufEtc,
+    mut buf: D::MessageBufEtc,
 ) -> Result<T::Owned, Error>
 where
-    T::Owned: Decode<T, DefaultFuchsiaResourceDialect>,
+    T::Owned: Decode<T, D>,
 {
     let (bytes, handles) = buf.split_mut();
     let (header, body_bytes) = decode_transaction_header(bytes)?;
     if header.ordinal != EXPECTED_ORDINAL {
         return Err(Error::InvalidResponseOrdinal);
     }
-    let mut output = Decode::<T, DefaultFuchsiaResourceDialect>::new_empty();
-    Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<T>(
-        &header,
-        body_bytes,
-        handles,
-        &mut output,
-    )?;
+    let mut output = Decode::<T, D>::new_empty();
+    Decoder::<D>::decode_into::<T>(&header, body_bytes, handles, &mut output)?;
     Ok(output)
 }
 
 /// A FIDL client which can be used to send buffers and receive responses via a channel.
 #[derive(Debug, Clone)]
-pub struct Client {
-    inner: Arc<ClientInner>,
+pub struct Client<D: ResourceDialect = DefaultFuchsiaResourceDialect> {
+    inner: Arc<ClientInner<D>>,
 }
 
 /// A future representing the decoded and transformed response to a FIDL query.
-pub type DecodedQueryResponseFut<T> =
-    Map<MessageResponse, fn(Result<MessageBufEtc, Error>) -> Result<T, Error>>;
+pub type DecodedQueryResponseFut<T, D = DefaultFuchsiaResourceDialect> = Map<
+    MessageResponse<D>,
+    fn(Result<<D as ResourceDialect>::MessageBufEtc, Error>) -> Result<T, Error>,
+>;
 
 /// A future representing the result of a FIDL query, with early error detection available if the
 /// message couldn't be sent.
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub struct QueryResponseFut<T>(pub MaybeDone<DecodedQueryResponseFut<T>>);
+pub struct QueryResponseFut<T, D: ResourceDialect = DefaultFuchsiaResourceDialect>(
+    pub MaybeDone<DecodedQueryResponseFut<T, D>>,
+);
 
-impl<T: Unpin> FusedFuture for QueryResponseFut<T> {
+impl<T: Unpin, D: ResourceDialect> FusedFuture for QueryResponseFut<T, D> {
     fn is_terminated(&self) -> bool {
         matches!(self.0, MaybeDone::Gone)
     }
 }
 
-impl<T: Unpin> Future for QueryResponseFut<T> {
+impl<T: Unpin, D: ResourceDialect> Future for QueryResponseFut<T, D> {
     type Output = Result<T, Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -125,15 +123,15 @@ impl From<u32> for Txid {
     }
 }
 
-impl Client {
+impl<D: ResourceDialect> Client<D> {
     /// Create a new client.
     ///
     /// `channel` is the asynchronous channel over which data is sent and received.
     /// `event_ordinals` are the ordinals on which events will be received.
-    pub fn new(channel: AsyncChannel, protocol_name: &'static str) -> Client {
+    pub fn new(channel: D::ProxyChannel, protocol_name: &'static str) -> Client<D> {
         Client {
             inner: Arc::new(ClientInner {
-                channel,
+                channel: channel.boxed(),
                 interests: Mutex::default(),
                 terminal_error: Mutex::default(),
                 protocol_name,
@@ -142,8 +140,8 @@ impl Client {
     }
 
     /// Get a reference to the client's underlying channel.
-    pub fn as_channel(&self) -> &AsyncChannel {
-        &self.inner.channel
+    pub fn as_channel(&self) -> &D::ProxyChannel {
+        self.inner.channel.as_channel()
     }
 
     /// Attempt to convert the `Client` back into a channel.
@@ -152,7 +150,7 @@ impl Client {
     /// no currently-alive `EventReceiver` or `MessageResponse`s that came from
     /// this `Client`, and no outstanding messages awaiting a response, even if
     /// that response will be discarded.
-    pub fn into_channel(self) -> Result<AsyncChannel, Self> {
+    pub fn into_channel(self) -> Result<D::ProxyChannel, Self> {
         // We need to check the message_interests table to make sure there are no outstanding
         // interests, since an interest might still exist even if all EventReceivers and
         // MessageResponses have been dropped. That would lead to returning an AsyncChannel which
@@ -165,7 +163,7 @@ impl Client {
         match Arc::try_unwrap(self.inner) {
             Ok(inner) => {
                 if inner.interests.lock().messages.is_empty() || inner.channel.is_closed() {
-                    Ok(inner.channel)
+                    Ok(inner.channel.unbox())
                 } else {
                     // This creates a new arc if there are outstanding interests. This will drop
                     // weak references, and whilst we do create a weak reference to ClientInner if
@@ -180,7 +178,7 @@ impl Client {
 
     /// Retrieve the stream of event messages for the `Client`.
     /// Panics if the stream was already taken.
-    pub fn take_event_receiver(&self) -> EventReceiver {
+    pub fn take_event_receiver(&self) -> EventReceiver<D> {
         {
             let mut lock = self.inner.interests.lock();
 
@@ -197,13 +195,13 @@ impl Client {
     /// Encodes and sends a request without expecting a response.
     pub fn send<T: TypeMarker>(
         &self,
-        body: impl Encode<T, DefaultFuchsiaResourceDialect>,
+        body: impl Encode<T, D>,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
     ) -> Result<(), Error> {
         let msg =
             TransactionMessage { header: TransactionHeader::new(0, ordinal, dynamic_flags), body };
-        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, _, ()>(
+        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, D, ()>(
             msg,
             |bytes, handles| self.send_raw(bytes, handles),
         )
@@ -212,21 +210,17 @@ impl Client {
     /// Encodes and sends a request. Returns a future that decodes the response.
     pub fn send_query<Request: TypeMarker, Response: TypeMarker, const ORDINAL: u64>(
         &self,
-        body: impl Encode<Request, DefaultFuchsiaResourceDialect>,
+        body: impl Encode<Request, D>,
         dynamic_flags: DynamicFlags,
-    ) -> QueryResponseFut<Response::Owned>
+    ) -> QueryResponseFut<Response::Owned, D>
     where
-        Response::Owned: Decode<Response, DefaultFuchsiaResourceDialect>,
+        Response::Owned: Decode<Response, D>,
     {
         self.send_query_and_decode::<Request, Response::Owned>(
             body,
             ORDINAL,
             dynamic_flags,
-            |buf| {
-                buf.and_then(
-                    decode_transaction_body::<Response, DefaultFuchsiaResourceDialect, ORDINAL>,
-                )
-            },
+            |buf| buf.and_then(decode_transaction_body::<Response, D, ORDINAL>),
         )
     }
 
@@ -234,11 +228,11 @@ impl Client {
     /// using the given `decode` function.
     pub fn send_query_and_decode<Request: TypeMarker, Output>(
         &self,
-        body: impl Encode<Request, DefaultFuchsiaResourceDialect>,
+        body: impl Encode<Request, D>,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
-        decode: fn(Result<MessageBufEtc, Error>) -> Result<Output, Error>,
-    ) -> QueryResponseFut<Output> {
+        decode: fn(Result<D::MessageBufEtc, Error>) -> Result<Output, Error>,
+    ) -> QueryResponseFut<Output, D> {
         let send_result = self.send_raw_query(|tx_id, bytes, handles| {
             let msg = TransactionMessage {
                 header: TransactionHeader::new(tx_id.as_raw_id(), ordinal, dynamic_flags),
@@ -258,30 +252,28 @@ impl Client {
     pub fn send_raw(
         &self,
         bytes: &[u8],
-        handles: &mut [HandleDisposition<'_>],
+        handles: &mut [<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition],
     ) -> Result<(), Error> {
         match self.inner.channel.write_etc(bytes, handles) {
-            Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
-            Err(e) => Err(Error::ClientWrite(e.into())),
+            Ok(()) | Err(None) => Ok(()),
+            Err(Some(e)) => Err(Error::ClientWrite(e.into())),
         }
     }
 
     /// Sends a raw query and receives a response future.
-    pub fn send_raw_query<F>(&self, encode_msg: F) -> Result<MessageResponse, Error>
+    pub fn send_raw_query<F>(&self, encode_msg: F) -> Result<MessageResponse<D>, Error>
     where
         F: for<'a, 'b> FnOnce(
             Txid,
             &'a mut Vec<u8>,
-            &'b mut Vec<HandleDisposition<'static>>,
+            &'b mut Vec<<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition>,
         ) -> Result<(), Error>,
     {
         let id = self.inner.interests.lock().register_msg_interest();
-        crate::encoding::with_tls_encode_buf::<_, DefaultFuchsiaResourceDialect>(
-            |bytes, handles| {
-                encode_msg(id, bytes, handles)?;
-                self.send_raw(bytes, handles)
-            },
-        )?;
+        crate::encoding::with_tls_encode_buf::<_, D>(|bytes, handles| {
+            encode_msg(id, bytes, handles)?;
+            self.send_raw(bytes, handles)
+        })?;
 
         Ok(MessageResponse { id, client: Some(self.inner.clone()) })
     }
@@ -290,16 +282,16 @@ impl Client {
 #[must_use]
 /// A future which polls for the response to a client message.
 #[derive(Debug)]
-pub struct MessageResponse {
+pub struct MessageResponse<D: ResourceDialect = DefaultFuchsiaResourceDialect> {
     id: Txid,
     // `None` if the message response has been received
-    client: Option<Arc<ClientInner>>,
+    client: Option<Arc<ClientInner<D>>>,
 }
 
-impl Unpin for MessageResponse {}
+impl<D: ResourceDialect> Unpin for MessageResponse<D> {}
 
-impl Future for MessageResponse {
-    type Output = Result<MessageBufEtc, Error>;
+impl<D: ResourceDialect> Future for MessageResponse<D> {
+    type Output = Result<D::MessageBufEtc, Error>;
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = &mut *self;
         let res;
@@ -317,7 +309,7 @@ impl Future for MessageResponse {
     }
 }
 
-impl Drop for MessageResponse {
+impl<D: ResourceDialect> Drop for MessageResponse<D> {
     fn drop(&mut self) {
         if let Some(client) = &self.client {
             client.interests.lock().deregister(self.id);
@@ -328,25 +320,25 @@ impl Drop for MessageResponse {
 /// An enum reprenting either a resolved message interest or a task on which to alert
 /// that a response message has arrived.
 #[derive(Debug)]
-enum MessageInterest {
+enum MessageInterest<D: ResourceDialect> {
     /// A new `MessageInterest`
     WillPoll,
     /// A task is waiting to receive a response, and can be awoken with `Waker`.
     Waiting(Waker),
     /// A message has been received, and a task will poll to receive it.
-    Received(MessageBufEtc),
+    Received(D::MessageBufEtc),
     /// A message has not been received, but the person interested in the response
     /// no longer cares about it, so the message should be discared upon arrival.
     Discard,
 }
 
-impl MessageInterest {
+impl<D: ResourceDialect> MessageInterest<D> {
     /// Check if a message has been received.
     fn is_received(&self) -> bool {
         matches!(*self, MessageInterest::Received(_))
     }
 
-    fn unwrap_received(self) -> MessageBufEtc {
+    fn unwrap_received(self) -> D::MessageBufEtc {
         if let MessageInterest::Received(buf) = self {
             buf
         } else {
@@ -364,14 +356,14 @@ enum EventReceiverState {
 
 /// A stream of events as `MessageBufEtc`s.
 #[derive(Debug)]
-pub struct EventReceiver {
-    inner: Arc<ClientInner>,
+pub struct EventReceiver<D: ResourceDialect = DefaultFuchsiaResourceDialect> {
+    inner: Arc<ClientInner<D>>,
     state: EventReceiverState,
 }
 
-impl Unpin for EventReceiver {}
+impl<D: ResourceDialect> Unpin for EventReceiver<D> {}
 
-impl FusedStream for EventReceiver {
+impl<D: ResourceDialect> FusedStream for EventReceiver<D> {
     fn is_terminated(&self) -> bool {
         matches!(self.state, EventReceiverState::Terminated)
     }
@@ -381,8 +373,8 @@ impl FusedStream for EventReceiver {
 ///   (1) After `None` is returned, the next poll panics
 ///   (2) Until this instance is dropped, no other EventReceiver may claim the
 ///       event channel by calling Client::take_event_receiver.
-impl Stream for EventReceiver {
-    type Item = Result<MessageBufEtc, Error>;
+impl<D: ResourceDialect> Stream for EventReceiver<D> {
+    type Item = Result<D::MessageBufEtc, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.state {
@@ -414,7 +406,7 @@ impl Stream for EventReceiver {
     }
 }
 
-impl Drop for EventReceiver {
+impl<D: ResourceDialect> Drop for EventReceiver<D> {
     fn drop(&mut self) {
         self.inner.interests.lock().dropped_event_listener();
     }
@@ -439,12 +431,12 @@ impl EventListener {
 
 /// A shared client channel which tracks EXPECTED and received responses
 #[derive(Debug)]
-struct ClientInner {
+struct ClientInner<D: ResourceDialect> {
     /// The channel that leads to the server we are connected to.
-    channel: AsyncChannel,
+    channel: <D::ProxyChannel as ProxyChannelFor<D>>::Boxed,
 
     /// Tracks the state of responses to two-way messages and events.
-    interests: Mutex<Interests>,
+    interests: Mutex<Interests<D>>,
 
     /// A terminal error, which can be a server provided epitaph, or None if the channel is still
     /// active.
@@ -454,18 +446,29 @@ struct ClientInner {
     protocol_name: &'static str,
 }
 
-#[derive(Debug, Default)]
-struct Interests {
-    messages: Slab<MessageInterest>,
-    events: VecDeque<MessageBufEtc>,
+#[derive(Debug)]
+struct Interests<D: ResourceDialect> {
+    messages: Slab<MessageInterest<D>>,
+    events: VecDeque<D::MessageBufEtc>,
     event_listener: EventListener,
     // The number of wakers registered waiting for either a message or an event.
     waker_count: usize,
 }
 
-impl Interests {
+impl<D: ResourceDialect> Default for Interests<D> {
+    fn default() -> Self {
+        Interests {
+            messages: Slab::new(),
+            events: Default::default(),
+            event_listener: Default::default(),
+            waker_count: 0,
+        }
+    }
+}
+
+impl<D: ResourceDialect> Interests<D> {
     /// Receives an event and returns a waker, if any.
-    fn push_event(&mut self, buf: MessageBufEtc) -> Option<Waker> {
+    fn push_event(&mut self, buf: D::MessageBufEtc) -> Option<Waker> {
         self.events.push_back(buf);
         self.take_event_waker()
     }
@@ -497,7 +500,7 @@ impl Interests {
 
     /// Receive a message, waking the waiter if they are waiting to poll and `wake` is true.
     /// Returns an error of the message isn't found.
-    fn push_message(&mut self, txid: Txid, buf: MessageBufEtc) -> Result<Option<Waker>, Error> {
+    fn push_message(&mut self, txid: Txid, buf: D::MessageBufEtc) -> Result<Option<Waker>, Error> {
         let InterestId(raw_id) = InterestId::from_txid(txid);
         // Look for a message interest with the given ID.
         // If one is found, store the message so that it can be picked up later.
@@ -523,7 +526,7 @@ impl Interests {
 
     /// Registers the waker from `cx` if the message has not already been received, replacing any
     /// previous waker registered.  Returns the message if it has been received.
-    fn register(&mut self, txid: Txid, cx: &Context<'_>) -> Option<MessageBufEtc> {
+    fn register(&mut self, txid: Txid, cx: &Context<'_>) -> Option<D::MessageBufEtc> {
         let InterestId(raw_id) = InterestId::from_txid(txid);
         let interest = self.messages.get_mut(raw_id).expect("Polled unregistered interest");
         match interest {
@@ -554,7 +557,7 @@ impl Interests {
     }
 
     /// Registers an event listener.
-    fn register_event_listener(&mut self, cx: &Context<'_>) -> Option<MessageBufEtc> {
+    fn register_event_listener(&mut self, cx: &Context<'_>) -> Option<D::MessageBufEtc> {
         self.events.pop_front().or_else(|| {
             if !mem::replace(&mut self.event_listener, EventListener::Some(cx.waker().clone()))
                 .is_some()
@@ -585,8 +588,11 @@ impl Interests {
     }
 }
 
-impl ClientInner {
-    fn poll_recv_event(self: &Arc<Self>, cx: &Context<'_>) -> Poll<Result<MessageBufEtc, Error>> {
+impl<D: ResourceDialect> ClientInner<D> {
+    fn poll_recv_event(
+        self: &Arc<Self>,
+        cx: &Context<'_>,
+    ) -> Poll<Result<D::MessageBufEtc, Error>> {
         // Update the EventListener with the latest waker, remove any stale WillPoll state
         if let Some(msg_buf) = self.interests.lock().register_event_listener(cx) {
             return Poll::Ready(Ok(msg_buf));
@@ -612,7 +618,7 @@ impl ClientInner {
         self: &Arc<Self>,
         txid: Txid,
         cx: &Context<'_>,
-    ) -> Poll<Result<MessageBufEtc, Error>> {
+    ) -> Poll<Result<D::MessageBufEtc, Error>> {
         // Register our waker with the interest if we haven't received a message yet.
         if let Some(buf) = self.interests.lock().register(txid, cx) {
             return Poll::Ready(Ok(buf));
@@ -656,13 +662,11 @@ impl ClientInner {
         let recv_once = |waker| {
             let cx = &mut Context::from_waker(&waker);
 
-            let mut buf = MessageBufEtc::new();
-            buf.ensure_capacity_bytes(crate::encoding::MIN_BUF_BYTES_SIZE);
-
+            let mut buf = D::MessageBufEtc::new();
             let result = self.channel.recv_etc_from(cx, &mut buf);
             match result {
                 Poll::Ready(Ok(())) => {}
-                Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                Poll::Ready(Err(None)) => {
                     // The channel has been closed, and no epitaph was received.
                     // Set the epitaph to PEER_CLOSED.
                     return Err(Error::ClientChannelClosed {
@@ -672,17 +676,17 @@ impl ClientInner {
                         reason: self.channel.closed_reason(),
                     });
                 }
-                Poll::Ready(Err(e)) => return Err(Error::ClientRead(e.into())),
+                Poll::Ready(Err(Some(e))) => return Err(Error::ClientRead(e.into())),
                 Poll::Pending => return Ok(ControlFlow::Break(())),
             };
 
-            let (header, body_bytes) = decode_transaction_header(buf.bytes())?;
+            let (bytes, _) = buf.split_mut();
+            let (header, body_bytes) = decode_transaction_header(bytes)?;
             if header.is_epitaph() {
                 // Received an epitaph. Record this so that everyone receives the same epitaph.
                 let handles = &mut [];
-                let mut epitaph_body =
-                    Decode::<EpitaphBody, DefaultFuchsiaResourceDialect>::new_empty();
-                Decoder::<DefaultFuchsiaResourceDialect>::decode_into::<EpitaphBody>(
+                let mut epitaph_body = Decode::<EpitaphBody, D>::new_empty();
+                Decoder::<D>::decode_into::<EpitaphBody>(
                     &header,
                     body_bytes,
                     handles,
@@ -745,13 +749,26 @@ impl ClientInner {
                             .unwrap()
                     }
                 } else {
+                    let weak = Arc::downgrade(self);
+                    let waker = ClientWaker(Arc::new(move || {
+                        if let Some(strong) = weak.upgrade() {
+                            // On host, we can't call recv_all because there are reentrancy issues; the waker is
+                            // woken whilst locks are held on the channel which recv_all needs.
+                            #[cfg(target_os = "fuchsia")]
+                            if strong.recv_all(None).is_ok() {
+                                return;
+                            }
+
+                            strong.wake_all();
+                        }
+                    }));
                     // If there's more than one waker, use a waker that points to
                     // `ClientInner` which will read the message and figure out which is
                     // the correct task to wake.
                     // SAFETY: We meet the requirements specified by RawWaker.
                     unsafe {
                         Waker::from_raw(RawWaker::new(
-                            Arc::downgrade(self).into_raw() as *const (),
+                            Arc::into_raw(Arc::new(waker)) as *const (),
                             &WAKER_VTABLE,
                         ))
                     }
@@ -788,39 +805,29 @@ impl ClientInner {
         }
         lock.waker_count = 0;
     }
-
-    fn wake(weak: &Weak<Self>) {
-        if let Some(strong) = weak.upgrade() {
-            // On host, we can't call recv_all because there are reentrancy issues; the waker is
-            // woken whilst locks are held on the channel which recv_all needs.
-            #[cfg(target_os = "fuchsia")]
-            if strong.recv_all(None).is_ok() {
-                return;
-            }
-
-            strong.wake_all();
-        }
-    }
 }
+
+#[derive(Clone)]
+struct ClientWaker(Arc<dyn Fn() + Send + Sync + 'static>);
 
 static WAKER_VTABLE: RawWakerVTable =
     RawWakerVTable::new(clone_waker, wake, wake_by_ref, drop_waker);
 
 unsafe fn clone_waker(data: *const ()) -> RawWaker {
-    let weak = mem::ManuallyDrop::new(Weak::from_raw(data as *const ClientInner));
-    RawWaker::new((*weak).clone().into_raw() as *const (), &WAKER_VTABLE)
+    Arc::increment_strong_count(data as *const ClientWaker);
+    RawWaker::new(data, &WAKER_VTABLE)
 }
 
 unsafe fn wake(data: *const ()) {
-    ClientInner::wake(&Weak::from_raw(data as *const ClientInner));
+    Arc::from_raw(data as *const ClientWaker).0();
 }
 
 unsafe fn wake_by_ref(data: *const ()) {
-    ClientInner::wake(&mem::ManuallyDrop::new(Weak::from_raw(data as *const ClientInner)));
+    mem::ManuallyDrop::new(Arc::from_raw(data as *const ClientWaker)).0();
 }
 
 unsafe fn drop_waker(data: *const ()) {
-    Weak::from_raw(data as *const ClientInner);
+    Arc::from_raw(data as *const ClientWaker);
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -829,7 +836,7 @@ pub mod sync {
 
     use super::*;
     use std::mem::MaybeUninit;
-    use zx::{self as zx, AsHandleRef};
+    use zx::{self as zx, AsHandleRef, MessageBufEtc};
 
     /// A synchronous client for making FIDL calls.
     #[derive(Debug)]
@@ -966,7 +973,7 @@ pub mod sync {
                         continue;
                     }
                     Err(e) => {
-                        return Err(self.wrap_error(|e| Error::ClientRead(e.into()), e));
+                        return Err(self.wrap_error(|x| Error::ClientRead(x.into()), e));
                     }
                 }
             }
@@ -999,7 +1006,8 @@ mod tests {
     use crate::epitaph::{self, ChannelEpitaphExt};
     use anyhow::{Context as _, Error};
     use assert_matches::assert_matches;
-    use fuchsia_async::{DurationExt, TimeoutExt};
+    use fuchsia_async as fasync;
+    use fuchsia_async::{Channel as AsyncChannel, DurationExt, TimeoutExt};
     use futures::channel::oneshot;
     use futures::stream::FuturesUnordered;
     use futures::task::{noop_waker, waker, ArcWake};
@@ -1007,8 +1015,7 @@ mod tests {
     use futures_test::task::new_count_waker;
     use std::future::pending;
     use std::thread;
-    use zx::AsHandleRef;
-    use {fuchsia_async as fasync, zx};
+    use zx::{AsHandleRef, MessageBufEtc};
 
     const SEND_ORDINAL_HIGH_BYTE: u8 = 42;
     const SEND_ORDINAL: u64 = 42 << 32;
@@ -1262,7 +1269,7 @@ mod tests {
     async fn client() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         let server = AsyncChannel::from_channel(server_end);
         let receiver = async move {
@@ -1289,7 +1296,7 @@ mod tests {
     async fn client_with_response() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         let server = AsyncChannel::from_channel(server_end);
         let mut buffer = MessageBufEtc::new();
@@ -1328,7 +1335,7 @@ mod tests {
     async fn client_with_response_receives_epitaph() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         let server = AsyncChannel::from_channel(server_end);
         let mut buffer = zx::MessageBufEtc::new();
@@ -1368,7 +1375,7 @@ mod tests {
     async fn event_cant_be_taken_twice() {
         let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
         let _foo = client.take_event_receiver();
         client.take_event_receiver();
     }
@@ -1377,7 +1384,7 @@ mod tests {
     async fn event_can_be_taken_after_drop() {
         let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
         let foo = client.take_event_receiver();
         drop(foo);
         client.take_event_receiver();
@@ -1387,7 +1394,7 @@ mod tests {
     async fn receiver_termination_test() {
         let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
         let mut foo = client.take_event_receiver();
         assert!(!foo.is_terminated(), "receiver should not report terminated before being polled");
         let _ = foo.next().await;
@@ -1402,7 +1409,7 @@ mod tests {
     async fn receiver_cant_be_polled_more_than_once_on_closed_stream() {
         let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
         let foo = client.take_event_receiver();
         drop(foo);
         let mut bar = client.take_event_receiver();
@@ -1416,7 +1423,8 @@ mod tests {
     async fn receiver_panics_when_polled_after_receiving_epitaph_then_none() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let server_end = AsyncChannel::from_channel(server_end);
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
         let mut stream = client.take_event_receiver();
 
         epitaph::write_epitaph_impl(&server_end, zx_status::Status::UNAVAILABLE)
@@ -1439,7 +1447,7 @@ mod tests {
     async fn event_can_be_taken() {
         let (client_end, _) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
         client.take_event_receiver();
     }
 
@@ -1447,7 +1455,7 @@ mod tests {
     async fn event_received() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         // Send the event from the server
         let server = AsyncChannel::from_channel(server_end);
@@ -1487,7 +1495,7 @@ mod tests {
     async fn receiver_can_be_taken_after_end_of_stream() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         // Send the event from the server
         let server = AsyncChannel::from_channel(server_end);
@@ -1537,7 +1545,7 @@ mod tests {
     async fn event_incompatible_format() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         // Send the event from the server
         let server = AsyncChannel::from_channel(server_end);
@@ -1574,7 +1582,7 @@ mod tests {
 
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         let mut event_receiver = client.take_event_receiver();
 
@@ -1637,7 +1645,8 @@ mod tests {
 
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let server_end = AsyncChannel::from_channel(server_end);
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         let mut event_receiver = client.take_event_receiver();
 
@@ -1722,7 +1731,7 @@ mod tests {
     async fn client_allows_take_event_stream_even_if_event_delivered() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         // first simulate an event coming in, even though nothing has polled
         send_transaction(TransactionHeader::new(0, 5, DynamicFlags::empty()), &server_end);
@@ -1884,7 +1893,7 @@ mod tests {
         // executor must be set up in order to create the channel.
         let (client_end, _server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         assert!(client.into_channel().is_ok());
     }
@@ -1895,7 +1904,7 @@ mod tests {
         // executor must be set up in order to create the channel.
         let (client_end, _server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         {
             // Create a send future to insert a message interest but drop it
@@ -1913,7 +1922,7 @@ mod tests {
         // executor must be set up in order to create the channel.
         let (client_end, _server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         let _cloned_client = client.clone();
 
@@ -1924,7 +1933,7 @@ mod tests {
     async fn client_into_channel_outstanding_messages_get_received() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         let server = AsyncChannel::from_channel(server_end);
         let mut buffer = MessageBufEtc::new();
@@ -1965,7 +1974,7 @@ mod tests {
     async fn client_decode_errors_are_broadcast() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         let server = AsyncChannel::from_channel(server_end);
 
@@ -2011,7 +2020,7 @@ mod tests {
     async fn into_channel_from_waker_succeeds() {
         let (client_end, server_end) = zx::Channel::create();
         let client_end = AsyncChannel::from_channel(client_end);
-        let client = Client::new(client_end, "test_protocol");
+        let client = Client::<DefaultFuchsiaResourceDialect>::new(client_end, "test_protocol");
 
         let server = AsyncChannel::from_channel(server_end);
         let mut buffer = MessageBufEtc::new();

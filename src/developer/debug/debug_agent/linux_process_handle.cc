@@ -100,6 +100,8 @@ debug::Status LinuxProcessHandle::Attach(ProcessHandleObserver* observer) {
   return task_->Attach();
 }
 
+bool LinuxProcessHandle::IsAttached() const { return task_->is_attached(); }
+
 void LinuxProcessHandle::Detach() { task_->Detach(); }
 
 uint64_t LinuxProcessHandle::GetLoaderBreakpointAddress() {

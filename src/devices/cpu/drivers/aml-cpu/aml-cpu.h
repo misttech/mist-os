@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.hardware.cpu.ctrl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power/cpp/wire.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/inspect/cpp/inspector.h>
 
 #include <mutex>
@@ -46,13 +47,14 @@ struct AmlCpuConfiguration {
 class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
  public:
   explicit AmlCpu(const std::vector<operating_point_t>& operating_points,
-                  const perf_domain_t& perf_domain)
+                  const perf_domain_t& perf_domain, inspect::ComponentInspector& inspect)
       : current_operating_point_(
             static_cast<uint32_t>(operating_points.size() -
                                   1))  // Assume the core is running at the slowest clock to begin.
         ,
         operating_points_(operating_points),
-        perf_domain_(perf_domain) {}
+        perf_domain_(perf_domain),
+        inspect_(inspect) {}
 
   zx_status_t Init(fidl::ClientEnd<fuchsia_hardware_clock::Clock> plldiv16,
                    fidl::ClientEnd<fuchsia_hardware_clock::Clock> cpudiv16,
@@ -92,8 +94,7 @@ class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
   void GetDomainId(GetDomainIdCompleter::Sync& completer) override;
   void GetRelativePerformance(GetRelativePerformanceCompleter::Sync& completer) override;
 
-  inspect::Inspector inspector_;
-  inspect::Node cpu_info_ = inspector_.GetRoot().CreateChild("cpu_info_service");
+  inspect::ComponentInspector& Inspector() { return inspect_; }
 
  private:
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> plldiv16_;
@@ -108,6 +109,13 @@ class AmlCpu : public fidl::WireServer<fuchsia_hardware_cpu_ctrl::Device> {
   const std::vector<operating_point_t> operating_points_;
 
   perf_domain_t perf_domain_;
+
+  inspect::ComponentInspector& inspect_;
+  inspect::Node cpu_info_ = inspect_.root().CreateChild("cpu_info_service");
+
+  inspect::UintProperty inspect_major_revision_;
+  inspect::UintProperty inspect_minor_revision_;
+  inspect::UintProperty inspect_package_id_;
 };
 
 std::vector<operating_point_t> PerformanceDomainOpPoints(const perf_domain_t& perf_domain,

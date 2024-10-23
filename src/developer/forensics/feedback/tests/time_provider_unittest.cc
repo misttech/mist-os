@@ -39,7 +39,7 @@ class TimeProviderTest : public UnitTestFixture {
 
   void SetUpTimeProvider() {
     auto clock = std::make_unique<timekeeper::TestClock>();
-    clock->Set(kTime);
+    clock->SetUtc(kTime);
 
     time_provider_ = std::make_unique<TimeProvider>(
         dispatcher(), zx::unowned_clock(clock_handle_.get_handle()), std::move(clock));

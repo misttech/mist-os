@@ -12,7 +12,7 @@ use chrono::{DateTime, TimeZone as _, Timelike as _, Utc};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use tracing::{info, warn};
-use {fuchsia_async as fasync, fuchsia_runtime as runtime, zx};
+use {fuchsia_async as fasync, fuchsia_runtime as runtime};
 
 /// Delay between polls of system and userspace clocks.
 const POLL_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(2);

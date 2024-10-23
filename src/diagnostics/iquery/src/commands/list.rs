@@ -5,7 +5,6 @@
 use crate::commands::types::*;
 use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
-use async_trait::async_trait;
 use diagnostics_data::{Inspect, InspectData};
 use serde::{Serialize, Serializer};
 use std::cmp::Ordering;
@@ -157,12 +156,11 @@ pub struct ListCommand {
     pub accessor: Option<String>,
 }
 
-#[async_trait]
 impl Command for ListCommand {
     type Result = ListResult;
 
-    async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
-        let inspect = provider.snapshot::<Inspect>(&self.accessor, &[]).await?;
+    async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
+        let inspect = provider.snapshot::<Inspect>(&self.accessor, std::iter::empty()).await?;
         let components = components_from_inspect_data(inspect);
         let results =
             list_response_items_from_components(&self.manifest, self.with_url, components);

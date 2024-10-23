@@ -59,8 +59,8 @@ impl FastbootNetworkConnectionConfig {
         wait_key: &str,
         wait_default: u64,
     ) -> Self {
-        let retry_count = ffx_config::get(retry_key).await.unwrap_or(retry_default);
-        let retry_wait_seconds = ffx_config::get(wait_key).await.unwrap_or(wait_default);
+        let retry_count = ffx_config::get(retry_key).unwrap_or(retry_default);
+        let retry_wait_seconds = ffx_config::get(wait_key).unwrap_or(wait_default);
         Self::new(retry_wait_seconds, retry_count)
     }
 
@@ -108,7 +108,7 @@ impl FastbootConnectionFactory for ConnectionFactory {
             FastbootConnectionKind::Tcp(target_name, addr) => {
                 let config = FastbootNetworkConnectionConfig::new_tcp().await;
                 let fastboot_device_file_path: Option<PathBuf> =
-                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
                 Ok(Box::new(
                     tcp_proxy(target_name, fastboot_device_file_path, &addr, config).await?,
                 ))
@@ -116,7 +116,7 @@ impl FastbootConnectionFactory for ConnectionFactory {
             FastbootConnectionKind::Udp(target_name, addr) => {
                 let config = FastbootNetworkConnectionConfig::new_udp().await;
                 let fastboot_device_file_path: Option<PathBuf> =
-                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                    ffx_config::get(fastboot_file_discovery::FASTBOOT_FILE_PATH).ok();
                 Ok(Box::new(
                     udp_proxy(target_name, fastboot_device_file_path, &addr, config).await?,
                 ))

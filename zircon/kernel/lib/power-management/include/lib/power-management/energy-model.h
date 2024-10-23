@@ -12,13 +12,13 @@
 #include <lib/stdcompat/span.h>
 #include <lib/stdcompat/utility.h>
 #include <lib/zx/result.h>
-#include <lib/zx/time.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls-next.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
 #include <atomic>
@@ -30,6 +30,8 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
+
+#include "power-level-controller.h"
 
 namespace power_management {
 
@@ -52,8 +54,17 @@ static constexpr auto kSupportedControlInterfaces = cpp20::to_array(
 
 // Returns whether the interface is a supported or not.
 constexpr bool IsSupportedControlInterface(zx_processor_power_control_t interface) {
-  return std::find(kSupportedControlInterfaces.begin(), kSupportedControlInterfaces.end(),
-                   static_cast<ControlInterface>(interface)) != kSupportedControlInterfaces.end();
+  for (auto supported_interface : kSupportedControlInterfaces) {
+    if (supported_interface == static_cast<ControlInterface>(interface)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Returns whether the interface is handled by the kernel or not.
+constexpr bool IsKernelControlInterface(ControlInterface interface) {
+  return interface != ControlInterface::kCpuDriver;
 }
 
 // Kernel representation of `zx_processor_power_level_t` with useful accessors and option support.
@@ -69,7 +80,7 @@ class PowerLevel {
   };
 
   constexpr PowerLevel() = default;
-  explicit constexpr PowerLevel(uint8_t level_index, const zx_processor_power_level_t& level)
+  explicit PowerLevel(uint8_t level_index, const zx_processor_power_level_t& level)
       : options_(level.options),
         control_(static_cast<ControlInterface>(level.control_interface)),
         control_argument_(level.control_argument),
@@ -87,9 +98,9 @@ class PowerLevel {
   // `Idle Power Level`is absent then that means that the entity is active and the active power
   // level should be used.
   //
-  // This situation happens for example, when a CPU transitions from an active power level A (which
-  // may be interpreted as a known OPP or P-State) into an idle state, such as suspension, idle
-  // thread or even powering it off.
+  // This situation happens for example, when a CPU transitions from an active power level A
+  // (which may be interpreted as a known OPP or P-State) into an idle state, such as suspension,
+  // idle thread or even powering it off.
   constexpr Type type() const { return processing_rate_ == 0 ? Type::kIdle : kActive; }
 
   // Processing rate when this power level is active. This is key to determining the available
@@ -97,8 +108,8 @@ class PowerLevel {
   constexpr uint64_t processing_rate() const { return processing_rate_; }
 
   // Relative to the system power consumption, determines how much power is being consumed at this
-  // level. This allows determining if this power level should be a candidate when operating under a
-  // given energy budget.
+  // level. This allows determining if this power level should be a candidate when operating under
+  // a given energy budget.
   constexpr uint64_t power_coefficient_nw() const { return power_coefficient_nw_; }
 
   // ID of the interface handling transitions for TO this power level.
@@ -106,18 +117,18 @@ class PowerLevel {
 
   // Argument to be interpreted by the control interface in order to transition to this level.
   //
-  // The control interface is only aware of this arguments, and power levels are identified by this
-  // argument.
+  // The control interface is only aware of this arguments, and power levels are identified by
+  // this argument.
   constexpr uint64_t control_argument() const { return control_argument_; }
 
-  // This level may be transitioned in a per cpu basis, without affecting other entities in the same
-  // power domain.
+  // This level may be transitioned in a per cpu basis, without affecting other entities in the
+  // same power domain.
   constexpr bool TargetsCpus() const {
     return (options_ & ZX_PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT) != 0;
   }
 
-  // This level may be transitioned in a per power domain basis, that is, all other entities in the
-  // power domain will be transitioned together.
+  // This level may be transitioned in a per power domain basis, that is, all other entities in
+  // the power domain will be transitioned together.
   //
   // This means that underlying hardware elements are share and it is not possible to transition a
   // single member of the power domain.
@@ -165,10 +176,11 @@ class PowerLevelTransition {
 
   constexpr PowerLevelTransition() = default;
   explicit constexpr PowerLevelTransition(const zx_processor_power_level_transition_t& transition)
-      : latency_(transition.latency), energy_cost_nj_(transition.energy_nj) {}
+      : latency_(zx_duration_from_nsec(transition.latency)),
+        energy_cost_nj_(transition.energy_nj) {}
 
   // Latency for transitioning from a given level to another.
-  constexpr zx::duration latency() const { return latency_; }
+  constexpr zx_duration_t latency() const { return latency_; }
 
   // Energy cost in nano joules(nj) for transition from a given level to another.
   constexpr uint64_t energy_cost_nj() const { return energy_cost_nj_; }
@@ -181,7 +193,7 @@ class PowerLevelTransition {
  private:
   // Time required for the transition to take effect. In some cases it may mean for the actual
   // voltage to stabilize.
-  zx::duration latency_ = zx::duration::infinite();
+  zx_duration_t latency_ = ZX_TIME_INFINITE;
 
   // Amount of energy consumed to perform the transition.
   uint64_t energy_cost_nj_ = std::numeric_limits<uint64_t>::max();
@@ -203,7 +215,7 @@ struct TransitionMatrix {
 
  private:
   friend PowerModel;
-  constexpr TransitionMatrix(cpp20::span<const PowerLevelTransition> transitions, size_t num_rows)
+  TransitionMatrix(cpp20::span<const PowerLevelTransition> transitions, size_t num_rows)
       : transitions_(transitions), num_rows_(num_rows) {
     ZX_DEBUG_ASSERT(transitions_.size() != 0);
     ZX_DEBUG_ASSERT(num_rows_ != 0);
@@ -254,7 +266,7 @@ class PowerModel {
 
   // Returns a transition matrix, where the entry <i,j> represents the transition costs for
   // transitioning from i to j.
-  constexpr TransitionMatrix transitions() const {
+  TransitionMatrix transitions() const {
     return TransitionMatrix(transitions_, power_levels_.size());
   }
 
@@ -284,7 +296,10 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
                     public fbl::SinglyLinkedListable<fbl::RefPtr<PowerDomain>> {
  public:
   PowerDomain(uint32_t id, zx_cpu_set_t cpus, PowerModel model)
-      : cpus_(cpus), id_(id), power_model_(std::move(model)) {}
+      : PowerDomain(id, cpus, std::move(model), nullptr) {}
+  PowerDomain(uint32_t id, zx_cpu_set_t cpus, PowerModel model,
+              fbl::RefPtr<PowerLevelController> controller)
+      : cpus_(cpus), id_(id), power_model_(std::move(model)), controller_(std::move(controller)) {}
 
   // ID representing the relationship between a set of CPUs and a power model.
   constexpr uint32_t id() const { return id_; }
@@ -297,9 +312,11 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
 
   // Normalized utilization accumulated from all the entities that this `PowerDomain`
   // is associated with (e.g. all the cpus in the power domain).
-  constexpr uint64_t total_normalized_utilization() const {
+  uint64_t total_normalized_utilization() const {
     return total_normalized_utilization_.load(std::memory_order_relaxed);
   }
+  // Handler for transitions where the target level's control interface is not kernel handled.
+  const fbl::RefPtr<PowerLevelController>& controller() const { return controller_; }
 
  private:
   friend class PowerState;
@@ -309,6 +326,7 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
   const PowerModel power_model_;
 
   std::atomic<uint64_t> total_normalized_utilization_{0};
+  const fbl::RefPtr<PowerLevelController> controller_ = nullptr;
 };
 
 // `PowerDomainRegistry` provides a starting point for looking at any
@@ -327,12 +345,35 @@ class PowerDomainRegistry {
   //  // `cpu_num` is a valid cpu number that falls within `cpu_set_t` bits.
   //  // `new_domain` new `PowerDomain` for `cpu_num`. If `nullptr` then
   //  //  current domain should be cleared.
-  //  void operator()(size_t cpu_num, fbl::RefPtr<PowerDomain>& new_domain)
+  //  //  void operator()(size_t cpu_num, fbl::RefPtr<PowerDomain>& new_domain)
   //
   template <typename CpuPowerDomainAccessor>
   zx::result<> Register(fbl::RefPtr<PowerDomain> power_domain,
                         CpuPowerDomainAccessor&& update_domain) {
     return UpdateRegistry(std::move(power_domain), update_domain);
+  }
+
+  // Register `power_domain` with this registry.
+  //
+  // A `CpuPowerDomainAccessor` must provide the following contract:
+  //
+  //  // `cpu_num` is a valid cpu number that falls within `cpu_set_t` bits.
+  //  //  current domain should be cleared.
+  //  //  void operator()(size_t cpu_num)
+  template <typename CpuPowerDomainAccessor>
+  zx::result<> Unregister(uint32_t domain_id, CpuPowerDomainAccessor&& clear_domain) {
+    return RemoveFromRegistry(domain_id, clear_domain);
+  }
+
+  // Returns a reference to a `PowerDomain` whose id matches `domain_id`.
+  // Returns `nullptr` if there is no match.
+  fbl::RefPtr<PowerDomain> Find(uint32_t domain_id) const {
+    for (auto& domain : domains_) {
+      if (domain.id() == domain_id) {
+        return fbl::RefPtr(const_cast<PowerDomain*>(&domain));
+      }
+    }
+    return nullptr;
   }
 
   // Visit each registered `PowerDomain`.
@@ -352,6 +393,10 @@ class PowerDomainRegistry {
   zx::result<> UpdateRegistry(
       fbl::RefPtr<PowerDomain> power_domain,
       fit::inline_function<void(size_t, fbl::RefPtr<PowerDomain>)> update_cpu_power_domain);
+
+  // Dissociates `domain_id` from all the cpus and removes it from the registry.
+  zx::result<> RemoveFromRegistry(uint32_t domain_id,
+                                  fit::inline_function<void(size_t)> clear_domain);
 
   fbl::SinglyLinkedList<fbl::RefPtr<PowerDomain>> domains_;
 };

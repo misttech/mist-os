@@ -110,8 +110,6 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   // Stores the child's release op, to be called after dispatcher shutdown.
   void AddDelayedChildReleaseOp(std::unique_ptr<DelayedReleaseOp> op);
 
-  std::string_view topological_path() const { return topological_path_; }
-  void set_topological_path(std::string path) { topological_path_ = std::move(path); }
   void set_fragments(std::vector<std::string> names) { fragments_ = std::move(names); }
   Driver* driver() { return driver_; }
 
@@ -201,9 +199,6 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
 
   DeviceServer device_server_;
 
-  // This is the device's topological path without the leading '/dev/'.
-  // TODO(https://fxbug.dev/42068361): Simplify this and the GetTopologicalPath API.
-  std::string topological_path_;
   const std::string name_;
   // A unique id for the device.
   uint32_t device_id_ = 0;

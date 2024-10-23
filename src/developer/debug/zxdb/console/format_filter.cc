@@ -43,6 +43,11 @@ OutputBuffer FormatFilter(const ConsoleContext* context, const Filter* filter) {
     out.Append("=true ");
   }
 
+  if (filter->job_only()) {
+    out.Append(Syntax::kVariable, "job_only");
+    out.Append("=true ");
+  }
+
   if (!filter->is_valid()) {
     out.Append(Syntax::kComment, "(invalid) ");
   }

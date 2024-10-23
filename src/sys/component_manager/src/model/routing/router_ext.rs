@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_io as fio;
 use futures::future::BoxFuture;
 use router_error::{Explain, RouterError};
 use sandbox::{Capability, Dict, DirEntry, RemotableCapability, Router};
 use std::sync::Arc;
 use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo};
 use vfs::execution_scope::ExecutionScope;
-use {fidl_fuchsia_io as fio, zx};
 
 /// A trait to add functions to Router that know about the component manager
 /// types.

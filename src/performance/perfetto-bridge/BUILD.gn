@@ -33,7 +33,6 @@ source_set("perfetto_bridge_lib") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl:fxl_cli",
     "//third_party/perfetto/protos/perfetto/config:cpp",
-    "//third_party/perfetto/protos/perfetto/trace:non_minimal_cpp",
     "//third_party/rapidjson",
   ]
 }

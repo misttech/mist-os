@@ -1541,12 +1541,7 @@ fn create_capability_decl(
         #[cfg(fuchsia_api_level_at_least = "HEAD")]
         ftest::Capability::Dictionary(dictionary) => {
             let name = try_into_source_name(&dictionary.name)?;
-            cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl {
-                name,
-                source: None,
-                source_dictionary: None,
-                source_path: None,
-            })
+            cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl { name, source_path: None })
         }
         #[cfg(fuchsia_api_level_at_least = "24")]
         ftest::Capability::Resolver(resolver) => {
@@ -2283,7 +2278,7 @@ mod tests {
     };
     use std::time::Duration;
     use test_case::test_case;
-    use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync};
 
     /// Assert that two ComponentTrees are equivalent.
     ///

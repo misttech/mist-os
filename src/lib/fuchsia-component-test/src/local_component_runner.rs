@@ -20,7 +20,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
-    fidl_fuchsia_process as fprocess, fuchsia_async as fasync, zx,
+    fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
 };
 
 /// The handles from the framework over which the local component should interact with other

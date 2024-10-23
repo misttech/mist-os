@@ -55,6 +55,12 @@ if (is_host) {
     libraries = [ "//src/performance/lib/trace_processing" ]
   }
 
+  python_host_test("memory_test") {
+    enable_mypy = true
+    main_source = "memory_test.py"
+    libraries = [ "//src/performance/lib/trace_processing" ]
+  }
+
   python_host_test("power_metrics_test") {
     enable_mypy = true
     main_source = "power_metrics_test.py"
@@ -107,6 +113,7 @@ group("tests") {
   public_deps = [
     ":agg_cpu_breakdown_test($host_toolchain)",
     ":cpu_breakdown_test($host_toolchain)",
+    ":memory_test($host_toolchain)",
     ":power_metrics_test($host_toolchain)",
     ":trace_importing_test($host_toolchain)",
     ":trace_metrics_test($host_toolchain)",

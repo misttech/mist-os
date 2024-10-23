@@ -5,12 +5,12 @@
 use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_device::ControllerProxy;
 use fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy};
+use fidl_fuchsia_io as fio;
 use fs_management::format::{detect_disk_format, DiskFormat};
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::TryStreamExt;
 use std::path::{Path, PathBuf};
-use {fidl_fuchsia_io as fio, zx};
 
 pub mod fvm;
 pub mod zxcrypt;
@@ -96,10 +96,8 @@ impl BlockDeviceMatcher<'_> {
 pub async fn wait_for_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<PathBuf> {
     const DEV_CLASS_BLOCK: &str = "/dev/class/block";
     assert!(!matchers.is_empty());
-    let block_dev_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        DEV_CLASS_BLOCK,
-        fio::OpenFlags::RIGHT_READABLE,
-    )?;
+    let block_dev_dir =
+        fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, fio::PERM_READABLE)?;
     let mut watcher = Watcher::new(&block_dev_dir).await?;
     while let Some(msg) = watcher.try_next().await? {
         if msg.event != WatchEvent::ADD_FILE && msg.event != WatchEvent::EXISTING {
@@ -129,10 +127,8 @@ pub async fn wait_for_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Resul
 pub async fn find_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<PathBuf> {
     const DEV_CLASS_BLOCK: &str = "/dev/class/block";
     assert!(!matchers.is_empty());
-    let block_dev_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        DEV_CLASS_BLOCK,
-        fio::OpenFlags::RIGHT_READABLE,
-    )?;
+    let block_dev_dir =
+        fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, fio::PERM_READABLE)?;
     let entries = fuchsia_fs::directory::readdir(&block_dev_dir)
         .await
         .context("Failed to readdir /dev/class/block")?;

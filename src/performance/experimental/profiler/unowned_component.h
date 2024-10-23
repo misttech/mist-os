@@ -16,20 +16,28 @@
 namespace profiler {
 
 // A component that is to be profiled, but who's lifecycle is not controlled by the profiler
-class UnownedComponent : public Component {
+class UnownedComponent : public ComponentTarget {
  public:
-  explicit UnownedComponent(async_dispatcher_t* dispatcher) : Component(dispatcher) {
-    needs_destruction_ = false;
-  }
-  static zx::result<std::unique_ptr<Component>> Create(async_dispatcher_t* dispatcher,
-                                                       const std::optional<std::string>& moniker,
-                                                       const std::optional<std::string>& url);
-  zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start = nullptr) override;
+  // An unowned component needs to be described by at least one of a moniker or url.
+  explicit UnownedComponent(async_dispatcher_t* dispatcher, std::optional<std::string> url,
+                            std::optional<Moniker> moniker)
+      : component_watcher_{dispatcher}, moniker_{std::move(moniker)}, url_{std::move(url)} {}
+  static zx::result<std::unique_ptr<UnownedComponent>> Create(
+      async_dispatcher_t* dispatcher, const std::optional<std::string>& moniker,
+      const std::optional<std::string>& url);
+  zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start) override;
   zx::result<> Stop() override;
   zx::result<> Destroy() override;
 
+ private:
+  // Start watching for a component at a `moniker`. Calls on_start_ when a component is created at
+  // the requested moniker or as a child of the moniker.
   zx::result<> Attach(const fidl::SyncClient<fuchsia_sys2::RealmQuery>& client,
-                      std::string moniker);
+                      const Moniker& moniker);
+  ComponentWatcher component_watcher_;
+  std::optional<Moniker> moniker_;
+  std::optional<std::string> url_;
+  std::optional<ComponentWatcher::ComponentEventHandler> on_start_;
 };
 
 }  // namespace profiler

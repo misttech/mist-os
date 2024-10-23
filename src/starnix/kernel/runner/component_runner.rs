@@ -19,6 +19,7 @@ use runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::{create_file_from_handle, RemoteFs, SyslogFile};
 use starnix_core::task::{CurrentTask, ExitStatus, Task};
+use starnix_core::vfs::fs_args::MountParams;
 use starnix_core::vfs::{
     FdNumber, FdTable, FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount,
 };
@@ -42,7 +43,7 @@ use std::path::Path;
 use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 /// Component controller epitaph value used as the base value to pass non-zero error
@@ -79,6 +80,10 @@ pub async fn start_component(
 
     let ns = start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
 
+    // If the component specifies a filesystem security label then it will be applied to all files
+    // in all directories mounted from the component's namespace.
+    let mount_seclabel = get_program_string(&start_info, "fsseclabel");
+
     let mut maybe_pkg = None;
     let mut maybe_svc = None;
     for entry in ns {
@@ -98,6 +103,7 @@ pub async fn start_component(
                         system_task,
                         &dir_proxy,
                         &dir_path,
+                        mount_seclabel,
                     )?;
                 }
                 _ => {
@@ -107,6 +113,7 @@ pub async fn start_component(
                         system_task,
                         &dir_proxy,
                         &format!("{component_path}/{dir_path}"),
+                        mount_seclabel,
                     )?;
                     if dir_path == "/pkg" {
                         maybe_pkg = Some(dir_proxy);
@@ -153,6 +160,7 @@ pub async fn start_component(
         credentials.cap_permitted = capabilities;
         credentials.cap_effective = capabilities;
         credentials.cap_inheritable = capabilities;
+        credentials.cap_ambient = capabilities;
     }
 
     run_component_features(system_task.kernel(), &component_features, maybe_svc).unwrap_or_else(
@@ -185,6 +193,7 @@ pub async fn start_component(
                 let cwd_path =
                     FsString::from(get_program_string(&start_info, "cwd").unwrap_or(&pkg_path));
                 let cwd = current_task.lookup_path(
+                    locked,
                     &mut LookupContext::default(),
                     current_task.fs().root(),
                     cwd_path.as_ref(),
@@ -206,7 +215,7 @@ pub async fn start_component(
                                 errno!(EINVAL)
                             })?;
                         let mount_point =
-                            current_task.lookup_path_from_root(action.path.as_ref())?;
+                            current_task.lookup_path_from_root(locked, action.path.as_ref())?;
                         mount_record.lock().mount(
                             mount_point,
                             WhatToMount::Fs(action.fs),
@@ -334,7 +343,7 @@ where
 {
     // Checking container directory already exists.
     // If this lookup fails, the container might not have the "container" feature enabled.
-    let mount_point = system_task.lookup_path_from_root("/container/component/".into())?;
+    let mount_point = system_task.lookup_path_from_root(locked, "/container/component/".into())?;
 
     // Find /container/component/{random} that doesn't already exist
     let component_path = loop {
@@ -422,6 +431,7 @@ impl MountRecord {
         system_task: &CurrentTask,
         directory: &fio::DirectorySynchronousProxy,
         path: &str,
+        mount_seclabel: Option<&str>,
     ) -> Result<(), Error>
     where
         L: LockBefore<FileOpsCore>,
@@ -429,7 +439,7 @@ impl MountRecord {
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and
         // create it if it doesn't exist.
-        let mut current_node = system_task.lookup_path_from_root(".".into())?;
+        let mut current_node = system_task.lookup_path_from_root(locked, ".".into())?;
         let mut context = LookupContext::default();
 
         // Extract each component using Path::new(path).components(). For example,
@@ -449,7 +459,7 @@ impl MountRecord {
             ) {
                 Ok(node) => node,
                 Err(errno) if errno == EEXIST || errno == ENOTDIR => {
-                    current_node.lookup_child(system_task, &mut context, sub_dir.into())?
+                    current_node.lookup_child(locked, system_task, &mut context, sub_dir.into())?
                 }
                 Err(e) => bail!(e),
             };
@@ -461,10 +471,18 @@ impl MountRecord {
         let (client_end, server_end) = zx::Channel::create();
         directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
 
+        // If a filesystem security label argument was provided then apply it to all files via
+        // mountpoint-labeling, with a "context=..." mount option.
+        let params = if let Some(security_context) = mount_seclabel {
+            MountParams::parse(format!("context={}", security_context).as_str().into()).unwrap()
+        } else {
+            MountParams::default()
+        };
+
         let fs = RemoteFs::new_fs(
             system_task.kernel(),
             client_end,
-            FileSystemOptions { source: path.into(), ..Default::default() },
+            FileSystemOptions { source: path.into(), params, ..Default::default() },
             rights,
         )?;
 

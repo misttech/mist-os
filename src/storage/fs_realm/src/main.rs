@@ -21,7 +21,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::directory::immutable::Simple as PseudoDirectory;
 use vfs::service;
-use {fidl_fuchsia_fs_realm as fs_realm, fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_fs_realm as fs_realm, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[derive(Clone)]
 pub struct FsRealmState {

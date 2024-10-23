@@ -19,7 +19,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrStorage as _,
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -189,20 +189,30 @@ impl BpfFsDir {
         Self { xattrs: MemoryXattrStorage::default() }
     }
 
-    pub fn register_pin(
+    pub fn register_pin<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         node: &NamespaceNode,
         name: &FsStr,
         object: BpfHandle,
-    ) -> Result<(), Errno> {
-        node.entry.create_entry(current_task, &node.mount, name, |dir, _mount, _name| {
-            Ok(dir.fs().create_node(
-                current_task,
-                BpfFsObject::new(object),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
-            ))
-        })?;
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        node.entry.create_entry(
+            locked,
+            current_task,
+            &node.mount,
+            name,
+            |_locked, dir, _mount, _name| {
+                Ok(dir.fs().create_node(
+                    current_task,
+                    BpfFsObject::new(object),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
+                ))
+            },
+        )?;
         Ok(())
     }
 }

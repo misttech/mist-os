@@ -65,8 +65,8 @@ impl MockRebootService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fuchsia_async as fasync;
     use std::sync::atomic::{AtomicU32, Ordering};
-    use {fuchsia_async as fasync, zx};
 
     #[fasync::run_singlethreaded(test)]
     async fn test_mock_reboot() {

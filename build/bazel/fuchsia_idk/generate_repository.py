@@ -3,7 +3,30 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Generate a Bazel repository for a given Fuchsia IDK."""
+"""Generate a Bazel repository for a given Fuchsia IDK.
+
+This rewrite the metadata files to use Bazel target labels for
+any file that is a Ninja artifact, instead of a source file,
+e.g. "arch/x64/lib/libfoo.so" -> "@fuchsia_idk//arch/x64:lib/libfoo.so"
+
+For now, these targets only map to filegroup() targets that wrap
+a symlink to the actual Ninja artifact. Later, these will point to
+actual Bazel actions to build the corresponding file on demand
+directly in the Bazel graph.
+
+Note that the top-level BUILD.bazel file in the repository will
+also include a Bazel target named "final_idk" which generates,
+at build time, an IDK export directory with the same content,
+but whose metadata files do not include any target labels.
+
+Such a repository can be distributed out-of-tree to third-party
+SDK produces, or to run the Fuchsia Bazel SDK test suite locally,
+but must be built explicitly before, e.g. with:
+
+```
+fx bazel build @fuchsia_idk//:final_idk
+```
+"""
 
 import argparse
 import json
@@ -44,6 +67,20 @@ def _to_starlark_string_list(items: T.List[str], indent: int = 4) -> str:
     for item in items:
         result += " " * indent + f'    "{item}",\n'
     result += " " * indent + "]"
+    return result
+
+
+def _to_starlark_string_dict(mapping: T.Dict[str, str], indent: int = 4) -> str:
+    items = sorted(mapping.items())
+    if not mapping:
+        return "{}"
+    if len(mapping) == 1:
+        key, value = mapping[0]
+        return f'{{ "{key}": "{value}" }}'
+    result = "{\n"
+    for key, value in items:
+        result += " " * indent + f'    "{key}": "{value}",\n'
+    result += " " * indent + "}"
     return result
 
 
@@ -159,6 +196,11 @@ class OutputIdk(object):
         self._symlinks: T.Dict[str, Path] = {}
         self._files: T.Dict[str, str] = {}
 
+        # A map from Bazel target labels to where to copy their
+        # artifact when generating a final IDK directory.
+        self._final_files: T.Dict[str, str] = {}
+        self._final_metas: T.Dict[str, str] = {}
+
     def add_symlink(self, link_relpath: str, target_path: Path) -> None:
         cur_path = self._symlinks.setdefault(link_relpath, target_path)
         assert (
@@ -168,7 +210,9 @@ class OutputIdk(object):
             link_relpath not in self._files
         ), f"Cannot add symlink {link_relpath} over existing file"
 
-    def add_file(self, relpath: str, content: str) -> None:
+    def add_file(
+        self, relpath: str, content: str, is_meta: bool = False
+    ) -> None:
         cur_content = self._files.setdefault(relpath, content)
         assert (
             cur_content == content
@@ -176,10 +220,15 @@ class OutputIdk(object):
         assert (
             relpath not in self._symlinks
         ), f"Cannot add file {relpath} over existing symlink"
+        self.add_final_file(relpath, is_meta)
 
-    def add_json_file(self, relpath: str, json_content: T.Any) -> None:
+    def add_json_file(
+        self, relpath: str, json_content: T.Any, is_meta: bool = False
+    ) -> None:
         self.add_file(
-            relpath, json.dumps(json_content, indent=2, separators=(",", ": "))
+            relpath,
+            json.dumps(json_content, indent=2, separators=(",", ": ")),
+            is_meta=is_meta,
         )
 
     def get_package_info_for(self, package_path: str) -> OutputPackageInfo:
@@ -190,7 +239,25 @@ class OutputIdk(object):
             )
         return result
 
+    def add_final_file(self, dst_path: str, is_meta: bool = False) -> None:
+        dst_path = str(
+            dst_path
+        )  # TODO(digit): Add assert, debug origin of Path value!
+        package, name = split_path_to_package_name(dst_path)
+        package_info = self.get_package_info_for(package)
+        package_info.add_export(name)
+        if is_meta:
+            self._final_metas[f"//%s:%s" % (package, name)] = dst_path
+        else:
+            self._final_files[f"//%s:%s" % (package, name)] = dst_path
+
+    def add_artifact_file(self, dst_path: str, target_label: str) -> None:
+        self._final_files[target_label] = dst_path
+
     def write_all(self) -> None:
+        # Ensure there is an OutputPackageInfo for the top-level package.
+        self.get_package_info_for("")
+
         # Write all package BUILD.bazel files.
         for package_dir, package_info in self._packages.items():
             package_path = self._output_dir / package_dir / "BUILD.bazel"
@@ -207,6 +274,26 @@ class OutputIdk(object):
             file_path = self._output_dir / file_relpath
             file_path.parent.mkdir(parents=True, exist_ok=True)
             file_path.write_text(content)
+
+        # Update the top-level BUILD.bazel file to generate
+        # a final IDK directory, if needed.
+        bazel_build_path = self._output_dir / "BUILD.bazel"
+        bazel_build = bazel_build_path.read_text()
+        bazel_build += """
+# buildifier: disable=load-on-top
+load(":generate_final_idk.bzl", "generate_final_idk")
+
+generate_final_idk(
+    name = "final_idk",
+    files_to_copy = {files_to_copy},
+    manifest = "meta/manifest.json",
+    meta_files_to_copy = {meta_files_to_copy},
+)
+""".format(
+            files_to_copy=_to_starlark_string_dict(self._final_files),
+            meta_files_to_copy=_to_starlark_string_dict(self._final_metas),
+        )
+        bazel_build_path.write_text(bazel_build)
 
 
 class PathRewriter(object):
@@ -228,7 +315,7 @@ class PathRewriter(object):
             input_dir: Path to the input export IDK directory.
             ninja_build_dir: Path to the Ninja build directory.
             exceptions: optional list of file basenames that will
-                be preerved as symlinks, even if they are generated
+                be preserved as symlinks, even if they are generated
                 Ninja artifacts.
         """
         self._repo_name = repo_name
@@ -268,6 +355,7 @@ class PathRewriter(object):
 
         if not src_path.is_relative_to(self._ninja_build_dir):
             # This is a source file, return the path unmodified.
+            self._output_idk.add_final_file(path)
             return path
         elif os.path.basename(path) in self._exceptions:
             # This file must be kept as a direct symlink even
@@ -275,11 +363,14 @@ class PathRewriter(object):
             # required for sysroot files because the C++ toolchain
             # configuration cannot currently support a generated
             # sysroot directory.
+            self._output_idk.add_final_file(path)
             return path
         else:
             # This is a Ninja generated file, return a label to
             # its Bazel package.
-            return f"@{self._repo_name}//{package}:{name}"
+            label = f"@{self._repo_name}//{package}:{name}"
+            self._output_idk.add_artifact_file(path, label)
+            return label
 
     def path_list(
         self, paths: T.List[str], relative_from: None | Path = None
@@ -525,7 +616,7 @@ def main():
         part_meta_path = part["meta"]
 
         src_meta_path = input_dir / part_meta_path
-        dst_meta_path = out_dir / part_meta_path
+        out_dir / part_meta_path
         try:
             meta = json.load(src_meta_path.open())
         except:
@@ -538,7 +629,7 @@ def main():
 
         rewriter.rewrite_metadata(meta)
 
-        output_idk.add_json_file(dst_meta_path, meta)
+        output_idk.add_json_file(part_meta_path, meta, is_meta=True)
 
     output_idk.write_all()
 

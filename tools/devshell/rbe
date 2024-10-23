@@ -12,6 +12,9 @@
 ##      Options:
 ##        -f,--force: Always request a fresh authentication token.
 ##
+##  fx rbe cleanlogs
+##      Clean up reproxy log dirs (from using fuchsia-reproxy-wrap.sh).
+##
 
 set -e
 
@@ -156,6 +159,15 @@ function auth_subcommand() {
   bazel_auth && reclient_auth && echo && style::echo --bold --green "You can now 'fx build' with RBE."
 }
 
+# LINT.IfChange(reproxy_log_dirs)
+# build/rbe/fuchsia-reproxy-wrap.sh writes to logs here:
+readonly rbe_logs_dir="${FUCHSIA_DIR}/out/.reproxy_logs"
+# LINT.ThenChange(/build/rbe/fuchsia-reproxy-wrap.sh:reproxy_log_dirs)
+function cleanlogs_subcommand() {
+  echo "Removing $rbe_logs_dir"
+  rm -rf "$rbe_logs_dir"
+}
+
 # main
 case "$action" in
   -h|--help)
@@ -164,6 +176,7 @@ case "$action" in
     ;;
 
   auth) auth_subcommand "${action_args[@]}" ;;
+  cleanlogs) cleanlogs_subcommand "${action_args[@]}" ;;
 
   *)
     fx-error Invalid syntax

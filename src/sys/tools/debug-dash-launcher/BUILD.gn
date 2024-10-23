@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_binary("bin") {
   output_name = "debug-dash-launcher"
@@ -30,7 +29,6 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/fuchsia-url",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
@@ -38,6 +36,7 @@ rustc_binary("bin") {
     "//third_party/rust_crates:indexmap",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:url",
   ]
 
   test_deps = [

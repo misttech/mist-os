@@ -12,12 +12,15 @@ use aes::cipher::{
 use aes::Aes256;
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
-use chacha20::{ChaCha20, Key};
+use chacha20::{self, ChaCha20};
 use fprint::TypeFingerprint;
+use futures::stream::FuturesUnordered;
+use futures::TryStreamExt as _;
 use fxfs_macros::{migrate_nodefault, Migrate};
 use serde::de::{Error as SerdeError, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use static_assertions::assert_cfg;
+use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use zx_status as zx;
 
@@ -32,6 +35,7 @@ const SECTOR_SIZE: u64 = 512;
 
 pub type KeyBytes = [u8; KEY_SIZE];
 
+#[derive(Debug)]
 pub struct UnwrappedKey {
     key: KeyBytes,
 }
@@ -46,7 +50,7 @@ impl UnwrappedKey {
     }
 }
 
-pub type UnwrappedKeys = Vec<(u64, UnwrappedKey)>;
+pub type UnwrappedKeys = Vec<(u64, Option<UnwrappedKey>)>;
 
 pub type WrappedKeyBytes = WrappedKeyBytesV32;
 
@@ -165,7 +169,7 @@ pub struct WrappedKeyV32 {
 /// unique to the file.
 pub type WrappedKeys = WrappedKeysV40;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 pub struct WrappedKeysV40(Vec<(u64, WrappedKeyV40)>);
 
 impl From<WrappedKeysV32> for WrappedKeysV40 {
@@ -195,41 +199,81 @@ impl std::ops::DerefMut for WrappedKeys {
     }
 }
 
-struct XtsCipher {
-    id: u64,
-    cipher: Aes256,
+impl WrappedKeys {
+    pub fn get_wrapping_key_with_id(&self, key_id: u64) -> Option<[u8; 16]> {
+        let wrapped_key_entry = self.0.iter().find(|(x, _)| *x == key_id);
+        wrapped_key_entry.map(|(_, wrapped_key)| wrapped_key.wrapping_key_id.to_le_bytes())
+    }
 }
 
-pub struct XtsCipherSet(Vec<XtsCipher>);
+#[derive(Clone, Debug)]
+pub struct XtsCipher {
+    id: u64,
+    // This is None if the key isn't present.
+    cipher: Option<Aes256>,
+}
 
-impl XtsCipherSet {
-    pub fn new(keys: &UnwrappedKeys) -> Self {
-        Self(
-            keys.iter()
-                .map(|(id, k)| XtsCipher {
-                    id: *id,
-                    cipher: Aes256::new(GenericArray::from_slice(k.key())),
-                })
-                .collect(),
-        )
+impl XtsCipher {
+    pub fn new(id: u64, key: &UnwrappedKey) -> Self {
+        Self { id, cipher: Some(Aes256::new(GenericArray::from_slice(key.key()))) }
+    }
+
+    pub fn unavailable(id: u64) -> Self {
+        XtsCipher { id, cipher: None }
+    }
+
+    pub fn key(&self) -> Option<&Aes256> {
+        self.cipher.as_ref()
+    }
+}
+
+/// References a specific key in the cipher set.
+pub struct Key {
+    keys: Arc<XtsCipherSet>,
+    // Index in the XtsCipherSet array for the key.
+    index: usize,
+}
+
+impl Key {
+    fn key(&self) -> &Aes256 {
+        self.keys.0[self.index].cipher.as_ref().unwrap()
+    }
+
+    pub fn key_id(&self) -> u64 {
+        self.keys.0[self.index].id
+    }
+
+    /// Encrypts data in the `buffer`.
+    ///
+    /// * `offset` is the byte offset within the file.
+    /// * `buffer` is mutated in place.
+    ///
+    /// `buffer` *must* be 16 byte aligned.
+    pub fn encrypt(&self, offset: u64, buffer: &mut [u8]) -> Result<(), Error> {
+        fxfs_trace::duration!(c"encrypt", "len" => buffer.len());
+        assert_eq!(offset % SECTOR_SIZE, 0);
+        let cipher = &self.key();
+        let mut sector_offset = offset / SECTOR_SIZE;
+        for sector in buffer.chunks_exact_mut(SECTOR_SIZE as usize) {
+            let mut tweak = Tweak(sector_offset as u128);
+            // The same key is used for encrypting the data and computing the tweak.
+            cipher.encrypt_block(GenericArray::from_mut_slice(tweak.as_mut_bytes()));
+            cipher.encrypt_with_backend(XtsProcessor::new(tweak, sector));
+            sector_offset += 1;
+        }
+        Ok(())
     }
 
     /// Decrypt the data in `buffer`.
     ///
     /// * `offset` is the byte offset within the file.
-    /// * `key_id` specifies which of the unwrapped keys to use.
     /// * `buffer` is mutated in place.
     ///
     /// `buffer` *must* be 16 byte aligned.
-    pub fn decrypt(&self, offset: u64, key_id: u64, buffer: &mut [u8]) -> Result<(), Error> {
+    pub fn decrypt(&self, offset: u64, buffer: &mut [u8]) -> Result<(), Error> {
         fxfs_trace::duration!(c"decrypt", "len" => buffer.len());
         assert_eq!(offset % SECTOR_SIZE, 0);
-        let cipher = &self
-            .0
-            .iter()
-            .find(|cipher| cipher.id == key_id)
-            .ok_or(anyhow!("Key not found"))?
-            .cipher;
+        let cipher = &self.key();
         let mut sector_offset = offset / SECTOR_SIZE;
         for sector in buffer.chunks_exact_mut(SECTOR_SIZE as usize) {
             let mut tweak = Tweak(sector_offset as u128);
@@ -241,32 +285,86 @@ impl XtsCipherSet {
         Ok(())
     }
 
-    /// Encrypts data in the `buffer`.
-    ///
-    /// * `offset` is the byte offset within the file.
-    /// * `key_id` specifies which of the unwrapped keys to use.
-    /// * `buffer` is mutated in place.
-    ///
-    /// `buffer` *must* be 16 byte aligned.
-    pub fn encrypt(&self, offset: u64, key_id: u64, buffer: &mut [u8]) -> Result<(), Error> {
-        fxfs_trace::duration!(c"encrypt", "len" => buffer.len());
-        assert_eq!(offset % SECTOR_SIZE, 0);
-        let cipher = &self
-            .0
-            .iter()
-            .find(|cipher| cipher.id == key_id)
-            .ok_or(anyhow!("Key not found"))?
-            .cipher;
-        let mut sector_offset = offset / SECTOR_SIZE;
-        for sector in buffer.chunks_exact_mut(SECTOR_SIZE as usize) {
-            let mut tweak = Tweak(sector_offset as u128);
-            // The same key is used for encrypting the data and computing the tweak.
-            cipher.encrypt_block(GenericArray::from_mut_slice(tweak.as_mut_bytes()));
-            cipher.encrypt_with_backend(XtsProcessor::new(tweak, sector));
-            sector_offset += 1;
+    /// Encrypts the filename contained in `buffer`.
+    /// TODO(https://fxbug.dev/356896315): Implement encryption for filenames.
+    pub fn encrypt_filename(&self, buffer: &mut Vec<u8>) -> Result<(), Error> {
+        // Pad the buffer such that its length is a multiple of 32.
+        if buffer.len() % 32 != 0 {
+            let remainder = 32 - (buffer.len() % 32);
+            for _ in 1..=remainder {
+                buffer.push(0);
+            }
+        }
+        for byte in buffer {
+            *byte = *byte + 1;
         }
         Ok(())
     }
+
+    /// Decrypts the filename contained in `buffer`.
+    /// TODO(https://fxbug.dev/356896315): Implement decryption for filenames.
+    pub fn decrypt_filename(&self, buffer: &mut Vec<u8>) -> Result<(), Error> {
+        for byte in &mut *buffer {
+            *byte = *byte - 1;
+        }
+        // Remove the padding
+        if let Some(i) = buffer.iter().rposition(|x| *x != 0) {
+            let new_len = i + 1;
+            buffer.truncate(new_len);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct XtsCipherSet(Vec<XtsCipher>);
+
+impl From<Vec<XtsCipher>> for XtsCipherSet {
+    fn from(value: Vec<XtsCipher>) -> Self {
+        Self(value)
+    }
+}
+
+impl XtsCipherSet {
+    pub fn new(keys: &UnwrappedKeys) -> Self {
+        Self(
+            keys.iter()
+                .map(|(id, k)| match k {
+                    Some(k) => XtsCipher::new(*id, k),
+                    None => XtsCipher::unavailable(*id),
+                })
+                .collect(),
+        )
+    }
+
+    pub fn ciphers(&self) -> &[XtsCipher] {
+        &self.0
+    }
+
+    pub fn cipher(&self, id: u64) -> Option<(usize, &XtsCipher)> {
+        self.0.iter().enumerate().find(|(_, x)| x.id == id)
+    }
+
+    pub fn contains_key_id(&self, id: u64) -> bool {
+        self.0.iter().find(|x| x.id == id).is_some()
+    }
+
+    pub fn find_key(self: &Arc<Self>, id: u64) -> FindKeyResult {
+        let Some((index, cipher)) = self.0.iter().enumerate().find(|(_, x)| x.id == id) else {
+            return FindKeyResult::NotFound;
+        };
+        if cipher.key().is_some() {
+            FindKeyResult::Key(Key { keys: self.clone(), index })
+        } else {
+            FindKeyResult::Unavailable
+        }
+    }
+}
+
+pub enum FindKeyResult {
+    NotFound,
+    Unavailable,
+    Key(Key),
 }
 
 /// A thin wrapper around a ChaCha20 stream cipher.  This will use a zero nonce. **NOTE**: Great
@@ -276,8 +374,10 @@ pub struct StreamCipher(ChaCha20);
 
 impl StreamCipher {
     pub fn new(key: &UnwrappedKey, offset: u64) -> Self {
-        let mut cipher =
-            Self(ChaCha20::new(Key::from_slice(&key.key), /* nonce: */ &[0; 12].into()));
+        let mut cipher = Self(ChaCha20::new(
+            chacha20::Key::from_slice(&key.key),
+            /* nonce: */ &[0; 12].into(),
+        ));
         cipher.0.seek(offset);
         cipher
     }
@@ -345,11 +445,17 @@ pub trait Crypt: Send + Sync {
         keys: &WrappedKeys,
         owner: u64,
     ) -> Result<UnwrappedKeys, zx::Status> {
-        let mut futures = vec![];
+        let futures = FuturesUnordered::new();
         for (key_id, key) in keys.iter() {
-            futures.push(async move { Ok((*key_id, self.unwrap_key(key, owner).await?)) });
+            futures.push(async move {
+                match self.unwrap_key(key, owner).await {
+                    Ok(unwrapped_key) => Ok((*key_id, Some(unwrapped_key))),
+                    Err(zx::Status::NOT_FOUND) => Ok((*key_id, None)),
+                    Err(e) => Err(e),
+                }
+            });
         }
-        futures::future::try_join_all(futures).await
+        Ok(futures.try_collect::<UnwrappedKeys>().await?)
     }
 }
 

@@ -16,6 +16,9 @@ namespace debug_ipc {
 bool FilterMatches(const Filter& filter, const std::string& process_name,
                    const std::vector<ComponentInfo>& components);
 
+// Returns true if the filter's configuration defers module loading.
+bool FilterDefersModules(const Filter* filter);
+
 }  // namespace debug_ipc
 
 #endif  // SRC_DEVELOPER_DEBUG_IPC_FILTER_UTILS_H_

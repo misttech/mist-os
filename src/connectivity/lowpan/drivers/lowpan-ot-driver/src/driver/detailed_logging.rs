@@ -39,10 +39,10 @@ impl DetailedLogging {
             self.detailed_logging_level.set(level);
         };
         if self.detailed_logging_enabled.get() {
-            diagnostics_log::set_minimum_severity(self.detailed_logging_level.get().into());
+            diagnostics_log::set_minimum_severity(self.detailed_logging_level.get());
             ot::set_logging_level(self.detailed_logging_level.get());
         } else {
-            diagnostics_log::set_minimum_severity(self.log_level_default.into());
+            diagnostics_log::set_minimum_severity(self.log_level_default);
             ot::set_logging_level(self.log_level_default);
         };
 

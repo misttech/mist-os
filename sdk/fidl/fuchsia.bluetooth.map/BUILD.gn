@@ -7,8 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.bluetooth.map") {
   name = "fuchsia.bluetooth.map"
 
-  sdk_category = "internal"
-
   sources = [
     "mce.fidl",
     "types.fidl",

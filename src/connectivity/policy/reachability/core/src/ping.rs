@@ -13,7 +13,7 @@ use tracing::warn;
 const PING_MESSAGE: &str = "Hello from reachability monitor!";
 const SEQ_MIN: u16 = 1;
 const SEQ_MAX: u16 = 3;
-const TIMEOUT: fasync::Duration = fasync::Duration::from_seconds(1);
+const TIMEOUT: fasync::MonotonicDuration = fasync::MonotonicDuration::from_seconds(1);
 
 async fn ping<I>(interface_name: &str, addr: I::SockAddr) -> anyhow::Result<()>
 where

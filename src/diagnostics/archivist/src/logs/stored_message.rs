@@ -10,13 +10,15 @@ use diagnostics_data::{LogsData, Severity};
 use diagnostics_log_encoding::encode::{
     Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, WriteEventParams,
 };
+use diagnostics_log_encoding::Argument;
 use diagnostics_message::LoggerMessage;
-use fidl_fuchsia_diagnostics_stream::RawSeverity;
+use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use std::fmt::Debug;
 use std::io::Cursor;
 use std::sync::Arc;
-use {fidl_fuchsia_diagnostics as fdiagnostics, zx};
+
+type RawSeverity = u8;
 
 #[derive(Debug)]
 pub struct StoredMessage {
@@ -182,7 +184,7 @@ struct LegacyMessageRecord<'a> {
 }
 
 impl RecordEvent for LegacyMessageRecord<'_> {
-    fn severity(&self) -> RawSeverity {
+    fn raw_severity(&self) -> RawSeverity {
         self.severity
     }
 
@@ -206,10 +208,7 @@ impl RecordEvent for LegacyMessageRecord<'_> {
         self,
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError> {
-        writer.write_argument(diagnostics_log_encoding::encode::Argument {
-            name: "message",
-            value: self.data.into(),
-        })?;
+        writer.write_argument(Argument::message(self.data))?;
         Ok(())
     }
 }
@@ -221,7 +220,7 @@ struct DebugLogRecordEvent<'a> {
 }
 
 impl RecordEvent for DebugLogRecordEvent<'_> {
-    fn severity(&self) -> RawSeverity {
+    fn raw_severity(&self) -> RawSeverity {
         self.severity
     }
 
@@ -245,10 +244,7 @@ impl RecordEvent for DebugLogRecordEvent<'_> {
         self,
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError> {
-        writer.write_argument(diagnostics_log_encoding::encode::Argument {
-            name: "message",
-            value: self.data.to_str_lossy().as_ref().into(),
-        })?;
+        writer.write_argument(Argument::message(self.data.to_str_lossy().as_ref()))?;
         Ok(())
     }
 }

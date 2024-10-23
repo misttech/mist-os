@@ -46,7 +46,7 @@ use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning};
 use fuchsia_inspect::health::Reporter;
 use std::cell::RefCell;
 use std::rc::Rc;
-use {rust_icu_sys as usys, rust_icu_unorm2 as unorm, zx};
+use {rust_icu_sys as usys, rust_icu_unorm2 as unorm};
 
 // There probably is a more general method of determining whether the characters
 // are combining characters. But somehow it escapes me now.

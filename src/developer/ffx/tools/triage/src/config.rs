@@ -51,7 +51,7 @@ pub async fn get_or_default_config_files(
                 .collect()
         } else {
             // OOT default configs are expected to be set in triage.config_path variable.
-            ffx_config::get(DEFAULT_CONFIG_PATHS_VARIABLE).await.context(format!(
+            ffx_config::get(DEFAULT_CONFIG_PATHS_VARIABLE).context(format!(
                 "Please set the default config using `ffx config set {} \"{}\"`.",
                 DEFAULT_CONFIG_PATHS_VARIABLE, r#"[\"config1.triage\",\"default/config2.triage\"]"#
             ))?

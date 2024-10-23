@@ -20,7 +20,7 @@ use zx::{AsHandleRef, Task};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_io as fio,
-    fidl_fuchsia_starnix_container as fstarnix, fidl_fuchsia_starnix_runner as fstarnixrunner, zx,
+    fidl_fuchsia_starnix_container as fstarnix, fidl_fuchsia_starnix_runner as fstarnixrunner,
 };
 
 /// The name of the collection that the starnix_kernel is run in.
@@ -227,6 +227,7 @@ async fn suspend_container(
     Result<fstarnixrunner::ManagerSuspendContainerResponse, fstarnixrunner::SuspendError>,
     Error,
 > {
+    fuchsia_trace::duration!(c"power", c"starnix-runner:suspending-container");
     let Some(container_job) = payload.container_job else {
         return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
     };
@@ -237,6 +238,11 @@ async fn suspend_container(
         Ok(handles) => handles,
         Err(e) => {
             warn!("error suspending container {:?}", e);
+            fuchsia_trace::instant!(
+                c"power",
+                c"starnix-runner:suspend-failed-actual",
+                fuchsia_trace::Scope::Process
+            );
             return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
         }
     };
@@ -248,6 +254,11 @@ async fn suspend_container(
             Ok(_) => {
                 // There were wake locks active after suspending all processes, resume
                 // and fail the suspend call.
+                fuchsia_trace::instant!(
+                    c"power",
+                    c"starnix-runner:suspend-failed-with-wake-locks",
+                    fuchsia_trace::Scope::Process
+                );
                 return Ok(Err(fstarnixrunner::SuspendError::WakeLocksExist));
             }
             Err(_) => {}
@@ -269,12 +280,15 @@ async fn suspend_container(
     // TODO: We will likely have to handle a larger number of wake sources in the
     // future, at which point we may want to consider a Port-based approach. This
     // would also allow us to unblock this thread.
-    match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
-        Ok(_) => {}
-        Err(e) => {
-            warn!("error waiting for wake event {:?}", e);
-        }
-    };
+    {
+        fuchsia_trace::duration!(c"power", c"starnix-runner:waiting-on-container-wake");
+        match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
+            Ok(_) => {}
+            Err(e) => {
+                warn!("error waiting for wake event {:?}", e);
+            }
+        };
+    }
 
     kernels.acquire_wake_lease(&container_job).await?;
 
@@ -313,6 +327,7 @@ pub async fn serve_starnix_manager(
                     remote_channel: Some(remote_channel),
                     container_channel: Some(container_channel),
                     resume_event: Some(resume_event),
+                    name: Some(name),
                     ..
                 } = payload
                 else {
@@ -324,7 +339,7 @@ pub async fn serve_starnix_manager(
                     proxy.resume_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed"),
                 );
 
-                start_proxy(proxy, suspend_context.resume_events.clone());
+                start_proxy(proxy, suspend_context.resume_events.clone(), name);
             }
             fstarnixrunner::ManagerRequest::Resume { .. } => {
                 resume_kernels(&suspend_context.suspended_processes)
@@ -347,14 +362,15 @@ struct ChannelProxy {
 }
 
 /// Starts a thread that proxies messages between `proxy.container_channel` and
-/// `proxy.remote_channel`. The thread will exit when either of the channels' peer is closed.
+/// `proxy.remote_channel`. The thread will exit when either of the channels' peer is closed, or
+/// if `proxy.resume_event`'s peer is closed.
 ///
 /// When the proxy exits, `proxy.resume_event` will be removed from `resume_events`.
-fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>>) {
+fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>>, name: String) {
     // TODO: We will likely have to handle a larger number of wake sources in the future,
     // at which point we may want to consider a Port-based approach, and reduce the number
     // of threads.
-    std::thread::spawn(move || {
+    let _ = std::thread::Builder::new().name(format!("proxy_thread_{:?}", name)).spawn(move || {
         let mut bounce_bytes = [MaybeUninit::uninit(); zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize];
         let mut bounce_handles =
             [const { MaybeUninit::uninit() }; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];
@@ -377,17 +393,21 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
                 },
             ];
 
-            match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
-                Ok(_) => {}
-                Err(e) => {
-                    tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
-                    break 'outer;
-                }
-            };
+            {
+                fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-waiting-for-messages");
+                match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
+                        break 'outer;
+                    }
+                };
+            }
 
             // Forward messages in both directions. Only messages that are entering the container
             // should signal `proxy.resume_event`, since those are the only messages that should
             // wake the container if it's suspended.
+            fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-forwarding-messages");
             if forward_message(
                 &wait_items[CONTAINER_CHANNEL_INDEX],
                 &proxy.container_channel,
@@ -451,8 +471,15 @@ fn forward_message(
         if let Some(event) = event {
             // Wait for the kernel endpoint to signal that the event has been handled, and
             // that it is now safe to suspend the container again.
-            match event.wait_handle(KERNEL_SIGNAL, zx::MonotonicInstant::INFINITE) {
-                Ok(_) => {}
+            match event.wait_handle(
+                KERNEL_SIGNAL | zx::Signals::EVENTPAIR_PEER_CLOSED,
+                zx::MonotonicInstant::INFINITE,
+            ) {
+                Ok(signals) => {
+                    if signals.contains(zx::Signals::EVENTPAIR_PEER_CLOSED) {
+                        return Err(anyhow!("Proxy eventpair was closed"));
+                    }
+                }
                 Err(e) => {
                     tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
                     return Err(anyhow!("Failed to wait on signal from kernel"));
@@ -569,7 +596,7 @@ mod test {
             remote_channel: remote_client,
             resume_event,
         };
-        start_proxy(channel_proxy, Default::default());
+        start_proxy(channel_proxy, Default::default(), "test".to_string());
 
         std::mem::drop(local_client);
 
@@ -589,9 +616,31 @@ mod test {
             remote_channel: remote_client,
             resume_event,
         };
-        start_proxy(channel_proxy, Default::default());
+        start_proxy(channel_proxy, Default::default(), "test".to_string());
 
         std::mem::drop(remote_server);
+
+        assert!(local_client
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
+            .is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn test_peer_closed_event() {
+        let (local_client, local_server) = zx::Channel::create();
+        let (remote_client, remote_server) = zx::Channel::create();
+        let (resume_event, local_resume_event) = zx::EventPair::create();
+
+        let channel_proxy = ChannelProxy {
+            container_channel: local_server,
+            remote_channel: remote_client,
+            resume_event,
+        };
+        start_proxy(channel_proxy, Default::default(), "test".to_string());
+
+        std::mem::drop(local_resume_event);
+
+        assert!(remote_server.write(&[0x0, 0x1, 0x2], &mut []).is_ok());
 
         assert!(local_client
             .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)

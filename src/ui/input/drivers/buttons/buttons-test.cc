@@ -104,11 +104,11 @@ class LocalFakeGpio : public fake_gpio::FakeGpio {
     }
     FakeGpio::ConfigureInterrupt(request, completer);
   }
-  void GetInterrupt2(GetInterrupt2RequestView request,
-                     GetInterrupt2Completer::Sync& completer) override {
+  void GetInterrupt(GetInterruptRequestView request,
+                    GetInterruptCompleter::Sync& completer) override {
     EXPECT_EQ(request->options, expected_interrupt_options_);
     check_interrupt_mode_ = false;
-    FakeGpio::GetInterrupt2(request, completer);
+    FakeGpio::GetInterrupt(request, completer);
   }
   fuchsia_hardware_gpio::InterruptOptions expected_interrupt_options_;
   fuchsia_hardware_gpio::InterruptMode expected_interrupt_mode_ =

@@ -230,7 +230,7 @@ mod tests {
     #[test]
     fn take_empty_bytes() {
         let (trailing, parsed) = take_n_padded(0, &[1, 1, 1, 1]).unwrap();
-        assert_eq!(parsed, []);
+        assert_eq!(parsed, [] as [u8; 0]);
         assert_eq!(trailing, [1, 1, 1, 1]);
     }
 

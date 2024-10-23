@@ -147,9 +147,11 @@ template("fidl_library") {
       defined(invoker.sdk_category) && invoker.sdk_category != "internal"
 
   # All publishable libraries must have compatibility tests.
-  # All such libraries are publishable except for those in partner_internal.
+  # All such libraries are publishable except for those in "cts" and
+  # "partner_internal".
   is_sdk_included_publishable =
-      requires_compatibility_tests && invoker.sdk_category != "partner_internal"
+      requires_compatibility_tests && invoker.sdk_category != "cts" &&
+      invoker.sdk_category != "partner_internal"
 
   if (is_unversioned_vendor_sdk) {
     # Override the values set above to account for this special case as
@@ -219,9 +221,6 @@ template("fidl_library") {
     # TODO(https://fxbug.dev/330947474): Resolve fdio dependency on library.
     "fuchsia.device",
 
-    # TODO(https://fxbug.dev/364293789): Resolve SDK prebuilt package dependencies on library.
-    "fuchsia.diagnostics.stream",
-
     # TODO(https://fxbug.dev/364294648): Resolve heapdump instrumentation dependency on library.
     "fuchsia.memory.heapdump.process",
 
@@ -257,7 +256,8 @@ template("fidl_library") {
 
   # TODO(https://fxbug.dev/364422340): Remove when internal library properly versioned.
   _is_internal_zx_library =
-      library_name == "zx" && !defined(invoker.sdk_category)
+      get_label_info(main_target_name, "label_no_toolchain") ==
+      "//zircon/vdso/zx:zx" && !defined(invoker.sdk_category)
 
   # //sdk/banjo/fuchsia.sysmem is the only Banjo library with versioning.
   # Banjo libraries do not have an SDK category and are not marked stable,
@@ -366,7 +366,10 @@ template("fidl_library") {
     }
   }
 
+  # Note that this file name may be different from those used for compatibility
+  # tests below.
   summary_file_json = "$target_gen_dir/$target_name.api_summary.json"
+
   plasa_fragment_file = summary_file_json
   plasa_fragment_target_name = "${target_name}_plasa"
   plasa_fragment_fidl(plasa_fragment_target_name) {
@@ -513,7 +516,12 @@ template("fidl_library") {
     }
 
     foreach(level, api_levels) {
-      fidl_ir_target_name = "${main_target_name}_compile_$level"
+      # Avoid clobbering files for different levels.
+      level_gen_dir = "${target_gen_dir}/${level}"
+
+      json_summary_file = "${level_gen_dir}/${library_name}.api_summary.json"
+
+      fidl_ir_target_name = "${main_target_name}_compile_${level}"
       fidl_ir(fidl_ir_target_name) {
         forward_variables_from(invoker, invoker_variables_to_forward_to_fidl_ir)
         fidl_target_name = main_target_name
@@ -527,26 +535,26 @@ template("fidl_library") {
         # check here where we ignore `available`.
         assert(
             !defined(available),
-            "Overriding `available` is not allowed for for SDK FIDL library '$library_name'.")
+            "Overriding `available` is not allowed for SDK FIDL library '${library_name}'.")
 
-        available = [ "fuchsia:$level" ]
+        available = [ "fuchsia:${level}" ]
         target_api_level = level
         goldens_dir = goldens_dir
 
-        # Avoid clobbering existing FIDL sources.
-        gen_dir = "$target_gen_dir/$level"
-        json_representation = "$gen_dir/$target_name.fidl.json"
-        out_json_summary = "$gen_dir/$library_name.api_summary.json"
+        gen_dir = level_gen_dir
+        json_representation = "${level_gen_dir}/${main_target_name}.fidl.json"
+        out_json_summary = json_summary_file
       }
+
       sdk_atom_deps += [ ":$fidl_ir_target_name" ]
 
       if (level != "HEAD") {
-        test_target = "${target_name}_${level}_compatibility_test"
+        test_target = "${main_target_name}_${level}_compatibility_test"
         fidl_api_compatibility_test(test_target) {
           forward_variables_from(invoker, [ "testonly" ])
           target_api_level = level
-          current = "$target_gen_dir/$level/$library_name.api_summary.json"
-          golden = "$goldens_dir/$level/$library_name.api_summary.json"
+          current = json_summary_file
+          golden = "${goldens_dir}/${level}/${library_name}.api_summary.json"
 
           if (update_goldens || bump_api_level) {
             # Using this policy for every level allows generating all goldens
@@ -607,8 +615,6 @@ template("fidl_library") {
   }
 
   if (defined(invoker.sdk_category)) {
-    sdk_category = invoker.sdk_category
-
     # Process sources.
     file_base = "fidl/$library_name"
     all_files = []
@@ -678,7 +684,7 @@ template("fidl_library") {
 
       id = "sdk://fidl/$library_name"
 
-      category = sdk_category
+      category = invoker.sdk_category
 
       if (is_stable) {
         if (defined(invoker.api)) {
@@ -713,13 +719,16 @@ template("fidl_library") {
         fidl_json = [ rebase_path(invoker.fidl_ir_json, root_build_dir) ]
         generated_sources = fidl_json
 
-        # Metadata for FIDL SDK files.
-        if (defined(invoker.sdk_category)) {
+        # For libraries included in an IDK, add the metadata to the list used to
+        # generate documentation.
+        # Historically, libraries in the  "partner_internal" SDK category have
+        # also been published, so include them as well.
+        if (is_sdk_included_publishable || category == "partner_internal") {
           sdk_fidl_json_data = [
             {
               name = library_name
               ir = rebase_path(invoker.fidl_ir_json, root_build_dir)
-              category = invoker.sdk_category
+              category = category
             },
           ]
         }

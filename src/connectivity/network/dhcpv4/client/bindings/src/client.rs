@@ -20,7 +20,7 @@ use rand::SeedableRng as _;
 use std::pin::pin;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 #[derive(thiserror::Error, Debug)]

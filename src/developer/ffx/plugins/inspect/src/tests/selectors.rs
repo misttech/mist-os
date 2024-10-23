@@ -93,9 +93,9 @@ async fn test_selectors_with_manifest_that_exists() {
         make_inspect_with_length("test/moniker1", 6, 30),
     ];
     let inspect_data = inspect_accessor_data(
-        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
-            "test/moniker1:root",
-        ))]),
+        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::StructuredSelector(
+            selectors::parse_verbose("test/moniker1:root").unwrap(),
+        )]),
         inspects,
     );
     run_command(
@@ -132,9 +132,9 @@ async fn test_selectors_with_selectors() {
     );
     let inspects = vec![make_inspect_with_length("test/moniker1", 3, 10)];
     let inspect_data = inspect_accessor_data(
-        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::RawSelector(String::from(
-            "test/moniker1:name:hello_3",
-        ))]),
+        ClientSelectorConfiguration::Selectors(vec![SelectorArgument::StructuredSelector(
+            selectors::parse_verbose("test/moniker1:name:hello_3").unwrap(),
+        )]),
         inspects,
     );
     run_command(

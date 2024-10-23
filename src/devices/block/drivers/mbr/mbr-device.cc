@@ -193,6 +193,8 @@ zx_status_t MbrDevice::BlockPartitionGetName(char* out_name, size_t capacity) {
   return ZX_OK;
 }
 
+zx_status_t MbrDevice::BlockPartitionGetFlags(uint64_t* out_flags) { return ZX_ERR_NOT_SUPPORTED; }
+
 void MbrDevice::DdkRelease() { delete this; }
 
 zx_status_t MbrDevice::DdkGetProtocol(uint32_t proto_id, void* out) {

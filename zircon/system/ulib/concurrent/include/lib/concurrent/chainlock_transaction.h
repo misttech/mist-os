@@ -32,7 +32,7 @@ namespace concurrent {
 // location.
 #define CONCURRENT_CHAINLOCK_TRANSACTION_CALLSITE(label) \
   []() constexpr -> ::concurrent::CallsiteInfo {         \
-    using fxt::operator"" _intern;                       \
+    using fxt::operator""_intern;                        \
     return {&label##_intern, __LINE__};                  \
   }()
 

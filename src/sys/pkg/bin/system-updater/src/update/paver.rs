@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context as _};
 use tracing::{info, warn};
-use {fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver, zx};
+use {fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver};
 
 mod configuration;
 pub use configuration::{CurrentConfiguration, NonCurrentConfiguration, TargetConfiguration};

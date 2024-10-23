@@ -729,9 +729,10 @@ void System::SyncFilters() {
 }
 
 void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches) {
-  // A collection of pids that we are going to attach to. The corresponding mode will determine if
-  // it should be performed as a weak attach. If a pid is matched by multiple filters, they must
-  // ALL be configured as weak filters for a weak attach to occur.
+  // A collection of pids that we are going to attach to. The corresponding config will determine
+  // the details of the attach. If a pid is matched by multiple filters, they must ALL be configured
+  // as weak filters for a weak attach to occur. Job only filters don't have this problem because
+  // they won't collide.
   std::map<uint64_t, debug_ipc::AttachConfig> pids_to_attach;
 
   for (const auto& match : matches) {
@@ -756,18 +757,29 @@ void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches)
         mode = Target::AttachMode::kWeak;
       }
 
+      debug_ipc::AttachConfig::Target target = debug_ipc::AttachConfig::Target::kProcess;
+      if (matched_filter && matched_filter->job_only()) {
+        target = debug_ipc::AttachConfig::Target::kJob;
+      }
+
       auto inserted = pids_to_attach.insert({matched_pid,
                                              {
                                                  .weak = mode == Target::AttachMode::kWeak,
+                                                 .target = target,
                                              }});
 
-      // Make sure we double check weak_attach after the insertion. If the pid had already been
+      // Make sure we double check the mode after the insertion. If the pid had already been
       // added to the map by a weak filter and this is a strong filter that also matched, then we
       // should strongly attach. Conversely, a strong filter should never be overruled by a weak
       // filter. If the filter id for this match is invalid or isn't found, perform a strong
       // attach.
-      if (mode != Target::AttachMode::kWeak)
+      if (mode == Target::AttachMode::kStrong)
         inserted.first->second.weak = false;
+
+      // Note that we don't need to worry about checking the target. The filter matching logic in
+      // the backend will send the job's koid when the filter is configured as job-only. Therefore
+      // we'll get different entries in |pids_to_attach| for the job and the child processes if
+      // multiple filters match.
     }
   }
 

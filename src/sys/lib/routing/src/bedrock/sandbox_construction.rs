@@ -21,7 +21,7 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use moniker::{ChildName, Moniker};
 use router_error::RouterError;
-use sandbox::{Capability, Data, Dict, Request, Router, Unit};
+use sandbox::{Capability, Data, Dict, Request, Router, SpecificRouter, Unit};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -188,7 +188,7 @@ impl ComponentSandbox {
 /// various dicts the component needs based on the contents of its manifest.
 pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
-    child_component_output_dictionary_routers: HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: HashMap<ChildName, SpecificRouter<Dict>>,
     decl: &cm_rust::ComponentDecl,
     component_input: ComponentInput,
     program_input_dict_additions: &Dict,
@@ -372,7 +372,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
 
 fn build_environment(
     moniker: &Moniker,
-    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, SpecificRouter<Dict>>,
     component_input: &ComponentInput,
     environment_decl: &cm_rust::EnvironmentDecl,
     program_input_dict_additions: &Dict,
@@ -464,7 +464,7 @@ fn build_environment(
 /// assumed to target `target_dict`.
 pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
-    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, SpecificRouter<Dict>>,
     component_input: &ComponentInput,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     program_output_dict: &Dict,
@@ -499,7 +499,7 @@ fn is_supported_use(use_: &cm_rust::UseDecl) -> bool {
 // access this configuration.
 fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
-    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, SpecificRouter<Dict>>,
     component_input: &ComponentInput,
     program_input: &ProgramInput,
     program_input_dict_additions: &Dict,
@@ -579,7 +579,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
 
 fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
-    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, SpecificRouter<Dict>>,
     component_input: &ComponentInput,
     program_input: &ProgramInput,
     program_input_dict_additions: &Dict,
@@ -651,9 +651,8 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             ))
         }
         cm_rust::UseSource::Framework => framework_dict
-            .clone()
-            .lazy_get(
-                source_path.to_owned(),
+            .get_router_or_not_found(
+                &source_path,
                 RoutingError::capability_from_framework_not_found(
                     moniker,
                     source_path.iter_segments().join("/"),
@@ -666,7 +665,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
                 capability_name.as_str().to_string(),
             );
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
-                capability_sourced_capabilities_dict.clone().lazy_get(capability_name.clone(), err)
+                capability_sourced_capabilities_dict.get_router_or_not_found(&capability_name, err)
             } else {
                 Router::new_error(err)
             }
@@ -678,8 +677,8 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             component_input
                 .environment()
                 .debug()
-                .lazy_get(
-                    use_protocol.source_name.clone(),
+                .get_router_or_not_found(
+                    &use_protocol.source_name,
                     RoutingError::use_from_environment_not_found(
                         moniker,
                         "protocol",
@@ -695,8 +694,8 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             component_input
                 .environment()
                 .runners()
-                .lazy_get(
-                    use_runner.source_name.clone(),
+                .get_router_or_not_found(
+                    &use_runner.source_name,
                     RoutingError::use_from_environment_not_found(
                         moniker,
                         "runner",
@@ -753,7 +752,7 @@ fn use_from_parent_router(
         RoutingError::use_from_parent_not_found(moniker, source_path.iter_segments().join("/"))
     };
     let component_input_capability =
-        component_input.capabilities().lazy_get(source_path.clone(), err);
+        component_input.capabilities().get_router_or_not_found(&source_path, err);
 
     let program_input_dict_additions = program_input_dict_additions.clone();
 
@@ -785,7 +784,7 @@ fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
 
 fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
-    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, SpecificRouter<Dict>>,
     component_input: &ComponentInput,
     program_output_dict: &Dict,
     framework_dict: &Dict,
@@ -820,7 +819,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                     source_path.iter_segments().join("/"),
                 )
             };
-            let router = component_input.capabilities().lazy_get(source_path.to_owned(), err);
+            let router = component_input.capabilities().get_router_or_not_found(&source_path, err);
             router.with_porcelain_type(porcelain_type, component.moniker().clone())
         }
         cm_rust::OfferSource::Self_ => program_output_dict
@@ -865,8 +864,8 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                 );
                 return;
             }
-            let router = framework_dict.clone().lazy_get(
-                source_path.to_owned(),
+            let router = framework_dict.clone().get_router_or_not_found(
+                &source_path,
                 RoutingError::capability_from_framework_not_found(
                     &component.moniker(),
                     source_path.iter_segments().join("/"),
@@ -880,7 +879,9 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                 capability_name.as_str().to_string(),
             );
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
-                capability_sourced_capabilities_dict.clone().lazy_get(capability_name.clone(), err)
+                capability_sourced_capabilities_dict
+                    .clone()
+                    .get_router_or_not_found(&capability_name, err)
             } else {
                 Router::new_error(err)
             }
@@ -934,7 +935,7 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
 
 fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
-    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
+    child_component_output_dictionary_routers: &HashMap<ChildName, SpecificRouter<Dict>>,
     program_output_dict: &Dict,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
@@ -998,9 +999,8 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
                 return;
             }
             framework_dict
-                .clone()
-                .lazy_get(
-                    source_path.to_owned(),
+                .get_router_or_not_found(
+                    &source_path,
                     RoutingError::capability_from_framework_not_found(
                         &component.moniker(),
                         source_path.iter_segments().join("/"),
@@ -1014,7 +1014,9 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
                 capability_name.as_str().to_string(),
             );
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
-                capability_sourced_capabilities_dict.clone().lazy_get(capability_name.clone(), err)
+                capability_sourced_capabilities_dict
+                    .clone()
+                    .get_router_or_not_found(&capability_name, err)
             } else {
                 Router::new_error(err)
             }

@@ -20,16 +20,14 @@ namespace sdmmc {
 zx::result<> SdmmcRootDevice::Start() {
   parent_node_.Bind(std::move(node()));
 
-  fidl::Arena arena;
-  fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> sdmmc_metadata;
+  fuchsia_hardware_sdmmc::SdmmcMetadata sdmmc_metadata;
   {
-    zx::result parsed_metadata = GetMetadata(arena);
-    if (parsed_metadata.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to GetMetadata: %s",
-               zx_status_get_string(parsed_metadata.error_value()));
-      return parsed_metadata.take_error();
+    zx::result result = GetMetadata();
+    if (result.is_error()) {
+      FDF_LOGL(ERROR, logger(), "Failed to get metadata: %s", result.status_string());
+      return result.take_error();
     }
-    sdmmc_metadata = *parsed_metadata;
+    sdmmc_metadata = std::move(result.value());
   }
 
   auto [controller_client_end, controller_server_end] =
@@ -40,6 +38,7 @@ zx::result<> SdmmcRootDevice::Start() {
   controller_.Bind(std::move(controller_client_end));
   root_node_.Bind(std::move(node_client_end));
 
+  fidl::Arena arena;
   const auto args =
       fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, name()).Build();
 
@@ -78,8 +77,8 @@ void SdmmcRootDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
 template <class DeviceType>
 zx::result<std::unique_ptr<SdmmcDevice>> SdmmcRootDevice::MaybeAddDevice(
     const std::string& name, std::unique_ptr<SdmmcDevice> sdmmc,
-    const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
-  if (zx_status_t st = sdmmc->Init(metadata.use_fidl()) != ZX_OK) {
+    const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) {
+  if (zx_status_t st = sdmmc->Init(metadata.use_fidl().value()) != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to initialize SdmmcDevice: %s", zx_status_get_string(st));
     return zx::error(st);
   }
@@ -103,66 +102,64 @@ zx::result<std::unique_ptr<SdmmcDevice>> SdmmcRootDevice::MaybeAddDevice(
   return zx::ok(nullptr);
 }
 
-zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>>
-SdmmcRootDevice::GetMetadata(fidl::AnyArena& arena) {
-  zx::result decoded = compat::GetMetadata<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
-      incoming(), arena, DEVICE_METADATA_SDMMC);
-
+zx::result<fuchsia_hardware_sdmmc::SdmmcMetadata> SdmmcRootDevice::GetMetadata() {
   constexpr uint32_t kMaxCommandPacking = 16;
 
+  zx::result decoded =
+      compat::GetMetadata<fuchsia_hardware_sdmmc::SdmmcMetadata>(incoming(), DEVICE_METADATA_SDMMC);
   if (decoded.is_error()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
       FDF_LOGL(INFO, logger(), "No metadata provided");
-      return zx::ok(
-          fidl::ObjectView(arena, fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena)
-                                      .max_frequency(UINT32_MAX)
-                                      .speed_capabilities(0)
-                                      .enable_cache(true)
-                                      .removable(false)
-                                      .max_command_packing(kMaxCommandPacking)
-                                      .use_fidl(true)
-                                      .Build()));
+      return zx::ok(fuchsia_hardware_sdmmc::SdmmcMetadata{
+          {.max_frequency = UINT32_MAX,
+           .speed_capabilities = fuchsia_hardware_sdmmc::SdmmcHostPrefs{0},
+           .enable_cache = true,
+           .removable = false,
+           .max_command_packing = kMaxCommandPacking,
+           .use_fidl = true}});
     }
-    FDF_LOGL(ERROR, logger(), "Failed to decode metadata: %s", decoded.status_string());
+    FDF_LOGL(ERROR, logger(), "Failed to get metadata: %s", decoded.status_string());
     return decoded.take_error();
   }
 
   // Default to trim and cache enabled, non-removable.
-  return zx::ok(fidl::ObjectView(
-      arena,
-      fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena)
-          .max_frequency(decoded->has_max_frequency() ? decoded->max_frequency() : UINT32_MAX)
-          .speed_capabilities(decoded->has_speed_capabilities()
-                                  ? decoded->speed_capabilities()
-                                  : static_cast<fuchsia_hardware_sdmmc::SdmmcHostPrefs>(0))
-          .enable_cache(!decoded->has_enable_cache() || decoded->enable_cache())
-          .removable(decoded->has_removable() && decoded->removable())
-          .max_command_packing(decoded->has_max_command_packing() ? decoded->max_command_packing()
-                                                                  : kMaxCommandPacking)
-          .use_fidl(!decoded->has_use_fidl() || decoded->use_fidl())
-          .Build()));
+  uint32_t max_frequency = decoded->max_frequency().value_or(UINT32_MAX);
+  fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities =
+      decoded->speed_capabilities().value_or(fuchsia_hardware_sdmmc::SdmmcHostPrefs{0});
+  bool enable_cache = decoded->enable_cache().value_or(true);
+  bool removable = decoded->removable().value_or(false);
+  uint32_t max_command_packing = decoded->max_command_packing().value_or(kMaxCommandPacking);
+  bool use_fidl = decoded->use_fidl().value_or(true);
+
+  return zx::ok(fuchsia_hardware_sdmmc::SdmmcMetadata{{.max_frequency = max_frequency,
+                                                       .speed_capabilities = speed_capabilities,
+                                                       .enable_cache = enable_cache,
+                                                       .removable = removable,
+                                                       .max_command_packing = max_command_packing,
+                                                       .use_fidl = use_fidl}});
 }
 
-zx_status_t SdmmcRootDevice::Init(
-    fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata) {
-  auto sdmmc = std::make_unique<SdmmcDevice>(this, *metadata);
+zx_status_t SdmmcRootDevice::Init(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) {
+  auto sdmmc = std::make_unique<SdmmcDevice>(this, metadata);
 
   // Probe for SDIO first, then SD/MMC.
   zx::result<std::unique_ptr<SdmmcDevice>> result =
-      MaybeAddDevice<SdioControllerDevice>("sdio", std::move(sdmmc), *metadata);
+      MaybeAddDevice<SdioControllerDevice>("sdio", std::move(sdmmc), metadata);
   if (result.is_error()) {
     return result.status_value();
-  } else if (*result == nullptr) {
+  }
+  if (*result == nullptr) {
     return ZX_OK;
   }
-  result = MaybeAddDevice<SdmmcBlockDevice>("block", std::move(*result), *metadata);
+  result = MaybeAddDevice<SdmmcBlockDevice>("block", std::move(*result), metadata);
   if (result.is_error()) {
     return result.status_value();
-  } else if (*result == nullptr) {
+  }
+  if (*result == nullptr) {
     return ZX_OK;
   }
 
-  if (metadata->removable()) {
+  if (metadata.removable().value()) {
     // This controller is connected to a removable card slot, and no card was inserted. Indicate
     // success so that our device remains available.
     // TODO(https://fxbug.dev/42080592): Enable detection of card insert/removal after

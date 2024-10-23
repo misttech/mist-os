@@ -11,13 +11,13 @@ use fidl_fuchsia_element::{GraphicalPresenterMarker, GraphicalPresenterProxy};
 use fidl_fuchsia_ui_app::ViewProviderMarker;
 use fidl_fuchsia_ui_gfx::DisplayInfo;
 use fidl_fuchsia_ui_scenic::{ScenicMarker, ScenicProxy};
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use wayland_server_protocol::*;
-use {fuchsia_async as fasync, zx};
 
 /// When the connection is created it is initialized with a 'wl_display' object
 /// that the client can immediately interact with.

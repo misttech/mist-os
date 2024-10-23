@@ -24,7 +24,7 @@ impl FactoryResetAction {
 
     async fn run_with_proxy(mut event_sender: Box<dyn SendEvent>, proxy: FactoryResetProxy) {
         // Wait 2 seconds so the UI transition is less jarring
-        fasync::Timer::new(fasync::Duration::from_seconds(2)).await;
+        fasync::Timer::new(fasync::MonotonicDuration::from_seconds(2)).await;
         println!("recovery: Executing factory reset command");
         let result = proxy.reset().await;
         match result {

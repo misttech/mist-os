@@ -15,7 +15,6 @@ use std::pin::pin;
 use std::task::Poll;
 use {
     fidl_fuchsia_hardware_network as netdev, fidl_fuchsia_net_tun as tun, fuchsia_async as fasync,
-    zx,
 };
 
 const DEFAULT_PORT_ID: u8 = 2;

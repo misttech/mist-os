@@ -8,6 +8,7 @@ use errors::FfxError;
 use ffx_command::{return_bug, return_user_error, FfxCommandLine, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
+use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use ffx_fidl::VersionInfo;
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::TargetInfoQuery;
@@ -185,6 +186,26 @@ impl FhoEnvironment {
         }
 
         Ok(())
+    }
+
+    pub async fn new(context: &EnvironmentContext, ffx: &FfxCommandLine) -> Result<Self> {
+        let build_info = context.build_info();
+        let injector = Injection::initialize_overnet(
+            context.clone(),
+            None,
+            DaemonVersionCheck::SameVersionInfo(build_info),
+        )
+        .await?;
+        let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
+        #[allow(deprecated)] // injector field.
+        let env = FhoEnvironment {
+            behavior: crate::from_env::connection_behavior(&ffx, &injector, &context).await?,
+            ffx: ffx.clone(),
+            context: context.clone(),
+            injector,
+            lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
+        };
+        Ok(env)
     }
 }
 

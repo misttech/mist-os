@@ -13,10 +13,17 @@ namespace {
 
 class MultiThreads : public F2fsFakeDevTestFixture {
  public:
-  MultiThreads() : F2fsFakeDevTestFixture(TestOptions{.block_count = 2097152}) {}
+  MultiThreads() : F2fsFakeDevTestFixture(TestOptions{.block_count = 1048576}) {}
 };
 
-TEST_F(MultiThreads, Truncate) {
+class MultiThreadsWithLFS : public MultiThreads, public testing::WithParamInterface<bool> {
+ public:
+  MultiThreadsWithLFS() : MultiThreads() {
+    mount_options_.SetValue(MountOption::kForceLfs, GetParam());
+  }
+};
+
+TEST_P(MultiThreadsWithLFS, Truncate) {
   zx::result test_file = root_dir_->Create("test2", fs::CreationType::kFile);
   ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
   {
@@ -44,7 +51,7 @@ TEST_F(MultiThreads, Truncate) {
   }
 }
 
-TEST_F(MultiThreads, Write) {
+TEST_P(MultiThreadsWithLFS, Write) {
   zx::result test_file1 = root_dir_->Create("test1", fs::CreationType::kFile);
   ASSERT_TRUE(test_file1.is_ok()) << test_file1.status_string();
   zx::result test_file2 = root_dir_->Create("test2", fs::CreationType::kFile);
@@ -53,7 +60,7 @@ TEST_F(MultiThreads, Write) {
     fbl::RefPtr<f2fs::File> vn1 = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file1));
     fbl::RefPtr<f2fs::File> vn2 = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file2));
 
-    constexpr int kNTry = 51200;
+    constexpr int kNTry = 25600;
     uint8_t buf[kPageSize * 2] = {1};
     // 3 iterations are enough to touch every block and trigger gc.
     for (int i = 0; i < 3; ++i) {
@@ -84,6 +91,9 @@ TEST_F(MultiThreads, Write) {
     vn2->Close();
   }
 }
+
+const std::array<bool, 2> kAllocParams = {false, true};
+INSTANTIATE_TEST_SUITE_P(/*no prefix*/, MultiThreadsWithLFS, ::testing::ValuesIn(kAllocParams));
 
 TEST_F(MultiThreads, Create) {
   zx::result child = root_dir_->Create("dir", fs::CreationType::kDirectory);

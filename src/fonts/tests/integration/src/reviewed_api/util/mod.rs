@@ -5,7 +5,7 @@
 pub use crate::util;
 pub use anyhow::{Context as _, Error};
 pub use zx::AsHandleRef;
-pub use {fidl_fuchsia_fonts as fonts, fidl_fuchsia_intl as intl, fuchsia_async as fasync, zx};
+pub use {fidl_fuchsia_fonts as fonts, fidl_fuchsia_intl as intl, fuchsia_async as fasync};
 
 pub type ProviderFactory = util::TypedProviderFactory<fonts::ProviderMarker>;
 

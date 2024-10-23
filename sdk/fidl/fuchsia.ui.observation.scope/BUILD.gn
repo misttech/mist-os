@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.observation.scope") {
-  sdk_category = "internal"  # do not increase visibility
+  # Do not increase visibility by adding `sdk_category`.
   sources = [ "registry.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.ui.observation.geometry",

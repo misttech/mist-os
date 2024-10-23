@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_diagnostics::Severity;
-use fidl_fuchsia_diagnostics_stream::{Argument, Record, Value};
 use fidl_fuchsia_validate_logs::{
-    EncodingPuppetMarker, EncodingValidatorRequest, EncodingValidatorRequestStream, TestFailure,
-    TestSuccess, ValidateResult, ValidateResultsIteratorGetNextResponse,
-    ValidateResultsIteratorRequest, ValidateResultsIteratorRequestStream,
+    Argument, EncodingPuppetMarker, EncodingValidatorRequest, EncodingValidatorRequestStream,
+    Record, TestFailure, TestSuccess, ValidateResult, ValidateResultsIteratorGetNextResponse,
+    ValidateResultsIteratorRequest, ValidateResultsIteratorRequestStream, Value,
 };
 use fuchsia_async as fasync;
 use fuchsia_component::client;
@@ -109,10 +108,9 @@ async fn serve_results(mut stream: ValidateResultsIteratorRequestStream) {
 }
 
 fn test_string() -> TestCase {
-    let timestamp = 12;
+    let timestamp = zx::BootInstant::from_nanos(12);
     let arg = Argument { name: String::from("hello"), value: Value::Text("world".to_string()) };
-    let record =
-        Record { timestamp, severity: Severity::Info.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Info, arguments: vec![arg] };
     // 5: represents the size of the record
     // 9: represents the type of Record (Log record)
     // 0x30: represents the INFO severity
@@ -138,11 +136,10 @@ fn test_string() -> TestCase {
 }
 
 fn test_multiword_string() -> TestCase {
-    let timestamp = 0x24;
+    let timestamp = zx::BootInstant::from_nanos(0x24);
     let arg =
         Argument { name: String::from("name"), value: Value::Text(String::from("aaaaaaabbb")) };
-    let record =
-        Record { timestamp, severity: Severity::Warn.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Warn, arguments: vec![arg] };
 
     #[rustfmt::skip]
     let expected_result = vec![
@@ -163,10 +160,9 @@ fn test_multiword_string() -> TestCase {
 }
 
 fn test_empty_string() -> TestCase {
-    let timestamp = 0x24;
+    let timestamp = zx::BootInstant::from_nanos(0x24);
     let arg = Argument { name: String::from("name"), value: Value::Text(String::from("")) };
-    let record =
-        Record { timestamp, severity: Severity::Warn.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Warn, arguments: vec![arg] };
 
     #[rustfmt::skip]
     let expected_result = vec![
@@ -185,10 +181,9 @@ fn test_empty_string() -> TestCase {
 }
 
 fn test_boolean() -> TestCase {
-    let timestamp = 0x24;
+    let timestamp = zx::BootInstant::from_nanos(0x24);
     let arg = Argument { name: String::from("name"), value: Value::Boolean(true) };
-    let record =
-        Record { timestamp, severity: Severity::Warn.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Warn, arguments: vec![arg] };
     #[rustfmt::skip]
     let expected_result = vec![
         // Record header - 4 for the size of the record, 9 for the type of Record (Log record), 0x40 for WARN severity
@@ -205,10 +200,9 @@ fn test_boolean() -> TestCase {
 }
 
 fn test_float() -> TestCase {
-    let timestamp = 6;
+    let timestamp = zx::BootInstant::from_nanos(6);
     let arg = Argument { name: String::from("name"), value: Value::Floating(3.25) };
-    let record =
-        Record { timestamp, severity: Severity::Warn.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Warn, arguments: vec![arg] };
     // Record header = 0x59, 0, 0, 0, 0, 0, 0, 0x40
     // Timestamp = 0x6, 0, 0, 0, 0, 0, 0, 0
     // Arg Header = 0x35, 0, 0x4, 0x80, 0, 0, 0, 0
@@ -222,10 +216,9 @@ fn test_float() -> TestCase {
 }
 
 fn test_unsigned_int() -> TestCase {
-    let timestamp = 6;
+    let timestamp = zx::BootInstant::from_nanos(6);
     let arg = Argument { name: String::from("name"), value: Value::UnsignedInt(3) };
-    let record =
-        Record { timestamp, severity: Severity::Debug.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Debug, arguments: vec![arg] };
     // Record header = 0x59, 0, 0, 0, 0, 0, 0, 0x20
     // Timestamp = 0x6, 0, 0, 0, 0, 0, 0, 0
     // Arg Header = 0x34, 0, 0x4, 0x80, 0, 0, 0, 0
@@ -239,10 +232,9 @@ fn test_unsigned_int() -> TestCase {
 }
 
 fn test_unsigned_int_max() -> TestCase {
-    let timestamp = 6;
+    let timestamp = zx::BootInstant::from_nanos(6);
     let arg = Argument { name: String::from("name"), value: Value::UnsignedInt(u64::MAX) };
-    let record =
-        Record { timestamp, severity: Severity::Debug.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Debug, arguments: vec![arg] };
     // Record header = 0x59, 0, 0, 0, 0, 0, 0, 0x20
     // Timestamp = 0x6, 0, 0, 0, 0, 0, 0, 0
     // Arg Header = 0x34, 0, 0x4, 0x80, 0, 0, 0, 0
@@ -256,10 +248,9 @@ fn test_unsigned_int_max() -> TestCase {
 }
 
 fn test_signed_int_negative() -> TestCase {
-    let timestamp = 9;
+    let timestamp = zx::BootInstant::from_nanos(9);
     let arg = Argument { name: String::from("name"), value: Value::SignedInt(-7) };
-    let record =
-        Record { timestamp, severity: Severity::Error.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Error, arguments: vec![arg] };
     // Record header = 0x59, 0, 0, 0, 0, 0, 0, 0x50
     // Timestamp = 0x9, 0, 0, 0, 0, 0, 0, 0
     // Arg Header = 0x33, 0, 0x4, 0x80, 0, 0, 0, 0
@@ -273,10 +264,9 @@ fn test_signed_int_negative() -> TestCase {
 }
 
 fn test_signed_int_positive() -> TestCase {
-    let timestamp = 9;
+    let timestamp = zx::BootInstant::from_nanos(9);
     let arg = Argument { name: String::from("name"), value: Value::SignedInt(4) };
-    let record =
-        Record { timestamp, severity: Severity::Warn.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Warn, arguments: vec![arg] };
     // Record header = 0x59, 0, 0, 0, 0, 0, 0, 0x40
     // Timestamp = 0x9, 0, 0, 0, 0, 0, 0, 0
     // Arg Header = 0x33, 0, 0x4, 0x80, 0, 0, 0, 0
@@ -290,10 +280,9 @@ fn test_signed_int_positive() -> TestCase {
 }
 
 fn test_multiword_arg_name() -> TestCase {
-    let timestamp = 0x4523;
+    let timestamp = zx::BootInstant::from_nanos(0x4523);
     let arg = Argument { name: String::from("abcdabcdabcd"), value: Value::SignedInt(9) };
-    let record =
-        Record { timestamp, severity: Severity::Error.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Error, arguments: vec![arg] };
     #[rustfmt::skip]
     let expected_result = vec![
         // record header
@@ -312,10 +301,9 @@ fn test_multiword_arg_name() -> TestCase {
 }
 
 fn test_word_size_arg_name() -> TestCase {
-    let timestamp = 0x4523;
+    let timestamp = zx::BootInstant::from_nanos(0x4523);
     let arg = Argument { name: String::from("abcdabcd"), value: Value::SignedInt(9) };
-    let record =
-        Record { timestamp, severity: Severity::Error.into_primitive(), arguments: vec![arg] };
+    let record = Record { timestamp, severity: Severity::Error, arguments: vec![arg] };
     #[rustfmt::skip]
     let expected_result = vec![
         // record header
@@ -333,9 +321,8 @@ fn test_word_size_arg_name() -> TestCase {
 }
 
 fn test_no_args() -> TestCase {
-    let timestamp = 0x1234;
-    let record =
-        Record { timestamp, severity: Severity::Error.into_primitive(), arguments: vec![] };
+    let timestamp = zx::BootInstant::from_nanos(0x1234);
+    let record = Record { timestamp, severity: Severity::Error, arguments: vec![] };
     #[rustfmt::skip]
     let expected_result = vec![
         // record header
@@ -347,12 +334,12 @@ fn test_no_args() -> TestCase {
 }
 
 fn test_multiple_args() -> TestCase {
-    let timestamp = 0xabcd;
+    let timestamp = zx::BootInstant::from_nanos(0xabcd);
     let arguments = vec![
         Argument { name: String::from("aa"), value: Value::SignedInt(3) },
         Argument { name: String::from("bbb"), value: Value::UnsignedInt(0x90) },
     ];
-    let record = Record { timestamp, severity: Severity::Error.into_primitive(), arguments };
+    let record = Record { timestamp, severity: Severity::Error, arguments };
     #[rustfmt::skip]
     let expected_result = vec![
         // record header

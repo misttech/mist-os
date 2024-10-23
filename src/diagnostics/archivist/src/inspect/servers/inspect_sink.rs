@@ -14,7 +14,7 @@ use futures::channel::mpsc;
 use futures::StreamExt;
 use std::sync::Arc;
 use tracing::warn;
-use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
 pub struct InspectSinkServer {
     /// Shared repository holding the Inspect handles.

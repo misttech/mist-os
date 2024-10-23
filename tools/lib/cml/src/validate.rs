@@ -426,29 +426,8 @@ which is almost certainly a mistake: {}",
         if let Some(name) = capability.dictionary.as_ref() {
             self.features.check(Feature::Dictionaries)?;
 
-            // The dictionary capability may depend on a dictionary it extends.
-            if let Some(extends) = capability.extends.as_ref() {
-                RouteFromSelfChecker {
-                    capability_name: Some(OneOrMany::One(name)),
-                    from: OneOrMany::One(extends.into()),
-                    container: &self.all_dictionaries,
-                    all_dictionaries: &self.all_dictionaries,
-                    typename: "dictionary",
-                }
-                .validate("extended")?;
-                let target = DependencyNode::Named(name);
-                let names = vec![extends.path.iter_segments().next().unwrap()];
-                for source in self.expand_source_dependencies(names, &extends.into()) {
-                    self.add_strong_dep(source, target);
-                }
-            }
             if capability.path.is_some() {
                 self.features.check(Feature::DynamicDictionaries)?;
-                if capability.extends.is_some() {
-                    return Err(Error::validate(
-                        "Dictionary capabilities do not support \"extends\" with \"path\"",
-                    ));
-                }
                 // If `path` is set that means the dictionary is provided by the program,
                 // which implies a dependency from `self` to the dictionary declaration.
                 let target = DependencyNode::Named(name);
@@ -7234,18 +7213,6 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "\"offer\" has dictionary target \"self/dict\" but \"dict\" sets \"path\". Therefore, it is a dynamic dictionary that does not allow offers into it."
         ),
-        test_cml_extend_dictionary_dynamic(
-            json!({
-                "capabilities": [
-                    {
-                        "dictionary": "dict",
-                        "extends": "parent/dict",
-                        "path": "/out/dir",
-                    },
-                ],
-            }),
-            Err(Error::Validate { err, .. }) if &err == "Dictionary capabilities do not support \"extends\" with \"path\""
-        ),
         test_cml_offer_dependency_cycle_from_dictionary(
             json!({
                     "offer": [
@@ -7364,44 +7331,6 @@ mod tests {
                 "Strong dependency cycles were found. Break the cycle by removing a \
                 dependency or marking an offer as weak. Cycles: {{#a -> #b -> #dict -> #a}}"
         ),
-        test_cml_offer_dependency_cycle_with_dictionary_that_extends(
-            json!({
-                "capabilities": [
-                    {
-                        "dictionary": "dict",
-                        "extends": "#b/foo",
-                    },
-                ],
-                "children": [
-                    {
-                        "name": "a",
-                        "url": "#meta/a.cm",
-                    },
-                    {
-                        "name": "b",
-                        "url": "#meta/b.cm",
-                    },
-                ],
-                "offer": [
-                    {
-                        "dictionary": "dict",
-                        "from": "self",
-                        "to": "#a",
-                    },
-                    {
-                        "protocol": "1",
-                        "from": "#a",
-                        "to": "#b",
-                    },
-                ],
-            }),
-            Err(Error::Validate {
-                err,
-                ..
-            }) if &err ==
-                "Strong dependency cycles were found. Break the cycle by removing a \
-                dependency or marking an offer as weak. Cycles: {{#a -> #b -> #dict -> #a}}"
-        ),
         test_cml_use_dependency_cycle_with_dictionary(
             json!({
                 "capabilities": [
@@ -7443,64 +7372,6 @@ mod tests {
             }) if &err ==
                 "Strong dependency cycles were found. Break the cycle by removing a \
                 dependency or marking an offer as weak. Cycles: {{#a -> self -> #dict -> #a}}"
-        ),
-        test_cml_use_dependency_cycle_with_dictionary_that_extends(
-            json!({
-                "capabilities": [
-                    {
-                        "dictionary": "dict",
-                        // This should create a dependency self -> #dict
-                        "path": "/some/dir",
-                    },
-                ],
-                "children": [
-                    {
-                        "name": "a",
-                        "url": "#meta/a.cm",
-                    },
-                ],
-                "use": [
-                    {
-                        "protocol": "1",
-                        "from": "#a",
-                    },
-                ],
-                "offer": [
-                    {
-                        "dictionary": "dict",
-                        "from": "self",
-                        "to": "#a",
-                    },
-                ],
-            }),
-            Err(Error::Validate {
-                err,
-                ..
-            }) if &err ==
-                "Strong dependency cycles were found. Break the cycle by removing a \
-                dependency or marking an offer as weak. Cycles: {{#a -> self -> #dict -> #a}}"
-        ),
-        test_cml_capabilities_dictionary_invalid_extends(
-            json!({
-                "capabilities": [
-                    {
-                        "dictionary": "dict",
-                        "extends": "bad",
-                    },
-                ]
-            }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad\", expected a path to a dictionary no more than 4095 characters in length"
-        ),
-        test_cml_capabilities_dictionary_extends_self_missing(
-            json!({
-                "capabilities": [
-                    {
-                        "dictionary": "dict",
-                        "extends": "self/other_dict/inner",
-                    },
-                ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "dictionary \"dict\" is extended from \"self/other_dict/inner\", so \"other_dict\" must be declared as a \"dictionary\" in \"capabilities\""
         ),
     }}
 

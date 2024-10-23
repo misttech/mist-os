@@ -204,23 +204,16 @@ void ControllerAllowlistPassthrough::ScheduleUnbind(ScheduleUnbindCompleter::Syn
 void ControllerAllowlistPassthrough::GetTopologicalPath(
     GetTopologicalPathCompleter::Sync &completer) {
   CheckAllowlist("GetTopologicalPath");
-  if (compat_client_.is_valid()) {
-    compat_client_->GetTopologicalPath().ThenExactlyOnce(
-        [completer = completer.ToAsync()](auto &result) mutable {
-          if (!result.ok()) {
-            completer.ReplyError(result.status());
-            return;
-          }
-          completer.Reply(result.value());
-        });
-  } else {
-    std::shared_ptr locked_node = node_.lock();
-    if (!locked_node) {
-      LOGF(ERROR, "Node was freed before it was used for %s.", class_name_.c_str());
-      return;
-    }
-    locked_node->GetTopologicalPath(completer);
+
+  // No longer going through the compat_client_ as we don't want the compat shim to handle
+  // topological paths anymore, so that we can remove GetTopologicalPath from the driver compat
+  // library.
+  std::shared_ptr locked_node = node_.lock();
+  if (!locked_node) {
+    LOGF(ERROR, "Node was freed before it was used for %s.", class_name_.c_str());
+    return;
   }
+  locked_node->GetTopologicalPath(completer);
 }
 
 zx_status_t ControllerAllowlistPassthrough::Connect(

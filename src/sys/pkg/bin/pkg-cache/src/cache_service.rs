@@ -29,7 +29,7 @@ use std::sync::Arc;
 use tracing::{error, warn};
 use vfs::directory::entry_container::Directory;
 use zx::Status;
-use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_trace as ftrace, zx};
+use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_trace as ftrace};
 
 mod missing_blobs;
 

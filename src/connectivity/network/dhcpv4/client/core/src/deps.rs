@@ -119,7 +119,7 @@ pub trait Instant: Sized + Ord + Copy + Clone + std::fmt::Debug + Send + Sync {
 
 impl Instant for fasync::MonotonicInstant {
     fn add(&self, duration: std::time::Duration) -> Self {
-        // On host builds, fasync::Duration is simply an alias for
+        // On host builds, fasync::MonotonicDuration is simply an alias for
         // std::time::Duration, making the `duration.into()` appear useless.
         #[allow(clippy::useless_conversion)]
         {

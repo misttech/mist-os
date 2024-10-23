@@ -15,8 +15,7 @@ type Error = enum {
     /// `src_subnet` was unspecified (`0/0`).
     UNSUPPORTED = 0;
 
-    /// One or more of the configuration fields was invalid (e.g. `src_if` can't
-    /// fit in u32)
+    /// One or more of the configuration fields was invalid (e.g. `src_if` is 0).
     INVALID_ARGUMENTS = 1;
 
     /// The provided `src_if` was not found.

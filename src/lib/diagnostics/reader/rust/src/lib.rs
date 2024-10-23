@@ -560,7 +560,7 @@ mod tests {
     };
     use futures::TryStreamExt;
     use tracing::{error, info};
-    use {fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_logger as flogger, zx};
+    use {fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_logger as flogger};
 
     const TEST_COMPONENT_URL: &str = "#meta/inspect_test_component.cm";
 

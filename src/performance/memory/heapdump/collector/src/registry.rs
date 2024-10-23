@@ -383,7 +383,8 @@ mod tests {
     const FAKE_ALLOCATION_THREAD_INFO_KEY: u64 = 6789;
     const FAKE_ALLOCATION_STACK_TRACE: [u64; 6] = [11111, 22222, 33333, 22222, 44444, 55555];
     const FAKE_ALLOCATION_STACK_TRACE_KEY: u64 = 9876;
-    const FAKE_ALLOCATION_TIMESTAMP: i64 = 123456789;
+    const FAKE_ALLOCATION_TIMESTAMP: zx::MonotonicInstant =
+        zx::MonotonicInstant::from_nanos(123456789);
     const FAKE_ALLOCATION_CONTENTS: [u8; FAKE_ALLOCATION_SIZE as usize] = *b"foobar!!";
 
     #[async_trait]

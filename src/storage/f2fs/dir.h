@@ -84,13 +84,12 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   zx_status_t ConvertInlineDir() __TA_REQUIRES(mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   void UpdateParentMetadata(VnodeF2fs *vnode, unsigned int current_depth) __TA_REQUIRES(mutex_);
-  zx_status_t InitInodeMetadata(VnodeF2fs *vnode) __TA_REQUIRES(mutex_)
+  zx_status_t InitInodeMetadata() final __TA_EXCLUDES(mutex_)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  zx_status_t MakeEmpty(VnodeF2fs *vnode) __TA_REQUIRES(mutex_)
+  zx_status_t MakeEmpty(ino_t parent_ino) __TA_REQUIRES(mutex_)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  zx_status_t MakeEmptyInlineDir(VnodeF2fs *vnode) __TA_REQUIRES(mutex_)
+  zx_status_t MakeEmptyInlineDir(ino_t parent_ino) __TA_REQUIRES(mutex_)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  void InitDentInode(VnodeF2fs *vnode, LockedPage &page) __TA_REQUIRES(mutex_);
   size_t RoomInInlineDir(const PageBitmap &bits, size_t slots) __TA_REQUIRES_SHARED(mutex_);
   size_t RoomForFilename(const PageBitmap &bits, size_t slots) __TA_REQUIRES_SHARED(mutex_);
 
@@ -116,7 +115,12 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   void VmoRead(uint64_t offset, uint64_t length) final;
   zx::result<PageBitmap> GetBitmap(fbl::RefPtr<Page> dentry_page) final;
 
+  // for data blocks
   block_t GetBlockAddr(LockedPage &page) final;
+  // If it tries to access a hole, return an error.
+  // The callers should be able to know whether |index| is valid or not.
+  zx_status_t GetLockedDataPage(pgoff_t index, LockedPage *out);
+  zx::result<std::vector<LockedPage>> GetLockedDataPages(pgoff_t start, size_t size);
 
  private:
   // helper

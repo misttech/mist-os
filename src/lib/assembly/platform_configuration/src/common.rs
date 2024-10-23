@@ -900,7 +900,10 @@ impl ConfigurationContext<'_> {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
             board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
-            gendir: Utf8PathBuf::new(),
+            gendir: Utf8PathBuf::from_path_buf(
+                tempfile::TempDir::new().unwrap().path().to_path_buf(),
+            )
+            .unwrap(),
             resource_dir: Utf8PathBuf::new(),
             developer_only_options: Default::default(),
         }

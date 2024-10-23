@@ -8,17 +8,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import trace_tools
 import vmstat_trace
-
-
-class EventJsonTests(unittest.TestCase):
-    def test_basic(self) -> None:
-        text = vmstat_trace.event_json("marbles", "fun", 5000, "count", 12)
-        self.assertEqual(
-            text,
-            """{"name": "marbles", "cat": "fun", "ph": "C", "pid": 1, "tid": 1, "ts": 5000, "args": {"count": "12"} },""",
-        )
-
 
 _TEST_START_TIME = datetime.datetime(
     year=1984,
@@ -85,6 +76,7 @@ class VmstatEntryTests(unittest.TestCase):
     def test_parse_vmstat_output(self) -> None:
         lines = [
             "# Remember, remember, the 5th of November",  # ignore comment
+            "",  # ignore blank
             "procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu------- -----timestamp-----",
             " r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu                 UTC",
             _SAMPLE_VMSTAT_DATA_LINE,
@@ -93,18 +85,18 @@ class VmstatEntryTests(unittest.TestCase):
         self.assertEqual(entries, [_SAMPLE_VMSTAT_ENTRY])
 
     def test_print_chrome_trace_json_empty(self) -> None:
-        lines = list(vmstat_trace.print_chrome_trace_json(iter([])))
-        self.assertEqual(lines, ["[", "]"])
+        fmt = trace_tools.Formatter()
+        lines = list(vmstat_trace.print_chrome_trace_json(fmt, iter([])))
+        self.assertEqual(lines, [])
 
     def test_print_chrome_trace_json_nonempty(self) -> None:
+        fmt = trace_tools.Formatter()
         lines = list(
             vmstat_trace.print_chrome_trace_json(
-                iter([_SAMPLE_VMSTAT_ENTRY] * 2)
+                fmt, iter([_SAMPLE_VMSTAT_ENTRY] * 2)
             )
         )
-        self.assertEqual(lines[0], "[")
-        self.assertEqual(lines[-1], "]")
-        self.assertEqual(len(lines[1:-1]), 18 * 2)  # one per field
+        self.assertEqual(len(lines), 18 * 2)  # one per field
 
 
 class MainTests(unittest.TestCase):

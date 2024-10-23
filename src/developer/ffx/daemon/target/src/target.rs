@@ -1181,10 +1181,10 @@ impl Target {
                 }
 
                 let watchdogs: bool =
-                    ffx_config::get("watchdogs.host_pipe.enabled").await.unwrap_or(false);
+                    ffx_config::get("watchdogs.host_pipe.enabled").unwrap_or(false);
 
                 let ssh_timeout: u16 =
-                    ffx_config::get(CONFIG_HOST_PIPE_SSH_TIMEOUT).await.unwrap_or(50);
+                    ffx_config::get(CONFIG_HOST_PIPE_SSH_TIMEOUT).unwrap_or(50);
                 let nr = spawn(
                     weak_target.clone(),
                     watchdogs,

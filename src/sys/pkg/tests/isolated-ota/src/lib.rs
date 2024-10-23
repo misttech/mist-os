@@ -28,7 +28,7 @@ use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
 use vfs::directory::entry_container::Directory;
 use vfs::file::vmo::read_only;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 struct TestResult {
     blobfs: Option<BlobfsRamdisk>,

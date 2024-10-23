@@ -4,9 +4,9 @@
 
 use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
+use fidl_fuchsia_io as fio;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
-use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn create_directory_with_create_if_absent_flag() {

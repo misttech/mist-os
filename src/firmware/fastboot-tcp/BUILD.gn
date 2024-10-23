@@ -10,7 +10,6 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/test.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("fastboot-tcp") {
   deps = [ ":package" ]
@@ -50,13 +49,6 @@ rustc_binary("bin") {
     "src/main.rs",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-}
-
-if (current_toolchain == default_toolchain) {
-  # The core realm shard to be used by product integrators.
-  core_shard("fastboot-tcp-core-shard") {
-    shard_file = "meta/fastboot_tcp.core_shard.cml"
-  }
 }
 
 fuchsia_component("component") {

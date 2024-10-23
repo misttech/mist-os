@@ -102,6 +102,7 @@ impl FsNodeOps for ZramDeviceDirectory {
 
     fn lookup(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -120,7 +121,7 @@ impl FsNodeOps for ZramDeviceDirectory {
                     FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
                 ))
             }
-            _ => self.base_dir.lookup(node, current_task, name),
+            _ => self.base_dir.lookup(locked, node, current_task, name),
         }
     }
 }

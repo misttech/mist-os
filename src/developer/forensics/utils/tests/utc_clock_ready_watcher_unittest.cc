@@ -21,7 +21,7 @@ constexpr timekeeper::time_utc kTime((zx::hour(7) + zx::min(14) + zx::sec(52)).g
 class UtcClockReadyWatcherTest : public UnitTestFixture {
  public:
   UtcClockReadyWatcherTest() {
-    clock_.Set(kTime);
+    clock_.SetUtc(kTime);
 
     zx_clock_create_args_v1_t clock_args{.backstop_time = 0};
     FX_CHECK(zx::clock::create(0u, &clock_args, &clock_handle_) == ZX_OK);

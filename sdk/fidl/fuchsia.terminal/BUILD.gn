@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.terminal") {
-  sdk_category = "internal"
-
   sources = [ "profiles.fidl" ]
 
   public_deps = [

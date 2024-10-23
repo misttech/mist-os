@@ -110,7 +110,8 @@ macro_rules! generate_test_cases_for_all_matchers {
 /// There is a risk of false negatives here, where a test that would have failed
 /// if given enough time passes instead, but the risk is relatively low, so we
 /// make the tradeoff for reasonable test durations.
-const NEGATIVE_CHECK_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(1);
+const NEGATIVE_CHECK_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(1);
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum ExpectedConnectivity {

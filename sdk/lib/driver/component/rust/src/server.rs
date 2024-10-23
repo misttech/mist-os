@@ -8,6 +8,7 @@ use std::num::NonZero;
 use std::ops::ControlFlow;
 use std::sync::OnceLock;
 
+use tracing::{debug, warn};
 use zx::Status;
 
 use fdf::{Channel, DispatcherBuilder, DispatcherRef};
@@ -124,14 +125,14 @@ impl<T: Driver> DriverServer<T> {
             match server_handle.read_bytes(dispatcher.clone()).await {
                 Ok(Some(message)) => {
                     if let ControlFlow::Break(_) = self.handle_message(message).await {
-                        // driver shut down, exit message loop
+                        // driver shut down or failed to start, exit message loop
                         return;
                     }
                 }
                 Ok(None) => panic!("unexpected empty message on server channel"),
-                Err(Status::PEER_CLOSED) => {
-                    // server peer closed, exit the main loop
-                    break;
+                Err(status @ Status::PEER_CLOSED) | Err(status @ Status::UNAVAILABLE) => {
+                    warn!("Driver server channel closed before a stop message with status {status}, exiting main loop early but stop() will not be called.");
+                    return;
                 }
                 Err(e) => panic!("unexpected error on server channel {e}"),
             }
@@ -155,6 +156,15 @@ impl<T: Driver> DriverServer<T> {
         Ok(())
     }
 
+    async fn handle_stop(&mut self) {
+        tracing::debug!("driver stopping");
+        self.driver
+            .take()
+            .expect("received stop message more than once or without successfully starting")
+            .stop()
+            .await;
+    }
+
     /// Dispatches messages from the driver host to the appropriate implementation.
     ///
     /// # Panics
@@ -170,15 +180,15 @@ impl<T: Driver> DriverServer<T> {
                     panic!("driver shutting down before it was finished starting")
                 };
                 responder.send_response(server_handle, res).unwrap();
-                ControlFlow::Continue(())
+                if res.is_ok() {
+                    ControlFlow::Continue(())
+                } else {
+                    debug!("driver failed to start, exiting main loop");
+                    ControlFlow::Break(())
+                }
             }
             DriverRequest::Stop {} => {
-                tracing::debug!("driver stopping");
-                self.driver
-                    .take()
-                    .expect("received stop message without having gotten a start message")
-                    .stop()
-                    .await;
+                self.handle_stop().await;
                 ControlFlow::Break(())
             }
             _ => panic!("Unknown message on server channel"),

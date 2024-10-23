@@ -48,6 +48,7 @@ impl FsNodeOps for BusCollectionDirectory {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -103,6 +104,7 @@ impl FsNodeOps for BusDevicesDirectory {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -124,41 +126,43 @@ mod tests {
     use crate::device::kobject::KObject;
     use crate::fs::sysfs::{BusCollectionDirectory, KObjectDirectory};
     use crate::task::CurrentTask;
-    use crate::testing::{create_fs, create_kernel_and_task};
+    use crate::testing::{create_fs, create_kernel_task_and_unlocked};
     use crate::vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode};
+    use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
     use std::sync::Arc;
 
     fn lookup_node(
+        locked: &mut Locked<'_, Unlocked>,
         task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
     ) -> Result<NamespaceNode, Errno> {
         let root = NamespaceNode::new_anonymous(fs.root().clone());
-        task.lookup_path(&mut LookupContext::new(SymlinkMode::NoFollow), root, name)
+        task.lookup_path(locked, &mut LookupContext::new(SymlinkMode::NoFollow), root, name)
     }
 
     #[::fuchsia::test]
     async fn bus_collection_directory_contains_expected_files() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let root_kobject = KObject::new_root(Default::default());
         let test_fs =
             create_fs(&kernel, BusCollectionDirectory::new(Arc::downgrade(&root_kobject)));
-        lookup_node(&current_task, &test_fs, "devices".into()).expect("devices");
+        lookup_node(&mut locked, &current_task, &test_fs, "devices".into()).expect("devices");
         // TODO(b/297369112): uncomment when "drivers" are added.
         // lookup_node(&current_task, &test_fs, b"drivers").expect("drivers");
     }
 
     #[::fuchsia::test]
     async fn bus_devices_directory_contains_device_links() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let root_kobject = KObject::new_root(Default::default());
         root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
         let test_fs =
             create_fs(&kernel, BusCollectionDirectory::new(Arc::downgrade(&root_kobject)));
 
-        let device_entry =
-            lookup_node(&current_task, &test_fs, "devices/0".into()).expect("deivce 0 directory");
+        let device_entry = lookup_node(&mut locked, &current_task, &test_fs, "devices/0".into())
+            .expect("deivce 0 directory");
         assert!(device_entry.entry.node.is_lnk());
     }
 }

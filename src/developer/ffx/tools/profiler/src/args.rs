@@ -4,6 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use std::io::IsTerminal;
+use std::path::PathBuf;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 /// Interact with the profiling subsystem.
@@ -18,6 +19,7 @@ pub struct ProfilerCommand {
 pub enum ProfilerSubCommand {
     Attach(Attach),
     Launch(Launch),
+    Symbolize(Symbolize),
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -133,4 +135,23 @@ pub struct Launch {
     /// detected, else false
     #[argh(option, default = "std::io::stdout().is_terminal()")]
     pub color_output: bool,
+}
+
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
+/// Symbolize a previously-recorded profile that was not symbolized.
+#[argh(subcommand, name = "symbolize")]
+#[derive(Default)]
+pub struct Symbolize {
+    /// path to the unsymbolized text file
+    #[argh(positional)]
+    pub input: PathBuf,
+
+    /// path to which to write the symbolized pprof file
+    #[argh(positional)]
+    pub output: PathBuf,
+
+    /// if false, output the raw symbolized sample file instead of attempting to convert to the
+    /// pprof format.
+    #[argh(option, default = "true")]
+    pub pprof_conversion: bool,
 }

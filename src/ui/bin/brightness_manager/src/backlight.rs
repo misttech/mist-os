@@ -10,11 +10,11 @@ use fidl_fuchsia_hardware_backlight::{
     DeviceMarker as BacklightMarker, DeviceProxy as BacklightProxy, State as BacklightCommand,
 };
 use fidl_fuchsia_ui_display_internal::{DisplayPowerMarker, DisplayPowerProxy};
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use std::sync::Arc;
-use {fuchsia_async as fasync, zx};
 
 /// The minimum brightness value that can be sent to the backlight service.
 const MIN_REGULATED_BRIGHTNESS: f64 = 0.0004;

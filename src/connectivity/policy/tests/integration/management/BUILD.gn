@@ -40,6 +40,7 @@ rustc_test("management") {
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
     "//src/lib/network/packet",
     "//src/sys/lib/component-events",
+    "//src/sys/lib/fuchsia_backoff",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:either",

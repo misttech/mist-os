@@ -7,7 +7,9 @@ import("//build/assembly/board_configuration.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/component/config.gni")
 import("//build/components/fuchsia_package.gni")
+import("//build/rust/rustc_binary.gni")
 import("//build/testing/host_test_data.gni")
+
 import("//build/zircon/tools.gni")
 
 rustc_test("resolve_bootfs_package") {
@@ -17,6 +19,7 @@ rustc_test("resolve_bootfs_package") {
   source_root = "src/resolve_bootfs_package.rs"
 
   deps = [
+    ":test.checker_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
@@ -24,10 +27,9 @@ rustc_test("resolve_bootfs_package") {
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
-    "//src/storage/lib/vfs/rust:vfs",
   ]
 
   sources = [ "src/resolve_bootfs_package.rs" ]
@@ -60,31 +62,15 @@ if (current_toolchain == default_toolchain) {
     }
   }
 
-  # This test uses the `trigger` component because it's conveniently already
-  # available, but the test doesn't really care about what this component does
-  # as long as it doesn't exit.
-  fuchsia_component("trigger") {
-    testonly = true
-    deps = [
-      "..:trigger_bin",
-      "../routing:trigger_shard",
-    ]
-    manifest = "meta/trigger.cml"
-  }
-
-  fuchsia_package("trigger_pkg") {
-    testonly = true
-    deps = [ ":trigger" ]
-  }
-
   # `assembled_system` builds a zbi for consumption by the test.
   assembled_system("test_zbi") {
     testonly = true
+    include_legacy_bundle = true
     product_assembly_config_label = ":product_config"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
     bootfs_labels = [ ":config" ]
-    bootfs_package_labels = [ ":trigger_pkg" ]
+    bootfs_package_labels = [ ":root_component_pkg" ]
     base_packages = []
   }
 
@@ -141,6 +127,7 @@ if (current_toolchain == default_toolchain) {
     deps = [
       ":bootfs_resource",
       ":component-manager-cmp",
+      ":root_component",
     ]
   }
 
@@ -168,4 +155,46 @@ if (current_toolchain == default_toolchain) {
       deps += [ ":fuchsia-boot-resolver-integration-tests" ]
     }
   }
+}
+
+fidl("test.checker") {
+  testonly = true
+  sources = [ "checker.test.fidl" ]
+}
+
+rustc_binary("root_component_bin") {
+  edition = "2021"
+  testonly = true
+  name = "root_component"
+  source_root = "src/root_component.rs"
+  deps = [
+    ":test.checker_rust",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
+    "//third_party/rust_crates:futures",
+  ]
+  sources = [ "src/root_component.rs" ]
+}
+
+fuchsia_component("root_component") {
+  testonly = true
+  deps = [ ":root_component_bin" ]
+  manifest = "meta/root_component.cml"
+}
+
+fuchsia_package("root_component_pkg") {
+  testonly = true
+  deps = [
+    ":root_component",
+    ":sentinel_file",
+  ]
+}
+
+resource("sentinel_file") {
+  testonly = true
+  sources = [ "bootfs_package_resolver_test_sentinel" ]
+  outputs = [ "data/bootfs_package_resolver_test_sentinel" ]
 }

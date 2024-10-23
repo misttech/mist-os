@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{ElfComponent, ElfComponentInfo};
+use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 use id::Id;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
-use {fuchsia_async as fasync, zx};
 
 /// [`ComponentSet`] tracks all the components executing inside an ELF runner,
 /// and presents an iterator over those components. It does this under the

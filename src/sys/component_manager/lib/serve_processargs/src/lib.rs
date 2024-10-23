@@ -179,13 +179,13 @@ fn validate_handle_type(handle_type: HandleType) -> Result<(), DeliveryError> {
 #[cfg(test)]
 mod test_util {
     use fidl::endpoints::ServerEnd;
+    use fidl_fuchsia_io as fio;
     use sandbox::{Connector, Receiver};
     use std::sync::Arc;
     use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::remote::RemoteLike;
-    use {fidl_fuchsia_io as fio, zx};
 
     pub fn multishot() -> (Connector, Receiver) {
         let (receiver, sender) = Connector::new();
@@ -247,7 +247,7 @@ mod tests {
     use test_util::{mock_dir, multishot};
     use vfs::directory::entry::serve_directory;
     use zx::{AsHandleRef, HandleBased, MonotonicInstant, Peered, Signals};
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn test_empty() -> Result<()> {

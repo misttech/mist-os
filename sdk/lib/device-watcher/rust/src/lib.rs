@@ -33,11 +33,11 @@ pub async fn wait_for_device_with<T>(
             let (controller_proxy, server_end) =
                 fidl::endpoints::create_proxy::<ControllerMarker>()?;
             if dev_dir
-                .open(
-                    fio::OpenFlags::NOT_DIRECTORY,
-                    fio::ModeType::empty(),
+                .open3(
                     &controller_filename,
-                    server_end.into_channel().into(),
+                    fio::Flags::PROTOCOL_SERVICE,
+                    &fio::Options::default(),
+                    server_end.into_channel(),
                 )
                 .is_err()
             {
@@ -112,11 +112,11 @@ async fn wait_for_file(dir: &fio::DirectoryProxy, name: &str) -> Result<()> {
 async fn recursive_wait_and_open_with_flags<T, F>(
     mut dir: fio::DirectoryProxy,
     name: &str,
-    flags: fio::OpenFlags,
+    flags: fio::Flags,
     op: F,
 ) -> Result<T>
 where
-    F: FnOnce(&fio::DirectoryProxy, &str, fio::OpenFlags) -> T,
+    F: FnOnce(&fio::DirectoryProxy, &str, fio::Flags) -> T,
 {
     let path = std::path::Path::new(name);
     let mut components = path.components().peekable();
@@ -138,7 +138,7 @@ where
         let file = file.to_str().unwrap();
         let () = wait_for_file(&dir, file).await?;
         if components.peek().is_some() {
-            dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(&dir, file, flags)?;
+            dir = fuchsia_fs::directory::open_directory_async(&dir, file, flags)?;
         } else {
             break Ok(op(&dir, file, flags));
         }
@@ -149,13 +149,8 @@ where
 /// the path and returns once it has waited on the final component in the path. If the path
 /// never appears this function will wait forever.
 pub async fn recursive_wait(dir: &fio::DirectoryProxy, name: &str) -> Result<()> {
-    recursive_wait_and_open_with_flags(
-        Clone::clone(dir),
-        name,
-        fio::OpenFlags::empty(),
-        |_, _, _| (),
-    )
-    .await
+    recursive_wait_and_open_with_flags(Clone::clone(dir), name, fio::Flags::empty(), |_, _, _| ())
+        .await
 }
 
 /// Open the path `name` within `dir`. This function waits for each directory to
@@ -168,17 +163,16 @@ pub async fn recursive_wait_and_open_directory(
     recursive_wait_and_open_with_flags(
         Clone::clone(dir),
         name,
-        fio::OpenFlags::DIRECTORY,
-        fuchsia_fs::directory::open_no_describe_deprecated::<fio::DirectoryMarker>,
+        fio::Flags::PROTOCOL_DIRECTORY,
+        fuchsia_fs::directory::open_async::<fio::DirectoryMarker>,
     )
     .await
     .and_then(|res| res.map_err(Into::into))
 }
 
-/// Open the path `name` within `dir`. This function waits for each directory to be available
-/// before it opens it. If the path never appears this function will wait forever. Does NOT
-/// support fio::DirectoryMarker. Use recursive_wait_and_open_directory() instead.
-/// TODO(https://fxbug.dev/42072966): Specialize this function to support fio::DirectoryMarker
+/// Connect to an instance of FIDL protocol hosted at `name` within `dir`. This function waits for
+/// each directory to be available before it opens it. If the path never appears this function will
+/// wait forever.
 pub async fn recursive_wait_and_open<P: fidl::endpoints::ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     name: &str,
@@ -186,8 +180,11 @@ pub async fn recursive_wait_and_open<P: fidl::endpoints::ProtocolMarker>(
     recursive_wait_and_open_with_flags(
         Clone::clone(dir),
         name,
-        fio::OpenFlags::empty(),
-        fuchsia_fs::directory::open_no_describe_deprecated::<P>,
+        fio::Flags::empty(),
+        |dir, path, _flags| {
+            // Cannot open services with other flags.
+            fuchsia_fs::directory::open_async::<P>(dir, path, fio::Flags::PROTOCOL_SERVICE)
+        },
     )
     .await
     .and_then(|res| res.map_err(Into::into))

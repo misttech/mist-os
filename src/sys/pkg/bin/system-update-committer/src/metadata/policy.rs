@@ -8,14 +8,26 @@ use super::errors::{
 };
 use crate::config::{Config as ComponentConfig, Mode};
 use fidl_fuchsia_paver as paver;
-use tracing::info;
+use tracing::{info, warn};
 use zx::Status;
 
 /// After gathering state from the BootManager, the PolicyEngine can answer whether we
 /// should verify and commit.
 #[derive(Debug)]
-pub struct PolicyEngine {
-    current_config: Option<(Configuration, paver::ConfigurationStatus)>,
+pub struct PolicyEngine(State);
+
+#[derive(Debug)]
+enum State {
+    // If no verification or committing is necessary, i.e. if any of:
+    //   * ABR is not supported
+    //   * the current config is Recovery
+    //   * the current config status is Healthy
+    NoOp,
+    Active {
+        current_config: Configuration,
+        // None if the value is erroneously missing from QueryConfigurationStatusAndBootAttempts.
+        boot_attempts: Option<u8>,
+    },
 }
 
 impl PolicyEngine {
@@ -26,51 +38,61 @@ impl PolicyEngine {
             .await
             .into_boot_manager_result("query_current_configuration")
         {
-            // As a special case, if we don't support ABR, ensure we neither verify nor commit.
             Err(BootManagerError::Fidl {
                 error: fidl::Error::ClientChannelClosed { status: Status::NOT_SUPPORTED, .. },
                 ..
             }) => {
                 info!("ABR not supported: skipping health verification and boot metadata updates");
-                return Ok(Self { current_config: None });
+                return Ok(Self(State::NoOp));
             }
             Err(e) => return Err(PolicyError::Build(e)),
-
-            // As a special case, if we're in Recovery, ensure we neither verify nor commit.
             Ok(paver::Configuration::Recovery) => {
                 info!("System in recovery: skipping health verification and boot metadata updates");
-                return Ok(Self { current_config: None });
+                return Ok(Self(State::NoOp));
             }
-
             Ok(paver::Configuration::A) => Configuration::A,
             Ok(paver::Configuration::B) => Configuration::B,
         };
 
-        let current_config_status = boot_manager
-            .query_configuration_status((&current_config).into())
+        let status_and_boot_attempts = boot_manager
+            .query_configuration_status_and_boot_attempts((&current_config).into())
             .await
             .into_boot_manager_result("query_configuration_status")
             .map_err(PolicyError::Build)?;
+        match status_and_boot_attempts
+            .status
+            .ok_or(PolicyError::Build(BootManagerError::StatusNotSet))?
+        {
+            paver::ConfigurationStatus::Healthy => {
+                return Ok(Self(State::NoOp));
+            }
+            paver::ConfigurationStatus::Pending => {}
+            // TODO(https://fxbug.dev/368597963) On the final boot attempt the current config will
+            // be marked unbootable, but fuchsia.paver.Firmware/SetConfigurationHealthy says it is
+            // an error to call it when the current config is unbootable.
+            paver::ConfigurationStatus::Unbootable => {
+                return Err(PolicyError::CurrentConfigurationUnbootable((&current_config).into()));
+            }
+        };
 
-        Ok(Self { current_config: Some((current_config, current_config_status)) })
+        let boot_attempts = status_and_boot_attempts.boot_attempts;
+        if boot_attempts.is_none() {
+            warn!("Current config status is pending but boot attempts was not set");
+        }
+
+        Ok(Self(State::Active { current_config, boot_attempts }))
     }
 
     /// Determines if we should verify and commit.
-    /// * If we should (e.g. if the system is pending commit), return `Ok(Some(slot_to_act_on))`.
-    /// * If we shouldn't (e.g. if the system is already committed), return `Ok(None)`.
-    /// * If the system is seriously busted, return an error.
-    pub fn should_verify_and_commit(&self) -> Result<Option<&Configuration>, PolicyError> {
-        match self.current_config.as_ref() {
-            Some((config, paver::ConfigurationStatus::Pending)) => Ok(Some(config)),
-            Some((config, paver::ConfigurationStatus::Unbootable)) => {
-                Err(PolicyError::CurrentConfigurationUnbootable(config.into()))
+    /// * If we should (e.g. if the system is pending commit), return
+    ///   `Some((slot_to_act_on, boot_attempts))`.
+    /// * If we shouldn't (e.g. if the system is already committed), return `None`.
+    pub fn should_verify_and_commit(&self) -> Option<(&Configuration, Option<u8>)> {
+        match &self.0 {
+            State::Active { current_config, boot_attempts } => {
+                Some((current_config, *boot_attempts))
             }
-            // We don't need to verify and commit in these situations because it wont give us any
-            // new information or have any effect on boot metadata:
-            // * ABR is not supported
-            // * current slot is recovery
-            // * current slot already healthy on boot
-            None | Some((_, paver::ConfigurationStatus::Healthy)) => Ok(None),
+            State::NoOp => None,
         }
     }
 
@@ -120,12 +142,14 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(paver::Configuration::Recovery)
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Healthy)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Healthy, None))
+                }))
                 .build(),
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
-        assert_eq!(engine.should_verify_and_commit().unwrap(), None);
+        assert_eq!(engine.should_verify_and_commit(), None);
 
         assert_eq!(paver.take_events(), vec![PaverEvent::QueryCurrentConfiguration]);
     }
@@ -140,7 +164,7 @@ mod tests {
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
-        assert_eq!(engine.should_verify_and_commit().unwrap(), None);
+        assert_eq!(engine.should_verify_and_commit(), None);
 
         assert_eq!(paver.take_events(), vec![]);
     }
@@ -150,18 +174,22 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Healthy)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Healthy, None))
+                }))
                 .build(),
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
-        assert_eq!(engine.should_verify_and_commit().unwrap(), None);
+        assert_eq!(engine.should_verify_and_commit(), None);
 
         assert_eq!(
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() },
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                },
             ]
         );
     }
@@ -181,18 +209,22 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Pending)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Pending, Some(1)))
+                }))
                 .build(),
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
-        assert_eq!(engine.should_verify_and_commit().unwrap(), Some(current_config));
+        assert_eq!(engine.should_verify_and_commit(), Some((current_config, Some(1))));
 
         assert_eq!(
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() },
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                },
             ]
         );
     }
@@ -212,13 +244,14 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Unbootable)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Unbootable, None))
+                }))
                 .build(),
         );
-        let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
         assert_matches!(
-            engine.should_verify_and_commit(),
+            PolicyEngine::build(&paver.spawn_boot_manager_service()).await,
             Err(PolicyError::CurrentConfigurationUnbootable(cc)) if cc == current_config.into()
         );
 
@@ -226,7 +259,9 @@ mod tests {
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() },
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                },
             ]
         );
     }

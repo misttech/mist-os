@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 rustc_library("lib") {
   name = "sl4f_lib"

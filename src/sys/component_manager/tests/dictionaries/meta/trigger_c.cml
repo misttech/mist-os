@@ -14,18 +14,11 @@
             // fidl.test.components.Trigger-d is provided by the dynamic dictionary.
             path: "/svc/fuchsia.component.sandbox.Router",
         },
-        {
-            dictionary: "dict",
-            extends: "self/dynamic",
-        },
+        { dictionary: "dict" },
         { protocol: "fidl.test.components.Trigger" },
     ],
     use: [
         { protocol: "fidl.examples.routing.echo.Echo" },
-        {
-            protocol: "fuchsia.component.sandbox.Factory",
-            from: "framework",
-        },
         {
             protocol: "fuchsia.component.sandbox.CapabilityStore",
             from: "framework",
@@ -41,7 +34,10 @@
     ],
     expose: [
         {
-            dictionary: "dict",
+            dictionary: [
+                "dict",
+                "dynamic",
+            ],
             from: "self",
         },
     ],

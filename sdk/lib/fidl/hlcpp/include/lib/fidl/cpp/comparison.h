@@ -59,6 +59,14 @@ struct Equality<fidl::basic_time<kClockId>> {
   }
 };
 
+template <zx_clock_t kClockId>
+struct Equality<fidl::basic_ticks<kClockId>> {
+  bool operator()(const fidl::basic_ticks<kClockId>& lhs,
+                  const fidl::basic_ticks<kClockId>& rhs) const {
+    return lhs == rhs;
+  }
+};
+
 template <typename T, size_t N>
 struct Equality<std::array<T, N>> {
   // N.B.: This may be constexpr-able in C++20.

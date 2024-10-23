@@ -70,6 +70,7 @@ impl FsNodeOps for CpuClassDirectory {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,

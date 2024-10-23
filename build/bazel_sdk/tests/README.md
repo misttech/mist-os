@@ -98,4 +98,18 @@ bazel test --config=fuchsia_x64 :tests
 ```
 
 To run against a local IDK, define `LOCAL_FUCHSIA_IDK_DIRECTORY` instead
-in your environment before invoking `bazel test ...` as above.
+in your environment before invoking `bazel test ...` as above. For
+example:
+
+```sh
+# Preparation steps (only do this once)
+cd /work/fuchsia
+fx set core.x64
+
+# Generate the final in-tree IDK. See //build/bazel/bazel_sdk/README.md
+# for more information.
+fx build //build/bazel:generate_final_in_tree_idk
+export LOCAL_FUCHSIA_IDK_DIRECTORY=$(fx get-build-dir)/gen/build/bazel/fuchsia_in_tree_idk
+
+bazel test --config=fuchsia_x64 :tests
+```

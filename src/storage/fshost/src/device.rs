@@ -11,7 +11,7 @@ use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy};
 use fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy};
-use fidl_fuchsia_io::{self as fio, OpenFlags};
+use fidl_fuchsia_io::{self as fio};
 use fs_management::filesystem::{BlockConnector, DirBasedBlockConnector};
 use fs_management::format::{detect_disk_format, DiskFormat};
 use fuchsia_async::waker_list::WakerList;
@@ -137,10 +137,8 @@ impl Device for NandDevice {
 
     async fn get_child(&self, suffix: &str) -> Result<Box<dyn Device>, Error> {
         const DEV_CLASS_NAND: &str = "/dev/class/nand";
-        let dev_class_nand = fuchsia_fs::directory::open_in_namespace_deprecated(
-            DEV_CLASS_NAND,
-            OpenFlags::RIGHT_READABLE,
-        )?;
+        let dev_class_nand =
+            fuchsia_fs::directory::open_in_namespace(DEV_CLASS_NAND, fio::PERM_READABLE)?;
         let child_path = device_watcher::wait_for_device_with(
             &dev_class_nand,
             |device_watcher::DeviceInfo { filename, topological_path }| {
@@ -369,10 +367,8 @@ impl Device for BlockDevice {
 
     async fn get_child(&self, suffix: &str) -> Result<Box<dyn Device>, Error> {
         const DEV_CLASS_BLOCK: &str = "/dev/class/block";
-        let dev_class_block = fuchsia_fs::directory::open_in_namespace_deprecated(
-            DEV_CLASS_BLOCK,
-            OpenFlags::RIGHT_READABLE,
-        )?;
+        let dev_class_block =
+            fuchsia_fs::directory::open_in_namespace(DEV_CLASS_BLOCK, fio::PERM_READABLE)?;
         let child_path = device_watcher::wait_for_device_with(
             &dev_class_block,
             |device_watcher::DeviceInfo { filename, topological_path }| {

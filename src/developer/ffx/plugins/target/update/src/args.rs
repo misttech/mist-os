@@ -4,11 +4,12 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
+use std::path::PathBuf;
 
 /// Manage updates: query/set update channel, kick off a check for update, force
 /// an update (to any point, i.e. a downgrade can be requested).
 #[ffx_command()]
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[derive(ArgsInfo, Clone, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
     name = "update",
@@ -21,7 +22,7 @@ pub struct Update {
 }
 
 /// SubCommands for `update`.
-#[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+#[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand)]
 pub enum Command {
     // fuchsia.update.channelcontrol.ChannelControl protocol:
@@ -35,7 +36,7 @@ pub enum Command {
 }
 
 /// Get the current (running) channel.
-#[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+#[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
 #[argh(
     subcommand,
     name = "channel",
@@ -54,7 +55,7 @@ pub struct Channel {
 pub mod channel {
     use argh::{ArgsInfo, FromArgs};
 
-    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+    #[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(subcommand)]
     pub enum Command {
         Get(Get),
@@ -63,9 +64,9 @@ pub mod channel {
         List(List),
     }
 
-    // LINT.IfChange
     /// Get the current channel
-    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+    #[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+    // LINT.IfChange
     #[argh(
         subcommand,
         name = "get-current",
@@ -73,11 +74,11 @@ pub mod channel {
         note = "For developer product configurations, this is by default 'devhost'.",
         error_code(1, "Timeout while getting update channel.")
     )]
-    pub struct Get {}
     // LINT.ThenChange(../../../repository/serve/src/lib.rs)
+    pub struct Get {}
 
     /// Get the target channel
-    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+    #[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(
         subcommand,
         name = "get-next",
@@ -90,7 +91,7 @@ system.",
     pub struct Target {}
 
     /// Set the target channel
-    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+    #[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(
         subcommand,
         name = "set",
@@ -117,7 +118,7 @@ channels.",
     }
 
     /// List the known target channels
-    #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+    #[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(
         subcommand,
         name = "list",
@@ -131,7 +132,7 @@ Returns an empty list if no other update channels are configured.",
 }
 
 /// Start an update. If no newer update is available, no update is performed.
-#[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+#[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
 #[argh(
     subcommand,
     name = "check-now",
@@ -157,11 +158,21 @@ pub struct CheckNow {
     /// monitor for state update.
     #[argh(switch)]
     pub monitor: bool,
+
+    /// use the product bundle to use as the source of the update.
+    #[argh(switch)]
+    pub product_bundle: bool,
+
+    /// optionally specify the product bundle to use as the source of the update
+    /// when `--product-bundle` is set. The default is to use the product bundle
+    /// configured with `product.path`.
+    #[argh(positional)]
+    pub product_bundle_path: Option<PathBuf>,
 }
 
 /// Directly invoke the system updater to install the provided update, bypassing
 /// any update checks.
-#[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+#[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
 #[argh(
     subcommand,
     name = "force-install",
@@ -194,6 +205,16 @@ pub struct ForceInstall {
     /// the url of the update package describing the update to install
     #[argh(positional)]
     pub update_pkg_url: String,
+
+    /// use the product bundle to use as the source of the update.
+    #[argh(switch)]
+    pub product_bundle: bool,
+
+    /// optionally specify the product bundle to use as the source of the update
+    /// when `--product-bundle` is set. The default is to use the product bundle
+    /// configured with `product.path`.
+    #[argh(positional)]
+    pub product_bundle_path: Option<PathBuf>,
 }
 
 #[cfg(test)]
@@ -265,7 +286,12 @@ mod tests {
         assert_eq!(
             update,
             Update {
-                cmd: Command::CheckNow(CheckNow { service_initiated: false, monitor: false })
+                cmd: Command::CheckNow(CheckNow {
+                    service_initiated: false,
+                    monitor: false,
+                    product_bundle: false,
+                    product_bundle_path: None
+                })
             }
         );
     }
@@ -275,7 +301,14 @@ mod tests {
         let update = Update::from_args(&["update"], &["check-now", "--monitor"]).unwrap();
         assert_eq!(
             update,
-            Update { cmd: Command::CheckNow(CheckNow { service_initiated: false, monitor: true }) }
+            Update {
+                cmd: Command::CheckNow(CheckNow {
+                    service_initiated: false,
+                    monitor: true,
+                    product_bundle: false,
+                    product_bundle_path: None
+                })
+            }
         );
     }
 
@@ -284,7 +317,14 @@ mod tests {
         let update = Update::from_args(&["update"], &["check-now", "--service-initiated"]).unwrap();
         assert_eq!(
             update,
-            Update { cmd: Command::CheckNow(CheckNow { service_initiated: true, monitor: false }) }
+            Update {
+                cmd: Command::CheckNow(CheckNow {
+                    service_initiated: true,
+                    monitor: false,
+                    product_bundle: false,
+                    product_bundle_path: None
+                })
+            }
         );
     }
 
@@ -302,6 +342,8 @@ mod tests {
                 cmd: Command::ForceInstall(ForceInstall {
                     update_pkg_url: "url".to_owned(),
                     reboot: true,
+                    product_bundle: false,
+                    product_bundle_path: None
                 })
             }
         );
@@ -317,6 +359,8 @@ mod tests {
                 cmd: Command::ForceInstall(ForceInstall {
                     update_pkg_url: "url".to_owned(),
                     reboot: false,
+                    product_bundle: false,
+                    product_bundle_path: None
                 })
             }
         );

@@ -6,22 +6,6 @@ library fuchsia.hardware.gpio;
 
 using zx;
 
-/// Maximum length of the GPIO name.
-const MAX_GPIO_NAME_LEN uint32 = 256;
-
-/// Flags for `ConfigIn`.
-type GpioFlags = strict enum : uint32 {
-    PULL_DOWN = 0x0;
-    PULL_UP = 0x1;
-    NO_PULL = 0x2;
-};
-
-/// Values for `SetPolarity`.
-type GpioPolarity = strict enum : uint32 {
-    LOW = 0x0;
-    HIGH = 0x1;
-};
-
 /// Whether to drive the GPIO to a high or low voltage, or disable the output buffer.
 type BufferMode = strict enum {
     INPUT = 0;
@@ -46,32 +30,6 @@ type InterruptConfiguration = table {
 /// Common error codes:
 /// - `ZX_ERR_NOT_SUPPORTED`: The requested operation is not supported by this controller.
 open protocol Gpio {
-    /// Get the pin of a GPIO
-    strict GetPin() -> (struct {
-        pin uint32;
-    }) error zx.Status;
-
-    /// Get the name of a GPIO.
-    strict GetName() -> (struct {
-        name string:MAX_GPIO_NAME_LEN;
-    }) error zx.Status;
-
-    /// Configures a GPIO for input.
-    strict ConfigIn(struct {
-        flags GpioFlags;
-    }) -> () error zx.Status;
-
-    /// Configures a GPIO for output.
-    strict ConfigOut(struct {
-        initial_value uint8;
-    }) -> () error zx.Status;
-
-    /// Configures the GPIO pin for an alternate function (I2C, SPI, etc)
-    /// the interpretation of "function" is platform dependent.
-    strict SetAltFunction(struct {
-        function uint64;
-    }) -> () error zx.Status;
-
     /// Reads the current value of a GPIO, returning `true` for a high voltage and `false` for a
     /// low voltage.
     strict Read() -> (struct {
@@ -88,20 +46,6 @@ open protocol Gpio {
         value uint8;
     }) -> () error zx.Status;
 
-    /// Sets the drive strength of the GPIO.
-    /// actual_ds_ua is always >= ds_ua. If ds_ua is larger than max value, the drive strength will be set to the max value.
-    /// Return error if unable to set drive strength. actual_ds_ua is not set in this case.
-    strict SetDriveStrength(struct {
-        ds_ua uint64;
-    }) -> (struct {
-        actual_ds_ua uint64;
-    }) error zx.Status;
-
-    /// Gets the configured drive strength of the GPIO in microamps (ua).
-    strict GetDriveStrength() -> (struct {
-        result_ua uint64;
-    }) error zx.Status;
-
     /// Gets an interrupt object pertaining to a particular GPIO pin. Only one interrupt may
     /// be outstanding per pin, and it must be released by calling `ReleaseInterrupt()` before the
     /// next call to `GetInterrupt()` will succeed.
@@ -109,20 +53,10 @@ open protocol Gpio {
     /// Returns `ZX_ERR_ALREADY_EXISTS` if `GetInterrupt()` has already been called without a
     /// subsequent call to `ReleaseInterrupt()`, `ZX_ERR_INVALID_ARGS` if `options` is invalid, or
     /// `ZX_ERR_ACCESS_DENIED` if another client has the interrupt.
-    // TODO(42082459): Complete transition to `GetInterrupt()` with this signature.
-    strict GetInterrupt2(struct {
+    strict GetInterrupt(struct {
         options InterruptOptions;
     }) -> (resource struct {
         interrupt zx.Handle:INTERRUPT;
-    }) error zx.Status;
-
-    /// Gets an interrupt object pertaining to a particular GPIO pin. `flags`
-    /// is passed as the `options` parameter when
-    /// [creating the interrupt](https://fuchsia.dev/fuchsia-src/reference/syscalls/interrupt_create).
-    strict GetInterrupt(struct {
-        flags uint32;
-    }) -> (resource struct {
-        irq zx.Handle:INTERRUPT;
     }) error zx.Status;
 
     /// Configures the polarity of an interrupt and whether it is edge- or level-triggered. Only the
@@ -143,16 +77,6 @@ open protocol Gpio {
     /// `GetInterrupt()` has not been called. Returns `ZX_ERR_ACCESS_DENIED` if another client has
     /// the interrupt.
     strict ReleaseInterrupt() -> () error zx.Status;
-};
-
-closed protocol Device {
-    /// Opens a new session on the device.
-    ///
-    /// At most one session is permitted at one time; the server end will be
-    /// closed with `ZX_ERR_ALREADY_BOUND` if a session already exists.
-    strict OpenSession(resource struct {
-        session server_end:Gpio;
-    });
 };
 
 service Service {

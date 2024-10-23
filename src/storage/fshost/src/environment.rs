@@ -37,7 +37,7 @@ pub use fxfs_container::FxfsContainer;
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_inspect as finspect};
 
 const INITIAL_SLICE_COUNT: u64 = 1;
 
@@ -212,12 +212,10 @@ impl Filesystem {
         &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
     ) -> Result<fio::DirectoryProxy, Error> {
-        let root = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+        let root = fuchsia_fs::directory::open_directory_async(
             &self.exposed_dir(serving_fs).context("failed to get exposed dir")?,
             "root",
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::POSIX_EXECUTABLE
-                | fio::OpenFlags::POSIX_WRITABLE,
+            fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE | fio::Flags::PERM_INHERIT_EXECUTE,
         )
         .context("failed to open the root directory")?;
         Ok(root)
@@ -281,10 +279,10 @@ pub trait Container: Send + Sync {
     async fn get_volumes(&mut self) -> Result<Vec<String>, Error> {
         // We expect the startup protocol to work with fxblob. There are no options for
         // reformatting the entire fxfs partition now that blobfs is one of the volumes.
-        let volumes_dir = fuchsia_fs::directory::open_directory_deprecated(
+        let volumes_dir = fuchsia_fs::directory::open_directory(
             self.fs().exposed_dir(),
             "volumes",
-            fuchsia_fs::OpenFlags::empty(),
+            fio::Flags::empty(),
         )
         .await
         .context("opening volumes directory")?;
@@ -306,10 +304,10 @@ pub trait Container: Send + Sync {
     async fn remove_all_non_blob_volumes(&mut self) -> Result<(), Error> {
         let blobfs_volume_label = self.blobfs_volume_label();
         let fs = self.fs();
-        let volumes_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+        let volumes_dir = fuchsia_fs::directory::open_directory_async(
             fs.exposed_dir(),
             "volumes",
-            fuchsia_fs::OpenFlags::empty(),
+            fio::Flags::empty(),
         )?;
         let volumes = fuchsia_fs::directory::readdir(&volumes_dir).await?;
         for volume in volumes {
@@ -360,7 +358,7 @@ pub struct FshostEnvironment {
     /// This lock can be taken and device.path() added to the vector to have them
     /// ignored the next time they appear to the Watcher/Matcher code.
     matcher_lock: Arc<Mutex<HashSet<String>>>,
-    inspector: fuchsia_inspect::Inspector,
+    inspector: finspect::Inspector,
     watcher: Watcher,
     registered_devices: Arc<RegisteredDevices>,
 }
@@ -372,6 +370,7 @@ impl FshostEnvironment {
         inspector: fuchsia_inspect::Inspector,
         watcher: Watcher,
     ) -> Self {
+        let corruption_events = inspector.root().create_child("corruption_events");
         Self {
             config: config.clone(),
             gpt: Filesystem::Queue(FilesystemQueue::default()),
@@ -379,7 +378,7 @@ impl FshostEnvironment {
             blobfs: Filesystem::Queue(FilesystemQueue::default()),
             data: Filesystem::Queue(FilesystemQueue::default()),
             fvm: None,
-            launcher: Arc::new(FilesystemLauncher { config }),
+            launcher: Arc::new(FilesystemLauncher { config, corruption_events }),
             matcher_lock,
             inspector,
             watcher,
@@ -533,10 +532,10 @@ impl FshostEnvironment {
         let root = filesystem.root(None)?;
 
         // Read desired format from fs_switch, use config as default.
-        let desired_format = match fuchsia_fs::directory::open_file_deprecated(
+        let desired_format = match fuchsia_fs::directory::open_file(
             &root,
             "fs_switch",
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .await
         {
@@ -775,9 +774,9 @@ impl Environment for FshostEnvironment {
     ) -> Result<Vec<String>, Error> {
         // Attach the FVM driver and connect to the VolumeManager.
         self.attach_driver(device, FVM_DRIVER_PATH).await?;
-        let fvm_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let fvm_dir = fuchsia_fs::directory::open_in_namespace(
             &device.topological_path(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )?;
         let fvm_volume_manager_proxy =
             recursive_wait_and_open::<VolumeManagerMarker>(&fvm_dir, "/fvm")
@@ -790,10 +789,7 @@ impl Environment for FshostEnvironment {
             .context("get_info failed")?;
 
         let fvm_topo_path = format!("{}/fvm", device.topological_path());
-        let fvm_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-            &fvm_topo_path,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )?;
+        let fvm_dir = fuchsia_fs::directory::open_in_namespace(&fvm_topo_path, fio::PERM_READABLE)?;
         let dir_entries = fuchsia_fs::directory::readdir(&fvm_dir).await?;
 
         self.fvm = Some((fvm_topo_path, fvm_dir));
@@ -1095,6 +1091,7 @@ impl Environment for FshostEnvironment {
 
 pub struct FilesystemLauncher {
     config: Arc<fshost_config::Config>,
+    corruption_events: finspect::Node,
 }
 
 impl FilesystemLauncher {
@@ -1269,10 +1266,8 @@ impl FilesystemLauncher {
         ignore_paths: &mut HashSet<String>,
     ) -> Result<Box<dyn Device>, Error> {
         tracing::info!(path = fvm_topo_path, "Resetting fvm partitions");
-        let fvm_directory_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
-            &fvm_topo_path,
-            fio::OpenFlags::RIGHT_READABLE,
-        )?;
+        let fvm_directory_proxy =
+            fuchsia_fs::directory::open_in_namespace(&fvm_topo_path, fio::PERM_READABLE)?;
         let fvm_volume_manager_proxy =
             connect_to_protocol_at_path::<VolumeManagerMarker>(&fvm_topo_path)
                 .context("Failed to connect to the fvm VolumeManagerProxy")?;
@@ -1463,5 +1458,10 @@ impl FilesystemLauncher {
             }
         })
         .detach();
+
+        // NOTE: If a corruption event has already been recorded, this will turn into a no-op, which
+        // means we'd short count the number of corruption events.  Given that this should only
+        // occur no more than once per-boot, this doesn't seem worth fixing.
+        self.corruption_events.record_uint(format, 1);
     }
 }

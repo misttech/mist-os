@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_wlan_fullmac as fidl_fullmac;
 use std::ffi::c_void;
 use tracing::error;
 use wlan_ffi_transport::completers::Completer;
 use wlan_fullmac_mlme::device::FullmacDevice;
 use wlan_fullmac_mlme::{start_and_serve_on_separate_thread, FullmacMlmeHandle};
-use {fidl_fuchsia_wlan_fullmac as fidl_fullmac, zx};
 
 /// Starts and runs the FullMAC MLME and SME futures on a separate thread. MLME will call the given
 /// `run_shutdown_completer` when it exits.

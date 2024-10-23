@@ -16,7 +16,9 @@ use starnix_core::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
     InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
 };
-use starnix_logging::{log_error, log_warn, track_stub};
+use starnix_logging::{
+    log_error, log_warn, trace_instant, track_stub, TraceScope, CATEGORY_STARNIX,
+};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
@@ -59,6 +61,7 @@ pub fn clear_wake_proxy_signal(event: &zx::EventPair, outstanding_reads: i32) {
 
     // We always want to raise the kernel signal so that we will get more FIDL messages.
     let set_mask = KERNEL_PROXY_EVENT_SIGNAL;
+    trace_instant!(CATEGORY_STARNIX, c"functionfs-signal", TraceScope::Process, "clear_mask" => clear_mask.bits(), "set_mask" => set_mask.bits());
     match event.signal_peer(clear_mask, set_mask) {
         Ok(_) => (),
         Err(e) => log_warn!("Failed to reset wake event state {:?}", e),
@@ -137,6 +140,11 @@ async fn handle_adb(
                         };
 
                         outstanding_reads.replace_with(|&mut old| old - 1);
+
+                        resume_event.as_ref().map(|e| {
+                            clear_wake_proxy_signal(e, *outstanding_reads.borrow());
+                        });
+
                         response_sender
                             .send(response)
                             .map_err(|e| log_error!("Failed to send to main thread: {:#?}", e))
@@ -288,7 +296,7 @@ fn connect_to_device(
         AdbProxyMode::None => (adb_proxy, None),
         AdbProxyMode::WakeContainer => {
             let (adb_proxy, adb_proxy_resume_event) =
-                create_proxy_for_wake_events(adb_proxy.into_channel());
+                create_proxy_for_wake_events(adb_proxy.into_channel(), "adb".to_string());
             let adb_proxy = fadb::UsbAdbImpl_SynchronousProxy::from_channel(adb_proxy);
             (adb_proxy, Some(adb_proxy_resume_event))
         }
@@ -330,7 +338,7 @@ impl FunctionFsRootDir {
             return Ok(());
         }
         let (device_proxy, adb_proxy, adb_proxy_resume_event) =
-            connect_to_device(AdbProxyMode::None)?;
+            connect_to_device(AdbProxyMode::WakeContainer)?;
         state.device_proxy = Some(device_proxy);
 
         let (command_sender, command_receiver) = async_channel::unbounded();
@@ -452,6 +460,7 @@ impl FsNodeOps for FunctionFsRootDir {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,

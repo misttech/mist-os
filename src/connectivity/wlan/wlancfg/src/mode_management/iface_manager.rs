@@ -33,7 +33,7 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::unimplemented;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.
@@ -86,7 +86,7 @@ async fn create_client_state_machine(
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
     connect_selection: Option<client_types::ConnectSelection>,
     telemetry_sender: TelemetrySender,
-    defect_sender: mpsc::UnboundedSender<Defect>,
+    defect_sender: mpsc::Sender<Defect>,
     roam_manager: RoamManager,
 ) -> Result<
     (
@@ -154,7 +154,7 @@ pub(crate) struct IfaceManagerService {
         FuturesUnordered<BoxFuture<'static, Result<ConnectionSelectionResponse, anyhow::Error>>>,
     telemetry_sender: TelemetrySender,
     // A sender to be cloned for state machines to report defects to the IfaceManager.
-    defect_sender: mpsc::UnboundedSender<Defect>,
+    defect_sender: mpsc::Sender<Defect>,
     _node: fuchsia_inspect::Node,
     recovery_node: BoundedListNode,
 }
@@ -169,7 +169,7 @@ impl IfaceManagerService {
         connection_selection_requester: ConnectionSelectionRequester,
         roam_manager: RoamManager,
         telemetry_sender: TelemetrySender,
-        defect_sender: mpsc::UnboundedSender<Defect>,
+        defect_sender: mpsc::Sender<Defect>,
         _node: fuchsia_inspect::Node,
     ) -> Self {
         let recovery_node = _node.create_child("recovery_record");
@@ -1345,7 +1345,7 @@ async fn serve_iface_functionality(
     reconnect_monitor_interval: &mut i64,
     connectivity_monitor_timer: &mut fasync::Interval,
     operation_futures: &mut FuturesUnordered<BoxFuture<'static, IfaceManagerOperation>>,
-    defect_receiver: &mut mpsc::UnboundedReceiver<Defect>,
+    defect_receiver: &mut mpsc::Receiver<Defect>,
     recovery_action_receiver: &mut recovery::RecoveryActionReceiver,
     recovery_in_progress: &mut bool,
 ) {
@@ -1470,7 +1470,7 @@ async fn serve_iface_functionality(
 pub(crate) async fn serve_iface_manager_requests(
     mut iface_manager: IfaceManagerService,
     requests: mpsc::Receiver<IfaceManagerRequest>,
-    mut defect_receiver: mpsc::UnboundedReceiver<Defect>,
+    mut defect_receiver: mpsc::Receiver<Defect>,
     mut recovery_action_receiver: recovery::RecoveryActionReceiver,
 ) -> Result<Infallible, Error> {
     // Client and AP state machines need to be allowed to run in order for several operations to
@@ -1572,8 +1572,8 @@ mod tests {
         pub node: inspect::Node,
         pub telemetry_sender: TelemetrySender,
         pub telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
-        pub defect_sender: mpsc::UnboundedSender<Defect>,
-        pub defect_receiver: mpsc::UnboundedReceiver<Defect>,
+        pub defect_sender: mpsc::Sender<Defect>,
+        pub defect_receiver: mpsc::Receiver<Defect>,
         pub recovery_sender: recovery::RecoveryActionSender,
         pub recovery_receiver: recovery::RecoveryActionReceiver,
         pub connection_selection_requester: ConnectionSelectionRequester,
@@ -1599,7 +1599,7 @@ mod tests {
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let scan_requester = Arc::new(FakeScanRequester::new());
-        let (defect_sender, defect_receiver) = mpsc::unbounded();
+        let (defect_sender, defect_receiver) = mpsc::channel(100);
         let (recovery_sender, recovery_receiver) =
             mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
         let (connection_selection_request_sender, connection_selection_request_receiver) =
@@ -4219,7 +4219,7 @@ mod tests {
     ) {
         // Start the service loop
         let (mut sender, receiver) = mpsc::channel(1);
-        let (_defect_sender, defect_receiver) = mpsc::unbounded();
+        let (_defect_sender, defect_receiver) = mpsc::channel(100);
         let (_recovery_sender, recovery_receiver) =
             mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
         let serve_fut = serve_iface_manager_requests(
@@ -4291,7 +4291,7 @@ mod tests {
     ) {
         // Start the service loop
         let (mut sender, receiver) = mpsc::channel(1);
-        let (_defect_sender, defect_receiver) = mpsc::unbounded();
+        let (_defect_sender, defect_receiver) = mpsc::channel(100);
         let (_recovery_sender, recovery_receiver) =
             mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
         let serve_fut = serve_iface_manager_requests(
@@ -5758,7 +5758,7 @@ mod tests {
     #[fuchsia::test]
     fn test_record_state_machine_defect() {
         let mut exec = fuchsia_async::TestExecutor::new();
-        let test_values = test_setup(&mut exec);
+        let mut test_values = test_setup(&mut exec);
         let phy_manager = Arc::new(Mutex::new(FakePhyManager {
             create_iface_ok: true,
             destroy_iface_ok: true,
@@ -5786,7 +5786,7 @@ mod tests {
         // Send a defect to the IfaceManager service loop.
         test_values
             .defect_sender
-            .unbounded_send(Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 0 }))
+            .try_send(Defect::Iface(IfaceFailure::ApStartFailure { iface_id: 0 }))
             .expect("failed to send defect notification");
 
         // Run the IfaceManager service so that it can process the defect.
@@ -6155,7 +6155,7 @@ mod tests {
 
         // Start the service loop
         let (mut req_sender, req_receiver) = mpsc::channel(1);
-        let (_defect_sender, defect_receiver) = mpsc::unbounded();
+        let (_defect_sender, defect_receiver) = mpsc::channel(100);
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
             req_receiver,

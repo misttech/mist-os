@@ -11,10 +11,11 @@ use crate::vfs::{
 };
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::HandleBased;
+use fidl_fuchsia_io as fio;
 use fuchsia_runtime::UtcInstant;
 use futures::future::BoxFuture;
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{AccessCheck, FileMode};
@@ -28,7 +29,6 @@ use vfs::directory::{self};
 use vfs::{
     attributes, execution_scope, file, path, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
 };
-use {fidl_fuchsia_io as fio, zx};
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
 pub fn serve_file(
@@ -240,6 +240,7 @@ impl StarnixNodeConnection {
         let offset = match pos {
             directory::traversal_position::TraversalPosition::Start => 0,
             directory::traversal_position::TraversalPosition::Name(_) => return error!(EINVAL),
+            directory::traversal_position::TraversalPosition::Bytes(_) => return error!(EINVAL),
             directory::traversal_position::TraversalPosition::Index(v) => *v as i64,
             directory::traversal_position::TraversalPosition::End => {
                 return Ok((directory::traversal_position::TraversalPosition::End, sink.seal()));
@@ -271,8 +272,12 @@ impl StarnixNodeConnection {
         }
     }
 
-    fn lookup_parent<'a>(&self, path: &'a FsStr) -> Result<(NamespaceNode, &'a FsStr), Errno> {
-        self.task()?.lookup_parent(&mut LookupContext::default(), &self.file.name, path)
+    fn lookup_parent<'a>(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        path: &'a FsStr,
+    ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
+        self.task()?.lookup_parent(locked, &mut LookupContext::default(), &self.file.name, path)
     }
 
     /// Implementation of `vfs::directory::entry::DirectoryEntry::open`.
@@ -302,11 +307,11 @@ impl StarnixNodeConnection {
             }
 
             // Open a path under the current directory.
+            let mut locked = kernel.kthreads.unlocked_for_async();
             let path = path.into_string();
-            let (node, name) = self.lookup_parent(path.as_bytes().into())?;
+            let (node, name) = self.lookup_parent(&mut locked, path.as_bytes().into())?;
             let create_directory = flags.creation_mode() != vfs::common::CreationMode::Never
                 && flags.create_directory();
-            let mut locked = kernel.kthreads.unlocked_for_async();
             let open_flags = to_open_flags(&flags);
             let file = match current_task.open_namespace_node_at(
                 &mut locked,
@@ -525,15 +530,19 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
         dst_name: path::Path,
     ) -> BoxFuture<'static, Result<(), zx::Status>> {
         Box::pin(async move {
+            let kernel = self.kernel().unwrap();
+            let mut locked = kernel.kthreads.unlocked_for_async();
             let src_name = src_name.into_string();
             let dst_name = dst_name.into_string();
             let src_dir = src_dir
                 .into_any()
                 .downcast::<StarnixNodeConnection>()
                 .map_err(|_| errno!(EXDEV))?;
-            let (src_node, src_name) = src_dir.lookup_parent(src_name.as_str().into())?;
-            let (dst_node, dst_name) = self.lookup_parent(dst_name.as_str().into())?;
+            let (src_node, src_name) =
+                src_dir.lookup_parent(&mut locked, src_name.as_str().into())?;
+            let (dst_node, dst_name) = self.lookup_parent(&mut locked, dst_name.as_str().into())?;
             NamespaceNode::rename(
+                &mut locked,
                 &*self.task()?,
                 &src_node,
                 src_name,

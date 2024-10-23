@@ -26,7 +26,7 @@ use futures::stream::futures_unordered::FuturesUnordered;
 use futures::{select, stream, Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_name as fnet_name,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 use anyhow::{Context as _, Result};

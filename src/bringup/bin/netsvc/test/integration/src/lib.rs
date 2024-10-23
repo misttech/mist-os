@@ -1517,11 +1517,12 @@ async fn replies_to_ping(name: &str, unicast: bool) {
             // Create a future that tries to ping regularly so we don't suffer
             // flakes in case of bad neighbor resolution. We'll always send
             // pings with the same sequence number.
-            let mut sink = fuchsia_async::Interval::new(fuchsia_async::Duration::from_seconds(1))
-                .map(|()| Ok(ping::PingData { sequence: SEQUENCE, addr, body: body.to_vec() }))
-                .forward(ping_sink)
-                .map(|r| r.expect("sink error"))
-                .fuse();
+            let mut sink =
+                fuchsia_async::Interval::new(fuchsia_async::MonotonicDuration::from_seconds(1))
+                    .map(|()| Ok(ping::PingData { sequence: SEQUENCE, addr, body: body.to_vec() }))
+                    .forward(ping_sink)
+                    .map(|r| r.expect("sink error"))
+                    .fuse();
 
             let reply = futures::select! {
                 () = sink => panic!("sink ended unexpectedly"),

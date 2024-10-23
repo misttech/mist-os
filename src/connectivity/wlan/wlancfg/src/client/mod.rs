@@ -17,7 +17,7 @@ use futures::select;
 use futures::stream::FuturesUnordered;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy, zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 pub mod connection_selection;
 pub mod roaming;
@@ -602,7 +602,7 @@ mod tests {
         }
 
         async fn get_sme_proxy_for_scan(&mut self) -> Result<SmeForScan, Error> {
-            let (defect_sender, _) = mpsc::unbounded();
+            let (defect_sender, _) = mpsc::channel(100);
             Ok(SmeForScan::new(self.sme_proxy.clone(), 0, defect_sender))
         }
 

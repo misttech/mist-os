@@ -169,7 +169,7 @@ zx::result<std::unique_ptr<VisitorRegistry>> LoadVisitors(fdf::Namespace& incomi
       continue;
     }
 
-    auto status = visitors->RegisterVisitor(std::move(visitor));
+    status = visitors->RegisterVisitor(std::move(visitor));
     if (status.is_error()) {
       FDF_LOG(ERROR, "visitor '%s' registration failed: %s", visitor_file.c_str(),
               status.status_string());

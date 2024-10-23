@@ -12,7 +12,7 @@
             type: "expect_failure",
             matchers: [
                 "MemtagStackTest.*",
-                "MemtagGlobalsTest.*",
+                "MemtagGlobalsTest.RelrRegressionTestForb314038442WithMteGlobals",
             ],
         },
         {

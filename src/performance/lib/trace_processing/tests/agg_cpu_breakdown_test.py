@@ -249,13 +249,15 @@ class AggCpuBreakdownTest(unittest.TestCase):
         self.assertEqual(model.processes[1].name, "small_process")
         self.assertEqual(len(model.processes[1].threads), 1)
 
-        processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
-        breakdown, total_time = processor.process_metrics_and_get_total_time()
+        processor = cpu_breakdown.CpuBreakdownMetricsProcessor()
+        breakdown, total_time = processor.process_metrics_and_get_total_time(
+            model
+        )
         print("total_time: %f" % total_time)
         agg_processor = agg_cpu_breakdown.AggCpuBreakdownMetricsProcessor(
-            breakdown, {0: 1.8, 2: 2.2, 3: 2.2, 5: 2.2}, total_time
+            {0: 1.8, 2: 2.2, 3: 2.2, 5: 2.2}, total_time
         )
-        agg_breakdown = agg_processor.aggregate_metrics()
+        agg_breakdown = agg_processor.aggregate_metrics(breakdown)
 
         self.assertEqual(len(agg_breakdown), 2)
         self.assertEqual(len(agg_breakdown[1.8]), 3)

@@ -108,14 +108,9 @@ where
                     proxy.mark(MarkDomain::Mark1, marks.mark_1).await?,
                     proxy.mark(MarkDomain::Mark2, marks.mark_2).await?,
                 ) {
-                    // We consider an Ok() or Eopnotsupp to be successful.
-                    // TODO(https://fxbug.dev/337134565): Remove Eopnotsupp exception once socket
-                    //                                    marks are fully implemented.
-                    Err(fposix::Errno::Eopnotsupp) | Ok(()) => {
-                        Ok(proxy.into_client_end().map_err(|_| {
-                            anyhow::anyhow!("Failed to convert socket proxy back into client end")
-                        })?)
-                    }
+                    Ok(()) => Ok(proxy.into_client_end().map_err(|_| {
+                        anyhow::anyhow!("Failed to convert socket proxy back into client end")
+                    })?),
 
                     Err(e) => Err(e),
                 },

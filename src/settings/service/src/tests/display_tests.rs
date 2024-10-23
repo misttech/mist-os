@@ -8,6 +8,7 @@ use crate::config::default_settings::DefaultSetting;
 use crate::display::build_display_default_settings;
 use crate::display::types::{DisplayInfo, LowLightMode, Theme};
 use crate::ingress::fidl::{display, Interface};
+use crate::inspect::config_logger::InspectConfigLogger;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::fakes::brightness_service::BrightnessService;
 use crate::tests::fakes::service_registry::ServiceRegistry;
@@ -20,6 +21,7 @@ use fidl::prelude::*;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_settings::{DisplayMarker, DisplayProxy, IntlMarker};
 use fuchsia_async::{Task, TestExecutor};
+use fuchsia_inspect::component;
 use futures::future::{self, BoxFuture};
 use futures::lock::Mutex;
 use std::sync::Arc;
@@ -29,7 +31,9 @@ const ENV_NAME: &str = "settings_service_display_test_environment";
 const AUTO_BRIGHTNESS_LEVEL: f32 = 0.9;
 
 fn default_settings() -> DefaultSetting<DisplayConfiguration, &'static str> {
-    build_display_default_settings()
+    let config_logger =
+        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+    build_display_default_settings(config_logger)
 }
 
 // Creates an environment that will fail on a get request.

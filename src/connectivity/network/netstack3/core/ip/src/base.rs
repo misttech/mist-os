@@ -40,6 +40,7 @@ use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
     FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata, FilterTimerId,
     ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
+    WeakConnectionError, WeakConntrackConnection,
 };
 use packet::{Buf, BufferMut, GrowBuffer, ParseBufferMut, ParseMetadata, Serializer};
 use packet_formats::error::IpParseError;
@@ -166,7 +167,47 @@ struct IpLayerPacketMetadataDropCheck {
     okay_to_drop: bool,
 }
 
-impl<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, BT> {
+/// Metadata that is produced and consumed by the IP layer for each packet, but
+/// which also traverses the device layer.
+#[derive(Debug, Default)]
+pub struct DeviceIpLayerMetadata {
+    /// Weak reference to this packet's connection tracking entry, if the packet is
+    /// tracked.
+    ///
+    /// This allows NAT to consistently associate locally-generated, looped-back
+    /// packets with the same connection at every filtering hook even when NAT may
+    /// have been performed on them, causing them to no longer match the original or
+    /// reply tuples of the connection.
+    conntrack_entry: Option<WeakConntrackConnection>,
+}
+
+impl<I: IpLayerIpExt, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, BT> {
+    fn from_device_ip_layer_metadata<CC>(
+        core_ctx: &mut CC,
+        DeviceIpLayerMetadata { conntrack_entry }: DeviceIpLayerMetadata,
+    ) -> Self
+    where
+        CC: CounterContext<IpCounters<I>>,
+    {
+        match conntrack_entry.map(WeakConntrackConnection::into_inner).transpose() {
+            // Either the packet was tracked and we've preserved its conntrack entry across
+            // loopback, or it was untracked and we just stash the `None`.
+            Ok(conn) => IpLayerPacketMetadata { conntrack_connection: conn, ..Default::default() },
+            // Conntrack entry was removed from table after packet was enqueued in loopback.
+            Err(WeakConnectionError::EntryRemoved) => IpLayerPacketMetadata::default(),
+            // Conntrack entry no longer matches the packet (for example, it could be that
+            // this is an IPv6 packet that was modified at the device layer and therefore it
+            // no longer matches its IPv4 conntrack entry).
+            Err(WeakConnectionError::InvalidEntry) => {
+                core_ctx
+                    .increment(|counters: &IpCounters<I>| &counters.invalid_cached_conntrack_entry);
+                IpLayerPacketMetadata::default()
+            }
+        }
+    }
+}
+
+impl<I: IpExt, BT: FilterBindingsTypes> IpLayerPacketMetadata<I, BT> {
     /// Acknowledge that it's okay to drop this packet metadata.
     ///
     /// When compiled with debug assertions, dropping [`IplayerPacketMetadata`]
@@ -1779,6 +1820,10 @@ pub struct IpCounters<I: IpLayerIpExt> {
     /// The stack doesn't have any sockets that belong to the multicast group,
     /// and the stack isn't configured to forward the multicast packet.
     pub multicast_no_interest: Counter,
+    /// Count of looped-back packets that held a cached conntrack entry that could
+    /// not be downcasted to the expected type. This would happen if, for example, a
+    /// packet was modified to a different IP version between EGRESS and INGRESS.
+    pub invalid_cached_conntrack_entry: Counter,
 }
 
 /// IPv4-specific Rx counters.
@@ -1940,6 +1985,12 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpSta
     #[cfg(any(test, feature = "testutils"))]
     pub fn pmtu_cache(&self) -> &Mutex<PmtuCache<I, BT>> {
         &self.pmtu_cache
+    }
+
+    /// Provides direct access to the filtering state.
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn filter(&self) -> &RwLock<filter::State<I, BT>> {
+        &self.filter
     }
 }
 
@@ -2644,6 +2695,19 @@ where
         }
         filter::Verdict::Accept => {}
     }
+
+    // If the packet is leaving through the loopback device, attempt to extract a
+    // weak reference to the packet's conntrack entry to plumb that through the
+    // device layer so it can be reused on ingress to the IP layer.
+    let conntrack_entry = if device.is_loopback() {
+        packet_metadata
+            .conntrack_connection
+            .take()
+            .and_then(|conn| WeakConntrackConnection::new(&conn))
+    } else {
+        None
+    };
+    let device_ip_layer_metadata = DeviceIpLayerMetadata { conntrack_entry };
     packet_metadata.acknowledge_drop();
 
     // The filtering layer may have changed our address. Perform a last moment
@@ -2666,12 +2730,12 @@ where
     // TODO(https://fxbug.dev/42148827): Check that the serializer fits in MTU
     // and fragment if necessary instead of just applying the limit.
     let body = body.with_size_limit(mtu.into());
-    core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof).map_err(
-        |ErrorAndSerializer { serializer, error }| IpSendFrameError {
+    core_ctx
+        .send_ip_frame(bindings_ctx, device, destination, device_ip_layer_metadata, body, proof)
+        .map_err(|ErrorAndSerializer { serializer, error }| IpSendFrameError {
             serializer: serializer.into_inner(),
             error: error.into(),
-        },
-    )
+        })
 }
 
 /// Drop a packet and undo the effects of parsing it.
@@ -2847,6 +2911,7 @@ pub fn receive_ipv4_packet<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
+    device_ip_layer_metadata: DeviceIpLayerMetadata,
     buffer: B,
 ) {
     if !core_ctx.is_ip_device_enabled(&device) {
@@ -2967,7 +3032,8 @@ pub fn receive_ipv4_packet<
 
     // TODO(ghanan): Act upon options.
 
-    let mut packet_metadata = IpLayerPacketMetadata::default();
+    let mut packet_metadata =
+        IpLayerPacketMetadata::from_device_ip_layer_metadata(core_ctx, device_ip_layer_metadata);
     let mut filter = core_ctx.filter_handler();
     match filter.ingress_hook(bindings_ctx, &mut packet, device, &mut packet_metadata) {
         IngressVerdict::Verdict(filter::Verdict::Accept) => {}
@@ -3166,6 +3232,7 @@ pub fn receive_ipv6_packet<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
+    device_ip_layer_metadata: DeviceIpLayerMetadata,
     buffer: B,
 ) {
     if !core_ctx.is_ip_device_enabled(&device) {
@@ -3336,7 +3403,8 @@ pub fn receive_ipv6_packet<
             }
         };
 
-    let mut packet_metadata = IpLayerPacketMetadata::default();
+    let mut packet_metadata =
+        IpLayerPacketMetadata::from_device_ip_layer_metadata(core_ctx, device_ip_layer_metadata);
     let mut filter = core_ctx.filter_handler();
     match filter.ingress_hook(bindings_ctx, &mut packet, device, &mut packet_metadata) {
         IngressVerdict::Verdict(filter::Verdict::Accept) => {}
@@ -3971,7 +4039,7 @@ fn receive_ip_packet_action_common<
         *dst_ip,
         RuleInput {
             packet_origin: PacketOrigin::NonLocal { source_address, incoming_device: device_id },
-            // TODO(https://fxbug.dev/337134565): packets can have marks as a result of a filtering
+            // TODO(https://fxbug.dev/369133279): packets can have marks as a result of a filtering
             // target like `MARK`.
             marks: &Default::default(),
         },

@@ -84,7 +84,7 @@ zx_status_t VnodeCache::ForAllVnodes(VnodeCallback callback, bool evict_inactive
 zx_status_t VnodeCache::ForDirtyVnodesIf(VnodeCallback cb, VnodeCallback cb_if) {
   std::vector<fbl::RefPtr<VnodeF2fs>> dirty_vnodes;
   {
-    std::lock_guard lock(list_lock_);
+    fs::SharedLock lock(list_lock_);
     for (auto iter = dirty_list_.begin(); iter != dirty_list_.end(); ++iter) {
       fbl::RefPtr<VnodeF2fs> vnode = iter.CopyPointer();
       if (cb_if == nullptr || cb_if(vnode) == ZX_OK) {

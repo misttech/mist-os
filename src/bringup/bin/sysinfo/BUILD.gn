@@ -6,16 +6,9 @@ import("//build/components.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 
-executable("sysinfo") {
-  output_dir = "$root_out_dir/zircon-migrated"
-  sources = [ "main.cc" ]
-  deps = [
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//src/sys/lib/stdout-to-debuglog/cpp",
-  ]
+fuchsia_package_with_single_component("package") {
+  package_name = "sysinfo"
+  manifest = "meta/sysinfo.cml"
 }
 
 test("test") {
@@ -32,15 +25,4 @@ bootfs_test("sysinfo-bootfs-test") {
   name = "sysinfo-test"
   environments = basic_envs
   deps = [ ":test" ]
-}
-
-fuchsia_component("component") {
-  component_name = "sysinfo"
-  manifest = "meta/sysinfo.cml"
-  deps = [ ":sysinfo" ]
-}
-
-fuchsia_package("package") {
-  package_name = "sysinfo"
-  deps = [ ":component" ]
 }

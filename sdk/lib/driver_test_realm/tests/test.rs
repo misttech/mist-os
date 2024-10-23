@@ -16,7 +16,7 @@ use vfs::service;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 async fn get_driver_info(
@@ -74,6 +74,7 @@ async fn run_boot_items(mut stream: fboot::ItemsRequestStream) {
     const PDEV_PID_PBUS_TEST: u32 = 0x01;
 
     /// This struct is defined in sdk/lib/zbi-format/include/lib/zbi-format/board.h
+    #[repr(C)]
     struct ZbiPlatformId {
         _vid: u32,
         _pid: u32,
@@ -82,7 +83,10 @@ async fn run_boot_items(mut stream: fboot::ItemsRequestStream) {
 
     while let Some(request) = stream.next().await {
         match request.unwrap() {
-            fboot::ItemsRequest::Get { type_, extra: _, responder } => {
+            fboot::ItemsRequest::Get { type_: _, extra: _, responder } => {
+                responder.send(None, 0).unwrap();
+            }
+            fboot::ItemsRequest::Get2 { type_, extra: _, responder } => {
                 if type_ == ZBI_TYPE_PLATFORM_ID {
                     let platform_id = ZbiPlatformId {
                         _vid: PDEV_VID_TEST,
@@ -94,14 +98,16 @@ async fn run_boot_items(mut stream: fboot::ItemsRequestStream) {
                     let bytes = unsafe {
                         std::mem::transmute::<ZbiPlatformId, [u8; PLATFORM_ID_SIZE]>(platform_id)
                     };
-                    vmo.write(&bytes, PLATFORM_ID_SIZE as u64).unwrap();
-                    responder.send(Some(vmo), PLATFORM_ID_SIZE as u32).unwrap();
+                    vmo.write(&bytes, 0).unwrap();
+                    let ret = vec![fboot::RetrievedItems {
+                        payload: vmo,
+                        length: PLATFORM_ID_SIZE as u32,
+                        extra: 0,
+                    }];
+                    responder.send(Ok(ret)).unwrap();
                 } else {
-                    responder.send(None, 0).unwrap();
+                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap();
                 }
-            }
-            fboot::ItemsRequest::Get2 { responder, type_: _, extra: _ } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap();
             }
             fboot::ItemsRequest::GetBootloaderFile { responder, filename: _ } => {
                 responder.send(None).unwrap();

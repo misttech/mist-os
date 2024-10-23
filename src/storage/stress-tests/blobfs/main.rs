@@ -10,9 +10,9 @@ mod read_actor;
 
 use crate::environment::BlobfsEnvironment;
 use argh::FromArgs;
+use diagnostics_log::Severity;
 use fuchsia_async as fasync;
 use stress_test::run_test;
-use tracing::Level;
 
 #[derive(Clone, Debug, FromArgs)]
 /// Creates an instance of fvm and performs stressful operations on it
@@ -27,7 +27,7 @@ pub struct Args {
 
     /// filter logging by level (off, error, warn, info, debug, trace)
     #[argh(option, short = 'l')]
-    log_filter: Option<Level>,
+    log_filter: Option<Severity>,
 
     /// size of one block of the ramdisk (in bytes)
     #[argh(option, default = "512")]

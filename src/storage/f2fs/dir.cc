@@ -259,53 +259,16 @@ void Dir::SetLinkSafe(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs
   SetLink(info, page, vnode);
 }
 
-void Dir::InitDentInode(VnodeF2fs *vnode, LockedPage &ipage) {
-  ipage.WaitOnWriteback();
-
-  // copy name info. to this inode page
-  Inode &inode = ipage->GetAddress<Node>()->i;
-  std::string_view name = vnode->GetNameView();
-  // double check |name|
-  ZX_DEBUG_ASSERT(IsValidNameLength(name));
-  auto size = safemath::checked_cast<uint32_t>(name.size());
-  inode.i_namelen = CpuToLe(size);
-  name.copy(reinterpret_cast<char *>(&inode.i_name[kCurrentBitPos]), size);
-  ipage.SetDirty();
-}
-
-zx_status_t Dir::InitInodeMetadata(VnodeF2fs *vnode) {
-  if (vnode->TestFlag(InodeInfoFlag::kNewInode)) {
-    if (auto page_or = vnode->NewInodePage(); page_or.is_error()) {
-      return page_or.error_value();
-    } else {
-      InitDentInode(vnode, *page_or);
-    }
-
-    if (vnode->IsDir()) {
-      if (zx_status_t err = MakeEmpty(vnode); err != ZX_OK) {
-        vnode->RemoveInodePage();
-        return err;
-      }
-    }
-
-#if 0  // porting needed
-    // err = f2fs_init_acl(inode, dir);
-    // if (err) {
-    //   remove_inode_page(inode);
-    //   return err;
-    // }
-#endif
-  } else {
-    LockedPage ipage;
-    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(vnode->Ino(), &ipage); err != ZX_OK) {
-      return err;
-    }
-    InitDentInode(vnode, ipage);
+zx_status_t Dir::InitInodeMetadata() {
+  std::lock_guard lock(mutex_);
+  if (zx_status_t ret = VnodeF2fs::InitInodeMetadataUnsafe(); ret != ZX_OK) {
+    return ret;
   }
-
-  if (vnode->TestFlag(InodeInfoFlag::kIncLink)) {
-    vnode->IncNlink();
-    vnode->SetDirty();
+  if (TestFlag(InodeInfoFlag::kNewInode)) {
+    if (zx_status_t ret = MakeEmpty(Ino()); ret != ZX_OK) {
+      RemoveInodePage();
+      return ret;
+    }
   }
   return ZX_OK;
 }
@@ -394,7 +357,7 @@ zx_status_t Dir::AddLink(std::string_view name, VnodeF2fs *vnode) {
       if (bit_pos >= kNrDentryInBlock)
         continue;
 
-      if (zx_status_t status = InitInodeMetadata(vnode); status != ZX_OK) {
+      if (zx_status_t status = vnode->InitInodeMetadata(); status != ZX_OK) {
         return status;
       }
       dentry_page.WaitOnWriteback();
@@ -485,31 +448,33 @@ void Dir::DeleteEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs
   }
 }
 
-zx_status_t Dir::MakeEmpty(VnodeF2fs *vnode) {
-  if (vnode->TestFlag(InodeInfoFlag::kInlineDentry))
-    return MakeEmptyInlineDir(vnode);
+zx_status_t Dir::MakeEmpty(ino_t parent_ino) {
+  if (TestFlag(InodeInfoFlag::kInlineDentry)) {
+    return MakeEmptyInlineDir(parent_ino);
+  }
 
   LockedPage dentry_page;
-  if (zx_status_t err = vnode->GetNewDataPage(0, true, &dentry_page); err != ZX_OK)
+  if (zx_status_t err = GetNewDataPage(0, true, &dentry_page); err != ZX_OK) {
     return err;
+  }
 
   DentryBlock *dentry_blk = dentry_page->GetAddress<DentryBlock>();
 
   DirEntry *de = &dentry_blk->dentry[kCurrentBitPos];
   de->name_len = CpuToLe(static_cast<uint16_t>(1));
   de->hash_code = 0;
-  de->ino = CpuToLe(vnode->Ino());
+  de->ino = CpuToLe(Ino());
   std::memcpy(dentry_blk->filename[kCurrentBitPos], ".", 1);
-  SetDirEntryType(*de, *vnode);
+  SetDirEntryType(*de, *this);
 
   de = &dentry_blk->dentry[kParentBitPos];
   de->hash_code = 0;
   de->name_len = CpuToLe(static_cast<uint16_t>(2));
-  de->ino = CpuToLe(Ino());
+  de->ino = CpuToLe(parent_ino);
   std::memcpy(dentry_blk->filename[kParentBitPos], "..", 2);
-  SetDirEntryType(*de, *vnode);
+  SetDirEntryType(*de, *this);
 
-  auto bits = vnode->GetBitmap(dentry_page.CopyRefPtr());
+  auto bits = GetBitmap(dentry_page.CopyRefPtr());
   ZX_DEBUG_ASSERT(bits.is_ok());
   bits->Set(0);
   bits->Set(1);
@@ -642,13 +607,14 @@ zx::result<LockedPage> Dir::FindDataPage(pgoff_t index, bool do_read) {
     }
   }
 
-  auto addr_or = FindDataBlkAddr(index);
-  if (addr_or.is_error()) {
-    return addr_or.take_error();
+  zx::result addrs_or = GetDataBlockAddresses(index, 1, true);
+  if (addrs_or.is_error()) {
+    return addrs_or.take_error();
   }
-  if (*addr_or == kNullAddr) {
+  block_t addr = addrs_or->front();
+  if (addr == kNullAddr) {
     return zx::error(ZX_ERR_NOT_FOUND);
-  } else if (*addr_or == kNewAddr) {
+  } else if (addr == kNewAddr) {
     // By fallocate(), there is no cached page, but with kNewAddr
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -659,13 +625,85 @@ zx::result<LockedPage> Dir::FindDataPage(pgoff_t index, bool do_read) {
   }
 
   if (do_read) {
-    if (auto status = fs()->MakeReadOperation(locked_page, *addr_or, PageType::kData);
+    if (auto status = fs()->MakeReadOperation(locked_page, addr, PageType::kData);
         status.is_error()) {
       return status.take_error();
     }
   }
 
   return zx::ok(std::move(locked_page));
+}
+
+zx_status_t Dir::GetLockedDataPage(pgoff_t index, LockedPage *out) {
+  auto page_or = GetLockedDataPages(index, index + 1);
+  if (page_or.is_error()) {
+    return page_or.error_value();
+  }
+  if (page_or->empty() || page_or.value()[0] == nullptr) {
+    return ZX_ERR_NOT_FOUND;
+  }
+
+  *out = std::move(page_or.value()[0]);
+  return ZX_OK;
+}
+
+zx::result<std::vector<LockedPage>> Dir::GetLockedDataPages(const pgoff_t start,
+                                                            const size_t size) {
+  std::vector<LockedPage> pages(size);
+  std::vector<pgoff_t> offsets;
+  auto found = FindLockedPages(start, start + size);
+  auto target = found.begin();
+  bool uptodate = true;
+  for (size_t i = 0; i < size; ++i) {
+    size_t offset = i + start;
+    if (target != found.end() && offset == (*target)->GetKey()) {
+      pages[i] = std::move(*target);
+      ++target;
+    }
+    if (!pages[i] || !pages[i]->IsUptodate()) {
+      uptodate = false;
+      offsets.push_back(offset);
+    }
+  }
+  // In case that all pages are found and uptodate, return them without requesting read I/Os.
+  if (uptodate) {
+    return zx::ok(std::move(pages));
+  }
+
+  auto addrs_or = GetDataBlockAddresses(offsets, true);
+  if (addrs_or.is_error()) {
+    return addrs_or.take_error();
+  }
+
+  // Build addrs to request read I/Os for valid blocks.
+  std::vector<block_t> addrs(size, kNullAddr);
+  auto addr = addrs_or->begin();
+  bool need_read_op = false;
+  for (auto offset : offsets) {
+    size_t index = offset - start;
+    block_t current = *addr++;
+    if (current == kNullAddr) {
+      continue;
+    }
+    auto &page = pages[index];
+    if (!page) {
+      GrabLockedPage(offset, &page);
+    }
+    // Pages should be uptodate when kNewAddr are assigned.
+    ZX_DEBUG_ASSERT(current != kNewAddr || page->SetUptodate());
+    need_read_op = true;
+    addrs[index] = current;
+  }
+
+  if (!need_read_op) {
+    return zx::ok(std::move(pages));
+  }
+
+  auto status = fs()->MakeReadOperations(pages, addrs, PageType::kData);
+  if (status.is_error()) {
+    return status.take_error();
+  }
+  return zx::ok(std::move(pages));
 }
 
 }  // namespace f2fs

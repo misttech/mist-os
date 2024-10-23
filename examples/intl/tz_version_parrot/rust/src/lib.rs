@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use assert_matches::assert_matches;
-use {rust_icu_ucal as ucal, zx};
+use rust_icu_ucal as ucal;
 // [START imports]
 use icu_data::Loader;
 // [END imports]

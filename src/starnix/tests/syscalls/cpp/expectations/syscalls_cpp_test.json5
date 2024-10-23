@@ -23,15 +23,6 @@
                 // TODO(https://fxbug.dev/342416456): Rework the test to take
                 // into account logs from the system.
                 "SyslogTest.ProcKmsgPoll",
-
-                // These tests can be enabled when the wake_locks feature is enabled.
-                "SysfsPowerTest.SuspendStateFileWriteFailsWaitAgain",
-                "SysfsPowerTest.SuspendStateFileWriteFailsCloseFD",
-                "SysfsPowerTest.SuspendStateFileWriteFailsCloseEpollFD",
-                "SysfsPowerTest.SuspendStateFileWriteFailsEpollDelete",
-                "SysfsPowerTest.SuspendStatsFilesUpdateAfterSuccessfulSuspend",
-                "SysfsPowerTest.SuspendStatsFilesUpdateAfterFailedSuspend",
-                "SysfsPowerTest.WakeLockBlocksSuspend",
             ],
         },
         {
@@ -77,6 +68,9 @@
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/5",
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/6",
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/7",
+
+                // TODO(https://fxbug.dev/371550616)
+                "CapsTest.AmbientCapabilitiesRequirePermittedAndInheritable",
             ],
         },
         {

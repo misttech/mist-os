@@ -108,7 +108,7 @@ closed protocol Pager {
     /// *type* set to `ZX_PKT_TYPE_PAGE_REQUEST` and *key* set to the value provided to
     /// `zx_pager_create_vmo()`. The packet's union is of type `zx_packet_page_request_t`:
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_packet_page_request {
     ///     uint16_t command;
     ///     uint16_t flags;
@@ -527,7 +527,6 @@ closed protocol Pager {
     ///   // ZX_VMO_DIRTY_RANGE_IS_ZERO indicates that the range contains all zeros.
     ///   uint64_t options;
     /// } zx_vmo_dirty_range_t;
-    ///
     /// ```
     ///
     /// *actual* is an optional pointer to return the number of dirty ranges that were written to *buffer*.
@@ -546,7 +545,6 @@ closed protocol Pager {
     /// Sample user code that wants to query all dirty ranges in a VMO might look like this:
     ///
     /// ```c
-    ///
     ///   zx_vmo_dirty_range_t ranges[5];
     ///   size_t actual = 0;
     ///   size_t avail = 0;
@@ -571,7 +569,6 @@ closed protocol Pager {
     ///     len -= (new_start - start);
     ///     start = new_start;
     ///   }
-    ///
     /// ```
     ///
     /// ## Rights

@@ -19,6 +19,7 @@ rustc_library("lib") {
     "src/presentation.rs",
     "src/repl.rs",
     "src/strict_mutex.rs",
+    "src/term_util.rs",
     "src/toolbox_fs.rs",
   ]
   deps = [
@@ -43,6 +44,8 @@ rustc_library("lib") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:crossterm",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:unicode-width",
+    "//third_party/rust_crates:vte",
   ]
 
   test_deps = [

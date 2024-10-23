@@ -105,6 +105,7 @@ system-update-committer
 ?system_recovery_fdr
 ?tcpdump
 ?tee-clients
+?tee_manager
 ?text_manager
 ?time-zone-info-service
 ?timekeeper

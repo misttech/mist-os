@@ -90,6 +90,7 @@ use fidl_fuchsia_metrics::{
     HistogramBucket, MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerFactoryProxy,
     MetricEventLoggerProxy, MetricEventPayload, ProjectSpec,
 };
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect::{self as inspect, NumericProperty};
 use fuchsia_inspect_derive::WithInspect;
@@ -104,7 +105,6 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, warn};
-use {fuchsia_async as fasync, zx};
 
 /// An event to be logged to the cobalt logger. Events are generated first,
 /// then logged. (This permits unit-testing the code that generates events from

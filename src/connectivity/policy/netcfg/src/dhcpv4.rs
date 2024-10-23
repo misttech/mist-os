@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use std::collections::HashSet;
-use std::num::NonZeroU64;
 use std::pin::Pin;
 
 use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt as _};
@@ -12,7 +11,7 @@ use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_name as fnet_name,
-    fidl_fuchsia_net_routes_admin as fnet_routes_admin, zx,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
 };
 
 use anyhow::Context as _;
@@ -27,7 +26,7 @@ use net_types::SpecifiedAddr;
 use tracing::{info, warn};
 use zx::HandleBased;
 
-use crate::{dns, errors};
+use crate::{dns, errors, InterfaceId};
 
 #[derive(Debug)]
 pub(super) struct ClientState {
@@ -41,8 +40,8 @@ pub(super) fn new_client_params() -> fnet_dhcp::NewClientParams {
 }
 
 pub(super) type ConfigurationStreamMap =
-    StreamMap<NonZeroU64, InterfaceIdTaggedConfigurationStream>;
-pub(super) type InterfaceIdTaggedConfigurationStream = Tagged<NonZeroU64, ConfigurationStream>;
+    StreamMap<InterfaceId, InterfaceIdTaggedConfigurationStream>;
+pub(super) type InterfaceIdTaggedConfigurationStream = Tagged<InterfaceId, ConfigurationStream>;
 pub(super) type ConfigurationStream =
     futures::stream::BoxStream<'static, Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>>;
 
@@ -55,7 +54,7 @@ pub(super) async fn probe_for_presence(provider: &fnet_dhcp::ClientProviderProxy
 }
 
 pub(super) async fn update_configuration(
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     ClientState { shutdown_sender: _, routers: configured_routers, route_set }: &mut ClientState,
     configuration: fnet_dhcp_ext::Configuration,
     dns_servers: &mut DnsServers,
@@ -109,15 +108,20 @@ pub(super) async fn update_configuration(
     )
     .await;
 
-    fnet_dhcp_ext::apply_new_routers(interface_id, route_set, configured_routers, new_routers)
-        .await
-        .unwrap_or_else(|e| {
-            warn!("error applying new DHCPv4-acquired router configuration: {:?}", e);
-        })
+    fnet_dhcp_ext::apply_new_routers(
+        interface_id.into(),
+        route_set,
+        configured_routers,
+        new_routers,
+    )
+    .await
+    .unwrap_or_else(|e| {
+        warn!("error applying new DHCPv4-acquired router configuration: {:?}", e);
+    })
 }
 
 pub(super) async fn start_client(
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     interface_name: &str,
     client_provider: &fnet_dhcp::ClientProviderProxy,
     route_set_provider: &fnet_routes_admin::RouteTableV4Proxy,
@@ -153,7 +157,7 @@ pub(super) async fn start_client(
             errors::Error::NonFatal(anyhow::anyhow!("error while getting authorization: {:?}", err))
         })?;
 
-    let client = client_provider.new_client_end_ext(interface_id, new_client_params());
+    let client = client_provider.new_client_end_ext(interface_id.into(), new_client_params());
     let (shutdown_sender, shutdown_receiver) = oneshot::channel();
 
     if let Some(stream) = configuration_streams.insert(
@@ -184,7 +188,7 @@ pub(super) enum AlreadyObservedClientExit {
 const TIMEOUT_WAITING_FOR_CLIENT_SHUTDOWN: std::time::Duration = std::time::Duration::from_secs(10);
 
 pub(super) async fn stop_client(
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     interface_name: &str,
     mut state: ClientState,
     configuration_streams: &mut ConfigurationStreamMap,

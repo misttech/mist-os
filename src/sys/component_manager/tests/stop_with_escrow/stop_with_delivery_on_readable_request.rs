@@ -22,7 +22,8 @@ pub async fn main() {
 }
 
 async fn handle_trigger(stream: TriggerRequestStream) {
-    let (stream, stalled) = detect_stall::until_stalled(stream, fasync::Duration::from_micros(1));
+    let (stream, stalled) =
+        detect_stall::until_stalled(stream, fasync::MonotonicDuration::from_micros(1));
     let mut stream = pin!(stream);
     while let Ok(Some(request)) = stream.try_next().await {
         match request {

@@ -26,12 +26,10 @@ def _fuchsia_virtual_device_impl(ctx):
                     "count": ctx.attr.cpu_count,
                 },
                 "audio": {
-                    "model": "hda",
+                    "model": ctx.attr.audio_model,
                 },
                 "inputs": {
-                    # Touch is the default to avoid issues with mouse capture
-                    # especially with cloudtops.
-                    "pointing_device": "touch",
+                    "pointing_device": ctx.attr.input_device,
                 },
                 "vsock": {
                     "enabled": ctx.attr.vsock_enabled,
@@ -120,6 +118,18 @@ fuchsia_virtual_device = rule(
         "vsock_cid": attr.int(
             doc = "The context id the guest vsock should. Only used if vsock_enable = true.",
             default = 3,
+        ),
+        "audio_model": attr.string(
+            doc = "The audio device model that should be emulated.",
+            values = ["ac97", "adlib", "cs4231A", "es1370", "gus", "hda", "none", "pcspk", "sb16"],
+            default = "hda",
+        ),
+        "input_device": attr.string(
+            doc = "The input device type that should be emulated.",
+            values = ["mouse", "none", "touch"],
+            # Touch is the default to avoid issues with mouse capture
+            # especially with cloudtops.
+            default = "touch",
         ),
     },
 )

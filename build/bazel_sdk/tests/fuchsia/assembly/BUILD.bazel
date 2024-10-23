@@ -10,6 +10,7 @@ load(
     "fuchsia_board_input_bundle",
     "fuchsia_bootloader_partition",
     "fuchsia_bootstrap_partition",
+    "fuchsia_gen_android_starnix_container",
     "fuchsia_package_with_configs",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
@@ -24,11 +25,25 @@ load(
     "tuf_repo",
     "tuf_repo_root",
 )
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_component",
+    "fuchsia_component_manifest",
+    "fuchsia_package",
+)
 load(":fuchsia_board_configuration_test.bzl", "fuchsia_board_configuration_test")
 load(":fuchsia_board_input_bundle_test.bzl", "fuchsia_board_input_bundle_test")
 load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
 load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test", "fuchsia_product_ota_config_test")
 load(":fuchsia_virtual_device_test.bzl", "fuchsia_virtual_device_test")
+load("//fuchsia/packaging/fuchsia_package:fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "get_fuchsia_api_levels")
+
+HEAD_ABI_REVISION = [
+    level.abi_revision
+    for level in get_fuchsia_api_levels()
+    if level.api_level == "HEAD"
+][0]
 
 fuchsia_prebuilt_package(
     name = "prebuilt_ams_light",
@@ -447,5 +462,49 @@ fuchsia_product_ota_config_test(
     name = "product_ota_config_golden_test_realm_b_tuf_repo",
     golden_file = ":test_data/some.other_hostname.com.json",
     product_config = ":test_product_configuration_with_ota_config",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_component_manifest(
+    name = "empty_component_manifest",
+    component_name = "empty_component",
+    content = "{}",
+)
+
+fuchsia_component(
+    name = "empty_component",
+    manifest = ":empty_component_manifest",
+)
+
+fuchsia_package(
+    name = "container_base_pkg",
+    package_name = "pkg_for_test",
+    components = [
+        ":empty_component",
+    ],
+    fuchsia_api_level = "HEAD",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_gen_android_starnix_container(
+    name = "fuchsia_android_starnix_container_for_test",
+    base = ":container_base_pkg",
+    base_files = [],
+    system = "test_data/ext4.img",
+)
+
+fuchsia_package_checker_test(
+    name = "fuchsia_gen_android_starnix_container_test",
+    package_name = "fuchsia_android_starnix_container_for_test",
+    expected_abi_revision = HEAD_ABI_REVISION,
+    expected_generated_blobs = {
+        ":test_data/container/odm/metadata.v1": "data/odm/metadata.v1",
+        ":test_data/container/system/15": "data/system/15",
+        ":test_data/container/system/metadata.v1": "data/system/metadata.v1",
+    },
+    manifests = [
+        "meta/empty_component.cm",
+    ],
+    package_under_test = ":fuchsia_android_starnix_container_for_test",
     visibility = ["//visibility:public"],
 )

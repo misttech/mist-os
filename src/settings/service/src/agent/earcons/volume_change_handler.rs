@@ -290,9 +290,11 @@ impl VolumeChangeHandler {
 mod tests {
     use std::sync::Arc;
 
+    use fuchsia_inspect::component;
     use futures::lock::Mutex;
 
     use crate::audio::build_audio_default_settings;
+    use crate::inspect::config_logger::InspectConfigLogger;
     use crate::message::base::MessengerType;
     use crate::service_context::ServiceContext;
 
@@ -304,7 +306,10 @@ mod tests {
         ModifiedCounters, // new_counters
         Vec<AudioStream>, // expected_changed_streams
     ) {
-        let mut settings = build_audio_default_settings();
+        let config_logger = Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(
+            component::inspector().root(),
+        )));
+        let mut settings = build_audio_default_settings(config_logger);
         let settings = settings
             .load_default_value()
             .expect("config data should exist and be parseable for tests")

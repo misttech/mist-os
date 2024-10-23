@@ -23,7 +23,7 @@ use wlan_frame_writer::write_frame_to_vec;
 use wlan_rsn::rsna::UpdateSink;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_softmac as fidl_wlan_softmac, zx,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_softmac as fidl_wlan_softmac,
 };
 
 pub mod event;

@@ -5,7 +5,7 @@
 use anyhow::Result;
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
-use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync};
 
 // This test checks for a very specific bug in the compat driver, where
 // adding devices would fail if it was in the same driver in the same driver host,

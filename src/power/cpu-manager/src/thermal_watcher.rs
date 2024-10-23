@@ -16,7 +16,7 @@ use futures::stream::FuturesUnordered;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use std::rc::Rc;
-use {fidl_fuchsia_thermal as fthermal, serde_json as json, zx};
+use {fidl_fuchsia_thermal as fthermal, serde_json as json};
 
 /// Node: ThermalWatcher
 ///

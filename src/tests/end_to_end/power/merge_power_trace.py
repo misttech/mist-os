@@ -38,8 +38,11 @@ def merge_trace(
 
     shutil.copy(trace, output)
     if power_format == PowerFileFormat.gonk:
+        rail_names = power_test_utils.read_gonk_header(power)
         gonk_samples = power_test_utils.read_gonk_samples(power)
-        power_test_utils.merge_gonk_data(model, gonk_samples, output)
+        power_test_utils.merge_gonk_data(
+            model, gonk_samples, output, rail_names
+        )
     else:
         samples = power_test_utils.read_power_samples(power)
         power_test_utils.merge_power_data(model, samples, output)

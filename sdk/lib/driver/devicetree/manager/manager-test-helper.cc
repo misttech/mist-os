@@ -133,14 +133,14 @@ bool CheckHasBindRules(std::vector<fuchsia_driver_framework::BindRule> expected,
 }
 
 void FakeEnvWrapper::Bind(
-    fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus_endpoints_server,
-    fidl::ServerEnd<fuchsia_driver_framework::CompositeNodeManager> mgr_endpoints_server,
-    fidl::ServerEnd<fuchsia_driver_framework::Node> node_endpoint_server) {
-  fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(pbus_endpoints_server), &pbus_);
-  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                   std::move(mgr_endpoints_server), &mgr_);
-  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                   std::move(node_endpoint_server), &node_);
+    fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus_server_end,
+    fidl::ServerEnd<fuchsia_driver_framework::CompositeNodeManager> mgr_server_end,
+    fidl::ServerEnd<fuchsia_driver_framework::Node> node_server_end) {
+  fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(pbus_server_end), &pbus_);
+  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(mgr_server_end),
+                   &mgr_);
+  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(node_server_end),
+                   &node_);
 }
 
 size_t FakeEnvWrapper::pbus_node_size() { return pbus_.nodes().size(); }

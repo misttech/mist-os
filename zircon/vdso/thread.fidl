@@ -177,7 +177,7 @@ closed protocol Thread {
     /// [`zx_vmar_unmap_handle_close_thread_exit()`] before reaching the last instruction.
     /// Below is an example:
     ///
-    /// ```
+    /// ```c
     /// void thread_entry(uintptr_t arg1, uintptr_t arg2) __attribute__((noreturn)) {
     ///   // do work here.
     ///

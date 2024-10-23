@@ -8,15 +8,15 @@ mod file_actor;
 mod instance_actor;
 
 use argh::FromArgs;
+use diagnostics_log::Severity;
 use environment::FsEnvironment;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fs_management::{F2fs, Fxfs, Minfs};
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use std::sync::Arc;
 use stress_test::run_test;
-use tracing::Level;
-use {fuchsia_async as fasync, zx};
 
 #[derive(Clone, Debug, FromArgs)]
 /// Creates an instance of fvm and performs stressful operations on it
@@ -31,7 +31,7 @@ pub struct Args {
 
     /// filter logging by level (off, error, warn, info, debug, trace)
     #[argh(option, short = 'l')]
-    log_filter: Option<Level>,
+    log_filter: Option<Severity>,
 
     /// size of one block of the ramdisk (in bytes)
     #[argh(option, default = "512")]

@@ -25,11 +25,11 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     See //build/sdk/sdk_atom.gni.
 #
 #   api (optional)
-#     Override path to the file representing the API of this library.
+#     Override path for the file representing the API of this library.
 #     This file is used to ensure modifications to the library's API are
 #     explicitly acknowledged.
-#     If not specified, the path will be "<SDK name>.api".
-#     Only allowed when `category` is not "internal".
+#     If not specified, the path will be "<sdk_name>.api".
+#     Not allowed when `category` is "internal".
 #
 #   libcxx_linkage (optional)
 #     Whether or how to link libc++. SDK shared libraries cannot link libc++.so
@@ -107,6 +107,9 @@ template("sdk_static_library") {
 
   output_name = target_name
   if (defined(invoker.output_name)) {
+    assert(
+        invoker.output_name != output_name,
+        "The specified `output_name` (`${invoker.output_name}`) matches the default. `output_name` only needs to be specified when overriding the default.")
     output_name = invoker.output_name
   }
 
@@ -416,6 +419,9 @@ template("sdk_static_library") {
     } else {
       api = "${sdk_name}.api"
       if (defined(invoker.api)) {
+        assert(
+            rebase_path(invoker.api, "//") != rebase_path(api, "//"),
+            "The specified `api` file (`${invoker.api}`) matches the default. `api` only needs to be specified when overriding the default.")
         api = invoker.api
       }
 

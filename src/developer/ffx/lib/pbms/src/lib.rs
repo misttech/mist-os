@@ -101,10 +101,7 @@ pub async fn load_product_bundle(product_bundle: &Option<String>) -> Result<Load
     // Can't use unwrap_or_else here since ffx config get is async.
     let bundle_path: Utf8PathBuf = match product_bundle {
         Some(p) => p.into(),
-        None => ffx_config::get::<String, &str>(PRODUCT_BUNDLE_PATH_KEY)
-            .await
-            .unwrap_or_default()
-            .into(),
+        None => ffx_config::get::<String, &str>(PRODUCT_BUNDLE_PATH_KEY).unwrap_or_default().into(),
     };
 
     if bundle_path.as_std_path() == Path::new("") {

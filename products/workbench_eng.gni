@@ -32,8 +32,6 @@
 # to this file, but each entry needs a ticket assigned to the assembly team with
 # an agreed upon solution for how to address the tech-debt.
 
-include_shell_commands_package = true
-
 # Use Bazel-built images
 use_bazel_images_only = true
 bazel_product_bundle_prefix = "//products/workbench:workbench_eng"

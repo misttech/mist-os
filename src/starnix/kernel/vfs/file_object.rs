@@ -37,8 +37,8 @@ use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, fsxattr, off_t, pid_t, uapi, FIONBIO, FIONREAD, FS_CASEFOLD_FL,
-    FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
+    errno, error, fsxattr, off_t, pid_t, uapi, FIGETBSZ, FIONBIO, FIONREAD, FIOQSIZE,
+    FS_CASEFOLD_FL, FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
     FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR,
     SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
 };
@@ -817,8 +817,30 @@ pub fn default_ioctl(
 ) -> Result<SyscallResult, Errno> {
     match request {
         TCGETS => error!(ENOTTY),
+        FIGETBSZ => {
+            let node = file.node();
+            let supported_file = node.is_reg() || node.is_dir();
+            if !supported_file {
+                return error!(ENOTTY);
+            }
+
+            let blocksize = file.node().stat(current_task)?.st_blksize;
+            current_task.write_object(arg.into(), &blocksize)?;
+            Ok(SUCCESS)
+        }
         FIONBIO => {
             file.update_file_flags(OpenFlags::NONBLOCK, OpenFlags::NONBLOCK);
+            Ok(SUCCESS)
+        }
+        FIOQSIZE => {
+            let node = file.node();
+            let supported_file = node.is_reg() || node.is_dir();
+            if !supported_file {
+                return error!(ENOTTY);
+            }
+
+            let size = file.node().stat(current_task)?.st_size;
+            current_task.write_object(arg.into(), &size)?;
             Ok(SUCCESS)
         }
         FIONREAD => {
@@ -1902,17 +1924,23 @@ mod tests {
         let mount = MountInfo::detached();
         let root_node = Arc::clone(root_fs.root());
         let file = root_node
-            .create_entry(&current_task, &mount, "test".into(), |dir, mount, name| {
-                dir.mknod(
-                    &mut locked,
-                    &current_task,
-                    mount,
-                    name,
-                    FileMode::IFREG | FileMode::ALLOW_ALL,
-                    DeviceType::NONE,
-                    FsCred::root(),
-                )
-            })
+            .create_entry(
+                &mut locked,
+                &current_task,
+                &mount,
+                "test".into(),
+                |locked, dir, mount, name| {
+                    dir.mknod(
+                        locked,
+                        &current_task,
+                        mount,
+                        name,
+                        FileMode::IFREG | FileMode::ALLOW_ALL,
+                        DeviceType::NONE,
+                        FsCred::root(),
+                    )
+                },
+            )
             .expect("create_node failed");
         let file_handle = file
             .open_anonymous(&mut locked, &current_task, OpenFlags::APPEND | OpenFlags::RDWR)

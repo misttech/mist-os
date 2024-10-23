@@ -66,7 +66,7 @@ pub struct BoardInformation {
     /// Consolidated configuration from all of the BoardInputBundles.  This is
     /// not deserialized from the BoardConfiguration, but is instead created by
     /// parsing each of the input_bundles and merging their configuration fields.
-    #[serde(skip_deserializing)]
+    #[serde(skip)]
     #[file_relative_paths]
     pub configuration: BoardProvidedConfig,
 

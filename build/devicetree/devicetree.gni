@@ -187,6 +187,11 @@ template("dtb") {
 
   # This actually compiles the DTB.
   action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
     deps = [ ":$dts_include_dirs_target" ]
 
     if (extension == "S") {
@@ -258,6 +263,8 @@ template("dts") {
                            [
                              "sources",
                              "deps",
+                             "testonly",
+                             "visibility",
                            ])
     assert([ sources[0] ] == sources, "Only one input file accepted.")
     assert(get_path_info(sources[0], "extension") == "dtb",
@@ -294,13 +301,8 @@ template("dts") {
 
 # Defines a devicetree to be built into a devicetree blob.
 #
-# There are three public targets -
-# 1. The main target compiles the devicetree source and runs all the necessary
-# verification checks.
-# 2. The target "$target_name.dtb" can be used to get the output devicetree
-# blob using `get_target_output("$target_name.dtb")`.
-# 3. The target "$target_name.assembly_inputs" can be used to include the devicetree
-# into assembly artifacts.
+# This compiles the device-tree, performs verification, and also defines
+# assembly_inputs metadata for this target.
 #
 # Parameters
 #
@@ -326,12 +328,13 @@ template("dts") {
 #     - Type: List(flags).
 #
 #  * outputs
-#     - Optional: The singleton list containing the output blob path. This value
-#       can be accessed as `get_target_outputs(target_name)`.
+#     - Optional: The singleton list containing the output blob path.
 #     - Type: list(path). Must only have one entry.
 #     - Default: target_out_dir + "/" + target_name + ".dtb"
 #
+#
 template("devicetree") {
+  # main_target = target_name
   compiled_dtb_target = "$target_name.dtb"
 
   decompiled_dts_target = "_devicetree.$target_name.decompiled"
@@ -357,6 +360,12 @@ template("devicetree") {
                              "dtcflags",
                            ])
     outputs = _dtb_path
+
+    # visibility = [
+    #   ":${assembly_inputs_target}",
+    #   ":${decompiled_dts_target}",
+    #   ":${main_target}",
+    # ]
   }
 
   # Decompile the compiled DTS so we can use it for the golden comparison.
@@ -366,6 +375,8 @@ template("devicetree") {
     forward_variables_from(invoker, [ "dtcflags" ])
     deps = [ ":$compiled_dtb_target" ]
     sources = get_target_outputs(":$compiled_dtb_target")
+
+    # visibility = [ ":${golden_dts_target}" ]
   }
 
   # Compare golden dts and decompiled dts file.
@@ -378,6 +389,8 @@ template("devicetree") {
         candidate = dts_outputs[0]
       },
     ]
+
+    # visibility = [ ":${main_target}" ]
   }
 
   generated_file(assembly_inputs_target) {
@@ -402,7 +415,7 @@ template("devicetree") {
   }
 
   group(target_name) {
-    deps = [
+    public_deps = [
       ":$compiled_dtb_target",
       ":$golden_dts_target",
     ]

@@ -2,14 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-declare_args() {
-  # Extra vendor-specific targets that may use the deprecated bindings.
-  vendor_hlcpp_visibility = []
-}
+# Extra vendor-specific targets that may use the deprecated bindings.
+import("//vendor/google/build/hlcpp_visibility.gni")
 
-# Are there any vendor HLCPP visibility overrides defined?
-vendor_hlcpp_included = vendor_hlcpp_visibility != []
-
+# Targets in this tree.
 hlcpp_visibility = [
   # Dependencies between SDK FIDL libraries.
   "//sdk/fidl/*",
@@ -32,9 +28,6 @@ hlcpp_visibility = [
 
   # Misc buildsystem stuff.
   "//sdk/ctf/*",
-
-  # We need to migrate vendor trees separately.
-  "//vendor/*",
 
   # Existing in-tree uses of HLCPP that should be removed.
   "//examples/components/config/integration_test:*",
@@ -71,14 +64,11 @@ hlcpp_visibility = [
   "//sdk/lib/inspect/component/cpp/tests:*",
   "//sdk/lib/inspect/contrib/cpp:*",
   "//sdk/lib/diagnostics/reader/cpp:*",
-  "//sdk/lib/inspect/service/cpp:*",
-  "//sdk/lib/inspect/service/cpp/tests:*",
   "//sdk/lib/media/audio/cpp:*",
   "//sdk/lib/media/cpp:*",
   "//sdk/lib/sys/component/cpp/testing:*",
   "//sdk/lib/sys/component/cpp/tests:*",
   "//sdk/lib/sys/cpp/*",
-  "//sdk/lib/sys/inspect/cpp/*",
   "//sdk/lib/sys/service/cpp:*",
   "//sdk/lib/ui/scenic/cpp/*",
   "//sdk/lib/vfs/cpp/*",
@@ -179,9 +169,7 @@ hlcpp_visibility = [
   "//src/diagnostics/archivist/tests/logs/cpp:*",
   "//src/diagnostics/validator/inspect/fidl:*",
   "//src/diagnostics/validator/inspect/lib/cpp:*",
-  "//src/diagnostics/validator/logs/encoding/fidl:*",
-  "//src/diagnostics/validator/logs/encoding/puppet/cpp:*",
-  "//src/diagnostics/validator/logs/sink/fidl:*",
+  "//src/diagnostics/validator/logs/fidl:*",
   "//src/diagnostics/validator/logs/sink/puppet/cpp:*",
   "//src/diagnostics/validator/logs/sink/puppet/sdk:*",
   "//src/graphics/bin/agis:*",

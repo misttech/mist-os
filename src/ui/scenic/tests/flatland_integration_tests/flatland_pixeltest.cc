@@ -404,7 +404,22 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
   root_flatland_->SetContent(kRootTransform, kImageContentId);
   BlockingPresent(this, root_flatland_);
 
-  auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
+  fuchsia::ui::composition::ScreenshotFormat ss_format;
+  switch (GetParam()) {
+    case fuchsia::images2::PixelFormat::B8G8R8A8:
+      ss_format = fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW;
+      break;
+    case fuchsia::images2::PixelFormat::R8G8B8A8:
+      ss_format = fuchsia::ui::composition::ScreenshotFormat::RGBA_RAW;
+      break;
+    case fuchsia::images2::PixelFormat::R5G6B5:
+      ss_format = fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW;
+      break;
+    default:
+      FX_LOGS(ERROR) << "Unexpected PixelFormat: " << GetParam();
+      FAIL();
+  }
+  auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_, ss_format);
   auto histogram = screenshot.Histogram();
 
   if (GetParam() == fuchsia::images2::PixelFormat::R5G6B5) {
@@ -628,6 +643,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
     std::swap(image_width, image_height);
   }
 
+  auto ss_format = fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW;
   unsigned int bytes_per_row = image_width * kByterPerPixel;
   for (uint32_t i = 0; i < image_vmo_bytes; i += kByterPerPixel) {
     const utils::Pixel color = GetPixelColor(i, bytes_per_row, image_vmo_bytes);
@@ -643,6 +659,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
     if (pixel_format == fuchsia::images2::PixelFormat::R8G8B8A8) {
       vmo_base[i] = color.red;
       vmo_base[i + 2] = color.blue;
+      ss_format = fuchsia::ui::composition::ScreenshotFormat::RGBA_RAW;
     }
     vmo_base[i + 1] = color.green;
     vmo_base[i + 3] = color.alpha;
@@ -685,7 +702,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
 
   BlockingPresent(this, root_flatland_);
 
-  auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
+  auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_, ss_format);
 
   // Verify that the number of pixels is the same (i.e. the image hasn't changed).
   auto histogram = screenshot.Histogram();
@@ -707,12 +724,20 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
             expected_colors->second.bottom_right);
 }
 
-TEST_F(FlatlandPixelTestBase, CoordinateViewTest) {
+class ParameterizedScreenshotFormatTest
+    : public FlatlandPixelTestBase,
+      public zxtest::WithParamInterface<fuchsia::ui::composition::ScreenshotFormat> {};
+
+INSTANTIATE_TEST_SUITE_P(ParameterizedScreenshotFormatTestWithParams,
+                         ParameterizedScreenshotFormatTest,
+                         zxtest::Values(fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW,
+                                        fuchsia::ui::composition::ScreenshotFormat::RGBA_RAW));
+TEST_P(ParameterizedScreenshotFormatTest, CoordinateViewTest) {
   Draw4RectanglesToDisplay();
 
   BlockingPresent(this, root_flatland_);
 
-  auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
+  auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_, GetParam());
 
   // Check pixel content at all four corners.
   EXPECT_EQ(screenshot.GetPixelAt(0, 0), utils::kBlack);  // Top left

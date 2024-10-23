@@ -61,14 +61,20 @@ class MockSystemInterface final : public SystemInterface {
   //        fuchsia-pkg://devhost/test_package#meta/component2.cm
   //      p: 26 job2-p1
   //        t: 27 initial-thread
-  //    j: 28 job3
-  //      p: 29 job2-p1 process-host
+  //    j: 28 job3 <many components, see mock_system_interface.cc>
+  //      p: 29 job3-p1 process-host
   //        t: 30 initial-thread
   //        t: 31 second-thread
   //    c: /moniker/generated/test:root fuchsia-pkg://devhost/root_package#meta/root_component.cm
   //      j: 32 job4 /moniker/generated/root:test/driver #meta/subpackage.cm
   //        p: 33 job4-p1
   //          t: 34 initial-thread
+  //    j: 35 job5 /some/moniker fuchsia-pkg://devhost/package#meta/component3.cm
+  //      p: 36 job5-p1
+  //        t: 37 initial-thread
+  //      j: 38 job51 /some/other/moniker fuchsia-pkg://devhost/other_package#meta/component4.cm
+  //        p: 39 job51-p1
+  //          t: 40 initial-thread
   static std::unique_ptr<MockSystemInterface> CreateWithData();
 
  private:

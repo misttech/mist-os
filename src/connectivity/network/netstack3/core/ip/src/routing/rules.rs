@@ -41,6 +41,11 @@ impl<I: Ip, D> RulesTable<I, D> {
     pub fn rules_mut(&mut self) -> &mut Vec<Rule<I, D>> {
         &mut self.rules
     }
+
+    /// Replaces the rules inside this table.
+    pub fn replace(&mut self, new_rules: Vec<Rule<I, D>>) {
+        self.rules = new_rules;
+    }
 }
 
 /// A routing rule.
@@ -55,8 +60,6 @@ pub struct Rule<I: Ip, D> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RuleAction<Lookup> {
     /// Will resolve to unreachable.
-    // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
-    #[allow(unused)]
     Unreachable,
     /// Lookup in a routing table.
     Lookup(Lookup),
@@ -67,16 +70,15 @@ pub enum RuleAction<Lookup> {
 /// Note that this matcher doesn't specify the source address/bound address like [`PacketOrigin`]
 /// because the user can specify a source address matcher without specifying the direction of the
 /// traffic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TrafficOriginMatcher {
     /// This only matches packets that are generated locally; the optional interface matcher
     /// can be used to match what device is bound to by `SO_BINDTODEVICE`.
-    // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
-    #[allow(unused)]
-    Local { bound_device_matcher: Option<DeviceNameMatcher> },
+    Local {
+        /// The matcher for the bound device.
+        bound_device_matcher: Option<DeviceNameMatcher>,
+    },
     /// This only matches non-local packets. The packets must be received from the network.
-    // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
-    #[allow(unused)]
     NonLocal,
 }
 
@@ -114,18 +116,14 @@ impl<'a, I: Ip, D: DeviceWithName> Matcher<PacketOrigin<I, &'a D>> for TrafficOr
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MarkMatcher {
     /// Matches a packet if it is unmarked.
-    // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
-    #[allow(unused)]
     Unmarked,
     /// The packet carries a mark that is in the range after masking.
-    // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
-    #[allow(unused)]
     Marked {
         /// The mask to apply.
         mask: u32,
         /// Start of the range, inclusive.
         start: u32,
-        /// End of the range, exclusive.
+        /// End of the range, inclusive.
         end: u32,
     },
 }
@@ -142,7 +140,7 @@ impl Matcher<Mark> for MarkMatcher {
         match self {
             MarkMatcher::Unmarked => actual.is_none(),
             MarkMatcher::Marked { mask, start, end } => {
-                actual.is_some_and(|actual| (*start..*end).contains(&(actual & *mask)))
+                actual.is_some_and(|actual| (*start..=*end).contains(&(actual & *mask)))
             }
         }
     }
@@ -232,7 +230,6 @@ impl MarkMatchers {
     /// # Panics
     ///
     /// Panics if the same domain is specified more than once.
-    #[cfg(any(test, feature = "testutils"))]
     pub fn new(iter: impl IntoIterator<Item = (MarkDomain, MarkMatcher)>) -> Self {
         let mut mark_matchers = [None; MARK_DOMAINS];
         for (domain, matcher) in iter.into_iter() {
@@ -252,7 +249,7 @@ impl Matcher<Marks> for MarkMatchers {
 /// Contains traffic matchers for a given rule.
 ///
 /// `None` fields match all packets.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleMatcher<I: Ip> {
     /// Matches on [`PacketOrigin`]'s bound address for a locally generated packet or the source
     /// address of an incoming packet.
@@ -453,27 +450,27 @@ mod test {
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(None) => false)]
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(Some(0)) => true)]
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(Some(1)) => false)]
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(Some(2)) => true)]
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(Some(3)) => false)]
     fn mark_matcher(matcher: MarkMatcher, mark: Mark) -> bool {
         matcher.matches(&mark)

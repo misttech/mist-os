@@ -222,9 +222,9 @@ mod tests {
     use diagnostics_message::{fx_log_packet_t, LoggerMessage, METADATA_SIZE};
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_logger::{LogLevelFilter, LogListenerSafeRequest};
+    use fuchsia_async as fasync;
     use libc::c_char;
     use moniker::ExtendedMoniker;
-    use {fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     async fn normal_behavior_test() {

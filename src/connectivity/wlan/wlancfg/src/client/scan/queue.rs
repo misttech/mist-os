@@ -6,10 +6,10 @@ use super::ScanReason;
 use crate::client::types::{self, Ssid};
 use crate::telemetry::TelemetryEvent::{ScanQueueStatistics, ScanRequestFulfillmentTime};
 use crate::telemetry::TelemetrySender;
+use fidl_fuchsia_wlan_sme as fidl_sme;
 use futures::channel::oneshot;
 use lazy_static::lazy_static;
 use tracing::warn;
-use {fidl_fuchsia_wlan_sme as fidl_sme, zx};
 
 lazy_static! {
     static ref WILDCARD_SSID: Ssid = Ssid::from_bytes_unchecked("".into());

@@ -13,9 +13,8 @@
 use anyhow::{Context, Error, Result};
 use diagnostics_hierarchy::Property;
 use diagnostics_log::{OnInterestChanged, Publisher, PublisherOptions, TestRecord};
-use diagnostics_log_encoding::encode::{Argument, Value};
+use diagnostics_log_encoding::Argument;
 use fidl::endpoints::create_request_stream;
-use fidl_fuchsia_diagnostics::Severity;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_async::{TaskGroup, Timer};
 use fuchsia_component::server::ServiceFs;
@@ -28,7 +27,7 @@ use inspect_runtime::EscrowOptions;
 use inspect_testing::ExampleInspectData;
 use std::sync::Arc;
 use tracing::{debug, error, info, trace, warn};
-use {fidl_fuchsia_archivist_test as fpuppet, zx};
+use {fidl_fuchsia_archivist_test as fpuppet, fidl_fuchsia_diagnostics as fdiagnostics};
 
 enum IncomingServices {
     Puppet(fpuppet::PuppetRequestStream),
@@ -83,7 +82,7 @@ fn subscribe_to_log_interest_changes(notifier: InterestChangedNotifier) -> Resul
 
 #[derive(Clone)]
 struct InterestChangedEvent {
-    severity: Severity,
+    severity: fdiagnostics::Severity,
 }
 
 struct PuppetServer {
@@ -116,10 +115,10 @@ impl PuppetServer {
 struct InterestChangedNotifier(UnboundedSender<InterestChangedEvent>);
 
 impl OnInterestChanged for InterestChangedNotifier {
-    fn on_changed(&self, severity: &Severity) {
+    fn on_changed(&self, severity: diagnostics_log::Severity) {
         let sender = self.0.clone();
         // Panic on failure since undelivered notifications may hang clients.
-        sender.unbounded_send(InterestChangedEvent { severity: *severity }).unwrap();
+        sender.unbounded_send(InterestChangedEvent { severity: severity.into() }).unwrap();
     }
 }
 
@@ -263,11 +262,11 @@ async fn handle_puppet_request(
 
             match time {
                 None => match severity {
-                    Severity::Trace => trace!("{message}"),
-                    Severity::Debug => debug!("{message}"),
-                    Severity::Error => error!("{message}"),
-                    Severity::Info => info!("{message}"),
-                    Severity::Warn => warn!("{message}"),
+                    fdiagnostics::Severity::Trace => trace!("{message}"),
+                    fdiagnostics::Severity::Debug => debug!("{message}"),
+                    fdiagnostics::Severity::Info => info!("{message}"),
+                    fdiagnostics::Severity::Warn => warn!("{message}"),
+                    fdiagnostics::Severity::Error => error!("{message}"),
                     _ => unimplemented!("Logging with severity: {severity:?}"),
                 },
                 Some(time) => {
@@ -279,10 +278,7 @@ async fn handle_puppet_request(
                             timestamp: zx::BootInstant::from_nanos(time),
                             file: None,
                             line: None,
-                            record_arguments: vec![Argument {
-                                name: "message",
-                                value: Value::Text(&message),
-                            }],
+                            record_arguments: vec![Argument::message(message.as_str())],
                         };
                         publisher.event_for_testing(record);
                     });
@@ -311,7 +307,7 @@ async fn handle_puppet_request(
 #[fidl_table_src(fpuppet::LogPuppetLogRequest)]
 pub struct LogRequest {
     pub message: String,
-    pub severity: Severity,
+    pub severity: fdiagnostics::Severity,
     #[fidl_field_type(optional)]
     pub time: Option<i64>,
 }

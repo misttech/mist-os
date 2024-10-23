@@ -194,6 +194,7 @@
 		compatible = "broadcom,bcm4359";
 		gpios = <&gpio A311D_GPIOX(7) 0>;
 		gpio-names = "WIFI_WAKE_HOST";
+		pinctrl-0 = <&wifi_pins>;
 	};
 
 	gpio_header {
@@ -223,6 +224,17 @@
 		bias-disable;
 		function = <0 0>;
 	};
+
+	fusb302_pins: fusb302-pins {
+		pins = <A311D_GPIOAO(8)>;
+		bias-pull-up;
+		output-disable;
+	};
+
+	wifi_pins: wifi-pins {
+		pins = <A311D_GPIOX(7)>;
+		bias-disable;
+	};
 };
 
 &i2c_AO {
@@ -244,6 +256,7 @@
 		reg = <0x22>;
 		gpios = <&gpio A311D_GPIOAO(8) 0>;
 		gpio-names = "USB_POWER_DELIVERY";
+		pinctrl-0 = <&fusb302_pins>;
 	};
 
 	rtc@51 {

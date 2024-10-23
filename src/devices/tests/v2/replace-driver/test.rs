@@ -12,7 +12,6 @@ use std::collections::{HashMap, HashSet};
 use {
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_registrar as fdr,
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_reloaddriver_test as ft, fuchsia_async as fasync,
-    zx,
 };
 
 const WAITER_NAME: &'static str = "waiter";

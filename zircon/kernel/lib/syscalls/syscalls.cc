@@ -14,6 +14,9 @@
 #include <stdint.h>
 #include <trace.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls.h>
+#include <zircon/syscalls/port.h>
+#include <zircon/syscalls/smc.h>
 #include <zircon/types.h>
 
 #include <kernel/stats.h>

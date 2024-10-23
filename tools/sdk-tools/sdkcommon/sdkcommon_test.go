@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	resolvedAddr        = "fe80::c0ff:eee:fe00:4444%en0"
+	resolvedAddr        = "[fe80::c0ff:eee:fe00:4444%en0]"
 	getSSHAddressOutput = "[fe80::9ded:df4f:5ee8:605f]:8022"
 )
 
@@ -32,14 +32,14 @@ var (
 	"serial":"<unknown>",
 	"target_type":"Unknown",
 	"target_state":"Product",
-	"addresses":["%v"]
+	"addresses":[{"ip": "%v", "ssh_port":22}]
 },{
 	"nodename":"another-test-device",
 	"rcs_state":"N",
 	"serial":"<unknown>",
 	"target_type":"Unknown",
 	"target_state":"Product",
-	"addresses":["fe80::9ded:df4f:5ee8:605f", "123-123-123"]
+	"addresses":[{"ip":"[fe80::9ded:df4f:5ee8:605f]", "ssh_port":22}, {"ip":"123-123-123","ssh_port":22}]
 }]`, resolvedAddr)
 	sshAddresses = map[string]string{
 		"test-device":                "127.0.0.1:22",
@@ -243,7 +243,7 @@ func TestListDevicesFfx(t *testing.T) {
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["ac80::9ded:df4f:5ee8:605f", "fe80::9ded:df4f:5ee8:605f"]}]`,
+			"addresses":[{"ip": "[ac80::9ded:df4f:5ee8:605f]","ssh_port":22},{"ip":"[fe80::9ded:df4f:5ee8:605f]","ssh_port":22}]}]`,
 			expectedFuchsiaDevice: []*FuchsiaDevice{
 				{
 					SSHAddr: "[fe80::9ded:df4f:5ee8:605f]:8022",
@@ -256,7 +256,7 @@ func TestListDevicesFfx(t *testing.T) {
 			"rcs_state":"N",
 			"serial":"<unknown>",
 			"target_type":"Unknown","target_state":"Product",
-			"addresses":["127.0.0.1"]}]`,
+			"addresses":[{"ip":"127.0.0.1", "ssh_port":22}]}]`,
 			expectedFuchsiaDevice: []*FuchsiaDevice{
 				{
 					SSHAddr: "127.0.0.1:2022",
@@ -270,13 +270,13 @@ func TestListDevicesFfx(t *testing.T) {
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["ac80::9ded:df4f:5ee8:605f"]},
+			"addresses":[{"ip":"[ac80::9ded:df4f:5ee8:605f]","ssh_port":22}]},
 			{"nodename":"test-device",
 			"rcs_state":"N",
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["ac80::9ded:df4f:5ee8:605f", "127.0.0.1"]}]`,
+			"addresses":[{"ip":"[ac80::9ded:df4f:5ee8:605f]", "ssh_port":22}, {"ip":"127.0.0.1", "ssh_port":22}]}]`,
 			expectedFuchsiaDevice: []*FuchsiaDevice{
 				{
 					SSHAddr: "[fe80::9ded:df4f:5ee8:605f]:8022",
@@ -891,10 +891,9 @@ func TestResolveTargetAddress(t *testing.T) {
 			execContextHelper: helperCommandContextForGetFuchsiaProperty,
 		},
 		{
-			name:       "Device name passed in but is not discoverable and is not set in ffx",
-			deviceName: "some-unknown-device",
-			expectedError: `Cannot get target address for some-unknown-device.
-		Try running 'ffx target list'.`,
+			name:              "Device name passed in but is not discoverable and is not set in ffx",
+			deviceName:        "some-unknown-device",
+			expectedError:     `Cannot get target address for some-unknown-device.`,
 			execHelper:        helperCommandForGetFuchsiaProperty,
 			execContextHelper: helperCommandContextForGetFuchsiaProperty,
 		},
@@ -906,14 +905,14 @@ func TestResolveTargetAddress(t *testing.T) {
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["%v"]
+			"addresses":[{"ip":"%v", "ssh_port":22}]
 		},{
 			"nodename":"another-test-device",
 			"rcs_state":"N",
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["fe80::9ded:df4f:5ee8:605f", "123-123-123"]}]`, resolvedAddr),
+			"addresses":[{"ip":"[fe80::9ded:df4f:5ee8:605f]", "ssh_port":22},{"ip":"123-123-123", "ssh_port":22}]}]`, resolvedAddr),
 			expectedConfig: DeviceConfig{
 				DeviceName:   "another-target-device-name",
 				Bucket:       "fuchsia-bucket",
@@ -937,9 +936,8 @@ func TestResolveTargetAddress(t *testing.T) {
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["ac80::9ded:df4f:5ee8:605f"]}]`,
-			expectedError: `Cannot get target address for fake-target-device-name.
-		Try running 'ffx target list'.`,
+			"addresses":[{"ip": "[ac80::9ded:df4f:5ee8:605f]", "ssh_port":22}]}]`,
+			expectedError:     `Cannot get target address for fake-target-device-name.`,
 			execHelper:        helperCommandForGetFuchsiaProperty,
 			execContextHelper: helperCommandContextForGetFuchsiaProperty,
 		},
@@ -950,7 +948,7 @@ func TestResolveTargetAddress(t *testing.T) {
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["ac80::9ded:df4f:5ee8:605f", "127.0.0.1"]}]`,
+			"addresses":[{"ip":"[ac80::9ded:df4f:5ee8:605f]","ssh_port":22},{"ip":"127.0.0.1","ssh_port":2022}]}]`,
 			expectedConfig: DeviceConfig{
 				DeviceName:   "test-device-ipv4",
 				Bucket:       "fuchsia",
@@ -971,7 +969,7 @@ func TestResolveTargetAddress(t *testing.T) {
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["fe80::9ded:df4f:5ee8:605f"]}]`,
+			"addresses":[{"ip":"[fe80::9ded:df4f:5ee8:605f]", "ssh_port":22}]}]`,
 			expectedConfig: DeviceConfig{
 				DeviceName:   "some-unknown-device",
 				Bucket:       "fuchsia",
@@ -1002,10 +1000,9 @@ func TestResolveTargetAddress(t *testing.T) {
 			name:                      "No discoverable device but ffx has a default device that is undiscoverable",
 			ffxTargetListOutput:       "[]",
 			ffxTargetDefaultGetOutput: "fake-target-device-name",
-			expectedError: `Cannot get target address for fake-target-device-name.
-		Try running 'ffx target list'.`,
-			execHelper:        helperCommandForGetFuchsiaProperty,
-			execContextHelper: helperCommandContextForGetFuchsiaProperty,
+			expectedError:             `Cannot get target address for fake-target-device-name.`,
+			execHelper:                helperCommandForGetFuchsiaProperty,
+			execContextHelper:         helperCommandContextForGetFuchsiaProperty,
 		},
 		{
 			name:                      "Multiple discoverable devices found but ffx has a default device",
@@ -1026,10 +1023,9 @@ func TestResolveTargetAddress(t *testing.T) {
 		{
 			name:                      "Multiple discoverable devices found but ffx has a default device that isn't discoverable",
 			ffxTargetDefaultGetOutput: "some-unknown-default-device",
-			expectedError: `Cannot get target address for some-unknown-default-device.
-		Try running 'ffx target list'.`,
-			execHelper:        helperCommandForNoDefaultDevice,
-			execContextHelper: helperCommandContextForNoDefaultDevice,
+			expectedError:             `Cannot get target address for some-unknown-default-device.`,
+			execHelper:                helperCommandForNoDefaultDevice,
+			execContextHelper:         helperCommandContextForNoDefaultDevice,
 		},
 		{
 			name: "One discoverable device and no configured device",
@@ -1038,7 +1034,7 @@ func TestResolveTargetAddress(t *testing.T) {
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["fe80::9ded:df4f:5ee8:605f"]}]`,
+			"addresses":[ {"ip":"[fe80::9ded:df4f:5ee8:605f]", "ssh_port": 8022}]}]`,
 			expectedConfig: DeviceConfig{
 				DeviceName:   "target-device",
 				Bucket:       "fuchsia",
@@ -1059,14 +1055,14 @@ func TestResolveTargetAddress(t *testing.T) {
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["123-123-123"]
+			"addresses":[{"ip":"123-123-123", "ssh_port":22}]
 		},{
 			"nodename":"remote-target-name",
 			"rcs_state":"N",
 			"serial":"<unknown>",
 			"target_type":"Unknown",
 			"target_state":"Product",
-			"addresses":["::1"]}]`,
+			"addresses":[ {"ip":"[::1]", "ssh_port": 22}]}]`,
 			expectedError:     fmt.Sprintf("Multiple devices found. %v", helpfulTipMsg),
 			execHelper:        helperCommandForNoConfiguredDevices,
 			execContextHelper: helperCommandContextForNoConfiguredDevices,

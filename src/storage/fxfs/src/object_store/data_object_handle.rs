@@ -169,6 +169,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             FsverityState::Pending(inner) => *mut_fsverity_state = FsverityState::Some(inner),
             FsverityState::Some(_) => panic!("Fsverity state was already set to Some"),
         }
+        // Once we finalize the fsverity state, the file is permanently read-only. The in-memory
+        // overwrite ranges tracking is only used for writing, so we don't need them anymore. This
+        // leaves any uninitialized, but allocated, overwrite regions if there are any, rather than
+        // converting them back to sparse regions.
+        self.overwrite_ranges.clear();
     }
 
     /// Sets `self.fsverity_state` directly to Some without going through the entire state machine.
@@ -241,11 +246,12 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             .mark_allocated(transaction, self.store().store_object_id(), device_range.clone())
             .await?;
         self.txn_update_size(transaction, new_size).await?;
+        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
         transaction.add(
             self.store().store_object_id,
             Mutation::merge_object(
                 ObjectKey::extent(self.object_id(), self.attribute_id(), old_end..new_size),
-                ObjectValue::Extent(ExtentValue::new_raw(device_range.start)),
+                ObjectValue::Extent(ExtentValue::new_raw(device_range.start, key_id)),
             ),
         );
         self.update_allocated_size(transaction, device_range.end - device_range.start, 0).await
@@ -271,7 +277,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         buf: MutableBufferRef<'_>,
         device_offset: u64,
     ) -> Result<MaybeChecksums, Error> {
-        self.handle.write_at(self.attribute_id(), offset, buf, device_offset).await
+        self.handle.write_at(self.attribute_id(), offset, buf, None, device_offset).await
     }
 
     /// Zeroes the given range.  The range must be aligned.  Returns the amount of data deallocated.
@@ -469,6 +475,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let mut to_allocate = Vec::new();
         let mut to_switch = Vec::new();
         let mut new_range = range.clone();
+        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
 
         {
             let tree = &self.store().tree;
@@ -621,7 +628,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 self.store().store_object_id(),
                 Mutation::merge_object(
                     ObjectKey::extent(self.object_id(), self.attribute_id(), switch_range),
-                    ObjectValue::Extent(ExtentValue::initialized_overwrite_extent(device_offset)),
+                    ObjectValue::Extent(ExtentValue::initialized_overwrite_extent(
+                        device_offset,
+                        key_id,
+                    )),
                 ),
                 AssocObj::Borrowed(self),
             );
@@ -655,6 +665,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                         ObjectValue::Extent(ExtentValue::blank_overwrite_extent(
                             device_range.start,
                             (device_range_len / self.block_size()) as usize,
+                            key_id,
                         )),
                     ),
                     AssocObj::Borrowed(self),
@@ -819,7 +830,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         ranges: &[Range<u64>],
         buf: MutableBufferRef<'_>,
     ) -> Result<(), Error> {
-        self.handle.multi_write(transaction, attribute_id, ranges, buf).await
+        self.handle.multi_write(transaction, attribute_id, None, ranges, buf).await
     }
 
     // If allow_allocations is false, then all the extents for the range must have been
@@ -840,6 +851,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     ) -> Result<(), Error> {
         assert_eq!((buf.len() as u32) % self.store().device.block_size(), 0);
         let end = offset + buf.len() as u64;
+
+        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
 
         // The transaction only ends up being used if allow_allocations is true
         let mut transaction =
@@ -992,7 +1005,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                                         self.attribute_id(),
                                         offset..offset + device_range_len,
                                     ),
-                                    ObjectValue::Extent(ExtentValue::new_raw(device_range.start)),
+                                    ObjectValue::Extent(ExtentValue::new_raw(
+                                        device_range.start,
+                                        key_id,
+                                    )),
                                 ),
                             );
 
@@ -1222,6 +1238,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             )))
             .await?;
         let mut allocated = 0;
+        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
         'outer: while file_range.start < file_range.end {
             let allocate_end = loop {
                 match iter.get() {
@@ -1313,7 +1330,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 self.store().store_object_id,
                 Mutation::merge_object(
                     ObjectKey::extent(self.object_id(), self.attribute_id(), this_file_range),
-                    ObjectValue::Extent(ExtentValue::new_raw(device_range.start)),
+                    ObjectValue::Extent(ExtentValue::new_raw(device_range.start, key_id)),
                 ),
             );
             ranges.push(device_range);
@@ -1337,6 +1354,15 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         node_attributes: Option<&fio::MutableNodeAttributes>,
         change_time: Option<Timestamp>,
     ) -> Result<(), Error> {
+        // This codepath is only called by files, whose wrapping key id users cannot directly set
+        // as per fscrypt.
+        ensure!(
+            !matches!(
+                node_attributes,
+                Some(fio::MutableNodeAttributes { wrapping_key_id: Some(_), .. })
+            ),
+            FxfsError::BadPath
+        );
         self.handle.update_attributes(transaction, node_attributes, change_time).await
     }
 
@@ -1367,7 +1393,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.handle.read_attr(attribute_id).await
     }
 
-    /// Writes an entire attribute.
+    /// Writes an entire attribute.  This *always* uses the volume data key.
     pub async fn write_attr(&self, attribute_id: u64, data: &[u8]) -> Result<(), Error> {
         // Must be different attribute otherwise cached size gets out of date.
         assert_ne!(attribute_id, self.attribute_id());
@@ -1485,6 +1511,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 sub_dirs: 0,
                 posix_attributes,
                 casefold: false,
+                wrapping_key_id: None,
             }),
             _ => bail!(FxfsError::NotFile),
         }
@@ -1776,10 +1803,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
 
-        object =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), crypt)
-                .await
-                .expect("create_object failed");
+        object = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            crypt,
+            None,
+        )
+        .await
+        .expect("create_object failed");
 
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
@@ -1968,10 +2000,15 @@ mod tests {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let object2 =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        let object2 = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
         let mut ef_buffer = object.allocate_buffer(block_size).await;
         ef_buffer.as_mut_slice().fill(0xef);
@@ -2478,9 +2515,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
 
         transaction.commit().await.unwrap();
@@ -2520,6 +2563,7 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
+            None,
             None,
         )
         .await
@@ -2571,6 +2615,7 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
+            None,
             None,
         )
         .await
@@ -2658,9 +2703,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
 
         transaction.commit().await.unwrap();
@@ -2696,10 +2747,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
-        handle =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        handle = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
 
         // As of writing, an empty filesystem has two 512kiB superblock extents and a little over
         // 256kiB of additional allocations (journal, etc) so we start use a 'magic' starting point
@@ -3160,9 +3216,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
         for _ in 0..100 {
@@ -3433,10 +3495,15 @@ mod tests {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let object2 =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        let object2 = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
 
         object2

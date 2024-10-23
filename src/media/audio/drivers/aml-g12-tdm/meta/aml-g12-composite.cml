@@ -20,6 +20,7 @@
                 'fuchsia.driver.compat.Service',
                 'fuchsia.hardware.clock.Service',
                 'fuchsia.hardware.gpio.Service',
+                'fuchsia.hardware.pin.Service',
                 'fuchsia.hardware.platform.device.Service',
             ],
         },

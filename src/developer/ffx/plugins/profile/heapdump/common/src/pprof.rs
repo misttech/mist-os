@@ -81,7 +81,7 @@ fn build_profile(snapshot: &Snapshot, with_tags: bool) -> Result<pprof::Profile>
                     },
                     pprof::Label {
                         key: st.intern("timestamp"),
-                        num: info.timestamp,
+                        num: info.timestamp.into_nanos(),
                         num_unit: st.intern("nanoseconds"),
                         ..Default::default()
                     },
@@ -167,17 +167,20 @@ mod tests {
     const ALLOC_1_SIZE: i64 = 0x1800;
     const ALLOC_1_THREAD_KOID: u64 = 1234;
     const ALLOC_1_THREAD_NAME: &str = "thread-1";
-    const ALLOC_1_TIMESTAMP: i64 = 8777777777778;
+    const ALLOC_1_TIMESTAMP: fidl::MonotonicInstant =
+        fidl::MonotonicInstant::from_nanos(8777777777778);
     const ALLOC_2_ADDRESS: u64 = 0x624000;
     const ALLOC_2_SIZE: i64 = 0x30;
     const ALLOC_2_THREAD_KOID: u64 = 5678;
     const ALLOC_2_THREAD_NAME: &str = "thread-2";
-    const ALLOC_2_TIMESTAMP: i64 = 9333333333333;
+    const ALLOC_2_TIMESTAMP: fidl::MonotonicInstant =
+        fidl::MonotonicInstant::from_nanos(9333333333333);
     const ALLOC_3_ADDRESS: u64 = 0x756000;
     const ALLOC_3_SIZE: i64 = 0xC000;
     const ALLOC_3_THREAD_KOID: u64 = 9999;
     const ALLOC_3_THREAD_NAME: &str = "thread-3";
-    const ALLOC_3_TIMESTAMP: i64 = 9876543211111;
+    const ALLOC_3_TIMESTAMP: fidl::MonotonicInstant =
+        fidl::MonotonicInstant::from_nanos(9876543211111);
 
     fn generate_fake_snapshot() -> Snapshot {
         let stack_trace_a = Rc::new(StackTrace { program_addresses: STACK_TRACE_A.to_vec() });
@@ -273,7 +276,7 @@ mod tests {
             assert_eq!(loc(allocation1.location_id[0]).address, STACK_TRACE_A[0]);
             assert_eq!(loc(allocation1.location_id[1]).address, STACK_TRACE_A[1]);
             assert_eq!(loc(allocation1.location_id[2]).address, STACK_TRACE_A[2]);
-            assert_eq!(allocation1.label[2].num, ALLOC_1_TIMESTAMP);
+            assert_eq!(allocation1.label[2].num, ALLOC_1_TIMESTAMP.into_nanos());
             assert_eq!(
                 st(allocation1.label[3].str),
                 format!("{}[{}]", ALLOC_1_THREAD_NAME, ALLOC_1_THREAD_KOID)
@@ -286,7 +289,7 @@ mod tests {
             assert_eq!(allocation2.location_id.len(), STACK_TRACE_B.len());
             assert_eq!(loc(allocation2.location_id[0]).address, STACK_TRACE_B[0]);
             assert_eq!(loc(allocation2.location_id[1]).address, STACK_TRACE_B[1]);
-            assert_eq!(allocation2.label[2].num, ALLOC_2_TIMESTAMP);
+            assert_eq!(allocation2.label[2].num, ALLOC_2_TIMESTAMP.into_nanos());
             assert_eq!(
                 st(allocation2.label[3].str),
                 format!("{}[{}]", ALLOC_2_THREAD_NAME, ALLOC_2_THREAD_KOID)
@@ -299,7 +302,7 @@ mod tests {
             assert_eq!(allocation3.location_id.len(), STACK_TRACE_B.len());
             assert_eq!(loc(allocation3.location_id[0]).address, STACK_TRACE_B[0]);
             assert_eq!(loc(allocation3.location_id[1]).address, STACK_TRACE_B[1]);
-            assert_eq!(allocation3.label[2].num, ALLOC_3_TIMESTAMP);
+            assert_eq!(allocation3.label[2].num, ALLOC_3_TIMESTAMP.into_nanos());
             assert_eq!(
                 st(allocation3.label[3].str),
                 format!("{}[{}]", ALLOC_3_THREAD_NAME, ALLOC_3_THREAD_KOID)

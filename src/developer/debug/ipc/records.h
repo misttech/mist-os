@@ -497,9 +497,20 @@ struct AttachConfig {
   // the frontend must explicitly request and load the modules to do anything with symbols.
   bool weak = false;
 
+  // The target of the attach. On Fuchsia, we can attach directly to both jobs and processes. On
+  // linux, we can only attach to processes.
+  enum class Target {
+    kJob,
+    kProcess,
+  } target = Target::kProcess;
+
   void Serialize(Serializer& ser, uint32_t ver) {
     if (ver >= 64) {
       ser | weak;
+    }
+
+    if (ver >= 66) {
+      ser | target;
     }
   }
 };
@@ -560,9 +571,17 @@ struct FilterConfig {
   // this filter's matching component.
   bool recursive = false;
 
+  // Fuchsia only. Indicate that the client is only interested in attaching to the closest job
+  // matching the filter. This prevents attaching to processes directly.
+  bool job_only = false;
+
   void Serialize(Serializer& ser, uint32_t ver) {
     if (ver >= 64) {
       ser | weak | recursive;
+    }
+
+    if (ver >= 66) {
+      ser | job_only;
     }
   }
 };

@@ -17,7 +17,7 @@ use fidl_fuchsia_recovery_ui::{
     FactoryResetCountdownRequestStream, FactoryResetCountdownState,
     FactoryResetCountdownWatchResponder,
 };
-use fuchsia_async::{Duration, MonotonicInstant, Task, TimeoutExt, Timer};
+use fuchsia_async::{MonotonicDuration, MonotonicInstant, Task, TimeoutExt, Timer};
 use fuchsia_inspect::health::Reporter;
 use futures::StreamExt;
 use metrics_registry::*;
@@ -25,7 +25,7 @@ use std::cell::RefCell;
 use std::fs::{self, File};
 use std::path::Path;
 use std::rc::Rc;
-use {fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio, zx};
+use {fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio};
 
 /// FactoryResetState tracks the state of the device through the factory reset
 /// process.
@@ -80,10 +80,10 @@ enum FactoryResetState {
 const FACTORY_RESET_DISALLOWED_PATH: &'static str = "/data/factory_reset_disallowed";
 const FACTORY_RESET_SOUND_PATH: &'static str = "/config/data/chirp-start-tone.wav";
 
-const BUTTON_TIMEOUT: Duration = Duration::from_millis(500);
-const RESET_TIMEOUT: Duration = Duration::from_seconds(10);
+const BUTTON_TIMEOUT: MonotonicDuration = MonotonicDuration::from_millis(500);
+const RESET_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(10);
 /// Maximum length of time to wait for the reset earcon to play (after `RESET_TIMEOUT` elapses).
-const EARCON_TIMEOUT: Duration = Duration::from_millis(2000);
+const EARCON_TIMEOUT: MonotonicDuration = MonotonicDuration::from_millis(2000);
 
 type NotifyFn = Box<
     dyn Fn(
@@ -345,9 +345,9 @@ impl FactoryResetHandler {
         tracing::debug!("Getting sound");
         // Get sound
         let (sound_endpoint, server_end) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
-        let () = fuchsia_fs::file::open_channel_in_namespace_deprecated(
+        let () = fuchsia_fs::file::open_channel_in_namespace(
             FACTORY_RESET_SOUND_PATH,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::Flags::PERM_READ,
             server_end,
         )
         .context("Failed to open factory reset sound file")?;
@@ -628,7 +628,7 @@ mod tests {
         assert_matches!(handler_state, FactoryResetState::ButtonCountdown { deadline: _ });
 
         // Skip ahead 500ms for the ButtonCountdown
-        executor.set_fake_time(MonotonicInstant::after(Duration::from_millis(500)));
+        executor.set_fake_time(MonotonicInstant::after(MonotonicDuration::from_millis(500)));
         executor.wake_expired_timers();
 
         // After the ButtonCountdown the reset_handler enters the
@@ -639,7 +639,7 @@ mod tests {
         assert_matches!(handler_state, FactoryResetState::ResetCountdown { deadline: _ });
 
         // Skip ahead 10s for the ResetCountdown
-        executor.set_fake_time(MonotonicInstant::after(Duration::from_seconds(10)));
+        executor.set_fake_time(MonotonicInstant::after(MonotonicDuration::from_seconds(10)));
         executor.wake_expired_timers();
 
         // After the ResetCountdown the reset_handler enters the

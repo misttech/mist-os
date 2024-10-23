@@ -27,7 +27,7 @@ pub struct Node {
     next: AtomicNodeIndex,
     pub address: u64,
     pub size: u64,
-    pub timestamp: i64,
+    pub timestamp: zx::MonotonicInstant,
     pub thread_info_key: ResourceKey,
     pub stack_trace_key: ResourceKey,
 }
@@ -133,7 +133,7 @@ impl AllocationsTableWriter {
         size: u64,
         thread_info_key: ResourceKey,
         stack_trace_key: ResourceKey,
-        timestamp: i64,
+        timestamp: zx::MonotonicInstant,
     ) -> Result<bool, crate::Error> {
         let bucket_index = Self::compute_bucket_index(address);
         let old_head = self.bucket_head_at(bucket_index).load(Relaxed);
@@ -204,7 +204,7 @@ impl AllocationsTableWriter {
         size: u64,
         thread_info_key: ResourceKey,
         stack_trace_key: ResourceKey,
-        timestamp: i64,
+        timestamp: zx::MonotonicInstant,
     ) -> Result<Option<u64>, crate::Error> {
         // Updates are implemented as an atomic insertion of a new node at the head followed by an
         // atomic deletion of the old node. Therefore, while an update is in progress, two nodes
@@ -237,7 +237,7 @@ impl AllocationsTableWriter {
         size: u64,
         thread_info_key: ResourceKey,
         stack_trace_key: ResourceKey,
-        timestamp: i64,
+        timestamp: zx::MonotonicInstant,
     ) -> Result<Option<(NodeIndex, NodeIndex, u64)>, crate::Error> {
         let bucket_index = Self::compute_bucket_index(address);
         let old_head = self.bucket_head_at(bucket_index).load(Relaxed);
@@ -418,7 +418,7 @@ mod tests {
             0x5678,
             THREAD_INFO_RESOURCE_KEY_1,
             STACK_TRACE_RESOURCE_KEY_1,
-            0,
+            zx::MonotonicInstant::ZERO,
         );
         assert_eq!(result, Ok(true));
 
@@ -427,7 +427,7 @@ mod tests {
             0x5678,
             THREAD_INFO_RESOURCE_KEY_1,
             STACK_TRACE_RESOURCE_KEY_1,
-            0,
+            zx::MonotonicInstant::ZERO,
         );
         assert_eq!(result, Ok(false));
     }
@@ -442,7 +442,7 @@ mod tests {
             0x5678,
             THREAD_INFO_RESOURCE_KEY_1,
             STACK_TRACE_RESOURCE_KEY_1,
-            0,
+            zx::MonotonicInstant::ZERO,
         );
         assert_eq!(result, Ok(true));
 
@@ -465,7 +465,7 @@ mod tests {
                 1,
                 THREAD_INFO_RESOURCE_KEY_1,
                 STACK_TRACE_RESOURCE_KEY_1,
-                0,
+                zx::MonotonicInstant::ZERO,
             );
             assert_eq!(result, Ok(true));
         }
@@ -476,7 +476,7 @@ mod tests {
             1,
             THREAD_INFO_RESOURCE_KEY_1,
             STACK_TRACE_RESOURCE_KEY_1,
-            0,
+            zx::MonotonicInstant::ZERO,
         );
         assert_eq!(result, Err(crate::Error::OutOfSpace));
 
@@ -488,7 +488,7 @@ mod tests {
             1,
             THREAD_INFO_RESOURCE_KEY_1,
             STACK_TRACE_RESOURCE_KEY_1,
-            0,
+            zx::MonotonicInstant::ZERO,
         );
         assert_eq!(result, Ok(true));
     }
@@ -504,7 +504,7 @@ mod tests {
                 1,
                 THREAD_INFO_RESOURCE_KEY_1,
                 STACK_TRACE_RESOURCE_KEY_1,
-                0,
+                zx::MonotonicInstant::ZERO,
             );
             assert_eq!(result, Ok(true), "failed to insert 0x{:x}", i);
 
@@ -524,7 +524,7 @@ mod tests {
                 1,
                 THREAD_INFO_RESOURCE_KEY_1,
                 STACK_TRACE_RESOURCE_KEY_1,
-                0,
+                zx::MonotonicInstant::ZERO,
             );
             assert_eq!(result, Ok(true), "failed to insert 0x{:x}", i);
         }
@@ -545,7 +545,7 @@ mod tests {
                 1,
                 THREAD_INFO_RESOURCE_KEY_1,
                 STACK_TRACE_RESOURCE_KEY_1,
-                0,
+                zx::MonotonicInstant::ZERO,
             );
             assert_eq!(result, Ok(true), "failed to insert 0x{:x}", i);
         }
@@ -579,7 +579,8 @@ mod tests {
                 if i % 4 >= 2 { THREAD_INFO_RESOURCE_KEY_1 } else { THREAD_INFO_RESOURCE_KEY_2 };
             let stack_trace_key =
                 if i % 2 == 0 { STACK_TRACE_RESOURCE_KEY_1 } else { STACK_TRACE_RESOURCE_KEY_2 };
-            let timestamp = (NUM_ITERATIONS as i64 / 2) - (i as i64); // test negative values too
+            let timestamp =
+                zx::MonotonicInstant::from_nanos((NUM_ITERATIONS as i64 / 2) - (i as i64)); // test negative values too
             let result =
                 writer.insert_allocation(i, 1, thread_info_key, stack_trace_key, timestamp);
             assert_eq!(result, Ok(true), "failed to insert 0x{:x}", i);
@@ -633,7 +634,7 @@ mod tests {
             size: 0x5678,
             thread_info_key: THREAD_INFO_RESOURCE_KEY_1,
             stack_trace_key: STACK_TRACE_RESOURCE_KEY_1,
-            timestamp: 99999999,
+            timestamp: zx::MonotonicInstant::from_nanos(99999999),
         };
 
         // Try to read it back and verify that the iterator returns an error.
@@ -653,7 +654,7 @@ mod tests {
             0x1111,
             THREAD_INFO_RESOURCE_KEY_1,
             STACK_TRACE_RESOURCE_KEY_1,
-            0,
+            zx::MonotonicInstant::ZERO,
         );
         assert_eq!(result, Ok(true));
 
@@ -668,7 +669,7 @@ mod tests {
             0x2222,
             THREAD_INFO_RESOURCE_KEY_2,
             STACK_TRACE_RESOURCE_KEY_2,
-            0,
+            zx::MonotonicInstant::ZERO,
         );
         let Ok(Some((new_node, old_node, old_size))) = result else {
             panic!("Update begin is supposed to succeed in this test, got {:?} instead", result)
@@ -700,7 +701,7 @@ mod tests {
             0x5678,
             THREAD_INFO_RESOURCE_KEY_1,
             STACK_TRACE_RESOURCE_KEY_1,
-            0,
+            zx::MonotonicInstant::ZERO,
         );
         assert_eq!(result, Ok(None));
     }

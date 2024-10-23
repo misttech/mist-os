@@ -33,7 +33,7 @@ use wlan_common::bss::BssDescription;
 use wlan_common::sequestered::Sequestered;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme, zx,
+    fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
 };
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
@@ -160,7 +160,7 @@ pub async fn serve(
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
     connect_selection: Option<types::ConnectSelection>,
     telemetry_sender: TelemetrySender,
-    defect_sender: mpsc::UnboundedSender<Defect>,
+    defect_sender: mpsc::Sender<Defect>,
     roam_manager: RoamManager,
     status_publisher: StateMachineStatusPublisher<Status>,
 ) {
@@ -219,7 +219,7 @@ struct CommonStateOptions {
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
     telemetry_sender: TelemetrySender,
     iface_id: u16,
-    defect_sender: mpsc::UnboundedSender<Defect>,
+    defect_sender: mpsc::Sender<Defect>,
     roam_manager: RoamManager,
     status_publisher: StateMachineStatusPublisher<Status>,
 }
@@ -437,7 +437,7 @@ async fn connecting_state<'a>(
         .await
         .map_err(|e| ExitReason(Err(format_err!("{:?}", e))))?;
 
-    notify_on_connection_result(&common_options, &options, ap_state.clone(), sme_result).await;
+    notify_on_connection_result(&mut common_options, &options, ap_state.clone(), sme_result).await;
 
     match (sme_result.code, sme_result.is_credential_rejected) {
         (fidl_ieee80211::StatusCode::Success, _) => {
@@ -490,7 +490,7 @@ fn notify_on_connection_attempt(common_options: &CommonStateOptions, options: &C
 }
 
 async fn notify_on_connection_result(
-    common_options: &CommonStateOptions,
+    common_options: &mut CommonStateOptions,
     options: &ConnectingOptions,
     ap_state: types::ApState,
     sme_result: fidl_sme::ConnectResult,
@@ -539,9 +539,11 @@ async fn notify_on_connection_result(
         );
     } else {
         // Defects should be logged for connection failures that are not due to bad credentials.
-        if let Err(e) = common_options.defect_sender.unbounded_send(Defect::Iface(
-            IfaceFailure::ConnectionFailure { iface_id: common_options.iface_id },
-        )) {
+        if let Err(e) =
+            common_options.defect_sender.try_send(Defect::Iface(IfaceFailure::ConnectionFailure {
+                iface_id: common_options.iface_id,
+            }))
+        {
             warn!("Failed to log connection failure: {}", e);
         }
     }
@@ -983,9 +985,11 @@ async fn notify_on_roam_result(
 
     // Log defect on connect failure.
     if result.status_code != fidl_ieee80211::StatusCode::Success && !result.is_credential_rejected {
-        if let Err(e) = common_options.defect_sender.unbounded_send(Defect::Iface(
-            IfaceFailure::ConnectionFailure { iface_id: common_options.iface_id },
-        )) {
+        if let Err(e) =
+            common_options.defect_sender.try_send(Defect::Iface(IfaceFailure::ConnectionFailure {
+                iface_id: common_options.iface_id,
+            }))
+        {
             warn!("Failed to log connection failure: {}", e);
         }
     }
@@ -1109,6 +1113,7 @@ mod tests {
     };
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl::prelude::*;
+    use fidl_fuchsia_wlan_policy as fidl_policy;
     use futures::task::Poll;
     use futures::Future;
     use ieee80211::MacAddrBytes;
@@ -1117,7 +1122,6 @@ mod tests {
     use std::pin::pin;
     use wlan_common::{assert_variant, random_fidl_bss_description};
     use wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason;
-    use {fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
     lazy_static! {
         pub static ref TEST_PASSWORD: Credential = Credential::Password(b"password".to_vec());
@@ -1131,7 +1135,7 @@ mod tests {
         client_req_sender: mpsc::Sender<ManualRequest>,
         update_receiver: mpsc::UnboundedReceiver<listener::ClientListenerMessage>,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
-        defect_receiver: mpsc::UnboundedReceiver<Defect>,
+        defect_receiver: mpsc::Receiver<Defect>,
         roam_service_request_receiver: mpsc::Receiver<RoamServiceRequest>,
         status_reader: StateMachineStatusReader<Status>,
     }
@@ -1146,7 +1150,7 @@ mod tests {
         let saved_networks_manager = Arc::new(saved_networks);
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (defect_sender, defect_receiver) = mpsc::unbounded();
+        let (defect_sender, defect_receiver) = mpsc::channel(100);
         let (roam_service_request_sender, roam_service_request_receiver) = mpsc::channel(100);
         let roam_manager = RoamManager::new(roam_service_request_sender);
         let (status_publisher, status_reader) = status_publisher_and_reader::<Status>();
@@ -2830,7 +2834,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Set time to indicate a decent uptime before the disconnect so the AP is retried
-        exec.set_fake_time(start_time + fasync::Duration::from_hours(24));
+        exec.set_fake_time(start_time + fasync::MonotonicDuration::from_hours(24));
 
         // SME notifies Policy of disconnection
         let is_sme_reconnecting = true;

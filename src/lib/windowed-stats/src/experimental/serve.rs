@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use derivative::Derivative;
+use fuchsia_async as fasync;
 use fuchsia_inspect::{Inspector, Node as InspectNode};
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::{select, Future, FutureExt, StreamExt};
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use {fuchsia_async as fasync, zx};
 
 use crate::experimental::clock::{Timed, Timestamp};
 use crate::experimental::series::{FoldError, Interpolator, MatrixSampler};

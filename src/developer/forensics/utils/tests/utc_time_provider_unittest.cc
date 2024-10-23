@@ -27,7 +27,7 @@ constexpr timekeeper::time_utc kTime((zx::hour(7) + zx::min(14) + zx::sec(52)).g
 class UtcTimeProviderTest : public UnitTestFixture {
  public:
   UtcTimeProviderTest() {
-    clock_.Set(kTime);
+    clock_.SetUtc(kTime);
 
     zx_clock_create_args_v1_t clock_args{.backstop_time = 0};
     FX_CHECK(zx::clock::create(0u, &clock_args, &clock_handle_) == ZX_OK);
@@ -54,57 +54,57 @@ class UtcTimeProviderTest : public UnitTestFixture {
   std::unique_ptr<UtcTimeProvider> utc_provider_;
 };
 
-TEST_F(UtcTimeProviderTest, Check_CurrentUtcMonotonicDifference) {
-  clock_.Set(zx::time(0));
+TEST_F(UtcTimeProviderTest, Check_CurrentUtcBootDifference) {
+  clock_.SetBoot(zx::time_boot(5));
+  clock_.SetUtc(timekeeper::time_utc(42));
   SignalLoggingQualityClock();
   RunLoopUntilIdle();
 
-  zx::time monotonic = clock_.MonotonicNow();
+  zx::time_boot boot = clock_.BootNow();
   timekeeper::time_utc utc;
   ASSERT_EQ(clock_.UtcNow(&utc), ZX_OK);
 
-  const auto utc_monotonic_difference = utc_provider_->CurrentUtcMonotonicDifference();
-  ASSERT_TRUE(utc_monotonic_difference.has_value());
-  EXPECT_EQ(monotonic.get() + utc_monotonic_difference.value().get(), utc.get());
+  const auto utc_boot_difference = utc_provider_->CurrentUtcBootDifference();
+  ASSERT_TRUE(utc_boot_difference.has_value());
+  EXPECT_EQ(boot.get() + utc_boot_difference.value().get(), utc.get());
 }
 
-TEST_F(UtcTimeProviderTest, Check_ReadsPreviousBootUtcMonotonicDifference) {
+TEST_F(UtcTimeProviderTest, Check_ReadsPreviousBootUtcBootDifference) {
   ASSERT_TRUE(files::WriteFile("/cache/current_utc_monotonic_difference.txt", "1234"));
 
-  // |is_first_instance| is true becuase the previous UTC-monotonic difference should be read.
+  // |is_first_instance| is true because the previous UTC-boot difference should be read.
   utc_provider_ = std::make_unique<UtcTimeProvider>(
       utc_clock_ready_watcher_.get(), &clock_,
       PreviousBootFile::FromCache(/*is_first_instance=*/true,
                                   "current_utc_monotonic_difference.txt"));
 
-  const auto previous_utc_monotonic_difference =
-      utc_provider_->PreviousBootUtcMonotonicDifference();
+  const auto previous_utc_boot_difference = utc_provider_->PreviousBootUtcBootDifference();
 
-  ASSERT_TRUE(previous_utc_monotonic_difference.has_value());
-  EXPECT_EQ(previous_utc_monotonic_difference.value().get(), 1234);
+  ASSERT_TRUE(previous_utc_boot_difference.has_value());
+  EXPECT_EQ(previous_utc_boot_difference.value().get(), 1234);
 
   ASSERT_TRUE(files::DeletePath("/cache/curren_utc_monotonic_difference.txt", /*recursive=*/true));
   ASSERT_TRUE(files::DeletePath("/tmp/curren_utc_monotonic_difference.txt", /*recursive=*/true));
 }
 
-TEST_F(UtcTimeProviderTest, Check_WritesPreviousBootUtcMonotonicDifference) {
+TEST_F(UtcTimeProviderTest, Check_WritesPreviousBootUtcBootDifference) {
   SignalLoggingQualityClock();
   RunLoopUntilIdle();
 
-  // |is_first_instance| is true becuase the previous UTC-monotonic difference should be read.
+  // |is_first_instance| is true because the previous UTC-boot difference should be read.
   utc_provider_ = std::make_unique<UtcTimeProvider>(
       utc_clock_ready_watcher_.get(), &clock_,
       PreviousBootFile::FromCache(/*is_first_instance=*/true,
                                   "current_utc_monotonic_difference.txt"));
   RunLoopUntilIdle();
 
-  const auto utc_monotonic_difference = utc_provider_->CurrentUtcMonotonicDifference();
-  ASSERT_TRUE(utc_monotonic_difference.has_value());
+  const auto utc_boot_difference = utc_provider_->CurrentUtcBootDifference();
+  ASSERT_TRUE(utc_boot_difference.has_value());
 
   std::string content;
   ASSERT_TRUE(files::ReadFileToString("/cache/current_utc_monotonic_difference.txt", &content));
 
-  EXPECT_EQ(content, std::to_string(utc_monotonic_difference.value().get()));
+  EXPECT_EQ(content, std::to_string(utc_boot_difference.value().get()));
 
   ASSERT_TRUE(files::DeletePath("/cache/curren_utc_monotonic_difference.txt", /*recursive=*/true));
   ASSERT_TRUE(files::DeletePath("/tmp/curren_utc_monotonic_difference.txt", /*recursive=*/true));
@@ -114,7 +114,7 @@ TEST_F(UtcTimeProviderTest, Check_NotReadyOnClockStarted) {
   ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get()))), ZX_OK);
   RunLoopUntilIdle();
 
-  EXPECT_FALSE(utc_provider_->CurrentUtcMonotonicDifference().has_value());
+  EXPECT_FALSE(utc_provider_->CurrentUtcBootDifference().has_value());
 }
 
 TEST_F(UtcTimeProviderTest, Check_NotReadyOnClockSynchronized) {
@@ -123,7 +123,7 @@ TEST_F(UtcTimeProviderTest, Check_NotReadyOnClockSynchronized) {
             ZX_OK);
   RunLoopUntilIdle();
 
-  EXPECT_FALSE(utc_provider_->CurrentUtcMonotonicDifference().has_value());
+  EXPECT_FALSE(utc_provider_->CurrentUtcBootDifference().has_value());
 }
 
 }  // namespace

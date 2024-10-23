@@ -522,48 +522,6 @@ TEST_F(DeviceTest, GetFragmentProtocolFromDeviceNoDriver) {
                                                            ZX_PROTOCOL_BLOCK, &proto));
 }
 
-TEST_F(DeviceTest, GetTopologicalPath) {
-  auto endpoints = fidl::CreateEndpoints<fdf::Node>();
-
-  // Create a device.
-  zx_protocol_device_t ops{};
-  compat::Device device(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
-                        dispatcher());
-  device.Bind({std::move(endpoints->client), dispatcher()});
-
-  // The root device doesn't have a valid topological path, so we add a child.
-  zx_device_t* second_device;
-  device_add_args_t args{
-      .name = "second-device",
-  };
-  device.Add(&args, &second_device);
-
-  auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  ASSERT_EQ(ZX_OK, endpoints.status_value());
-
-  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), second_device);
-
-  fidl::WireClient<fuchsia_device::Controller> client;
-  client.Bind(std::move(dev_endpoints->client), dispatcher());
-
-  bool callback_called = false;
-  client->GetTopologicalPath().Then(
-      [&callback_called](
-          fidl::WireUnownedResult<fuchsia_device::Controller::GetTopologicalPath>& result) {
-        if (!result.ok()) {
-          FAIL() << result.error();
-          return;
-        }
-        ASSERT_TRUE(result->is_ok());
-        std::string path(result->value()->path.data(), result->value()->path.size());
-        EXPECT_STREQ("/dev/second-device", path.data());
-        callback_called = true;
-      });
-
-  ASSERT_TRUE(RunLoopUntilIdle());
-  ASSERT_TRUE(callback_called);
-}
-
 TEST_F(DeviceTest, TestBind) {
   fdf_testing::TestNode node("root", dispatcher());
   zx::result node_client = node.CreateNodeChannel();

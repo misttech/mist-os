@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_dash as fdash;
 use fuchsia_component::client::connect_to_protocol;
-use {fidl_fuchsia_dash as fdash, zx};
 
 #[fuchsia::test]
 pub async fn unknown_tools_package() {
@@ -75,7 +75,7 @@ pub async fn bad_url() {
 
     let launcher = connect_to_protocol::<fdash::LauncherMarker>().unwrap();
 
-    let urls = &["fuchsia-pkg://fuchsia.com/!@#$%^&*(".to_string()];
+    let urls = &["#".to_string()];
     let err = launcher
         .explore_component_over_socket(
             ".",

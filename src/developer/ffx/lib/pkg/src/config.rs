@@ -67,7 +67,7 @@ pub async fn determine_why_repository_server_is_not_running() -> anyhow::Error {
 
 /// Return the repository server mode.
 pub async fn repository_server_mode() -> Result<String> {
-    if let Some(mode) = ffx_config::get(CONFIG_KEY_SERVER_MODE).await? {
+    if let Some(mode) = ffx_config::get(CONFIG_KEY_SERVER_MODE)? {
         Ok(mode)
     } else {
         Ok(String::new())
@@ -76,7 +76,7 @@ pub async fn repository_server_mode() -> Result<String> {
 
 /// Return the repository registration mode.
 pub async fn repository_registration_mode() -> Result<String> {
-    if let Some(mode) = ffx_config::get(CONFIG_KEY_REGISTRATION_MODE).await? {
+    if let Some(mode) = ffx_config::get(CONFIG_KEY_REGISTRATION_MODE)? {
         Ok(mode)
     } else {
         // Default to FIDL
@@ -86,7 +86,7 @@ pub async fn repository_registration_mode() -> Result<String> {
 
 /// Return if the repository server is enabled.
 pub async fn get_repository_server_enabled() -> Result<bool> {
-    if let Some(enabled) = ffx_config::get(CONFIG_KEY_SERVER_ENABLED).await? {
+    if let Some(enabled) = ffx_config::get(CONFIG_KEY_SERVER_ENABLED)? {
         Ok(enabled)
     } else {
         Ok(false)
@@ -104,9 +104,7 @@ pub async fn set_repository_server_enabled(enabled: bool) -> Result<()> {
 
 /// Return if the last used repository address used.
 pub async fn get_repository_server_last_address_used() -> Result<Option<std::net::SocketAddr>> {
-    if let Some(address) =
-        ffx_config::get::<Option<String>, _>(CONFIG_KEY_LAST_USED_ADDRESS).await?
-    {
+    if let Some(address) = ffx_config::get::<Option<String>, _>(CONFIG_KEY_LAST_USED_ADDRESS)? {
         if address.is_empty() {
             Ok(None)
         } else {
@@ -132,7 +130,7 @@ pub async fn set_repository_server_last_address_used(socket_address: String) -> 
 
 /// Return the repository server address from ffx config.
 pub async fn repository_listen_addr() -> Result<Option<std::net::SocketAddr>> {
-    if let Some(address) = ffx_config::get::<Option<String>, _>(CONFIG_KEY_SERVER_LISTEN).await? {
+    if let Some(address) = ffx_config::get::<Option<String>, _>(CONFIG_KEY_SERVER_LISTEN)? {
         if address.is_empty() {
             Ok(None)
         } else {
@@ -165,7 +163,7 @@ fn repository_registrations_query(repo_name: &str) -> String {
 
 /// Return the default repository from the configuration if set.
 pub async fn get_default_repository() -> Result<Option<String>> {
-    let config_default: Option<String> = ffx_config::get(CONFIG_KEY_DEFAULT_REPOSITORY).await?;
+    let config_default: Option<String> = ffx_config::get(CONFIG_KEY_DEFAULT_REPOSITORY)?;
     if config_default.is_some() {
         return Ok(config_default);
     } else {
@@ -194,7 +192,7 @@ pub async fn unset_default_repository() -> Result<()> {
 
 /// Get repository spec from config.
 pub async fn get_repository(repo_name: &str) -> Result<Option<RepositorySpec>> {
-    if let Some(value) = ffx_config::get(&repository_query(repo_name)).await? {
+    if let Some(value) = ffx_config::get(&repository_query(repo_name))? {
         Ok(serde_json::from_value(value)?)
     } else {
         Ok(None)
@@ -204,7 +202,7 @@ pub async fn get_repository(repo_name: &str) -> Result<Option<RepositorySpec>> {
 /// Read all the repositories from the config. This will log, but otherwise ignore invalid entries.
 pub async fn get_repositories() -> BTreeMap<String, RepositorySpec> {
     #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336157)
-    let value = match ffx_config::get::<Option<Value>, _>(CONFIG_KEY_REPOSITORIES).await {
+    let value = match ffx_config::get::<Option<Value>, _>(CONFIG_KEY_REPOSITORIES) {
         Ok(Some(value)) => value,
         Ok(None) => {
             return BTreeMap::new();
@@ -267,7 +265,7 @@ pub async fn get_registration(
     repo_name: &str,
     target_identifier: &str,
 ) -> Result<Option<RepositoryTarget>> {
-    if let Some(value) = ffx_config::get(&registration_query(repo_name, target_identifier)).await? {
+    if let Some(value) = ffx_config::get(&registration_query(repo_name, target_identifier))? {
         Ok(Some(serde_json::from_value(value)?))
     } else {
         Ok(None)
@@ -276,7 +274,7 @@ pub async fn get_registration(
 
 pub async fn get_registrations() -> BTreeMap<String, BTreeMap<String, RepositoryTarget>> {
     #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336157)
-    let value = match ffx_config::get::<Option<Value>, _>(CONFIG_KEY_REGISTRATIONS).await {
+    let value = match ffx_config::get::<Option<Value>, _>(CONFIG_KEY_REGISTRATIONS) {
         Ok(Some(value)) => value,
         Ok(None) => {
             return BTreeMap::new();
@@ -314,7 +312,7 @@ pub async fn get_registrations() -> BTreeMap<String, BTreeMap<String, Repository
 
 pub async fn get_repository_registrations(repo_name: &str) -> BTreeMap<String, RepositoryTarget> {
     #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336157)
-    let targets = match ffx_config::get(&repository_registrations_query(repo_name)).await {
+    let targets = match ffx_config::get(&repository_registrations_query(repo_name)) {
         Ok(Some(targets)) => targets,
         Ok(None) => {
             return BTreeMap::new();

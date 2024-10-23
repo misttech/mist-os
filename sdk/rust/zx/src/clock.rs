@@ -61,12 +61,6 @@ impl<Output: Timeline> Clock<BootTimeline, Output> {
     /// Create a new clock object with the provided arguments, with the boot clock as the reference
     /// timeline. Wraps the [zx_clock_create] syscall.
     ///
-    /// WARNING: this has been added in advance of https://fxrev.dev/1066674, the boot timeline is
-    /// not yet available in the stable vdso. This currently uses the monotonic clock which is
-    /// temporarily equivalent to the boot clock until the monotonic clock starts pausing during
-    /// suspend in the near future. This will be migrated to the boot clock before the monotonic
-    /// clock begins pausing during suspend.
-    ///
     /// [zx_clock_create]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_create
     pub fn create(opts: ClockOpts, backstop: Option<Instant<Output>>) -> Result<Self, Status> {
         // TODO(https://fxbug.dev/328306129) add the boot clock reference option

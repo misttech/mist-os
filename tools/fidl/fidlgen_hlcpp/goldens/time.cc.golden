@@ -22,6 +22,8 @@ void AllInstants::Encode(::fidl::Encoder* _encoder, size_t _offset,
   } else {
     ::fidl::Encode(_encoder, &monotonic, _offset + 0);
     ::fidl::Encode(_encoder, &boot, _offset + 8);
+    ::fidl::Encode(_encoder, &monotonic_ticks, _offset + 16);
+    ::fidl::Encode(_encoder, &boot_ticks, _offset + 24);
   }
 }
 
@@ -31,6 +33,8 @@ void AllInstants::Decode(::fidl::Decoder* _decoder, AllInstants* _value, size_t 
   } else {
     ::fidl::Decode(_decoder, &_value->monotonic, _offset + 0);
     ::fidl::Decode(_decoder, &_value->boot, _offset + 8);
+    ::fidl::Decode(_decoder, &_value->monotonic_ticks, _offset + 16);
+    ::fidl::Decode(_decoder, &_value->boot_ticks, _offset + 24);
   }
 }
 
@@ -39,6 +43,12 @@ zx_status_t AllInstants::Clone(AllInstants* _result) const {
   if (_status != ZX_OK)
     return _status;
   _status = ::fidl::Clone(boot, &_result->boot);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(monotonic_ticks, &_result->monotonic_ticks);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(boot_ticks, &_result->boot_ticks);
   if (_status != ZX_OK)
     return _status;
   return ZX_OK;
@@ -57,6 +67,12 @@ ComplexInstants::ComplexInstants(ComplexInstants&& other) {
   if (field_presence_.IsSet<1>()) {
     Construct(&boot_value_.value, std::move(other.boot_value_.value));
   }
+  if (field_presence_.IsSet<2>()) {
+    Construct(&monotonic_ticks_value_.value, std::move(other.monotonic_ticks_value_.value));
+  }
+  if (field_presence_.IsSet<3>()) {
+    Construct(&boot_ticks_value_.value, std::move(other.boot_ticks_value_.value));
+  }
 }
 
 ComplexInstants::~ComplexInstants() {
@@ -65,6 +81,12 @@ ComplexInstants::~ComplexInstants() {
   }
   if (field_presence_.IsSet<1>()) {
     Destruct(&boot_value_.value);
+  }
+  if (field_presence_.IsSet<2>()) {
+    Destruct(&monotonic_ticks_value_.value);
+  }
+  if (field_presence_.IsSet<3>()) {
+    Destruct(&boot_ticks_value_.value);
   }
 }
 
@@ -91,6 +113,28 @@ ComplexInstants& ComplexInstants::operator=(ComplexInstants&& other) {
     field_presence_.Clear<1>();
     Destruct(&boot_value_.value);
   }
+  if (other.field_presence_.IsSet<2>()) {
+    if (field_presence_.IsSet<2>()) {
+      monotonic_ticks_value_.value = std::move(other.monotonic_ticks_value_.value);
+    } else {
+      field_presence_.Set<2>();
+      Construct(&monotonic_ticks_value_.value, std::move(other.monotonic_ticks_value_.value));
+    }
+  } else if (field_presence_.IsSet<2>()) {
+    field_presence_.Clear<2>();
+    Destruct(&monotonic_ticks_value_.value);
+  }
+  if (other.field_presence_.IsSet<3>()) {
+    if (field_presence_.IsSet<3>()) {
+      boot_ticks_value_.value = std::move(other.boot_ticks_value_.value);
+    } else {
+      field_presence_.Set<3>();
+      Construct(&boot_ticks_value_.value, std::move(other.boot_ticks_value_.value));
+    }
+  } else if (field_presence_.IsSet<3>()) {
+    field_presence_.Clear<3>();
+    Destruct(&boot_ticks_value_.value);
+  }
   return *this;
 }
 
@@ -112,6 +156,24 @@ ComplexInstants& ComplexInstants::set_boot(::std::vector<::fidl::basic_time<ZX_C
     Construct(&boot_value_.value, std::move(_value));
   } else {
     boot_value_.value = std::move(_value);
+  }
+  return *this;
+}
+ComplexInstants& ComplexInstants::set_monotonic_ticks(::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10> _value) {
+  if (!field_presence_.IsSet<2>()) {
+    field_presence_.Set<2>();
+    Construct(&monotonic_ticks_value_.value, std::move(_value));
+  } else {
+    monotonic_ticks_value_.value = std::move(_value);
+  }
+  return *this;
+}
+ComplexInstants& ComplexInstants::set_boot_ticks(::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10> _value) {
+  if (!field_presence_.IsSet<3>()) {
+    field_presence_.Set<3>();
+    Construct(&boot_ticks_value_.value, std::move(_value));
+  } else {
+    boot_ticks_value_.value = std::move(_value);
   }
   return *this;
 }
@@ -170,6 +232,54 @@ void ComplexInstants::Encode(::fidl::Encoder* _encoder, size_t _offset,
       envelope->flags = 0;
     }
   }
+  if (field_presence_.IsSet<2>()) {
+    const size_t length_before = _encoder->CurrentLength();
+    const size_t handles_before = _encoder->CurrentHandleCount();
+
+    size_t envelope_base = base + (3 - 1) * sizeof(fidl_envelope_t);
+
+    if (::fidl::EncodingInlineSize<::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>>(_encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+      ::fidl::Encode(_encoder, &monotonic_ticks_value_.value, envelope_base);
+
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
+      envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
+      envelope->flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+    } else {
+      ::fidl::Encode(
+          _encoder,
+          &monotonic_ticks_value_.value,
+          _encoder->Alloc(::fidl::EncodingInlineSize<::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>, ::fidl::Encoder>(_encoder)));
+
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
+      envelope->num_bytes = static_cast<uint32_t>(_encoder->CurrentLength() - length_before);
+      envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
+      envelope->flags = 0;
+    }
+  }
+  if (field_presence_.IsSet<3>()) {
+    const size_t length_before = _encoder->CurrentLength();
+    const size_t handles_before = _encoder->CurrentHandleCount();
+
+    size_t envelope_base = base + (4 - 1) * sizeof(fidl_envelope_t);
+
+    if (::fidl::EncodingInlineSize<::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>>(_encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+      ::fidl::Encode(_encoder, &boot_ticks_value_.value, envelope_base);
+
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
+      envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
+      envelope->flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+    } else {
+      ::fidl::Encode(
+          _encoder,
+          &boot_ticks_value_.value,
+          _encoder->Alloc(::fidl::EncodingInlineSize<::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>, ::fidl::Encoder>(_encoder)));
+
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
+      envelope->num_bytes = static_cast<uint32_t>(_encoder->CurrentLength() - length_before);
+      envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
+      envelope->flags = 0;
+    }
+  }
 }
 
 void ComplexInstants::Decode(::fidl::Decoder* _decoder, ComplexInstants* _value, size_t _offset) {
@@ -206,6 +316,30 @@ void ComplexInstants::Decode(::fidl::Decoder* _decoder, ComplexInstants* _value,
   } else {
     goto done_2;
   }
+  if (count >= 3) {
+    size_t envelope_base = base + (3 - 1) * sizeof(fidl_envelope_t);
+    fidl_envelope_t* envelope = _decoder->GetPtr<fidl_envelope_t>(envelope_base);
+    if (*reinterpret_cast<const void* const*>(envelope) != nullptr) {
+      ::fidl::Decode(_decoder, _value->mutable_monotonic_ticks(),
+                     _decoder->EnvelopeValueOffset(envelope));
+    } else {
+      _value->clear_monotonic_ticks();
+    }
+  } else {
+    goto done_3;
+  }
+  if (count >= 4) {
+    size_t envelope_base = base + (4 - 1) * sizeof(fidl_envelope_t);
+    fidl_envelope_t* envelope = _decoder->GetPtr<fidl_envelope_t>(envelope_base);
+    if (*reinterpret_cast<const void* const*>(envelope) != nullptr) {
+      ::fidl::Decode(_decoder, _value->mutable_boot_ticks(),
+                     _decoder->EnvelopeValueOffset(envelope));
+    } else {
+      _value->clear_boot_ticks();
+    }
+  } else {
+    goto done_4;
+  }
 
   return;
 
@@ -215,6 +349,10 @@ done_1:
   _value->clear_monotonic();
 done_2:
   _value->clear_boot();
+done_3:
+  _value->clear_monotonic_ticks();
+done_4:
+  _value->clear_boot_ticks();
   return;
 }
 
@@ -232,6 +370,20 @@ zx_status_t ComplexInstants::Clone(ComplexInstants* result) const {
       return _status;
   } else {
     result->clear_boot();
+  }
+  if (field_presence_.IsSet<2>()) {
+    zx_status_t _status = ::fidl::Clone(monotonic_ticks_value_.value, result->mutable_monotonic_ticks());
+    if (_status != ZX_OK)
+      return _status;
+  } else {
+    result->clear_monotonic_ticks();
+  }
+  if (field_presence_.IsSet<3>()) {
+    zx_status_t _status = ::fidl::Clone(boot_ticks_value_.value, result->mutable_boot_ticks());
+    if (_status != ZX_OK)
+      return _status;
+  } else {
+    result->clear_boot_ticks();
   }
   return ZX_OK;
 }

@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_sysinfo as sysinfo, zx,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_sysinfo as sysinfo,
 };
 
 #[async_trait::async_trait]

@@ -25,6 +25,42 @@ class RegistryServerStreamConfigWarningTest : public RegistryServerWarningTest {
 // Device-less tests
 //
 // A subsequent call to WatchDevicesAdded before the previous one completes should fail.
+TEST_F(RegistryServerWarningTest, WatchDevicesTwiceBeforeDeviceDiscoveryCompletes) {
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  bool received_callback_0 = false, received_callback_1 = false;
+
+  // Before initial device discovery, first `WatchDevicesAdded` call should pend indefinitely
+  // (and should continue to, even after a subsequent `WatchDevicesAdded` call fails).
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback_0](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        received_callback_0 = true;
+        ADD_FAILURE() << "Unexpected completion for WatchDevicesAdded; should pend indefinitely";
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_FALSE(received_callback_0);
+
+  // The next `WatchDevicesAdded` call should fail immediately with domain error
+  // ALREADY_PENDING, since the previous call has not yet completed.
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback_1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        received_callback_1 = true;
+        ASSERT_TRUE(result.is_error());
+        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fad::RegistryWatchDevicesAddedError::kAlreadyPending)
+            << result.error_value();
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback_0);
+  EXPECT_TRUE(received_callback_1);
+  EXPECT_EQ(RegistryServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
+// A subsequent call to WatchDevicesAdded before the previous one completes should fail.
 TEST_F(RegistryServerWarningTest, WatchDevicesAddedWhilePending) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -185,7 +221,7 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverMissingObserver) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_id = *result->devices()->at(0).token_id();
+        added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -198,7 +234,7 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverMissingObserver) {
 
   registry->client()
       ->CreateObserver({{
-          .token_id = *added_id,
+          .token_id = added_id,
       }})
       .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
         received_callback = true;
@@ -233,7 +269,7 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_id = *result->devices()->at(0).token_id();
+        added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -246,7 +282,7 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
 
   registry->client()
       ->CreateObserver({{
-          .token_id = *added_id,
+          .token_id = added_id,
           .observer_server = fidl::ServerEnd<fad::Observer>(),
       }})
       .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
@@ -288,7 +324,7 @@ TEST_F(RegistryServerCompositeWarningTest, CreateObserverMissingObserver) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_id = *result->devices()->at(0).token_id();
+        added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -301,7 +337,7 @@ TEST_F(RegistryServerCompositeWarningTest, CreateObserverMissingObserver) {
 
   registry->client()
       ->CreateObserver({{
-          .token_id = *added_id,
+          .token_id = added_id,
       }})
       .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
         received_callback = true;
@@ -336,7 +372,7 @@ TEST_F(RegistryServerCompositeWarningTest, CreateObserverBadObserver) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_id = *result->devices()->at(0).token_id();
+        added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -349,7 +385,7 @@ TEST_F(RegistryServerCompositeWarningTest, CreateObserverBadObserver) {
 
   registry->client()
       ->CreateObserver({{
-          .token_id = *added_id,
+          .token_id = added_id,
           .observer_server = fidl::ServerEnd<fad::Observer>(),
       }})
       .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
@@ -391,7 +427,7 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverMissingObserver) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_id = *result->devices()->at(0).token_id();
+        added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -404,7 +440,7 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverMissingObserver) {
 
   registry->client()
       ->CreateObserver({{
-          .token_id = *added_id,
+          .token_id = added_id,
       }})
       .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
         received_callback = true;
@@ -439,7 +475,7 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverBadObserver) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_id = *result->devices()->at(0).token_id();
+        added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -452,7 +488,7 @@ TEST_F(RegistryServerStreamConfigWarningTest, CreateObserverBadObserver) {
 
   registry->client()
       ->CreateObserver({{
-          .token_id = *added_id,
+          .token_id = added_id,
           .observer_server = fidl::ServerEnd<fad::Observer>(),
       }})
       .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {

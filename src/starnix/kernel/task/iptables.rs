@@ -6,6 +6,7 @@ use crate::mm::MemoryAccessorExt;
 use crate::task::CurrentTask;
 use crate::vfs::socket::iptables_utils::{self, write_string_to_ascii_buffer};
 use crate::vfs::socket::{SocketDomain, SocketHandle, SocketType};
+use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::sync::Controller;
 use fidl_fuchsia_net_filter_ext::{
     Change, CommitError, ControllerCreationError, ControllerId, PushChangesError,
@@ -30,7 +31,6 @@ use std::collections::HashMap;
 use std::mem::size_of;
 use thiserror::Error;
 use zerocopy::{FromBytes, IntoBytes};
-use {fidl_fuchsia_net_filter as fnet_filter, zx};
 
 const NAMESPACE_ID_PREFIX: &str = "starnix";
 
