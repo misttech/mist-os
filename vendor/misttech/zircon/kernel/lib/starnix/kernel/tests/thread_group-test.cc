@@ -53,7 +53,7 @@ bool test_exit_status() {
   auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
   {
     auto child = (*current_task).clone_task_for_test(0, {kSIGCHLD});
-    (*child)->thread_group()->exit(starnix::ExitStatusExit(42), {});
+    (*child)->thread_group()->exit(starnix::ExitStatus::Exit(42), {});
   }
   // ASSERT_EQ(current_task->thread_group->read(), starnix::ExitStatusExit(42))
 
