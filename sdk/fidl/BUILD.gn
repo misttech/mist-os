@@ -311,3 +311,12 @@ group("sdk_partner_internal_libs") {
 group("sdk_partner_internal_libs_allowlist") {
   visibility = _partner_internal_fidl_libraries_targets_list
 }
+
+group("internal_only_idk_libs_allowlist") {
+  visibility = []
+
+  # The "internal_only_idk" SDK category is deprecated - do not add to this list.
+  # TODO(https://fxbug.dev/333907192): Promote this library to "partner" or
+  # "partner_internal" and delete this group.
+  visibility += [ "//sdk/fidl/fuchsia.boot($fidl_toolchain)" ]
+}
