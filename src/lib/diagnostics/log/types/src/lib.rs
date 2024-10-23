@@ -216,15 +216,15 @@ impl FromStr for Severity {
 
 impl PartialEq<fdiagnostics::Severity> for Severity {
     fn eq(&self, other: &fdiagnostics::Severity) -> bool {
-        match (self, other) {
+        matches!(
+            (self, other),
             (Severity::Trace, fdiagnostics::Severity::Trace)
-            | (Severity::Debug, fdiagnostics::Severity::Debug)
-            | (Severity::Info, fdiagnostics::Severity::Info)
-            | (Severity::Warn, fdiagnostics::Severity::Warn)
-            | (Severity::Error, fdiagnostics::Severity::Error)
-            | (Severity::Fatal, fdiagnostics::Severity::Fatal) => true,
-            _ => false,
-        }
+                | (Severity::Debug, fdiagnostics::Severity::Debug)
+                | (Severity::Info, fdiagnostics::Severity::Info)
+                | (Severity::Warn, fdiagnostics::Severity::Warn)
+                | (Severity::Error, fdiagnostics::Severity::Error)
+                | (Severity::Fatal, fdiagnostics::Severity::Fatal)
+        )
     }
 }
 

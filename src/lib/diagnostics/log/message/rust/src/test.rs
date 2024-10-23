@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![cfg(test)]
-
 use super::*;
 use assert_matches::assert_matches;
 use diagnostics_data::*;
@@ -353,7 +351,7 @@ fn no_tags_with_message() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp: zx::BootInstant::from_nanos(3).into(),
+            timestamp: zx::BootInstant::from_nanos(3),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Debug,
@@ -429,7 +427,7 @@ fn legacy_message_severity() {
 
     let expected_message = |severity: Severity, raw_severity: Option<u8>| {
         let mut expected_message = LogsDataBuilder::new(BuilderArgs {
-            timestamp: zx::BootInstant::from_nanos(3).into(),
+            timestamp: zx::BootInstant::from_nanos(3),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity,
@@ -495,7 +493,7 @@ fn test_raw_severity_parsing_and_conversions() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp: zx::BootInstant::from_nanos(72).into(),
+            timestamp: zx::BootInstant::from_nanos(72),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Debug,
@@ -554,7 +552,7 @@ fn test_from_structured() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp: zx::BootInstant::from_nanos(72).into(),
+            timestamp: zx::BootInstant::from_nanos(72),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Error,
@@ -599,7 +597,7 @@ fn test_from_structured() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp: zx::BootInstant::from_nanos(72).into(),
+            timestamp: zx::BootInstant::from_nanos(72),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Error,
@@ -624,7 +622,7 @@ fn test_from_structured() {
     assert_eq!(
         parsed,
         LogsDataBuilder::new(BuilderArgs {
-            timestamp: zx::BootInstant::from_nanos(72).into(),
+            timestamp: zx::BootInstant::from_nanos(72),
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Error,
@@ -634,7 +632,7 @@ fn test_from_structured() {
 
     // parse error
     assert_matches!(
-        crate::from_structured(get_test_identity(), &vec![]).unwrap_err(),
+        crate::from_structured(get_test_identity(), &[]).unwrap_err(),
         MessageError::ParseError { .. }
     );
 }

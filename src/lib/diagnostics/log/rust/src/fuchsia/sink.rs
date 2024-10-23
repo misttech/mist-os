@@ -62,10 +62,7 @@ impl Sink {
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
         let mut encoder = Encoder::new(
             Cursor::new(&mut buf[..]),
-            EncoderOpts {
-                always_log_file_line: self.config.always_log_file_line,
-                ..EncoderOpts::default()
-            },
+            EncoderOpts { always_log_file_line: self.config.always_log_file_line },
         );
         if encode(&mut encoder, previously_dropped).is_err() {
             restore_and_increment_dropped_count();
@@ -77,7 +74,7 @@ impl Sink {
         self.send(packet, restore_and_increment_dropped_count);
     }
 
-    fn send(&self, packet: &[u8], on_error: impl Fn() -> ()) {
+    fn send(&self, packet: &[u8], on_error: impl Fn()) {
         while let Err(status) = self.socket.write(packet) {
             if status != zx::Status::SHOULD_WAIT || !self.config.retry_on_buffer_full {
                 on_error();
