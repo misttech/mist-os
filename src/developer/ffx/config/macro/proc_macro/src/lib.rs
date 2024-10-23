@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, bail, Context, Error, Result};
 use include_str_from_working_dir::include_str_from_working_dir_env;
 use proc_macro::TokenStream;
 use quote::quote;
 use serde_json::Value;
+use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
+use syn::Result;
 
 const FFX_CONFIG_DEFAULT: &'static str = "ffx_config_default";
 
@@ -56,6 +58,21 @@ fn option_wrapped_type<'a>(ty: &'a syn::Type) -> Option<&'a syn::Type> {
     None
 }
 
+enum ConfigArgs {
+    Str(syn::LitStr),
+    MetaNameValue(syn::MetaNameValue),
+}
+
+impl syn::parse::Parse for ConfigArgs {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        Ok(if input.peek(syn::LitStr) {
+            ConfigArgs::Str(input.parse()?)
+        } else {
+            ConfigArgs::MetaNameValue(input.parse()?)
+        })
+    }
+}
+
 struct FfxConfigField<'a> {
     value_type: ConfigValueType,
     key: syn::LitStr,
@@ -65,49 +82,53 @@ struct FfxConfigField<'a> {
 
 impl<'a> FfxConfigField<'a> {
     fn parse(field: &'a syn::Field, attr: &syn::Attribute) -> Result<Self> {
-        let wrapped_type =
-            option_wrapped_type(&field.ty).ok_or(anyhow!("type must be wrapped in Option<_>"))?;
-        let value_type: ConfigValueType =
-            type_ident(wrapped_type).ok_or(anyhow!("couldn't get wrapped type"))?.try_into()?;
-        let (key, default) = if let syn::Meta::List(meta_list) = attr.parse_meta()? {
+        let wrapped_type = option_wrapped_type(&field.ty)
+            .ok_or_else(|| syn::Error::new(field.ty.span(), "type must be wrapped in Option<_>"))?;
+        let value_type =
+            ConfigValueType::try_from(type_ident(wrapped_type).ok_or_else(|| {
+                syn::Error::new(wrapped_type.span(), "couldn't get wrapped type")
+            })?)?;
+        let (key, default) = {
             let mut key = None;
             let mut default = None;
-            for kv in meta_list.nested.iter() {
-                if let syn::NestedMeta::Meta(syn::Meta::NameValue(name)) = kv {
-                    let value_to_update = match &name
-                        .path
-                        .segments
-                        .last()
-                        .expect("must have at least one segment")
-                        .ident
-                    {
-                        n if n == "key" => &mut key,
-                        n if n == "default" => &mut default,
-                        n => panic!("unsupported ident: `{}`", n),
-                    };
-                    if let syn::Lit::Str(lit) = &name.lit {
-                        *value_to_update = Some(lit.clone())
-                    } else {
-                        panic!(
-                            "value for \"{}\" must be set to a string",
-                            value_to_update.as_ref().expect("value set to empty").value()
-                        )
+            let nested =
+                attr.parse_args_with(Punctuated::<ConfigArgs, syn::Token![,]>::parse_terminated)?;
+            for meta in nested {
+                match meta {
+                    ConfigArgs::MetaNameValue(name) => {
+                        let value_to_update = if name.path.is_ident("key") {
+                            &mut key
+                        } else if name.path.is_ident("default") {
+                            &mut default
+                        } else {
+                            return Err(syn::Error::new(name.span(), "unsupported ident"));
+                        };
+                        if let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(lit), .. }) =
+                            &name.value
+                        {
+                            *value_to_update = Some(lit.clone())
+                        } else {
+                            return Err(syn::Error::new(
+                                name.value.span(),
+                                format!(
+                                    "value for \"{}\" must be set to a string",
+                                    value_to_update.as_ref().expect("value set to empty").value()
+                                ),
+                            ));
+                        }
                     }
-                } else {
-                    key = Some(
-                        attr.parse_args::<syn::LitStr>()
-                            .context("expecting config string with no default")?,
-                    );
-                    default = Option::<syn::LitStr>::None;
-                    break;
+                    ConfigArgs::Str(lit) => {
+                        key = Some(lit);
+                        default = Option::<syn::LitStr>::None;
+                        break;
+                    }
                 }
             }
-            (key.ok_or(anyhow!("key expected"))?, default)
-        } else {
-            panic!("error parsing meta list. Is the attribute formtted correctly?");
+            (key.ok_or_else(|| syn::Error::new(attr.span(), "key expected"))?, default)
         };
-        let func_name =
-            field.ident.as_ref().ok_or(anyhow!("ffx_config_default fields must have names"))?;
+        let func_name = field.ident.as_ref().ok_or_else(|| {
+            syn::Error::new(field.span(), "ffx_config_default fields must have names")
+        })?;
         Ok(Self { value_type, key, default, func_name })
     }
 }
@@ -165,15 +186,13 @@ impl quote::ToTokens for ConfigValueType {
     }
 }
 
-impl TryFrom<&syn::Ident> for ConfigValueType {
-    type Error = Error;
-
+impl ConfigValueType {
     fn try_from(value: &syn::Ident) -> Result<Self> {
         Ok(match value {
             n if n == "String" => ConfigValueType::StringType,
             n if n == "f64" => ConfigValueType::FloatType,
             n if n == "u64" => ConfigValueType::IntegerType,
-            _ => bail!("unsupported type: {}", value),
+            _ => return Err(syn::Error::new(value.span(), "unsupported type")),
         })
     }
 }
@@ -185,8 +204,11 @@ fn generate_impls(item: &syn::ItemStruct) -> TokenStream {
         let mut config_builder = Option::<String>::None;
     });
     for field in item.fields.iter() {
-        if let Some(attr) = field.attrs.iter().find(|a| a.path.is_ident(FFX_CONFIG_DEFAULT)) {
-            let config_field = FfxConfigField::parse(field, attr).unwrap();
+        if let Some(attr) = field.attrs.iter().find(|a| a.path().is_ident(FFX_CONFIG_DEFAULT)) {
+            let config_field = match FfxConfigField::parse(field, attr) {
+                Ok(f) => f,
+                Err(e) => return e.to_compile_error().into(),
+            };
             let field = &config_field.func_name;
             let key = &config_field.key;
             runtime_config_builder.push(quote! {
@@ -223,6 +245,25 @@ fn generate_impls(item: &syn::ItemStruct) -> TokenStream {
     })
 }
 
+/// Allows specifying parameters that are backed by configurations. Also allows
+/// specifying a default value if the field is missing from the configuration.
+///
+/// # Example
+/// ```
+/// #[derive(FfxConfigBacked)]
+/// struct Abc {
+///   #[ffx_config_default(key = "abc.first", default = "0")]
+///   field1: Option<u64>,
+///
+///   #[ffx_config_default(key = "abc.second")]
+///   field2: Option<u64>,
+///
+///   #[ffx_config_default("abc.third")]
+///   field3: Option<u64>,
+///
+///   field4: u32,
+/// }
+/// ```
 #[proc_macro_derive(FfxConfigBacked, attributes(ffx_config_default))]
 pub fn derive_ffx_config_backed(input: TokenStream) -> TokenStream {
     let item: syn::ItemStruct = syn::parse(input.into()).expect("expected struct");
