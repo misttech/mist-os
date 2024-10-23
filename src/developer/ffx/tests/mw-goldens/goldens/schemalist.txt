@@ -3,6 +3,7 @@ daemon_stop.json
 emu_show.json
 emu_start.json
 emu_stop.json
+package_file-hash.json
 product_download.json
 product_get-artifacts.json
 product_get-image-path.json
