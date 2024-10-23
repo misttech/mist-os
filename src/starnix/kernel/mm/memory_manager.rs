@@ -26,10 +26,11 @@ use starnix_logging::{
     impossible_error, log_warn, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
+use starnix_types::futex_address::FutexAddress;
+use starnix_types::math::round_up_to_system_page_size;
+use starnix_types::ownership::WeakRef;
+use starnix_types::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::futex_address::FutexAddress;
-use starnix_uapi::math::round_up_to_system_page_size;
-use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::range_ext::RangeExt;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::restricted_aspace::{
@@ -37,7 +38,6 @@ use starnix_uapi::restricted_aspace::{
 };
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
-use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE,

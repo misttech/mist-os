@@ -16,9 +16,9 @@ use crate::vfs::{
 
 use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_types::math::round_up_to_system_page_size;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, AccessCheck};
-use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::seal_flags::SealFlags;

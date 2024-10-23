@@ -25,10 +25,10 @@ use std::sync::{mpsc, Arc};
 use zerocopy::{Immutable, IntoBytes};
 
 use starnix_syscalls::{SyscallArg, SyscallResult};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserAddress;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{statfs, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
 
 /// Create a FileSystemHandle for use in testing.

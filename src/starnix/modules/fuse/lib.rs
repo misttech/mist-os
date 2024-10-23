@@ -28,14 +28,15 @@ use starnix_sync::{
     RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
+use starnix_types::time::{duration_from_timespec, time_from_timespec};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EINTR, EINVAL, ENOENT, ENOSYS};
 use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::time::{duration_from_timespec, time_from_timespec};
-use starnix_uapi::vfs::{default_statfs, FdEvents};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, errno_from_code, error, mode, off_t, statfs, uapi, FUSE_SUPER_MAGIC};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};

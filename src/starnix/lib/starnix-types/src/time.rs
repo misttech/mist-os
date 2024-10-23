@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::errors::{error, Errno};
-use crate::{itimerspec, timespec, timeval};
-
 use linux_uapi::itimerval;
+use starnix_uapi::errors::{error, Errno};
+use starnix_uapi::{itimerspec, timespec, timeval};
 use static_assertions::const_assert_eq;
 
 const MICROS_PER_SECOND: i64 = 1000 * 1000;

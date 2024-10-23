@@ -26,6 +26,7 @@ use starnix_core::vfs::{
 use starnix_core::{security, signals};
 use starnix_logging::{log_error, log_info, log_warn};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex};
+use starnix_types::ownership::WeakRef;
 use starnix_uapi::auth::{Capabilities, Credentials};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errno;
@@ -33,7 +34,6 @@ use starnix_uapi::errors::{Errno, EEXIST, ENOTDIR};
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::signals::{SIGINT, SIGKILL};
 use starnix_uapi::unmount_flags::UnmountFlags;
 use std::ffi::CString;

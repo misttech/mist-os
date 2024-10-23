@@ -22,14 +22,15 @@ use starnix_sync::{
     FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, MutexGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::user_buffer::{UserBuffer, UserBuffers};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::CAP_SYS_RESOURCE;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::SIGPIPE;
 use starnix_uapi::user_address::{UserAddress, UserRef};
-use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
-use starnix_uapi::vfs::{default_statfs, FdEvents};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     errno, error, statfs, uapi, FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
 };

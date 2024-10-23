@@ -23,12 +23,12 @@ use selinux::{
 };
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
 use starnix_sync::Mutex;
+use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
-use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
 use std::collections::HashSet;

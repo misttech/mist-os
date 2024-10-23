@@ -5,9 +5,9 @@
 // A FutexAddress is a more limited form of UserAddress. FutexAddress values must be aligned
 // to a 4 byte boundary and must be within the restricted address space range.
 
-use super::errors::{error, Errno};
-use super::restricted_aspace::RESTRICTED_ASPACE_HIGHEST_ADDRESS;
-use super::user_address::UserAddress;
+use starnix_uapi::errors::{error, Errno};
+use starnix_uapi::restricted_aspace::RESTRICTED_ASPACE_HIGHEST_ADDRESS;
+use starnix_uapi::user_address::UserAddress;
 use std::fmt;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use zx::sys::zx_vaddr_t;
@@ -45,6 +45,12 @@ impl TryFrom<UserAddress> for FutexAddress {
 
     fn try_from(value: UserAddress) -> Result<Self, Errno> {
         value.ptr().try_into()
+    }
+}
+
+impl Into<UserAddress> for FutexAddress {
+    fn into(self) -> UserAddress {
+        UserAddress::const_from(self.ptr() as u64)
     }
 }
 

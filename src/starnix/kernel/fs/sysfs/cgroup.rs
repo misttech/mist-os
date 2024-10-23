@@ -15,12 +15,12 @@ use crate::vfs::{
     FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_types::ownership::WeakRef;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::{errno, error, pid_t};
 use std::sync::Arc;
 

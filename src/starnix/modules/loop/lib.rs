@@ -18,11 +18,11 @@ use starnix_core::vfs::{
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::device_type::{DeviceType, LOOP_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserRef;
-use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::{
     __kernel_old_dev_t, errno, error, loop_info, loop_info64, uapi, BLKFLSBUF, BLKGETSIZE,
     BLKGETSIZE64, LOOP_CHANGE_FD, LOOP_CLR_FD, LOOP_CONFIGURE, LOOP_CTL_ADD, LOOP_CTL_GET_FREE,

@@ -14,9 +14,9 @@ use crate::vfs::{
 };
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_types::time::{duration_from_timespec, timespec_from_duration, timespec_is_zero};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::time::{duration_from_timespec, timespec_from_duration, timespec_is_zero};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{error, itimerspec, TFD_TIMER_ABSTIME};
 use std::sync::{Arc, Weak};

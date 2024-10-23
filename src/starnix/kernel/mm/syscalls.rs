@@ -15,9 +15,9 @@ use fuchsia_runtime::UtcInstant;
 use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::SyscallArg;
+use starnix_types::time::{duration_from_timespec, time_from_timespec, timespec_from_time};
 use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
 use starnix_uapi::errors::{Errno, EINTR};
-use starnix_uapi::time::{duration_from_timespec, time_from_timespec, timespec_from_time};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{

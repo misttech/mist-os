@@ -16,6 +16,7 @@ use fuchsia_runtime::UtcInstant;
 use futures::future::BoxFuture;
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_types::convert::{FromFidl as _, IntoFidl as _};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{AccessCheck, FileMode};
@@ -71,7 +72,7 @@ pub fn serve_file_at(
                 };
                 StarnixNodeConnection::new(Arc::downgrade(&kernel), file)
             };
-            starnix_file.open(scope.clone(), open_flags.into(), path::Path::dot(), server_end);
+            starnix_file.open(scope.clone(), open_flags.into_fidl(), path::Path::dot(), server_end);
             scope.wait().await;
         }
     });
@@ -680,7 +681,7 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
     }
 
     fn update_flags(&self, flags: fio::OpenFlags) -> zx::Status {
-        let flags = OpenFlags::from(flags);
+        let flags = OpenFlags::from_fidl(flags);
 
         // `fcntl(F_SETFL)` also supports setting `O_NOATIME`, but it's allowed
         // only when the calling process has the same EUID as the UID of the

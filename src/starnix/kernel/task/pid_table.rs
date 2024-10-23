@@ -5,7 +5,7 @@
 use crate::memory_attribution;
 use crate::task::{ProcessGroup, Task, ThreadGroup, ZombieProcess};
 use starnix_logging::track_stub;
-use starnix_uapi::ownership::{TempRef, WeakRef};
+use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::pid_t;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};

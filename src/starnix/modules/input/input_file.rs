@@ -11,8 +11,8 @@ use starnix_core::vfs::{fileops_impl_noop_sync, FileObject, FileOps};
 use starnix_logging::{log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::time::duration_from_timeval;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::time::duration_from_timeval;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{

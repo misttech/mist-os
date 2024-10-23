@@ -21,10 +21,10 @@ use starnix_logging::track_stub;
 use starnix_sync::{LockBefore, Locked, MmDumpable};
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_syscalls::SyscallResult;
+use starnix_types::ownership::{OwnedRef, Releasable, WeakRef};
 use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
 use starnix_uapi::elf::ElfNoteType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::ownership::{OwnedRef, Releasable, WeakRef};
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, SIGCHLD, SIGKILL, SIGSTOP, SIGTRAP};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{

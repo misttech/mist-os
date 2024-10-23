@@ -19,12 +19,12 @@ use starnix_core::vfs::{
 };
 use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{errno, error, ino_t, off_t, statfs, EXT4_SUPER_MAGIC};
 use std::sync::Arc;
 use zx::HandleBased;

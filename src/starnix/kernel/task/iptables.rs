@@ -14,9 +14,9 @@ use fidl_fuchsia_net_filter_ext::{
 use fuchsia_component::client::connect_to_protocol_sync;
 use itertools::Itertools;
 use starnix_logging::{log_warn, track_stub};
+use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::iptables_flags::NfIpHooks;
-use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::{
     c_char, errno, error, ip6t_entry, ip6t_get_entries, ip6t_getinfo, ipt_entry, ipt_get_entries,
     ipt_getinfo, nf_inet_hooks_NF_INET_NUMHOOKS, xt_counters, xt_counters_info,

@@ -12,9 +12,9 @@ use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
 use starnix_sync::{
     EventWaitGuard, InterruptibleEvent, Mutex, NotifyKind, PortEvent, PortWaitResult,
 };
+use starnix_types::ownership::debug_assert_no_local_temp_ref;
 use starnix_uapi::error;
 use starnix_uapi::errors::{Errno, EINTR};
-use starnix_uapi::ownership::debug_assert_no_local_temp_ref;
 use starnix_uapi::vfs::FdEvents;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};

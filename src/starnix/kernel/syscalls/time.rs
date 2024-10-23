@@ -10,12 +10,12 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::UtcInstant;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{InterruptibleEvent, Locked, Unlocked, WakeReason};
-use starnix_uapi::auth::CAP_WAKE_ALARM;
-use starnix_uapi::errors::{Errno, EINTR};
-use starnix_uapi::time::{
+use starnix_types::time::{
     duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
     timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
 };
+use starnix_uapi::auth::CAP_WAKE_ALARM;
+use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::user_address::UserRef;
 use starnix_uapi::{
     errno, error, from_status_like_fdio, itimerspec, itimerval, pid_t, sigevent, timespec, timeval,
@@ -547,7 +547,7 @@ mod test {
     use crate::testing::*;
     use crate::time::utc::UtcClockOverrideGuard;
     use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcDuration};
-    use starnix_uapi::ownership::OwnedRef;
+    use starnix_types::ownership::OwnedRef;
     use starnix_uapi::signals;
     use starnix_uapi::user_address::UserAddress;
     use test_util::{assert_geq, assert_leq};

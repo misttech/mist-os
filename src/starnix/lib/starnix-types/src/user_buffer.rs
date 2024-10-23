@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::errors::{errno, error, Errno};
-use super::user_address::UserAddress;
 use super::PAGE_SIZE;
-use once_cell::sync::Lazy;
 use smallvec::SmallVec;
+use starnix_uapi::errors::{errno, error, Errno};
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use std::sync::LazyLock;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 pub type UserBuffers = SmallVec<[UserBuffer; 1]>;
@@ -21,7 +21,7 @@ pub struct UserBuffer {
     pub length: usize,
 }
 
-pub static MAX_RW_COUNT: Lazy<usize> = Lazy::new(|| ((1 << 31) - *PAGE_SIZE) as usize);
+pub static MAX_RW_COUNT: LazyLock<usize> = LazyLock::new(|| ((1 << 31) - *PAGE_SIZE) as usize);
 
 impl UserBuffer {
     pub fn cap_buffers_to_max_rw_count(
@@ -78,6 +78,18 @@ impl UserBuffer {
         } else {
             false
         }
+    }
+}
+
+impl<T> TryInto<UserRef<T>> for UserBuffer {
+    type Error = Errno;
+
+    /// Returns EINVAL if the buffer is too small for the type.
+    fn try_into(self) -> Result<UserRef<T>, Errno> {
+        if self.length < std::mem::size_of::<T>() {
+            return error!(EINVAL);
+        }
+        Ok(UserRef::new(self.address))
     }
 }
 

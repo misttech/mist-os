@@ -17,14 +17,14 @@ use crate::vfs::syscalls::{
 };
 use crate::vfs::{DirentSink32, FdNumber};
 use starnix_logging::track_stub;
+use starnix_types::time::{
+    duration_from_poll_timeout, duration_from_timeval, timeval_from_duration,
+};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoResultExt};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::{SigSet, SIGCHLD};
-use starnix_uapi::time::{
-    duration_from_poll_timeout, duration_from_timeval, timeval_from_duration,
-};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::vfs::EpollEvent;
 use starnix_uapi::{

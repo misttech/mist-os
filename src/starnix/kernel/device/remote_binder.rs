@@ -27,10 +27,10 @@ use starnix_logging::{
 };
 use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::ownership::{OwnedRef, WeakRef};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoCode, EAGAIN, EINTR};
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::{OwnedRef, WeakRef};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, errno_from_code, error, pid_t, uapi, PATH_MAX};

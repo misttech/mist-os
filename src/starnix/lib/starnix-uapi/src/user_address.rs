@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::errors::{error, Errno};
-use super::futex_address::FutexAddress;
+use super::errors::Errno;
 use super::math::round_up_to_increment;
 use super::uapi;
-use super::user_buffer::UserBuffer;
 use std::marker::PhantomData;
 use std::{fmt, mem, ops};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-use zx::sys::zx_vaddr_t;
+use zx_types::zx_vaddr_t;
 
 #[derive(
     Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, KnownLayout, FromBytes, Immutable,
@@ -89,12 +87,6 @@ impl From<uapi::uaddr> for UserAddress {
 impl From<UserAddress> for uapi::uaddr {
     fn from(value: UserAddress) -> Self {
         Self { addr: value.0 }
-    }
-}
-
-impl From<FutexAddress> for UserAddress {
-    fn from(value: FutexAddress) -> Self {
-        Self(value.ptr() as u64)
     }
 }
 
@@ -219,18 +211,6 @@ impl<T> From<UserRef<T>> for UserAddress {
     }
 }
 
-impl<T> TryFrom<UserBuffer> for UserRef<T> {
-    type Error = Errno;
-
-    /// Returns EINVAL if the buffer is too small for the type.
-    fn try_from(buf: UserBuffer) -> Result<Self, Errno> {
-        if buf.length < mem::size_of::<T>() {
-            return error!(EINVAL);
-        }
-        Ok(Self::new(buf.address))
-    }
-}
-
 impl<T> From<uapi::uref<T>> for UserRef<T> {
     fn from(value: uapi::uref<T>) -> Self {
         Self::new(value.addr.into())
@@ -303,7 +283,7 @@ impl fmt::Display for UserCString {
 mod tests {
     use super::{UserAddress, UserRef};
 
-    #[::fuchsia::test]
+    #[test]
     fn test_into() {
         assert_eq!(UserRef::<u32>::default(), UserAddress::default().into());
         let user_address = UserAddress::from(32);

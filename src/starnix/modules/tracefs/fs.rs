@@ -10,10 +10,10 @@ use starnix_core::vfs::{
     FsNodeInfo, FsStr, StaticDirectoryBuilder,
 };
 use starnix_sync::{Locked, Unlocked};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{statfs, TRACEFS_MAGIC};
 
 pub fn trace_fs(

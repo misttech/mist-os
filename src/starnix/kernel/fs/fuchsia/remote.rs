@@ -28,13 +28,13 @@ use starnix_sync::{
     FileOpsCore, Locked, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{
     __kernel_fsid_t, errno, error, from_status_like_fdio, fsverity_descriptor, ino_t, off_t, statfs,
 };

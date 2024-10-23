@@ -14,12 +14,12 @@ use crate::vfs::{
 };
 use serde::{Deserialize, Serialize};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{errno, error, statfs};
 use std::borrow::Cow;
 use std::net::{Ipv4Addr, Ipv6Addr};

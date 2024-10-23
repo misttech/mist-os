@@ -28,11 +28,11 @@ use selinux::{
 };
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicU64, Ordering};

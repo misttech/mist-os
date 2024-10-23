@@ -7,7 +7,7 @@ use crate::signals::SignalInfo;
 use crate::task::{Session, ThreadGroup};
 use macro_rules_attribute::apply;
 use starnix_sync::{LockBefore, Locked, OrderedRwLock, ProcessGroupState};
-use starnix_uapi::ownership::{TempRef, WeakRef};
+use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::pid_t;
 use starnix_uapi::signals::{Signal, SIGCONT, SIGHUP};
 use std::collections::BTreeMap;

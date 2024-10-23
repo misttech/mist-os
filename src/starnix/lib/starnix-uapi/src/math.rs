@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use super::errors::{errno, Errno};
-use super::PAGE_SIZE;
 
 pub fn round_up_to_increment<N, M>(size: N, increment: M) -> Result<N, Errno>
 where
@@ -20,12 +19,4 @@ where
         size
     };
     N::try_from(result).map_err(|_| errno!(EINVAL))
-}
-
-pub fn round_up_to_system_page_size<N>(size: N) -> Result<N, Errno>
-where
-    N: TryInto<usize>,
-    N: TryFrom<usize>,
-{
-    round_up_to_increment(size, *PAGE_SIZE)
 }

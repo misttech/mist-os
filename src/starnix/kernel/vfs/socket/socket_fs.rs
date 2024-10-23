@@ -6,8 +6,8 @@ use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
     CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr,
 };
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{statfs, SOCKFS_MAGIC};
 use std::sync::Arc;
 

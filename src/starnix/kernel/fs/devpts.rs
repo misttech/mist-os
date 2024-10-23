@@ -20,6 +20,7 @@ use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::{DeviceType, TTY_ALT_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -27,7 +28,7 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::SIGWINCH;
 use starnix_uapi::user_address::{UserAddress, UserRef};
-use starnix_uapi::vfs::{default_statfs, FdEvents};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     errno, error, gid_t, ino_t, pid_t, statfs, uapi, uid_t, DEVPTS_SUPER_MAGIC, FIOASYNC, FIOCLEX,
     FIONBIO, FIONCLEX, FIONREAD, FIOQSIZE, TCFLSH, TCGETA, TCGETS, TCGETX, TCSBRK, TCSBRKP, TCSETA,
