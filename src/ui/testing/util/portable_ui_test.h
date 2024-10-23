@@ -100,6 +100,9 @@ class PortableUITest : public LoggingEventLoop, public ::testing::Test {
   // in injector coordinate space.
   void InjectSwipe(int start_x, int start_y, int end_x, int end_y, int move_event_count);
 
+  // Injects a touch event.
+  void InjectTouchEvent(fuchsia_input_report::TouchInputReport report);
+
   // Registers a fake mouse device, for which mouse movement is measured on a
   // scale of [-1000, 1000] on both axes and scroll is measured from [-100, 100]
   // on both axes.

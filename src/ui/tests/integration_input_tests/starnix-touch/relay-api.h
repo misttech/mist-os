@@ -7,13 +7,17 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace relay_api {
 
-constexpr char kReadyMessage[] = "READY";
-constexpr char kFailedMessage[] = "FAILED";
-constexpr char kEventDelimiter[] = "EVENT";
+constexpr std::string kWaitForStdinMessage = "WAIT_FOR_STDIN";
+constexpr std::string kReadyMessage = "READY";
+constexpr std::string kFailedMessage = "FAILED";
+constexpr std::string kEventDelimiter = "EVENT";
 constexpr char kEventFormat[] = "EVENT tv_sec=%ld tv_usec=%ld type=%hu code=%hu value=%d";
+constexpr std::string kQuitCmd = "quit";
+constexpr std::string kEventCmd = "watch_event";
 
 // The formatted event string will be sent across systems, so verify that the
 // size of a `long` is the same on both sides. Similarly for `unsigned short`.
@@ -30,9 +34,17 @@ constexpr size_t kMaxPacketLen = sizeof(kEventFormat) + 3 * internal::kMaxDigits
 
 // Touch down is expressed in six `uapi::input_event`s: BTN_TOUCH, ABS_MT_SLOT,
 // ABS_MT_TRACKING_ID, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, and EV_SYN.
+constexpr size_t kDownNumPackets = 6;
+
+// Touch move expressed in four: ABS_MT_SLOT, ABS_MT_POSITION_X,
+// ABS_MT_POSITION_Y, and EV_SYN.
+constexpr size_t kMoveNumPackets = 4;
+
 // Touch up is expressed in four: BTN_TOUCH, ABS_MT_SLOT, ABS_MT_TRACKING_ID,
 // and EV_SYN.
-constexpr size_t kDownUpNumPackets = 10;
+constexpr size_t kUpNumPackets = 4;
+
+constexpr size_t kDownUpNumPackets = kDownNumPackets + kUpNumPackets;
 
 }  // namespace relay_api
 
