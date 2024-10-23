@@ -384,12 +384,15 @@ fn get_doc_attr(attrs: &[syn::Attribute]) -> Option<String> {
     let attrs = attrs
         .iter()
         .filter_map(|attr| {
-            if !attr.path.is_ident("doc") {
+            if !attr.path().is_ident("doc") {
                 return None;
             }
 
-            let meta = attr.parse_meta().ok()?;
-            if let syn::Meta::NameValue(syn::MetaNameValue { lit: syn::Lit::Str(s), .. }) = meta {
+            if let syn::Meta::NameValue(syn::MetaNameValue {
+                value: syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(s), .. }),
+                ..
+            }) = &attr.meta
+            {
                 return Some(s.value());
             }
 
