@@ -538,16 +538,16 @@ async fn serve_failing_blobfs(
             fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
                 launch_cloned_blobfs(object, flags, open_flags)
             }
-            fio::DirectoryRequest::Reopen { rights_request, object_request, control_handle: _ } => {
-                let _ = object_request;
-                todo!("https://fxbug.dev/42157659: rights_request={:?}", rights_request);
+            fio::DirectoryRequest::Clone2 { request, control_handle: _ } => {
+                let _ = request;
+                todo!("https://fxbug.dev/324112547");
             }
             fio::DirectoryRequest::Close { responder } => {
                 responder.send(Err(zx::Status::IO.into_raw())).context("failing close")?
             }
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
                 let _ = responder;
-                todo!("https://fxbug.dev/42157659");
+                todo!("https://fxbug.dev/324112547");
             }
             fio::DirectoryRequest::Sync { responder } => {
                 responder.send(Err(zx::Status::IO.into_raw())).context("failing sync")?
@@ -574,11 +574,11 @@ async fn serve_failing_blobfs(
             }
             fio::DirectoryRequest::GetAttributes { query, responder } => {
                 let _ = responder;
-                todo!("https://fxbug.dev/42157659: query={:?}", query);
+                todo!("https://fxbug.dev/324112547: query={:?}", query);
             }
             fio::DirectoryRequest::UpdateAttributes { payload, responder } => {
                 let _ = responder;
-                todo!("https://fxbug.dev/42157659: payload={:?}", payload);
+                todo!("https://fxbug.dev/324112547: payload={:?}", payload);
             }
             fio::DirectoryRequest::ListExtendedAttributes { iterator: _, control_handle: _ } => {
                 todo!("https://fxbug.dev/42073111");

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use fidl::endpoints::create_proxy;
+use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_io as fio;
 use futures::TryStreamExt as _;
 use io_conformance_util::flags::Rights;
@@ -152,7 +152,7 @@ async fn clone_directory_with_additional_rights() {
 }
 
 #[fuchsia::test]
-async fn reopen_file_unsupported() {
+async fn clone2_file_unsupported() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
@@ -160,17 +160,17 @@ async fn reopen_file_unsupported() {
     let file_proxy =
         open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
 
-    // fuchsia.io/Node.Reopen
-    let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    file_proxy.reopen(&fio::RightsRequest::default(), reopen_server).unwrap();
+    // fuchsia.unknown/Cloneable.Clone2
+    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    file_proxy.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_matches!(
-        reopen_proxy.take_event_stream().try_next().await,
+        clone_proxy.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
     );
 }
 
 #[fuchsia::test]
-async fn reopen_file_node_reference_unsupported() {
+async fn clone2_file_node_reference_unsupported() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
@@ -178,45 +178,45 @@ async fn reopen_file_node_reference_unsupported() {
     let file_proxy =
         open_file_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
 
-    // fuchsia.io/Node.Reopen
-    let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    file_proxy.reopen(&fio::RightsRequest::default(), reopen_server).unwrap();
+    // fuchsia.unknown/Cloneable.Clone2
+    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    file_proxy.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_matches!(
-        reopen_proxy.take_event_stream().try_next().await,
+        clone_proxy.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
     );
 }
 
 #[fuchsia::test]
-async fn reopen_directory_unsupported() {
+async fn clone2_directory_unsupported() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![directory("dir", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
 
-    // fuchsia.io/Node.Reopen
-    let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    dir_proxy.reopen(&fio::RightsRequest::default(), reopen_server).unwrap();
+    // fuchsia.unknown/Cloneable.Clone2
+    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    dir_proxy.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_matches!(
-        reopen_proxy.take_event_stream().try_next().await,
+        clone_proxy.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
     );
 }
 
 #[fuchsia::test]
-async fn reopen_directory_node_reference_unsupported() {
+async fn clone2_directory_node_reference_unsupported() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![directory("dir", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
 
-    // fuchsia.io/Node.Reopen
-    let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    dir_proxy.reopen(&fio::RightsRequest::default(), reopen_server).unwrap();
+    // fuchsia.unknown/Cloneable.Clone2
+    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    dir_proxy.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_matches!(
-        reopen_proxy.take_event_stream().try_next().await,
+        clone_proxy.take_event_stream().try_next().await,
         Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
     );
 }

@@ -160,10 +160,10 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::Clone { flags, object, control_handle: _ } => {
                 self.handle_clone(flags, object);
             }
-            fio::NodeRequest::Reopen { rights_request: _, object_request, control_handle: _ } => {
-                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
-                // Suppress any errors in the event a bad `object_request` channel was provided.
-                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
+            fio::NodeRequest::Clone2 { request, control_handle: _ } => {
+                // TODO(https://fxbug.dev/324112547): Handle unimplemented io2 method.
+                // Suppress any errors in the event a bad `request` channel was provided.
+                let _: Result<_, _> = request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::NodeRequest::Close { responder } => {
                 responder.send(Ok(()))?;

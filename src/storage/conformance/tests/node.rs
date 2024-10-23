@@ -169,5 +169,3 @@ async fn test_open_node_with_attributes() {
                 }
     );
 }
-
-// TODO(https://fxbug.dev/293947862): Add tests for fuchsia.io/Node.Reopen.
