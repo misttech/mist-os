@@ -21,7 +21,8 @@ use zerocopy::{FromBytes, IntoBytes};
 use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 use zxio::{
     msghdr, sockaddr, sockaddr_storage, socklen_t, zx_handle_t, zx_status_t, zxio_object_type_t,
-    zxio_seek_origin_t, zxio_storage_t, ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
+    zxio_seek_origin_t, zxio_storage_t, ZXIO_SELINUX_CONTEXT_STATE_DATA,
+    ZXIO_SHUTDOWN_OPTIONS_READ, ZXIO_SHUTDOWN_OPTIONS_WRITE,
 };
 
 pub mod zxio;
@@ -371,11 +372,65 @@ pub struct RecvMessageInfo {
 /// Options for Open3.
 #[derive(Default)]
 pub struct ZxioOpenOptions<'a> {
-    pub attributes: Option<&'a mut zxio_node_attributes_t>,
+    attributes: Option<&'a mut zxio_node_attributes_t>,
 
     /// If an object is to be created, attributes that should be stored with the object at creation
     /// time. Not all servers support all attributes.
-    pub create_attributes: Option<zxio::zxio_node_attr>,
+    create_attributes: Option<zxio::zxio_node_attr>,
+}
+
+impl<'a> ZxioOpenOptions<'a> {
+    /// Consumes the `create_attributes`` but the `attributes` is passed as a mutable ref, since the
+    /// retrieved attributes will be written back into it. If any pointer fields are non-null, this
+    /// will fail assertions.
+    pub fn new(
+        attributes: Option<&'a mut zxio_node_attributes_t>,
+        create_attributes: Option<zxio::zxio_node_attr>,
+    ) -> Self {
+        if let Some(attrs) = &attributes {
+            validate_pointer_fields(attrs);
+        }
+        if let Some(attrs) = &create_attributes {
+            validate_pointer_fields(attrs);
+        }
+        Self { attributes, create_attributes }
+    }
+
+    /// Attaches the provided selinux context buffer to the `create_attributes`
+    pub fn with_selinux_context_write(mut self, context: &'a [u8]) -> Result<Self, zx::Status> {
+        if context.len() > fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize {
+            return Err(zx::Status::INVALID_ARGS);
+        }
+        // If this value increases we'll have to rethink the below conversions.
+        const_assert_eq!(fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN, 256);
+        {
+            let create_attributes = self.create_attributes.get_or_insert_with(Default::default);
+            create_attributes.selinux_context_length = context.len() as u16;
+            create_attributes.selinux_context_state = ZXIO_SELINUX_CONTEXT_STATE_DATA;
+            // SAFETY: In this context the pointer will only be read from, but the type is a
+            // mutable pointer.
+            create_attributes.selinux_context = context.as_ptr() as *mut u8;
+            create_attributes.has.selinux_context = true;
+        }
+        Ok(self)
+    }
+
+    /// Attaches the provided selinux context buffer to receive the context into. This call will
+    /// fail if no attributes query was attached, since the success of the fetch cannot be verified.
+    pub fn with_selinux_context_read(
+        mut self,
+        context: &'a mut [u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize],
+    ) -> Result<Self, zx::Status> {
+        if let Some(attributes_query) = &mut self.attributes {
+            attributes_query.selinux_context = context.as_mut_ptr();
+            attributes_query.has.selinux_context = true;
+        } else {
+            // If the value attributes query wasn't passed in we can't populate it, and the caller
+            // can't get a response back to see if it worked anyways. Fail the request.
+            return Err(zx::Status::INVALID_ARGS);
+        }
+        Ok(self)
+    }
 }
 
 /// Describes the mode of operation when setting an extended attribute.
@@ -494,6 +549,28 @@ unsafe extern "C" fn storage_allocator(
     status.into_raw()
 }
 
+/// Ensures that no pointer fields have been set. Used to enforce usage of code paths that can
+/// ensure safety. Without this, anything passing a `zxio_node_attributes_t` from the caller to
+/// zxio should be marked unsafe.
+fn validate_pointer_fields(attrs: &zxio_node_attributes_t) {
+    // If you're reading this, and the safe path you want doesn't exist, then add one!
+    assert!(
+        attrs.fsverity_root_hash.is_null(),
+        "Passed in a pointer for the fsverity_root_hash that could not assure the lifetime."
+    );
+    assert!(
+        attrs.selinux_context.is_null(),
+        "Passed in a pointer for the selinux_context that could not assure the lifetime."
+    );
+}
+
+/// To be called before letting any `zxio_node_attributes_t` get passed back to the caller, ensuring
+/// that any pointers used in the call are cleaned up.
+fn clean_pointer_fields(attrs: &mut zxio_node_attributes_t) {
+    attrs.fsverity_root_hash = std::ptr::null_mut();
+    attrs.selinux_context = std::ptr::null_mut();
+}
+
 pub const ZXIO_ROOT_HASH_LENGTH: usize = 64;
 
 impl Zxio {
@@ -573,15 +650,19 @@ impl Zxio {
         &self,
         path: &str,
         flags: fio::Flags,
-        options: ZxioOpenOptions<'_>,
+        mut options: ZxioOpenOptions<'_>,
     ) -> Result<Self, zx::Status> {
         let zxio = Zxio::default();
 
         let mut zxio_open_options = zxio::zxio_open_options::default();
-        zxio_open_options.inout_attr =
-            options.attributes.map(|a| a as *mut _).unwrap_or(std::ptr::null_mut());
-        zxio_open_options.create_attr =
-            options.create_attributes.as_ref().map(|a| a as *const _).unwrap_or(std::ptr::null());
+        zxio_open_options.inout_attr = match &mut options.attributes {
+            Some(a) => (*a) as *mut zxio_node_attributes_t,
+            None => std::ptr::null_mut(),
+        };
+        zxio_open_options.create_attr = match &options.create_attributes {
+            Some(a) => a as *const zxio_node_attributes_t,
+            None => std::ptr::null_mut(),
+        };
 
         let status = unsafe {
             zxio::zxio_open3(
@@ -593,6 +674,9 @@ impl Zxio {
                 zxio.as_storage_ptr(),
             )
         };
+        if let Some(attributes) = options.attributes {
+            clean_pointer_fields(attributes);
+        }
         zx::ok(status)?;
         Ok(zxio)
     }
@@ -601,6 +685,9 @@ impl Zxio {
         handle: zx::Handle,
         attributes: Option<&mut zxio_node_attributes_t>,
     ) -> Result<Zxio, zx::Status> {
+        if let Some(attr) = &attributes {
+            validate_pointer_fields(attr);
+        }
         let zxio = Zxio::default();
         let status = unsafe {
             zxio::zxio_create_with_on_representation(
@@ -891,6 +978,7 @@ impl Zxio {
     ) -> Result<zxio_node_attributes_t, zx::Status> {
         let mut attributes = self.node_attributes_from_query(query, Some(fsverity_root_hash));
         let status = unsafe { zxio::zxio_attr_get(self.as_ptr(), &mut attributes) };
+        clean_pointer_fields(&mut attributes);
         zx::ok(status)?;
         Ok(attributes)
     }

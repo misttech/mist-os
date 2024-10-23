@@ -44,5 +44,7 @@ C(zxio_object_type_t, ZXIO_OBJECT_TYPE_RAW_SOCKET);
 C(zxio_object_type_t, ZXIO_OBJECT_TYPE_PACKET_SOCKET);
 C(zxio_object_type_t, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET);
 C(zxio_object_type_t, ZXIO_OBJECT_TYPE_SYMLINK);
+C(zxio_selinux_context_state_t, ZXIO_SELINUX_CONTEXT_STATE_DATA);
+C(zxio_selinux_context_state_t, ZXIO_SELINUX_CONTEXT_STATE_USE_XATTRS);
 
 #endif  // SRC_STARNIX_LIB_SYNCIO_STUB_MISSING_INCLUDES_H_

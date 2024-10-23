@@ -97,7 +97,7 @@ async fn test_fsverity_enabled() {
                 .open3(
                     "foo",
                     fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_SET_ATTRIBUTES,
-                    ZxioOpenOptions { attributes: Some(&mut attrs), ..Default::default() },
+                    ZxioOpenOptions::new(Some(&mut attrs), None),
                 )
                 .expect("open3 failed"),
         );
@@ -174,7 +174,7 @@ async fn test_not_fsverity_enabled() {
                 .open3(
                     "foo",
                     fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_SET_ATTRIBUTES,
-                    ZxioOpenOptions { attributes: Some(&mut attrs), ..Default::default() },
+                    ZxioOpenOptions::new(Some(&mut attrs), None),
                 )
                 .expect("open3 failed"),
         );
@@ -730,7 +730,7 @@ async fn test_open3() {
             .open3(
                 "test_dir",
                 fio::RW_STAR_DIR.to_flags(),
-                ZxioOpenOptions { attributes: Some(&mut attr), create_attributes: None },
+                ZxioOpenOptions::new(Some(&mut attr), None),
             )
             .expect("open3 failed");
 
@@ -760,11 +760,7 @@ async fn test_open3() {
             ..Default::default()
         };
         let _test_file = test_dir
-            .open3(
-                "test_file",
-                fio::Flags::empty(),
-                ZxioOpenOptions { attributes: Some(&mut attr), create_attributes: None },
-            )
+            .open3("test_file", fio::Flags::empty(), ZxioOpenOptions::new(Some(&mut attr), None))
             .expect("open3 failed");
         assert_eq!(attr.protocols, zxio::ZXIO_NODE_PROTOCOL_FILE);
         assert_eq!(
@@ -903,10 +899,7 @@ async fn test_open3_create_attributes() {
                 fio::Flags::FLAG_MUST_CREATE
                     | fio::Flags::PROTOCOL_DIRECTORY
                     | fio::RW_STAR_DIR.to_flags(),
-                ZxioOpenOptions {
-                    attributes: Some(&mut attr),
-                    create_attributes: Some(create_attr),
-                },
+                ZxioOpenOptions::new(Some(&mut attr), Some(create_attr)),
             )
             .expect("open3 failed");
 
@@ -1129,6 +1122,110 @@ async fn test_casefold() {
                 Default::default(),
             )
             .expect("open3 failed");
+    })
+    .await;
+
+    fixture.close().await;
+}
+
+#[fuchsia::test]
+async fn test_open3_selinux_context_attr() {
+    let fixture = TestFixture::new().await;
+    let root = fixture.root();
+
+    let (dir_client, dir_server) = zx::Channel::create();
+    root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server.into()).expect("clone failed");
+
+    fasync::unblock(move || {
+        const CONTEXT_STRING: &str = "context";
+        const TEST_FILE: &str = "foo";
+
+        assert!(CONTEXT_STRING.as_bytes().len() <= fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize);
+
+        let dir_zxio = Zxio::create(dir_client.into_handle()).expect("create failed");
+        // Set value during creation.
+        {
+            let write_buf = CONTEXT_STRING.as_bytes().to_vec();
+            let mut read_buf = [0u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize];
+            // Verify that we can still fetch attributes properly at the same time.
+            let mut attr: zxio_node_attributes_t = Default::default();
+            let _file = dir_zxio
+                .open3(
+                    TEST_FILE,
+                    fio::Flags::FLAG_MUST_CREATE
+                        | fio::Flags::PROTOCOL_FILE
+                        | fio::Flags::PERM_READ
+                        | fio::Flags::PERM_WRITE
+                        | fio::Flags::PERM_GET_ATTRIBUTES
+                        | fio::Flags::PERM_SET_ATTRIBUTES,
+                    ZxioOpenOptions::new(Some(&mut attr), None)
+                        .with_selinux_context_read(&mut read_buf)
+                        .unwrap()
+                        .with_selinux_context_write(&write_buf)
+                        .unwrap(),
+                )
+                .expect("Creating file");
+            assert!(attr.has.selinux_context);
+            assert_eq!(attr.selinux_context_state, zxio::ZXIO_SELINUX_CONTEXT_STATE_DATA);
+            assert_eq!(attr.selinux_context_length as usize, CONTEXT_STRING.as_bytes().len());
+            assert_eq!(
+                &read_buf[..attr.selinux_context_length as usize],
+                CONTEXT_STRING.as_bytes()
+            );
+        }
+
+        // Retrieve the value on reopen
+        {
+            let mut attr: zxio_node_attributes_t = Default::default();
+            let mut buf = [0u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize];
+            let file = dir_zxio
+                .open3(
+                    TEST_FILE,
+                    fio::Flags::PROTOCOL_FILE
+                        | fio::Flags::PERM_READ
+                        | fio::Flags::PERM_WRITE
+                        | fio::Flags::PERM_GET_ATTRIBUTES
+                        | fio::Flags::PERM_SET_ATTRIBUTES,
+                    ZxioOpenOptions::new(Some(&mut attr), None)
+                        .with_selinux_context_read(&mut buf)
+                        .unwrap(),
+                )
+                .expect("Opening file");
+
+            assert!(attr.has.selinux_context);
+            assert_eq!(attr.selinux_context_state, zxio::ZXIO_SELINUX_CONTEXT_STATE_DATA);
+            assert_eq!(attr.selinux_context_length as usize, CONTEXT_STRING.as_bytes().len());
+            assert_eq!(&buf[..attr.selinux_context_length as usize], CONTEXT_STRING.as_bytes());
+
+            // Make the value too long to fetch.
+            file.xattr_set(
+                fio::SELINUX_CONTEXT_NAME.as_bytes(),
+                &[0x45u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize + 1],
+                XattrSetMode::Replace,
+            )
+            .expect("Setting a long xattr");
+        }
+
+        // Value is too long to return on open, so it says so.
+        {
+            let mut attr: zxio_node_attributes_t = Default::default();
+            let mut buf = [0u8; fio::MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN as usize];
+            let _file = dir_zxio
+                .open3(
+                    TEST_FILE,
+                    fio::Flags::PROTOCOL_FILE
+                        | fio::Flags::PERM_READ
+                        | fio::Flags::PERM_WRITE
+                        | fio::Flags::PERM_GET_ATTRIBUTES
+                        | fio::Flags::PERM_SET_ATTRIBUTES,
+                    ZxioOpenOptions::new(Some(&mut attr), None)
+                        .with_selinux_context_read(&mut buf)
+                        .unwrap(),
+                )
+                .expect("Opening file");
+
+            assert_eq!(attr.selinux_context_state, zxio::ZXIO_SELINUX_CONTEXT_STATE_USE_XATTRS);
+        }
     })
     .await;
 

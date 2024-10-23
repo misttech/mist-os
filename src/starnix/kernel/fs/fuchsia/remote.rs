@@ -555,9 +555,9 @@ impl FsNodeOps for RemoteNode {
                         | fio::Flags::PERM_GET_ATTRIBUTES
                         | fio::Flags::PERM_SET_ATTRIBUTES
                         | fio::Flags::PERM_MODIFY,
-                    ZxioOpenOptions {
-                        attributes: Some(&mut attrs),
-                        create_attributes: Some(zxio_node_attributes_t {
+                    ZxioOpenOptions::new(
+                        Some(&mut attrs),
+                        Some(zxio_node_attributes_t {
                             mode: mode.bits(),
                             uid: owner.uid,
                             gid: owner.gid,
@@ -571,7 +571,7 @@ impl FsNodeOps for RemoteNode {
                             },
                             ..Default::default()
                         }),
-                    },
+                    ),
                 )
                 .map_err(|status| from_status_like_fdio!(status, name))?,
         );
@@ -622,9 +622,9 @@ impl FsNodeOps for RemoteNode {
                     fio::Flags::FLAG_MUST_CREATE
                         | fio::Flags::PROTOCOL_DIRECTORY
                         | fio::RW_STAR_DIR.to_flags(),
-                    ZxioOpenOptions {
-                        attributes: Some(&mut attrs),
-                        create_attributes: Some(zxio_node_attributes_t {
+                    ZxioOpenOptions::new(
+                        Some(&mut attrs),
+                        Some(zxio_node_attributes_t {
                             mode: mode.bits(),
                             uid: owner.uid,
                             gid: owner.gid,
@@ -636,7 +636,7 @@ impl FsNodeOps for RemoteNode {
                             },
                             ..Default::default()
                         }),
-                    },
+                    ),
                 )
                 .map_err(|status| from_status_like_fdio!(status, name))?,
         );
@@ -694,7 +694,7 @@ impl FsNodeOps for RemoteNode {
                 .open3(
                     name,
                     open_operations.to_flags(),
-                    ZxioOpenOptions { attributes: Some(&mut attrs), create_attributes: None },
+                    ZxioOpenOptions::new(Some(&mut attrs), None),
                 )
                 .map_err(|status| from_status_like_fdio!(status, name))?,
         );
