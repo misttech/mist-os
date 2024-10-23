@@ -29,7 +29,7 @@ use crate::state::Hook;
 /// either `true` (NAT the connection) or `false` (do not NAT), but the
 /// `OnceCell` containing the configuration should always be initialized by the
 /// time a connection is inserted in the conntrack table.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct NatConfig {
     destination: OnceCell<bool>,
     source: OnceCell<bool>,
