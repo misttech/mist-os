@@ -34,6 +34,7 @@
 #include <ktl/algorithm.h>
 #include <ktl/optional.h>
 #include <object/process_dispatcher.h>
+#include <object/thread_dispatcher.h>
 
 #include "../kernel_priv.h"
 
@@ -60,7 +61,8 @@ util::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& cur
   }
 }
 
-void __NO_RETURN do_exit(long code) { ProcessDispatcher::ExitCurrent(code); }
+void __NO_RETURN do_exit(long code) { Thread::Current::Exit(static_cast<int>(code)); }
+void __NO_RETURN do_group_exit(long code) { ProcessDispatcher::ExitCurrent(code); }
 
 }  // namespace
 
@@ -375,15 +377,15 @@ fit::result<Errno, uid_t> sys_getegid(const CurrentTask& current_task) {
 fit::result<Errno> sys_exit(const CurrentTask& current_task, uint32_t code) {
   // Only change the current exit status if this has not been already set by exit_group, as
   // otherwise it has priority.
-  // current_task.write().set_exit_status_if_not_already(ExitStatus::Exit(code as u8));
-  // Ok(())
+  current_task->Write()->set_exit_status_if_not_already(
+      ExitStatus::Exit(static_cast<uint8_t>(code)));
   do_exit((code & 0xff) << 8);
   __UNREACHABLE;
 }
 
 fit::result<Errno> sys_exit_group(CurrentTask& current_task, uint32_t code) {
-  current_task.thread_group_exit(ExitStatusExit(static_cast<uint8_t>(code)));
-  do_exit((code & 0xff) << 8);
+  current_task.thread_group_exit(ExitStatus::Exit(static_cast<uint8_t>(code)));
+  do_group_exit((code & 0xff) << 8);
   __UNREACHABLE;
 }
 

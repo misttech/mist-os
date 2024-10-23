@@ -218,7 +218,7 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
         ExitStatus exit_status = [&siginfo, &exit_status_fn]() {
           if (siginfo.signal == kSIGKILL) {
             // This overrides the stop/continue choice.
-            return ExitStatus(ExitStatusKill{siginfo});
+            return ExitStatus::Kill(siginfo);
           } else {
             return exit_status_fn(siginfo);
           }
@@ -234,12 +234,12 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
       auto child_stopped = c->base_->load_stopped();
       if (child_stopped == StopState::Awake && options.wait_for_continued()) {
         return WaitableChildResult::ReadyNow(build_wait_result(*c, [](const SignalInfo& siginfo) {
-          return ExitStatus(ExitStatusContinue(siginfo, PtraceEvent::None));
+          return ExitStatus::Continue(siginfo, PtraceEvent::None);
         }));
       }
       if (child_stopped == StopState::GroupStopped && options.wait_for_stopped()) {
         return WaitableChildResult::ReadyNow(build_wait_result(*c, [](const SignalInfo& siginfo) {
-          return ExitStatus(ExitStatusStop(siginfo, PtraceEvent::None));
+          return ExitStatus::Stop(siginfo, PtraceEvent::None);
         }));
       }
     }

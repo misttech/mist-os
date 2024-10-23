@@ -38,12 +38,33 @@ struct ExitStatusContinue {
   PtraceEvent ptrace_event;
 };
 
-// Variant representing ExitStatus
-using ExitStatus = ktl::variant<ExitStatusExit, ExitStatusKill, ExitStatusCoreDump, ExitStatusStop,
-                                ExitStatusContinue>;
-
-class ExitStatusHelper {
+class ExitStatus {
  public:
+  using Variant = ktl::variant<ExitStatusExit, ExitStatusKill, ExitStatusCoreDump, ExitStatusStop,
+                               ExitStatusContinue>;
+
+  static ExitStatus Exit(uint8_t code) { return ExitStatus(ExitStatusExit{code}); }
+
+  static ExitStatus Kill(SignalInfo signal_info) {
+    return ExitStatus(ExitStatusKill{ktl::move(signal_info)});
+  }
+
+  static ExitStatus CoreDump(SignalInfo signal_info) {
+    return ExitStatus(ExitStatusCoreDump{ktl::move(signal_info)});
+  }
+
+  static ExitStatus Stop(SignalInfo signal_info, PtraceEvent ptrace_event) {
+    return ExitStatus(
+        ExitStatusStop{.signal_info = ktl::move(signal_info), .ptrace_event = ptrace_event});
+  }
+
+  static ExitStatus Continue(SignalInfo signal_info, PtraceEvent ptrace_event) {
+    return ExitStatus(
+        ExitStatusContinue{.signal_info = ktl::move(signal_info), .ptrace_event = ptrace_event});
+  }
+
+  // const Variant& variant() const { return variant_; }
+
   static int wait_status(const ExitStatus& exit_status) {
     return std::visit(
         overloaded{
@@ -62,7 +83,7 @@ class ExitStatusHelper {
               uint32_t trace_event_val = static_cast<uint32_t>(stop.ptrace_event);
               return (0x7f + (stop.signal_info.signal.number() << 8)) | (trace_event_val << 16);
             }},
-        exit_status);
+        exit_status.variant_);
   }
 
   static int signal_info_code(const ExitStatus& exit_status) {
@@ -71,7 +92,7 @@ class ExitStatusHelper {
                                  [](const ExitStatusCoreDump&) -> int { return CLD_DUMPED; },
                                  [](const ExitStatusStop&) -> int { return CLD_STOPPED; },
                                  [](const ExitStatusContinue&) -> int { return CLD_CONTINUED; }},
-                      exit_status);
+                      exit_status.variant_);
   }
 
   static int signal_info_status(const ExitStatus& exit_status) {
@@ -84,7 +105,7 @@ class ExitStatusHelper {
             },
             [](const ExitStatusStop& stop) -> int { return stop.signal_info.signal.number(); },
             [](const ExitStatusContinue& cont) -> int { return cont.signal_info.signal.number(); }},
-        exit_status);
+        exit_status.variant_);
   }
 
  private:
@@ -95,6 +116,10 @@ class ExitStatusHelper {
   // explicit deduction guide (not needed as of C++20)
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
+
+  explicit ExitStatus(Variant variant) : variant_(ktl::move(variant)) {}
+
+  Variant variant_;
 };
 
 // This enum describes the state that a task or thread group can be in when being stopped.
@@ -177,6 +202,8 @@ struct AtomicStopState {
 
   StopState load(ktl::memory_order order) const {
     uint8_t value = inner_.load(order);
+    // SAFETY: we only ever store to the atomic a value originating
+    // from a valid `StopState`.
     return static_cast<StopState>(value);
   }
 

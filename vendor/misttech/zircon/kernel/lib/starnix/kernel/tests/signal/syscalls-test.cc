@@ -31,12 +31,12 @@ bool test_wait4_by_pgid() {
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
   auto child1 = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
   auto child1_pid = (*child1)->id();
-  (*child1)->thread_group()->exit(starnix::ExitStatusExit(42), ktl::nullopt);
+  (*child1)->thread_group()->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
   child1.~AutoReleasableTask();
   auto child2 = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
   ASSERT_TRUE((*child2)->thread_group()->setsid().is_ok(), "setsid");
   auto child2_pid = (*child2)->id();
-  (*child2)->thread_group()->exit(starnix::ExitStatusExit(42), ktl::nullopt);
+  (*child2)->thread_group()->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
   child2.~AutoReleasableTask();
 
   auto result = sys_wait4(*current_task, -child2_pid, mtl::DefaultConstruct<UserRef<int32_t>>(), 0,
