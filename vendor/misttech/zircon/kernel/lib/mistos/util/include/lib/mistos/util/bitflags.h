@@ -125,7 +125,6 @@ struct Flags {
   [[nodiscard]] Flags complement() const { return from_bits_truncate(~bits()); }
 
   // C++ operators ----------
-
   bool operator==(const Flags& other) const { return bits_ == other.bits_; }
   bool operator!=(const Flags& other) const { return bits_ != other.bits_; }
 
@@ -164,7 +163,19 @@ struct Flags {
     return *this;
   }
 
-  Flags operator!() const { return complement(); }
+  Flags operator^(const Flags& other) const { return symmetric_difference(other); }
+  Flags operator^(const Enum& value) const { return symmetric_difference(Flags(value)); }
+
+  Flags& operator^=(const Flags& other) {
+    *this = symmetric_difference(other);
+    return *this;
+  }
+  Flags& operator^=(const Enum& value) {
+    *this = symmetric_difference(Flags(value));
+    return *this;
+  }
+
+  Flags operator~() const { return complement(); }
 
  private:
   explicit Flags(Bits value) : bits_(value) {}
