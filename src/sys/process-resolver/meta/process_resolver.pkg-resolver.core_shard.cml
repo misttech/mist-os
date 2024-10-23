@@ -10,8 +10,14 @@
     ],
     offer: [
         {
+            protocol: "fuchsia.pkg.PackageResolver-boot",
+            from: "parent",
+            to: "#process_resolver",
+        },
+        {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#pkg-resolver",
+            as: "fuchsia.pkg.PackageResolver-pkg",
             to: "#process_resolver",
         },
     ],

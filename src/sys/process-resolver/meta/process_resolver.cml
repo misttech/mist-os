@@ -11,7 +11,8 @@
         { protocol: "fuchsia.process.Resolver" },
     ],
     use: [
-        { protocol: "fuchsia.pkg.PackageResolver" },
+        { protocol: "fuchsia.pkg.PackageResolver-boot" },
+        { protocol: "fuchsia.pkg.PackageResolver-pkg" },
     ],
     expose: [
         {

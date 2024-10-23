@@ -185,6 +185,17 @@
                 ],
             },
             {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.pkg.PackageResolver-boot",
+                capability: "protocol",
+                target_monikers: [
+                    // process is used in userdebug builds to launch
+                    // shell binaries. It uses PackageResolver to resolve tools from packages.
+                    "/core/process_resolver",
+                ],
+            },
+            {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
                 source_name: "bin",
