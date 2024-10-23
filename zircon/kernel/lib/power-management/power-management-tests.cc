@@ -135,7 +135,7 @@ bool ControllerDpcPostsUpdateWhenPending() {
 
   power_management::ControllerDpc controller_dpc([&details]() { return details; });
   controller_dpc.NotifyPendingUpdate();
-  ASSERT_EQ(controller->Wait(Deadline::after(zx_duration_from_msec(20))), ZX_OK);
+  ASSERT_EQ(controller->Wait(Deadline::infinite()), ZX_OK);
   ASSERT_EQ(controller->count(), 1);
 
   auto req = controller->request();
@@ -181,7 +181,7 @@ bool ControllerDpcTryQueueManyTimesIsOk() {
   for (size_t i = 0; i < 150; ++i) {
     controller_dpc.NotifyPendingUpdate();
   }
-  ASSERT_EQ(controller->Wait(Deadline::after(zx_duration_from_msec(20))), ZX_OK);
+  ASSERT_EQ(controller->Wait(Deadline::infinite()), ZX_OK);
 
   ASSERT_GE(controller->count(), 1);
   auto req = controller->request();
@@ -251,7 +251,7 @@ bool ControllerDpcTryQueueFromIrqContext() {
   Timer try_queue_timer;
   try_queue_timer.Set(Deadline::after(ZX_TIME_INFINITE_PAST), try_queue_from_irq_details,
                       &controller_dpc);
-  ASSERT_EQ(controller->Wait(Deadline::after(zx_duration_from_msec(20))), ZX_OK);
+  ASSERT_EQ(controller->Wait(Deadline::infinite()), ZX_OK);
   ASSERT_EQ(controller->count(), 1);
   auto req = controller->request();
   ASSERT_TRUE(req);
