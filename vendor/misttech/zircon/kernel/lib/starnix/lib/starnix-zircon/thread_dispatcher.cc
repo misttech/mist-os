@@ -12,13 +12,14 @@
 
 #include <ktl/move.h>
 
+#include "zircon/assert.h"
+
 #define LOCAL_TRACE 0
 
 void ThreadDispatcher::SetTask(fbl::RefPtr<TaskWrapper> task) { starnix_task_ = ktl::move(task); }
 
 // Get the associated Starnix Task.
-TaskWrapper* ThreadDispatcher::task() { return starnix_task_.get(); }
-const TaskWrapper* ThreadDispatcher::task() const { return starnix_task_.get(); }
+fbl::RefPtr<TaskWrapper> ThreadDispatcher::task() { return starnix_task_; }
 
 zx_status_t ThreadDispatcher::SetForkFrame(const zx_thread_state_general_regs_t& fork_frame) {
   canary_.Assert();

@@ -5,8 +5,11 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_ZIRCON_INCLUDE_LIB_STARNIX_ZIRCON_TASK_WRAPPER_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_ZIRCON_INCLUDE_LIB_STARNIX_ZIRCON_TASK_WRAPPER_H_
 
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <ktl/optional.h>
 
 namespace starnix {
 class Task;
@@ -15,13 +18,13 @@ class CurrentTask;
 
 class TaskWrapper : public fbl::RefCounted<TaskWrapper> {
  public:
-  TaskWrapper(fbl::RefPtr<starnix::Task> task);
+  TaskWrapper(ktl::optional<starnix::CurrentTask> task);
   ~TaskWrapper();
 
-  starnix::CurrentTask into();
+  starnix::CurrentTask& into();
 
  private:
-  fbl::RefPtr<starnix::Task> task_;
+  ktl::optional<starnix::CurrentTask> task_;
 };
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_ZIRCON_INCLUDE_LIB_STARNIX_ZIRCON_TASK_WRAPPER_H_
