@@ -299,7 +299,7 @@ V1CopyFromV2BufferMemorySettings(const fuchsia_sysmem2::wire::BufferMemorySettin
     const PixelFormatAndModifier& v2);
 
 // For cases that also need to convey pixel_format_modifier, see
-// V2CopyFromV1PixelFormat. The implied modifier when not provided or not set
+// V1CopyFromV2PixelFormat. The implied modifier when not provided or not set
 // is FORMAT_MODIFIER_NONE (aka LINEAR).
 [[nodiscard]] fuchsia_sysmem::PixelFormatType V1CopyFromV2PixelFormatType(
     const fuchsia_images2::PixelFormat& v2);
