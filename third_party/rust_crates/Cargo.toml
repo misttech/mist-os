@@ -81,7 +81,7 @@ crossbeam-utils = "0.8.14"
 cfg-if = "1.0.0"
 chacha20 = "0.9.0"
 csv = "1.2.1"
-darling = "0.12.0"
+darling = "0.20.10"
 data-encoding = "2.1.2"
 derivative = { version = "2.2.0", features = ["use_core"] }
 derive_builder = "0.11.1"

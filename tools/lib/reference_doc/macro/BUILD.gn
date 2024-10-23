@@ -10,7 +10,9 @@ rustc_macro("macro") {
   source_root = "src/lib.rs"
 
   deps = [
-    "//third_party/rust_crates:darling",
+    # FIXME(https://fxbug.dev/374591680): Please update to darling 0.20.x.
+    # "//third_party/rust_crates:darling",
+    "//third_party/rust_crates:darling-v0_12_4",
     "//third_party/rust_crates:proc-macro2",
     "//third_party/rust_crates:quote",
 
