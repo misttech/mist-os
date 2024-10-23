@@ -142,7 +142,7 @@ fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_s
 
   if (waitable_process.value().has_value()) {
     auto& process = waitable_process.value().value();
-    int32_t status = ExitStatusHelper::wait_status(process.exit_info.status);
+    int32_t status = ExitStatus::wait_status(process.exit_info.status);
 
     if (!user_rusage->is_null()) {
       // TODO(https://fxbug.dev/322874768): Implement real rusage from wait4
