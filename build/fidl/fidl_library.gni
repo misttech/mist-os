@@ -189,7 +189,7 @@ template("fidl_library") {
 
   assert(
       requires_compatibility_tests == defined(invoker.stable),
-      "`stable` must be set if and only if the category ('${sdk_category_string_for_assert}') requires compatibility tests.")
+      "`stable` must be specified if and only if `sdk_category` is specified.")
 
   is_stable = defined(invoker.stable) && invoker.stable
 
