@@ -45,7 +45,6 @@ use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use async_utils::stream::WithTag as _;
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
-use fuchsia_fs::OpenFlags;
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::fidl_ip_v4;
@@ -2048,9 +2047,9 @@ impl<'a> NetCfg<'a> {
         anyhow::Error,
     > {
         let installer = self.installer.clone();
-        let directory = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let directory = fuchsia_fs::directory::open_in_namespace(
             devices::NetworkDeviceInstance::PATH,
-            OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .with_context(|| format!("error opening netdevice directory"))?;
         let stream_of_streams = fvfs_watcher::Watcher::new(&directory)

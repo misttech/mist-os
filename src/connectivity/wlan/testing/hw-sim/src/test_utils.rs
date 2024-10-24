@@ -98,10 +98,9 @@ impl TestRealmContext {
                 .expect("Failed to connect to driver test realm");
 
         let (pkg_client, pkg_server) = create_endpoints();
-        fuchsia_fs::directory::open_channel_in_namespace_deprecated(
+        fuchsia_fs::directory::open_channel_in_namespace(
             "/pkg",
-            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE
-                | fidl_fuchsia_io::OpenFlags::RIGHT_EXECUTABLE,
+            fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::PERM_EXECUTABLE,
             pkg_server,
         )
         .expect("Could not open /pkg");

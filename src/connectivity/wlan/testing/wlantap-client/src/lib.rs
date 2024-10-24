@@ -11,10 +11,7 @@ pub struct Wlantap {
 
 impl Wlantap {
     pub async fn open() -> Result<Self, Error> {
-        let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-            "/dev",
-            fuchsia_fs::OpenFlags::empty(),
-        )?;
+        let dir = fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::Flags::empty())?;
         Self::open_from_devfs(&dir).await
     }
 
