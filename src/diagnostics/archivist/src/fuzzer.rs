@@ -33,9 +33,8 @@ impl<'a> Arbitrary<'a> for RandomLogRecord {
         let tid = u64::arbitrary(u)?;
 
         // Fill the first datalen bytes of data.
-        let mut data = [0 as u8; zx::sys::ZX_LOG_RECORD_DATA_MAX];
-        let mut partial = &mut data[0..datalen as usize];
-        u.fill_buffer(&mut partial)?;
+        let mut data = [0u8; zx::sys::ZX_LOG_RECORD_DATA_MAX];
+        u.fill_buffer(&mut data[0..datalen as usize])?;
 
         Ok(RandomLogRecord(
             zx::DebugLogRecord::from_raw(&zx::sys::zx_log_record_t {

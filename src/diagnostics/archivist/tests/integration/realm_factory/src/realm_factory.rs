@@ -28,7 +28,7 @@ impl ArchivistRealmFactory {
             params = params.realm_name(realm_name);
         }
         let builder = RealmBuilder::with_params(params).await?;
-        let config = options.archivist_config.unwrap_or(ArchivistConfig::default());
+        let config = options.archivist_config.unwrap_or_default();
 
         // The following configurations are tweakble.
         builder
@@ -78,7 +78,7 @@ impl ArchivistRealmFactory {
                     })
                     .collect()
             })
-            .unwrap_or(Vec::new());
+            .unwrap_or_default();
         builder
             .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
                 name: "fuchsia.diagnostics.ComponentInitialInterests".parse()?,
