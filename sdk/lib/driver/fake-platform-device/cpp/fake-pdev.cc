@@ -70,11 +70,12 @@ void FakePDev::GetBtiById(GetBtiByIdRequestView request, GetBtiByIdCompleter::Sy
       completer.ReplyError(ZX_ERR_NOT_FOUND);
       return;
     }
-    zx_status_t status = fake_bti_create(bti.reset_and_get_address());
-    if (status != ZX_OK) {
-      completer.ReplyError(status);
+    zx::result result = fake_bti::CreateFakeBti();
+    if (result.is_error()) {
+      completer.ReplyError(result.status_value());
       return;
     }
+    bti = std::move(result.value());
   } else {
     itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti);
   }
