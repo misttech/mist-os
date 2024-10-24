@@ -119,17 +119,18 @@ impl Channel {
     pub fn recv_msg(&self) -> impl Future<Output = Result<ChannelMessage, Error>> {
         let client = self.0.client();
         let handle = self.0.proto();
-        async move {
-            let client = client?;
+
+        let result = client.map(move |client| {
             client
                 .transaction(
                     ordinals::READ_CHANNEL,
                     proto::ChannelReadChannelRequest { handle },
                     Responder::ReadChannel,
                 )
-                .map(|f| f.map(|message| ChannelMessage::from_proto(&client, message)))
-                .await
-        }
+                .map(move |f| f.map(|message| ChannelMessage::from_proto(&client, message)))
+        });
+
+        async move { result?.await }
     }
 
     /// Writes a message into the channel.
@@ -214,15 +215,15 @@ impl Channel {
         let client = self.0.client();
         let handle = self.0.proto();
 
-        async move {
-            client?
-                .transaction(
-                    ordinals::WRITE_CHANNEL,
-                    proto::ChannelWriteChannelRequest { handle, data, handles },
-                    move |x| Responder::WriteChannel(x, handle),
-                )
-                .await
-        }
+        let result = client.map(move |client| {
+            client.transaction(
+                ordinals::WRITE_CHANNEL,
+                proto::ChannelWriteChannelRequest { handle, data, handles },
+                move |x| Responder::WriteChannel(x, handle),
+            )
+        });
+
+        async move { result?.await }
     }
 
     /// Split this channel into a streaming reader and a writer. This is more
