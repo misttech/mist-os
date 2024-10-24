@@ -491,7 +491,7 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
     memcpy(buffer, config_desc.data(), length);
     *out_actual = length;
     return ZX_OK;
-  } else if (value >> 8 == USB_DT_STRING) {
+  } else if (desc_type == USB_DT_STRING) {
     uint8_t desc[255];
     auto* header = reinterpret_cast<usb_descriptor_header_t*>(desc);
     header->b_descriptor_type = USB_DT_STRING;
@@ -526,9 +526,22 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
     memcpy(buffer, desc, length);
     *out_actual = length;
     return ZX_OK;
+  } else if (desc_type == USB_DT_DEVICE_QUALIFIER) {
+    if (device_desc_.b_length == 0) {
+      zxlogf(ERROR, "%s: device descriptor not set", __func__);
+      return ZX_ERR_INTERNAL;
+    }
+    length = std::min(length, sizeof(usb_device_qualifier_descriptor_t));
+    memcpy(buffer, &device_desc_, length);
+    auto* qualifier = static_cast<usb_device_qualifier_descriptor_t*>(buffer);
+    qualifier->b_descriptor_type = USB_DT_DEVICE_QUALIFIER;
+    qualifier->b_num_configurations = 0;
+    qualifier->b_reserved = 0;
+    *out_actual = length;
+    return ZX_OK;
   }
 
-  zxlogf(DEBUG, "%s unsupported value: %d index: %d", __func__, value, index);
+  zxlogf(ERROR, "%s unsupported value: %x index: %d", __func__, value, index);
   return ZX_ERR_NOT_SUPPORTED;
 }
 
@@ -759,6 +772,7 @@ zx_status_t UsbPeripheral::CommonControl(const usb_setup_t* setup, const uint8_t
                  request == USB_REQ_GET_STATUS && length == 2) {
         static_cast<uint8_t*>(read_buffer)[1] = 1 << USB_DEVICE_SELF_POWERED;
         *out_read_actual = read_size;
+        return ZX_OK;
       } else {
         // Delegate to one of the function drivers.
         // USB_RECIP_DEVICE should only be used when there is a single active interface.
