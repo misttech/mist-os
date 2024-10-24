@@ -94,7 +94,7 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
 class GpioInitDevice {
  public:
   static std::unique_ptr<GpioInitDevice> Create(
-      const std::shared_ptr<fdf::Namespace>& incoming,
+      const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
       fidl::UnownedClientEnd<fuchsia_driver_framework::Node> node, fdf::Logger& logger,
       uint32_t controller_id, fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>& pinimpl);
 

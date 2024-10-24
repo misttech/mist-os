@@ -269,7 +269,7 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
 
   fidl::Arena arena;
 
-  zx::result decoded = compat::GetMetadata<fuchsia_hardware_pinimpl::wire::ControllerMetadata>(
+  zx::result decoded = compat::GetMetadata<fuchsia_hardware_pinimpl::wire::Metadata>(
       incoming(), arena, DEVICE_METADATA_GPIO_CONTROLLER);
   if (decoded.is_error()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
@@ -278,8 +278,8 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
       FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
       return completer(decoded.take_error());
     }
-  } else {
-    controller_id = decoded->id;
+  } else if (decoded->has_controller_id()) {
+    controller_id = decoded->controller_id();
   }
 
   zx::result scheduler_role = compat::GetMetadata<fuchsia_scheduler::RoleName>(
@@ -311,9 +311,13 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
         *std::move(pinimpl_fidl_client), fidl_dispatcher()->get(),
         fidl::ObserveTeardown(fit::bind_member<&GpioRootDevice::ClientTeardownHandler>(this)));
 
-    // Process init metadata while we are still the exclusive owner of the GPIO client.
-    init_device_ =
-        GpioInitDevice::Create(incoming(), node().borrow(), logger(), controller_id, pinimpl_);
+    if (decoded.is_ok() && decoded->has_init_steps() && !decoded->init_steps().empty()) {
+      // Process init metadata while we are still the exclusive owner of the GPIO client.
+      init_device_ = GpioInitDevice::Create(decoded->init_steps(), node().borrow(), logger(),
+                                            controller_id, pinimpl_);
+    } else {
+      FDF_LOG(INFO, "No init metadata provided");
+    }
   }
 
   if (zx::result<fdf::OwnedChildNode> node = AddOwnedChild("gpio"); node.is_error()) {
@@ -405,29 +409,11 @@ void GpioRootDevice::ClientTeardownHandler() {
 }
 
 std::unique_ptr<GpioInitDevice> GpioInitDevice::Create(
-    const std::shared_ptr<fdf::Namespace>& incoming,
+    const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
     fidl::UnownedClientEnd<fuchsia_driver_framework::Node> node, fdf::Logger& logger,
     uint32_t controller_id, fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>& pinimpl) {
-  // Don't add the init device if anything goes wrong here, as the hardware may be in a state that
-  // child devices don't expect.
-  fdf::Arena arena('GPIO');
-  zx::result decoded = compat::GetMetadata<fuchsia_hardware_pinimpl::wire::Metadata>(
-      incoming, arena, DEVICE_METADATA_GPIO_INIT);
-  if (!decoded.is_ok()) {
-    if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
-      FDF_LOG(INFO, "No init metadata provided");
-    } else {
-      FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
-    }
-    return {};
-  }
-  if (!(*decoded)->has_init_steps()) {
-    FDF_LOG(INFO, "No init metadata provided");
-    return {};
-  }
-
   std::unique_ptr device = std::make_unique<GpioInitDevice>();
-  if (device->ConfigureGpios((*decoded)->init_steps(), pinimpl) != ZX_OK) {
+  if (ConfigureGpios(init_steps, pinimpl) != ZX_OK) {
     // Return without adding the init device if some GPIOs could not be configured. This will
     // prevent all drivers that depend on the initial state from binding, which should make it more
     // obvious that something has gone wrong.

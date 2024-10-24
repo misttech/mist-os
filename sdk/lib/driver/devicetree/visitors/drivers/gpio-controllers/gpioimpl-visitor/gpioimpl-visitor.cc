@@ -528,7 +528,11 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
   }
 
   {
-    fuchsia_hardware_pinimpl::ControllerMetadata metadata = {{.id = controller->first}};
+    fuchsia_hardware_pinimpl::Metadata metadata = {{.controller_id = controller->first}};
+    if (!controller->second.metadata.init_steps()->empty()) {
+      metadata.init_steps() = *std::move(controller->second.metadata.init_steps());
+    }
+
     const fit::result encoded_controller_metadata = fidl::Persist(metadata);
     if (!encoded_controller_metadata.is_ok()) {
       FDF_LOG(ERROR, "Failed to encode GPIO controller metadata for node %s: %s",
@@ -542,22 +546,6 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
     }};
     node.AddMetadata(std::move(controller_metadata));
     FDF_LOG(DEBUG, "Gpio controller metadata added to node '%s'", node.name().c_str());
-  }
-
-  if (!controller->second.metadata.init_steps()->empty()) {
-    const fit::result encoded_init_steps = fidl::Persist(controller->second.metadata);
-    if (!encoded_init_steps.is_ok()) {
-      FDF_LOG(ERROR, "Failed to encode GPIO init metadata for node %s: %s", node.name().c_str(),
-              encoded_init_steps.error_value().FormatDescription().c_str());
-      return zx::error(encoded_init_steps.error_value().status());
-    }
-
-    fuchsia_hardware_platform_bus::Metadata init_metadata = {{
-        .id = std::to_string(DEVICE_METADATA_GPIO_INIT),
-        .data = encoded_init_steps.value(),
-    }};
-    node.AddMetadata(std::move(init_metadata));
-    FDF_LOG(DEBUG, "Gpio init steps metadata added to node '%s'", node.name().c_str());
   }
 
   if (!controller->second.gpio_pins_metadata.empty()) {

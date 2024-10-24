@@ -527,7 +527,8 @@ TEST_F(GpioTest, Init) {
   std::vector<uint8_t>& message = encoded.value();
 
   driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_INIT, message.data(), message.size()));
+    EXPECT_OK(
+        env.compat().AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER, message.data(), message.size()));
     EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, kGpioPins, sizeof(kGpioPins)));
   });
 
@@ -569,7 +570,8 @@ TEST_F(GpioTest, InitWithoutPins) {
 
   std::vector<uint8_t>& message = encoded.value();
   driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_INIT, message.data(), message.size()));
+    EXPECT_OK(
+        env.compat().AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER, message.data(), message.size()));
   });
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
@@ -628,7 +630,8 @@ TEST_F(GpioTest, InitErrorHandling) {
   std::vector<uint8_t>& message = encoded.value();
 
   driver_test().RunInEnvironmentTypeContext([&](GpioTestEnvironment& env) {
-    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_INIT, message.data(), message.size()));
+    EXPECT_OK(
+        env.compat().AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER, message.data(), message.size()));
     EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, kGpioPins, sizeof(kGpioPins)));
   });
 
@@ -662,7 +665,7 @@ TEST_F(GpioTest, ControllerId) {
       DECL_GPIO_PIN(2),
   };
 
-  fuchsia_hardware_pinimpl::wire::ControllerMetadata controller_metadata = {.id = kController};
+  fuchsia_hardware_pinimpl::Metadata controller_metadata{{.controller_id = kController}};
   const fit::result encoded_controller_metadata = fidl::Persist(controller_metadata);
   ASSERT_TRUE(encoded_controller_metadata.is_ok());
 
