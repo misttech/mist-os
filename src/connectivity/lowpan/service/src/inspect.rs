@@ -122,7 +122,7 @@ impl IfaceTreeHolder {
         if online_states.contains(&new_connectivity_state)
             && !online_states.contains(&status.connectivity_state_value)
         {
-            status._online_since = Some(status.node.create_time("online_since"));
+            status._online_since = Some(status.node.create_time("online_since").property);
         } else if !online_states.contains(&new_connectivity_state) {
             status._online_since = None;
         }

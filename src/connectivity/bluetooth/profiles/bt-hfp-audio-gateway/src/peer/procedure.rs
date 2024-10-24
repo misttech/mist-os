@@ -450,7 +450,7 @@ impl IProcedure {
         }
 
         self.inspect.take().map(|n| {
-            NodeTimeExt::<zx::MonotonicTimeline>::record_time(&n, "completed_at");
+            let _instant = NodeTimeExt::<zx::MonotonicTimeline>::record_time(&n, "completed_at");
             n
         })
     }
@@ -482,7 +482,7 @@ impl Inspect for &mut IProcedure {
 
         // By default, every procedure will expose the procedure name & the time it was started at.
         node.record_string("name", &self.marker().to_string());
-        NodeTimeExt::<zx::MonotonicTimeline>::record_time(&node, "started_at");
+        let _instant = NodeTimeExt::<zx::MonotonicTimeline>::record_time(&node, "started_at");
         // In some cases, a procedure may want to expose additional inspect properties. A weak_clone
         // of the node can be used by the procedure to record any extra information.
         // The effectiveness of the weak clone is tied to that of the original `node`.
