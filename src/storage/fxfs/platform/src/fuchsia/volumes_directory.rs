@@ -45,7 +45,7 @@ const MEBIBYTE: u64 = 1024 * 1024;
 pub struct VolumesDirectory {
     root_volume: RootVolume,
     directory_node: Arc<vfs::directory::immutable::Simple>,
-    mounted_volumes: futures::lock::Mutex<HashMap<u64, (String, FxVolumeAndRoot)>>,
+    mounted_volumes: futures::lock::Mutex<HashMap<u64, MountedVolume>>,
     inspect_tree: Weak<FsInspectTree>,
     mem_monitor: Option<MemoryPressureMonitor>,
     // The state of profile recordings. Should be locked *after* mounted_volumes.
@@ -64,7 +64,13 @@ pub struct VolumesDirectory {
 /// volume creation/removal ops) should exist on this guard instead of VolumesDirectory.
 pub struct MountedVolumesGuard<'a> {
     volumes_directory: Arc<VolumesDirectory>,
-    mounted_volumes: futures::lock::MutexGuard<'a, HashMap<u64, (String, FxVolumeAndRoot)>>,
+    mounted_volumes: futures::lock::MutexGuard<'a, HashMap<u64, MountedVolume>>,
+}
+
+struct MountedVolume {
+    sequence: u64,
+    name: String,
+    volume: FxVolumeAndRoot,
 }
 
 impl MountedVolumesGuard<'_> {
@@ -143,7 +149,12 @@ impl MountedVolumesGuard<'_> {
         volume
             .volume()
             .start_background_task(flush_task_config, self.volumes_directory.mem_monitor.as_ref());
-        self.mounted_volumes.insert(store_id, (name.to_string(), volume.clone()));
+        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+        let sequence = SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        self.mounted_volumes.insert(
+            store_id,
+            MountedVolume { sequence, name: name.to_string(), volume: volume.clone() },
+        );
         if let Some(inspect) = self.volumes_directory.inspect_tree.upgrade() {
             inspect.register_volume(
                 name.to_string(),
@@ -236,7 +247,7 @@ impl MountedVolumesGuard<'_> {
 
     async fn terminate(&mut self) {
         let volumes = std::mem::take(&mut *self.mounted_volumes);
-        for (_, (name, volume)) in volumes {
+        for (_, MountedVolume { name, volume, .. }) in volumes {
             if let Some(callback) = self.volumes_directory.on_volume_added.get() {
                 callback(&name, None);
             }
@@ -247,12 +258,48 @@ impl MountedVolumesGuard<'_> {
     // Unmounts the volume identified by `store_id`.  The caller should take locks to avoid races if
     // necessary.
     async fn unmount(&mut self, store_id: u64) -> Result<(), Error> {
-        let (name, volume) = self.mounted_volumes.remove(&store_id).ok_or(FxfsError::NotFound)?;
+        let MountedVolume { name, volume, .. } =
+            self.mounted_volumes.remove(&store_id).ok_or(FxfsError::NotFound)?;
         if let Some(callback) = self.volumes_directory.on_volume_added.get() {
             callback(&name, None);
         }
         volume.volume().terminate().await;
         Ok(())
+    }
+
+    // Auto-unmount the volume when the last connection to the volume is closed.
+    fn auto_unmount(&self, store_id: u64) {
+        let volumes_directory = self.volumes_directory.clone();
+        let mounted_volume = self.mounted_volumes.get(&store_id).unwrap();
+        let sequence = mounted_volume.sequence;
+        let scope = mounted_volume.volume.volume().scope().clone();
+        fasync::Task::spawn(async move {
+            scope.wait().await;
+
+            // Check that the same volume is still mounted i.e. there wasn't an explicit
+            // unmount.
+            let mut mounted_volumes = volumes_directory.lock().await;
+            match mounted_volumes.mounted_volumes.get(&store_id) {
+                Some(m) if m.sequence == sequence => {}
+                _ => return,
+            }
+
+            info!(store_id, "Last connection to volume closed, shutting down");
+            let root_store = volumes_directory.root_volume.volume_directory().store();
+            let fs = root_store.filesystem();
+            let _guard = fs
+                .lock_manager()
+                .txn_lock(lock_keys![LockKey::object(
+                    root_store.store_object_id(),
+                    volumes_directory.root_volume.volume_directory().object_id(),
+                )])
+                .await;
+
+            if let Err(e) = mounted_volumes.unmount(store_id).await {
+                warn!(?e, store_id, "Failed to unmount volume");
+            }
+        })
+        .detach();
     }
 }
 
@@ -291,8 +338,8 @@ impl VolumesDirectory {
     /// active profile recording or replay.
     pub async fn delete_profile(
         self: &Arc<Self>,
-        volume: &str,
-        profile: &str,
+        volume_name: &str,
+        profile_name: &str,
     ) -> Result<(), zx::Status> {
         // Volumes lock is taken first to provide consistent lock ordering with mounting a volume.
         let volumes = self.mounted_volumes.lock().await;
@@ -307,20 +354,16 @@ impl VolumesDirectory {
             warn!("Failing profile deletion while profile operations are in flight.");
             return Err(zx::Status::UNAVAILABLE);
         }
-        for (_, (vol_name, volume_and_root)) in &*volumes {
-            if vol_name == volume {
+        for (_, MountedVolume { name, volume, .. }) in &*volumes {
+            if name == volume_name {
                 let dir = Arc::new(FxDirectory::new(
                     None,
-                    volume_and_root
-                        .volume()
-                        .get_profile_directory()
-                        .await
-                        .map_err(map_to_status)?,
+                    volume.volume().get_profile_directory().await.map_err(map_to_status)?,
                 ));
-                return dir.unlink(profile, false).await;
+                return dir.unlink(profile_name, false).await;
             }
         }
-        warn!("Volume '{}' not found while deleting profile '{}'", volume, profile);
+        warn!(volume_name, profile_name, "Volume not found while deleting profile");
         Err(zx::Status::NOT_FOUND)
     }
 
@@ -338,7 +381,7 @@ impl VolumesDirectory {
                 .lock()
                 .await
                 .values()
-                .map(|v| v.1.volume().clone()) // Clones of each FxVolume.
+                .map(|v| v.volume.volume().clone()) // Clones of each FxVolume.
                 .collect::<Vec<Arc<FxVolume>>>();
             state = self.profiling_state.lock().await;
         }
@@ -352,25 +395,26 @@ impl VolumesDirectory {
     /// replay.
     pub async fn record_or_replay_profile(
         self: Arc<Self>,
-        name: String,
+        profile_name: String,
         duration_secs: u32,
     ) -> Result<(), Error> {
         // Volumes lock is taken first to provide consistent lock ordering with mounting a volume.
         let volumes = self.mounted_volumes.lock().await;
         let mut state = self.profiling_state.lock().await;
         if state.is_none() {
-            for (_, (volume_name, volume_and_root)) in &*volumes {
-                let is_blob =
-                    volume_and_root.root().clone().into_any().downcast::<BlobDirectory>().is_ok();
+            for (_, MountedVolume { name, volume, .. }) in &*volumes {
+                let is_blob = volume.root().clone().into_any().downcast::<BlobDirectory>().is_ok();
                 // Just log the errors, don't stop half-way.
-                if let Err(e) = volume_and_root
+                if let Err(error) = volume
                     .volume()
-                    .record_or_replay_profile(new_profile_state(is_blob), &name)
+                    .record_or_replay_profile(new_profile_state(is_blob), &profile_name)
                     .await
                 {
                     error!(
-                        "Failed to record or replay profile '{}' for volume {}: {:?}",
-                        &name, volume_name, e
+                        ?error,
+                        profile_name,
+                        volume_name = name,
+                        "Failed to record or replay profile",
                     );
                 }
             }
@@ -380,7 +424,7 @@ impl VolumesDirectory {
                     .await;
                 this.stop_profile_tasks().await;
             });
-            *state = Some((name, timer_task));
+            *state = Some((profile_name, timer_task));
             Ok(())
         } else {
             // Consistency in the recording and replaying cannot be ensured at the volume level
@@ -527,29 +571,6 @@ impl VolumesDirectory {
             outgoing_dir_server_end.into_channel().into(),
         );
 
-        // Automatically unmount when all channels are closed.
-        let me = self.clone();
-        fasync::Task::spawn(async move {
-            scope.wait().await;
-            info!(store_id, "Last connection to volume closed, shutting down");
-
-            let mut mounted_volumes = me.lock().await;
-            let root_store = me.root_volume.volume_directory().store();
-            let fs = root_store.filesystem();
-            let _guard = fs
-                .lock_manager()
-                .txn_lock(lock_keys![LockKey::object(
-                    root_store.store_object_id(),
-                    me.root_volume.volume_directory().object_id(),
-                )])
-                .await;
-
-            if let Err(e) = mounted_volumes.unmount(store_id).await {
-                warn!(?e, store_id, "Failed to unmount volume");
-            }
-        })
-        .detach();
-
         info!(store_id, "Serving volume");
         Ok(())
     }
@@ -570,7 +591,10 @@ impl VolumesDirectory {
         };
         let as_blob = as_blob.unwrap_or(false);
         let volume = guard.create_and_mount_volume(&name, crypt, as_blob).await?;
-        self.serve_volume(&volume, outgoing_directory, as_blob).context("failed to serve volume")
+        self.serve_volume(&volume, outgoing_directory, as_blob)
+            .context("failed to serve volume")?;
+        guard.auto_unmount(volume.volume().store().store_object_id());
+        Ok(())
     }
 
     async fn handle_volume_requests(
@@ -652,8 +676,8 @@ impl VolumesDirectory {
                         );
 
                         let flushes = FuturesUnordered::new();
-                        for (_, vol_and_root) in volumes.values() {
-                            let vol = vol_and_root.volume().clone();
+                        for MountedVolume { volume, .. } in volumes.values() {
+                            let vol = volume.volume().clone();
                             flushes.push(async move {
                                 vol.flush_all_files().await;
                             });
@@ -730,9 +754,13 @@ impl VolumesDirectory {
             None
         };
         let as_blob = options.as_blob.unwrap_or(false);
+        let mut guard = self.lock().await;
         let volume =
-            self.mount_volume(name, crypt, as_blob).await.context("failed to mount volume")?;
-        self.serve_volume(&volume, outgoing_directory, as_blob).context("failed to serve volume")
+            guard.mount_volume(name, crypt, as_blob).await.context("failed to mount volume")?;
+        self.serve_volume(&volume, outgoing_directory, as_blob)
+            .context("failed to serve volume")?;
+        guard.auto_unmount(volume.volume().store().store_object_id());
+        Ok(())
     }
 
     async fn handle_admin_requests(
