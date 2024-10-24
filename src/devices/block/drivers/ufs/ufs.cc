@@ -744,7 +744,11 @@ zx_status_t Ufs::Init() {
   logical_unit_count_ = lun_count.value();
   properties_.logical_unit_count =
       controller_node.CreateUint("logical_unit_count", logical_unit_count_);
-  properties_.wake_on_request_count = controller_node.CreateUint("wake_on_request_count", 0);
+  properties_.wake_on_request_count = inspect_node_.CreateUint("wake_on_request_count", 0);
+  // 14 buckets spanning from 1us to ~8ms.
+  properties_.wake_latency_us = inspect_node_.CreateExponentialUintHistogram(
+      "wake_latency_us", /*floor=*/1, /*initial_step=*/1, /*step_multiplier=*/2,
+      /*buckets=*/14);
 
   inspector().inspector().emplace(std::move(controller_node));
   inspector().inspector().emplace(std::move(wb_node));
@@ -1002,7 +1006,7 @@ zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
       return result.take_error();
     }
   }
-  properties_.power_suspended = controller_node.CreateBool("power_suspended", false);
+  properties_.power_suspended = inspect_node_.CreateBool("power_suspended", false);
 
   zx::result<uint32_t> result = device_manager_->GetBootLunEnabled();
   if (result.is_error()) {
@@ -1288,7 +1292,7 @@ zx::result<> Ufs::ConfigurePowerManagement() {
   fidl::Arena<> arena;
   const auto power_configs = fidl::ToWire(arena, GetAllPowerConfigs());
   if (power_configs.count() == 0) {
-    FDF_LOGL(INFO, logger(), "No power configs found.");
+    FDF_LOG(INFO, "No power configs found.");
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -1421,15 +1425,22 @@ void Ufs::WatchHardwareRequiredLevel() {
         const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
         switch (required_level) {
           case kPowerLevelOn: {
+            const zx::time start = zx::clock::get_monotonic();
+
             // Actually raise the hardware's power level.
             zx::result result = device_manager_->ResumePower();
             if (result.is_error()) {
-              FDF_LOG(ERROR, "Failed to resume power: %s", result.status_string());
+              const zx::duration duration = zx::clock::get_monotonic() - start;
+              FDF_LOGL(ERROR, logger(), "Failed to resume power after %ld us: %s",
+                       duration.to_usecs(), result.status_string());
               return;
             }
 
             // Communicate to Power Broker that the hardware power level has been raised.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
+
+            const zx::duration duration = zx::clock::get_monotonic() - start;
+            properties_.wake_latency_us.Insert(duration.to_usecs());
 
             wait_for_power_resumed_.Signal();
             break;

@@ -58,8 +58,7 @@ TEST_F(PowerTest, PowerSuspendResume) {
   inspect::InspectTestHelper inspector;
   inspector.ReadInspect(inspect_vmo);
 
-  const inspect::Hierarchy* root =
-      inspector.hierarchy().GetByPath({"ufs"})->GetByPath({"controller"});
+  const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"ufs"});
   ASSERT_NOT_NULL(root);
 
   const auto* power_suspended =
@@ -124,7 +123,7 @@ TEST_F(PowerTest, PowerSuspendResume) {
 
   inspector.ReadInspect(inspect_vmo);
 
-  root = inspector.hierarchy().GetByPath({"ufs"})->GetByPath({"controller"});
+  root = inspector.hierarchy().GetByPath({"ufs"});
   ASSERT_NOT_NULL(root);
 
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
@@ -152,7 +151,7 @@ TEST_F(PowerTest, PowerSuspendResume) {
 
   inspector.ReadInspect(inspect_vmo);
 
-  root = inspector.hierarchy().GetByPath({"ufs"})->GetByPath({"controller"});
+  root = inspector.hierarchy().GetByPath({"ufs"});
   ASSERT_NOT_NULL(root);
 
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
@@ -180,7 +179,7 @@ TEST_F(PowerTest, PowerSuspendResume) {
 
   inspector.ReadInspect(inspect_vmo);
 
-  root = inspector.hierarchy().GetByPath({"ufs"})->GetByPath({"controller"});
+  root = inspector.hierarchy().GetByPath({"ufs"});
   ASSERT_NOT_NULL(root);
 
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");

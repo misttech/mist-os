@@ -86,14 +86,15 @@ struct IoCommand {
 };
 
 struct InspectProperties {
+  inspect::BoolProperty power_suspended;              // Updated whenever power state changes.
+  inspect::UintProperty wake_on_request_count;        // Updated whenever wake-on-request occurs.
+  inspect::ExponentialUintHistogram wake_latency_us;  // Updated whenever wake-on-request occurs.
   // Controller
-  inspect::UintProperty max_transfer_bytes;     // Set once by the init thread.
-  inspect::UintProperty logical_unit_count;     // Set once by the init thread.
-  inspect::StringProperty reference_clock;      // Set once by the init thread.
-  inspect::UintProperty power_condition;        // Updated whenever power state changes.
-  inspect::UintProperty link_state;             // Updated whenever power state changes.
-  inspect::BoolProperty power_suspended;        // Updated whenever power state changes.
-  inspect::UintProperty wake_on_request_count;  // Updated whenever wake-on-request occurs.
+  inspect::UintProperty max_transfer_bytes;  // Set once by the init thread.
+  inspect::UintProperty logical_unit_count;  // Set once by the init thread.
+  inspect::StringProperty reference_clock;   // Set once by the init thread.
+  inspect::UintProperty power_condition;     // Updated whenever power state changes.
+  inspect::UintProperty link_state;          // Updated whenever power state changes.
   // Version
   inspect::UintProperty major_version_number;  // Set once by the init thread.
   inspect::UintProperty minor_version_number;  // Set once by the init thread.
