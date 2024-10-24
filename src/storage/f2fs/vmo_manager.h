@@ -8,7 +8,7 @@
 #include <fbl/intrusive_wavl_tree.h>
 
 #include "src/storage/f2fs/common.h"
-#include "src/storage/f2fs/f2fs_layout.h"
+#include "src/storage/f2fs/layout.h"
 
 namespace f2fs {
 

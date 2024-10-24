@@ -5,8 +5,8 @@
 #ifndef SRC_STORAGE_F2FS_XATTR_H_
 #define SRC_STORAGE_F2FS_XATTR_H_
 
-#include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/layout.h"
 
 namespace f2fs {
 constexpr uint32_t kXattrMagic = 0xF2F52011;

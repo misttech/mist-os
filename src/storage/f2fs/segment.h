@@ -9,9 +9,9 @@
 
 #include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/common.h"
-#include "src/storage/f2fs/f2fs_internal.h"
-#include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/layout.h"
+#include "src/storage/f2fs/superblock_info.h"
 
 namespace f2fs {
 

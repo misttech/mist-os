@@ -9,9 +9,9 @@
 #include <fbl/intrusive_wavl_tree.h>
 
 #include "src/storage/f2fs/bitmap.h"
-#include "src/storage/f2fs/f2fs_internal.h"
-#include "src/storage/f2fs/f2fs_layout.h"
+#include "src/storage/f2fs/layout.h"
 #include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/superblock_info.h"
 
 class F2fs;
 

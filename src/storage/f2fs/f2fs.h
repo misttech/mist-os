@@ -57,10 +57,10 @@
 #include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 
 #include "src/storage/f2fs/common.h"
-#include "src/storage/f2fs/f2fs_layout.h"
+#include "src/storage/f2fs/layout.h"
 #include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/mount.h"
-#include "src/storage/f2fs/f2fs_internal.h"
+#include "src/storage/f2fs/superblock_info.h"
 #include "src/storage/f2fs/storage_buffer.h"
 #include "src/storage/f2fs/writeback.h"
 #include "src/storage/f2fs/reader.h"

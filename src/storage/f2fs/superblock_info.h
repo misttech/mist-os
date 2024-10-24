@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_F2FS_F2FS_INTERNAL_H_
-#define SRC_STORAGE_F2FS_F2FS_INTERNAL_H_
+#ifndef SRC_STORAGE_F2FS_SUPERBLOCK_INFO_H_
+#define SRC_STORAGE_F2FS_SUPERBLOCK_INFO_H_
 
 #include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/common.h"
@@ -134,14 +134,6 @@ class SuperblockInfo {
       return status;
     }
     checkpoint_block_ = block;
-    InitFromCheckpoint();
-    return ZX_OK;
-  }
-  zx_status_t SetCheckpoint(const fbl::RefPtr<Page> &page) {
-    if (zx_status_t status = CheckBlockSize(*page->GetAddress<Checkpoint>()); status != ZX_OK) {
-      return status;
-    }
-    page->Read(&checkpoint_block_, 0, kBlockSize);
     InitFromCheckpoint();
     return ZX_OK;
   }
@@ -449,4 +441,4 @@ class SuperblockInfo {
 
 }  // namespace f2fs
 
-#endif  // SRC_STORAGE_F2FS_F2FS_INTERNAL_H_
+#endif  // SRC_STORAGE_F2FS_SUPERBLOCK_INFO_H_

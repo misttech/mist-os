@@ -226,14 +226,17 @@ zx_status_t F2fs::GetValidCheckpoint() {
   cp_start_blk_no += 1 << superblock_info_->GetLogBlocksPerSeg();
   ValidateCheckpoint(cp_start_blk_no, &cp2_version, &cp2);
 
+  BlockBuffer<Checkpoint> checkpoint_block;
   if (cp1 && cp2) {
     if (VerAfter(cp2_version, cp1_version)) {
-      if (superblock_info_->SetCheckpoint(cp2.CopyRefPtr()) != ZX_OK) {
+      cp2->Read(checkpoint_block.get(), 0, kBlockSize);
+      if (superblock_info_->SetCheckpoint(checkpoint_block) != ZX_OK) {
         cur_page = cp1.CopyRefPtr();
         cp_start_blk_no = start_addr;
       }
     } else {
-      if (superblock_info_->SetCheckpoint(cp1.CopyRefPtr()) != ZX_OK) {
+      cp1->Read(checkpoint_block.get(), 0, kBlockSize);
+      if (superblock_info_->SetCheckpoint(checkpoint_block) != ZX_OK) {
         cur_page = cp2.CopyRefPtr();
       } else {
         cp_start_blk_no = start_addr;
@@ -249,7 +252,8 @@ zx_status_t F2fs::GetValidCheckpoint() {
   }
 
   if (cur_page) {
-    if (zx_status_t status = superblock_info_->SetCheckpoint(cur_page); status != ZX_OK) {
+    cur_page->Read(checkpoint_block.get(), 0, kBlockSize);
+    if (zx_status_t status = superblock_info_->SetCheckpoint(checkpoint_block); status != ZX_OK) {
       return status;
     }
   }
