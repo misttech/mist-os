@@ -495,7 +495,7 @@ int Ufs::IoLoop() {
         wake_on_request_lease_control_client_end = std::move(lease_control_client_end.value());
         ZX_ASSERT(wake_on_request_lease_control_client_end.is_valid());
 
-        ++wake_on_request_count_;
+        properties_.wake_on_request_count.Add(1);
 
         lock_.unlock();
         wait_for_power_resumed_.Wait();
@@ -630,35 +630,47 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
   return ZX_OK;
 }
 
-static void PopulateVersionInspect(const VersionReg& version_reg, inspect::Node* inspect_node,
-                                   inspect::Inspector* inspector) {
+// Record the constant inspects.
+void Ufs::PopulateVersionInspect(inspect::Node* inspect_node) {
+  const fdf::MmioBuffer& mmio = mmio_.value();
+  VersionReg version_reg = VersionReg::Get().ReadFrom(&mmio);
+
   auto version = inspect_node->CreateChild("version");
-  version.RecordUint("major_version_number", version_reg.major_version_number());
-  version.RecordUint("minor_version_number", version_reg.minor_version_number());
-  version.RecordUint("version_suffix", version_reg.version_suffix());
-  inspector->emplace(std::move(version));
+  properties_.major_version_number =
+      version.CreateUint("major_version_number", version_reg.major_version_number());
+  properties_.minor_version_number =
+      version.CreateUint("minor_version_number", version_reg.minor_version_number());
+  properties_.version_suffix = version.CreateUint("version_suffix", version_reg.version_suffix());
+  inspector().inspector().emplace(std::move(version));
 
   FDF_LOG(INFO, "Controller version %u.%u found", version_reg.major_version_number(),
           version_reg.minor_version_number());
 }
 
-static void PopulateCapabilitiesInspect(const CapabilityReg& caps_reg, inspect::Node* inspect_node,
-                                        inspect::Inspector* inspector) {
+// Record the constant inspects.
+void Ufs::PopulateCapabilitiesInspect(inspect::Node* inspect_node) {
+  const fdf::MmioBuffer& mmio = mmio_.value();
+  CapabilityReg caps_reg = CapabilityReg::Get().ReadFrom(&mmio);
+
   auto caps = inspect_node->CreateChild("capabilities");
-  caps.RecordBool("crypto_support", caps_reg.crypto_support());
-  caps.RecordBool("uic_dme_test_mode_command_supported",
-                  caps_reg.uic_dme_test_mode_command_supported());
-  caps.RecordBool("out_of_order_data_delivery_supported",
-                  caps_reg.out_of_order_data_delivery_supported());
-  caps.RecordBool("64_bit_addressing_supported", caps_reg._64_bit_addressing_supported());
-  caps.RecordBool("auto_hibernation_support", caps_reg.auto_hibernation_support());
-  caps.RecordUint("number_of_utp_task_management_request_slots",
-                  caps_reg.number_of_utp_task_management_request_slots());
-  caps.RecordUint("number_of_outstanding_rtt_requests_supported",
-                  caps_reg.number_of_outstanding_rtt_requests_supported());
-  caps.RecordUint("number_of_utp_transfer_request_slots",
-                  caps_reg.number_of_utp_transfer_request_slots());
-  inspector->emplace(std::move(caps));
+  properties_.crypto_support = caps.CreateBool("crypto_support", caps_reg.crypto_support());
+  properties_.uic_dme_test_mode_command_supported = caps.CreateBool(
+      "uic_dme_test_mode_command_supported", caps_reg.uic_dme_test_mode_command_supported());
+  properties_.out_of_order_data_delivery_supported = caps.CreateBool(
+      "out_of_order_data_delivery_supported", caps_reg.out_of_order_data_delivery_supported());
+  properties_._64_bit_addressing_supported =
+      caps.CreateBool("64_bit_addressing_supported", caps_reg._64_bit_addressing_supported());
+  properties_.auto_hibernation_support =
+      caps.CreateBool("auto_hibernation_support", caps_reg.auto_hibernation_support());
+  properties_.number_of_utp_task_management_request_slots =
+      caps.CreateUint("number_of_utp_task_management_request_slots",
+                      caps_reg.number_of_utp_task_management_request_slots());
+  properties_.number_of_outstanding_rtt_requests_supported =
+      caps.CreateUint("number_of_outstanding_rtt_requests_supported",
+                      caps_reg.number_of_outstanding_rtt_requests_supported());
+  properties_.number_of_utp_transfer_request_slots = caps.CreateUint(
+      "number_of_utp_transfer_request_slots", caps_reg.number_of_utp_transfer_request_slots());
+  inspector().inspector().emplace(std::move(caps));
 }
 
 zx::result<> Ufs::InitMmioBuffer() {
@@ -678,13 +690,9 @@ zx_status_t Ufs::Init() {
     return result.error_value();
   }
 
-  const fdf::MmioBuffer& mmio = mmio_.value();
-  VersionReg version_reg = VersionReg::Get().ReadFrom(&mmio);
-  CapabilityReg caps_reg = CapabilityReg::Get().ReadFrom(&mmio);
-
   inspect_node_ = inspector().root().CreateChild("ufs");
-  PopulateVersionInspect(version_reg, &inspect_node_, &inspector().inspector());
-  PopulateCapabilitiesInspect(caps_reg, &inspect_node_, &inspector().inspector());
+  PopulateVersionInspect(&inspect_node_);
+  PopulateCapabilitiesInspect(&inspect_node_);
 
   auto controller_node = inspect_node_.CreateChild("controller");
   auto wb_node = controller_node.CreateChild("writebooster");
@@ -720,7 +728,8 @@ zx_status_t Ufs::Init() {
   // The maximum transfer size supported by UFSHCI spec is 65535 * 256 KiB. However, we limit the
   // maximum transfer size to 1MiB for performance reason.
   max_transfer_bytes_ = kMaxTransferSize1MiB;
-  controller_node.RecordUint("max_transfer_bytes", max_transfer_bytes_);
+  properties_.max_transfer_bytes =
+      controller_node.CreateUint("max_transfer_bytes", max_transfer_bytes_);
 
   zx::result<uint32_t> lun_count;
   if (lun_count = AddLogicalUnits(); lun_count.is_error()) {
@@ -733,9 +742,9 @@ zx_status_t Ufs::Init() {
     return ZX_ERR_BAD_STATE;
   }
   logical_unit_count_ = lun_count.value();
-  controller_node.RecordUint("logical_unit_count", logical_unit_count_);
-  controller_node.RecordUint("wake_on_request_count",
-                             static_cast<uint32_t>(wake_on_request_count_));
+  properties_.logical_unit_count =
+      controller_node.CreateUint("logical_unit_count", logical_unit_count_);
+  properties_.wake_on_request_count = controller_node.CreateUint("wake_on_request_count", 0);
 
   inspector().inspector().emplace(std::move(controller_node));
   inspector().inspector().emplace(std::move(wb_node));
@@ -842,7 +851,7 @@ zx::result<> Ufs::InitController() {
   }
   transfer_request_processor_ = std::move(*transfer_request_processor);
 
-  auto device_manager = DeviceManager::Create(*this, *transfer_request_processor_);
+  auto device_manager = DeviceManager::Create(*this, *transfer_request_processor_, properties_);
   if (device_manager.is_error()) {
     FDF_LOG(ERROR, "Failed to create device manager %s", device_manager.status_string());
     return device_manager.take_error();
@@ -993,13 +1002,14 @@ zx::result<> Ufs::InitDeviceInterface(inspect::Node& controller_node) {
       return result.take_error();
     }
   }
+  properties_.power_suspended = controller_node.CreateBool("power_suspended", false);
 
   zx::result<uint32_t> result = device_manager_->GetBootLunEnabled();
   if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to check Boot LUN enabled %s", result.status_string());
     return result.take_error();
   }
-  attributes_node.RecordUint("bBootLunEn", result.value());
+  properties_.b_boot_lun_en = attributes_node.CreateUint("bBootLunEn", result.value());
 
   // TODO(https://fxbug.dev/42075643): Set bMaxNumOfRTT (Read-to-transfer)
 

@@ -85,6 +85,60 @@ struct IoCommand {
   list_node_t node;
 };
 
+struct InspectProperties {
+  // Controller
+  inspect::UintProperty max_transfer_bytes;     // Set once by the init thread.
+  inspect::UintProperty logical_unit_count;     // Set once by the init thread.
+  inspect::StringProperty reference_clock;      // Set once by the init thread.
+  inspect::UintProperty power_condition;        // Updated whenever power state changes.
+  inspect::UintProperty link_state;             // Updated whenever power state changes.
+  inspect::BoolProperty power_suspended;        // Updated whenever power state changes.
+  inspect::UintProperty wake_on_request_count;  // Updated whenever wake-on-request occurs.
+  // Version
+  inspect::UintProperty major_version_number;  // Set once by the init thread.
+  inspect::UintProperty minor_version_number;  // Set once by the init thread.
+  inspect::UintProperty version_suffix;        // Set once by the init thread.
+  // Capabilities
+  inspect::BoolProperty crypto_support;                        // Set once by the init thread.
+  inspect::BoolProperty uic_dme_test_mode_command_supported;   // Set once by the init thread.
+  inspect::BoolProperty out_of_order_data_delivery_supported;  // Set once by the init thread.
+  inspect::BoolProperty _64_bit_addressing_supported;          // Set once by the init thread.
+  inspect::BoolProperty auto_hibernation_support;              // Set once by the init thread.
+  inspect::UintProperty
+      number_of_utp_task_management_request_slots;  // Set once by the init thread.
+  inspect::UintProperty
+      number_of_outstanding_rtt_requests_supported;            // Set once by the init thread.
+  inspect::UintProperty number_of_utp_transfer_request_slots;  // Set once by the init thread.
+  // Attribute
+  inspect::UintProperty b_boot_lun_en;         // Set once by the init thread.
+  inspect::UintProperty b_current_power_mode;  // Updated whenever power state changes.
+  inspect::UintProperty b_active_icc_level;    // Updated whenever power state changes.
+  // Unipro
+  inspect::UintProperty remote_version;           // Set once by the init thread.
+  inspect::UintProperty local_version;            // Set once by the init thread.
+  inspect::UintProperty host_t_activate;          // Set once by the init thread.
+  inspect::UintProperty device_t_activate;        // Set once by the init thread.
+  inspect::UintProperty host_granularity;         // Set once by the init thread.
+  inspect::UintProperty device_granularity;       // Set once by the init thread.
+  inspect::UintProperty pa_active_tx_data_lanes;  // Set once by the init thread.
+  inspect::UintProperty pa_active_rx_data_lanes;  // Set once by the init thread.
+  inspect::UintProperty pa_max_rx_hs_gear;        // Set once by the init thread.
+  inspect::UintProperty pa_tx_gear;               // Updated whenever gear changes.
+  inspect::UintProperty pa_rx_gear;               // Updated whenever gear changes.
+  inspect::BoolProperty tx_termination;           // Set once by the init thread.
+  inspect::BoolProperty rx_termination;           // Set once by the init thread.
+  inspect::UintProperty pa_hs_series;             // Set once by the init thread.
+  inspect::UintProperty power_mode;               // Updated whenever power state changes.
+  // WriteBooster
+  inspect::BoolProperty is_write_booster_enabled;                    // Set once by the init thread.
+  inspect::BoolProperty writebooster_buffer_flush_during_hibernate;  // Set once by the init thread.
+  inspect::BoolProperty writebooster_buffer_flush_enabled;           // Set once by the init thread.
+  inspect::UintProperty write_booster_buffer_type;                   // Set once by the init thread.
+  inspect::UintProperty user_space_configuration_option;             // Set once by the init thread.
+  inspect::UintProperty write_booster_dedicated_lu;                  // Set once by the init thread.
+  inspect::UintProperty write_booster_buffer_size_in_bytes;          // Set once by the init thread.
+};
+
 using HostControllerCallback = fit::function<zx::result<>(NotifyEvent, uint64_t data)>;
 
 class Ufs : public fdf::DriverBase, public scsi::Controller {
@@ -206,6 +260,9 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   zx::result<> ConnectToPciService();
   zx::result<> ConfigResources();
 
+  void PopulateVersionInspect(inspect::Node *inspect_node);
+  void PopulateCapabilitiesInspect(inspect::Node *inspect_node);
+
   zx::result<> InitMmioBuffer();
   zx::result<> InitQuirk();
   zx::result<> InitController();
@@ -294,8 +351,6 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   bool driver_shutdown_ TA_GUARDED(lock_) = false;
   bool disable_completion_ = false;
 
-  uint32_t wake_on_request_count_ = 0;
-
   // The maximum transfer size supported by UFSHCI spec is 65535 * 256 KiB. However, we limit the
   // maximum transfer size to 1MiB for performance reason.
   uint32_t max_transfer_bytes_ = kMaxTransferSize1MiB;
@@ -305,6 +360,9 @@ class Ufs : public fdf::DriverBase, public scsi::Controller {
   std::mutex lock_;
 
   ufs_config::Config config_;
+
+  // Record the variable inspects.
+  InspectProperties properties_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;

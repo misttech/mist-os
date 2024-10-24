@@ -44,13 +44,32 @@ TEST_F(PowerTest, PowerSuspendResume) {
   runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
 
   // TODO(https://fxbug.dev/42075643): Check if suspend is enabled with inspect
-  ASSERT_TRUE(!dut_->IsResumed());
+  ASSERT_FALSE(dut_->IsResumed());
   UfsPowerMode power_mode = UfsPowerMode::kSleep;
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  const zx::vmo inspect_vmo = dut_->inspect().DuplicateVmo();
+  ASSERT_TRUE(inspect_vmo.is_valid());
+
+  inspect::InspectTestHelper inspector;
+  inspector.ReadInspect(inspect_vmo);
+
+  const inspect::Hierarchy* root =
+      inspector.hierarchy().GetByPath({"ufs"})->GetByPath({"controller"});
+  ASSERT_NOT_NULL(root);
+
+  const auto* power_suspended =
+      root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_TRUE(power_suspended->value());
+  const auto* wake_on_request_count =
+      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NOT_NULL(wake_on_request_count);
+  EXPECT_EQ(wake_on_request_count->value(), 0);
 
   // 2. Issue request while power is suspended.
   awake_complete.Reset();
@@ -95,14 +114,26 @@ TEST_F(PowerTest, PowerSuspendResume) {
   });
   runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
 
-  // TODO(https://fxbug.dev/42075643): Check if suspend is enabled with inspect
-  ASSERT_TRUE(!dut_->IsResumed());
+  ASSERT_FALSE(dut_->IsResumed());
   power_mode = UfsPowerMode::kSleep;
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  inspector.ReadInspect(inspect_vmo);
+
+  root = inspector.hierarchy().GetByPath({"ufs"})->GetByPath({"controller"});
+  ASSERT_NOT_NULL(root);
+
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_TRUE(power_suspended->value());
+  wake_on_request_count =
+      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NOT_NULL(wake_on_request_count);
+  EXPECT_EQ(wake_on_request_count->value(), 1);
 
   // 3. Trigger power level change to kPowerLevelOn.
   awake_complete.Reset();
@@ -111,14 +142,26 @@ TEST_F(PowerTest, PowerSuspendResume) {
   });
   runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
 
-  // TODO(https://fxbug.dev/42075643): Check if suspend is enabled with inspect
-  ASSERT_FALSE(!dut_->IsResumed());
+  ASSERT_TRUE(dut_->IsResumed());
   power_mode = UfsPowerMode::kActive;
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  inspector.ReadInspect(inspect_vmo);
+
+  root = inspector.hierarchy().GetByPath({"ufs"})->GetByPath({"controller"});
+  ASSERT_NOT_NULL(root);
+
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_FALSE(power_suspended->value());
+  wake_on_request_count =
+      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NOT_NULL(wake_on_request_count);
+  EXPECT_EQ(wake_on_request_count->value(), 1);
 
   // 4. Trigger power level change to kPowerLevelOff.
   sleep_complete.Reset();
@@ -127,14 +170,26 @@ TEST_F(PowerTest, PowerSuspendResume) {
   });
   runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
 
-  // TODO(https://fxbug.dev/42075643): Check if suspend is enabled with inspect
-  ASSERT_TRUE(!dut_->IsResumed());
+  ASSERT_FALSE(dut_->IsResumed());
   power_mode = UfsPowerMode::kSleep;
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerMode(), power_mode);
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentPowerCondition(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].first);
   ASSERT_EQ(dut_->GetDeviceManager().GetCurrentLinkState(),
             dut_->GetDeviceManager().GetPowerModeMap()[power_mode].second);
+
+  inspector.ReadInspect(inspect_vmo);
+
+  root = inspector.hierarchy().GetByPath({"ufs"})->GetByPath({"controller"});
+  ASSERT_NOT_NULL(root);
+
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_TRUE(power_suspended->value());
+  wake_on_request_count =
+      root->node().get_property<inspect::UintPropertyValue>("wake_on_request_count");
+  ASSERT_NOT_NULL(wake_on_request_count);
+  EXPECT_EQ(wake_on_request_count->value(), 1);
 }
 
 }  // namespace ufs
