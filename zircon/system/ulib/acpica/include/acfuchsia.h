@@ -25,6 +25,7 @@
 #error Unexpected architecture
 #endif
 
+extern zx_paddr_t acpi_rsdp;
 extern zx_handle_t mmio_resource_handle;
 extern zx_handle_t ioport_resource_handle;
 extern zx_handle_t irq_resource_handle;

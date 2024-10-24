@@ -5,12 +5,15 @@
 #include "smbios.h"
 
 #include <lib/ddk/driver.h>
+#include <lib/fdf/cpp/arena.h>
+#include <lib/fidl_driver/cpp/sync_call.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/smbios/smbios.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <limits.h>
+#include <zircon/errors.h>
 
 #include <fbl/algorithm.h>
 namespace smbios {
@@ -54,7 +57,8 @@ class SmbiosState {
   // Must only be invoked once on an instance.  On success, |entry_point()|
   // and |struct_table_mapping()| are usable.  |entry_point()| will be
   // guaranteed to be a valid SMBIOS entry point structure.
-  zx_status_t LoadFromFirmware(zx::unowned_resource mmio_resource);
+  zx_status_t LoadFromFirmware(zx::unowned_resource mmio_resource,
+                               fdf::ClientEnd<fuchsia_hardware_platform_bus::Firmware> client);
 
   // These values are only valid as long as the instance is around.
   const smbios::EntryPoint* entry_point() const {
@@ -70,9 +74,25 @@ class SmbiosState {
   uintptr_t struct_table_start_ = 0;
 };
 
-zx_status_t SmbiosState::LoadFromFirmware(zx::unowned_resource mmio_resource) {
-  zx_paddr_t acpi_rsdp, smbios_ep;
-  zx_status_t status = zx_pc_firmware_tables(mmio_resource->get(), &acpi_rsdp, &smbios_ep);
+zx_status_t SmbiosState::LoadFromFirmware(
+    zx::unowned_resource mmio_resource,
+    fdf::ClientEnd<fuchsia_hardware_platform_bus::Firmware> client) {
+  fdf::Arena arena('FIRM');
+  auto result = fdf::WireCall(client).buffer(arena)->GetFirmware(
+      fuchsia_hardware_platform_bus::FirmwareType::kSmbios);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  auto& item = result->value()->blobs[0];
+  if (item.length != sizeof(zx_paddr_t)) {
+    return ZX_ERR_INTERNAL;
+  }
+  zx_paddr_t smbios_ep;
+  zx_status_t status = item.vmo.read(&smbios_ep, 0, sizeof(smbios_ep));
   if (status != ZX_OK) {
     return status;
   }
@@ -134,9 +154,10 @@ bool smbios_product_name_is_valid(const char* product_name) {
   return true;
 }
 
-zx_status_t SmbiosInfo::Load(zx::unowned_resource mmio_resource) {
+zx_status_t SmbiosInfo::Load(zx::unowned_resource mmio_resource,
+                             fdf::ClientEnd<fuchsia_hardware_platform_bus::Firmware> client) {
   SmbiosState smbios;
-  zx_status_t status = smbios.LoadFromFirmware(std::move(mmio_resource));
+  zx_status_t status = smbios.LoadFromFirmware(std::move(mmio_resource), std::move(client));
   if (status != ZX_OK) {
     return status;
   }

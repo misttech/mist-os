@@ -841,6 +841,8 @@ impl BuiltinEnvironment {
                     .set_store_item(ZbiType::DeviceTree)
                     .set_store_item(ZbiType::DriverMetadata)
                     .set_store_item(ZbiType::CpuTopology)
+                    .set_store_item(ZbiType::AcpiRsdp)
+                    .set_store_item(ZbiType::Smbios)
                     .parse()?,
             ),
             None => None,
