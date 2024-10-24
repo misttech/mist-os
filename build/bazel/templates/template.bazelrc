@@ -97,3 +97,7 @@ build --per_file_copt=src/lib/diagnostics/accessor2logger_accessor2logger/log_me
 
 # Set up Pigweed configuration and module backends.
 import third_party/pigweed/configuration.bazelrc
+
+# Profiling network usage can help find unexpected uploading/downloading by RBE, BES, etc.
+# As of Bazel 8, this will be enabled by default.
+build --experimental_collect_system_network_usage
