@@ -347,6 +347,30 @@ fn may_create(
     Ok(())
 }
 
+/// Helper that checks whether the current task can link a file or directory. Called by
+/// [`check_fs_node_link_access`].
+fn may_link(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let (current_sid, fscreate_sid) = {
+        let attrs = &current_task.read().security_state.attrs;
+        (attrs.current_sid, attrs.fscreate_sid)
+    };
+    let file_sid = fscreate_sid.unwrap_or_else(
+        // TODO: Calculate the new file's SID here.
+        || SecurityId::initial(InitialSid::File),
+    );
+    let parent_sid = fs_node_effective_sid(parent);
+
+    check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
+    check_permission(&permission_check, current_sid, parent_sid, DirPermission::AddName)?;
+    check_permission(&permission_check, current_sid, file_sid, FilePermission::Link)?;
+    Ok(())
+}
+
 /// Validate that `current_task` has permission to create a regular file in the `parent` directory,
 /// with the specified file `mode`.
 pub(super) fn check_fs_node_create_access(
@@ -390,6 +414,16 @@ pub(super) fn check_fs_node_mknod_access(
     _device_id: DeviceType,
 ) -> Result<(), Errno> {
     may_create(security_server, current_task, parent)
+}
+
+/// Validate that `current_task` has  the permission to create a new hard link to a file.
+pub(super) fn check_fs_node_link_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    _child: &FsNode,
+) -> Result<(), Errno> {
+    may_link(security_server, current_task, parent)
 }
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`

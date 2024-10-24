@@ -200,6 +200,18 @@ pub fn check_fs_node_mknod_access(
     })
 }
 
+/// Validate that `current_task` has  the permission to create a new hard link to a file.
+/// Corresponds to the `security_inode_link()` hook.
+pub fn check_fs_node_link_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    child: &FsNode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_link_access(security_server, current_task, parent, child)
+    })
+}
+
 /// Return the default initial `TaskState` for kernel tasks.
 pub fn task_alloc_for_kernel() -> TaskState {
     TaskState { attrs: selinux_hooks::TaskAttrs::for_kernel() }

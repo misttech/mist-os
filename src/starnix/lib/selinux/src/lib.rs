@@ -303,8 +303,12 @@ class_permission_enum! {
         /// Permission to use a file as an entry point to the calling domain without performing a
         /// transition.
         ExecuteNoTrans("execute_no_trans"),
+        /// Permissions to create hard link.
+        Link("link"),
         /// Permission to open a file.
         Open("open"),
+        /// Permission to delete a file or remove a hard link.
+        Unlink("unlink"),
         // keep-sorted end
     }
 }
