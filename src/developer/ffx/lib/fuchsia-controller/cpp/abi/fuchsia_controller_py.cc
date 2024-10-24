@@ -617,9 +617,9 @@ PyObject *context_target_wait(PyObject *self, PyObject *args) {
 
 PyObject *channel_write(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
-  PyObject *bytes = nullptr;
+  PyObject *buffer = nullptr;
   PyObject *handles = nullptr;
-  if (!PyArg_ParseTuple(args, "OOO", &obj, &bytes, &handles)) {
+  if (!PyArg_ParseTuple(args, "OOO", &obj, &buffer, &handles)) {
     return nullptr;
   }
   auto channel = DowncastChannel(obj);
@@ -645,7 +645,7 @@ PyObject *channel_write(PyObject *self, PyObject *args) {
   // channel_write_etc call.
   memcpy(c_handles, view.buf, view.len);
   PyBuffer_Release(&view);
-  if (PyObject_GetBuffer(bytes, &view, PyBUF_CONTIG_RO) < 0) {
+  if (PyObject_GetBuffer(buffer, &view, PyBUF_CONTIG_RO) < 0) {
     PyErr_SetString(PyExc_TypeError, "Expected a buffer.");
     return nullptr;
   }

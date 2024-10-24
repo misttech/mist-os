@@ -125,23 +125,23 @@ class ServerBase(object):
                     fidl_type=info.response_identifier, response=res
                 )
         if res is not None:
-            fidl_msg = encode_fidl_message(
+            encoded_fidl_message = encode_fidl_message(
                 ordinal=ordinal,
                 object=res,
                 library=self.library,
                 txid=txid,
                 type_name=res.__fidl_raw_type__,
             )
-            self.channel.write(fidl_msg)
+            self.channel.write(encoded_fidl_message)
         elif info.empty_response:
-            fidl_msg = encode_fidl_message(
+            encoded_fidl_message = encode_fidl_message(
                 ordinal=ordinal,
                 object=None,
                 library=self.library,
                 txid=txid,
                 type_name=None,
             )
-            self.channel.write(fidl_msg)
+            self.channel.write(encoded_fidl_message)
         return True
 
     async def _channel_read(self) -> FidlMessage:
@@ -174,11 +174,11 @@ class ServerBase(object):
         type_name = None
         if msg_obj is not None:
             type_name = msg_obj.__fidl_raw_type__
-        fidl_message = encode_fidl_message(
+        encoded_fidl_message = encode_fidl_message(
             ordinal=ordinal,
             object=msg_obj,
             library=library,
             txid=0,
             type_name=type_name,
         )
-        self.channel.write(fidl_message)
+        self.channel.write(encoded_fidl_message)

@@ -32,11 +32,6 @@ def connect_handle_notifier() -> int:
     return fuchsia_controller_internal.connect_handle_notifier()
 
 
-def encode_ints(ints) -> bytes:
-    """Encodes an array-like object of int-like things to a byte buffer."""
-    return b"".join([x.to_bytes(4, byteorder="little") for x in ints])
-
-
 class Handle:
     """Fuchsia controller FIDL handle.
 
@@ -275,12 +270,21 @@ class Channel:
         else:
             raise HandleTypeError(handle)
 
-    def write(self, data) -> int:
+    def write(
+        self,
+        encoded_fidl_message: tuple[
+            bytes, list[tuple[int, int, int, int, int]]
+        ],
+    ) -> int:
         """Writes data to the channel.
 
         Args:
-            data: The data to write to the channel. This must be a tuple of two elements
-            containing bytes and handles.
+            encoded_fidl_message: An encoded FIDL message of the format returned
+                                  by encode::encode_fidl_message from fidl_codec. This message is a
+                                  tuple where the first element is a list of bytes. The second
+                                  element is a list of tuples in the structure of a
+                                  `zx_handle_disposition_t`, e.g. operation, handle, type, rights,
+                                  and result. See `//zircon/system/public/zircon/types.h`.
 
         Returns:
             The number of bytes written.
@@ -288,11 +292,15 @@ class Channel:
         Raises:
             TypeError: If data is not the correct type.
         """
-        bytes = encode_ints(
-            [elem for handle_desc in data[1] for elem in handle_desc]
+        encoded_handles = b"".join(
+            [
+                x.to_bytes(4, byteorder="little")
+                for handle_desc in encoded_fidl_message[1]
+                for x in handle_desc
+            ]
         )
         return fuchsia_controller_internal.channel_write(
-            self._handle, data[0], bytes
+            self._handle, encoded_fidl_message[0], encoded_handles
         )
 
     def read(self) -> typing.Tuple[bytes, typing.List[Handle]]:
