@@ -55,10 +55,12 @@ bool test_exit_status() {
     auto child = (*current_task).clone_task_for_test(0, {kSIGCHLD});
     (*child)->thread_group()->exit(starnix::ExitStatus::Exit(42), {});
   }
-  ASSERT_EQ(
-      starnix::ExitStatus::signal_info_status(
-          (*current_task)->thread_group()->Read()->get_zombie_children()[0]->exit_info.status),
-      starnix::ExitStatus::signal_info_status(starnix::ExitStatus::Exit(42)));
+  ASSERT_EQ((*current_task)
+                ->thread_group()
+                ->Read()
+                ->get_zombie_children()[0]
+                ->exit_info.status.signal_info_status(),
+            starnix::ExitStatus::Exit(42).signal_info_status());
 
   END_TEST;
 }

@@ -54,6 +54,12 @@ void TaskMutableState::update_flags(TaskFlags clear, TaskFlags set) {
   DEBUG_ASSERT(swapped == observed);
 }
 
+bool TaskMutableState::is_any_signal_pending() const {
+  starnix_uapi::SigSet mask = this->signal_mask();
+  return signals_.is_any_pending() ||
+         base_->thread_group()->pending_signals_.Lock()->is_any_allowed_by_mask(mask);
+}
+
 fbl::RefPtr<Task> Task::New(pid_t id, const ktl::string_view& command,
                             fbl::RefPtr<ThreadGroup> thread_group,
                             ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,

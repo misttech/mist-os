@@ -13,18 +13,18 @@
 #include <lib/mistos/starnix/kernel/task/waiter.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
+#include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/stats.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/assert.h>
 
 #include <fbl/ref_counted.h>
+#include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 #include <ktl/optional.h>
 #include <object/handle.h>
-
-#include "fbl/ref_counted_upgradeable.h"
 
 class ProcessDispatcher;
 
@@ -54,14 +54,20 @@ struct ProcessExitInfo {
 struct WaitResult {
   pid_t pid;
   uid_t uid;
+
   ProcessExitInfo exit_info;
+
+  /// Cumulative time stats for the process and its children.
   TaskTimeStats time_stats;
 
-  // Converts the wait result to a signal info
-  /*SignalInfo AsSignalInfo() const {
-    return SignalInfo::new_sigchld(pid, uid, exit_info.status.SignalInfoStatus(),
-                                   exit_info.status.SignalInfoCode());
-  }*/
+  // impl WaitResult
+
+  // According to wait(2) man page, SignalInfo.signal needs to always be set to SIGCHLD
+  SignalInfo AsSignalInfo() const {
+    return SignalInfo::New(
+        kSIGCHLD, exit_info.status.signal_info_code(),
+        SIGCHLDDetail{.pid = pid, .uid = uid, .status = exit_info.status.signal_info_status()});
+  }
 };
 
 class ThreadGroupMutableState;
@@ -477,6 +483,12 @@ class ThreadGroup
  public:
   /// Tasks ptraced by this process
   // pub ptracees: Mutex<BTreeMap<pid_t, TaskContainer>>,
+
+  /// The signals that are currently pending for this thread group.
+  mutable starnix_sync::StarnixMutex<QueuedSignals> pending_signals_;
+
+  /// The monotonic time at which the thread group started.
+  zx_instant_mono_t start_time_;
 
   /// impl ThreadGroup
   static fbl::RefPtr<ThreadGroup> New(

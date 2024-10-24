@@ -44,6 +44,7 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 #include <ktl/string_view.h>
+#include <ktl/type_traits.h>
 #include <lockdep/guard.h>
 #include <object/handle.h>
 #include <object/process_dispatcher.h>
@@ -687,6 +688,28 @@ void CurrentTask::release() {
   }
   LTRACE_EXIT_OBJ;
 }
+
+template <typename T, typename F>
+fit::result<Errno, T> CurrentTask::wait_with_temporary_mask(SigSet signal_mask, F&& wait_function) {
+  {
+    auto state = task_->Write();
+    state->set_flags(TaskFlags(TaskFlagsEnum::TEMPORARY_SIGNAL_MASK), true);
+    state->set_temporary_signal_mask(signal_mask);
+  }
+  return wait_function(this);
+}
+
+
+/*fit::result<Errno> CurrentTask::block_until(EventWaitGuard& guard, zx::MonotonicInstant deadline)
+{ return run_in_state(RunState::Event(guard.event()), [&]() -> fit::result<Errno> { auto result =
+guard.block_until(deadline); if (result.is_error()) { switch (result.error()) { case
+WakeReason::Interrupted: return fit::error(errno(EINTR)); case WakeReason::DeadlineExpired: return
+fit::error(errno(ETIMEDOUT));
+      }
+    }
+    return fit::ok();
+  });
+}*/
 
 fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
     FdNumber dir_fd, FsStr path, ResolveFlags flags) const {

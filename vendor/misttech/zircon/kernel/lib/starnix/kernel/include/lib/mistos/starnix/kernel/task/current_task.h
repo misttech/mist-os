@@ -10,8 +10,10 @@
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/loader.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
+#include <lib/mistos/starnix/kernel/signals/types.h>
 #include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/task/pid_table.h>
+#include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/starnix/kernel/vfs/mount.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
@@ -134,6 +136,55 @@ class CurrentTask : public TaskMemoryAccessor {
   void set_creds(Credentials creds) const;
 
   void release();
+
+  /// Sets the task's signal mask to `signal_mask` and runs `wait_function`.
+  ///
+  /// Signals are dequeued prior to the original signal mask being restored. This is done by the
+  /// signal machinery in the syscall dispatch loop.
+  ///
+  /// The returned result is the result returned from the wait function.
+  template <typename T, typename F>
+  fit::result<Errno, T> wait_with_temporary_mask(SigSet signal_mask, F&& wait_function);
+
+  /// Set the RunState for the current task to the given value and then call the given callback.
+  ///
+  /// When the callback is done, the run_state is restored to `RunState::Running`.
+  ///
+  /// This function is typically used just before blocking the current task on some operation.
+  /// The given `run_state` registers the mechanism for interrupting the blocking operation with
+  /// the task and the given `callback` actually blocks the task.
+  ///
+  /// This function can only be called in the `RunState::Running` state and cannot set the
+  /// run state to `RunState::Running`. For this reason, this function cannot be reentered.
+  // template <typename T, typename F>
+  // fit::result<Errno, T> run_in_state(RunState run_state, F&& callback);
+  template <typename F, typename... ResultArgs>
+  auto run_in_state(RunState run_state, F&& callback) const -> fit::result<Errno, ResultArgs...> {
+    ASSERT(run_state != RunState::Running());
+    {
+      auto state = task_->Write();
+      ASSERT(!state->is_blocked());
+      // A note on PTRACE_LISTEN - the thread cannot be scheduled
+      // regardless of pending signals.
+      if (state->is_any_signal_pending() && !state->is_ptrace_listening()) {
+        return fit::error(errno(EINTR));
+      }
+      state->set_run_state(run_state);
+    }
+
+    auto result = ktl::forward<F>(callback)();
+
+    {
+      auto state = task_->Write();
+      ZX_ASSERT_MSG(state->run_state() == run_state,
+                    "SignalState run state changed while waiting!");
+      state->set_run_state(RunState::Running());
+    }
+
+    return result;
+  }
+
+  // fit::result<Errno> block_until(EventWaitGuard& guard, zx_instant_mono_t deadline);
 
   /// Determine namespace node indicated by the dir_fd.
   ///

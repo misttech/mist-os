@@ -65,7 +65,8 @@ class ExitStatus {
 
   // const Variant& variant() const { return variant_; }
 
-  static int wait_status(const ExitStatus& exit_status) {
+  /// Converts the given exit status to a status code suitable for returning from wait syscalls.
+  int wait_status() const {
     return std::visit(
         overloaded{
             [](const ExitStatusExit& status) -> int { return static_cast<int>(status.code) << 8; },
@@ -83,19 +84,19 @@ class ExitStatus {
               uint32_t trace_event_val = static_cast<uint32_t>(stop.ptrace_event);
               return (0x7f + (stop.signal_info.signal.number() << 8)) | (trace_event_val << 16);
             }},
-        exit_status.variant_);
+        variant_);
   }
 
-  static int signal_info_code(const ExitStatus& exit_status) {
+  int signal_info_code() const {
     return std::visit(overloaded{[](const ExitStatusExit&) -> int { return CLD_EXITED; },
                                  [](const ExitStatusKill&) -> int { return CLD_KILLED; },
                                  [](const ExitStatusCoreDump&) -> int { return CLD_DUMPED; },
                                  [](const ExitStatusStop&) -> int { return CLD_STOPPED; },
                                  [](const ExitStatusContinue&) -> int { return CLD_CONTINUED; }},
-                      exit_status.variant_);
+                      variant_);
   }
 
-  static int signal_info_status(const ExitStatus& exit_status) {
+  int signal_info_status() const {
     return std::visit(
         overloaded{
             [](const ExitStatusExit& status) -> int { return static_cast<int>(status.code); },
@@ -105,7 +106,7 @@ class ExitStatus {
             },
             [](const ExitStatusStop& stop) -> int { return stop.signal_info.signal.number(); },
             [](const ExitStatusContinue& cont) -> int { return cont.signal_info.signal.number(); }},
-        exit_status.variant_);
+        variant_);
   }
 
  private:

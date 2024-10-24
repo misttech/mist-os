@@ -421,7 +421,7 @@ void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> curren
   //}
   for (auto task : tasks) {
     task->Write()->set_exit_status(exit_status);
-    // send_standard_signal(&task, SignalInfo::default(SIGKILL));
+    //send_standard_signal(&task, SignalInfo::default(SIGKILL));
   }
   LTRACE_EXIT_OBJ;
 }
@@ -537,6 +537,7 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
 }
 
 void ThreadGroup::do_zombie_notifications(fbl::RefPtr<ZombieProcess> zombie) const {
+  LTRACEF("zombie pid %d\n", zombie->pid);
   auto state = Write();
 
   state->children_.erase(zombie->pid);
@@ -548,16 +549,16 @@ void ThreadGroup::do_zombie_notifications(fbl::RefPtr<ZombieProcess> zombie) con
 */
 
   auto exit_signal = zombie->exit_info.exit_signal;
-  // auto signal_info = zombie->ToWaitResult().as_signal_info();
+  auto signal_info = zombie->ToWaitResult().AsSignalInfo();
 
   fbl::AllocChecker ac;
   state->zombie_children_.push_back(ktl::move(zombie), &ac);
   ZX_ASSERT(ac.check());
-  // state->child_status_waiters_.NotifyAll();
+  state->child_status_waiters_.NotifyAll();
 
   // Send signals
   if (exit_signal.has_value()) {
-    // signal_info.signal = exit_signal.value();
+    signal_info.signal = exit_signal.value();
     //  state->send_signal(signal_info);
   }
 }

@@ -163,16 +163,16 @@ class TaskMutableState {
   bool is_ptrace_listening() { return false; }
 
   /// Returns the task's currently active signal mask.
-  SigSet signal_mask() const { return signals_.mask(); }
+  SigSet signal_mask() const { return signals_.mask_; }
 
   /// Returns true if `signal` is currently blocked by this task's signal mask.
-  bool is_signal_masked(Signal signal) const { return signals_.mask().has_signal(signal); }
+  bool is_signal_masked(Signal signal) const { return signals_.mask_.has_signal(signal); }
 
   /// Returns true if `signal` is blocked by the saved signal mask.
   ///
   /// Note that the current signal mask may still not be blocking the signal.
   bool is_signal_masked_by_saved_mask(Signal signal) const {
-    auto saved_mask = signals_.saved_mask();
+    auto saved_mask = signals_.saved_mask_;
     return saved_mask.has_value() && saved_mask->has_signal(signal);
   }
 
@@ -195,6 +195,32 @@ class TaskMutableState {
   /// This mask should be removed by a matching call to `restore_signal_mask`.
   void set_temporary_signal_mask(const SigSet& mask) { signals_.set_temporary_mask(mask); }
 
+  /// Removes the currently active, temporary, signal mask and restores the
+  /// previously active signal mask.
+  void restore_signal_mask() { signals_.restore_mask(); }
+
+  /// Returns true if the task's current `RunState` is blocked.
+  bool is_blocked() const { return signals_.run_state_.is_blocked(); }
+
+  /// Sets the task's `RunState` to `run_state`.
+  void set_run_state(RunState run_state) { signals_.run_state_ = run_state; }
+
+  RunState run_state() const { return signals_.run_state_; }
+
+  /*bool on_signal_stack(uint64_t stack_pointer_register) const {
+    if (signals_.alt_stack().has_value()) {
+      return sigaltstack_contains_pointer(signals_.alt_stack().value(), stack_pointer_register);
+    }
+    return false;
+  }
+
+  void set_sigaltstack(const ktl::optional<sigaltstack>& stack) { signals_.set_alt_stack(stack); }
+
+  ktl::optional<sigaltstack> sigaltstack() const { return signals_.alt_stack(); }
+*/
+
+  // impl TaskMutableState<Base = Task>
+
   void update_flags(TaskFlags clear, TaskFlags set);
 
   void set_flags(TaskFlags flag, bool v) {
@@ -215,6 +241,10 @@ class TaskMutableState {
       exit_status_ = status;
     }
   }
+
+  /// Returns whether or not a signal is pending for this task, taking the current
+  /// signal mask into account.
+  bool is_any_signal_pending() const;
 
  private:
   friend class Task;
@@ -414,7 +444,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   bool is_exited() const { return flags().contains(TaskFlagsEnum::EXITED); }
 
-  // StopState load_stopped() const { return stop_state_.load(std::memory_order_relaxed); }
+  StopState load_stopped() const { return stop_state_.load(std::memory_order_relaxed); }
 
   /// Upgrade a Reference to a Task, returning a ESRCH errno if the reference cannot be borrowed.
   static fit::result<Errno, fbl::RefPtr<Task>> from_weak(util::WeakPtr<Task> weak) {

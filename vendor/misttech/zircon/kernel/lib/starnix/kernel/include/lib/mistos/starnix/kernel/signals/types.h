@@ -10,14 +10,21 @@
 #include <lib/mistos/starnix/kernel/task/waiter.h>
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/starnix_sync/interruptible_event.h>
 #include <zircon/types.h>
 
+#include <utility>
+
+#include <fbl/ref_ptr.h>
 #include <ktl/array.h>
 #include <ktl/variant.h>
 
 #include <linux/signal.h>
 
 namespace starnix {
+
+using starnix_sync::InterruptibleEvent;
+using starnix_uapi::SigSet;
 
 struct SignalInfoHeader {
   uint32_t signo;
@@ -78,6 +85,7 @@ struct SignalInfo {
         .signal = signal, .errno = 0, .code = code, ._pad = 0, .detail = detail, .force = false};
   }
 
+#if 0
   static SignalInfo new_kill(starnix_uapi::Signal signal, pid_t pid, uid_t uid) {
     return SignalInfo{.signal = signal,
                       .errno = 0,
@@ -124,10 +132,78 @@ struct SignalInfo {
                       .detail = TimerDetail{},
                       .force = false};
   }
+#endif
+};
+
+// Whether, and how, this task is blocked. This enum can be extended with new
+// variants to optimize different kinds of waiting.
+class RunState {
+ public:
+  using Variant = ktl::variant<ktl::monostate, WaiterRef, fbl::RefPtr<InterruptibleEvent>>;
+
+  /// This task is not blocked.
+  ///
+  /// The task might be running in userspace or kernel.
+  static RunState Running() { return RunState({}); }
+
+  /// This thread is blocked in a `Waiter`.
+  static RunState Waiter(WaiterRef ref) { return RunState(ktl::move(ref)); }
+
+  /// This thread is blocked in an `InterruptibleEvent`.
+  static RunState Event(fbl::RefPtr<InterruptibleEvent> event) { return RunState(event); }
+
+  bool is_blocked() const {
+    return ktl::visit(overloaded{[](const ktl::monostate&) { return false; },
+                                 [](const WaiterRef& ref) { return ref.IsValid(); },
+                                 [](const fbl::RefPtr<InterruptibleEvent>&) { return true; }},
+                      variant_);
+  }
+
+  void wake() {
+    ktl::visit(overloaded{[](ktl::monostate&) {
+                            // Do nothing for Running state
+                          },
+                          [](WaiterRef& waiter) { waiter.Interrupt(); },
+                          [](fbl::RefPtr<InterruptibleEvent>& event) {
+                            // event->Interrupt();
+                          }},
+               variant_);
+  }
+
+  bool operator==(const RunState& other) const {
+    return std::visit(
+        overloaded{[](const ktl::monostate&, const ktl::monostate&) { return true; },
+                   [](const WaiterRef& lhs, const WaiterRef& rhs) { return lhs == rhs; },
+                   [](const fbl::RefPtr<InterruptibleEvent>& lhs,
+                      const fbl::RefPtr<InterruptibleEvent>& rhs) { return lhs == rhs; },
+                   [](const auto&, const auto&) { return false; }},
+        variant_, other.variant_);
+  }
+
+  bool operator!=(const RunState& other) const { return !(*this == other); }
+
+ private:
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
+  explicit RunState(Variant variant) : variant_(ktl::move(variant)) {}
+
+  Variant variant_;
+};
+
+class QueuedSignals {
+ public:
+  /// Returns whether any signals are queued and not blocked by the given mask.
+  bool is_any_allowed_by_mask(SigSet mask) { return false; }
 };
 
 class SignalState {
- private:
+ public:
   // See https://man7.org/linux/man-pages/man2/sigaltstack.2.html
   ktl::optional<sigaltstack> alt_stack_;
 
@@ -135,7 +211,7 @@ class SignalState {
   WaitQueue signal_wait_;
 
   /// A handle for interrupting this task, if any.
-  // RunState run_state_;
+  RunState run_state_;
 
   /// The signal mask of the task.
   ///
@@ -155,21 +231,28 @@ class SignalState {
   /// The queue of signals for the task.
   // QueuedSignals queue_;
 
- public:
+  /// impl SignalState
+
   static SignalState with_mask(starnix_uapi::SigSet mask) { return SignalState(mask); }
 
+  /// Sets the signal mask of the state, and returns the old signal mask.
   starnix_uapi::SigSet set_mask(starnix_uapi::SigSet signal_mask) {
     starnix_uapi::SigSet old_mask = mask_;
     mask_ = signal_mask & ~starnix_uapi::UNBLOCKABLE_SIGNALS;
     return old_mask;
   }
 
+  /// Sets the signal mask of the state temporarily, until the signal machinery has completed its
+  /// next dequeue operation. This can be used by syscalls that want to change the signal mask
+  /// during a wait, but want the signal mask to be reset before returning back to userspace after
+  /// the wait.
   void set_temporary_mask(starnix_uapi::SigSet signal_mask) {
     ASSERT(!saved_mask_.has_value());
     saved_mask_ = mask_;
     mask_ = signal_mask & ~starnix_uapi::UNBLOCKABLE_SIGNALS;
   }
-
+  // Restores the signal mask to what it was before the previous call to `set_temporary_mask`.
+  /// If there is no saved mask, the mask is left alone.
   void restore_mask() {
     if (saved_mask_.has_value()) {
       mask_ = *saved_mask_;
@@ -181,8 +264,37 @@ class SignalState {
 
   ktl::optional<starnix_uapi::SigSet> saved_mask() const { return saved_mask_; }
 
+  // void enqueue(SignalInfo siginfo) { queue_.enqueue(siginfo); signal_wait_.notify_all(); }
+
+  // void jump_queue(SignalInfo siginfo) { queue_.jump_queue(siginfo); signal_wait_.notify_all(); }
+
+  // bool is_empty() const { return queue_.is_empty(); }
+
+  // ktl::optional<SignalInfo> take_next_where(ktl::function<bool(const SignalInfo&)> predicate) {
+  //   return queue_.take_next_where(predicate);
+  // }
+
+  bool is_any_pending() const {
+    // return queue_.is_any_allowed_by_mask(mask_);
+    return false;  // Placeholder until queue_ is implemented
+  }
+
+  // bool is_any_allowed_by_mask(starnix_uapi::SigSet mask) const {
+  //   return queue_.is_any_allowed_by_mask(mask);
+  // }
+
+  // starnix_uapi::SigSet pending() const { return queue_.pending(); }
+
+  // bool has_queued(starnix_uapi::Signal signal) const { return queue_.has_queued(signal); }
+
+  // size_t num_queued() const { return queue_.num_queued(); }
+
+  // #ifdef __Fuchsia_CONFIG_STARNIX_TEST
+  // size_t queued_count(starnix_uapi::Signal signal) const { return queue_.queued_count(signal); }
+  // #endif
+
  private:
-  explicit SignalState(starnix_uapi::SigSet mask) : mask_(mask) {}
+  explicit SignalState(starnix_uapi::SigSet mask) : run_state_(RunState::Running()), mask_(mask) {}
 };
 
 }  // namespace starnix
