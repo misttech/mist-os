@@ -8,7 +8,7 @@ use crate::validate::*;
 use anyhow::format_err;
 use fidl_fuchsia_diagnostics::{
     ComponentSelector, Interest, LogInterestSelector, PropertySelector, Selector, SelectorArgument,
-    Severity, StringSelector, StringSelectorUnknown, SubtreeSelector, TreeNames, TreeSelector,
+    Severity, StringSelector, SubtreeSelector, TreeNames, TreeSelector,
 };
 use moniker::{ChildName, ExtendedMoniker, Moniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
 use std::borrow::{Borrow, Cow};
@@ -44,12 +44,10 @@ pub fn contains_recursive_glob(component_selector: &ComponentSelector) -> bool {
 }
 
 fn string_selector_contains_recursive_glob(selector: &StringSelector) -> bool {
-    match selector {
-        StringSelector::StringPattern(pattern) if pattern == RECURSIVE_WILDCARD_SYMBOL_STR => true,
-        StringSelector::StringPattern(_)
-        | StringSelector::ExactMatch(_)
-        | StringSelectorUnknown!() => false,
-    }
+    matches!(
+        selector,
+        StringSelector::StringPattern(pattern) if pattern == RECURSIVE_WILDCARD_SYMBOL_STR
+    )
 }
 
 /// Extracts and validates or parses a selector from a `SelectorArgument`.
@@ -74,7 +72,7 @@ pub fn parse_tree_selector<'a, E>(
 where
     E: ParsingError<'a>,
 {
-    let result = parser::consuming_tree_selector::<E>(&unparsed_tree_selector)?;
+    let result = parser::consuming_tree_selector::<E>(unparsed_tree_selector)?;
     Ok(result.into())
 }
 
@@ -85,7 +83,7 @@ pub fn parse_component_selector<'a, E>(
 where
     E: ParsingError<'a>,
 {
-    let result = parser::consuming_component_selector::<E>(&unparsed_component_selector)?;
+    let result = parser::consuming_component_selector::<E>(unparsed_component_selector)?;
     Ok(result.into())
 }
 
@@ -170,15 +168,15 @@ fn parse_severity(severity: &str) -> Option<Severity> {
 }
 
 /// Converts an unparsed Inspect selector into a ComponentSelector and TreeSelector.
-pub fn parse_selector<'a, E>(unparsed_selector: &'a str) -> Result<Selector, Error>
+pub fn parse_selector<E>(unparsed_selector: &str) -> Result<Selector, Error>
 where
-    E: ParsingError<'a>,
+    for<'a> E: ParsingError<'a>,
 {
-    let result = parser::selector::<E>(&unparsed_selector)?;
+    let result = parser::selector::<E>(unparsed_selector)?;
     Ok(result.into())
 }
 
-pub fn parse_verbose<'a>(unparsed_selector: &'a str) -> Result<Selector, Error> {
+pub fn parse_verbose(unparsed_selector: &str) -> Result<Selector, Error> {
     parse_selector::<VerboseError>(unparsed_selector)
 }
 
@@ -227,7 +225,7 @@ pub fn sanitize_string_for_selectors(node: &str) -> Cow<'_, str> {
     for (index, node_char) in node.char_indices() {
         token_builder.maybe_init(index);
         if is_special_character(node_char) {
-            token_builder.into_string();
+            token_builder.turn_into_string();
             token_builder.push(ESCAPE_CHARACTER, index);
         }
         token_builder.push(node_char, index);
@@ -454,9 +452,7 @@ pub fn selector_to_string(selector: Selector) -> Result<String, anyhow::Error> {
             .map(|segment| match segment {
                 StringSelector::StringPattern(s) => Ok(s),
                 StringSelector::ExactMatch(s) => Ok(escape_special_chars(&s)),
-                _ => {
-                    return Err(format_err!("Unknown string selector type"));
-                }
+                _ => Err(format_err!("Unknown string selector type")),
             })
             .collect::<Result<Vec<_>, anyhow::Error>>()?
             .join("/"))
@@ -483,7 +479,7 @@ pub fn selector_to_string(selector: Selector) -> Result<String, anyhow::Error> {
 pub fn match_string(selector: &StringSelector, target: impl AsRef<str>) -> bool {
     match selector {
         StringSelector::ExactMatch(s) => s == target.as_ref(),
-        StringSelector::StringPattern(pattern) => match_pattern(&pattern, &target.as_ref()),
+        StringSelector::StringPattern(pattern) => match_pattern(pattern, target.as_ref()),
         _ => false,
     }
 }
@@ -502,7 +498,7 @@ fn match_pattern(pattern: &str, target: &str) -> bool {
             '\\' => {
                 match chars.next() {
                     Some((i, c)) => {
-                        token.into_string();
+                        token.turn_into_string();
                         token.push(c, i);
                     }
                     // We found a backslash without a character to its right. Return false as this
@@ -534,13 +530,13 @@ fn match_pattern(pattern: &str, target: &str) -> bool {
 
     // If the pattern doesn't begin with a * and the target string doesn't start with the first
     // pattern token, we can exit.
-    if pattern.chars().nth(0) != Some('*') && !target.starts_with(pattern_tokens[0].as_ref()) {
+    if !pattern.starts_with('*') && !target.starts_with(pattern_tokens[0].as_ref()) {
         return false;
     }
 
     // If the last character of the pattern is not an unescaped * and the target string doesn't end
     // with the last token in the pattern, then we can exit.
-    if pattern.chars().rev().nth(0) != Some('*')
+    if !pattern.ends_with('*')
         && pattern.chars().rev().nth(1) != Some('\\')
         && !target.ends_with(pattern_tokens[pattern_tokens.len() - 1].as_ref())
     {
@@ -579,13 +575,13 @@ impl<'a> TokenBuilder<'a> {
     }
 
     fn maybe_init(&mut self, start_index: usize) {
-        match self {
-            Self::Init(s) => *self = Self::Slice { string: s, start: start_index, end: None },
-            _ => {}
-        }
+        let Self::Init(s) = self else {
+            return;
+        };
+        *self = Self::Slice { string: s, start: start_index, end: None };
     }
 
-    fn into_string(&mut self) {
+    fn turn_into_string(&mut self) {
         if let Self::Slice { string, start, end: Some(end) } = self {
             *self = Self::String(string[*start..=*end].to_string())
         }
@@ -709,7 +705,7 @@ impl SelectorExt for ExtendedMoniker {
     fn matches_selector(&self, selector: &Selector) -> Result<bool, anyhow::Error> {
         match self {
             ExtendedMoniker::ComponentManager => match_component_moniker_against_selector(
-                &[EXTENDED_MONIKER_COMPONENT_MANAGER_STR],
+                [EXTENDED_MONIKER_COMPONENT_MANAGER_STR],
                 selector,
             ),
             ExtendedMoniker::ComponentInstance(moniker) => moniker.matches_selector(selector),
@@ -750,7 +746,7 @@ impl SelectorExt for ExtendedMoniker {
                     }
                 }
                 .into_iter()
-                .map(|value| StringSelector::ExactMatch(value))
+                .map(StringSelector::ExactMatch)
                 .collect(),
             ),
             ..Default::default()
@@ -814,7 +810,7 @@ impl SelectorExt for Moniker {
         ComponentSelector {
             moniker_segments: Some(
                 self.path()
-                    .into_iter()
+                    .iter()
                     .map(|value| StringSelector::ExactMatch(value.to_string()))
                     .collect(),
             ),
@@ -831,7 +827,7 @@ enum SegmentIterator<'a> {
 impl<'a> From<&'a Moniker> for SegmentIterator<'a> {
     fn from(moniker: &'a Moniker) -> Self {
         let path = moniker.path();
-        if path.len() == 0 {
+        if path.is_empty() {
             return SegmentIterator::Root(false);
         }
         SegmentIterator::Iter { path: path.as_slice(), current_index: 0 }
@@ -843,9 +839,7 @@ impl Iterator for SegmentIterator<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Iter { path, current_index } => {
-                let Some(segment) = path.get(*current_index) else {
-                    return None;
-                };
+                let segment = path.get(*current_index)?;
                 let result = segment.to_string();
                 *self = Self::Iter { path, current_index: *current_index + 1 };
                 Some(result)
@@ -1004,9 +998,7 @@ a:b:c
 
         let component_selectors = selectors
             .into_iter()
-            .map(|selector| {
-                parse_component_selector::<VerboseError>(&selector.to_string()).unwrap()
-            })
+            .map(|selector| parse_component_selector::<VerboseError>(selector).unwrap())
             .collect::<Vec<_>>();
 
         let match_res =
@@ -1079,9 +1071,9 @@ a:b:c
         ))
         .unwrap();
         let component_selector = selector.component_selector.as_ref().unwrap();
-        let moniker = vec!["foo".to_string(), "coll:bar".to_string(), "baz".to_string()];
+        let moniker = ["foo", "coll:bar", "baz"];
         assert!(
-            match_moniker_against_component_selector(moniker.iter(), &component_selector).unwrap()
+            match_moniker_against_component_selector(moniker.iter(), component_selector).unwrap()
         );
     }
 

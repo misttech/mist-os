@@ -16,6 +16,8 @@ rustc_binary("bin") {
   ]
 
   sources = [ "src/main.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_package_with_single_component("selectors-benchmarks") {

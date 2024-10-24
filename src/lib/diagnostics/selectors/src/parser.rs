@@ -14,7 +14,7 @@ use nom::multi::separated_list1;
 use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
 use nom::IResult;
 
-static ALL_TREE_NAMES_SELECTED_SYMBOL: &'static str = "...";
+const ALL_TREE_NAMES_SELECTED_SYMBOL: &str = "...";
 
 /// Recognizes 0 or more spaces or tabs.
 fn whitespace0<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
@@ -124,7 +124,7 @@ where
     E: NomParseError<&'a str>,
 {
     let (rest, comment) = spaced(preceded(tag("//"), is_not("\n\r")))(input)?;
-    if rest.len() > 0 {
+    if !rest.is_empty() {
         let (rest, _) = one_of("\n\r")(rest)?; // consume the newline character
         return Ok((rest, comment));
     }
@@ -168,8 +168,8 @@ pub struct VerboseError;
 mod private {
     pub trait Sealed {}
 
-    impl<'a> Sealed for super::FastError {}
-    impl<'a> Sealed for super::VerboseError {}
+    impl Sealed for super::FastError {}
+    impl Sealed for super::VerboseError {}
 }
 
 /// Implemented by types which can be used to specify the error strategy the parsers should use.
@@ -264,7 +264,7 @@ where
             do_parse_selector::<<E as ParsingError<'_>>::Internal>(
                 /*allow_inline_comment=*/ true,
             ),
-            |s| Some(s),
+            Some,
         ),
     ))))(input);
     match result {
@@ -342,7 +342,7 @@ mod tests {
 
         for (test_string, expected_segments) in test_vector {
             let (_, selector) =
-                component_selector::<nom::error::VerboseError<&str>>(&test_string).unwrap();
+                component_selector::<nom::error::VerboseError<&str>>(test_string).unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
                 "For '{}', got: {:?}",
