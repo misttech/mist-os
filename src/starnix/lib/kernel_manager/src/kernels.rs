@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::StarnixKernel;
+use crate::{generate_kernel_name, StarnixKernel};
 use anyhow::Error;
 use attribution_server::{AttributionServer, AttributionServerHandle};
 use fidl::endpoints::{Proxy, ServerEnd};
@@ -59,10 +59,33 @@ impl Kernels {
     ) -> Result<(), Error> {
         let realm =
             connect_to_protocol::<fcomponent::RealmMarker>().expect("Failed to connect to realm.");
+
+        let kernel_name = generate_kernel_name(&start_info)?;
+        let wake_lease = 'out: {
+            let Ok(activity_governor) = connect_to_protocol::<fpower::ActivityGovernorMarker>()
+            else {
+                break 'out None;
+            };
+
+            match activity_governor.take_application_activity_lease(&kernel_name).await {
+                Ok(l) => Some(l),
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to acquire application activity lease for kernel: {:?}",
+                        e
+                    );
+                    None
+                }
+            }
+        };
+
         let (kernel, on_stop) =
             StarnixKernel::create(realm, KERNEL_URL, start_info, controller).await?;
         let kernel_job = kernel.job.clone();
         let kernel_koid = kernel.job.get_koid()?;
+
+        *kernel.wake_lease.lock() = wake_lease;
+        tracing::info!("Acquired wake lease for {:?}", kernel_job);
 
         self.memory_update_publisher.on_update(attribution_info_for_kernel(&kernel));
         self.kernels.lock().insert(kernel_koid, kernel);
@@ -77,7 +100,7 @@ impl Kernels {
                 on_removed_publisher.on_update(vec![fattribution::AttributionUpdate::Remove(koid)]);
             }
         });
-        self.acquire_wake_lease(&kernel_job).await?;
+
         Ok(())
     }
 
