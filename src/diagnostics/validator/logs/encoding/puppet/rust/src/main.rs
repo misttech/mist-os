@@ -27,7 +27,7 @@ async fn run_encoding_service(mut stream: EncodingPuppetRequestStream) -> Result
             Ok(()) => {
                 let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
                 let vmo = Vmo::create(BUFFER_SIZE as u64)?;
-                vmo.write(&encoded, 0)?;
+                vmo.write(encoded, 0)?;
                 responder.send(Ok(Buffer { vmo, size: encoded.len() as u64 }))?;
             }
             Err(EncodingError::Unsupported) => {

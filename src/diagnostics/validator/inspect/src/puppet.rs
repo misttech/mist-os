@@ -25,8 +25,9 @@ pub struct Config {
 /// - The full rendering of both trees?
 /// - The condensed diff between the trees? (This may still be quite large.)
 /// - Both full and condensed renderings?
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Serialize)]
 pub enum DiffType {
+    #[default]
     Full,
     Diff,
     Both,
@@ -170,7 +171,7 @@ impl Connection {
     async fn initialize_vmo(&mut self) -> Result<Vmo, Error> {
         self.root_link_channel = Self::fetch_link_channel(&self.fidl).await;
         match &self.root_link_channel {
-            Some(root_link_channel) => Self::get_vmo_handle(&root_link_channel).await,
+            Some(root_link_channel) => Self::get_vmo_handle(root_link_channel).await,
             None => {
                 let params = validate::InitializationParams {
                     vmo_size: Some(VMO_SIZE),
@@ -185,9 +186,7 @@ impl Connection {
                 }
                 match handle {
                     Some(unwrapped_handle) => Ok(Vmo::from(unwrapped_handle)),
-                    None => {
-                        return Err(format_err!("Failed to unwrap handle"));
-                    }
+                    None => Err(format_err!("Failed to unwrap handle")),
                 }
             }
         }
@@ -235,7 +234,7 @@ pub(crate) mod tests {
     pub(crate) async fn local_incomplete_puppet() -> Result<Puppet, Error> {
         let (client_end, server_end) = create_proxy().unwrap();
         spawn_local_puppet(server_end).await;
-        Ok(Puppet::connect_local(client_end).await?)
+        Puppet::connect_local(client_end).await
     }
 
     async fn spawn_local_puppet(server_end: ServerEnd<InspectPuppetMarker>) {
@@ -269,15 +268,15 @@ pub(crate) mod tests {
                         }
                         InspectPuppetRequest::Act { action, responder } => match action {
                             Action::CreateNode(CreateNode { parent, id, name }) => {
-                                inspector_maybe.as_ref().map(|i| {
+                                if let Some(ref inspector) = inspector_maybe {
                                     let parent_node = if parent == ROOT_ID {
-                                        i.root()
+                                        inspector.root()
                                     } else {
                                         nodes.get(&parent).unwrap()
                                     };
                                     let new_child = parent_node.create_child(name);
                                     nodes.insert(id, new_child);
-                                });
+                                }
                                 responder.send(TestResult::Ok)?;
                             }
                             Action::CreateNumericProperty(CreateNumericProperty {

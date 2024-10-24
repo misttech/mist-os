@@ -77,7 +77,7 @@ async fn demux_fidl(
     loop {
         match stream.next().await.unwrap()? {
             LogSinkRequest::Connect { socket: _, control_handle: _ } => {
-                return Err(anyhow::format_err!("shouldn't ever receive legacy connections"))
+                return Err(anyhow::format_err!("shouldn't ever receive legacy connections"));
             }
             LogSinkRequest::WaitForInterestChange { responder } => {
                 if got_initial_interest_request {
@@ -113,10 +113,8 @@ async fn wait_for_severity(
     stream: &mut LogSinkRequestStream,
 ) -> Result<LogSinkWaitForInterestChangeResponder, Error> {
     match stream.next().await.unwrap()? {
-        LogSinkRequest::WaitForInterestChange { responder } => {
-            return Ok(responder);
-        }
-        _ => return Err(anyhow::format_err!("Unexpected FIDL message")),
+        LogSinkRequest::WaitForInterestChange { responder } => Ok(responder),
+        _ => Err(anyhow::format_err!("Unexpected FIDL message")),
     }
 }
 
@@ -213,7 +211,7 @@ impl Puppet {
                     .read_record(ReadRecordArgs { new_file_line_rules, override_file_line: true })
                     .await?
                     .unwrap(),
-                RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
+                RecordAssertion::builder(&puppet.info, Severity::Info, new_file_line_rules)
                     .add_string("message", "Puppet started.�(")
                     .build(puppet.start_time..zx::BootInstant::get())
             );
@@ -224,7 +222,7 @@ impl Puppet {
                     .read_record(ReadRecordArgs { new_file_line_rules, override_file_line: true })
                     .await?
                     .unwrap(),
-                RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
+                RecordAssertion::builder(&puppet.info, Severity::Info, new_file_line_rules)
                     .add_string("message", "Puppet started.")
                     .build(puppet.start_time..zx::BootInstant::get())
             );
@@ -241,7 +239,7 @@ impl Puppet {
             interest_listener,
         )
         .await?;
-        return Ok(puppet);
+        Ok(puppet)
     }
 
     async fn read_record(&self, args: ReadRecordArgs) -> Result<Option<TestRecord>, Error> {
@@ -379,8 +377,8 @@ async fn assert_logged_severities(
     for severity in severities {
         assert_eq!(
             puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
-            RecordAssertion::new(&puppet.info, *severity, new_file_line_rules)
-                .add_string("message", &severity_to_string(*severity))
+            RecordAssertion::builder(&puppet.info, *severity, new_file_line_rules)
+                .add_string("message", severity_to_string(*severity))
                 .build(puppet.start_time..zx::BootInstant::get())
         );
     }
@@ -420,7 +418,7 @@ where
     info!("Waiting for interest....");
     assert_eq!(
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
-        RecordAssertion::new(&puppet.info, Severity::Warn, new_file_line_rules)
+        RecordAssertion::builder(&puppet.info, Severity::Warn, new_file_line_rules)
             .add_string("message", "Changed severity")
             .build(puppet.start_time..zx::BootInstant::get())
     );
@@ -429,7 +427,7 @@ where
     send_log_with_severity!(Info);
     send_log_with_severity!(Warn);
     send_log_with_severity!(Error);
-    assert_logged_severities(&puppet, &[Severity::Warn, Severity::Error], new_file_line_rules)
+    assert_logged_severities(puppet, &[Severity::Warn, Severity::Error], new_file_line_rules)
         .await
         .unwrap();
     info!("Got interest");
@@ -438,7 +436,7 @@ where
     listener.send(Ok(&interest))?;
     assert_eq!(
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
-        RecordAssertion::new(&puppet.info, Severity::Trace, new_file_line_rules)
+        RecordAssertion::builder(&puppet.info, Severity::Trace, new_file_line_rules)
             .add_string("message", "Changed severity")
             .build(puppet.start_time..zx::BootInstant::get())
     );
@@ -449,7 +447,7 @@ where
     send_log_with_severity!(Error);
 
     assert_logged_severities(
-        &puppet,
+        puppet,
         &[Severity::Trace, Severity::Debug, Severity::Info, Severity::Warn, Severity::Error],
         new_file_line_rules,
     )
@@ -462,7 +460,7 @@ where
     info!("Waiting for reset interest....");
     assert_eq!(
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
-        RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
+        RecordAssertion::builder(&puppet.info, Severity::Info, new_file_line_rules)
             .add_string("message", "Changed severity")
             .build(puppet.start_time..zx::BootInstant::get())
     );
@@ -473,7 +471,7 @@ where
     send_log_with_severity!(Error);
 
     assert_logged_severities(
-        &puppet,
+        puppet,
         &[Severity::Info, Severity::Warn, Severity::Error],
         new_file_line_rules,
     )
@@ -498,7 +496,7 @@ where
         info!("Waiting for interest to change back....");
         assert_eq!(
             puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
-            RecordAssertion::new(&puppet.info, Severity::Trace, new_file_line_rules)
+            RecordAssertion::builder(&puppet.info, Severity::Trace, new_file_line_rules)
                 .add_string("message", "Changed severity")
                 .build(puppet.start_time..zx::BootInstant::get())
         );
@@ -527,7 +525,7 @@ async fn assert_dot_removal(puppet: &mut Puppet, new_file_line_rules: bool) -> R
             .read_record(ReadRecordArgs { new_file_line_rules, override_file_line: false })
             .await?
             .unwrap(),
-        RecordAssertion::new(&puppet.info, Severity::Error, false)
+        RecordAssertion::builder(&puppet.info, Severity::Error, false)
             .add_string("file", "test_file.cc")
             .add_string("key", "value")
             .add_unsigned("line", 9001u64)
@@ -590,11 +588,11 @@ fn args_strategy() -> impl Strategy<Value = Vec<(String, fvalidate::Value)>> {
     });
 
     let value_strategy = prop_oneof![
-        any::<String>().prop_map(|s| fvalidate::Value::Text(s.into())),
-        any::<i64>().prop_map(|n| fvalidate::Value::SignedInt(n)),
-        any::<u64>().prop_map(|n| fvalidate::Value::UnsignedInt(n)),
-        any::<f64>().prop_map(|f| fvalidate::Value::Floating(f)),
-        any::<bool>().prop_map(|f| fvalidate::Value::Boolean(f)),
+        any::<String>().prop_map(fvalidate::Value::Text),
+        any::<i64>().prop_map(fvalidate::Value::SignedInt),
+        any::<u64>().prop_map(fvalidate::Value::UnsignedInt),
+        any::<f64>().prop_map(fvalidate::Value::Floating),
+        any::<bool>().prop_map(fvalidate::Value::Boolean),
     ];
 
     vec((key_strategy, value_strategy), 0..=MAX_ARGS as usize)
@@ -608,7 +606,7 @@ struct TestCycle {
 impl TestCycle {
     fn new(info: &PuppetInfo, vector: TestVector, new_file_line_rules: bool) -> Self {
         let spec = RecordSpec { file: "test".to_string(), line: 25, record: vector.record() };
-        let mut assertion = RecordAssertion::new(&info, vector.severity, new_file_line_rules);
+        let mut assertion = RecordAssertion::builder(info, vector.severity, new_file_line_rules);
         for (name, value) in vector.args {
             match value {
                 fvalidate::Value::Text(t) => assertion.add_string(&name, t.to_string()),
@@ -703,7 +701,7 @@ struct RecordAssertion {
 }
 
 impl RecordAssertion {
-    fn new(
+    fn builder(
         info: &PuppetInfo,
         severity: Severity,
         new_file_line_rules: bool,
@@ -740,12 +738,12 @@ impl RecordAssertionBuilder {
         RecordAssertion {
             valid_times,
             severity: self.severity,
-            arguments: std::mem::replace(&mut self.arguments, Default::default()),
+            arguments: std::mem::take(&mut self.arguments),
         }
     }
 
     fn add_string(&mut self, name: &str, value: impl Into<String>) -> &mut Self {
-        self.arguments.insert(name.to_owned(), fvalidate::Value::Text(value.into().into()));
+        self.arguments.insert(name.to_owned(), fvalidate::Value::Text(value.into()));
         self
     }
 

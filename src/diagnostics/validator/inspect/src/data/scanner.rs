@@ -427,19 +427,14 @@ impl Scanner {
         id: BlockIndex,
         get_the_hashset: F, // Gets children or properties
     ) {
-        if !self.nodes.contains_key(&parent) {
-            self.nodes.insert(
-                parent,
-                ScannedNode {
-                    validated: false,
-                    name: BlockIndex::EMPTY,
-                    parent: BlockIndex::ROOT,
-                    children: HashSet::new(),
-                    properties: HashSet::new(),
-                    metrics: None,
-                },
-            );
-        }
+        self.nodes.entry(parent).or_insert_with(|| ScannedNode {
+            validated: false,
+            name: BlockIndex::EMPTY,
+            parent: BlockIndex::ROOT,
+            children: HashSet::new(),
+            properties: HashSet::new(),
+            metrics: None,
+        });
         if let Some(parent_node) = self.nodes.get_mut(&parent) {
             get_the_hashset(parent_node).insert(id);
         }
@@ -466,7 +461,7 @@ impl Scanner {
             }
             BlockType::ArrayValue => {
                 let entry_type = block.array_entry_type()?;
-                let slots = block.array_slots()? as usize;
+                let slots = block.array_slots()?;
                 match entry_type {
                     BlockType::IntValue => {
                         let array_format = block.array_format()?;
@@ -560,6 +555,7 @@ impl Scanner {
 
     // ***** Functions which convert Scanned* objects into Node and Property objects.
 
+    #[allow(clippy::type_complexity)]
     fn make_valid_node_tree(
         &mut self,
         id: BlockIndex,
@@ -769,42 +765,40 @@ mod tests {
                     actual.as_ref().unwrap()
                 );
             }
+        } else if actual.is_err() {
+            println!(
+                "BAD: With ({},{}) -> {}, got unexpected error {:?}",
+                index, offset, value, actual
+            );
+        } else if actual.as_ref().ok().map(|s| &s[..]) == predicted {
+            println!(
+                "With ({},{}) -> {}, got expected string {:?}",
+                index,
+                offset,
+                value,
+                predicted.unwrap()
+            );
         } else {
-            if actual.is_err() {
-                println!(
-                    "BAD: With ({},{}) -> {}, got unexpected error {:?}",
-                    index, offset, value, actual
-                );
-            } else if actual.as_ref().ok().map(|s| &s[..]) == predicted {
-                println!(
-                    "With ({},{}) -> {}, got expected string {:?}",
-                    index,
-                    offset,
-                    value,
-                    predicted.unwrap()
-                );
-            } else {
-                println!(
-                    "BAD: With ({},{}) -> {}, expected string {:?} but got {:?}",
-                    index,
-                    offset,
-                    value,
-                    predicted.unwrap(),
-                    actual.as_ref().unwrap()
-                );
-                println!("Raw data: {:?}", data::Scanner::try_from(buffer as &[u8]))
-            }
+            println!(
+                "BAD: With ({},{}) -> {}, expected string {:?} but got {:?}",
+                index,
+                offset,
+                value,
+                predicted.unwrap(),
+                actual.as_ref().unwrap()
+            );
+            println!("Raw data: {:?}", data::Scanner::try_from(buffer as &[u8]))
         }
         assert_eq!(predicted, actual.as_ref().ok().map(|s| &s[..]));
         buffer[location] = previous;
     }
 
     fn put_header<T: ReadBytes>(header: &Block<&mut T>, buffer: &mut [u8], index: usize) {
-        copy_into(&HeaderFields::value(&header).to_le_bytes(), buffer, index * 16);
+        copy_into(&HeaderFields::value(header).to_le_bytes(), buffer, index * 16);
     }
 
     fn put_payload<T: ReadBytes>(payload: &Block<&mut T>, buffer: &mut [u8], index: usize) {
-        copy_into(&PayloadFields::value(&payload).to_le_bytes(), buffer, index * 16 + 8);
+        copy_into(&PayloadFields::value(payload).to_le_bytes(), buffer, index * 16 + 8);
     }
 
     #[fuchsia::test]
@@ -1082,11 +1076,11 @@ mod tests {
     #[fuchsia::test]
     fn test_zero_bits() -> Result<(), Error> {
         let mut buffer = [0u8; 48];
-        for byte in 0..16 {
-            buffer[byte] = 0xff;
+        for byte in buffer.iter_mut().take(16) {
+            *byte = 0xff;
         }
-        for byte in 32..48 {
-            buffer[byte] = 0xff;
+        for byte in buffer.iter_mut().skip(32) {
+            *byte = 0xff;
         }
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());

@@ -57,7 +57,7 @@ pub(crate) enum BlockStatus {
 }
 
 // Gathers statistics for a type of block.
-#[derive(Debug, Serialize, PartialEq)]
+#[derive(Debug, Default, Serialize, PartialEq)]
 pub struct BlockStatistics {
     pub count: u64,
     pub header_bytes: usize,
@@ -67,16 +67,6 @@ pub struct BlockStatistics {
 }
 
 impl BlockStatistics {
-    fn new() -> BlockStatistics {
-        BlockStatistics {
-            count: 0,
-            header_bytes: 0,
-            data_bytes: 0,
-            total_bytes: 0,
-            data_percent: 0,
-        }
-    }
-
     fn update(&mut self, numbers: &BlockMetrics, status: BlockStatus) {
         let BlockMetrics { header_bytes, data_bytes, total_bytes, .. } = numbers;
         self.header_bytes += header_bytes;
@@ -91,7 +81,7 @@ impl BlockStatistics {
 }
 
 // Stores statistics for every type (description) of block, plus VMO as a whole.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 pub struct Metrics {
     pub block_count: u64,
     pub size: usize,
@@ -120,7 +110,7 @@ impl Description for ScannedBlock<'_> {
 
 impl Metrics {
     pub fn new() -> Metrics {
-        Metrics { block_count: 0, size: 0, block_statistics: HashMap::new() }
+        Self::default()
     }
 
     pub(crate) fn record(&mut self, metrics: &BlockMetrics, status: BlockStatus) {
@@ -128,8 +118,7 @@ impl Metrics {
             BlockStatus::NotUsed => format!("{}(UNUSED)", metrics.description),
             BlockStatus::Used => metrics.description.clone(),
         };
-        let statistics =
-            self.block_statistics.entry(description).or_insert_with(|| BlockStatistics::new());
+        let statistics = self.block_statistics.entry(description).or_default();
         statistics.count += 1;
         statistics.update(metrics, status);
         self.block_count += 1;
@@ -213,6 +202,7 @@ mod tests {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn test_metrics(
         buffer: &[u8],
         block_count: u64,
@@ -279,7 +269,7 @@ mod tests {
 
         let mut container = [0u8; 16];
         let mut header = Block::new(&mut container, BlockIndex::EMPTY);
-        HeaderFields::set_order(&mut header, constants::HEADER_ORDER as u8);
+        HeaderFields::set_order(&mut header, constants::HEADER_ORDER);
         set_type!(header, Header);
         HeaderFields::set_header_magic(&mut header, constants::HEADER_MAGIC_NUMBER);
         HeaderFields::set_header_version(&mut header, constants::HEADER_VERSION_NUMBER);

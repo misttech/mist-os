@@ -90,7 +90,7 @@ async fn run_trial(
 }
 
 async fn run_actions(
-    actions: &mut Vec<validate::Action>,
+    actions: &mut [validate::Action],
     data: &mut Data,
     puppet: &mut puppet::Puppet,
     trial_name: &str,
@@ -135,7 +135,7 @@ async fn run_actions(
         try_compare(
             data,
             puppet,
-            &trial_name,
+            trial_name,
             step_index as i32,
             Some(action),
             action_number as i32,
@@ -147,7 +147,7 @@ async fn run_actions(
 }
 
 async fn run_lazy_actions(
-    actions: &mut Vec<validate::LazyAction>,
+    actions: &mut [validate::LazyAction],
     data: &mut Data,
     puppet: &mut puppet::Puppet,
     trial_name: &str,
@@ -192,7 +192,7 @@ async fn run_lazy_actions(
         try_compare(
             data,
             puppet,
-            &trial_name,
+            trial_name,
             step_index as i32,
             Some(action),
             action_number as i32,
