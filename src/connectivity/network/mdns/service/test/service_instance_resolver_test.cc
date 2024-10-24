@@ -264,5 +264,33 @@ TEST_F(InstanceResolverTest, ResponseWithoutAaaa) {
   ExpectNoOther();
 }
 
+TEST_F(InstanceResolverTest, DuplicateAddressesEliminated) {
+  fuchsia::net::mdns::ServiceInstance instance_from_callback;
+  bool callback_called = false;
+
+  ServiceInstanceResolver under_test(
+      this, kServiceName, kInstanceName, now(), Media::kBoth, IpVersions::kBoth, kExcludeLocal,
+      kIncludeLocalProxies,
+      [&instance_from_callback, &callback_called](fuchsia::net::mdns::ServiceInstance instance) {
+        instance_from_callback = std::move(instance);
+        callback_called = true;
+      });
+
+  SetAgent(under_test);
+
+  under_test.Start(kLocalHostFullName);
+
+  ReplyAddress sender_address(inet::SocketAddress(0xfe80, 1, inet::IpPort::From_uint16_t(5353)),
+                              inet::IpAddress(0xfe80, 100), 1, Media::kWireless, IpVersions::kV6);
+  ReceivePublication(under_test, kHostFullName, kServiceName, kInstanceName, kPort, kText,
+                     sender_address, false);
+
+  ReceiveAddress(under_test, kHostFullName, sender_address);
+  ReceiveAddress(under_test, kHostFullName, sender_address);
+  auto service_instance = under_test.GetInstance();
+  // there shuold only be 1 address
+  ASSERT_EQ(service_instance.addresses().size(), 1UL);
+}
+
 }  // namespace test
 }  // namespace mdns

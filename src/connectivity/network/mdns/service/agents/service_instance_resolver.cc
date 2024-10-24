@@ -114,15 +114,24 @@ void ServiceInstanceResolver::ReceiveResource(const DnsResource& resource,
       break;
     case DnsType::kA:
       if (resource.name_.dotted_string_ == target_full_name_) {
-        auto address = MdnsFidlUtil::CreateSocketAddressV4(
+        auto socket_address = MdnsFidlUtil::CreateSocketAddressV4(
             inet::SocketAddress(resource.a_.address_.address_, port_));
-        instance_.set_ipv4_endpoint(address);
+        instance_.set_ipv4_endpoint(socket_address);
+        auto address = fuchsia::net::SocketAddress::WithIpv4(std::move(socket_address));
         if (!instance_.has_addresses()) {
           instance_.set_addresses(std::vector<fuchsia::net::SocketAddress>());
         }
 
-        instance_.mutable_addresses()->push_back(
-            fuchsia::net::SocketAddress::WithIpv4(std::move(address)));
+        bool duplicate_address = false;
+        for (auto& curr_address : instance_.addresses()) {
+          if (fidl::Equality<fuchsia::net::SocketAddress>{}(address, curr_address)) {
+            duplicate_address = true;
+            break;
+          }
+        }
+        if (!duplicate_address) {
+          instance_.mutable_addresses()->push_back(fidl::Clone(address));
+        }
       }
       break;
     case DnsType::kAaaa:
@@ -132,15 +141,24 @@ void ServiceInstanceResolver::ReceiveResource(const DnsResource& resource,
         if (resource.aaaa_.address_.address_.is_link_local()) {
           scope_id = sender_address.interface_id();
         }
-        auto address = MdnsFidlUtil::CreateSocketAddressV6(
+        auto socket_address = MdnsFidlUtil::CreateSocketAddressV6(
             inet::SocketAddress(resource.aaaa_.address_.address_, port_, scope_id));
-        instance_.set_ipv6_endpoint(address);
+        instance_.set_ipv6_endpoint(socket_address);
+        auto address = fuchsia::net::SocketAddress::WithIpv6(std::move(socket_address));
         if (!instance_.has_addresses()) {
           instance_.set_addresses(std::vector<fuchsia::net::SocketAddress>());
         }
 
-        instance_.mutable_addresses()->push_back(
-            fuchsia::net::SocketAddress::WithIpv6(std::move(address)));
+        bool duplicate_address = false;
+        for (auto& curr_address : instance_.addresses()) {
+          if (fidl::Equality<fuchsia::net::SocketAddress>{}(address, curr_address)) {
+            duplicate_address = true;
+            break;
+          }
+        }
+        if (!duplicate_address) {
+          instance_.mutable_addresses()->push_back(fidl::Clone(address));
+        }
       }
       break;
     case DnsType::kTxt:
@@ -171,6 +189,10 @@ void ServiceInstanceResolver::OnAddLocalServiceInstance(const Mdns::ServiceInsta
   callback_(fidl::To<fuchsia::net::mdns::ServiceInstance>(instance));
   callback_ = nullptr;
   PostTaskForTime([this]() { RemoveSelf(); }, now());
+}
+
+fuchsia::net::mdns::ServiceInstance ServiceInstanceResolver::GetInstance() {
+  return std::move(instance_);
 }
 
 }  // namespace mdns
