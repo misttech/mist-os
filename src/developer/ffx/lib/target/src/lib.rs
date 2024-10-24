@@ -293,14 +293,19 @@ async fn wait_for_device_inner(
         loop {
             futures_lite::future::yield_now().await;
             break match knocker.knock_rcs(target_spec_clone.clone(), &env).await {
-                Err(KnockError::CriticalError(e)) => Err(ffx_command::Error::Unexpected(e)),
-                Err(KnockError::NonCriticalError(e)) => {
+                Err(e) => {
+                    tracing::debug!("unable to knock target: {e:?}");
                     if let WaitFor::DeviceOffline = behavior {
                         Ok(())
                     } else {
-                        tracing::debug!("unable to knock target: {e:?}");
-                        async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
-                        continue;
+                        if let KnockError::CriticalError(e) = e {
+                            Err(ffx_command::Error::Unexpected(e.into()))
+                        } else {
+                            tracing::debug!("error non-critical. retrying.");
+                            async_io::Timer::after(Duration::from_millis(DOWN_REPOLL_DELAY_MS))
+                                .await;
+                            continue;
+                        }
                     }
                 }
                 Ok(()) => {
@@ -747,7 +752,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn wait_for_device_critical_error_causes_failure_even_waiting_for_down() {
+    async fn wait_for_device_critical_error_does_not_cause_failure_waiting_for_down() {
         let mut mock = MockRcsKnocker::new();
         mock.expect_knock_rcs().times(1).returning(|_, _| {
             Box::pin(async { Err(KnockError::CriticalError(bug!("Oh no!").into())) })
@@ -761,7 +766,7 @@ mod test {
             WaitFor::DeviceOffline,
         )
         .await;
-        assert!(res.is_err(), "{:?}", res);
+        assert!(res.is_ok(), "{:?}", res);
     }
 
     #[fuchsia::test]
