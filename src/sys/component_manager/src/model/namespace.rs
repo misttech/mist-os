@@ -174,6 +174,9 @@ fn protocol_use(
 ) -> DirEntry {
     let router = BedrockUseRouteRequest::UseProtocol(decl.clone())
         .into_router(component.as_weak(), program_input);
+    let Capability::ConnectorRouter(router) = router else {
+        unreachable!();
+    };
 
     // When there are router errors, they are sent to the error handler, which reports
     // errors.

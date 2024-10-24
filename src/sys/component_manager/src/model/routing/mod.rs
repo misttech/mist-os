@@ -22,16 +22,12 @@ use async_trait::async_trait;
 use cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl};
 use cm_types::{Availability, Name};
 use errors::ModelError;
-use fidl::endpoints::create_proxy;
-use fidl_fuchsia_io as fio;
 use moniker::Moniker;
 use router_error::RouterError;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use vfs::directory::entry::OpenRequest;
-use vfs::path::Path;
-use vfs::ToObjectRequest;
 
 pub use bedrock::{RouteRequest as BedrockRouteRequest, UseRouteRequest as BedrockUseRouteRequest};
 
@@ -109,28 +105,6 @@ pub(super) async fn route_and_open_capability_with_reporting(
             Err(e)
         }
     }
-}
-
-/// Same as `route_and_open_capability` except this returns a new request.  This will only work for
-/// protocols.
-pub(super) async fn open_capability<Proxy: fidl::endpoints::Proxy>(
-    route_request: &RouteRequest,
-    target: &Arc<ComponentInstance>,
-) -> Result<Proxy, RouterError> {
-    let (proxy, server) = create_proxy::<Proxy::Protocol>().unwrap();
-    let mut object_request = fio::OpenFlags::empty().to_object_request(server);
-    route_and_open_capability(
-        route_request,
-        target,
-        OpenRequest::new(
-            target.execution_scope.clone(),
-            fio::OpenFlags::empty(),
-            Path::dot(),
-            &mut object_request,
-        ),
-    )
-    .await?;
-    Ok(proxy)
 }
 
 /// Create a new `RouteRequest` from an `ExposeDecl`, checking that the capability type can

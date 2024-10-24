@@ -9,7 +9,7 @@ use cm_rust::{
     ExposeDecl, ExposeDictionaryDecl, ExposeProtocolDecl, ExposeRunnerDecl, UseDecl,
     UseProtocolDecl, UseRunnerDecl,
 };
-use sandbox::{Capability, Router};
+use sandbox::Capability;
 
 /// A request to route a capability through the bedrock layer from use.
 #[derive(Clone, Debug)]
@@ -37,7 +37,7 @@ impl UseRouteRequest {
         self,
         target: WeakComponentInstance,
         program_input: &ProgramInput,
-    ) -> Router {
+    ) -> Capability {
         match self {
             Self::UseProtocol(decl) => {
                 let Some(capability) = program_input.namespace().get_capability(&decl.target_path)
@@ -48,14 +48,14 @@ impl UseRouteRequest {
                         decl.target_path, target.moniker
                     );
                 };
-                let Capability::ConnectorRouter(router) = capability else {
+                let Capability::ConnectorRouter(_) = &capability else {
                     panic!(
                         "program input dictionary for component {} had an entry with an unexpected \
-                                 type: {:?}",
+                         type: {:?}",
                         target.moniker, capability
                     );
                 };
-                router.into()
+                capability
             }
             Self::UseRunner(_) => {
                 // A component can only use one runner, it must be this one.
@@ -101,7 +101,11 @@ impl TryFrom<&Vec<&ExposeDecl>> for ExposeRouteRequest {
 }
 
 impl ExposeRouteRequest {
-    pub fn into_router(self, target: WeakComponentInstance, sandbox: &ComponentSandbox) -> Router {
+    pub fn into_router(
+        self,
+        target: WeakComponentInstance,
+        sandbox: &ComponentSandbox,
+    ) -> Capability {
         match self {
             Self::ExposeProtocol(decl) => {
                 let Some(capability) =
@@ -113,14 +117,14 @@ impl ExposeRouteRequest {
                         decl.target_name, target.moniker
                     );
                 };
-                let Capability::ConnectorRouter(router) = capability else {
+                let Capability::ConnectorRouter(_) = &capability else {
                     panic!(
                         "program input dictionary for component {} had an entry with an unexpected \
                                  type: {:?}",
                         target.moniker, capability
                     );
                 };
-                router.into()
+                capability
             }
             Self::ExposeDictionary(decl) => {
                 let Some(capability) =
@@ -132,14 +136,14 @@ impl ExposeRouteRequest {
                         decl.target_name, target.moniker
                     );
                 };
-                let Capability::DictionaryRouter(router) = capability else {
+                let Capability::DictionaryRouter(_) = &capability else {
                     panic!(
                         "program input dictionary for component {} had an entry with an unexpected \
                                  type: {:?}",
                         target.moniker, capability
                     );
                 };
-                router.into()
+                capability
             }
             Self::ExposeRunner(decl) => {
                 let Some(capability) =
@@ -151,14 +155,14 @@ impl ExposeRouteRequest {
                         decl.target_name, target.moniker
                     );
                 };
-                let Capability::ConnectorRouter(router) = capability else {
+                let Capability::ConnectorRouter(_) = &capability else {
                     panic!(
                         "program input dictionary for component {} had an entry with an unexpected \
                                  type: {:?}",
                         target.moniker, capability
                     );
                 };
-                router.into()
+                capability
             }
         }
     }
@@ -196,7 +200,11 @@ impl TryFrom<&Vec<&ExposeDecl>> for RouteRequest {
 }
 
 impl RouteRequest {
-    pub fn into_router(self, target: WeakComponentInstance, sandbox: &ComponentSandbox) -> Router {
+    pub fn into_router(
+        self,
+        target: WeakComponentInstance,
+        sandbox: &ComponentSandbox,
+    ) -> Capability {
         match self {
             Self::Use(r) => r.into_router(target, &sandbox.program_input),
             Self::Expose(r) => r.into_router(target, sandbox),

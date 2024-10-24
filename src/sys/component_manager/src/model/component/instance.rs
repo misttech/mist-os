@@ -14,9 +14,8 @@ use crate::model::environment::Environment;
 use crate::model::escrow::{self, EscrowedState};
 use crate::model::namespace::create_namespace;
 use crate::model::routing::legacy::RouteRequestExt;
-use crate::model::routing::router_ext::RouterExt;
 use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
-use crate::model::routing::{self, RoutingError, RoutingFailureErrorReporter};
+use crate::model::routing::{self, router_ext, RoutingFailureErrorReporter};
 use crate::model::start::Start;
 use crate::model::storage::build_storage_admin_dictionary;
 use crate::model::token::{InstanceToken, InstanceTokenState};
@@ -33,7 +32,7 @@ use ::routing::component_instance::{
     ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
     WeakComponentInstanceInterface,
 };
-use ::routing::error::ComponentInstanceError;
+use ::routing::error::{ComponentInstanceError, RoutingError};
 use ::routing::resolving::{ComponentAddress, ComponentResolutionContext};
 use ::routing::{DictExt, WeakInstanceTokenExt};
 use async_trait::async_trait;
@@ -59,7 +58,7 @@ use hooks::{CapabilityReceiver, EventPayload};
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::RouterError;
 use sandbox::{
-    Capability, Connector, Dict, DirEntry, RemotableCapability, Request, Router, SpecificRoutable,
+    Capability, Connector, Dict, DirEntry, RemotableCapability, Request, SpecificRoutable,
     SpecificRouter, SpecificRouterResponse, WeakInstanceToken,
 };
 use std::collections::HashMap;
@@ -686,7 +685,7 @@ impl ResolvedInstanceState {
     pub async fn get_exposed_dict(&self) -> &Dict {
         let create_exposed_dict = async {
             let component = self.weak_component.upgrade().unwrap();
-            let dict = Router::dict_routers_to_open(
+            let dict = router_ext::dict_routers_to_dir_entry(
                 &component.execution_scope,
                 &self.sandbox.component_output_dict,
             );
