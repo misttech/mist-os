@@ -6,7 +6,7 @@ use anyhow::{Context, Error};
 use assert_matches::assert_matches;
 use async_trait::async_trait;
 use blobfs_ramdisk::BlobfsRamdisk;
-use fidl::endpoints::{ClientEnd, Proxy, RequestStream, ServerEnd};
+use fidl::endpoints::{RequestStream, ServerEnd};
 use fidl_fuchsia_paver::{Asset, Configuration};
 use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryConfigs};
 use fuchsia_component_test::{
@@ -223,14 +223,11 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
             }
         };
 
-        let blobfs_proxy = fio::DirectoryProxy::from_channel(fasync::Channel::from_channel(
-            blobfs_handle.into_channel(),
-        ));
-
+        let blobfs_proxy = blobfs_handle.into_proxy().unwrap();
         let (blobfs_client_end_clone, remote) =
             fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         blobfs_proxy
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::from(remote.into_channel()))
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into())
             .unwrap();
 
         let blobfs_proxy_clone = blobfs_client_end_clone.into_proxy().unwrap();
@@ -510,10 +507,8 @@ fn launch_cloned_blobfs(
 ) {
     let flags =
         if flags.contains(fio::OpenFlags::CLONE_SAME_RIGHTS) { parent_flags } else { flags };
-    let chan = fidl::AsyncChannel::from_channel(end.into_channel());
-    let stream = fio::DirectoryRequestStream::from_channel(chan);
     fasync::Task::spawn(async move {
-        serve_failing_blobfs(stream, flags)
+        serve_failing_blobfs(end.into_stream().unwrap().cast_stream(), flags)
             .await
             .unwrap_or_else(|e| panic!("Failed to serve cloned blobfs handle: {e:?}"));
     })
@@ -615,8 +610,30 @@ async fn serve_failing_blobfs(
                 let _ = object_request;
                 todo!("https://fxbug.dev/293947862: path={} protocols={:?}", path, protocols);
             }
-            fio::DirectoryRequest::Open3 { .. } => {
-                todo!("https://fxbug.dev/348698584");
+            fio::DirectoryRequest::Open3 { path, flags, options, object, control_handle: _ } => {
+                vfs::ObjectRequest::new3(flags, &options, object).handle(|request| {
+                    if path == "." {
+                        let mut open1_flags = fio::OpenFlags::empty();
+                        if flags.contains(fio::PERM_READABLE) {
+                            open1_flags |= fio::OpenFlags::RIGHT_READABLE;
+                        }
+                        if flags.contains(fio::PERM_WRITABLE) {
+                            open1_flags |= fio::OpenFlags::RIGHT_WRITABLE;
+                        }
+                        if flags.contains(fio::PERM_EXECUTABLE) {
+                            open1_flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
+                        }
+
+                        launch_cloned_blobfs(
+                            request.take().into_server_end(),
+                            open1_flags,
+                            open_flags,
+                        );
+                        Ok(())
+                    } else {
+                        Err(zx::Status::IO)
+                    }
+                });
             }
             fio::DirectoryRequest::Unlink { name: _, options: _, responder } => {
                 responder.send(Err(zx::Status::IO.into_raw())).context("failing unlink")?
@@ -657,24 +674,19 @@ async fn serve_failing_blobfs(
 
 #[fasync::run_singlethreaded(test)]
 pub async fn test_blobfs_broken() -> Result<(), Error> {
-    let (client, server) = zx::Channel::create();
+    let (client, server) = fidl::endpoints::create_request_stream().unwrap();
     let package = build_test_package().await?;
-    let paver_hook = |_: &PaverEvent| zx::Status::IO;
     let env = TestEnvBuilder::new()
         .test_executor(IsolatedOtaTestExecutor::new())
         .add_package(package)
         .fuchsia_image(b"zbi-contents".to_vec(), None)
-        .blobfs(ClientEnd::from(client))
-        .paver(|p| p.insert_hook(mphooks::return_error(paver_hook)))
+        .blobfs(client)
         .build()
         .await
         .context("Building TestEnv")?;
 
-    let stream =
-        fio::DirectoryRequestStream::from_channel(fidl::AsyncChannel::from_channel(server));
-
     fasync::Task::spawn(async move {
-        serve_failing_blobfs(stream, fio::OpenFlags::empty())
+        serve_failing_blobfs(server, fio::OpenFlags::empty())
             .await
             .unwrap_or_else(|e| panic!("Failed to serve blobfs: {e:?}"));
     })
