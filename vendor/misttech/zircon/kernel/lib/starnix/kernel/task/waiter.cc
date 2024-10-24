@@ -4,16 +4,15 @@
 
 #include "lib/mistos/starnix/kernel/task/waiter.h"
 
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/util/num.h>
 #include <lib/mistos/util/weak_wrapper.h>
 
-#include <cstddef>
 #include <utility>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
-
-#include "fbl/alloc_checker.h"
-#include "lib/mistos/starnix_uapi/vfs.h"
 
 #include <ktl/enforce.h>
 
@@ -73,6 +72,34 @@ void SignalHandler::Handle(zx_signals_t signals) const {
   }
 }
 
+void WaiterRef::WillRemoveFromWaitQueue(WaitKey key) {}
+
+bool WaiterRef::Notify(WaitKey key, WaitEvents events) {
+  return ktl::visit(
+      WaiterKind::overloaded{[&](const util::WeakPtr<PortWaiter>& waiter) -> bool {
+                               if (auto strong = waiter.Lock()) {
+                                 strong->QueueEvents(key, events);
+                                 return true;
+                               }
+                               return false;
+                             },
+                             [&](const util::WeakPtr<InterruptibleEvent>& event) -> bool {
+                               if (auto strong = event.Lock()) {
+                                 // strong->Notify();
+                                 return true;
+                               }
+                               return false;
+                             },
+                             [&](const util::WeakPtr<AbortHandle>& handle) -> bool {
+                               if (auto strong = handle.Lock()) {
+                                 // strong->Abort();
+                                 return true;
+                               }
+                               return false;
+                             }},
+      waiter_kind_.waiter_);
+}
+
 WaitQueue::WaitQueue() {
   fbl::AllocChecker ac;
   inner_ = fbl::MakeRefCountedChecked<starnix_sync::StarnixMutex<WaitQueueImpl>>(&ac);
@@ -106,6 +133,27 @@ WaitCanceler WaitQueue::WaitAsync(const Waiter& waiter) const {
   return WaitAsyncEntry(waiter, waiter.CreateWaitEntry(WaitEvents::All()));
 }
 
+size_t WaitQueue::NotifyEventsCount(WaitEvents events, size_t limit) const {
+  // profile_duration!("NotifyEventsCount");
+  size_t woken = 0;
+  auto wait_queue = this->inner_->Lock();
+  wait_queue->waiters.key_ordered_retain([&](WaitEntryWithId& entry_with_id) {
+    if (limit > 0 && entry_with_id.entry.filter.Intercept(events)) {
+      if (entry_with_id.entry.waiter.Notify(entry_with_id.entry.key, events)) {
+        limit--;
+        woken++;
+      }
+
+      entry_with_id.entry.waiter.WillRemoveFromWaitQueue(entry_with_id.entry.key);
+      return false;
+    } else {
+      return true;
+    }
+  });
+
+  return woken;
+}
+
 Waiter Waiter::New() { return Waiter(PortWaiter::New(false)); }
 
 Waiter Waiter::NewIgnoringSignals() { return Waiter(PortWaiter::New(true)); }
@@ -122,7 +170,7 @@ fbl::RefPtr<PortWaiter> PortWaiter::New(bool ignore_signals) {
   return waiter;
 }
 
-fit::result<Errno> PortWaiter::WaitInternal(zx_instant_mono_t deadline) const {
+fit::result<Errno> PortWaiter::WaitInternal(zx_instant_mono_t deadline) {
   // This method can block arbitrarily long, possibly waiting for another process. The
   // current thread should not own any local ref that might delay the release of a resource
   // while doing so.
@@ -155,7 +203,7 @@ fit::result<Errno> PortWaiter::WaitInternal(zx_instant_mono_t deadline) const {
 }
 
 fit::result<Errno> PortWaiter::WaitUntil(const CurrentTask& current_task,
-                                         zx_instant_mono_t deadline) const {
+                                         zx_instant_mono_t deadline) {
   auto is_waiting = zx_nsec_from_duration(deadline) > 0;
 
   auto callback = [&]() -> fit::result<Errno> {
@@ -183,11 +231,11 @@ fit::result<Errno> PortWaiter::WaitUntil(const CurrentTask& current_task,
   // Trigger delayed releaser before blocking.
   // current_task.trigger_delayed_releaser();
 
-  // if (is_waiting) {
-  //  current_task.run_in_state(RunState::Waiter(WaiterRef::from_port(this)), callback);
-  //} else {
+  if (is_waiting) {
+    return current_task.run_in_state(
+        RunState::Waiter(WaiterRef::FromPort(fbl::RefPtr<PortWaiter>(this))), callback);
+  }
   return callback();
-  //}
 }
 
 ktl::optional<WaitCallback> PortWaiter::RemoveCallback(const WaitKey& key) const {
@@ -204,7 +252,44 @@ void PortWaiter::Interrupt() const {
   if (ignore_signals_) {
     return;
   }
-  // port_->Notify(NotifyKind::Interrupt);
+  port_->Notify(NotifyKind::Interrupt);
+}
+
+void PortWaiter::QueueEvents(const WaitKey& key, WaitEvents events) const {
+  // profile_duration!("PortWaiterHandleEvent");
+
+  // Defer notification
+  auto notify_guard = fit::defer([this]() { port_->Notify(NotifyKind::Regular); });
+
+  // Handling user events immediately when they are triggered breaks any
+  // ordering expectations on Linux by batching all starnix events with
+  // the first starnix event even if other events occur on the Fuchsia
+  // platform (and are enqueued to the `zx::Port`) between them. This
+  // ordering does not seem to be load-bearing for applications running on
+  // starnix so we take the divergence in ordering in favour of improved
+  // performance (by minimizing syscalls) when operating on FDs backed by
+  // starnix.
+  //
+  // TODO(https://fxbug.dev/42084319): If we can read a batch of packets
+  // from the `zx::Port`, maybe we can keep the ordering?
+  auto callback = RemoveCallback(key);
+  if (!callback.has_value()) {
+    return;
+  }
+
+  ktl::visit(
+      WaitCallback::overloaded{
+          [&](const EventHandler& handler) {
+            auto fd_events = ktl::visit(
+                WaitEvents::overloaded{
+                    [&](const ktl::monostate&) -> FdEvents { return FdEvents::all(); },
+                    [&](const FdEvents& e) -> FdEvents { return e; },
+                    [&](const uint64_t&) -> FdEvents { ZX_PANIC("wrong type of handler called"); }},
+                events.data());
+            handler.Handle(fd_events);
+          },
+          [&](const SignalHandler&) { ZX_PANIC("wrong type of handler called"); }},
+      callback->callback());
 }
 
 PortWaiter::PortWaiter(fbl::RefPtr<PortEvent> port, bool ignore_signals)

@@ -38,6 +38,11 @@ fit::result<Errno, pid_t> negate_pid(pid_t pid) {
 }
 }  // namespace
 
+fit::result<Errno> sys_kill(const CurrentTask& current_task, pid_t pid,
+                            starnix_uapi::UncheckedSignal unchecked_signal) {
+  return fit::error(errno(ENOSYS));
+}
+
 /// Waits on the task with `pid` to exit or change state.
 ///
 /// - `current_task`: The current task.
@@ -141,7 +146,7 @@ fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_s
 
     if (waitable_process.value().has_value()) {
       auto& process = waitable_process.value().value();
-      int32_t status = ExitStatus::wait_status(process.exit_info.status);
+      int32_t status = process.exit_info.status.wait_status();
 
       if (!user_rusage->is_null()) {
         // TODO(https://fxbug.dev/322874768): Implement real rusage from wait4

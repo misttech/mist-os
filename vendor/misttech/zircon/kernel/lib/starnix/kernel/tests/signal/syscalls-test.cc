@@ -29,6 +29,48 @@ using starnix::ProcessSelector;
 using starnix::WaitingOptions;
 using starnix::WaitResult;
 
+/// Wait4 does not support all options.
+bool test_wait4_options() {
+  BEGIN_TEST;
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto id = 1;
+
+  ASSERT_EQ(sys_wait4(*current_task, id, mtl::DefaultConstruct<starnix_uapi::UserRef<int32_t>>(),
+                      WEXITED, mtl::DefaultConstruct<starnix_uapi::UserRef<struct ::rusage>>())
+                .error_value()
+                .error_code(),
+            errno(EINVAL).error_code());
+  ASSERT_EQ(sys_wait4(*current_task, id, mtl::DefaultConstruct<starnix_uapi::UserRef<int32_t>>(),
+                      WNOWAIT, mtl::DefaultConstruct<starnix_uapi::UserRef<struct ::rusage>>())
+                .error_value()
+                .error_code(),
+            errno(EINVAL).error_code());
+  ASSERT_EQ(sys_wait4(*current_task, id, mtl::DefaultConstruct<starnix_uapi::UserRef<int32_t>>(),
+                      0xffff, mtl::DefaultConstruct<starnix_uapi::UserRef<struct ::rusage>>())
+                .error_value()
+                .error_code(),
+            errno(EINVAL).error_code());
+  END_TEST;
+}
+
+bool test_echild_when_no_zombie() {
+  BEGIN_TEST;
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+
+  // Send the signal to the task.
+  ASSERT_TRUE(
+      sys_kill(*current_task, (*current_task)->get_pid(), UncheckedSignal::From(SIGCHLD)).is_ok());
+
+  // Verify that ECHILD is returned because there is no zombie process and no children to block
+  // waiting for.
+  auto result = friend_wait_on_pid(*current_task, ProcessSelector::AnyProcess(),
+                                   WaitingOptions::new_for_wait4(0, 0).value());
+  ASSERT_TRUE(result.is_error());
+  ASSERT_EQ(result.error_value().error_code(), errno(ECHILD).error_code());
+
+  END_TEST;
+}
+
 bool test_no_error_when_zombie() {
   BEGIN_TEST;
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
@@ -55,10 +97,69 @@ bool test_no_error_when_zombie() {
 
   ASSERT_EQ(expected_result.pid, result.value()->pid);
   ASSERT_EQ(expected_result.uid, result.value()->uid);
-  ASSERT_EQ(ExitStatus::wait_status(expected_result.exit_info.status),
-            ExitStatus::wait_status(result.value()->exit_info.status));
+  ASSERT_EQ(expected_result.exit_info.status.wait_status(),
+            result.value()->exit_info.status.wait_status());
   ASSERT_EQ(expected_result.time_stats.user_time_ns, result.value()->time_stats.user_time_ns);
   ASSERT_EQ(expected_result.time_stats.system_time_ns, result.value()->time_stats.system_time_ns);
+
+  END_TEST;
+}
+
+struct thread_args {
+  starnix::CurrentTask* current_task;
+  starnix::TaskBuilder* child_task;
+};
+
+bool test_waiting_for_child() {
+  BEGIN_TEST;
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+
+  auto child = (*current_task)
+                   .clone_task(0, starnix_uapi::kSIGCHLD, mtl::DefaultConstruct<UserRef<pid_t>>(),
+                               mtl::DefaultConstruct<UserRef<pid_t>>());
+  ASSERT_TRUE(child.is_ok(), "clone_task");
+
+  auto child_task = ktl::move(child.value());
+
+  // No child is currently terminated.
+  auto result = friend_wait_on_pid(*current_task, ProcessSelector::AnyProcess(),
+                                   WaitingOptions::new_for_wait4(WNOHANG, 0).value());
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_FALSE(result.value().has_value());
+
+  thread_args args = {.current_task = &*current_task, .child_task = &child_task};
+  Thread* thread = Thread::Create(
+      "",
+      [](void* arg) -> int {
+        thread_args* args = reinterpret_cast<thread_args*>(arg);
+        auto& [lcurrent_task, lchild_task] = *args;
+
+        // Wait for the main thread to be blocked on waiting for a child.
+        printf("Sleep\n");
+        while (!(*lcurrent_task)->Read()->is_blocked()) {
+          Thread::Current::SleepRelative(ZX_MSEC(10));
+        }
+        printf("Wake\n");
+        (*lchild_task)->thread_group()->exit(ExitStatus::Exit(0), ktl::nullopt);
+        return (*lchild_task)->id();
+      },
+      &args, DEFAULT_PRIORITY);
+
+  thread->Resume();
+
+  printf("Wait\n");
+  // Block until child is terminated.
+  result = friend_wait_on_pid(*current_task, ProcessSelector::AnyProcess(),
+                              WaitingOptions::new_for_wait4(0, 0).value());
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_TRUE(result.value().has_value());
+
+  auto waited_child = result.value().value();
+
+  // Child is deleted, the thread must be able to terminate.
+  int child_id = 0;
+  thread->Join(&child_id, ZX_TIME_INFINITE);
+  ASSERT_EQ(child_id, waited_child.pid);
 
   END_TEST;
 }
@@ -91,7 +192,10 @@ bool test_wait4_by_pgid() {
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_signal_syscalls)
+UNITTEST("test wait4 options", unit_testing::test_wait4_options)
+// UNITTEST("test echild when no zombie", unit_testing::test_echild_when_no_zombie)
 UNITTEST("test no error when zombie", unit_testing::test_no_error_when_zombie)
+UNITTEST("test waiting for child", unit_testing::test_waiting_for_child)
 UNITTEST("test wait4 by pgid", unit_testing::test_wait4_by_pgid)
 UNITTEST_END_TESTCASE(starnix_signal_syscalls, "starnix_signal_syscalls",
                       "Tests for Signal Syscalls")

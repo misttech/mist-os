@@ -8,6 +8,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 
 #include <linux/resource.h>
@@ -70,6 +71,9 @@ class WaitingOptions {
   bool wait_for_clone_;
   ktl::optional<pid_t> waiter_;
 };
+
+fit::result<Errno> sys_kill(const CurrentTask& current_task, pid_t pid,
+                            starnix_uapi::UncheckedSignal unchecked_signal);
 
 fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_selector,
                                     starnix_uapi::UserRef<int32_t> user_wstatus, uint32_t options,

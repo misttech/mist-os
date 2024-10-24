@@ -12,21 +12,24 @@
 #include <lib/mistos/util/dense_map.h>
 #include <lib/mistos/util/small_vector.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/interruptible_event.h>
 #include <lib/starnix_sync/locks.h>
 #include <lib/starnix_sync/port_event.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
-#include <cstddef>
-#include <cstdint>
+#include <limits>
 
 #include <fbl/ref_counted.h>
+#include <fbl/ref_counted_upgradeable.h>
+#include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 #include <ktl/optional.h>
 #include <ktl/variant.h>
 
 namespace starnix {
 
+using starnix_sync::InterruptibleEvent;
 using starnix_sync::PortEvent;
 using starnix_uapi::FdEvents;
 
@@ -202,15 +205,39 @@ class WaitEvents {
  public:
   using Variant = ktl::variant<ktl::monostate, FdEvents, uint64_t>;
 
+  /// All event: a wait on `All` will be woken up by all event, and a trigger on `All` will wake
+  /// every waiter.
   static WaitEvents All() { return WaitEvents(ktl::monostate{}); }
+  /// Wait on the set of FdEvents.
   static WaitEvents Fd(FdEvents events) { return WaitEvents(events); }
+  /// Wait for the specified value.
   static WaitEvents Value(uint64_t value) { return WaitEvents(value); }
 
-  FdEvents GetFdEvents() const { return std::get<FdEvents>(data_); }
-  uint64_t GetValue() const { return std::get<uint64_t>(data_); }
+  /// impl WaitEvents
 
-  /// Returns whether a wait on `self` should be woken up by `other`.
-  bool Intercept(const WaitEvents& other) const;
+  ///  Returns whether a wait on `self` should be woken up by `other`.
+  bool Intercept(const WaitEvents& other) const {
+    return ktl::visit(WaitEvents::overloaded{
+                          [](const ktl::monostate&, const Variant&) { return true; },
+                          [](const Variant&, const ktl::monostate&) { return true; },
+                          [](const FdEvents& self, const FdEvents& other) {
+                            return (self.bits() & other.bits()) != 0;
+                          },
+                          [](const uint64_t& self, const uint64_t& other) { return self == other; },
+                          [](const auto&, const auto&) { return false; }},
+                      data_, other.data_);
+  }
+
+  // C++
+  const Variant& data() const { return data_; }
+
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
 
  private:
   explicit WaitEvents(Variant data) : data_(ktl::move(data)) {}
@@ -225,7 +252,7 @@ struct WaitQueueImpl;
 /// Implementation of Waiter. We put the Waiter data in an Arc so that WaitQueue can tell when the
 /// Waiter has been destroyed by keeping a Weak reference. But this is an implementation detail
 /// and a Waiter should have a single owner. So the Arc is hidden inside Waiter.
-class PortWaiter : public fbl::RefCounted<PortWaiter> {
+class PortWaiter : public fbl::RefCountedUpgradeable<PortWaiter> {
  private:
   using CallbackMap = std::map<WaitKey, WaitCallback, std::less<>,
                                util::Allocator<std::pair<const WaitKey, WaitCallback>>>;
@@ -252,9 +279,9 @@ class PortWaiter : public fbl::RefCounted<PortWaiter> {
   static fbl::RefPtr<PortWaiter> New(bool ignore_signals);
 
   /// Waits until the given deadline has passed or the waiter is woken up. See wait_until().
-  fit::result<Errno> WaitInternal(zx_instant_mono_t deadline) const;
+  fit::result<Errno> WaitInternal(zx_instant_mono_t deadline);
 
-  fit::result<Errno> WaitUntil(const CurrentTask& current_task, zx_instant_mono_t deadline) const;
+  fit::result<Errno> WaitUntil(const CurrentTask& current_task, zx_instant_mono_t deadline);
 
   WaitKey NextKey() const {
     uint64_t key = next_key_.next();
@@ -291,27 +318,34 @@ class PortWaiter : public fbl::RefCounted<PortWaiter> {
   explicit PortWaiter(fbl::RefPtr<PortEvent> port, bool ignore_signals);
 };
 
-struct AbortHandle {};
+class AbortHandle : public fbl::RefCountedUpgradeable<AbortHandle> {};
 
 class WaiterKind {
  public:
-  using Variant =
-      ktl::variant<util::WeakPtr<PortWaiter>, util::WeakPtr<Event>, util::WeakPtr<AbortHandle>>;
+  using Variant = ktl::variant<util::WeakPtr<PortWaiter>, util::WeakPtr<InterruptibleEvent>,
+                               util::WeakPtr<AbortHandle>>;
 
-  static WaiterKind PortWaiterKind(util::WeakPtr<PortWaiter> waiter) {
+  static WaiterKind PortWaiter(util::WeakPtr<PortWaiter> waiter) {
     return WaiterKind(ktl::move(waiter));
   }
-  static WaiterKind EventKind(util::WeakPtr<Event> waiter) { return WaiterKind(ktl::move(waiter)); }
-
-  static WaiterKind AbortHandleKind(util::WeakPtr<AbortHandle> waiter) {
+  static WaiterKind Event(util::WeakPtr<InterruptibleEvent> waiter) {
     return WaiterKind(ktl::move(waiter));
   }
 
-  bool IsPortWaiter() const { return std::holds_alternative<util::WeakPtr<PortWaiter>>(waiter_); }
-  bool IsEvent() const { return std::holds_alternative<util::WeakPtr<Event>>(waiter_); }
-  bool IsAbortHandle() const { return std::holds_alternative<util::WeakPtr<AbortHandle>>(waiter_); }
+  static WaiterKind AbortHandle(util::WeakPtr<AbortHandle> waiter) {
+    return WaiterKind(ktl::move(waiter));
+  }
+
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
 
  private:
+  friend class WaiterRef;
   explicit WaiterKind(Variant waiter) : waiter_(ktl::move(waiter)) {}
 
   Variant waiter_;
@@ -324,12 +358,20 @@ class Waiter;
 class WaiterRef {
  public:
   static WaiterRef FromPort(fbl::RefPtr<PortWaiter> waiter) {
-    return WaiterRef(WaiterKind::PortWaiterKind(util::WeakPtr(waiter.get())));
+    return WaiterRef(WaiterKind::PortWaiter(util::WeakPtr(waiter.get())));
   }
-  static WaiterRef FromEvent(fbl::RefPtr<Event> waiter);
+  static WaiterRef FromEvent(fbl::RefPtr<InterruptibleEvent> waiter);
   static WaiterRef FromAbortHandle(fbl::RefPtr<AbortHandle> waiter);
 
-  bool IsValid() const;
+  bool IsValid() const {
+    return ktl::visit(
+        WaiterKind::overloaded{
+            [](const util::WeakPtr<PortWaiter>& waiter) { return waiter.Lock() != nullptr; },
+            [](const util::WeakPtr<InterruptibleEvent>& event) { return event.Lock() != nullptr; },
+            [](const util::WeakPtr<AbortHandle>& handle) { return handle.Lock() != nullptr; }},
+        waiter_kind_.waiter_);
+  }
+
   void Interrupt();
 
   void RemoveCallback(WaitKey key);
@@ -346,11 +388,22 @@ class WaiterRef {
   /// which events occurred.
   ///
   /// If the client is using an `AbortHandle`, `AbortHandle::abort()` will be called.
-  void Notify(WaitKey key, WaitEvents events);
+  bool Notify(WaitKey key, WaitEvents events);
 
   bool operator==(const Waiter& other) const;
-  // bool operator==(const Arc<InterruptibleEvent>& other) const;
-  bool operator==(const WaiterRef& other) const;
+  bool operator==(const fbl::RefPtr<InterruptibleEvent>& other) const;
+
+  bool operator==(const WaiterRef& other) const {
+    return ktl::visit(WaiterKind::overloaded{
+                          [](const util::WeakPtr<PortWaiter>& lhs,
+                             const util::WeakPtr<PortWaiter>& rhs) { return lhs == rhs; },
+                          [](const util::WeakPtr<InterruptibleEvent>& lhs,
+                             const util::WeakPtr<InterruptibleEvent>& rhs) { return lhs == rhs; },
+                          [](const util::WeakPtr<AbortHandle>& lhs,
+                             const util::WeakPtr<AbortHandle>& rhs) { return lhs == rhs; },
+                          [](const auto&, const auto&) { return false; }},
+                      waiter_kind_.waiter_, other.waiter_kind_.waiter_);
+  }
 
  private:
   explicit WaiterRef(WaiterKind waiter) : waiter_kind_(ktl::move(waiter)) {}
@@ -542,17 +595,19 @@ class WaitQueue {
 
   void WaitAsyncSimple(Waiter& waiter) const;
 
-  void NotifyEventsCount(WaitEvents events, size_t* limit) const;
+  size_t NotifyEventsCount(WaitEvents events, size_t limit) const;
 
   void NotifyFdEvents(FdEvents events) const;
 
-  void NotifyValue(uint64_t value) const;
+  void NotifyValue(uint64_t value) const {
+    NotifyEventsCount(WaitEvents::All(), std::numeric_limits<size_t>::max());
+  }
 
-  void NotifyUnorderedCount(size_t limit) const;
+  void NotifyUnorderedCount(size_t limit) const { NotifyEventsCount(WaitEvents::All(), limit); }
 
-  void NotifyAll() const;
+  void NotifyAll() const { NotifyUnorderedCount(std::numeric_limits<size_t>::max()); }
 
-  bool IsEmpty() const;
+  bool IsEmpty() const { return inner_->Lock()->waiters.empty(); }
 
  private:
   fbl::RefPtr<starnix_sync::StarnixMutex<WaitQueueImpl>> inner_;
