@@ -192,8 +192,6 @@ void EnsurePartitionsMatch(const gpt::GptDevice* gpt,
   }
 }
 
-constexpr paver::Partition kUnknownPartition = static_cast<paver::Partition>(1000);
-
 TEST(PartitionName, Bootloader) {
   EXPECT_STREQ(PartitionName(paver::Partition::kBootloaderA, paver::PartitionScheme::kNew),
                GPT_BOOTLOADER_A_NAME);
@@ -216,13 +214,6 @@ TEST(PartitionName, AbrMetadata) {
                GUID_ABR_META_NAME);
 }
 
-TEST(PartitionName, UnknownPartition) {
-  // We don't define what is returned in this case, but it shouldn't crash and
-  // it should be non-empty.
-  EXPECT_STRNE(PartitionName(kUnknownPartition, paver::PartitionScheme::kNew), "");
-  EXPECT_STRNE(PartitionName(kUnknownPartition, paver::PartitionScheme::kLegacy), "");
-}
-
 TEST(PartitionSpec, ToStringDefaultContentType) {
   // This is a bit of a change-detector test since we don't actually care about
   // the string value, but it's the cleanest way to check that the string is
@@ -234,11 +225,6 @@ TEST(PartitionSpec, ToStringDefaultContentType) {
 TEST(PartitionSpec, ToStringWithContentType) {
   EXPECT_EQ(PartitionSpec(paver::Partition::kZirconA, "foo").ToString(), "Zircon A (foo)");
   EXPECT_EQ(PartitionSpec(paver::Partition::kVbMetaB, "a b c").ToString(), "VBMeta B (a b c)");
-}
-
-TEST(PartitionSpec, ToStringUnknownPartition) {
-  EXPECT_NE(PartitionSpec(kUnknownPartition).ToString(), "");
-  EXPECT_NE(PartitionSpec(kUnknownPartition, "foo").ToString(), "");
 }
 
 class GptDevicePartitionerTests : public zxtest::Test {

@@ -22,6 +22,7 @@
 #include <fbl/string.h>
 #include <fbl/unique_fd.h>
 
+#include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/partition-client.h"
 #include "src/storage/lib/paver/paver-context.h"
@@ -48,6 +49,7 @@ enum class Partition {
 };
 
 const char* PartitionName(Partition partition, PartitionScheme scheme);
+std::optional<uuid::Uuid> PartitionTypeGuid(Partition partition, PartitionScheme scheme);
 
 enum class Arch {
   kX64,

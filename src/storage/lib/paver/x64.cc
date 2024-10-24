@@ -19,6 +19,7 @@
 #include "src/storage/lib/paver/system_shutdown_state.h"
 #include "src/storage/lib/paver/utils.h"
 #include "src/storage/lib/paver/validation.h"
+#include "zircon/hw/gpt.h"
 
 namespace paver {
 
@@ -36,6 +37,18 @@ constexpr PartitionScheme kPartitionScheme = PartitionScheme::kLegacy;
 
 // TODO: Remove support after July 9th 2021.
 constexpr char kOldEfiName[] = "efi-system";
+
+// Returns the GUID for the given partition, applying EFI-specific mappings.
+Uuid PartitionType(Partition partition) {
+  if (partition == Partition::kBootloaderA) {
+    // Special case for the bootloader which must be an ESP.
+    return GUID_EFI_VALUE;
+  }
+  std::optional<Uuid> type = PartitionTypeGuid(partition, kPartitionScheme);
+  // OK to assert; known types for the EfiDevicePartitioner have a GUID
+  ZX_ASSERT(type);
+  return *type;
+}
 
 }  // namespace
 
@@ -125,11 +138,8 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::AddPartition(
   }
 
   const char* name = PartitionName(spec.partition, kPartitionScheme);
-  auto type = GptPartitionType(spec.partition);
-  if (type.is_error()) {
-    return type.take_error();
-  }
-  return gpt_->AddPartition(name, type.value(), minimum_size_bytes, /*optional_reserve_bytes*/ 0);
+  Uuid type = PartitionType(spec.partition);
+  return gpt_->AddPartition(name, type, minimum_size_bytes, /*optional_reserve_bytes*/ 0);
 }
 
 zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition(
@@ -160,8 +170,7 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition
     case Partition::kVbMetaR:
     case Partition::kAbrMeta: {
       const auto filter = [&spec](const gpt_partition_t& part) {
-        auto status = GptPartitionType(spec.partition);
-        return status.is_ok() && FilterByType(part, status.value());
+        return FilterByType(part, PartitionType(spec.partition));
       };
       auto status = gpt_->FindPartition(filter);
       if (status.is_error()) {
@@ -205,8 +214,7 @@ zx::result<> EfiDevicePartitioner::InitPartitionTables() const {
   auto status = gpt_->WipePartitions([&partitions_to_add](const gpt_partition_t& part) {
     for (auto& partition : partitions_to_add) {
       // Get the partition type GUID, and compare it.
-      auto status = GptPartitionType(partition);
-      if (status.is_error() || status.value() != Uuid(part.type)) {
+      if (PartitionType(partition) != Uuid(part.type)) {
         continue;
       }
       // If we are wiping any non-bootloader partition, we are done.
