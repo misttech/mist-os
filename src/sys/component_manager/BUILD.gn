@@ -74,6 +74,7 @@ rustc_binary("bin") {
     "//src/lib/include_bytes_from_working_dir",
     "//src/lib/versioning/version-history/rust",
     "//src/lib/versioning/version-history/rust/data",
+    "//src/power/shutdown-shim:lib",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/component_manager/lib/builtins",
     "//src/sys/component_manager/lib/diagnostics",

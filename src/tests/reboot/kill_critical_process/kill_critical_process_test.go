@@ -15,5 +15,5 @@ import (
 func TestKillCriticalProcess(t *testing.T) {
 	// Killing a critical process will result in an "unclean reboot" because,
 	// among other things, the filesystem won't be shutdown cleanly.
-	reboottest.RebootWithCommand(t, "killall shutdown-shim.cm", reboottest.UncleanReboot, reboottest.Reboot, reboottest.UserspaceRootJobTermination)
+	reboottest.RebootWithCommand(t, "killall driver_manager.cm", reboottest.UncleanReboot, reboottest.Reboot, reboottest.UserspaceRootJobTermination)
 }

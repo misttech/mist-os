@@ -225,6 +225,37 @@ impl BuiltinRunner {
                       namespace: Namespace,
                       outgoing_dir: ServerEnd<fio::DirectoryMarker>,
                       lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
+                      _program: Option<Dictionary>| {
+                    async move {
+                        let _lifecycle_server = lifecycle_server;
+                        let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
+                        let Some(svc) = ns_entries.into_iter().find_map(|e| {
+                            if e.path == "/svc" {
+                                Some(e.directory.into_proxy().unwrap())
+                            } else {
+                                None
+                            }
+                        }) else {
+                            error!("[shutdown-shim] no /svc in namespace");
+                            return;
+                        };
+                        let res = shutdown_shim::main(svc, outgoing_dir).await;
+                        if let Err(e) = res {
+                            error!("[shutdown-shim] {e}");
+                        }
+                    }
+                    .boxed()
+                },
+            )
+        });
+        out.insert("shutdown-shim", f);
+
+        let f: BuiltinProgramGen = Box::new(|| {
+            Box::new(
+                move |_job: zx::Job,
+                      namespace: Namespace,
+                      outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+                      lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
                       program: Option<Dictionary>| {
                     async move {
                         let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
