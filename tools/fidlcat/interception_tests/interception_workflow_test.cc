@@ -597,7 +597,6 @@ TEST_F(InterceptionWorkflowTestX64, SyscallsAutomated) {
       "zx_pager_create_vmo fully automated\n"
       "zx_pager_detach_vmo doesn't need automation\n"
       "zx_pager_supply_pages doesn't need automation\n"
-      "zx_pc_firmware_tables fully automated\n"
       "zx_pci_add_subtract_io_range doesn't need automation\n"
       "zx_pci_cfg_pio_rw fully automated\n"
       "zx_pci_config_read fully automated\n"
@@ -672,7 +671,7 @@ TEST_F(InterceptionWorkflowTestX64, SyscallsAutomated) {
       "zx_vmo_set_cache_policy doesn't need automation\n"
       "zx_vmo_set_size doesn't need automation\n"
       "zx_vmo_write fully automated\n";
-  uint32_t expected_fully_automated = 65;
+  uint32_t expected_fully_automated = 64;
   uint32_t expected_cant_be_automated = 59;
   uint32_t expected_partially_automated = 17;
   uint32_t expected_not_automated = 12;

@@ -86,7 +86,6 @@
     "zx_pager_query_dirty_ranges",
     "zx_pager_query_vmo_stats",
     "zx_pager_supply_pages",
-    "zx_pc_firmware_tables",
     "zx_pci_add_subtract_io_range",
     "zx_pci_cfg_pio_rw",
     "zx_pci_config_read",

@@ -72,16 +72,15 @@ zx_status_t FindEntryPoint(const void** base, smbios::EntryPointVersion* version
     if (!memcmp(p, SMBIOS2_ANCHOR, strlen(SMBIOS2_ANCHOR))) {
       *base = p;
       *version = smbios::EntryPointVersion::V2_1;
-      gSmbiosPhys = smbios;
       return ZX_OK;
     } else if (!memcmp(p, SMBIOS3_ANCHOR, strlen(SMBIOS3_ANCHOR))) {
       *base = p;
       *version = smbios::EntryPointVersion::V3_0;
-      gSmbiosPhys = smbios;
       return ZX_OK;
     }
     mapping->Destroy();
   }
+
   return ZX_ERR_NOT_FOUND;
 }
 
@@ -159,8 +158,6 @@ void pc_init_smbios() {
   kStructBase = struct_table_virt;
   cleanup_mapping.cancel();
 }
-
-zx_paddr_t pc_get_smbios_entrypoint() { return gSmbiosPhys; }
 
 static zx_status_t DebugStructWalk(smbios::SpecVersion ver, const smbios::Header* hdr,
                                    const smbios::StringTable& st) {

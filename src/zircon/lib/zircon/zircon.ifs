@@ -89,7 +89,6 @@ Symbols:
   - { Name: _zx_pager_query_dirty_ranges, Type: Func }
   - { Name: _zx_pager_query_vmo_stats, Type: Func }
   - { Name: _zx_pager_supply_pages, Type: Func }
-  - { Name: _zx_pc_firmware_tables, Type: Func }
   - { Name: _zx_pci_add_subtract_io_range, Type: Func }
   - { Name: _zx_pci_cfg_pio_rw, Type: Func }
   - { Name: _zx_pci_config_read, Type: Func }
@@ -299,7 +298,6 @@ Symbols:
   - { Name: zx_pager_query_dirty_ranges, Type: Func, Weak: true }
   - { Name: zx_pager_query_vmo_stats, Type: Func, Weak: true }
   - { Name: zx_pager_supply_pages, Type: Func, Weak: true }
-  - { Name: zx_pc_firmware_tables, Type: Func, Weak: true }
   - { Name: zx_pci_add_subtract_io_range, Type: Func, Weak: true }
   - { Name: zx_pci_cfg_pio_rw, Type: Func, Weak: true }
   - { Name: zx_pci_config_read, Type: Func, Weak: true }
