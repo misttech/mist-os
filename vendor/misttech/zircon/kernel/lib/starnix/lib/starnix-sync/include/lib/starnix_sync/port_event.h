@@ -11,6 +11,7 @@
 
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <kernel/event.h>
 #include <ktl/atomic.h>
 #include <ktl/move.h>
 #include <ktl/variant.h>
@@ -18,6 +19,37 @@
 #include <object/port_dispatcher.h>
 
 namespace starnix_sync {
+
+// A PortEvent is interested only in events originating from within the
+// process (see PortEvent::futex_ for more details), and the waiter
+// may be notified.
+constexpr int32_t FUTEX_WAITING = 0;
+
+// A PortEvent is interested only in events originating from within the
+// process (see PortEvent::futex_ for more details), and the waiter
+// has been notified of an event.
+constexpr int32_t FUTEX_NOTIFIED = 1;
+
+// A PortEvent is interested only in events originating from within the
+// process (see PortEvent::futex_ for more details), and the waiter
+// has been notified of an interrupt.
+constexpr int32_t FUTEX_INTERRUPTED = 2;
+
+// A PortEvent is interested in events originating from outside of
+// process (see PortEvent::futex_ for more details). The waiter's zx::Port
+// should be used instead of the Futex.
+constexpr int32_t FUTEX_USE_PORT = 3;
+
+// Specifies the ordering for atomics accessed by both the "notifier" and
+// "notifee" (the waiter).
+//
+// Relaxed ordering because the PortEvent does not provide synchronization
+// between the "notifier" and the "notifee". If a notifee needs synchronization,
+// it needs to perform that synchronization itself.
+//
+// See PortEvent::Wait for more details.
+constexpr std::memory_order ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE =
+    std::memory_order_relaxed;
 
 // The kind of notification.
 enum class NotifyKind : uint8_t { Regular, Interrupt };
@@ -98,13 +130,31 @@ class PortEvent : public fbl::RefCounted<PortEvent> {
   void Cancel(fbl::RefPtr<Dispatcher> handle, uint64_t key);
 
  private:
+  /// Queue a packet to the underlying Zircon port, which will cause the
+  /// waiter to wake up.
+  ///
+  /// This method should only be called when the waiter is interested in
+  /// events that may originate from outside of the process.
+  void QueueUserPacketData(NotifyKind kind);
+
+ public:
+  /// Marks the port as ready to handle a notification (or an interrupt) and
+  /// wakes up any blocked waiters.
+  void Notify(NotifyKind kind);
+
+ private:
+  ktl::atomic<uint8_t> state_;
+
+  /// The Futex used to wake up a thread when this waiter is waiting for
+  /// events that don't depend on a `zx::Port`.
+  Event event_;
+
   // The underlying Zircon port that the waiter waits on when it is
   // interested in events that cross process boundaries.
   //
   // Lazily allocated to optimize for the case where waiters are interested
   // only in events triggered within a process.
   KernelHandle<PortDispatcher> port_;
-
   zx_rights_t rights_;
 
   // Indicates whether a user packet is sitting in the zx_port_t to wake up
