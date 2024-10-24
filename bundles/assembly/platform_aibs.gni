@@ -229,6 +229,7 @@ user_platform_aib_names =
       # Session
       "element_manager",
       "session_manager",
+      "session_manager_disable_pkg_cache",
 
       # SetUI
       "setui",
@@ -313,6 +314,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "core_realm_development_access_rcs_no_usb",
                          "core_realm_development_access_rcs_usb",
                          "core_realm_development_access_userdebug",
+                         "session_manager_enable_pkg_cache",
                          "standard_userdebug",
                          "standard_userdebug_and_eng",
                          "mdns_fuchsia_device_wired_service",
@@ -427,6 +429,7 @@ experimental_aib_names = [
   "power_framework_testing_sag",
   "topology_test_daemon",
   "trusted_execution_environment",
+  "session_manager_enable_pkg_cache",
 ]
 
 # Ensure that we do not list any experimental AIBs as required

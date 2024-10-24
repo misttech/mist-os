@@ -58,6 +58,7 @@ impl DefaultByBuildType for SwdConfig {
             on_verification_failure: VerificationFailureAction::default(),
             tuf_config_paths: vec![],
             include_configurator: false,
+            enable_upgradable_packages: false,
         }
     }
 }
@@ -125,7 +126,7 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
         )?;
         builder.set_config_capability(
             "fuchsia.pkgcache.EnableUpgradablePackages",
-            Config::new(ConfigValueType::Bool, false.into()),
+            Config::new(ConfigValueType::Bool, subsystem_config.enable_upgradable_packages.into()),
         )?;
 
         Ok(())

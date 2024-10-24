@@ -70,6 +70,8 @@ enum PlatformCapability {
     Lowpan,
     #[serde(rename = "fuchsia.kernel.VmexResource")]
     VmexResource,
+    #[serde(rename = "fuchsia.pkg.PackageCache")]
+    PackageCache,
 }
 
 impl PlatformCapability {
@@ -78,6 +80,7 @@ impl PlatformCapability {
         match self {
             &PlatformCapability::Lowpan => "fuchsia.lowpan.device.DeviceExtraConnector",
             &PlatformCapability::VmexResource => "fuchsia.kernel.VmexResource",
+            &PlatformCapability::PackageCache => "fuchsia.pkg.PackageCache",
         }
     }
 
@@ -86,6 +89,7 @@ impl PlatformCapability {
         match self {
             &PlatformCapability::Lowpan => "/core/lowpanservice",
             &PlatformCapability::VmexResource => "<component_manager>",
+            &PlatformCapability::PackageCache => "/bootstrap/pkg-cache",
         }
     }
 }

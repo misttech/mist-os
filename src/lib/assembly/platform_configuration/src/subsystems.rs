@@ -384,7 +384,7 @@ fn configure_subsystems(
 
     session::SessionConfig::define_configuration(
         &context_base.for_subsystem("session"),
-        &(&platform.session, &product.session, &product.session_url),
+        &(&platform.session, &product.session, &product.session_url, &platform.software_delivery),
         builder,
     )
     .context("Configuring the 'session' subsystem")?;
