@@ -12,7 +12,7 @@ use fidl_fuchsia_bluetooth_gatt2::{
     LocalServiceRequest, Server_Marker as Server_Marker2, Server_Proxy,
 };
 use fidl_fuchsia_bluetooth_host::{DiscoverySessionProxy, HostProxy, ProtocolRequest};
-use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker};
+use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker, PrivilegedPeripheralMarker};
 use fidl_fuchsia_bluetooth_sys::{
     self as sys, InputCapability, OutputCapability, PairingDelegateProxy,
 };
@@ -60,6 +60,7 @@ pub static HOST_INIT_TIMEOUT: i64 = 5; // Seconds
 pub enum HostService {
     LeCentral,
     LePeripheral,
+    LePrivilegedPeripheral,
     LeGatt,
     LeGatt2,
     Profile,
@@ -805,6 +806,11 @@ impl HostDispatcher {
                     HostService::LePeripheral => {
                         let remote = ServerEnd::<PeripheralMarker>::new(chan.into());
                         let _ = host.request_protocol(ProtocolRequest::Peripheral(remote));
+                    }
+                    HostService::LePrivilegedPeripheral => {
+                        let remote = ServerEnd::<PrivilegedPeripheralMarker>::new(chan.into());
+                        let _ =
+                            host.request_protocol(ProtocolRequest::PrivilegedPeripheral(remote));
                     }
                     HostService::LeGatt => {
                         let remote = ServerEnd::<Server_Marker>::new(chan.into());
