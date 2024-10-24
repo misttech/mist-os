@@ -160,9 +160,11 @@ pub(crate) async fn wait_for_rcs(
                 Ok(n) => n,
                 Err(e) => {
                     tracing::debug!("unable to get overnet node, forcing connection to exit with last seen SSH error: {err:?}. Overnet node error was {e:?}");
+                    t.host_pipe_log_buffer().push_line(err.to_string());
                     break Err(host_pipe_err_to_fidl(err));
                 }
             });
+            t.host_pipe_log_buffer().push_line(err.to_string());
             break Err(host_pipe_err_to_fidl(err));
         } else {
             tracing::trace!("RCS dropped after event fired. Waiting again.");
@@ -200,6 +202,9 @@ fn host_pipe_err_to_fidl(ssh_err: SshError) -> ffx::TargetConnectionError {
         SshError::NoRouteToHost => ffx::TargetConnectionError::NoRouteToHost,
         SshError::InvalidArgument => ffx::TargetConnectionError::InvalidArgument,
         SshError::TargetIncompatible => ffx::TargetConnectionError::TargetIncompatible,
+        SshError::ConnectionClosedByRemoteHost => {
+            ffx::TargetConnectionError::ConnectionClosedByRemoteHost
+        }
     }
 }
 

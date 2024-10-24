@@ -31,9 +31,11 @@ impl From<SshError> for OvernetConnectionError {
             | NetworkUnreachable => OvernetConnectionError::NonFatal(ssh_err.into()),
             // These errors are unrecoverable, as they are fundamental errors in an existing
             // configuration.
-            PermissionDenied | KeyVerificationFailure | InvalidArgument | TargetIncompatible => {
-                OvernetConnectionError::Fatal(ssh_err.into())
-            }
+            PermissionDenied
+            | KeyVerificationFailure
+            | InvalidArgument
+            | TargetIncompatible
+            | ConnectionClosedByRemoteHost => OvernetConnectionError::Fatal(ssh_err.into()),
         }
     }
 }
@@ -206,5 +208,7 @@ mod test {
         assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
         let err = Timeout;
         assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        let err = ConnectionClosedByRemoteHost;
+        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
     }
 }

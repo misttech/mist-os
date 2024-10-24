@@ -177,6 +177,9 @@ type TargetConnectionError = strict enum {
     FAILED_TO_KNOCK_SERVICE = 12;
     /// Daemon's ABI does not match the target's.
     TARGET_INCOMPATIBLE = 13;
+    /// The connection was closed by the remote host (unique from `connection
+    /// refused`).
+    CONNECTION_CLOSED_BY_REMOTE_HOST = 14;
 };
 
 // TODO(https://fxbug.dev/42176602): Migrate the method specifc error enums to use

@@ -480,9 +480,13 @@ impl FidlProtocol for TargetCollectionProtocol {
                                 return add_target_responder
                                     .error(&ffx::AddTargetError {
                                         connection_error: Some(e),
-                                        connection_error_logs: Some(
-                                            target.host_pipe_log_buffer().lines(),
-                                        ),
+                                        connection_error_logs: match target
+                                            .host_pipe_log_buffer()
+                                            .lines()
+                                        {
+                                            vec if vec.is_empty() => None,
+                                            v => Some(v),
+                                        },
                                         ..Default::default()
                                     })
                                     .map_err(Into::into)
