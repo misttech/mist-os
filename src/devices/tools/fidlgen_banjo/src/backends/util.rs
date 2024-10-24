@@ -404,6 +404,14 @@ pub fn type_to_cpp_str(ty: &Type, wrappers: bool, ir: &FidlIr) -> Result<String,
         Type::Vector { ref element_type, .. } => type_to_cpp_str(element_type, wrappers, ir),
         Type::Str { .. } => Ok(String::from("char*")),
         Type::Primitive { ref subtype } => primitive_type_to_c_str(subtype),
+        Type::Endpoint { role: EndpointRole::Client, protocol, .. } => {
+            let c_name = to_c_name(&protocol.get_name());
+            if not_callback(protocol, ir)? {
+                return Ok(format!("{}_protocol_t", c_name));
+            } else {
+                return Ok(format!("{}_t", c_name));
+            }
+        }
         Type::Identifier { identifier, .. } => match ir
             .get_declaration(identifier)
             .unwrap_or_else(|e| panic!("Could not find declaration for {:?}: {:?}", identifier, e))
@@ -413,14 +421,6 @@ pub fn type_to_cpp_str(ty: &Type, wrappers: bool, ir: &FidlIr) -> Result<String,
             | Declaration::Union
             | Declaration::Enum
             | Declaration::Bits => Ok(format!("{}_t", to_c_name(&identifier.get_name()))),
-            Declaration::Protocol => {
-                let c_name = to_c_name(&identifier.get_name());
-                if not_callback(identifier, ir)? {
-                    return Ok(format!("{}_protocol_t", c_name));
-                } else {
-                    return Ok(format!("{}_t", c_name));
-                }
-            }
             _ => Err(anyhow!("Identifier type not handled: {:?}", identifier)),
         },
         Type::Handle { ref subtype, .. } => {
@@ -494,18 +494,6 @@ pub fn get_in_params(
                         return Ok(format!("{} {}", ty_name, name));
                     }
                     match ir.get_declaration(identifier).unwrap() {
-                        Declaration::Protocol => {
-                            if transform && not_callback(identifier, ir)? {
-                                let ty_name = protocol_to_ops_cpp_str(identifier, ir).unwrap();
-                                Ok(format!(
-                                    "void* {name}_ctx, const {ty_name}* {name}_ops",
-                                    ty_name = ty_name,
-                                    name = name
-                                ))
-                            } else {
-                                Ok(format!("const {}* {}", ty_name, name))
-                            }
-                        }
                         Declaration::Struct | Declaration::Table | Declaration::Union => {
                             let prefix =
                                 if param.maybe_attributes.has("InOut") { "" } else { "const " };
@@ -515,6 +503,18 @@ pub fn get_in_params(
                             Ok(format!("{} {}", ty_name, name))
                         }
                         decl => Err(anyhow!("Unsupported declaration: {:?}", decl)),
+                    }
+                }
+                Type::Endpoint { role: EndpointRole::Client, protocol, .. } => {
+                    if transform && not_callback(protocol, ir)? {
+                        let ty_name = protocol_to_ops_cpp_str(protocol, ir).unwrap();
+                        Ok(format!(
+                            "void* {name}_ctx, const {ty_name}* {name}_ops",
+                            ty_name = ty_name,
+                            name = name
+                        ))
+                    } else {
+                        Ok(format!("const {}* {}", ty_name, name))
                     }
                 }
                 Type::Str { .. } => Ok(format!("const {} {}", ty_name, name)),
@@ -621,7 +621,8 @@ fn method_out_param_to_cpp_str(param: &MethodParameter<'_>, wrappers: bool, ir: 
             }
         }
         Type::Handle { .. } => format!("{}* out_{}", ty_name, name),
-        Type::Identifier { nullable, .. } => {
+        Type::Identifier { nullable, .. }
+        | Type::Endpoint { role: EndpointRole::Client, nullable, .. } => {
             let ptr = if *nullable { "*" } else { "" };
             format!("{}{}* out_{}", ty_name, ptr, name)
         }

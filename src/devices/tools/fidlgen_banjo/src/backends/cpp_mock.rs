@@ -412,14 +412,15 @@ impl<'a, W: io::Write> CppMockBackend<'a, W> {
                                     size = name_size(&param.maybe_attributes),
                                 )
                             }
+                            Type::Endpoint { role: EndpointRole::Client, .. } => {
+                                format!("*{}", name)
+                            }
                             Type::Identifier { identifier, .. } => {
                                 if identifier.is_base_type() {
                                     name
                                 } else {
                                     match ir.get_declaration(identifier).unwrap() {
-                                        Declaration::Protocol
-                                        | Declaration::Struct
-                                        | Declaration::Union => {
+                                        Declaration::Struct | Declaration::Union => {
                                             format!("*{}", name)
                                         }
                                         _ => name,

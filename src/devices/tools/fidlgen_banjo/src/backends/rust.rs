@@ -29,7 +29,7 @@ fn can_derive_partialeq(
         Type::Vector { ref element_type, .. } => can_derive_partialeq(element_type, parents, ir),
         Type::Str { .. } => Ok(true),
         Type::Handle { .. } => Ok(true),
-        Type::Request { .. } => Ok(true),
+        Type::Endpoint { .. } => Ok(true),
         Type::Primitive { .. } => Ok(true),
         Type::Internal { subtype: InternalSubtype::FrameworkErr } => Ok(true),
         Type::Identifier { identifier: type_id, .. } => {
@@ -49,8 +49,6 @@ fn can_derive_partialeq(
                 // enum.rs template always derive PartialEq
                 Declaration::Enum { .. } => Ok(true),
                 Declaration::Bits { .. } => Ok(true),
-                // Protocols are not generated, but this supports some tests.
-                Declaration::Protocol { .. } => Ok(true),
                 Declaration::Struct => {
                     let decl = ir.get_struct(type_id)?;
                     for field in &decl.members {
@@ -159,8 +157,6 @@ fn type_to_rust_str(
                 }
                 Declaration::Enum => Ok(format!("{name}", name = identifier.get_name())),
                 Declaration::Bits => Ok(format!("{name}", name = identifier.get_name())),
-                // Protocols are not generated, but this supports some tests.
-                Declaration::Protocol => return Ok(to_c_name(identifier.get_name())),
                 Declaration::Struct | Declaration::Table | Declaration::Union => {
                     if *nullable {
                         Ok(format!("*mut {name}", name = identifier.get_name()))
@@ -170,6 +166,10 @@ fn type_to_rust_str(
                 }
                 _ => Err(anyhow!("Can't handle declaration of {:?}", identifier)),
             }
+        }
+        // Protocols are not generated, but this supports some tests.
+        Type::Endpoint { role: EndpointRole::Client, protocol, .. } => {
+            Ok(to_c_name(protocol.get_name()))
         }
         Type::Handle { .. } => Ok(format!("zircon_types::zx_handle_t")),
         _ => Err(anyhow!("Can't handle type {:?}", ty)),
@@ -185,6 +185,7 @@ fn field_to_rust_str(field: &StructMember, ir: &FidlIr) -> Result<String, Error>
         | Type::Str { .. }
         | Type::Primitive { .. }
         | Type::Identifier { .. }
+        | Type::Endpoint { role: EndpointRole::Client, .. }
         | Type::Handle { .. } => Ok(format!(
             "    pub {c_name}: {ty},",
             c_name = c_name,
@@ -218,6 +219,7 @@ fn table_field_to_rust_str(field: &TableMember, ir: &FidlIr) -> Result<String, E
         | Type::Str { .. }
         | Type::Primitive { .. }
         | Type::Identifier { .. }
+        | Type::Endpoint { role: EndpointRole::Client, .. }
         | Type::Handle { .. } => Ok(format!(
             "    pub {c_name}: {ty},",
             c_name = c_name,
