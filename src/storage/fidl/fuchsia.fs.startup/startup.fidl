@@ -55,7 +55,6 @@ type StartOptions = resource struct {
     /// prefetch data and hold the vmos in cache for N seconds. Functionally this means that the
     /// first launch with this option records the profile and all other launches with this option
     /// will replay that profile.
-    /// TODO(https://fxbug.dev/328071060): Enable profile recordings access and handling.
     startup_profiling_seconds uint32;
 };
 
