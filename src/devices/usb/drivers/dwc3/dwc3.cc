@@ -710,7 +710,7 @@ void Dwc3::DciIntfSetSpeed(fdescriptor::wire::UsbSpeed speed) {
   if (!result.ok()) {
     zxlogf(ERROR, "(framework) SetSpeed(): %s", result.status_string());
   } else if (result->is_error()) {
-    zxlogf(ERROR, "SetSpeed(): %s", result.error().FormatDescription().c_str());
+    zxlogf(ERROR, "SetSpeed(): %s", zx_status_get_string(result->error_value()));
   }
 }
 
@@ -722,7 +722,7 @@ void Dwc3::DciIntfSetConnected(bool connected) {
   if (!result.ok()) {
     zxlogf(ERROR, "(framework) SetConnected(): %s", result.status_string());
   } else if (result->is_error()) {
-    zxlogf(ERROR, "SetConnected(): %s", result.error().FormatDescription().c_str());
+    zxlogf(ERROR, "SetConnected(): %s", zx_status_get_string(result->error_value()));
   }
 }
 
@@ -742,7 +742,7 @@ zx_status_t Dwc3::DciIntfControl(const fdescriptor::wire::UsbSetup* setup,
     return ZX_ERR_INTERNAL;
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Control(): %s", result.error().FormatDescription().c_str());
+    zxlogf(ERROR, "Control(): %s", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
