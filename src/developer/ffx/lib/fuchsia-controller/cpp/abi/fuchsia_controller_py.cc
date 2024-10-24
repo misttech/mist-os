@@ -712,8 +712,8 @@ PyObject *channel_read(PyObject *self, PyObject *args) {
 
 PyObject *socket_write(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
-  PyObject *data = nullptr;
-  if (!PyArg_ParseTuple(args, "OO", &obj, &data)) {
+  PyObject *buffer = nullptr;
+  if (!PyArg_ParseTuple(args, "OO", &obj, &buffer)) {
     return nullptr;
   }
   auto socket = DowncastSocket(obj);
@@ -721,7 +721,7 @@ PyObject *socket_write(PyObject *self, PyObject *args) {
     return nullptr;
   }
   Py_buffer view;
-  if (PyObject_GetBuffer(data, &view, PyBUF_CONTIG_RO) < 0) {
+  if (PyObject_GetBuffer(buffer, &view, PyBUF_CONTIG_RO) < 0) {
     PyErr_SetString(PyExc_TypeError, "Expected a buffer.");
     return nullptr;
   }

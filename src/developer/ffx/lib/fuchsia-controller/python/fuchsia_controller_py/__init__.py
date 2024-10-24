@@ -101,12 +101,11 @@ class Socket:
         else:
             raise HandleTypeError(handle)
 
-    def write(self, data) -> int:
+    def write(self, buffer: bytes) -> int:
         """Writes data to the socket.
 
         Args:
-            data: The data to write to the socket. This must be a tuple of two elements
-            containing bytes and handles.
+            data: The buffer to write to the socket.
 
         Returns:
             The number of bytes written.
@@ -114,7 +113,7 @@ class Socket:
         Raises:
             TypeError: If data is not the correct type.
         """
-        return fuchsia_controller_internal.socket_write(self._handle, data)
+        return fuchsia_controller_internal.socket_write(self._handle, buffer)
 
     def read(self) -> bytes:
         """Reads data from the socket."""
