@@ -4,6 +4,8 @@
 
 #include "src/storage/lib/vfs/cpp/journal/header_view.h"
 
+#include <span>
+
 #include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/journal/format.h"
@@ -17,12 +19,12 @@ constexpr uint64_t kSequenceNumber = 20;
 
 TEST(JournalHeaderView, JournalHeaderView) {
   uint8_t block[kBlockSize] = {};
-  JournalHeaderView header(cpp20::span<uint8_t>(block, kBlockSize));
+  JournalHeaderView header(std::span<uint8_t>(block, kBlockSize));
 }
 
 TEST(JournalHeaderView, Initialize) {
   uint8_t block[kBlockSize] = {};
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
 
   JournalHeaderView header(span, kPayloadBlocks, kSequenceNumber);
   ASSERT_EQ(kPayloadBlocks, header.PayloadBlocks());
@@ -36,7 +38,7 @@ TEST(JournalHeaderView, Initialize) {
 
 TEST(JournalHeaderView, LoadValidHeader) {
   uint8_t block[kBlockSize] = {};
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
 
   JournalHeaderView header(span, kPayloadBlocks, kSequenceNumber);
 
@@ -48,7 +50,7 @@ TEST(JournalHeaderView, LoadValidHeader) {
 
 TEST(JournalHeaderView, LoadValidRevocation) {
   uint8_t block[kBlockSize] = {};
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
 
   JournalHeaderView header(span, kPayloadBlocks, kSequenceNumber);
   auto prefix = reinterpret_cast<JournalPrefix*>(block);
@@ -62,7 +64,7 @@ TEST(JournalHeaderView, LoadValidRevocation) {
 
 TEST(JournalHeaderView, LoadBadMagicNumber) {
   uint8_t block[kBlockSize] = {};
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
 
   auto loaded = fs::JournalHeaderView::Create(span, kSequenceNumber);
   ASSERT_EQ(ZX_ERR_BAD_STATE, loaded.error());
@@ -70,7 +72,7 @@ TEST(JournalHeaderView, LoadBadMagicNumber) {
 
 TEST(JournalHeaderView, LoadSmallBuffer) {
   uint8_t block[kBlockSize - 1] = {};
-  cpp20::span<uint8_t> span(block, sizeof(block));
+  std::span<uint8_t> span(block, sizeof(block));
 
   auto loaded = fs::JournalHeaderView::Create(span, kSequenceNumber);
   ASSERT_EQ(ZX_ERR_BUFFER_TOO_SMALL, loaded.error());
@@ -78,7 +80,7 @@ TEST(JournalHeaderView, LoadSmallBuffer) {
 
 TEST(JournalHeaderView, SetTargetBlock) {
   uint8_t block[kBlockSize] = {};
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
 
   JournalHeaderView header(span, kPayloadBlocks, kSequenceNumber);
   for (uint32_t i = 0; i < kPayloadBlocks; i++) {
@@ -95,7 +97,7 @@ TEST(JournalHeaderView, SetTargetBlock) {
 TEST(JournalHeaderView, TargetBlockPtr) {
   uint8_t block[kBlockSize] = {};
   auto header_block = reinterpret_cast<const JournalHeaderBlock*>(block);
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
   uint32_t target_block = 3;
 
   JournalHeaderView header(span, kPayloadBlocks, kSequenceNumber);
@@ -110,7 +112,7 @@ TEST(JournalHeaderView, TargetBlockPtr) {
 TEST(JournalHeaderView, SetEscapedBlock) {
   uint8_t block[kBlockSize] = {};
   auto header_block = reinterpret_cast<const JournalHeaderBlock*>(block);
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
 
   JournalHeaderView header(span, kPayloadBlocks, kSequenceNumber);
   for (uint32_t i = 0; i < kPayloadBlocks; i++) {
@@ -129,7 +131,7 @@ TEST(JournalHeaderView, SetEscapedBlock) {
 
 TEST(JournalHeaderView, PayloadBlocks) {
   uint8_t block[kBlockSize] = {};
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
   uint32_t payload_blocks = 5;
 
   JournalHeaderView header(span, payload_blocks, kSequenceNumber);
@@ -139,7 +141,7 @@ TEST(JournalHeaderView, PayloadBlocks) {
 TEST(JournalHeaderView, PayloadBlocksPtr) {
   uint8_t block[kBlockSize] = {};
   auto header_block = reinterpret_cast<const JournalHeaderBlock*>(block);
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
 
   JournalHeaderView header(span, kPayloadBlocks, kSequenceNumber);
   auto ptr = header.PayloadBlocksPtr();
@@ -151,7 +153,7 @@ TEST(JournalHeaderView, PayloadBlocksPtr) {
 
 TEST(JournalHeaderView, SequenceNumber) {
   uint8_t block[kBlockSize] = {};
-  cpp20::span<uint8_t> span(block, kBlockSize);
+  std::span<uint8_t> span(block, kBlockSize);
   uint32_t sequence_number = 33;
 
   JournalHeaderView header(span, kPayloadBlocks, sequence_number);

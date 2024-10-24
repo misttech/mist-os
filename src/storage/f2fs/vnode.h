@@ -5,6 +5,8 @@
 #ifndef SRC_STORAGE_F2FS_VNODE_H_
 #define SRC_STORAGE_F2FS_VNODE_H_
 
+#include <span>
+
 #include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/dir_entry_cache.h"
 #include "src/storage/f2fs/file_cache.h"
@@ -325,9 +327,9 @@ class VnodeF2fs : public fs::PagedVnode,
   void CleanupCache();
 
   zx_status_t SetExtendedAttribute(XattrIndex index, std::string_view name,
-                                   cpp20::span<const uint8_t> value, XattrOption option);
+                                   std::span<const uint8_t> value, XattrOption option);
   zx::result<size_t> GetExtendedAttribute(XattrIndex index, std::string_view name,
-                                          cpp20::span<uint8_t> out);
+                                          std::span<uint8_t> out);
 
   nid_t XattrNid() const { return xattr_nid_; }
 

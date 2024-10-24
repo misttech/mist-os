@@ -6,9 +6,9 @@
 #define SRC_STORAGE_VOLUME_IMAGE_FTL_RAW_NAND_IMAGE_UTILS_H_
 
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <cstdint>
+#include <span>
 
 #include <fbl/algorithm.h>
 
@@ -41,7 +41,7 @@ constexpr uint64_t RawNandImageGetNextEraseBlockOffset(uint64_t start_offset,
 
 // Writes a block of size |oob_bytes.size() + page_content.size()| into |writer| at |offset|.
 inline fpromise::result<void, std::string> RawNandImageWritePage(
-    cpp20::span<const uint8_t> page_content, cpp20::span<const uint8_t> oob_bytes, uint64_t offset,
+    std::span<const uint8_t> page_content, std::span<const uint8_t> oob_bytes, uint64_t offset,
     Writer* writer) {
   auto result = writer->Write(offset, page_content);
   if (result.is_error()) {

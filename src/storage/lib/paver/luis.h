@@ -5,6 +5,8 @@
 #ifndef SRC_STORAGE_LIB_PAVER_LUIS_H_
 #define SRC_STORAGE_LIB_PAVER_LUIS_H_
 
+#include <span>
+
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/device-partitioner.h"
@@ -37,7 +39,7 @@ class LuisPartitioner : public DevicePartitioner {
   zx::result<> WipePartitionTables() const override;
 
   zx::result<> ValidatePayload(const PartitionSpec& spec,
-                               cpp20::span<const uint8_t> data) const override;
+                               std::span<const uint8_t> data) const override;
 
   zx::result<> Flush() const override { return zx::ok(); }
   zx::result<> OnStop() const override { return zx::ok(); }

@@ -36,7 +36,7 @@ class SherlockPartitioner : public DevicePartitioner {
   zx::result<> WipePartitionTables() const override;
 
   zx::result<> ValidatePayload(const PartitionSpec& spec,
-                               cpp20::span<const uint8_t> data) const override;
+                               std::span<const uint8_t> data) const override;
 
   zx::result<> Flush() const override { return zx::ok(); }
   zx::result<> OnStop() const override { return zx::ok(); }

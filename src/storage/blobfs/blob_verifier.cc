@@ -4,7 +4,6 @@
 
 #include "src/storage/blobfs/blob_verifier.h"
 
-#include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
@@ -16,6 +15,7 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <utility>
 
 #include <safemath/checked_math.h>
@@ -33,7 +33,7 @@ BlobVerifier::BlobVerifier(Digest digest, std::shared_ptr<BlobfsMetrics> metrics
 
 zx::result<std::unique_ptr<BlobVerifier>> BlobVerifier::Create(
     Digest digest, std::shared_ptr<BlobfsMetrics> metrics,
-    cpp20::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout) {
+    std::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout) {
   std::unique_ptr<BlobVerifier> verifier(new BlobVerifier(std::move(digest), std::move(metrics)));
   verifier->tree_verifier_.SetUseCompactFormat(ShouldUseCompactMerkleTreeFormat(layout.Format()));
 

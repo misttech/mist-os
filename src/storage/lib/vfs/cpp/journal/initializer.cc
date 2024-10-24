@@ -8,17 +8,20 @@
 #include <sys/mman.h>
 #include <zircon/errors.h>
 
+#include <span>
+
 #include "src/storage/lib/vfs/cpp/journal/format.h"
 
 namespace fs {
 namespace {
 
-void InitJournalBlock(cpp20::span<uint8_t> block) {
+void InitJournalBlock(std::span<uint8_t> block) {
   memset(block.data(), 0, block.size());
   JournalInfo* info = reinterpret_cast<JournalInfo*>(block.data());
   info->magic = kJournalMagic;
 
-  // TODO(https://fxbug.dev/42118919): This checksum should be on entire block and not just JournalInfo.
+  // TODO(https://fxbug.dev/42118919): This checksum should be on entire block and not just
+  // JournalInfo.
   info->checksum = crc32(0, block.data(), sizeof(fs::JournalInfo));
 }
 
@@ -26,7 +29,7 @@ void InitJournalBlock(cpp20::span<uint8_t> block) {
 
 zx_status_t MakeJournal(uint64_t journal_blocks, const WriteBlocksFn& WriteBlocks) {
   uint8_t block[kJournalBlockSize];
-  cpp20::span<uint8_t> buffer(block, sizeof(block));
+  std::span<uint8_t> buffer(block, sizeof(block));
   InitJournalBlock(buffer);
 
   auto status = WriteBlocks(buffer, 0, 1);
@@ -46,7 +49,7 @@ zx_status_t MakeJournal(uint64_t journal_blocks, const WriteBlocksFn& WriteBlock
     return ZX_ERR_NO_MEMORY;
   }
 
-  cpp20::span<const uint8_t> buffers(static_cast<const uint8_t*>(blocks), map_length);
+  std::span<const uint8_t> buffers(static_cast<const uint8_t*>(blocks), map_length);
   status = WriteBlocks(buffers, kJournalMetadataBlocks, block_count);
 
   if (munmap(blocks, map_length) != 0) {

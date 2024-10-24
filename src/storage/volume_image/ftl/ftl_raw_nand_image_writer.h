@@ -6,9 +6,9 @@
 #define SRC_STORAGE_VOLUME_IMAGE_FTL_FTL_RAW_NAND_IMAGE_WRITER_H_
 
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <cstdint>
+#include <span>
 #include <tuple>
 
 #include "src/storage/volume_image/ftl/options.h"
@@ -30,7 +30,7 @@ class FtlRawNandImageWriter final : public Writer {
   // Returns a |FtlRawNandWriter| that will translate requests from the |device_options| into
   // the returned |options| that are guaranteed to be valid for FTL metadata on success.
   static fpromise::result<std::tuple<FtlRawNandImageWriter, RawNandOptions>, std::string> Create(
-      const RawNandOptions& device_options, cpp20::span<const RawNandImageFlag> flags,
+      const RawNandOptions& device_options, std::span<const RawNandImageFlag> flags,
       ImageFormat format, Writer* writer);
 
   FtlRawNandImageWriter() = delete;
@@ -45,7 +45,7 @@ class FtlRawNandImageWriter final : public Writer {
   // This Write method expects page data and page oob to be performed in separate calls.
   //
   // On error the returned result to contains a string describing the error.
-  fpromise::result<void, std::string> Write(uint64_t offset, cpp20::span<const uint8_t> data) final;
+  fpromise::result<void, std::string> Write(uint64_t offset, std::span<const uint8_t> data) final;
 
   // Returns a scalar describing how pages are coalesced to meet the upper layer requirements.
   constexpr uint32_t scale_factor() const { return scale_factor_; }

@@ -12,6 +12,7 @@
 #include <zircon/errors.h>
 
 #include <set>
+#include <span>
 
 #include <gtest/gtest.h>
 
@@ -146,12 +147,12 @@ class BlobLoaderTest : public TestWithParam<TestParamType> {
   }
 
   // Used to access protected Blob/BlobVerifier members because this class is a friend.
-  cpp20::span<const uint8_t> GetBlobMerkleData(const Blob* blob) const {
+  std::span<const uint8_t> GetBlobMerkleData(const Blob* blob) const {
     std::lock_guard lock(blob->mutex_);
     return blob->loader_info_.verifier->merkle_data();
   }
 
-  void CheckMerkleTreeContents(cpp20::span<const uint8_t> merkle_data, const BlobInfo& info) {
+  void CheckMerkleTreeContents(std::span<const uint8_t> merkle_data, const BlobInfo& info) {
     std::unique_ptr<MerkleTreeInfo> merkle_tree = CreateMerkleTree(
         info.data.get(), info.size_data, ShouldUseCompactMerkleTreeFormat(blob_layout_format_));
     ASSERT_EQ(merkle_data.size(), merkle_tree->merkle_tree_size);

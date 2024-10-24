@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <zircon/errors.h>
 
+#include <span>
 #include <string_view>
 
 #include <fbl/unique_fd.h>
@@ -106,7 +107,7 @@ TEST_P(RenameTest, Children) {
   ASSERT_GT(fd, 0);
 
   static constexpr uint8_t file_contents_array[] = "This should be in the file";
-  constexpr cpp20::span kFileContents(file_contents_array);
+  constexpr std::span kFileContents(file_contents_array);
   ASSERT_EQ(write(fd, kFileContents.data(), kFileContents.size()),
             static_cast<ssize_t>(kFileContents.size()));
 
@@ -393,7 +394,8 @@ TEST_P(RenameTest, RenameDirIntoRootSuceeds) {
 
 TEST_P(RenameTest, RenameDirectoryToChildIsForbidden) {
   // This test ensures renaming a directory to a child is forbidden.  The basic tests above test a
-  // variant of this, but this case is to specifically catch the issue described in https://fxbug.dev/42178035.
+  // variant of this, but this case is to specifically catch the issue described in
+  // https://fxbug.dev/42178035.
   ASSERT_EQ(mkdir(GetPath("alpha").c_str(), 0755), 0);
   ASSERT_EQ(mkdir(GetPath("alpha/bravo").c_str(), 0755), 0);
   ASSERT_EQ(mkdir(GetPath("alpha/bravo/charlie").c_str(), 0755), 0);

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <span>
 #include <unordered_set>
 
 #include <gtest/gtest.h>
@@ -617,8 +618,8 @@ TEST_F(FileTest, BasicXattrSetGet) {
   ASSERT_EQ(std::memcmp(buf.data(), value.data(), value.size()), 0);
 
   // Remove xattr, then get xattr is failed
-  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name,
-                                                cpp20::span<const uint8_t>(), XattrOption::kNone),
+  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, std::span<const uint8_t>(),
+                                                XattrOption::kNone),
             ZX_OK);
   result = test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, name, buf);
   ASSERT_TRUE(result.is_error());
@@ -677,7 +678,7 @@ TEST_F(FileTest, XattrFill) {
   // Remove half of xattrs
   for (uint32_t i = 0; i < xattrs.size(); i += 2) {
     ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, xattrs[i].first,
-                                                  cpp20::span<const uint8_t>(), XattrOption::kNone),
+                                                  std::span<const uint8_t>(), XattrOption::kNone),
               ZX_OK);
   }
 

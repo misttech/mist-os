@@ -235,7 +235,7 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> TryBindToFvmDriver(
     return topo_path.take_error();
   }
   std::string path = std::move(topo_path.value());
-  if (!cpp20::starts_with(std::string_view(path), kDevPath)) {
+  if (!std::string_view(path).starts_with(kDevPath)) {
     ERROR("Topo path does not start with '%s': %s\n", kDevPath, path.c_str());
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -437,8 +437,7 @@ zx::result<bool> FvmPartitionIsChild(fidl::UnownedClientEnd<fuchsia_device::Cont
     ERROR("Couldn't get topological path of partition: %s\n", partition_path.status_string());
     return partition_path.take_error();
   }
-  if (cpp20::starts_with(std::string_view(fvm_path.value()),
-                         std::string_view(partition_path.value()))) {
+  if (std::string_view(fvm_path.value()).starts_with(std::string_view(partition_path.value()))) {
     ERROR("Partition does not exist within FVM: partition='%s' fvm='%s'\n",
           partition_path.value().c_str(), fvm_path.value().c_str());
     return zx::ok(false);

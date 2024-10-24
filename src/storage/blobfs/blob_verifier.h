@@ -5,7 +5,6 @@
 #ifndef SRC_STORAGE_BLOBFS_BLOB_VERIFIER_H_
 #define SRC_STORAGE_BLOBFS_BLOB_VERIFIER_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
@@ -13,6 +12,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <span>
 
 #include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/blob_layout.h"
@@ -35,7 +35,7 @@ class BlobVerifier {
   // size for |data_size| bytes is bigger than |merkle_size|.
   [[nodiscard]] static zx::result<std::unique_ptr<BlobVerifier>> Create(
       Digest digest, std::shared_ptr<BlobfsMetrics> metrics,
-      cpp20::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout);
+      std::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout);
 
   // Creates an instance of BlobVerifier for blobs named |digest|, which are small enough to not
   // have a stored merkle tree (i.e. MerkleTreeBytes(data_size) == 0). The passed-in BlobfsMetrics
@@ -64,8 +64,8 @@ class BlobVerifier {
   }
 
   const Digest& digest() { return digest_; }
-  cpp20::span<const uint8_t> merkle_data() const {
-    return cpp20::span(merkle_data_.get(), tree_verifier_.GetTreeLength());
+  std::span<const uint8_t> merkle_data() const {
+    return std::span(merkle_data_.get(), tree_verifier_.GetTreeLength());
   }
 
  private:

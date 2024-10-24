@@ -97,7 +97,6 @@ source_set("fvm-test") {
     ":fvm-image-extend",
     ":fvm-sparse-image",
     ":fvm-unpack",
-    "//sdk/lib/stdcompat",
     "//src/lib/json_parser",
     "//src/storage/fvm",
     "//src/storage/volume_image/serialization:schema",

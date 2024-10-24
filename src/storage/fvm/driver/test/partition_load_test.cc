@@ -76,7 +76,7 @@ TEST_F(FvmVPartitionLoadTest, LoadPartitionWithPlaceHolderGuidIsUpdated) {
   // relative paths, but ControllerGetTopologicalPath returns an absolute path
   // with the assumption that devfs is rooted at /dev.
   constexpr std::string_view kHeader = "/dev/";
-  ASSERT_TRUE(cpp20::starts_with(topological_path, kHeader));
+  ASSERT_TRUE(topological_path.starts_with(kHeader));
   std::string partition_path(topological_path.substr(kHeader.size()));
 
   {

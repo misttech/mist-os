@@ -4,13 +4,13 @@
 
 #include "src/storage/fvm/metadata.h"
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
 #include <memory>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <safemath/checked_math.h>
@@ -24,18 +24,18 @@ namespace {
 
 // Returns a byte view of a fixed size struct.
 template <typename T>
-cpp20::span<const uint8_t> FixedSizeStructToSpan(const T& typed_content) {
-  return cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&typed_content), sizeof(T));
+std::span<const uint8_t> FixedSizeStructToSpan(const T& typed_content) {
+  return std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&typed_content), sizeof(T));
 }
 
 // Returns a byte view of an array of structs.
 template <typename T>
-cpp20::span<const uint8_t> ContainerToSpan(const T& container) {
+std::span<const uint8_t> ContainerToSpan(const T& container) {
   if (container.empty()) {
-    return cpp20::span<const uint8_t>();
+    return std::span<const uint8_t>();
   }
-  return cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(container.data()),
-                                    container.size() * sizeof(*container.data()));
+  return std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(container.data()),
+                                  container.size() * sizeof(*container.data()));
 }
 
 }  // namespace
@@ -133,9 +133,9 @@ zx::result<Metadata> Metadata::CopyWithNewDimensions(const Header& dimensions) c
   new_header.vpartition_table_size = dimensions.vpartition_table_size;
   new_header.allocation_table_size = dimensions.allocation_table_size;
 
-  // TODO(https://fxbug.dev/42138108) The first entries in the partition/slice tables must be unused.
-  // |Synthesize()| expects an array that does *not* include the empty zero entries.
-  // Remove this after we support zero-indexing.
+  // TODO(https://fxbug.dev/42138108) The first entries in the partition/slice tables must be
+  // unused. |Synthesize()| expects an array that does *not* include the empty zero entries. Remove
+  // this after we support zero-indexing.
   const VPartitionEntry* partitions = nullptr;
   size_t num_partitions = header.GetPartitionTableEntryCount();
   if (num_partitions <= 1) {
@@ -215,8 +215,8 @@ zx::result<Metadata> Metadata::Synthesize(const fvm::Header& header,
   size_t buffer_size = BytesNeeded(header);
   std::unique_ptr<uint8_t[]> buf(new uint8_t[buffer_size]);
 
-  // TODO(https://fxbug.dev/42138108) The first entries in the partition/slice tables must be unused.
-  // Remove this after we support zero-indexing.
+  // TODO(https://fxbug.dev/42138108) The first entries in the partition/slice tables must be
+  // unused. Remove this after we support zero-indexing.
   std::vector<VPartitionEntry> actual_partitions(0);
   if (num_partitions > 0) {
     ZX_ASSERT(partitions != nullptr);
@@ -236,11 +236,11 @@ zx::result<Metadata> Metadata::Synthesize(const fvm::Header& header,
     }
   }
 
-  const cpp20::span<const uint8_t> header_span = FixedSizeStructToSpan(header);
-  const cpp20::span<const uint8_t> partitions_span = ContainerToSpan(actual_partitions);
-  const cpp20::span<const uint8_t> slices_span = ContainerToSpan(actual_slices);
+  const std::span<const uint8_t> header_span = FixedSizeStructToSpan(header);
+  const std::span<const uint8_t> partitions_span = ContainerToSpan(actual_partitions);
+  const std::span<const uint8_t> slices_span = ContainerToSpan(actual_slices);
 
-  auto write_metadata = [&](size_t offset, size_t sz, const cpp20::span<const uint8_t>& span) {
+  auto write_metadata = [&](size_t offset, size_t sz, const std::span<const uint8_t>& span) {
     ZX_ASSERT(offset + sz <= buffer_size);
     ZX_ASSERT(sz >= span.size());
     if (!span.empty()) {

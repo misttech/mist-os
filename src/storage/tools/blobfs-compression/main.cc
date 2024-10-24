@@ -8,6 +8,7 @@
 
 #include <cstdio>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -98,7 +99,7 @@ zx_status_t MapFileForWriting(const fbl::unique_fd& fd, const char* file, size_t
 }
 
 // Mmaps the |fd| for reading, returning the mapping as a span.
-zx::result<cpp20::span<const uint8_t>> MapFileForReading(const fbl::unique_fd& fd) {
+zx::result<std::span<const uint8_t>> MapFileForReading(const fbl::unique_fd& fd) {
   struct stat info;
   if (fstat(fd.get(), &info) < 0) {
     fprintf(stderr, "fstat failed: %s\n", strerror(errno));
@@ -121,10 +122,10 @@ zx::result<cpp20::span<const uint8_t>> MapFileForReading(const fbl::unique_fd& f
     }
   }
 
-  return zx::ok(cpp20::span{static_cast<const uint8_t*>(data), size});
+  return zx::ok(std::span{static_cast<const uint8_t*>(data), size});
 }
 
-zx::result<> WriteDataToFile(const fbl::unique_fd& fd, cpp20::span<const uint8_t> data) {
+zx::result<> WriteDataToFile(const fbl::unique_fd& fd, std::span<const uint8_t> data) {
   size_t written_bytes = 0;
   ssize_t write_result = 0;
   while (written_bytes < data.size_bytes()) {

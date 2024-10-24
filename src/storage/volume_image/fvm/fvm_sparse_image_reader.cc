@@ -9,6 +9,7 @@
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
+#include <span>
 #include <string>
 
 #include "src/lib/digest/digest.h"
@@ -26,8 +27,8 @@ namespace {
 
 // Returns a byte view of a fixed size struct.
 template <typename T>
-cpp20::span<uint8_t> FixedSizeStructToSpan(T& typed_content) {
-  return cpp20::span<uint8_t>(reinterpret_cast<uint8_t*>(&typed_content), sizeof(T));
+std::span<uint8_t> FixedSizeStructToSpan(T& typed_content) {
+  return std::span<uint8_t>(reinterpret_cast<uint8_t*>(&typed_content), sizeof(T));
 }
 
 class DecompressionHelper {
@@ -35,7 +36,7 @@ class DecompressionHelper {
   DecompressionHelper(Reader& base_reader, uint64_t start_offset)
       : base_reader_(base_reader), compressed_offset_(start_offset) {
     ZX_ASSERT(decompressor_
-                  .Prepare([this](cpp20::span<const uint8_t> decompressed_data) {
+                  .Prepare([this](std::span<const uint8_t> decompressed_data) {
                     decompressed_buffer_.insert(decompressed_buffer_.end(),
                                                 decompressed_data.begin(), decompressed_data.end());
                     return fpromise::ok();
@@ -43,7 +44,7 @@ class DecompressionHelper {
                   .is_ok());
   }
 
-  fpromise::result<void, std::string> Read(uint64_t offset, cpp20::span<uint8_t> buffer) {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) {
     size_t some;
     for (size_t done = 0; done < buffer.size(); done += some, offset += some) {
       bool making_progress = true;
@@ -59,7 +60,7 @@ class DecompressionHelper {
               kBufferSize - current_size, base_reader_.length() - compressed_offset_));
           compressed_buffer_.resize(current_size + len);
           auto result = base_reader_.Read(
-              compressed_offset_, cpp20::span<uint8_t>(&compressed_buffer_[current_size], len));
+              compressed_offset_, std::span<uint8_t>(&compressed_buffer_[current_size], len));
           if (result.is_error()) {
             return result.take_error_result();
           }
@@ -67,7 +68,7 @@ class DecompressionHelper {
         }
         if (!compressed_buffer_.empty()) {
           const size_t old_size = decompressed_buffer_.size();
-          auto result = decompressor_.Decompress(cpp20::span<uint8_t>(compressed_buffer_));
+          auto result = decompressor_.Decompress(std::span<uint8_t>(compressed_buffer_));
           if (result.is_error()) {
             return result.take_error_result();
           }
@@ -123,7 +124,7 @@ class SparseImageReader : public Reader {
   uint64_t length() const override { return kMetadataOffset + metadata_.Get()->size(); }
 
   fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const override {
+                                           std::span<uint8_t> buffer) const override {
     if (IsMetadata(offset)) {
       size_t some = 0;
       const fvm::MetadataBuffer* raw_metadata = metadata_.Get();

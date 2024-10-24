@@ -6,7 +6,6 @@
 #define SRC_STORAGE_VOLUME_IMAGE_UTILS_BOUNDED_WRITER_H_
 
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <cstdint>
 #include <memory>
@@ -24,7 +23,7 @@ class BoundedWriter final : public Writer {
       : offset_(offset), length_(length), writer_(std::move(writer)) {}
 
   fpromise::result<void, std::string> Write(uint64_t offset,
-                                            cpp20::span<const uint8_t> buffer) final {
+                                            std::span<const uint8_t> buffer) final {
     if (offset + buffer.size() > length_) {
       return fpromise::error(
           "BoundedWriter::Write out of bounds. offset: " + std::to_string(offset) + " byte_cout: " +

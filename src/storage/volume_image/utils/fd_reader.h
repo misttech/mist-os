@@ -6,7 +6,6 @@
 #define SRC_STORAGE_VOLUME_IMAGE_UTILS_FD_READER_H_
 
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <string>
 #include <string_view>
@@ -41,8 +40,7 @@ class FdReader final : public Reader {
   // |buffer|.
   //
   // On error the returned result to contains a string describing the error.
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final;
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final;
 
   // Returns a unique identifier for this |FdReader|.
   std::string_view name() const { return name_; }

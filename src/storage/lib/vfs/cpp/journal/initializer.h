@@ -6,16 +6,16 @@
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_INITIALIZER_H_
 
 #include <inttypes.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/types.h>
 
 #include <functional>
+#include <span>
 
 namespace fs {
 
 // Writes |block_count| blocks worth of data in |buffer| at |block_offset| to backing data
 // store.
-using WriteBlocksFn = std::function<zx_status_t(cpp20::span<const uint8_t> buffer,
+using WriteBlocksFn = std::function<zx_status_t(std::span<const uint8_t> buffer,
                                                 uint64_t block_offset, uint64_t block_count)>;
 
 // Makes a journal that fits in |journal_blocks| by writing journal metadata using user supplied

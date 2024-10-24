@@ -6,8 +6,8 @@
 #define SRC_STORAGE_VOLUME_IMAGE_UTILS_WRITER_H_
 
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
+#include <span>
 #include <string>
 
 namespace storage::volume_image {
@@ -25,7 +25,7 @@ class Writer {
   //
   // On error the returned result to contains a string describing the error.
   virtual fpromise::result<void, std::string> Write(uint64_t offset,
-                                                    cpp20::span<const uint8_t> buffer) = 0;
+                                                    std::span<const uint8_t> buffer) = 0;
 };
 
 }  // namespace storage::volume_image

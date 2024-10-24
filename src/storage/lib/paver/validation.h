@@ -5,7 +5,6 @@
 #ifndef SRC_STORAGE_LIB_PAVER_VALIDATION_H_
 #define SRC_STORAGE_LIB_PAVER_VALIDATION_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -21,20 +20,20 @@ namespace paver {
 // On success, sets "header" to the header of the ZBI image, and
 // "payload" to the payload of the ZBI. Both are guaranteed to be
 // completed contained in "data".
-bool ExtractZbiPayload(cpp20::span<const uint8_t> data, const zbi_header_t** header,
-                       cpp20::span<const uint8_t>* payload);
+bool ExtractZbiPayload(std::span<const uint8_t> data, const zbi_header_t** header,
+                       std::span<const uint8_t>* payload);
 
 // Perform some basic safety checks to ensure the given payload is a valid ZBI
 // for the given architecture.
-bool IsValidKernelZbi(Arch arch, cpp20::span<const uint8_t> data);
+bool IsValidKernelZbi(Arch arch, std::span<const uint8_t> data);
 
 // Perform some basic safety checks to ensure the given payload is a valid Android image.
-bool IsValidAndroidKernel(cpp20::span<const uint8_t> data);
-bool IsValidAndroidVendorKernel(cpp20::span<const uint8_t> data);
+bool IsValidAndroidKernel(std::span<const uint8_t> data);
+bool IsValidAndroidVendorKernel(std::span<const uint8_t> data);
 
 // Perform some basic safety checks to ensure the given payload is a valid ChromeOS
 // kernel image.
-bool IsValidChromeOsKernel(cpp20::span<const uint8_t> data);
+bool IsValidChromeOsKernel(std::span<const uint8_t> data);
 
 }  // namespace paver
 

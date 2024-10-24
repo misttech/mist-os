@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -33,7 +34,7 @@ namespace {
 class MetadataBufferView final : public fvm::MetadataBuffer {
  public:
   MetadataBufferView() : data_(std::vector<uint8_t>()) {}
-  explicit MetadataBufferView(cpp20::span<uint8_t> data) : data_(data) {}
+  explicit MetadataBufferView(std::span<uint8_t> data) : data_(data) {}
 
   std::unique_ptr<MetadataBuffer> Create(size_t size) const final {
     auto view = std::make_unique<MetadataBufferView>();
@@ -50,20 +51,19 @@ class MetadataBufferView final : public fvm::MetadataBuffer {
   }
 
  private:
-  mutable std::variant<cpp20::span<uint8_t>, std::vector<uint8_t>> data_;
+  mutable std::variant<std::span<uint8_t>, std::vector<uint8_t>> data_;
 };
 
 class DelegateReader final : public Reader {
  public:
-  DelegateReader(fit::function<fpromise::result<void, std::string>(uint64_t, cpp20::span<uint8_t>)>
+  DelegateReader(fit::function<fpromise::result<void, std::string>(uint64_t, std::span<uint8_t>)>
                      delegate_reader,
                  uint64_t length)
       : delegate_(std::move(delegate_reader)), length_(length) {}
 
   uint64_t length() const final { return length_; }
 
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     if (offset + buffer.size() > length_) {
       return fpromise::error("DelegateReader::Read attempting to read out of bounds.");
     }
@@ -71,25 +71,24 @@ class DelegateReader final : public Reader {
   }
 
  private:
-  fit::function<fpromise::result<void, std::string>(uint64_t, cpp20::span<uint8_t>)> delegate_;
+  fit::function<fpromise::result<void, std::string>(uint64_t, std::span<uint8_t>)> delegate_;
   uint64_t length_ = 0;
 };
 
 class DelegateWriter final : public Writer {
  public:
   DelegateWriter(
-      fit::function<fpromise::result<void, std::string>(uint64_t, cpp20::span<const uint8_t>)>
+      fit::function<fpromise::result<void, std::string>(uint64_t, std::span<const uint8_t>)>
           delegate_reader)
       : delegate_(std::move(delegate_reader)) {}
 
   fpromise::result<void, std::string> Write(uint64_t offset,
-                                            cpp20::span<const uint8_t> buffer) final {
+                                            std::span<const uint8_t> buffer) final {
     return delegate_(offset, buffer);
   }
 
  private:
-  fit::function<fpromise::result<void, std::string>(uint64_t, cpp20::span<const uint8_t>)>
-      delegate_;
+  fit::function<fpromise::result<void, std::string>(uint64_t, std::span<const uint8_t>)> delegate_;
 };
 
 FvmOptions MakeOptions() {
@@ -106,8 +105,7 @@ using internal::MakeHeader;
 constexpr uint64_t kDefaultSliceCount{200};
 constexpr uint64_t kDefaultImageSize{UINT64_C(20) * (1 << 20)};
 
-void StreamContents(uint64_t offset, cpp20::span<const uint8_t> contents,
-                    cpp20::span<uint8_t> buffer) {
+void StreamContents(uint64_t offset, std::span<const uint8_t> contents, std::span<uint8_t> buffer) {
   uint64_t written_bytes = 0;
 
   while (written_bytes < buffer.size()) {
@@ -119,9 +117,9 @@ void StreamContents(uint64_t offset, cpp20::span<const uint8_t> contents,
   }
 }
 
-cpp20::span<const uint8_t> AsSpan(const fvm::Metadata& metadata) {
-  return cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(metadata.Get()->data()),
-                                    metadata.Get()->size());
+std::span<const uint8_t> AsSpan(const fvm::Metadata& metadata) {
+  return std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(metadata.Get()->data()),
+                                  metadata.Get()->size());
 }
 
 TEST(FvmImageExtendTest, BadFvmSuperblockIsError) {
@@ -147,7 +145,7 @@ TEST(FvmImageExtendTest, ValidHeaderWithBadMetadataIsError) {
       [&header](auto offset, auto buffer) {
         StreamContents(
             offset,
-            cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&header), sizeof(header)),
+            std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&header), sizeof(header)),
             buffer);
         return fpromise::ok();
       },
@@ -225,8 +223,7 @@ TEST(FvmImageExtendTest, ValidHeaderAndMetadataAndWriterErrorIsError) {
 
 fpromise::result<void, std::string> ValidFvmRead(const fvm::Metadata& metadata,
                                                  const FvmOptions& options, uint64_t image_size,
-                                                 uint64_t offset,
-                                                 cpp20::span<uint8_t> read_buffer) {
+                                                 uint64_t offset, std::span<uint8_t> read_buffer) {
   const auto& header = metadata.GetHeader();
   if (offset + read_buffer.size() > image_size) {
     return fpromise::error("ValidFvmRead out of bounds. Offset " + std::to_string(offset) +
@@ -275,8 +272,8 @@ fpromise::result<void, std::string> ValidFvmRead(const fvm::Metadata& metadata,
                          " Image Size: " + std::to_string(image_size));
 }
 
-void CheckMetadata(cpp20::span<const fvm::VPartitionEntry> partitions,
-                   cpp20::span<const fvm::SliceEntry> slices, const fvm::Metadata& metadata) {
+void CheckMetadata(std::span<const fvm::VPartitionEntry> partitions,
+                   std::span<const fvm::SliceEntry> slices, const fvm::Metadata& metadata) {
   for (uint64_t vpartition_index = 0; vpartition_index < partitions.size(); ++vpartition_index) {
     const auto& expected_vpartition = partitions[vpartition_index];
     const auto& actual_vpartition = metadata.GetPartitionEntry(vpartition_index + 1);
@@ -317,7 +314,7 @@ void CheckMetadata(cpp20::span<const fvm::VPartitionEntry> partitions,
 }
 
 void CheckSliceContents(uint64_t allocated_pslice_count, const FvmOptions& options,
-                        const fvm::Metadata& metadata, cpp20::span<const uint8_t> image_contents) {
+                        const fvm::Metadata& metadata, std::span<const uint8_t> image_contents) {
   // Check each slice content.
   std::vector<uint8_t> expected_slice;
   expected_slice.resize(options.slice_size, 0);
@@ -325,7 +322,7 @@ void CheckSliceContents(uint64_t allocated_pslice_count, const FvmOptions& optio
     uint64_t slice_offset = metadata.GetHeader().GetSliceDataOffset(pslice);
     uint8_t byte_value = static_cast<uint8_t>(pslice % std::numeric_limits<uint8_t>::max());
     auto actual_slice =
-        cpp20::span<const uint8_t>(image_contents).subspan(slice_offset, options.slice_size);
+        std::span<const uint8_t>(image_contents).subspan(slice_offset, options.slice_size);
 
     memset(expected_slice.data(), byte_value, expected_slice.size());
 
@@ -336,7 +333,7 @@ void CheckSliceContents(uint64_t allocated_pslice_count, const FvmOptions& optio
   }
 }
 
-fvm::Metadata MakeMetadata(const FvmOptions& options, cpp20::span<uint8_t> image) {
+fvm::Metadata MakeMetadata(const FvmOptions& options, std::span<uint8_t> image) {
   const auto new_header = MakeHeader(options, kDefaultSliceCount);
   auto primary_metadata = std::make_unique<MetadataBufferView>(
       image.subspan(new_header.GetSuperblockOffset(fvm::SuperblockType::kPrimary),
@@ -479,7 +476,7 @@ TEST(FvmImageGetTrimmedSizeTest, ValidHeaderWithBadMetadataIsError) {
       [&header](auto offset, auto buffer) {
         StreamContents(
             offset,
-            cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&header), sizeof(header)),
+            std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&header), sizeof(header)),
             buffer);
         return fpromise::ok();
       },
@@ -499,7 +496,7 @@ TEST(FvmImageGetTrimmedSizeTest, TrimmedValueWithNoAllocatedSlicesIsOk) {
   std::vector<fvm::VPartitionEntry> partitions = {MakePartitionEntry("partition-1-2-3", 0),
                                                   MakePartitionEntry("partition-2-3-4", 0)};
 
-  auto metadata_or = fvm::Metadata::Synthesize(header, partitions, cpp20::span<fvm::SliceEntry>());
+  auto metadata_or = fvm::Metadata::Synthesize(header, partitions, std::span<fvm::SliceEntry>());
   ASSERT_TRUE(metadata_or.is_ok()) << metadata_or.error_value();
 
   DelegateReader reader(
@@ -574,7 +571,7 @@ TEST(FvmImageGetSizeTest, ValidHeaderWithBadMetadataIsError) {
       [&header](auto offset, auto buffer) {
         StreamContents(
             offset,
-            cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&header), sizeof(header)),
+            std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&header), sizeof(header)),
             buffer);
         return fpromise::ok();
       },
@@ -594,7 +591,7 @@ TEST(FvmImageGetSize, ReturnsFvmPartitionSizeFromHeader) {
   std::vector<fvm::VPartitionEntry> partitions = {MakePartitionEntry("partition-1-2-3", 0),
                                                   MakePartitionEntry("partition-2-3-4", 0)};
 
-  auto metadata_or = fvm::Metadata::Synthesize(header, partitions, cpp20::span<fvm::SliceEntry>());
+  auto metadata_or = fvm::Metadata::Synthesize(header, partitions, std::span<fvm::SliceEntry>());
   ASSERT_TRUE(metadata_or.is_ok()) << metadata_or.error_value();
 
   DelegateReader reader(

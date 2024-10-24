@@ -5,13 +5,13 @@
 #ifndef SRC_STORAGE_BLOBFS_BLOB_LOADER_H_
 #define SRC_STORAGE_BLOBFS_BLOB_LOADER_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
 #include <cstdint>
 #include <memory>
+#include <span>
 
 #include <storage/buffer/resizeable_vmo_buffer.h>
 
@@ -77,8 +77,8 @@ class BlobLoader {
   // Reads |block_count| blocks starting at |block_offset| from the blob specified by |node_index|
   // and returns a span pointing to the data read (which will be contained within read_mapper_).
   // The span will remain valid until the next call to LoadBlocks or Decommit is called.
-  zx::result<cpp20::span<const uint8_t>> LoadBlocks(uint32_t node_index, uint64_t block_offset,
-                                                    uint64_t block_count);
+  zx::result<std::span<const uint8_t>> LoadBlocks(uint32_t node_index, uint64_t block_offset,
+                                                  uint64_t block_count);
 
   // Returns the block size used by blobfs.
   uint64_t GetBlockSize() const;

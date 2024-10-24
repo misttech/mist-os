@@ -71,7 +71,7 @@ class VmoWriter final : public Writer {
   }
 
   fpromise::result<void, std::string> Write(uint64_t offset,
-                                            cpp20::span<const uint8_t> buffer) final {
+                                            std::span<const uint8_t> buffer) final {
     if (offset + buffer.size() > vmo_size_) {
       auto result = zx::make_result(vmo_->set_size(offset + buffer.size()));
       if (result.is_error()) {
@@ -106,8 +106,7 @@ class VmoReader final : public Reader {
 
   uint64_t length() const final { return vmo_size_; }
 
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     auto result = zx::make_result(vmo_->read(buffer.data(), offset, buffer.size()));
     if (result.is_error()) {
       return fpromise::error(result.status_string());

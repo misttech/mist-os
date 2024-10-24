@@ -4,7 +4,6 @@
 
 #include "src/storage/fvm/metadata.h"
 
-#include <lib/stdcompat/span.h>
 #include <zircon/errors.h>
 
 #include <random>

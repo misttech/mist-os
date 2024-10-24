@@ -75,8 +75,7 @@ class FakeReader final : public Reader {
 
   uint64_t length() const override { return std::numeric_limits<uint64_t>::max(); }
 
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     return fpromise::ok();
   }
 };

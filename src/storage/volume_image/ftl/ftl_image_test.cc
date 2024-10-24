@@ -5,7 +5,6 @@
 #include "src/storage/volume_image/ftl/ftl_image.h"
 
 #include <lib/fit/function.h>
-#include <lib/stdcompat/span.h>
 #include <stdint.h>
 
 #include <iterator>
@@ -40,7 +39,7 @@ class FakeWriter final : public Writer {
   //
   // On error the returned result to contains a string describing the error.
   fpromise::result<void, std::string> Write(uint64_t offset,
-                                            cpp20::span<const uint8_t> buffer) final {
+                                            std::span<const uint8_t> buffer) final {
     if (offset > pages_.size()) {
       std::fill_n(std::back_inserter(pages_), offset - pages_.size(), -1);
     }
@@ -48,7 +47,7 @@ class FakeWriter final : public Writer {
     return fpromise::ok();
   }
 
-  cpp20::span<const uint8_t> pages() const { return pages_; }
+  std::span<const uint8_t> pages() const { return pages_; }
 
  private:
   std::vector<uint8_t> pages_;
@@ -58,8 +57,8 @@ class FakeWriter final : public Writer {
 };
 
 void VisitBlocksOnBuffer(
-    uint32_t block_size, uint64_t offset, cpp20::span<uint8_t> buffer,
-    fit::function<void(uint32_t block_number, cpp20::span<uint8_t> block_view)> visitor) {
+    uint32_t block_size, uint64_t offset, std::span<uint8_t> buffer,
+    fit::function<void(uint32_t block_number, std::span<uint8_t> block_view)> visitor) {
   uint64_t block_start = GetBlockFromBytes(offset, block_size);
   uint64_t block_count = GetBlockCount(offset, buffer.size(), block_size);
 
@@ -88,7 +87,7 @@ void VisitBlocksOnBuffer(
 // Will fill each block with a pattern based on the requested block number.
 class FakeReader final : public Reader {
  public:
-  static void FillBlock(uint64_t block_number, cpp20::span<uint8_t> buffer) {
+  static void FillBlock(uint64_t block_number, std::span<uint8_t> buffer) {
     uint8_t* bytes = reinterpret_cast<uint8_t*>(&block_number);
 
     for (size_t i = 0; i < buffer.size(); ++i) {
@@ -104,8 +103,7 @@ class FakeReader final : public Reader {
   // |buffer.size()|] to |buffer|.
   //
   // On error the returned result to contains a string describing the error.
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     VisitBlocksOnBuffer(block_size_, offset, buffer, FillBlock);
     return fpromise::ok();
   }
@@ -133,11 +131,11 @@ struct MapPage {
   std::vector<uint32_t> entries;
 };
 
-void CheckMapPage(const MapPage& expected_map_page, cpp20::span<const uint8_t> actual_contents,
+void CheckMapPage(const MapPage& expected_map_page, std::span<const uint8_t> actual_contents,
                   const RawNandOptions& options) {
   auto expected_map_page_contents =
-      cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(expected_map_page.entries.data()),
-                                 expected_map_page.entries.size() * sizeof(uint32_t));
+      std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(expected_map_page.entries.data()),
+                               expected_map_page.entries.size() * sizeof(uint32_t));
 
   std::vector<uint8_t> expected_oob(16, 0xFF);
   ftl_image_internal::WriteOutOfBandBytes<ftl_image_internal::PageType::kMapPage>(
@@ -155,7 +153,7 @@ void CheckMapPage(const MapPage& expected_map_page, cpp20::span<const uint8_t> a
 void CheckVolumePage(uint64_t source_offset, uint64_t target_offset, uint64_t length,
                      uint32_t logical_page_number, uint32_t physical_page_number,
                      const RawNandOptions& options, const Reader* reader,
-                     cpp20::span<const uint8_t> contents) {
+                     std::span<const uint8_t> contents) {
   std::vector<uint8_t> expected_page(options.page_size, 0xFF);
   std::vector<uint8_t> expected_oob(options.oob_bytes_size, 0xFF);
 
@@ -171,12 +169,12 @@ void CheckVolumePage(uint64_t source_offset, uint64_t target_offset, uint64_t le
 
   EXPECT_THAT(oob_view, testing::ElementsAreArray(expected_oob));
   ASSERT_THAT(page_view,
-              testing::ElementsAreArray(cpp20::span<uint8_t>(expected_page).subspan(0, length)));
+              testing::ElementsAreArray(std::span<uint8_t>(expected_page).subspan(0, length)));
 }
 
 void CheckVolumePagesInMapping(const AddressMap& mapping, const RawNandOptions& options,
                                uint32_t logical_page_start, uint32_t physical_page_start,
-                               const Reader* reader, cpp20::span<const uint8_t> contents) {
+                               const Reader* reader, std::span<const uint8_t> contents) {
   uint64_t read_bytes = 0;
   uint64_t page_count = GetBlockCount(mapping.target, mapping.count, options.page_size);
 
@@ -228,7 +226,7 @@ TEST(FtlImageTest, FtlImageWriteWithASinglePageAlignedMappingIsOk) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   ASSERT_THAT(writer.pages(), testing::SizeIs(written_content_size));
 
-  auto view = cpp20::span<const uint8_t>(writer.pages());
+  auto view = std::span<const uint8_t>(writer.pages());
 
   // Check volume page, which should be the first physical page written plus OOB size.
   CheckVolumePagesInMapping(partition.address().mappings[0], options, 8, 0, partition.reader(),
@@ -303,7 +301,7 @@ TEST(FtlImageTest, FtlImageWriteWithMultiplePageAlignedMappingIsOk) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   ASSERT_THAT(writer.pages(), testing::SizeIs(written_content_size));
 
-  auto view = cpp20::span<const uint8_t>(writer.pages());
+  auto view = std::span<const uint8_t>(writer.pages());
 
   // Check volume page, which should be the first physical page written plus OOB size.
   CheckVolumePagesInMapping(partition.address().mappings[0], options, 8, 0, partition.reader(),
@@ -362,7 +360,7 @@ TEST(FtlImageTest, FtlImageWriteWithMultipleAlignedMappingsIsOk) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   ASSERT_THAT(writer.pages(), testing::SizeIs(written_content_size));
 
-  auto view = cpp20::span<const uint8_t>(writer.pages());
+  auto view = std::span<const uint8_t>(writer.pages());
 
   // Check volume page, which should be the first physical page written plus OOB size.
   CheckVolumePagesInMapping(partition.address().mappings[0], options, 8, 0, partition.reader(),
@@ -423,7 +421,7 @@ TEST(FtlImageTest, FtlImageWriteWithASinglePageUnalignedMappingIsOk) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   ASSERT_THAT(writer.pages(), testing::SizeIs(written_content_size));
 
-  auto view = cpp20::span<const uint8_t>(writer.pages());
+  auto view = std::span<const uint8_t>(writer.pages());
 
   // Check volume page, which should be the first physical page written plus OOB size.
   CheckVolumePagesInMapping(partition.address().mappings[0], options, 8, 0, partition.reader(),
@@ -475,7 +473,7 @@ TEST(FtlImageTest, FtlImageWriteWithAMultiplePageUnalignedMappingIsOk) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   ASSERT_THAT(writer.pages(), testing::SizeIs(written_content_size));
 
-  auto view = cpp20::span<const uint8_t>(writer.pages());
+  auto view = std::span<const uint8_t>(writer.pages());
 
   // Check volume page, which should be the first physical page written plus OOB size.
   CheckVolumePagesInMapping(partition.address().mappings[0], options, 8, 0, partition.reader(),
@@ -534,7 +532,7 @@ TEST(FtlImageTest, FtlImageWriteWithAMultiplePageUnalignedAndMultipleMappingsIsO
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   ASSERT_THAT(writer.pages(), testing::SizeIs(written_content_size));
 
-  auto view = cpp20::span<const uint8_t>(writer.pages());
+  auto view = std::span<const uint8_t>(writer.pages());
 
   // Check volume page, which should be the first physical page written plus OOB size.
   CheckVolumePagesInMapping(partition.address().mappings[0], options, 8, 0, partition.reader(),
@@ -601,7 +599,7 @@ TEST(FtlImageTest, FtlImageWriteWithAMultiplePagesAndMultipleMappingsIsOk) {
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   ASSERT_THAT(writer.pages(), testing::SizeIs(written_content_size));
 
-  auto view = cpp20::span<const uint8_t>(writer.pages());
+  auto view = std::span<const uint8_t>(writer.pages());
 
   // Check volume page, which should be the first physical page written plus OOB size.
   CheckVolumePagesInMapping(partition.address().mappings[0], options, 8, 0, partition.reader(),
@@ -664,7 +662,7 @@ TEST(FtlImageTest, FtlImageWriteWithBiggerSizeThanMappingAndNoFillingHasNoEffect
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   ASSERT_THAT(writer.pages(), testing::SizeIs(written_content_size));
 
-  auto view = cpp20::span<const uint8_t>(writer.pages());
+  auto view = std::span<const uint8_t>(writer.pages());
 
   // Check volume page, which should be the first physical page written plus OOB size.
   CheckVolumePagesInMapping(partition.address().mappings[0], options, 8, 0, partition.reader(),
@@ -686,8 +684,7 @@ class ZeroReader final : public Reader {
  public:
   uint64_t length() const override { return std::numeric_limits<uint64_t>::max(); }
 
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     std::fill(buffer.begin(), buffer.end(), 0);
     return fpromise::ok();
   }
@@ -732,7 +729,7 @@ TEST(FtlImageTest, FtlImageWriteWithBiggerSizeThanMappingAndWithFillingMapsZeroe
   ASSERT_TRUE(write_result.is_ok()) << write_result.error();
   ASSERT_THAT(writer.pages(), testing::SizeIs(written_content_size));
 
-  auto view = cpp20::span<const uint8_t>(writer.pages());
+  auto view = std::span<const uint8_t>(writer.pages());
 
   // Check volume page, which should be the first physical page written plus OOB size.
   CheckVolumePagesInMapping(partition.address().mappings[0], options, 8, 0, partition.reader(),

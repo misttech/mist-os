@@ -8,11 +8,11 @@
 #ifndef SRC_STORAGE_BLOBFS_DELIVERY_BLOB_PRIVATE_H_
 #define SRC_STORAGE_BLOBFS_DELIVERY_BLOB_PRIVATE_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 
 #include "src/storage/blobfs/delivery_blob.h"
 
@@ -53,7 +53,7 @@ struct MetadataType1 {
                               bool is_compressed);
 
   /// Parse and return a `MetadataType1` from a byte `buffer` and a parsed `header`.
-  static zx::result<MetadataType1> FromBuffer(cpp20::span<const uint8_t> buffer,
+  static zx::result<MetadataType1> FromBuffer(std::span<const uint8_t> buffer,
                                               const blobfs::DeliveryBlobHeader& header);
 };
 

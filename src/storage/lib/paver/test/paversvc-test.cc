@@ -2494,9 +2494,8 @@ TEST_F(PaverServiceLuisTest, WriteSparseVolume) {
   ASSERT_OK(block_client->Read(block_read_vmo, image.image_length, kFvmBlockStart, 0));
 
   // Verify the written data against the unsparsed payload
-  cpp20::span<const uint8_t> raw_as_bytes = {
-      reinterpret_cast<const uint8_t*>(image.raw_data.data()),
-      image.raw_data.size() * sizeof(uint32_t)};
+  std::span<const uint8_t> raw_as_bytes = {reinterpret_cast<const uint8_t*>(image.raw_data.data()),
+                                           image.raw_data.size() * sizeof(uint32_t)};
   ASSERT_BYTES_EQ(block_read_vmo_mapper.start(), raw_as_bytes.data(), raw_as_bytes.size());
 }
 

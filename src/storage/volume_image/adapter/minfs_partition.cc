@@ -38,8 +38,7 @@ class PatchedSuperblockReader final : public Reader {
 
   uint64_t length() const final { return reader_->length(); }
 
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     if (auto read_result = reader_->Read(offset, buffer); read_result.is_error()) {
       return read_result.take_error_result();
     }
@@ -97,7 +96,7 @@ fpromise::result<Partition, std::string> CreateMinfsFvmPartition(
   minfs::Superblock superblock = {};
   if (auto sb_read_result = source_image->Read(
           0,
-          cpp20::span<uint8_t>(reinterpret_cast<uint8_t*>(&superblock), sizeof(minfs::Superblock)));
+          std::span<uint8_t>(reinterpret_cast<uint8_t*>(&superblock), sizeof(minfs::Superblock)));
       sb_read_result.is_error()) {
     return sb_read_result.take_error_result();
   }

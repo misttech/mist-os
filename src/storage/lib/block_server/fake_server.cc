@@ -4,6 +4,8 @@
 
 #include "src/storage/lib/block_server/fake_server.h"
 
+#include <span>
+
 namespace block_server {
 
 /// Implementation of Interface backed by a VMO.
@@ -28,7 +30,7 @@ class FakeServer::FakeInterface : public Interface {
   void OnNewSession(Session session) override {
     std::thread([session = std::move(session)]() mutable { session.Run(); }).detach();
   }
-  void OnRequests(Session& session, cpp20::span<const Request> requests) override {
+  void OnRequests(Session& session, std::span<const Request> requests) override {
     std::vector<uint8_t> buf;
     size_t len;
     for (const Request& request : requests) {

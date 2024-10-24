@@ -7,7 +7,6 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/array.h>
 #include <lib/fidl/cpp/wire/channel.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
@@ -18,6 +17,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <span>
 #include <utility>
 
 #include <fbl/array.h>
@@ -44,7 +44,7 @@ DeliveryBlobInfo GenerateBlob(uint64_t size) {
   memset(buf.get(), 0xAB, size);
   // Don't compress the blob. The BlobCreator protocol doesn't need to test writing compressed blobs
   // and compressing blobs makes it harder to reason about the size of payloads.
-  auto delivery_blob = GenerateDeliveryBlobType1(cpp20::span(buf.get(), size), /*compress=*/false);
+  auto delivery_blob = GenerateDeliveryBlobType1(std::span(buf.get(), size), /*compress=*/false);
   ZX_ASSERT(delivery_blob.is_ok());
   auto digest = CalculateDeliveryBlobDigest(*delivery_blob);
   ZX_ASSERT(digest.is_ok());

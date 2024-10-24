@@ -10,6 +10,7 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 
+#include <span>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -188,7 +189,7 @@ TEST(Service, OpeningServiceWithNodeReferenceFlag) {
   const fidl::WireResult result = fidl::WireCall(abc->client)->Query();
   ASSERT_EQ(result.status(), ZX_OK);
   const fidl::WireResponse response = result.value();
-  const cpp20::span data = response.protocol.get();
+  const std::span data = response.protocol.get();
   const std::string_view protocol{reinterpret_cast<const char*>(data.data()), data.size_bytes()};
   ASSERT_EQ(protocol, fio::wire::kNodeProtocolName);
 

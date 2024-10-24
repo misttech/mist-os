@@ -6,7 +6,6 @@
 #define SRC_STORAGE_LIB_BLOCK_SERVER_FAKE_SERVER_H_
 
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/vmo.h>
 
 #include <memory>

@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 
+#include <span>
 #include <unordered_set>
 
 #include <gtest/gtest.h>
@@ -50,7 +51,7 @@ class TestInterface : public Interface {
     }).detach();
   }
 
-  void OnRequests(Session& session, cpp20::span<const Request> requests) override {
+  void OnRequests(Session& session, std::span<const Request> requests) override {
     for (const Request& request : requests) {
       switch (request.operation.tag) {
         case Operation::Tag::Read:

@@ -5,7 +5,6 @@
 #ifndef SRC_STORAGE_BLOBFS_COMPRESSION_CHUNKED_H_
 #define SRC_STORAGE_BLOBFS_COMPRESSION_CHUNKED_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
@@ -13,6 +12,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 
 #include <fbl/macros.h>
 
@@ -88,7 +88,7 @@ class SeekableChunkedDecompressor : public SeekableDecompressor {
   DISALLOW_COPY_ASSIGN_AND_MOVE(SeekableChunkedDecompressor);
 
   // |max_compressed_size| is used for validation purposes only.
-  static zx_status_t CreateDecompressor(cpp20::span<const uint8_t> seek_table_data,
+  static zx_status_t CreateDecompressor(std::span<const uint8_t> seek_table_data,
                                         size_t max_compressed_size,
                                         std::unique_ptr<SeekableDecompressor>* out);
 

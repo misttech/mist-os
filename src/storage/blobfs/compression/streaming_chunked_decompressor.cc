@@ -5,7 +5,6 @@
 #include "src/storage/blobfs/compression/streaming_chunked_decompressor.h"
 
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
@@ -17,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <utility>
 
 #include <fbl/algorithm.h>
@@ -87,7 +87,7 @@ StreamingChunkedDecompressor::StreamingChunkedDecompressor(
       compression_buff_(std::move(compression_buff)),
       stream_callback_(std::move(stream_callback)) {}
 
-zx::result<> StreamingChunkedDecompressor::Update(cpp20::span<const uint8_t> data) {
+zx::result<> StreamingChunkedDecompressor::Update(std::span<const uint8_t> data) {
   if (compressed_bytes_ + data.size_bytes() > seek_table_.CompressedSize()) {
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }

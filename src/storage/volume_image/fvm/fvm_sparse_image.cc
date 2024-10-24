@@ -39,13 +39,13 @@ constexpr uint64_t kReadBufferSize = 4096;
 // Currently we are not endian safe, so we are no worst than before. If this matter,
 // this should be updated.
 template <typename T>
-cpp20::span<const uint8_t> FixedSizeStructToSpan(const T& typed_content) {
-  return cpp20::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&typed_content), sizeof(T));
+std::span<const uint8_t> FixedSizeStructToSpan(const T& typed_content) {
+  return std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(&typed_content), sizeof(T));
 }
 
 template <typename T>
-cpp20::span<uint8_t> FixedSizeStructToSpan(T& typed_content) {
-  return cpp20::span<uint8_t>(reinterpret_cast<uint8_t*>(&typed_content), sizeof(T));
+std::span<uint8_t> FixedSizeStructToSpan(T& typed_content) {
+  return std::span<uint8_t>(reinterpret_cast<uint8_t*>(&typed_content), sizeof(T));
 }
 
 class NoopCompressor final : public Compressor {
@@ -55,7 +55,7 @@ class NoopCompressor final : public Compressor {
     return fpromise::ok();
   }
 
-  fpromise::result<void, std::string> Compress(cpp20::span<const uint8_t> uncompressed_data) final {
+  fpromise::result<void, std::string> Compress(std::span<const uint8_t> uncompressed_data) final {
     handler_(uncompressed_data);
     return fpromise::ok();
   }
@@ -141,7 +141,7 @@ fpromise::result<uint64_t, std::string> FvmSparseWriteImageInternal(const FvmDes
       while (remaining_bytes > 0) {
         uint64_t bytes_to_read = std::min(kReadBufferSize, remaining_bytes);
         remaining_bytes -= bytes_to_read;
-        auto buffer_view = cpp20::span(data.data(), bytes_to_read);
+        auto buffer_view = std::span(data.data(), bytes_to_read);
 
         auto extent_data_read_result = reader->Read(read_offset, buffer_view);
         if (extent_data_read_result.is_error()) {
@@ -159,7 +159,7 @@ fpromise::result<uint64_t, std::string> FvmSparseWriteImageInternal(const FvmDes
       while (default_fill_remaining_bytes > 0) {
         uint64_t bytes_to_write = std::min(kReadBufferSize, default_fill_remaining_bytes);
         default_fill_remaining_bytes -= bytes_to_write;
-        auto buffer_view = cpp20::span(data.data(), bytes_to_write);
+        auto buffer_view = std::span(data.data(), bytes_to_write);
 
         auto compress_result = compressor->Compress(buffer_view);
         if (compress_result.is_error()) {
@@ -197,8 +197,7 @@ class SharedReader final : public Reader {
 
   uint64_t length() const final { return length_; }
 
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     if (offset + buffer.size() > length_) {
       return fpromise::error("SharedReader::Read out of bounds. Offset: " + std::to_string(offset) +
                              " Length: " + std::to_string(buffer.size()) +
@@ -516,7 +515,7 @@ fpromise::result<fvm::Header, std::string> ConvertToFvmHeader(
 }
 
 fpromise::result<fvm::Metadata, std::string> ConvertToFvmMetadata(
-    const fvm::Header& header, cpp20::span<const PartitionEntry> partition_entries) {
+    const fvm::Header& header, std::span<const PartitionEntry> partition_entries) {
   std::vector<fvm::VPartitionEntry> vpartition_entries;
   std::vector<fvm::SliceEntry> slice_entries;
 
@@ -618,8 +617,8 @@ fpromise::result<bool, std::string> FvmSparseDecompressImage(uint64_t offset, co
   auto decompressor = decompressor_or.take_value();
 
   auto write_decompressed =
-      [&accumulated_offset, &writer](
-          cpp20::span<const uint8_t> decompressed_data) -> fpromise::result<void, std::string> {
+      [&accumulated_offset,
+       &writer](std::span<const uint8_t> decompressed_data) -> fpromise::result<void, std::string> {
     auto write_result = writer.Write(accumulated_offset, decompressed_data);
     if (write_result.is_error()) {
       return write_result;
@@ -640,7 +639,7 @@ fpromise::result<bool, std::string> FvmSparseDecompressImage(uint64_t offset, co
   uint64_t read_offset = header_or.value().header_length;
   uint64_t last_hint = reader.length();
   while (read_offset < reader.length()) {
-    auto compressed_view = cpp20::span<uint8_t>(compressed_data);
+    auto compressed_view = std::span<uint8_t>(compressed_data);
 
     if (compressed_view.size() > reader.length() - read_offset) {
       compressed_view = compressed_view.subspan(0, reader.length() - read_offset);

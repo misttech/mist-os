@@ -71,7 +71,6 @@ static_library("blobfs") {
   public_deps = [
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
-    "//sdk/lib/stdcompat",
     "//src/lib/chunked-compression",
     "//src/lib/digest",
     "//src/storage/lib/vfs/cpp/journal",
@@ -82,7 +81,6 @@ static_library("blobfs") {
   ]
   deps = [
     "//sdk/lib/fit-promise",
-    "//sdk/lib/stdcompat",
     "//sdk/lib/syslog/cpp",
     "//src/lib/chunked-compression",
     "//src/lib/digest",

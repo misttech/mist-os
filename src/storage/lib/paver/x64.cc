@@ -262,7 +262,7 @@ zx::result<> EfiDevicePartitioner::WipePartitionTables() const {
 }
 
 zx::result<> EfiDevicePartitioner::ValidatePayload(const PartitionSpec& spec,
-                                                   cpp20::span<const uint8_t> data) const {
+                                                   std::span<const uint8_t> data) const {
   if (!SupportsPartition(spec)) {
     ERROR("Unsupported partition %s\n", spec.ToString().c_str());
     return zx::error(ZX_ERR_NOT_SUPPORTED);

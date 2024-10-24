@@ -6,7 +6,6 @@
 #define SRC_STORAGE_VOLUME_IMAGE_UTILS_BLOCK_WRITER_H_
 
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <string_view>
 #include <vector>
@@ -37,8 +36,7 @@ class BlockWriter final : public Writer {
   // |buffer.size()|] to |buffer|.
   //
   // On error the returned result to contains a string describing the error.
-  fpromise::result<void, std::string> Write(uint64_t offset,
-                                            cpp20::span<const uint8_t> buffer) final;
+  fpromise::result<void, std::string> Write(uint64_t offset, std::span<const uint8_t> buffer) final;
 
  private:
   // Used to define the block alignment of the resource.

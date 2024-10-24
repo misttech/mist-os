@@ -9,6 +9,7 @@
 #include <lib/zx/result.h>
 
 #include <memory>
+#include <span>
 
 #include "src/storage/lib/block_server/block_server_c.h"
 
@@ -87,7 +88,7 @@ class Interface {
 
   // Called when new requests arrive.  It is OK for this method to block so as to cause push back on
   // the fifo (which is recommended for effective flow control).
-  virtual void OnRequests(Session&, cpp20::span<const Request>) = 0;
+  virtual void OnRequests(Session&, std::span<const Request>) = 0;
 };
 
 class BlockServer {

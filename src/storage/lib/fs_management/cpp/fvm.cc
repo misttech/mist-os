@@ -21,7 +21,6 @@
 #include <lib/fdio/vfs.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fit/defer.h>
-#include <lib/stdcompat/string_view.h>
 #include <string.h>
 #include <unistd.h>
 #include <zircon/assert.h>
@@ -194,10 +193,10 @@ zx::result<bool> PartitionMatches(fidl::UnownedClientEnd<fuchsia_device::Control
       return zx::error(response.error_value());
     }
     std::string_view path = response.value()->path.get();
-    if (!matcher.parent_device.empty() && !cpp20::starts_with(path, matcher.parent_device)) {
+    if (!matcher.parent_device.empty() && !path.starts_with(matcher.parent_device)) {
       return zx::ok(false);
     }
-    if (!matcher.ignore_prefix.empty() && cpp20::starts_with(path, matcher.ignore_prefix)) {
+    if (!matcher.ignore_prefix.empty() && path.starts_with(matcher.ignore_prefix)) {
       return zx::ok(false);
     }
     if (!matcher.ignore_if_path_contains.empty() &&

@@ -59,7 +59,7 @@ AddressMap FromValue(const rapidjson::Value& value) {
 }  // namespace
 
 fpromise::result<AddressDescriptor, std::string> AddressDescriptor::Deserialize(
-    cpp20::span<const uint8_t> serialized) {
+    std::span<const uint8_t> serialized) {
   rapidjson::Document document;
   rapidjson::ParseResult result =
       document.Parse(reinterpret_cast<const char*>(serialized.data()), serialized.size());

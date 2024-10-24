@@ -6,7 +6,6 @@
 #define SRC_STORAGE_VOLUME_IMAGE_UTILS_LZ4_COMPRESSOR_H_
 
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <string>
 #include <vector>
@@ -50,8 +49,8 @@ class Lz4Compressor final : public Compressor {
   // If the returned buffer is empty, data has been buffered, and symbols will be
   // emitted as next call to |Compress|, or when |Finalize| is called.
   //
-  // On failure, returns a string decribing the error condition.
-  fpromise::result<void, std::string> Compress(cpp20::span<const uint8_t> uncompressed_data) final;
+  // On failure, returns a string describing the error condition.
+  fpromise::result<void, std::string> Compress(std::span<const uint8_t> uncompressed_data) final;
 
   // Returns |fpromise::ok| on success, returning a buffer containing the symbols of any buffered
   // data not emitted on last |Compress| call, and set of symbols marking the end of the

@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <zircon/syscalls-next.h>
 
+#include <span>
+
 #include "src/storage/f2fs/f2fs.h"
 
 namespace f2fs {
@@ -1228,14 +1230,14 @@ void VnodeF2fs::SetColdFile() {
   std::lock_guard lock(mutex_);
   const std::vector<std::string> &extension_list = superblock_info_.GetExtensionList();
   for (const auto &extension : extension_list) {
-    if (cpp20::ends_with(std::string_view(name_), std::string_view(extension))) {
+    if (std::string_view(name_).ends_with(std::string_view(extension))) {
       SetAdvise(FAdvise::kCold);
       break;
     }
     // compare upper case
     std::string upper_sub(extension);
     std::transform(upper_sub.cbegin(), upper_sub.cend(), upper_sub.begin(), ::toupper);
-    if (cpp20::ends_with(std::string_view(name_), std::string_view(upper_sub))) {
+    if (std::string_view(name_).ends_with(std::string_view(upper_sub))) {
       SetAdvise(FAdvise::kCold);
       break;
     }
@@ -1248,7 +1250,7 @@ bool VnodeF2fs::IsColdFile() {
 }
 
 zx_status_t VnodeF2fs::SetExtendedAttribute(XattrIndex index, std::string_view name,
-                                            cpp20::span<const uint8_t> value, XattrOption option) {
+                                            std::span<const uint8_t> value, XattrOption option) {
   if (name.empty()) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -1331,7 +1333,7 @@ zx_status_t VnodeF2fs::SetExtendedAttribute(XattrIndex index, std::string_view n
 }
 
 zx::result<size_t> VnodeF2fs::GetExtendedAttribute(XattrIndex index, std::string_view name,
-                                                   cpp20::span<uint8_t> out) {
+                                                   std::span<uint8_t> out) {
   if (name.empty()) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }

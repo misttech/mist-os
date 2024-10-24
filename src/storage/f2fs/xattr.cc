@@ -60,7 +60,7 @@ zx::result<uint32_t> XattrOperator::FindSlotOffset(XattrIndex index, std::string
 }
 
 zx_status_t XattrOperator::Add(XattrIndex index, std::string_view name,
-                               cpp20::span<const uint8_t> value) {
+                               std::span<const uint8_t> value) {
   uint32_t slot_offset = GetEndOffset();
   if (slot_offset >= available_slots_) {
     return ZX_ERR_NO_SPACE;
@@ -103,7 +103,7 @@ void XattrOperator::Remove(uint32_t offset) {
 }
 
 zx::result<size_t> XattrOperator::Lookup(XattrIndex index, std::string_view name,
-                                         cpp20::span<uint8_t> out) {
+                                         std::span<uint8_t> out) {
   zx::result<uint32_t> offset_or = FindSlotOffset(index, name);
   if (offset_or.is_error()) {
     return offset_or.take_error();

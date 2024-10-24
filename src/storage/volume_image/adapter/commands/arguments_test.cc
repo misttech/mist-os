@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/stdcompat/array.h>
-
 #include <array>
 #include <cstdint>
+#include <span>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -173,8 +172,7 @@ TEST(ArgumentTest, CreateParamsFromArgsIsOk) {
   };
 
   {
-    auto params_or =
-        CreateParams::FromArguments(cpp20::span<std::string_view>(kArgs).subspan(0, 19));
+    auto params_or = CreateParams::FromArguments(std::span<std::string_view>(kArgs).subspan(0, 19));
     auto params = params_or.take_value();
     EXPECT_EQ(params.fvm_options.compression.schema, CompressionSchema::kNone);
   }
@@ -237,8 +235,7 @@ TEST(ArgumentTest, CreateParamsFromArgsIsOk) {
   }
 
   {
-    auto params_or =
-        CreateParams::FromArguments(cpp20::span<std::string_view>(kArgs).subspan(0, 19));
+    auto params_or = CreateParams::FromArguments(std::span<std::string_view>(kArgs).subspan(0, 19));
     ASSERT_TRUE(params_or.is_ok()) << params_or.error();
     auto params = params_or.take_value();
     EXPECT_EQ(params.fvm_options.compression.schema, CompressionSchema::kNone);
@@ -411,7 +408,7 @@ TEST(ArgumentTest, PaveParamsFromArgsWithDiskTypeIsOk) {
 }
 
 TEST(ArgumentTest, ExtendParamsFromArgsIsOk) {
-  auto kArgs = cpp20::to_array<std::string_view>({
+  auto kArgs = std::to_array<std::string_view>({
       "fvm",
       "test_fvm.sparse.blk",
       "extend",
@@ -433,7 +430,7 @@ TEST(ArgumentTest, ExtendParamsFromArgsIsOk) {
   }
 
   {
-    auto args_without_trim = cpp20::span<std::string_view>(kArgs).subspan(0, kArgs.size() - 1);
+    auto args_without_trim = std::span<std::string_view>(kArgs).subspan(0, kArgs.size() - 1);
     auto params_or = ExtendParams::FromArguments(args_without_trim);
     ASSERT_TRUE(params_or.is_ok()) << params_or.error();
     auto params = params_or.take_value();
@@ -445,8 +442,7 @@ TEST(ArgumentTest, ExtendParamsFromArgsIsOk) {
   }
 
   {
-    auto args_without_trim_or_fit =
-        cpp20::span<std::string_view>(kArgs).subspan(0, kArgs.size() - 2);
+    auto args_without_trim_or_fit = std::span<std::string_view>(kArgs).subspan(0, kArgs.size() - 2);
     auto params_or = ExtendParams::FromArguments(args_without_trim_or_fit);
     ASSERT_TRUE(params_or.is_ok()) << params_or.error();
     auto params = params_or.take_value();
@@ -459,7 +455,7 @@ TEST(ArgumentTest, ExtendParamsFromArgsIsOk) {
 }
 
 TEST(ArgumentTest, SizeParamsFromArgsIsOk) {
-  auto kArgs = cpp20::to_array<std::string_view>({
+  auto kArgs = std::to_array<std::string_view>({
       "fvm",
       "test_fvm.sparse.blk",
       "size",
@@ -477,7 +473,7 @@ TEST(ArgumentTest, SizeParamsFromArgsIsOk) {
   }
 
   {
-    auto args_without_disk = cpp20::span<std::string_view>(kArgs).subspan(0, kArgs.size() - 2);
+    auto args_without_disk = std::span<std::string_view>(kArgs).subspan(0, kArgs.size() - 2);
     auto params_or = SizeParams::FromArguments(args_without_disk);
     ASSERT_TRUE(params_or.is_ok()) << params_or.error();
     auto params = params_or.take_value();

@@ -4,7 +4,6 @@
 
 #include "src/storage/blobfs/allocator/host_allocator.h"
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -23,12 +22,12 @@
 
 namespace blobfs {
 
-HostAllocator::HostAllocator(RawBitmap block_bitmap, cpp20::span<Inode> node_map,
+HostAllocator::HostAllocator(RawBitmap block_bitmap, std::span<Inode> node_map,
                              std::unique_ptr<id_allocator::IdAllocator> node_bitmap)
     : BaseAllocator(std::move(block_bitmap), std::move(node_bitmap)), node_map_(node_map) {}
 
 zx::result<std::unique_ptr<HostAllocator>> HostAllocator::Create(RawBitmap block_bitmap,
-                                                                 cpp20::span<Inode> node_map) {
+                                                                 std::span<Inode> node_map) {
   std::unique_ptr<id_allocator::IdAllocator> node_bitmap;
   if (zx_status_t status = id_allocator::IdAllocator::Create(node_map.size(), &node_bitmap);
       status != ZX_OK) {

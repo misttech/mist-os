@@ -136,7 +136,7 @@ TEST(VmofileTests, test_vmofile_basic) {
     const fidl::WireResult result = fidl::WireCall(file)->Query();
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
-    const cpp20::span data = response.protocol.get();
+    const std::span data = response.protocol.get();
     const std::string_view protocol{reinterpret_cast<const char*>(data.data()), data.size_bytes()};
     ASSERT_EQ(protocol, fio::wire::kFileProtocolName);
   }
@@ -223,7 +223,7 @@ TEST(VmofileTests, test_vmofile_exec) {
     const fidl::WireResult result = fidl::WireCall(file)->Query();
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
-    const cpp20::span data = response.protocol.get();
+    const std::span data = response.protocol.get();
     const std::string_view protocol{reinterpret_cast<const char*>(data.data()), data.size_bytes()};
     ASSERT_EQ(protocol, fio::wire::kFileProtocolName);
   }

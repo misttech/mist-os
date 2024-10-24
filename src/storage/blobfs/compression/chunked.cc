@@ -4,7 +4,6 @@
 
 #include "src/storage/blobfs/compression/chunked.h"
 
-#include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
@@ -16,6 +15,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <utility>
 
 #include "src/lib/chunked-compression/chunked-archive.h"
@@ -135,7 +135,7 @@ SeekableChunkedDecompressor::SeekableChunkedDecompressor(
     : seek_table_(std::move(seek_table)) {}
 
 zx_status_t SeekableChunkedDecompressor::CreateDecompressor(
-    cpp20::span<const uint8_t> seek_table_data, size_t max_compressed_size,
+    std::span<const uint8_t> seek_table_data, size_t max_compressed_size,
     std::unique_ptr<SeekableDecompressor>* out) {
   auto seek_table = std::make_unique<chunked_compression::SeekTable>();
   chunked_compression::HeaderReader reader;

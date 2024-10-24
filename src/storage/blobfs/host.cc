@@ -6,7 +6,6 @@
 
 #include <fcntl.h>
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <stdio.h>
@@ -24,6 +23,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -118,7 +118,7 @@ zx::result<> WriteBlock(int fd, uint64_t block_number, const void* data) {
 }
 
 struct MerkleTreeInfo {
-  static zx::result<MerkleTreeInfo> Create(cpp20::span<const uint8_t> data,
+  static zx::result<MerkleTreeInfo> Create(std::span<const uint8_t> data,
                                            BlobLayoutFormat blob_layout_format) {
     MerkleTreeCreator mtc;
     mtc.SetUseCompactFormat(blob_layout_format == BlobLayoutFormat::kCompactMerkleTreeAtEnd);
@@ -249,7 +249,7 @@ zx::result<BlobInfo> BlobInfo::CreateCompressed(
     return blob_info;
   }
 
-  cpp20::span<const uint8_t> data = blob_info->GetData();
+  std::span<const uint8_t> data = blob_info->GetData();
   if (data.size() <= kCompressionSizeThresholdBytes) {
     // The blob is already small and compressing wouldn't save any space, leave the blob
     // uncompressed.
@@ -289,7 +289,7 @@ zx::result<BlobInfo> BlobInfo::CreateUncompressed(int fd, BlobLayoutFormat blob_
     return file_mapping.take_error();
   }
 
-  cpp20::span<const uint8_t> data = file_mapping->data();
+  std::span<const uint8_t> data = file_mapping->data();
   zx::result<MerkleTreeInfo> merkle_tree_info = MerkleTreeInfo::Create(data, blob_layout_format);
   if (merkle_tree_info.is_error()) {
     return merkle_tree_info.take_error();
@@ -349,7 +349,7 @@ int Mkfs(int fd, uint64_t block_count, const FilesystemOptions& options) {
 
   // All in-memory structures have been created successfully. Dump everything to disk.
   // Initialize on-disk journal.
-  fs::WriteBlocksFn write_blocks_fn = [fd, &info](cpp20::span<const uint8_t> buffer,
+  fs::WriteBlocksFn write_blocks_fn = [fd, &info](std::span<const uint8_t> buffer,
                                                   uint64_t block_offset, uint64_t block_count) {
     ZX_ASSERT((block_offset + block_count) <= JournalBlocks(info));
     ZX_ASSERT(buffer.size() >= (block_count * kBlobfsBlockSize));
@@ -558,7 +558,7 @@ zx::result<std::unique_ptr<Blobfs>> Blobfs::Create(fbl::unique_fd blockfd_, off_
   }
 
   auto host_allocator =
-      HostAllocator::Create(std::move(block_bitmap).value(), cpp20::span<Inode>(fs->node_map_));
+      HostAllocator::Create(std::move(block_bitmap).value(), std::span<Inode>(fs->node_map_));
   if (host_allocator.is_error()) {
     return host_allocator.take_error();
   }
@@ -741,12 +741,12 @@ zx::result<> Blobfs::WriteData(const BlobInfo& blob_info,
 
   // Copy the data to the buffer.
   uint64_t data_offset = block_size * blob_layout.DataBlockOffset();
-  cpp20::span<const uint8_t> data = blob_info.GetData();
+  std::span<const uint8_t> data = blob_info.GetData();
   memcpy(buf.get() + data_offset, data.data(), data.size());
 
   // |merkle_data| will be null when the blob size is less than or equal to the Merkle tree node
   // size.
-  cpp20::span<const uint8_t> merkle_tree = blob_info.GetMerkleTree();
+  std::span<const uint8_t> merkle_tree = blob_info.GetMerkleTree();
   if (!merkle_tree.empty()) {
     // Copy the Merkle tree to the buffer.
     uint64_t merkle_offset = block_size * blob_layout.MerkleTreeBlockOffset() +
@@ -946,7 +946,7 @@ fpromise::result<void, std::string> Blobfs::VisitBlobs(BlobVisitor visitor) {
       return load_result.take_error_result();
     }
     BlobView view = {
-        .merkle_hash = cpp20::span<const uint8_t>(inode->merkle_root_hash),
+        .merkle_hash = std::span<const uint8_t>(inode->merkle_root_hash),
         .blob_contents = load_result.value(),
     };
 

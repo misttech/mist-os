@@ -6,7 +6,6 @@
 
 #include <inttypes.h>
 #include <lib/cksum.h>
-#include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -19,6 +18,7 @@
 #include <iomanip>
 #include <limits>
 #include <memory>
+#include <span>
 #include <utility>
 
 #include <bitmap/raw-bitmap.h>
@@ -1582,7 +1582,7 @@ zx::result<> Mkfs(const MountOptions& options, Bcache* bc) {
     (void)bc->Writeblk(kFvmSuperblockBackup, &info);
   }
 
-  fs::WriteBlocksFn write_blocks_fn = [bc, info](cpp20::span<const uint8_t> buffer,
+  fs::WriteBlocksFn write_blocks_fn = [bc, info](std::span<const uint8_t> buffer,
                                                  uint64_t block_offset, uint64_t block_count) {
     ZX_ASSERT((block_count + block_offset) <= JournalBlocks(info));
     ZX_ASSERT(buffer.size() >= (block_count * info.BlockSize()));

@@ -5,7 +5,6 @@
 #include "src/storage/blobfs/blob_loader.h"
 
 #include <lib/fit/defer.h>
-#include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -19,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -197,7 +197,7 @@ zx_status_t BlobLoader::InitForDecompression(
     return ZX_ERR_BAD_STATE;
   }
 
-  cpp20::span<const uint8_t> bytes;
+  std::span<const uint8_t> bytes;
   if (auto bytes_or = LoadBlocks(node_index, blob_layout.DataBlockOffset(), blocks_to_read);
       bytes_or.is_error()) {
     FX_LOGS(ERROR) << "Failed to load compression header: " << bytes_or.status_string();
@@ -222,9 +222,9 @@ zx_status_t BlobLoader::InitForDecompression(
   return ZX_OK;
 }
 
-zx::result<cpp20::span<const uint8_t>> BlobLoader::LoadBlocks(uint32_t node_index,
-                                                              uint64_t block_offset,
-                                                              uint64_t block_count) {
+zx::result<std::span<const uint8_t>> BlobLoader::LoadBlocks(uint32_t node_index,
+                                                            uint64_t block_offset,
+                                                            uint64_t block_count) {
   TRACE_DURATION("blobfs", "BlobLoader::LoadBlocks", "block_count", block_count);
 
   if (block_count > read_mapper_.capacity()) {
@@ -270,7 +270,7 @@ zx::result<cpp20::span<const uint8_t>> BlobLoader::LoadBlocks(uint32_t node_inde
   }
 
   return zx::ok(
-      cpp20::span(static_cast<const uint8_t*>(read_mapper_.Data(0)), block_count * GetBlockSize()));
+      std::span(static_cast<const uint8_t*>(read_mapper_.Data(0)), block_count * GetBlockSize()));
 }
 
 uint64_t BlobLoader::GetBlockSize() const { return txn_manager_->Info().block_size; }
