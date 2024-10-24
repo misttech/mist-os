@@ -39,44 +39,33 @@ pub fn validate_fidl_table(input: proc_macro::TokenStream) -> proc_macro::TokenS
     }
 }
 
-fn metas<'a>(attrs: &'a [Attribute]) -> impl Iterator<Item = Meta> + 'a {
-    attrs.iter().filter_map(|a| match a.parse_meta() {
-        Ok(meta) => Some(meta),
-        Err(_) => None,
-    })
-}
-
-fn list_with_arg(meta: Meta, call: &str) -> Option<NestedMeta> {
-    match meta {
-        Meta::List(list) => {
-            if list.path.is_ident(call) && list.nested.len() == 1 {
-                Some(list.nested.into_pairs().next().unwrap().into_value())
-            } else {
-                None
-            }
-        }
-        _ => None,
-    }
-}
-
-fn unique_list_with_arg(attrs: &[Attribute], call: &str) -> Result<Option<NestedMeta>> {
-    let metas = metas(attrs);
-    let mut lists_with_arg: Vec<NestedMeta> =
-        metas.filter_map(|meta| list_with_arg(meta, call)).collect();
-    if lists_with_arg.len() > 1 {
+fn unique_list_with_arg(attrs: &[Attribute], call: &str) -> Result<Option<Meta>> {
+    let mut attrs = attrs.iter().filter(|attr| attr.path().is_ident(call));
+    let attr = match attrs.next() {
+        Some(attr) => attr,
+        None => return Ok(None),
+    };
+    if let Some(attr) = attrs.next() {
         return Err(Error::new(
-            lists_with_arg[1].span(),
+            attr.span(),
             &format!("The {} attribute should only be declared once.", call),
         ));
     }
+    let mut nested = attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+    if nested.len() > 1 {
+        return Err(Error::new(
+            attr.span(),
+            &format!("The {} attribute only expects one argument", call),
+        ));
+    }
 
-    Ok(lists_with_arg.pop())
+    return Ok(nested.pop().map(|pair| pair.into_value()));
 }
 
 fn fidl_table_path(span: Span, attrs: &[Attribute]) -> Result<Path> {
     match unique_list_with_arg(attrs, "fidl_table_src")? {
-        Some(nested) => match nested {
-            NestedMeta::Meta(Meta::Path(fidl_table_path)) => Ok(fidl_table_path),
+        Some(meta) => match meta {
+            Meta::Path(fidl_table_path) => Ok(fidl_table_path),
             _ => Err(Error::new(
                 span,
                 concat!(
@@ -98,8 +87,8 @@ fn fidl_table_path(span: Span, attrs: &[Attribute]) -> Result<Path> {
 
 fn fidl_table_validator(span: Span, attrs: &[Attribute]) -> Result<Option<Ident>> {
     unique_list_with_arg(attrs, "fidl_table_validator")?
-        .map(|nested| match nested {
-            NestedMeta::Meta(Meta::Path(fidl_table_validator)) => fidl_table_validator
+        .map(|meta| match meta {
+            Meta::Path(fidl_table_validator) => fidl_table_validator
                 .get_ident()
                 .cloned()
                 .ok_or(Error::new(fidl_table_validator.span(), "Invalid Identifier")),
@@ -268,7 +257,7 @@ impl TryFrom<(Span, &[Attribute])> for FidlFieldKind {
     type Error = Error;
     fn try_from((span, attrs): (Span, &[Attribute])) -> Result<Self> {
         if let Some(kind) = match unique_list_with_arg(attrs, "fidl_field_type")? {
-            Some(NestedMeta::Meta(Meta::Path(field_type))) => {
+            Some(Meta::Path(field_type)) => {
                 field_type.get_ident().and_then(|i| match i.to_string().as_str() {
                     "required" => Some(FidlFieldKind::Required),
                     "optional" => Some(FidlFieldKind::Optional),
@@ -276,10 +265,12 @@ impl TryFrom<(Span, &[Attribute])> for FidlFieldKind {
                     _ => None,
                 })
             }
-            Some(NestedMeta::Meta(Meta::NameValue(ref default_value)))
-                if default_value.path.is_ident("default") =>
-            {
-                Some(FidlFieldKind::HasDefault(default_value.lit.clone()))
+            Some(Meta::NameValue(ref default_value)) if default_value.path.is_ident("default") => {
+                if let Expr::Lit(ExprLit { ref lit, .. }) = default_value.value {
+                    Some(FidlFieldKind::HasDefault(lit.clone()))
+                } else {
+                    return Err(Error::new(default_value.span(), "expected literal value"));
+                }
             }
             _ => None,
         } {
@@ -288,7 +279,7 @@ impl TryFrom<(Span, &[Attribute])> for FidlFieldKind {
 
         let error = Err(Error::new(span, INVALID_FIDL_FIELD_ATTRIBUTE_MSG));
         match unique_list_with_arg(attrs, "fidl_field_with_default")? {
-            Some(NestedMeta::Meta(Meta::Path(field_type))) => match field_type.get_ident() {
+            Some(Meta::Path(field_type)) => match field_type.get_ident() {
                 Some(ident) => Ok(FidlFieldKind::ExprDefault(ident.clone())),
                 _ => error,
             },
