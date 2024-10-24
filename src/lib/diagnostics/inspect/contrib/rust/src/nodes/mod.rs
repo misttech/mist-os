@@ -15,6 +15,23 @@ pub use zx::{BootTimeline, MonotonicTimeline};
 
 use fuchsia_inspect::{InspectType, IntProperty, Node, Property, StringReference};
 
+/// Implemented by timelines for which we can get the current time.
+pub trait GetCurrentTime: zx::Timeline + Sized {
+    fn get_current_time() -> zx::Instant<Self>;
+}
+
+impl GetCurrentTime for zx::MonotonicTimeline {
+    fn get_current_time() -> zx::MonotonicInstant {
+        zx::MonotonicInstant::get()
+    }
+}
+
+impl GetCurrentTime for zx::BootTimeline {
+    fn get_current_time() -> zx::BootInstant {
+        zx::BootInstant::get()
+    }
+}
+
 /// Returned by functions which take the current time and write it to a property.
 pub struct CreateTimeResult<T> {
     /// The time written to the property.
@@ -41,52 +58,28 @@ pub trait NodeTimeExt<T: zx::Timeline> {
     fn record_time(&self, name: impl Into<StringReference>) -> zx::Instant<T>;
 }
 
-impl NodeTimeExt<zx::MonotonicTimeline> for Node {
-    fn create_time(
-        &self,
-        name: impl Into<StringReference>,
-    ) -> CreateTimeResult<zx::MonotonicTimeline> {
-        let timestamp = zx::MonotonicInstant::get();
+impl<T> NodeTimeExt<T> for Node
+where
+    T: zx::Timeline + GetCurrentTime,
+{
+    fn create_time(&self, name: impl Into<StringReference>) -> CreateTimeResult<T> {
+        let timestamp = T::get_current_time();
         CreateTimeResult { timestamp, property: self.create_time_at(name, timestamp) }
     }
 
     fn create_time_at(
         &self,
         name: impl Into<StringReference>,
-        timestamp: zx::MonotonicInstant,
-    ) -> TimeProperty<zx::MonotonicTimeline> {
+        timestamp: zx::Instant<T>,
+    ) -> TimeProperty<T> {
         TimeProperty {
             inner: self.create_int(name, timestamp.into_nanos()),
             _phantom: marker::PhantomData,
         }
     }
 
-    fn record_time(&self, name: impl Into<StringReference>) -> zx::MonotonicInstant {
-        let instant = zx::MonotonicInstant::get();
-        self.record_int(name, instant.into_nanos());
-        instant
-    }
-}
-
-impl NodeTimeExt<zx::BootTimeline> for Node {
-    fn create_time(&self, name: impl Into<StringReference>) -> CreateTimeResult<zx::BootTimeline> {
-        let timestamp = zx::BootInstant::get();
-        CreateTimeResult { timestamp, property: self.create_time_at(name, timestamp) }
-    }
-
-    fn create_time_at(
-        &self,
-        name: impl Into<StringReference>,
-        timestamp: zx::BootInstant,
-    ) -> TimeProperty<zx::BootTimeline> {
-        TimeProperty {
-            inner: self.create_int(name, timestamp.into_nanos()),
-            _phantom: marker::PhantomData,
-        }
-    }
-
-    fn record_time(&self, name: impl Into<StringReference>) -> zx::BootInstant {
-        let instant = zx::BootInstant::get();
+    fn record_time(&self, name: impl Into<StringReference>) -> zx::Instant<T> {
+        let instant = T::get_current_time();
         self.record_int(name, instant.into_nanos());
         instant
     }
@@ -99,26 +92,17 @@ pub struct TimeProperty<T> {
     _phantom: marker::PhantomData<T>,
 }
 
-impl TimeProperty<zx::MonotonicTimeline> {
+impl<T> TimeProperty<T>
+where
+    T: zx::Timeline + GetCurrentTime,
+{
     /// Updates the underlying property with the current monotonic timestamp.
     pub fn update(&self) {
-        self.set_at(zx::MonotonicInstant::get());
+        self.set_at(T::get_current_time());
     }
 
     /// Updates the underlying property with the given timestamp.
-    pub fn set_at(&self, timestamp: zx::MonotonicInstant) {
-        Property::set(&self.inner, timestamp.into_nanos());
-    }
-}
-
-impl TimeProperty<zx::BootTimeline> {
-    /// Updates the underlying property with the current monotonic timestamp.
-    pub fn update(&self) {
-        self.set_at(zx::BootInstant::get());
-    }
-
-    /// Updates the underlying property with the given timestamp.
-    pub fn set_at(&self, timestamp: zx::BootInstant) {
+    pub fn set_at(&self, timestamp: zx::Instant<T>) {
         Property::set(&self.inner, timestamp.into_nanos());
     }
 }
