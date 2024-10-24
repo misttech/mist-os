@@ -24,6 +24,7 @@ rustc_test("test") {
     "//sdk/fidl/fuchsia.sensors.types:fuchsia.sensors.types_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/sensors/tests/testing/realm-factory/fidl:fuchsia.sensors.realm_rust",
     "//src/testing/realm_client/rust",
