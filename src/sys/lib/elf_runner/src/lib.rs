@@ -724,10 +724,10 @@ mod tests {
         ))
     }
 
-    fn namespace_entry(path: &str, flags: fio::OpenFlags) -> fcrunner::ComponentNamespaceEntry {
+    fn namespace_entry(path: &str, flags: fio::Flags) -> fcrunner::ComponentNamespaceEntry {
         // Get a handle to /pkg
         let ns_path = path.to_string();
-        let ns_dir = fuchsia_fs::directory::open_in_namespace_deprecated(path, flags).unwrap();
+        let ns_dir = fuchsia_fs::directory::open_in_namespace(path, flags).unwrap();
         // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
         let client_end = ClientEnd::new(
             ns_dir.into_channel().expect("could not convert proxy to channel").into_zx_channel(),
@@ -740,11 +740,11 @@ mod tests {
     }
 
     fn pkg_dir_namespace_entry() -> fcrunner::ComponentNamespaceEntry {
-        namespace_entry("/pkg", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE)
+        namespace_entry("/pkg", fio::PERM_READABLE | fio::PERM_EXECUTABLE)
     }
 
     fn svc_dir_namespace_entry() -> fcrunner::ComponentNamespaceEntry {
-        namespace_entry("/svc", fio::OpenFlags::RIGHT_READABLE)
+        namespace_entry("/svc", fio::PERM_READABLE)
     }
 
     fn hello_world_startinfo(
@@ -885,12 +885,9 @@ mod tests {
     // TODO(https://fxbug.dev/42073224): A variation of this is used in a couple of places. We should consider
     // refactoring this into a test util file.
     async fn read_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str) -> String {
-        let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
-            &root_proxy,
-            path,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )
-        .expect("Failed to open file.");
+        let file_proxy =
+            fuchsia_fs::directory::open_file_async(&root_proxy, path, fuchsia_fs::PERM_READABLE)
+                .expect("Failed to open file.");
         let res = fuchsia_fs::file::read_to_string(&file_proxy).await;
         res.expect("Unable to read file.")
     }

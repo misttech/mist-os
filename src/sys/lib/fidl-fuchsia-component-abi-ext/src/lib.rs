@@ -47,9 +47,7 @@ async fn read_abi_revision(
     dir: &fio::DirectoryProxy,
     path: &str,
 ) -> Result<AbiRevision, AbiRevisionFileError> {
-    let file =
-        fuchsia_fs::directory::open_file_deprecated(&dir, path, fio::OpenFlags::RIGHT_READABLE)
-            .await?;
+    let file = fuchsia_fs::directory::open_file(&dir, path, fio::Flags::PERM_READ).await?;
     let bytes: [u8; 8] = fuchsia_fs::file::read(&file)
         .await?
         .try_into()
@@ -60,7 +58,7 @@ async fn read_abi_revision(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fuchsia_fs::directory::open_in_namespace_deprecated;
+    use fuchsia_fs::directory::open_in_namespace;
     use std::sync::Arc;
     use vfs::directory::entry_container::Directory;
     use vfs::file::vmo::read_only;
@@ -137,11 +135,7 @@ mod tests {
     // Read this test package's ABI revision.
     #[fuchsia::test]
     async fn read_test_pkg_abi_revision() -> Result<(), AbiRevisionFileError> {
-        let dir_proxy = open_in_namespace_deprecated(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .unwrap();
+        let dir_proxy = open_in_namespace("/pkg", fio::Flags::PERM_READ).unwrap();
         let abi_revision = read_abi_revision(&dir_proxy, AbiRevision::PATH)
             .await
             .expect("test package doesn't contain an ABI revision");

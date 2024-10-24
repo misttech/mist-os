@@ -7,7 +7,7 @@ use component_events::matcher::EventMatcher;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::{MonotonicDuration, MonotonicInstant, Task, Timer};
 use fuchsia_component_test::ScopedInstance;
-use fuchsia_fs::directory::open_file_no_describe_deprecated;
+use fuchsia_fs::directory::open_file_async;
 use std::mem;
 
 #[fuchsia::test]
@@ -39,16 +39,12 @@ async fn test_debug_started() {
 
     let payload = event.result().expect("debug_started should not be err");
 
-    let job_id_content = open_file_no_describe_deprecated(
-        &payload.runtime_dir,
-        "elf/job_id",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .expect("cannot open elf/job_id")
-    .read(fio::MAX_BUF)
-    .await
-    .expect("failed to read elf/job_id")
-    .expect("failed to read elf/job_id");
+    let job_id_content = open_file_async(&payload.runtime_dir, "elf/job_id", fio::PERM_READABLE)
+        .expect("cannot open elf/job_id")
+        .read(fio::MAX_BUF)
+        .await
+        .expect("failed to read elf/job_id")
+        .expect("failed to read elf/job_id");
 
     let job_id: u64 = String::from_utf8(job_id_content)
         .expect("cannot parse job_id")
