@@ -7,19 +7,19 @@
 //! There is no support for actual resource constraints, or any operations outside of adding tasks
 //! to a control group (for the duration of their lifetime).
 
-use crate::task::{CurrentTask, Task};
-use crate::vfs::buffers::InputBuffer;
-use crate::vfs::{
+use starnix_core::task::{CurrentTask, Task};
+use starnix_core::vfs::buffers::InputBuffer;
+use starnix_core::vfs::{
     fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_not_dir,
-    AppendLockGuard, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode,
-    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
+    AppendLockGuard, BytesFile, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject,
+    FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, pid_t};
 use std::sync::Arc;
@@ -128,6 +128,26 @@ impl FsNodeOps for CgroupDirectoryNode {
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         error!(EPERM)
+    }
+
+    fn lookup(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        match &**name {
+            // This is reached if `cgroup.controllers` is not a child of the parent DirEntry.
+            // After first access, the node is created and added as a child.
+            // TODO: Create `cgroup.controllers` during creation of the filesystem.
+            b"cgroup.controllers" => Ok(node.fs().create_node(
+                current_task,
+                BytesFile::new_node(b"".to_vec()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            )),
+            _ => error!(ENOENT),
+        }
     }
 }
 

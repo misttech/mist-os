@@ -4,7 +4,6 @@
 
 use crate::bpf::program::BPF_PROG_TYPE_FUSE;
 use crate::device::kobject::KObjectHandle;
-use crate::fs::sysfs::cgroup::CgroupDirectoryNode;
 use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
 };
@@ -51,14 +50,7 @@ impl SysFs {
         dir.subdir(current_task, "fs", 0o755, |dir| {
             dir.subdir(current_task, "selinux", 0o755, |_| ());
             dir.subdir(current_task, "bpf", 0o755, |_| ());
-            dir.node(
-                "cgroup",
-                fs.create_node(
-                    current_task,
-                    CgroupDirectoryNode::new(),
-                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
-                ),
-            );
+            dir.subdir(current_task, "cgroup", 0o755, |_| ());
             dir.subdir(current_task, "fuse", 0o755, |dir| {
                 dir.subdir(current_task, "connections", 0o755, |_| ());
                 dir.subdir(current_task, "features", 0o755, |dir| {

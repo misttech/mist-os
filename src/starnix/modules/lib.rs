@@ -16,6 +16,7 @@ use starnix_core::fs::sysfs::{sys_fs, DeviceDirectory};
 use starnix_core::fs::tmpfs::tmp_fs;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_registry::FsRegistry;
+use starnix_modules_cgroup::{CgroupV1Fs, CgroupV2Fs};
 use starnix_modules_device_mapper::{create_device_mapper, device_mapper_init};
 use starnix_modules_ext4::ExtFilesystem;
 use starnix_modules_functionfs::FunctionFs;
@@ -100,6 +101,11 @@ pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: 
     let registry = kernel.expando.get::<FsRegistry>();
     registry.register(b"binder".into(), BinderFs::new_fs);
     registry.register(b"bpf".into(), BpfFs::new_fs);
+    registry.register(b"cgroup".into(), CgroupV1Fs::new_fs);
+    registry.register(b"cgroup2".into(), CgroupV2Fs::new_fs);
+    // Cpusets use the generic cgroup (v1) subsystem.
+    // From https://docs.kernel.org/admin-guide/cgroup-v1/cpusets.html
+    registry.register(b"cpuset".into(), CgroupV1Fs::new_fs);
     registry.register(b"devpts".into(), dev_pts_fs);
     registry.register(b"devtmpfs".into(), dev_tmp_fs);
     registry.register(b"ext4".into(), ExtFilesystem::new_fs);

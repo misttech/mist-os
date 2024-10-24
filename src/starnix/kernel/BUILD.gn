@@ -149,7 +149,6 @@ rustc_library("starnix_core") {
     "fs/proc/sysctl.rs",
     "fs/proc/sysrq.rs",
     "fs/sysfs/bus_collection_directory.rs",
-    "fs/sysfs/cgroup.rs",
     "fs/sysfs/cpu_class_directory.rs",
     "fs/sysfs/device_directory.rs",
     "fs/sysfs/fs.rs",
