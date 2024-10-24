@@ -1919,7 +1919,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteBootloaderNotAligned) {
   ValidateUnwrittenPages(8 * kPagesPerBlock - 1, 1);
 }
 
-TEST_F(PaverServiceSkipBlockTest, WriteVolumes) {
+TEST_F(PaverServiceSkipBlockTest, DISABLED_WriteVolumes) {
   // TODO(https://fxbug.dev/42109028): Figure out a way to test this.
 }
 
