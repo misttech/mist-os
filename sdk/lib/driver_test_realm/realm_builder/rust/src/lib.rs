@@ -217,10 +217,10 @@ impl DriverTestRealmInstance for RealmInstance {
     }
 
     fn driver_test_realm_connect_to_dev(&self) -> Result<fio::DirectoryProxy> {
-        fuchsia_fs::directory::open_directory_no_describe_deprecated(
+        fuchsia_fs::directory::open_directory_async(
             self.root.get_exposed_dir(),
             "dev-topological",
-            fio::OpenFlags::empty(),
+            fio::Flags::empty(),
         )
         .map_err(Into::into)
     }
