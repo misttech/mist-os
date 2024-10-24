@@ -127,6 +127,22 @@ pub(crate) struct OriginalDestination {
     pub known_to_server: bool,
 }
 
+pub(crate) struct BoundSockets<S: SocketType + ?Sized> {
+    pub client: S::BoundClient,
+    pub server: S::BoundServer,
+}
+
+pub(crate) struct ConnectedSockets<C, S> {
+    pub client: C,
+    pub server: S,
+}
+
+impl<C, S> ConnectedSockets<C, S> {
+    pub(crate) fn as_mut(&mut self) -> ConnectedSockets<&mut C, &mut S> {
+        ConnectedSockets { client: &mut self.client, server: &mut self.server }
+    }
+}
+
 /// Contains some sort of handle to a socket purely for the purposes of keeping the socket open.
 pub(crate) struct OpaqueSocketHandle {
     _handle: Box<dyn Any>,
@@ -138,18 +154,24 @@ impl OpaqueSocketHandle {
     }
 }
 
+pub(crate) struct OpaqueSocketHandles {
+    _client: OpaqueSocketHandle,
+    _server: OpaqueSocketHandle,
+}
+
 pub(crate) trait SocketType {
-    type Client;
-    type Server;
+    type BoundClient;
+    type BoundServer: 'static;
+    type ConnectedClient: 'static;
+    type ConnectedServer;
 
     fn matcher<I: Ip>() -> Matchers;
 
-    async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
+    async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (BoundSockets<Self>, SockAddrs) {
         Self::bind_sockets_to_ports(
             realms,
             addrs,
-            // Let netstack pick the ports by default
-            Ports { src: 0, dst: 0 },
+            Ports { src: 0, dst: 0 }, /* let netstack pick the ports by default */
         )
         .await
     }
@@ -158,15 +180,50 @@ pub(crate) trait SocketType {
         realms: Realms<'_>,
         addrs: Addrs,
         ports: Ports,
-    ) -> (Sockets<Self>, SockAddrs);
+    ) -> (BoundSockets<Self>, SockAddrs);
 
     async fn run_test<I: ping::FuchsiaIpExt>(
         realms: Realms<'_>,
-        sockets: Sockets<Self>,
+        sockets: BoundSockets<Self>,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         expected_original_dst: Option<OriginalDestination>,
-    ) -> (Self::Server, OpaqueSocketHandle);
+    ) -> OpaqueSocketHandles {
+        let BoundSockets { client, mut server } = sockets;
+        let mut connected = Self::connect(
+            client,
+            &mut server,
+            sock_addrs,
+            expected_connectivity,
+            expected_original_dst,
+        )
+        .await;
+        if let Some(connected) = connected.as_mut() {
+            Self::send_and_recv::<I>(realms, connected.as_mut(), sock_addrs, expected_connectivity)
+                .await;
+        }
+        OpaqueSocketHandles {
+            _client: OpaqueSocketHandle::new(
+                connected.map(|ConnectedSockets { client, .. }| client),
+            ),
+            _server: OpaqueSocketHandle::new(server),
+        }
+    }
+
+    async fn connect(
+        client: Self::BoundClient,
+        server: &mut Self::BoundServer,
+        sock_addrs: SockAddrs,
+        expected_connectivity: ExpectedConnectivity,
+        expected_original_dst: Option<OriginalDestination>,
+    ) -> Option<ConnectedSockets<Self::ConnectedClient, Self::ConnectedServer>>;
+
+    async fn send_and_recv<I: ping::FuchsiaIpExt>(
+        realms: Realms<'_>,
+        connected: ConnectedSockets<&mut Self::ConnectedClient, &mut Self::ConnectedServer>,
+        sock_addrs: SockAddrs,
+        expected_connectivity: ExpectedConnectivity,
+    );
 }
 
 const CLIENT_PAYLOAD: &'static str = "hello from client";
@@ -187,8 +244,10 @@ const SERVER_PAYLOAD: &'static str = "hello from server";
 pub(crate) struct IrrelevantToTest;
 
 impl SocketType for IrrelevantToTest {
-    type Client = <UdpSocket as SocketType>::Client;
-    type Server = <UdpSocket as SocketType>::Server;
+    type BoundClient = <UdpSocket as SocketType>::BoundClient;
+    type BoundServer = <UdpSocket as SocketType>::BoundServer;
+    type ConnectedClient = <UdpSocket as SocketType>::ConnectedClient;
+    type ConnectedServer = <UdpSocket as SocketType>::ConnectedServer;
 
     fn matcher<I: Ip>() -> Matchers {
         <UdpSocket as SocketType>::matcher::<I>()
@@ -198,28 +257,37 @@ impl SocketType for IrrelevantToTest {
         realms: Realms<'_>,
         addrs: Addrs,
         ports: Ports,
-    ) -> (Sockets<Self>, SockAddrs) {
-        let (Sockets { client, server }, addrs) =
+    ) -> (BoundSockets<Self>, SockAddrs) {
+        let (BoundSockets { client, server }, addrs) =
             UdpSocket::bind_sockets_to_ports(realms, addrs, ports).await;
-        (Sockets { client, server }, addrs)
+        (BoundSockets { client, server }, addrs)
     }
 
-    async fn run_test<I: ping::FuchsiaIpExt>(
-        realms: Realms<'_>,
-        sockets: Sockets<Self>,
+    async fn connect(
+        client: Self::BoundClient,
+        server: &mut Self::BoundServer,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         expected_original_dst: Option<OriginalDestination>,
-    ) -> (Self::Server, OpaqueSocketHandle) {
-        let Sockets { client: client_sock, server: server_sock } = sockets;
-        UdpSocket::run_test::<I>(
+    ) -> Option<ConnectedSockets<Self::ConnectedClient, Self::ConnectedServer>> {
+        UdpSocket::connect(client, server, sock_addrs, expected_connectivity, expected_original_dst)
+            .await
+            .map(|ConnectedSockets { client, server }| ConnectedSockets { client, server })
+    }
+
+    async fn send_and_recv<I: ping::FuchsiaIpExt>(
+        realms: Realms<'_>,
+        connected: ConnectedSockets<&mut Self::ConnectedClient, &mut Self::ConnectedServer>,
+        sock_addrs: SockAddrs,
+        expected_connectivity: ExpectedConnectivity,
+    ) {
+        UdpSocket::send_and_recv::<I>(
             realms,
-            Sockets { client: client_sock, server: server_sock },
+            ConnectedSockets { client: connected.client, server: connected.server },
             sock_addrs,
             expected_connectivity,
-            expected_original_dst,
         )
-        .await
+        .await;
     }
 }
 
@@ -231,8 +299,10 @@ impl SocketType for TcpSocket {
     // it to the server, we use a `socket2::Socket` to store it at rest because
     // neither `std` nor `fuchsia_async` provide a way to bind a local socket
     // without connecting it to a remote.
-    type Client = socket2::Socket;
-    type Server = fasync::net::AcceptStream;
+    type BoundClient = socket2::Socket;
+    type BoundServer = fasync::net::AcceptStream;
+    type ConnectedClient = fasync::net::TcpStream;
+    type ConnectedServer = fasync::net::TcpStream;
 
     fn matcher<I: Ip>() -> Matchers {
         Matchers {
@@ -248,7 +318,7 @@ impl SocketType for TcpSocket {
         realms: Realms<'_>,
         addrs: Addrs,
         ports: Ports,
-    ) -> (Sockets<Self>, SockAddrs) {
+    ) -> (BoundSockets<Self>, SockAddrs) {
         let Realms { client, server } = realms;
         let Addrs { client: client_addr, server: server_addr } = addrs;
         let Ports { src: client_port, dst: server_port } = ports;
@@ -284,17 +354,16 @@ impl SocketType for TcpSocket {
             server: server.local_addr().expect("get local addr"),
         };
 
-        (Sockets { client, server: server.accept_stream() }, addrs)
+        (BoundSockets { client, server: server.accept_stream() }, addrs)
     }
 
-    async fn run_test<I: ping::FuchsiaIpExt>(
-        _realms: Realms<'_>,
-        sockets: Sockets<Self>,
+    async fn connect(
+        client: Self::BoundClient,
+        server: &mut Self::BoundServer,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         expected_original_dst: Option<OriginalDestination>,
-    ) -> (Self::Server, OpaqueSocketHandle) {
-        let Sockets { client, mut server } = sockets;
+    ) -> Option<ConnectedSockets<Self::ConnectedClient, Self::ConnectedServer>> {
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
 
         info!(
@@ -315,11 +384,11 @@ impl SocketType for TcpSocket {
                         Some((_stream, _addr)) => {
                             panic!("unexpectedly connected successfully")
                         }
-                        None => {}
+                        None => None,
                     }
                 }
                 ExpectedConnectivity::TwoWay => {
-                    let (mut stream, from) = server
+                    let (stream, from) = server
                         .next()
                         .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
                             panic!(
@@ -331,15 +400,10 @@ impl SocketType for TcpSocket {
                         .expect("client should connect to server")
                         .expect("accept connection");
 
-                    let mut buf = [0u8; 1024];
-                    let bytes = stream.read(&mut buf).await.expect("read from client");
                     assert_eq!(from.ip(), client_addr.ip());
-                    assert_eq!(bytes, CLIENT_PAYLOAD.as_bytes().len());
-                    assert_eq!(&buf[..bytes], CLIENT_PAYLOAD.as_bytes());
-
-                    let bytes =
-                        stream.write(SERVER_PAYLOAD.as_bytes()).await.expect("write to client");
-                    assert_eq!(bytes, SERVER_PAYLOAD.as_bytes().len());
+                    if client_addr.port() != 0 {
+                        assert_eq!(from.port(), client_addr.port());
+                    }
 
                     if let Some(OriginalDestination {
                         dst: expected,
@@ -348,7 +412,7 @@ impl SocketType for TcpSocket {
                     }) = expected_original_dst
                     {
                         if !known_to_server {
-                            return server;
+                            return Some(stream);
                         }
                         if expected.is_ipv4() {
                             let original_dst = socket2::Socket::from(
@@ -362,9 +426,10 @@ impl SocketType for TcpSocket {
                             // IP6T_SO_ORIGINAL_DST on Fuchsia.
                         };
                     }
+
+                    Some(stream)
                 }
             }
-            server
         };
 
         let client_fut = async move {
@@ -382,7 +447,7 @@ impl SocketType for TcpSocket {
                     }
                 }
                 ExpectedConnectivity::TwoWay => {
-                    let mut stream = fasync::net::TcpStream::connect_from_raw(client, server_addr)
+                    let stream = fasync::net::TcpStream::connect_from_raw(client, server_addr)
                         .expect("connect to server")
                         .map(|r| r.expect("connect to server"))
                         .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
@@ -392,15 +457,6 @@ impl SocketType for TcpSocket {
                             );
                         })
                         .await;
-
-                    let bytes =
-                        stream.write(CLIENT_PAYLOAD.as_bytes()).await.expect("write to server");
-                    assert_eq!(bytes, CLIENT_PAYLOAD.as_bytes().len());
-
-                    let mut buf = [0u8; 1024];
-                    let bytes = stream.read(&mut buf).await.expect("read from server");
-                    assert_eq!(bytes, SERVER_PAYLOAD.as_bytes().len());
-                    assert_eq!(&buf[..bytes], SERVER_PAYLOAD.as_bytes());
 
                     if let Some(OriginalDestination {
                         dst: expected,
@@ -428,8 +484,58 @@ impl SocketType for TcpSocket {
             }
         };
 
-        let (server, client) = futures::future::join(server_fut, client_fut).await;
-        (server, OpaqueSocketHandle::new(client))
+        let (client, server) = futures::future::join(client_fut, server_fut).await;
+        match expected_connectivity {
+            ExpectedConnectivity::None | ExpectedConnectivity::ClientToServerOnly => {
+                assert_matches!((client, server), (None, None));
+                None
+            }
+            ExpectedConnectivity::TwoWay => {
+                let client = client.expect("client should have connected");
+                let server = server.expect("server should have accepted connection");
+                Some(ConnectedSockets { client, server })
+            }
+        }
+    }
+
+    async fn send_and_recv<I: ping::FuchsiaIpExt>(
+        _realms: Realms<'_>,
+        sockets: ConnectedSockets<&mut Self::ConnectedClient, &mut Self::ConnectedServer>,
+        // NB: socket addresses are not needed because the TCP sockets are already
+        // connected.
+        _sock_addrs: SockAddrs,
+        expected_connectivity: ExpectedConnectivity,
+    ) {
+        match expected_connectivity {
+            ExpectedConnectivity::None | ExpectedConnectivity::ClientToServerOnly => {
+                panic!("sockets are already connected")
+            }
+            ExpectedConnectivity::TwoWay => {}
+        }
+
+        let ConnectedSockets { client, server } = sockets;
+
+        let server_fut = async move {
+            let mut buf = [0u8; 1024];
+            let bytes = server.read(&mut buf).await.expect("read from client");
+            assert_eq!(bytes, CLIENT_PAYLOAD.as_bytes().len());
+            assert_eq!(&buf[..bytes], CLIENT_PAYLOAD.as_bytes());
+
+            let bytes = server.write(SERVER_PAYLOAD.as_bytes()).await.expect("write to client");
+            assert_eq!(bytes, SERVER_PAYLOAD.as_bytes().len());
+        };
+
+        let client_fut = async move {
+            let bytes = client.write(CLIENT_PAYLOAD.as_bytes()).await.expect("write to server");
+            assert_eq!(bytes, CLIENT_PAYLOAD.as_bytes().len());
+
+            let mut buf = [0u8; 1024];
+            let bytes = client.read(&mut buf).await.expect("read from server");
+            assert_eq!(bytes, SERVER_PAYLOAD.as_bytes().len());
+            assert_eq!(&buf[..bytes], SERVER_PAYLOAD.as_bytes());
+        };
+
+        futures::future::join(server_fut, client_fut).await;
     }
 }
 
@@ -437,8 +543,10 @@ impl SocketType for TcpSocket {
 pub(crate) struct UdpSocket;
 
 impl SocketType for UdpSocket {
-    type Client = fasync::net::UdpSocket;
-    type Server = fasync::net::UdpSocket;
+    type BoundClient = fasync::net::UdpSocket;
+    type BoundServer = fasync::net::UdpSocket;
+    type ConnectedClient = fasync::net::UdpSocket;
+    type ConnectedServer = fasync::net::UdpSocket;
 
     fn matcher<I: Ip>() -> Matchers {
         Matchers {
@@ -454,7 +562,7 @@ impl SocketType for UdpSocket {
         realms: Realms<'_>,
         addrs: Addrs,
         ports: Ports,
-    ) -> (Sockets<Self>, SockAddrs) {
+    ) -> (BoundSockets<Self>, SockAddrs) {
         let Realms { client, server } = realms;
         let Addrs { client: client_addr, server: server_addr } = addrs;
         let Ports { src: client_port, dst: server_port } = ports;
@@ -475,18 +583,33 @@ impl SocketType for UdpSocket {
             server: server_sock.local_addr().expect("get server addr"),
         };
 
-        (Sockets { client: client_sock, server: server_sock }, addrs)
+        (BoundSockets { client: client_sock, server: server_sock }, addrs)
     }
 
-    async fn run_test<I: ping::FuchsiaIpExt>(
-        _realms: Realms<'_>,
-        sockets: Sockets<Self>,
-        sock_addrs: SockAddrs,
-        expected_connectivity: ExpectedConnectivity,
+    async fn connect(
+        client: Self::BoundClient,
+        server: &mut Self::BoundServer,
+        _sock_addrs: SockAddrs,
+        _expected_connectivity: ExpectedConnectivity,
         // NB: SO_ORIGINAL_DST is not supported for UDP sockets.
         _expected_original_dst: Option<OriginalDestination>,
-    ) -> (Self::Server, OpaqueSocketHandle) {
-        let Sockets { client, server } = sockets;
+    ) -> Option<ConnectedSockets<Self::ConnectedClient, Self::ConnectedServer>> {
+        // Clone the underlying server socket so the lifetime of the resulting
+        // [`ConnectedSockets`] is not tied to the [`Self::BoundServer`] socket.
+        let server = fasync::net::UdpSocket::from_socket(
+            server.as_ref().try_clone().expect("clone socket").into(),
+        )
+        .expect("into std socket");
+        Some(ConnectedSockets { client, server })
+    }
+
+    async fn send_and_recv<I: ping::FuchsiaIpExt>(
+        _realms: Realms<'_>,
+        sockets: ConnectedSockets<&mut Self::ConnectedClient, &mut Self::ConnectedServer>,
+        sock_addrs: SockAddrs,
+        expected_connectivity: ExpectedConnectivity,
+    ) {
+        let ConnectedSockets { client, server } = sockets;
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
 
         info!(
@@ -520,15 +643,17 @@ impl SocketType for UdpSocket {
                         server.recv_from(&mut buf[..]).await.expect("receive from client");
                     assert_eq!(bytes, CLIENT_PAYLOAD.as_bytes().len());
                     assert_eq!(&buf[..bytes], CLIENT_PAYLOAD.as_bytes());
-                    assert_eq!(from, client_addr);
+                    assert_eq!(from.ip(), client_addr.ip());
+                    if client_addr.port() != 0 {
+                        assert_eq!(from.port(), client_addr.port());
+                    }
                     let bytes = server
-                        .send_to(SERVER_PAYLOAD.as_bytes(), client_addr)
+                        .send_to(SERVER_PAYLOAD.as_bytes(), from)
                         .await
                         .expect("reply to client");
                     assert_eq!(bytes, SERVER_PAYLOAD.as_bytes().len());
                 }
             }
-            server
         };
 
         let client_fut = async move {
@@ -574,10 +699,9 @@ impl SocketType for UdpSocket {
                     assert_eq!(from, server_addr);
                 }
             }
-            client
         };
-        let (server, client) = futures::future::join(server_fut, client_fut).await;
-        (server, OpaqueSocketHandle::new(client))
+
+        futures::future::join(server_fut, client_fut).await;
     }
 }
 
@@ -589,8 +713,10 @@ impl SocketType for IcmpSocket {
     // such as the locally bound port, to create an appropriate filter. For
     // ICMP, there is no port, and filtering is not done based on ICMP ID, so
     // there is no requirement to bind the sockets up front.
-    type Client = ();
-    type Server = ();
+    type BoundClient = ();
+    type BoundServer = ();
+    type ConnectedClient = ();
+    type ConnectedServer = ();
 
     fn matcher<I: Ip>() -> Matchers {
         Matchers {
@@ -606,7 +732,7 @@ impl SocketType for IcmpSocket {
         _realms: Realms<'_>,
         addrs: Addrs,
         ports: Ports,
-    ) -> (Sockets<Self>, SockAddrs) {
+    ) -> (BoundSockets<Self>, SockAddrs) {
         let Addrs { client: client_addr, server: server_addr } = addrs;
         let Ports { src: client_port, dst: server_port } = ports;
 
@@ -618,18 +744,27 @@ impl SocketType for IcmpSocket {
 
         let addrs = SockAddrs { client: client_addr, server: server_addr };
 
-        (Sockets { client: (), server: () }, addrs)
+        (BoundSockets { client: (), server: () }, addrs)
     }
 
-    async fn run_test<I: ping::FuchsiaIpExt>(
+    async fn connect(
+        (): Self::BoundClient,
+        (): &mut Self::BoundServer,
+        _sock_addrs: SockAddrs,
+        _expected_connectivity: ExpectedConnectivity,
+        _expected_original_dst: Option<OriginalDestination>,
+    ) -> Option<ConnectedSockets<Self::ConnectedClient, Self::ConnectedServer>> {
+        Some(ConnectedSockets { client: (), server: () })
+    }
+
+    async fn send_and_recv<I: ping::FuchsiaIpExt>(
         realms: Realms<'_>,
-        sockets: Sockets<Self>,
+        connected: ConnectedSockets<&mut Self::ConnectedClient, &mut Self::ConnectedServer>,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
-        // NB: SO_ORIGINAL_DST is not supported for ICMP sockets.
-        _expected_original_dst: Option<OriginalDestination>,
-    ) -> (Self::Server, OpaqueSocketHandle) {
+    ) {
         let Realms { client, server } = realms;
+        let ConnectedSockets { client: (), server: () } = connected;
 
         const SEQ: u16 = 1;
 
@@ -667,9 +802,6 @@ impl SocketType for IcmpSocket {
                 .await;
             }
         }
-
-        let Sockets { client, server } = sockets;
-        (server, OpaqueSocketHandle::new(client))
     }
 }
 
@@ -682,11 +814,6 @@ pub(crate) struct Realms<'a> {
 pub(crate) struct Addrs {
     pub client: fnet::IpAddress,
     pub server: fnet::IpAddress,
-}
-
-pub(crate) struct Sockets<S: SocketType + ?Sized> {
-    pub client: S::Client,
-    pub server: S::Server,
 }
 
 #[derive(Clone, Copy)]
@@ -841,7 +968,7 @@ impl<'a> TestNet<'a> {
     pub(crate) async fn run_test<I, S>(
         &mut self,
         expected_connectivity: ExpectedConnectivity,
-    ) -> (S::Server, OpaqueSocketHandle)
+    ) -> OpaqueSocketHandles
     where
         I: TestIpExt,
         S: SocketType,
@@ -865,7 +992,7 @@ impl<'a> TestNet<'a> {
         &'params mut self,
         expected_connectivity: ExpectedConnectivity,
         setup: F,
-    ) -> (S::Server, OpaqueSocketHandle)
+    ) -> OpaqueSocketHandles
     where
         I: TestIpExt,
         S: SocketType,
@@ -1310,6 +1437,8 @@ pub(crate) trait RouterTestIpExt:
     /// The router's IP address and subnet prefix assigned on the interface that
     /// neighbors the client.
     const ROUTER_CLIENT_ADDR_WITH_PREFIX: fnet::Subnet;
+    /// The subnet shared by the client and router.
+    const ROUTER_CLIENT_SUBNET: fnet::Subnet;
     /// The server netstack's IP address and subnet prefix. The server is on the
     /// same subnet as the router's server-facing interface.
     const SERVER_ADDR_WITH_PREFIX: fnet::Subnet;
@@ -1325,6 +1454,7 @@ pub(crate) trait RouterTestIpExt:
 impl RouterTestIpExt for Ipv4 {
     const CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
     const ROUTER_CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("192.0.2.2/24");
+    const ROUTER_CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("192.0.2.0/24");
     const SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("10.0.0.1/24");
     const ROUTER_SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("10.0.0.2/24");
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("8.8.8.0/24");
@@ -1333,6 +1463,7 @@ impl RouterTestIpExt for Ipv4 {
 impl RouterTestIpExt for Ipv6 {
     const CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("a::1/64");
     const ROUTER_CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("a::2/64");
+    const ROUTER_CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("a::/64");
     const SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("b::1/64");
     const ROUTER_SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("b::2/64");
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("c::/64");
@@ -1717,7 +1848,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
     pub async fn run_test<S: SocketType>(
         &mut self,
         expected_connectivity: ExpectedConnectivity,
-    ) -> (S::Server, OpaqueSocketHandle) {
+    ) -> OpaqueSocketHandles {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), Self::addrs()).await;
         S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await
     }
@@ -1734,7 +1865,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         &'params mut self,
         expected_connectivity: ExpectedConnectivity,
         setup: F,
-    ) -> (S::Server, OpaqueSocketHandle)
+    ) -> OpaqueSocketHandles
     where
         S: SocketType,
         F: for<'b> FnOnce(
@@ -2021,7 +2152,7 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
         matcher: &M,
         realms: Realms<'_>,
         subnets: Subnets,
-    ) -> (<M::SocketType as SocketType>::Server, OpaqueSocketHandle) {
+    ) -> OpaqueSocketHandles {
         let (sockets, sock_addrs) = M::SocketType::bind_sockets(
             realms,
             Addrs { client: subnets.src.addr, server: subnets.dst.addr },

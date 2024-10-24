@@ -2,5 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    actions: [],
+    actions: [
+        {
+            type: "expect_failure",
+            matchers: [
+                // TODO(https://fxbug.dev/341128580): once Netstack3's filtering engine supports
+                // UDP packets with a source port of 0, this test should pass.
+                "AllInetTests/UdpSocketRawTest.ReceiveWithZeroSourcePort/*",
+            ],
+        },
+    ],
 }

@@ -39,7 +39,7 @@ const CONNECTION_EXPIRY_TIME_UDP: Duration = Duration::from_secs(120);
 const CONNECTION_EXPIRY_OTHER: Duration = Duration::from_secs(30);
 
 /// The maximum number of connections in the conntrack table.
-const MAXIMUM_CONNECTIONS: usize = 50_000;
+pub(crate) const MAXIMUM_CONNECTIONS: usize = 50_000;
 
 /// Implements a connection tracking subsystem.
 ///
