@@ -83,6 +83,9 @@ async fn preprocess_flash_cmd<W: Write>(
             if cmd.oem_stage.iter().any(|f| f.command() == SSH_OEM_COMMAND) {
                 ffx_bail!("Both the SSH key and the SSH OEM Stage flags were set. Only use one.");
             }
+            if cmd.skip_authorized_keys {
+                ffx_bail!("Both the SSH key and Skip Uploading Authorized Keys flags were set. Only use one.");
+            }
             cmd.oem_stage.push(OemFile::new(
                 SSH_OEM_COMMAND.to_string(),
                 ssh_file
@@ -93,17 +96,28 @@ async fn preprocess_flash_cmd<W: Write>(
         }
         None => {
             if !cmd.oem_stage.iter().any(|f| f.command() == SSH_OEM_COMMAND) {
-                let ssh_keys =
-                    SshKeyFiles::load(None).await.context("finding ssh authorized_keys file.")?;
-                ssh_keys.create_keys_if_needed(false).context("creating ssh keys if needed")?;
-                if ssh_keys.authorized_keys.exists() {
-                    let k = ssh_keys.authorized_keys.display().to_string();
-                    eprintln!("No `--authorized-keys` flag, using {}", k);
-                    cmd.oem_stage.push(OemFile::new(SSH_OEM_COMMAND.to_string(), k));
+                if cmd.skip_authorized_keys {
+                    tracing::warn!("Skipping uploading authorized keys");
+                    writeln!(writer, "Skipping uploading authorized-keys")
+                        .user_message("Error writing user message")?;
                 } else {
-                    // Since the key will be initialized, this should never happen.
-                    ffx_bail!("Warning: flashing without a SSH key is not advised.");
+                    let ssh_keys = SshKeyFiles::load(None)
+                        .await
+                        .context("finding ssh authorized_keys file.")?;
+                    ssh_keys.create_keys_if_needed(false).context("creating ssh keys if needed")?;
+                    if ssh_keys.authorized_keys.exists() {
+                        let k = ssh_keys.authorized_keys.display().to_string();
+                        eprintln!("No `--authorized-keys` flag, using {}", k);
+                        cmd.oem_stage.push(OemFile::new(SSH_OEM_COMMAND.to_string(), k));
+                    } else {
+                        // Since the key will be initialized, this should never happen.
+                        ffx_bail!("We requested ssh keys to be created but they were not");
+                    }
                 }
+            } else if cmd.skip_authorized_keys {
+                // We have both skip authorized-keys and the OEM command including
+                // the authorized keys... this is a problem.
+                ffx_bail!("Both the SSH OEM Stage and Skip Uploading Authorized Keys flags were set. Only use one.");
             }
         }
     };
