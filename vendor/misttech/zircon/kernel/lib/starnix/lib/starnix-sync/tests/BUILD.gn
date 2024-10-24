@@ -3,7 +3,10 @@
 # found in the LICENSE file.
 
 source_set("tests") {
-  sources = [ "locks-test.cc" ]
+  sources = [
+    "locks-test.cc",
+    #"port_event-test.cc",
+  ]
   deps = [
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-sync",
     "//zircon/kernel/lib/unittest",
