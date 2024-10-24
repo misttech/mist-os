@@ -38,6 +38,10 @@
     {
       "meta": "tools/x64/ffx_tools/ffx-agis-meta.json",
       "type": "ffx_tool"
+    },
+    {
+      "meta": "pkg/sysroot/meta.json",
+      "type": "sysroot"
     }
   ],
   "root": "..",
