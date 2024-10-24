@@ -14,9 +14,9 @@ use moniker::Moniker;
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::Path;
+use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use zx_status::Status;
 
 /// Builder struct for `RealmQueryResult`/
@@ -37,6 +37,7 @@ use zx_status::Status;
 ///   .when("some/thing") // Start another build.
 ///   ...
 /// ```
+#[derive(Default)]
 pub struct MockRealmQueryBuilder {
     mapping: HashMap<String, Box<MockRealmQueryBuilderInner>>,
 }
@@ -88,9 +89,9 @@ impl MockRealmQueryBuilderInner {
                 mock_dir_diagnostics.add_entry(MockFile::new_arc(entry.to_owned()));
         }
 
-        mock_dir_top = mock_dir_top.add_entry(Arc::new(mock_dir_diagnostics));
+        mock_dir_top = mock_dir_top.add_entry(Rc::new(mock_dir_diagnostics));
 
-        fuchsia_async::Task::local(async move { Arc::new(mock_dir_top).serve(server_end).await })
+        fuchsia_async::Task::local(async move { Rc::new(mock_dir_top).serve(server_end).await })
             .detach();
     }
 
@@ -133,7 +134,7 @@ impl MockRealmQueryBuilderInner {
 impl MockRealmQueryBuilder {
     /// Create a new empty `MockRealmQueryBuilder`.
     pub fn new() -> Self {
-        MockRealmQueryBuilder { mapping: HashMap::new() }
+        Self::default()
     }
 
     /// Start a build of `RealmQueryResult` by specifying the
@@ -222,7 +223,7 @@ impl Default for MockRealmQuery {
 
 impl MockRealmQuery {
     /// Serves the `RealmQuery` interface asynchronously and runs until the program terminates.
-    pub async fn serve(self: Arc<Self>, object: ServerEnd<fsys2::RealmQueryMarker>) {
+    pub async fn serve(self: Rc<Self>, object: ServerEnd<fsys2::RealmQueryMarker>) {
         let mut stream = object.into_stream().unwrap();
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
@@ -313,7 +314,7 @@ impl MockRealmQuery {
     /// Serves the `RealmQuery` interface asynchronously and runs until the program terminates.
     /// Then, instead of needing the client to discover the protocol, return the proxy for futher
     /// test use.
-    pub async fn get_proxy(self: Arc<Self>) -> fsys2::RealmQueryProxy {
+    pub async fn get_proxy(self: Rc<Self>) -> fsys2::RealmQueryProxy {
         let (proxy, server_end) = create_proxy::<fsys2::RealmQueryMarker>().unwrap();
         fuchsia_async::Task::local(async move { self.serve(server_end).await }).detach();
         proxy
@@ -322,13 +323,13 @@ impl MockRealmQuery {
 
 // Mock directory structure.
 pub trait Entry {
-    fn open(self: Arc<Self>, flags: fio::OpenFlags, path: &str, object: ServerEnd<fio::NodeMarker>);
+    fn open(self: Rc<Self>, flags: fio::OpenFlags, path: &str, object: ServerEnd<fio::NodeMarker>);
     fn encode(&self, buf: &mut Vec<u8>);
     fn name(&self) -> String;
 }
 
 pub struct MockDir {
-    subdirs: HashMap<String, Arc<dyn Entry>>,
+    subdirs: HashMap<String, Rc<dyn Entry>>,
     name: String,
     at_end: AtomicBool,
 }
@@ -338,16 +339,16 @@ impl MockDir {
         MockDir { name, subdirs: HashMap::new(), at_end: AtomicBool::new(false) }
     }
 
-    pub fn new_arc(name: String) -> Arc<Self> {
-        Arc::new(Self::new(name))
+    pub fn new_arc(name: String) -> Rc<Self> {
+        Rc::new(Self::new(name))
     }
 
-    pub fn add_entry(mut self, entry: Arc<dyn Entry>) -> Self {
+    pub fn add_entry(mut self, entry: Rc<dyn Entry>) -> Self {
         self.subdirs.insert(entry.name(), entry);
         self
     }
 
-    async fn serve(self: Arc<Self>, object: ServerEnd<fio::DirectoryMarker>) {
+    async fn serve(self: Rc<Self>, object: ServerEnd<fio::DirectoryMarker>) {
         let mut stream = object.into_stream().unwrap();
         let _ = stream.control_handle().send_on_open_(
             Status::OK.into_raw(),
@@ -384,7 +385,7 @@ impl MockDir {
     }
 }
 
-fn encode_entries(subdirs: &HashMap<String, Arc<dyn Entry>>) -> Vec<u8> {
+fn encode_entries(subdirs: &HashMap<String, Rc<dyn Entry>>) -> Vec<u8> {
     let mut buf = Vec::new();
     let mut data = subdirs.iter().collect::<Vec<(_, _)>>();
     data.sort_by(|a, b| a.0.cmp(b.0));
@@ -395,12 +396,7 @@ fn encode_entries(subdirs: &HashMap<String, Arc<dyn Entry>>) -> Vec<u8> {
 }
 
 impl Entry for MockDir {
-    fn open(
-        self: Arc<Self>,
-        flags: fio::OpenFlags,
-        path: &str,
-        object: ServerEnd<fio::NodeMarker>,
-    ) {
+    fn open(self: Rc<Self>, flags: fio::OpenFlags, path: &str, object: ServerEnd<fio::NodeMarker>) {
         let path = Path::new(path);
         let mut path_iter = path.iter();
         let segment = if let Some(segment) = path_iter.next() {
@@ -439,13 +435,8 @@ impl Entry for MockDir {
 }
 
 impl Entry for fio::DirectoryProxy {
-    fn open(
-        self: Arc<Self>,
-        flags: fio::OpenFlags,
-        path: &str,
-        object: ServerEnd<fio::NodeMarker>,
-    ) {
-        let _ = fio::DirectoryProxy::open(&*self, flags, fio::ModeType::empty(), path, object);
+    fn open(self: Rc<Self>, flags: fio::OpenFlags, path: &str, object: ServerEnd<fio::NodeMarker>) {
+        let _ = fio::DirectoryProxy::open(&self, flags, fio::ModeType::empty(), path, object);
     }
 
     fn encode(&self, _buf: &mut Vec<u8>) {
@@ -465,14 +456,14 @@ impl MockFile {
     pub fn new(name: String) -> Self {
         MockFile { name }
     }
-    pub fn new_arc(name: String) -> Arc<Self> {
-        Arc::new(Self::new(name))
+    pub fn new_arc(name: String) -> Rc<Self> {
+        Rc::new(Self::new(name))
     }
 }
 
 impl Entry for MockFile {
     fn open(
-        self: Arc<Self>,
+        self: Rc<Self>,
         _flags: fio::OpenFlags,
         _path: &str,
         _object: ServerEnd<fio::NodeMarker>,

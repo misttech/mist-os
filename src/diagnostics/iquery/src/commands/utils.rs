@@ -19,12 +19,12 @@ static EXPECTED_PROTOCOL_RE: LazyLock<Regex> =
 /// Returns the selectors for a component whose url contains the `manifest` string.
 pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
     manifest: &Option<String>,
-    tree_selectors: &Vec<String>,
+    tree_selectors: Vec<String>,
     accessor: &Option<String>,
     provider: &P,
 ) -> Result<Vec<String>, Error> {
     let Some(manifest) = manifest.as_ref() else {
-        return Ok(tree_selectors.clone());
+        return Ok(tree_selectors);
     };
     let list_command = ListCommand {
         manifest: Some(manifest.clone()),
@@ -223,12 +223,12 @@ mod test {
     use assert_matches::assert_matches;
     use iquery_test_support::MockRealmQuery;
     use selectors::parse_verbose;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     #[fuchsia::test]
     async fn test_get_accessors() {
-        let fake_realm_query = Arc::new(MockRealmQuery::default());
-        let realm_query = Arc::clone(&fake_realm_query).get_proxy().await;
+        let fake_realm_query = Rc::new(MockRealmQuery::default());
+        let realm_query = Rc::clone(&fake_realm_query).get_proxy().await;
 
         let res = get_accessor_selectors(&realm_query).await;
 

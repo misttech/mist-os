@@ -14,7 +14,7 @@ mod tests;
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
     let command_line: CommandLine = argh::from_env();
-    let provider = ArchiveAccessorProvider::default();
+    let provider = ArchiveAccessorProvider;
     match command_line.execute(&provider).await {
         Ok(result) => {
             println!("{}", result);

@@ -61,7 +61,7 @@ where
     match &payload {
         Some(hierarchy) => {
             writeln!(w, "  payload:")?;
-            output_hierarchy(w, &hierarchy, 2)
+            output_hierarchy(w, hierarchy, 2)
         }
         None => writeln!(w, "  payload: null"),
     }
@@ -94,9 +94,9 @@ where
                 writeln!(w, "{}{} = Binary:\n{}", value_indent, name, byte_str.trim())?;
             }
             Property::Bool(name, value) => writeln!(w, "{}{} = {}", value_indent, name, value)?,
-            Property::IntArray(name, array) => output_array(w, &value_indent, &name, &array)?,
-            Property::UintArray(name, array) => output_array(w, &value_indent, &name, &array)?,
-            Property::DoubleArray(name, array) => output_array(w, &value_indent, &name, &array)?,
+            Property::IntArray(name, array) => output_array(w, &value_indent, name, array)?,
+            Property::UintArray(name, array) => output_array(w, &value_indent, name, array)?,
+            Property::DoubleArray(name, array) => output_array(w, &value_indent, name, array)?,
             Property::StringList(name, list) => {
                 let max_line_length = 100;
                 let length_of_brackets = 2;
@@ -213,21 +213,31 @@ where
     }
 }
 
-fn output_histogram<T, F, W>(
-    w: &mut W,
-    indent: &str,
-    name: &str,
-    histogram_type: &str,
-    counts: &[T],
-    indexes: &Option<Vec<usize>>,
+struct OutputHistogramArgs<'a, T, F> {
+    indent: &'a str,
+    name: &'a str,
+    histogram_type: &'a str,
+    counts: &'a [T],
+    indexes: Option<&'a [usize]>,
     size: usize,
     bound_calculator: F,
-) -> fmt::Result
+}
+
+fn output_histogram<T, F, W>(w: &mut W, args: OutputHistogramArgs<'_, T, F>) -> fmt::Result
 where
     W: fmt::Write,
     T: NumberFormat + fmt::Display + PartialOrd + Zero,
     F: Fn(usize) -> (T, T),
 {
+    let OutputHistogramArgs {
+        indent,
+        name,
+        histogram_type,
+        counts,
+        indexes,
+        size,
+        bound_calculator,
+    } = args;
     let value_indent = format!("{}{}", indent, " ".repeat(INDENT));
     write!(
         w,
@@ -254,7 +264,7 @@ where
             write!(w, ", ")?;
         }
     }
-    write!(w, "]\n")
+    writeln!(w, "]")
 }
 
 fn output_array<T, W>(
@@ -300,13 +310,15 @@ where
             };
             output_histogram(
                 w,
-                value_indent,
-                name,
-                "linear",
-                counts,
-                indexes,
-                *size,
-                bucket_bounder,
+                OutputHistogramArgs {
+                    indent: value_indent,
+                    name,
+                    histogram_type: "linear",
+                    counts,
+                    indexes: indexes.as_deref(),
+                    size: *size,
+                    bound_calculator: bucket_bounder,
+                },
             )
         }
         ArrayContent::ExponentialHistogram(ExponentialHistogram {
@@ -328,13 +340,15 @@ where
             };
             output_histogram(
                 w,
-                value_indent,
-                name,
-                "exponential",
-                counts,
-                indexes,
-                *size,
-                bucket_bounder,
+                OutputHistogramArgs {
+                    indent: value_indent,
+                    name,
+                    histogram_type: "exponential",
+                    counts,
+                    indexes: indexes.as_deref(),
+                    size: *size,
+                    bound_calculator: bucket_bounder,
+                },
             )
         }
     }
@@ -374,9 +388,9 @@ impl NumberFormat for usize {
 
 impl NumberFormat for f64 {
     fn format(&self) -> String {
-        if *self == std::f64::MAX || *self == std::f64::INFINITY {
+        if *self == f64::MAX || *self == f64::INFINITY {
             "inf".to_string()
-        } else if *self == std::f64::MIN || *self == std::f64::NEG_INFINITY {
+        } else if *self == f64::MIN || *self == f64::NEG_INFINITY {
             "-inf".to_string()
         } else {
             format!("{}", self)

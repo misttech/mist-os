@@ -13,7 +13,7 @@ use fidl_fuchsia_diagnostics::{
     ClientSelectorConfiguration, DataType, SelectorArgument, StreamMode, StreamParameters,
 };
 use iquery::commands::SelectorsCommand;
-use std::sync::Arc;
+use std::rc::Rc;
 
 #[fuchsia::test]
 async fn test_selectors_no_parameters() {
@@ -23,7 +23,7 @@ async fn test_selectors_no_parameters() {
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
         ..Default::default()
     };
-    let expected_responses = Arc::new(vec![]);
+    let expected_responses = Rc::new(vec![]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand { manifest: None, selectors: vec![], accessor: None };
@@ -51,7 +51,7 @@ async fn test_selectors_with_unknown_manifest() {
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
         ..Default::default()
     };
-    let expected_responses = Arc::new(vec![]);
+    let expected_responses = Rc::new(vec![]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand {

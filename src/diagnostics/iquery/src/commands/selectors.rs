@@ -50,7 +50,7 @@ impl Command for SelectorsCommand {
         }
         let selectors = utils::get_selectors_for_manifest(
             &self.manifest,
-            &self.selectors,
+            self.selectors,
             &self.accessor,
             provider,
         )
@@ -104,7 +104,7 @@ fn inspect_to_selectors(inspect_data: Vec<InspectData>) -> Vec<String> {
             let moniker = schema.moniker;
             schema.payload.map(|hierarchy| get_selectors(moniker.to_string(), hierarchy))
         })
-        .flat_map(|results| results)
+        .flatten()
         .collect::<Vec<_>>();
     result.sort();
     result
