@@ -176,13 +176,8 @@ zx_status_t Sherlock::EmmcInit() {
           .id = std::to_string(DEVICE_METADATA_GPT_INFO),
           .data = std::move(encoded.value()),
       }},
-      // TODO(b/355244376): Remove this entry once DEVICE_METADATA_SDMMC is no longer referenced.
       {{
           .id = std::to_string(DEVICE_METADATA_SDMMC),
-          .data = std::vector<uint8_t>{sdmmc_metadata.value()},
-      }},
-      {{
-          .id = fuchsia_hardware_sdmmc::wire::kMetadataTypeName,
           .data = std::move(sdmmc_metadata.value()),
       }},
   };

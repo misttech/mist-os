@@ -60,7 +60,6 @@ source_set("aml-sdmmc-driver-source") {
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/platform-device/cpp",
     "//sdk/lib/inspect/component/cpp",
-    "//src/devices/block/lib/sdmmc_metadata",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",

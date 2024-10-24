@@ -49,7 +49,6 @@ fuchsia_cc_driver(
         "//sdk/lib/driver/compat/cpp",
         "//src/devices/block/lib/sdio",
         "//src/devices/block/lib/sdmmc",
-        "//src/devices/block/lib/sdmmc_metadata",
         "//src/devices/lib/amlogic",
         "//src/devices/lib/dma-buffer",
         "//src/lib/ddk:ddk_metadata",

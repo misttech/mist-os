@@ -18,7 +18,6 @@
     capabilities: [
         { service: "fuchsia.hardware.power.PowerTokenService" },
         { service: "fuchsia.hardware.sdmmc.SdmmcService" },
-        { service: "fuchsia.hardware.sdmmc.SdmmcMetadata" },
     ],
     use: [
         {
@@ -46,10 +45,6 @@
         },
         {
             service: "fuchsia.hardware.sdmmc.SdmmcService",
-            from: "self",
-        },
-        {
-            service: "fuchsia.hardware.sdmmc.SdmmcMetadata",
             from: "self",
         },
     ],

@@ -12,11 +12,8 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "fidl/fuchsia.hardware.sdmmc/cpp/natural_types.h"
-#include "lib/driver/metadata/cpp/metadata.h"
 #include "sdio-controller-device.h"
 #include "sdmmc-block-device.h"
-#include "src/devices/block/lib/sdmmc_metadata/metadata.h"
 
 namespace sdmmc {
 
@@ -108,35 +105,31 @@ zx::result<std::unique_ptr<SdmmcDevice>> SdmmcRootDevice::MaybeAddDevice(
 zx::result<fuchsia_hardware_sdmmc::SdmmcMetadata> SdmmcRootDevice::GetMetadata() {
   constexpr uint32_t kMaxCommandPacking = 16;
 
-  std::optional<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata;
-  {
-    zx::result result =
-        fdf_metadata::GetMetadataIfExists<fuchsia_hardware_sdmmc::SdmmcMetadata>(incoming());
-    if (result.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to get metadata: %s", result.status_string());
-      return result.take_error();
+  zx::result decoded =
+      compat::GetMetadata<fuchsia_hardware_sdmmc::SdmmcMetadata>(incoming(), DEVICE_METADATA_SDMMC);
+  if (decoded.is_error()) {
+    if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
+      FDF_LOGL(INFO, logger(), "No metadata provided");
+      return zx::ok(fuchsia_hardware_sdmmc::SdmmcMetadata{
+          {.max_frequency = UINT32_MAX,
+           .speed_capabilities = fuchsia_hardware_sdmmc::SdmmcHostPrefs{0},
+           .enable_cache = true,
+           .removable = false,
+           .max_command_packing = kMaxCommandPacking,
+           .use_fidl = true}});
     }
-    metadata = std::move(result.value());
-  }
-  if (!metadata.has_value()) {
-    FDF_LOGL(INFO, logger(), "No metadata provided");
-    return zx::ok(fuchsia_hardware_sdmmc::SdmmcMetadata{
-        {.max_frequency = UINT32_MAX,
-         .speed_capabilities = fuchsia_hardware_sdmmc::SdmmcHostPrefs{0},
-         .enable_cache = true,
-         .removable = false,
-         .max_command_packing = kMaxCommandPacking,
-         .use_fidl = true}});
+    FDF_LOGL(ERROR, logger(), "Failed to get metadata: %s", decoded.status_string());
+    return decoded.take_error();
   }
 
   // Default to trim and cache enabled, non-removable.
-  uint32_t max_frequency = metadata->max_frequency().value_or(UINT32_MAX);
+  uint32_t max_frequency = decoded->max_frequency().value_or(UINT32_MAX);
   fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities =
-      metadata->speed_capabilities().value_or(fuchsia_hardware_sdmmc::SdmmcHostPrefs{0});
-  bool enable_cache = metadata->enable_cache().value_or(true);
-  bool removable = metadata->removable().value_or(false);
-  uint32_t max_command_packing = metadata->max_command_packing().value_or(kMaxCommandPacking);
-  bool use_fidl = metadata->use_fidl().value_or(true);
+      decoded->speed_capabilities().value_or(fuchsia_hardware_sdmmc::SdmmcHostPrefs{0});
+  bool enable_cache = decoded->enable_cache().value_or(true);
+  bool removable = decoded->removable().value_or(false);
+  uint32_t max_command_packing = decoded->max_command_packing().value_or(kMaxCommandPacking);
+  bool use_fidl = decoded->use_fidl().value_or(true);
 
   return zx::ok(fuchsia_hardware_sdmmc::SdmmcMetadata{{.max_frequency = max_frequency,
                                                        .speed_capabilities = speed_capabilities,

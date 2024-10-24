@@ -45,7 +45,6 @@ source_set("sdhci-driver-source") {
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
     "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//zircon/system/ulib/fbl",
   ]
@@ -54,7 +53,6 @@ source_set("sdhci-driver-source") {
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//src/devices/block/lib/sdmmc",
-    "//src/devices/block/lib/sdmmc_metadata:sdmmc_metadata_legacy",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
     "//src/lib/vmo_store",

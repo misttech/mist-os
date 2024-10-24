@@ -110,7 +110,8 @@ zx::result<> AmlSdmmc::Start() {
   {
     zx::result<> result = compat_server_.Initialize(
         incoming(), outgoing(), node_name(), name(),
-        compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}), get_banjo_config());
+        compat::ForwardMetadata::Some({DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO}),
+        get_banjo_config());
     if (result.is_error()) {
       return result.take_error();
     }
@@ -169,7 +170,6 @@ zx::result<> AmlSdmmc::Start() {
   std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_sdmmc::SdmmcService>(arena));
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_power::PowerTokenService>(arena));
-  offers.push_back(metadata_server_.MakeOffer(arena));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name())
@@ -190,12 +190,6 @@ zx::result<> AmlSdmmc::Start() {
 zx::result<> AmlSdmmc::InitResources(
     fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client) {
   fdf::PDev pdev{std::move(pdev_client)};
-
-  if (zx_status_t status = InitMetadataServer(pdev); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to initialize metadata server: %s",
-             zx_status_get_string(status));
-    return zx::error(status);
-  }
 
   {
     zx::result mmio_params = pdev.GetMmio(0);
@@ -1784,23 +1778,6 @@ void AmlSdmmc::PrepareStop(fdf::PrepareStopCompleter completer) {
   }
 
   completer(zx::ok());
-}
-
-zx_status_t AmlSdmmc::InitMetadataServer(fdf::PDev& pdev) {
-  zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_sdmmc::SdmmcMetadata>(
-      fuchsia_hardware_sdmmc::kMetadataTypeName);
-  if (metadata.is_error()) {
-    FDF_LOGL(ERROR, logger(), "Failed to get metadata: %s", metadata.status_string());
-    return metadata.status_value();
-  }
-  metadata_server_.SetMetadata(metadata.value());
-  zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
-  if (status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to serve metadata: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  return ZX_OK;
 }
 
 }  // namespace aml_sdmmc

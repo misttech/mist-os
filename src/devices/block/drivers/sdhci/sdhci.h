@@ -23,13 +23,12 @@
 
 #include "dma-descriptor-builder.h"
 #include "sdhci-reg.h"
-#include "src/devices/block/lib/sdmmc_metadata/metadata_legacy.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace sdhci {
 
 class Sdhci;
-using DeviceType = ddk::Device<Sdhci, ddk::Unbindable>;
+using DeviceType = ddk::Device<Sdhci, ddk::Initializable, ddk::Unbindable>;
 
 class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_protocol> {
  public:
@@ -82,6 +81,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
+  void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
   void DdkUnbind(ddk::UnbindTxn txn);
 
@@ -234,10 +234,6 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   bool DataStageReadReady() TA_REQ(mtx_);
   void DataStageWriteReady() TA_REQ(mtx_);
 
-  zx_status_t InitMetadataServer();
-
-  zx_status_t AddSdhciDevice();
-
   zx::interrupt irq_;
   thrd_t irq_thread_;
 
@@ -268,9 +264,6 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   std::array<SdmmcVmoStore, SDMMC_MAX_CLIENT_ID + 1> registered_vmo_stores_;
 
   std::optional<PendingRequest> pending_request_ TA_GUARDED(mtx_);
-
-  sdmmc::MetadataServer metadata_server_;
-  fdf::OutgoingDirectory outgoing_;
 };
 
 }  // namespace sdhci

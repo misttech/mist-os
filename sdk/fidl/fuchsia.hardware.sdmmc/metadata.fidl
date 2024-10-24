@@ -28,6 +28,3 @@ type SdmmcMetadata = table {
     /// default value is true if no metadata is specified.
     6: use_fidl bool;
 };
-
-// Name of the FIDL type [`fuchsia.hardware.sdmmc/SdmmcMetadata`].
-const METADATA_TYPE_NAME string = "fuchsia.hardware.sdmmc.SdmmcMetadata";
