@@ -29,10 +29,7 @@ pub(crate) struct FetchCommand {
     pub(crate) tags: Vec<Tag>,
 }
 
-fn extract_json_map(hierarchy: Option<DiagnosticsHierarchy>) -> Option<Map<String, Value>> {
-    let Some(hierarchy) = hierarchy else {
-        return None;
-    };
+fn extract_json_map(hierarchy: DiagnosticsHierarchy) -> Option<Map<String, Value>> {
     let Ok(Value::Object(mut map)) = serde_json::to_value(hierarchy) else {
         return None;
     };
@@ -72,12 +69,12 @@ impl std::ops::Deref for DataMap {
 fn condensed_map_of_data(items: impl IntoIterator<Item = Data<Inspect>>) -> DataMap {
     DataMap(items.into_iter().fold(HashMap::new(), |mut entries, item| {
         let Data { payload, moniker, .. } = item;
-        if let Some(new_map) = extract_json_map(payload) {
+        if let Some(new_map) = payload.and_then(extract_json_map) {
             match entries.entry(moniker) {
                 Entry::Occupied(mut o) => {
                     let existing_payload = o.get_mut();
                     if let Value::Object(existing_payload_map) = existing_payload {
-                        existing_payload_map.extend(new_map.into_iter());
+                        existing_payload_map.extend(new_map);
                     }
                 }
                 Entry::Vacant(v) => {
@@ -164,7 +161,7 @@ fn record_timestamped_error(
     warn!("{error}");
     let error = PersistSchema::error(timestamps, error);
     for tag in tags {
-        file_handler::write(&service_name, &tag, &error);
+        file_handler::write(service_name, tag, &error);
     }
 }
 
@@ -271,7 +268,7 @@ impl Fetcher {
             let mut tags = HashMap::new();
             for (tag_name, TagConfig { selectors, max_bytes, .. }) in tags_info.iter() {
                 let selectors = strip_inspect_prefix(selectors)
-                    .map(|s| selectors::parse_selector::<selectors::VerboseError>(s))
+                    .map(selectors::parse_verbose)
                     .collect::<Result<Vec<_>, _>>()?;
                 let info = TagInfo { selectors, max_save_length: *max_bytes };
                 tags.insert(tag_name.clone(), info);
@@ -302,7 +299,7 @@ mod tests {
     #[fuchsia::test]
     fn test_selector_stripping() {
         assert_eq!(
-            strip_inspect_prefix(&vec![
+            strip_inspect_prefix(&[
                 "INSPECT:foo".to_string(),
                 "oops:bar".to_string(),
                 "INSPECT:baz".to_string()
@@ -321,8 +318,8 @@ mod tests {
         )
         .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
         .build();
-        let empty_data_result = condensed_map_of_data(vec![empty_data].into_iter());
-        let empty_vec_result = condensed_map_of_data(vec![].into_iter());
+        let empty_data_result = condensed_map_of_data([empty_data]);
+        let empty_vec_result = condensed_map_of_data([]);
 
         let expected_map = HashMap::new();
 
@@ -361,7 +358,7 @@ mod tests {
             }
         });
 
-        let result = condensed_map_of_data(vec![data].into_iter());
+        let result = condensed_map_of_data([data]);
 
         pretty_assertions::assert_eq!(
             serde_json::to_value(&result).unwrap(),

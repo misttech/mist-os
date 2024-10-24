@@ -84,7 +84,7 @@ impl Scheduler {
             }
         }
         if !now_tags.is_empty() {
-            let _ = state.fetcher.send(FetchCommand { service: service.clone(), tags: now_tags });
+            state.fetcher.send(FetchCommand { service: service.clone(), tags: now_tags });
         }
         // later_tags may not all be fetchable at the same time. Batch the ones that are.
         later_tags.sort_by(|a, b| a.0.cmp(&b.0));
@@ -123,7 +123,7 @@ impl Scheduler {
                     tag_states.get_mut(tag).unwrap().state = FetchState::Idle;
                 }
             }
-            let _ = fetcher.send(command);
+            fetcher.send(command);
         });
     }
 }

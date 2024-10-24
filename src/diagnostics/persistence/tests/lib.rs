@@ -173,7 +173,7 @@ async fn diagnostics_persistence_integration() {
     // Tests for multiple-tag persistence.
 
     // An empty vector should be allowed and cause no change.
-    assert_eq!(realm.request_persist_tags(&vec![]).await, vec![]);
+    assert_eq!(realm.request_persist_tags(&[]).await, vec![]);
     expect_file_change(FileChange {
         old: FileState::None,
         new: FileState::None,
@@ -184,7 +184,7 @@ async fn diagnostics_persistence_integration() {
     // One tag should report correctly and save correctly.
     realm.set_inspect(Some(1i64)).await;
     assert_eq!(
-        realm.request_persist_tags(&vec!["test-component-metric-two"]).await,
+        realm.request_persist_tags(&["test-component-metric-two"]).await,
         vec![PersistResult::Queued]
     );
     expect_file_change(FileChange {
@@ -197,9 +197,7 @@ async fn diagnostics_persistence_integration() {
     // Two tags should report correctly and save correctly.
     realm.set_inspect(Some(2i64)).await;
     assert_eq!(
-        realm
-            .request_persist_tags(&vec!["test-component-metric", "test-component-metric-two"])
-            .await,
+        realm.request_persist_tags(&["test-component-metric", "test-component-metric-two"]).await,
         vec![PersistResult::Queued, PersistResult::Queued]
     );
     expect_file_change(FileChange {
@@ -218,7 +216,7 @@ async fn diagnostics_persistence_integration() {
     // One good and one bad tag should report correctly and save correctly.
     realm.set_inspect(Some(4i64)).await;
     assert_eq!(
-        realm.request_persist_tags(&vec!["wrong_component_metric", "test-component-metric"]).await,
+        realm.request_persist_tags(&["wrong_component_metric", "test-component-metric"]).await,
         vec![PersistResult::BadName, PersistResult::Queued]
     );
     expect_file_change(FileChange {
@@ -238,7 +236,7 @@ async fn diagnostics_persistence_integration() {
     realm.set_inspect(Some(6i64)).await;
     assert_eq!(
         realm
-            .request_persist_tags(&vec!["test-component-metric-two", "test-component-metric-two"])
+            .request_persist_tags(&["test-component-metric-two", "test-component-metric-two"])
             .await,
         vec![PersistResult::Queued, PersistResult::Queued]
     );
@@ -352,7 +350,7 @@ fn clean_and_test_timestamps(map: &mut serde_json::Map<String, Value>) {
         {
             assert!(before.as_u64() <= after.as_u64(), "Monotonic timestamps must increase");
         } else {
-            assert!(false, "Timestamp map must contain before/after monotonic values");
+            panic!("Timestamp map must contain before/after monotonic values");
         }
         for key in TIMESTAMP_STRUCT_ENTRIES.iter() {
             let key = key.to_string();
@@ -409,7 +407,7 @@ fn expect_file_change(rules: FileChange<'_>) {
                 continue;
             }
             let parse_result: Result<Value, serde_json::Error> = serde_json::from_str(&contents);
-            if let Err(_) = parse_result {
+            if parse_result.is_err() {
                 warn!("Bad JSON data in the file. Partial writes happen sometimes. Retrying.");
                 thread::sleep(time::Duration::from_millis(100));
                 continue;
@@ -478,7 +476,7 @@ fn expect_file_change(rules: FileChange<'_>) {
 
 fn json_strings_match(observed: &str, expected: &str, context: &str) -> bool {
     fn parse_json(string: &str, context1: &str, context2: &str) -> Value {
-        let parse_result: Result<Value, serde_json::Error> = serde_json::from_str(&string);
+        let parse_result: Result<Value, serde_json::Error> = serde_json::from_str(string);
         match parse_result {
             Ok(json) => json,
             Err(badness) => {
@@ -525,7 +523,7 @@ fn zero_and_test_timestamps(contents: &str) -> String {
     let mut string_result_array = result_json
         .as_array()
         .expect("result json is an array of objs.")
-        .into_iter()
+        .iter()
         .filter_map(|val| {
             let mut val = val.clone();
 
