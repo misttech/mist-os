@@ -188,7 +188,7 @@ impl Parse for PseudoDirectory {
         };
 
         let entries: Vec<DirectoryEntry> =
-            input.parse_terminated::<_, Token![,]>(DirectoryEntry::parse)?.into_iter().collect();
+            input.parse_terminated(DirectoryEntry::parse, Token![,])?.into_iter().collect();
 
         Ok(PseudoDirectory { assign_to, entries })
     }
