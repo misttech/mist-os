@@ -116,7 +116,7 @@ fn generate_timestamp_message(boot_timestamp: Timestamp) -> LogEntry {
                 component_url: Some("ffx".into()),
                 severity: Severity::Info,
             })
-            .set_message(format!("Logging started"))
+            .set_message("Logging started")
             .add_key(LogsProperty::String(
                 LogsField::Other("utc_time_now".into()),
                 chrono::Utc::now().to_rfc3339(),
@@ -278,9 +278,6 @@ where
                 self.format_text_log(options_for_this_line_only, log_entry)?;
             }
             None => {
-                match log_entry {
-                    _ => {}
-                }
                 self.writer.item(&log_entry).map_err(|err| LogError::UnknownError(err.into()))?;
             }
         };
@@ -301,14 +298,12 @@ where
     W: Write + ToolIO<OutputItem = LogEntry>,
 {
     fn set_boot_timestamp(&mut self, boot_ts_nanos: Timestamp) {
-        match &mut self.options.display {
-            Some(LogTextDisplayOptions {
-                time_format: LogTimeDisplayFormat::WallTime { ref mut offset, .. },
-                ..
-            }) => {
-                *offset = boot_ts_nanos.into_nanos();
-            }
-            _ => (),
+        if let Some(LogTextDisplayOptions {
+            time_format: LogTimeDisplayFormat::WallTime { ref mut offset, .. },
+            ..
+        }) = &mut self.options.display
+        {
+            *offset = boot_ts_nanos.into_nanos();
         }
         self.boot_ts_nanos = Some(boot_ts_nanos);
     }
@@ -348,7 +343,7 @@ where
     pub fn new_from_args(cmd: &LogCommand, writer: W) -> Self {
         let is_json = writer.is_machine();
         let formatter = DefaultLogFormatter::new(
-            LogFilterCriteria::try_from(cmd.clone()).unwrap(),
+            LogFilterCriteria::from(cmd.clone()),
             writer,
             LogFormatterOptions {
                 display: if is_json {
@@ -379,7 +374,6 @@ where
                         },
                         show_file: !cmd.hide_file,
                         show_full_moniker: cmd.show_full_moniker,
-                        ..Default::default()
                     })
                 },
                 since: DeviceOrLocalTimestamp::new(cmd.since.as_ref(), cmd.since_boot.as_ref()),
@@ -421,13 +415,14 @@ where
                 unreachable!("If we are here, we can only be formatting text");
             }
         };
-        Ok(match log_entry {
+        match log_entry {
             LogEntry { data: LogData::TargetLog(data), .. } => {
                 // TODO(https://fxbug.dev/42072442): Add support for log spam redaction and other
                 // features listed in the design doc.
                 writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
             }
-        })
+        }
+        Ok(())
     }
 }
 
@@ -828,13 +823,12 @@ mod test {
                     time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 1 },
                     ..Default::default()
                 }),
-                ..Default::default()
             },
         );
         formatter.set_boot_timestamp(Timestamp::from_nanos(1));
 
         let (sender, receiver) = zx::Socket::create_stream();
-        let logs = (0..4).map(|i| make_log_with_timestamp(i)).collect::<Vec<_>>();
+        let logs = (0..4).map(make_log_with_timestamp).collect::<Vec<_>>();
         sender
             .write(serde_json::to_string(&logs).unwrap().as_bytes())
             .expect("failed to write target log");
@@ -897,9 +891,10 @@ mod test {
     async fn test_default_formatter_with_hidden_metadata() {
         let buffers = TestBuffers::default();
         let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
-        let mut options = LogFormatterOptions::default();
-        options.display =
-            Some(LogTextDisplayOptions { show_metadata: false, ..Default::default() });
+        let options = LogFormatterOptions {
+            display: Some(LogTextDisplayOptions { show_metadata: false, ..Default::default() }),
+            ..LogFormatterOptions::default()
+        };
         let mut formatter =
             DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
         formatter.push_log(log_entry()).await.unwrap();

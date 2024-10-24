@@ -57,7 +57,7 @@ pub type ParsingResult<'a, O> = IResult<ParsingContext<'a>, O, VerboseError<Pars
 //  _before_ the non-whitespace that the parser is trying to match.
 
 // Matches 0 or more whitespace characters: \n, \t, ' '.
-fn whitespace<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ParsingContext<'a>> {
+fn whitespace(i: ParsingContext<'_>) -> ParsingResult<'_, ParsingContext<'_>> {
     take_while(|c| " \n\t".contains(c))(i)
 }
 
@@ -75,7 +75,7 @@ fn spewing<'a, F, O>(
 where
     F: FnMut(&'a str) -> IResult<&'a str, O, VerboseError<&'a str>>,
 {
-    let dumper = move |i: ParsingContext<'a>| {
+    let dumper = move |i: ParsingContext<'_>| {
         println!("{}:'{}'", note, &i[..min(20, i.len())]);
         Ok((i, ()))
     };
@@ -92,7 +92,7 @@ where
 
 // Parses a name with the first character alphabetic or '_' and 0..n additional
 // characters alphanumeric or '_'.
-fn simple_name<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, &'a str> {
+fn simple_name(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
     map(
         recognize(pair(
             take_while_m_n(1, 1, |c: char| c.is_ascii() && (is_alphabetic(c as u8) || c == '_')),
@@ -104,7 +104,7 @@ fn simple_name<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, &'a str> {
 
 // Parses two simple names joined by "::" to form a namespaced name. Returns a
 // Metric-type Expression holding the namespaced name.
-fn name_with_namespace<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn name_with_namespace(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     map(separated_pair(simple_name, tag("::"), simple_name), move |(s1, s2)| {
         ExpressionTree::Variable(VariableName::new(format!("{}::{}", s1, s2)))
     })(i)
@@ -112,13 +112,13 @@ fn name_with_namespace<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, Expressio
 
 // Parses a simple name with no namespace and returns a Metric-type Expression
 // holding the simple name.
-fn name_no_namespace<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn name_no_namespace(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     map(simple_name, move |s: &str| ExpressionTree::Variable(VariableName::new(s.to_string())))(i)
 }
 
 // Parses either a simple or namespaced name and returns a Metric-type Expression
 // holding it.
-fn name<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn name(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     alt((name_with_namespace, name_no_namespace))(i)
 }
 
@@ -126,7 +126,7 @@ fn name<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
 // DEC_DIGIT (DEC_DIGIT|_)*
 // Parse the first decimal digit
 // Consume all the remaining (DEC_DIGIT|_)
-fn decimal_literal<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, &'a str> {
+fn decimal_literal(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
     map(
         recognize(tuple((one_of("0123456789"), many0(one_of("0123456789_"))))),
         |d: ParsingContext<'_>| d.into_inner(),
@@ -139,7 +139,7 @@ fn decimal_literal<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, &'a str> {
 // So we consume all the preceding '_'
 // The next digit must be a DEC_DIGIT, if not the float exponent is not valid
 // Consume all the remaining (DEC_DIGIT|_)
-fn float_exponent<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, &'a str> {
+fn float_exponent(i: ParsingContext<'_>) -> ParsingResult<'_, &str> {
     map(
         recognize(tuple((
             one_of("eE"),
@@ -162,7 +162,7 @@ fn float_exponent<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, &'a str> {
 //  3. DECIMAL_LITERAL . DECIMAL_LITERAL (FLOAT_EXPONENT)? Eg. 1__234__.12E-3 (1.23412)
 //  4. DECIMAL_LITERAL . (not followed by '.', '_', 'e') Eg. 1.
 //  5. DECIMAL_LITERAL Eg. 1_2__3__4 (1234)
-fn double<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, f64> {
+fn double(i: ParsingContext<'_>) -> ParsingResult<'_, f64> {
     map(
         recognize(tuple((
             opt(one_of("+-")),
@@ -190,7 +190,7 @@ fn double<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, f64> {
 // it finds a number, number() attempts to parse those same characters as an int.
 // If it succeeds, it treats the number as an Int type.
 // Note that this handles unary + and -.
-fn number<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn number(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     match double(i) {
         Ok((remaining, float)) => {
             let number_len = i.input_len() - remaining.input_len(); // How many characters were accepted
@@ -199,7 +199,7 @@ fn number<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
                 Err(_) => Ok((remaining, ExpressionTree::Value(MetricValue::Float(float)))),
             }
         }
-        Err(error) => return Err(error),
+        Err(error) => Err(error),
     }
 }
 
@@ -212,19 +212,19 @@ macro_rules! any_string {
     }};
 }
 
-fn single_quote_string<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn single_quote_string(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     any_string!(char('\''), is_not("'"), char('\''), i)
 }
 
-fn escaped_single_quote_string<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn escaped_single_quote_string(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     any_string!(tag("\'"), is_not("\'"), tag("\'"), i)
 }
 
-fn double_quote_string<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn double_quote_string(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     any_string!(char('\"'), is_not("\""), char('\"'), i)
 }
 
-fn escaped_double_quote_string<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn escaped_double_quote_string(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     any_string!(tag("\""), is_not("\""), tag("\""), i)
 }
 
@@ -235,7 +235,7 @@ fn escaped_double_quote_string<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, E
 // - '"hello"'
 // - "\"hello\""
 // - '\'hello\''
-fn string<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn string(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     alt((
         single_quote_string,
         escaped_single_quote_string,
@@ -256,7 +256,7 @@ macro_rules! math {
     };
 }
 
-fn function_name_parser<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, Function> {
+fn function_name_parser(i: ParsingContext<'_>) -> ParsingResult<'_, Function> {
     // alt has a limited number of args, so must be nested.
     // At some point, worry about efficiency.
     // Make sure that if one function is a prefix of another, the longer one comes first or the
@@ -302,7 +302,7 @@ fn function_name_parser<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, Function
     ))(i)
 }
 
-fn function_expression<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn function_expression(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     let open_paren = spaced(char('('));
     let expressions = separated_list0(spaced(char(',')), expression_top);
     let close_paren = spaced(char(')'));
@@ -312,7 +312,7 @@ fn function_expression<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, Expressio
     })(i)
 }
 
-fn vector_expression<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn vector_expression(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     let open_bracket = spaced(char('['));
     let expressions = separated_list0(spaced(char(',')), expression_top);
     let close_bracket = spaced(char(']'));
@@ -323,7 +323,7 @@ fn vector_expression<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionT
 // I use "primitive" to mean an expression that is not an infix operator pair:
 // a primitive value, a metric name, a function (simple name followed by
 // parenthesized expression list), or any expression contained by ( ) or [ ].
-fn expression_primitive<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn expression_primitive(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     let paren_expr = delimited(char('('), terminated(expression_top, whitespace), char(')'));
     let res =
         spaced(alt((paren_expr, function_expression, vector_expression, number, string, name)))(i);
@@ -331,7 +331,7 @@ fn expression_primitive<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, Expressi
 }
 
 // Scans for primitive expressions separated by * and /.
-fn expression_muldiv<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn expression_muldiv(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     let (i, init) = expression_primitive(i)?;
     let mut init = Some(init);
     fold_many0(
@@ -352,7 +352,7 @@ fn expression_muldiv<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionT
 
 // Scans for muldiv expressions (which may be a single primitive expression)
 // separated by + and -. Remember unary + and - will be recognized by number().
-fn expression_addsub<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn expression_addsub(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     let (i, init) = expression_muldiv(i)?;
     let mut init = Some(init);
     fold_many0(
@@ -364,7 +364,7 @@ fn expression_addsub<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionT
 
 // Top-level expression. Should match the entire expression string, and also
 // can be used inside parentheses.
-fn expression_top<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
+fn expression_top(i: ParsingContext<'_>) -> ParsingResult<'_, ExpressionTree> {
     // Note: alt() is not BNF - it's sequential. It's important to put the longer strings first.
     // If a shorter substring succeeds where it shouldn't, the alt() may not get another chance.
     let comparison = alt((
@@ -389,21 +389,17 @@ pub(crate) fn parse_expression(i: &str, namespace: &str) -> Result<ExpressionTre
     let ctx = ParsingContext::new(i, namespace);
     let mut match_whole = all_consuming(terminated(expression_top, whitespace));
     match match_whole(ctx) {
-        Err(Err::Error(e)) | Err(Err::Failure(e)) => {
-            return Err(format_err!(
-                "Expression Error: \n{}",
-                convert_error(
-                    ctx.into_inner(),
-                    VerboseError {
-                        errors: e.errors.into_iter().map(|e| (e.0.into_inner(), e.1)).collect()
-                    }
-                )
-            ))
-        }
+        Err(Err::Error(e)) | Err(Err::Failure(e)) => Err(format_err!(
+            "Expression Error: \n{}",
+            convert_error(
+                ctx.into_inner(),
+                VerboseError {
+                    errors: e.errors.into_iter().map(|e| (e.0.into_inner(), e.1)).collect()
+                }
+            )
+        )),
         Ok((_, result)) => Ok(result),
-        Err(Incomplete(what)) => {
-            return Err(format_err!("Why did I get an incomplete? {:?}", what))
-        }
+        Err(Incomplete(what)) => Err(format_err!("Why did I get an incomplete? {:?}", what)),
     }
 }
 

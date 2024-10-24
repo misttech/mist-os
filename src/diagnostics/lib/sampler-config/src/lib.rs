@@ -166,7 +166,7 @@ pub enum DataType {
 
 // #[cfg(test)] won't work because it's used outside the library.
 pub fn parse_selector_for_test(selector_str: &str) -> Option<ParsedSelector> {
-    Some(selector_list::parse_selector::<serde::de::value::Error>(selector_str).unwrap())
+    Some(selector_list::parse_selector(selector_str).unwrap())
 }
 
 // TODO(https://fxbug.dev/42169836): Maybe refactor this into a generic ValueList - but remember that
@@ -360,11 +360,9 @@ impl MetricConfig {
             selectors
                 .iter_mut()
                 .map::<Result<_, anyhow::Error>, _>(|s| {
-                    match Self::interpolate_template(s, &component) {
+                    match Self::interpolate_template(s, component) {
                         Ok(Some(filled_template)) => {
-                            Ok(match selector_list::parse_selector::<serde::de::value::Error>(
-                                &filled_template,
-                            ) {
+                            Ok(match selector_list::parse_selector(&filled_template) {
                                 Ok(selector) => Ok(Some(selector)),
                                 Err(err) => Err(err),
                             }?)
@@ -415,7 +413,7 @@ impl MetricConfig {
                 MONIKER_INTERPOLATION,
                 &selectors::sanitize_string_for_selectors(&component_info.moniker.to_string()),
             ))),
-            (_, _, Some(_), Some(id)) => Ok(Some(template.replace(INSTANCE_ID_INTERPOLATION, &id))),
+            (_, _, Some(_), Some(id)) => Ok(Some(template.replace(INSTANCE_ID_INTERPOLATION, id))),
             (_, _, Some(_), None) => Ok(None),
             (None, _, None, _) => {
                 bail!(
@@ -435,14 +433,14 @@ impl MetricConfig {
 impl ProjectConfig {
     fn from_template(
         template: ProjectTemplate,
-        components: &Vec<ComponentIdInfo>,
+        components: &[ComponentIdInfo],
     ) -> Result<Self, Error> {
         let ProjectTemplate { metrics, customer_id, project_id, poll_rate_sec, source_name } =
             template;
         let mut expanded_metrics = vec![];
         for component in components.iter() {
             for metric in &metrics {
-                expanded_metrics.push(MetricConfig::from_template(metric.to_owned(), &component)?);
+                expanded_metrics.push(MetricConfig::from_template(metric.to_owned(), component)?);
             }
         }
         Ok(ProjectConfig {
@@ -458,7 +456,7 @@ impl ProjectConfig {
 fn add_instance_ids(ids: component_id_index::Index, fire_components: &mut Vec<ComponentIdInfo>) {
     for component in fire_components {
         if let ExtendedMoniker::ComponentInstance(moniker) = &component.moniker {
-            component.instance_id = ids.id_for_moniker(&moniker).map(|h| format!("{h}"));
+            component.instance_id = ids.id_for_moniker(moniker).map(|h| format!("{h}"));
         }
     }
 }
@@ -542,23 +540,19 @@ impl SamplerConfig {
                 let source_name = config.source_name.clone();
                 top_node.record_child(source_name, |file_node| {
                     for metric in config.metrics.iter() {
-                        for selector in metric.selectors.iter() {
-                            if let Some(ref selector) = selector {
-                                file_node.record_child(
-                                    format!("{}", next_selector_index),
-                                    |selector_node| {
-                                        next_selector_index += 1;
-                                        selector_node.record_string(
-                                            "selector",
-                                            selector.selector_string.clone(),
-                                        );
-                                        selector_node.record_uint(
-                                            "upload_count",
-                                            selector.get_upload_count(),
-                                        );
-                                    },
-                                );
-                            }
+                        for selector in metric.selectors.iter().flatten() {
+                            file_node.record_child(
+                                format!("{}", next_selector_index),
+                                |selector_node| {
+                                    next_selector_index += 1;
+                                    selector_node.record_string(
+                                        "selector",
+                                        selector.selector_string.clone(),
+                                    );
+                                    selector_node
+                                        .record_uint("upload_count", selector.get_upload_count());
+                                },
+                            );
                         }
                     }
                 });
@@ -618,7 +612,7 @@ mod tests {
 
         let config = SamplerConfigBuilder::default()
             .minimum_sample_rate_sec(10)
-            .sampler_dir(&load_path)
+            .sampler_dir(load_path)
             .load();
         assert!(config.is_ok());
         assert_eq!(config.unwrap().project_configs.len(), 2);
@@ -658,7 +652,7 @@ mod tests {
 
         let config = SamplerConfigBuilder::default()
             .minimum_sample_rate_sec(10)
-            .sampler_dir(&load_path)
+            .sampler_dir(load_path)
             .load();
         assert!(config.is_err());
     }
@@ -704,7 +698,7 @@ mod tests {
 
         let config = SamplerConfigBuilder::default()
             .minimum_sample_rate_sec(10)
-            .sampler_dir(&load_path)
+            .sampler_dir(load_path)
             .load();
         assert!(config.is_ok());
         assert_eq!(config.unwrap().project_configs.len(), 2);
@@ -750,7 +744,7 @@ mod tests {
 
         let config = SamplerConfigBuilder::default()
             .minimum_sample_rate_sec(10)
-            .sampler_dir(&load_path)
+            .sampler_dir(load_path)
             .load();
         assert!(config.is_ok());
         assert_eq!(config.as_ref().unwrap().project_configs.len(), 2);
@@ -778,7 +772,7 @@ mod tests {
 "#).unwrap();
         let config = SamplerConfigBuilder::default()
             .minimum_sample_rate_sec(10)
-            .sampler_dir(&load_path)
+            .sampler_dir(load_path)
             .load();
         assert!(config.is_ok());
         assert_eq!(config.as_ref().unwrap().project_configs[0].metrics[0].event_codes, vec![]);
@@ -880,26 +874,23 @@ mod tests {
 
         let config = SamplerConfigBuilder::default()
             .minimum_sample_rate_sec(10)
-            .sampler_dir(&sampler_load_path)
-            .fire_dir(&fire_load_path)
+            .sampler_dir(sampler_load_path)
+            .fire_dir(fire_load_path)
             .load();
         assert!(config.is_ok());
         let configs = &config.as_ref().unwrap().project_configs;
         // Customer ID 6 is normal Sampler config. ID 7 and 8 are FIRE configs. There must be
         // one project config for each customer ID, 3 total.
-        let config_6 = configs.iter().filter(|c| c.customer_id() == 6).next().unwrap();
-        let config_7 = configs.iter().filter(|c| c.customer_id() == 7).next().unwrap();
-        let config_8 = configs.iter().filter(|c| c.customer_id() == 8).next().unwrap();
-        let metric_6 =
-            config_6.metrics.iter().filter(|m| m.event_codes == vec![0, 0]).next().unwrap();
+        let config_6 = configs.iter().find(|c| c.customer_id() == 6).unwrap();
+        let config_7 = configs.iter().find(|c| c.customer_id() == 7).unwrap();
+        let config_8 = configs.iter().find(|c| c.customer_id() == 8).unwrap();
+        let metric_6 = config_6.metrics.iter().find(|m| m.event_codes == vec![0, 0]).unwrap();
         let metric_7_42 =
-            config_7.metrics.iter().filter(|m| m.event_codes == vec![42, 1, 2]).next().unwrap();
+            config_7.metrics.iter().find(|m| m.event_codes == vec![42, 1, 2]).unwrap();
         let metric_7_43 =
-            config_7.metrics.iter().filter(|m| m.event_codes == vec![43, 1, 2]).next().unwrap();
-        let metric_8_42 =
-            config_8.metrics.iter().filter(|m| m.event_codes == vec![42]).next().unwrap();
-        let metric_8_43 =
-            config_8.metrics.iter().filter(|m| m.event_codes == vec![43]).next().unwrap();
+            config_7.metrics.iter().find(|m| m.event_codes == vec![43, 1, 2]).unwrap();
+        let metric_8_42 = config_8.metrics.iter().find(|m| m.event_codes == vec![42]).unwrap();
+        let metric_8_43 = config_8.metrics.iter().find(|m| m.event_codes == vec![43]).unwrap();
 
         // Make sure we don't have any extra configs or metrics
         assert_eq!(configs.len(), 3);

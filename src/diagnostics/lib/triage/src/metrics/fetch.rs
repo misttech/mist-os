@@ -84,7 +84,7 @@ impl<'a> FileDataFetcher<'a> {
             // Selectors return a vector. Non-wildcarded Inspect selectors will usually return
             // a vector with a single element, but when a component exposes multiple
             // `fuchsia.inspect.Tree`s, a non-wildcarded selector may match multiple properties.
-            SelectorType::Inspect => MetricValue::Vector(self.inspect.fetch(&selector)),
+            SelectorType::Inspect => MetricValue::Vector(self.inspect.fetch(selector)),
         }
     }
 
@@ -408,10 +408,10 @@ impl InspectFetcher {
         if !found_component {
             return Ok(vec![missing(format!(
                 "No component found matching selector {}",
-                selector_string.body.to_string()
+                selector_string.body,
             ))]);
         }
-        Ok(properties.into_iter().map(|property| MetricValue::from(property)).collect())
+        Ok(properties.into_iter().map(MetricValue::from).collect())
     }
 
     pub fn fetch(&self, selector: &SelectorString) -> Vec<MetricValue> {
@@ -440,8 +440,8 @@ mod test {
 
     static LOCAL_M: LazyLock<HashMap<String, JsonValue>> = LazyLock::new(|| {
         let mut m = HashMap::new();
-        m.insert("foo".to_owned(), JsonValue::try_from(42).unwrap());
-        m.insert("a::b".to_owned(), JsonValue::try_from(7).unwrap());
+        m.insert("foo".to_owned(), JsonValue::from(42));
+        m.insert("a::b".to_owned(), JsonValue::from(7));
         m
     });
     static FOO_42_AB_7_TRIAL_FETCHER: LazyLock<TrialDataFetcher<'static>> =

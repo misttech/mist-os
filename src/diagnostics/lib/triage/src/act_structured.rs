@@ -52,8 +52,8 @@ impl TriageOutput {
     /// Returns true if any triggered [Warning]s or [Error]s are generated while building the
     /// [TriageOutput], and false otherwise.
     pub fn has_reportable_issues(&self) -> bool {
-        for (_namespace, actions_map) in &self.actions {
-            for (_name, action) in actions_map {
+        for actions_map in self.actions.values() {
+            for action in actions_map.values() {
                 if action.has_reportable_issue() {
                     return true;
                 }
@@ -74,7 +74,7 @@ impl<'a> StructuredActionContext<'a> {
     pub(crate) fn new(
         metrics: &'a Metrics,
         actions: &'a Actions,
-        diagnostic_data: &'a Vec<DiagnosticData>,
+        diagnostic_data: &'a [DiagnosticData],
         now: Option<i64>,
     ) -> StructuredActionContext<'a> {
         let fetcher = FileDataFetcher::new(diagnostic_data);
@@ -122,11 +122,11 @@ impl StructuredActionContext<'_> {
     }
 
     /// Update alerts after ensuring their trigger is evaluated.
-    fn update_alerts(&mut self, action: &Alert, namespace: &String, name: &String) {
+    fn update_alerts(&mut self, action: &Alert, namespace: &str, name: &str) {
         self.metric_state.eval_action_metric(namespace, &action.trigger);
         self.triage_output.add_action(
-            namespace.clone(),
-            name.clone(),
+            namespace.to_owned(),
+            name.to_owned(),
             Action::Alert(action.clone()),
         );
     }

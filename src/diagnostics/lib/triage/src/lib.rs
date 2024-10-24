@@ -55,7 +55,7 @@ fn time_from_snapshot(files: &[DiagnosticData]) -> Option<i64> {
 /// Each DiagnosticData will yield a single ActionResults instance.
 /// Minor errors will not be included.
 pub fn analyze(
-    diagnostic_data: &Vec<DiagnosticData>,
+    diagnostic_data: &[DiagnosticData],
     parse_result: &ParseResult,
 ) -> Result<ActionResults, Error> {
     inner_analyze(diagnostic_data, parse_result, false /* verbose */)
@@ -87,7 +87,7 @@ fn inner_analyze(
 /// Analyze all DiagnosticData against loaded configs and generate the corresponding TriageOutput.
 /// A single TriageOutput instance is returned regardless of the length of DiagnosticData.
 pub fn analyze_structured(
-    diagnostic_data: &Vec<DiagnosticData>,
+    diagnostic_data: &[DiagnosticData],
     parse_result: &ParseResult,
 ) -> Result<TriageOutput, Error> {
     parse_result.reset_state();
@@ -103,7 +103,7 @@ pub fn analyze_structured(
 
 // Do not call this from WASM - WASM does not provde a monotonic clock.
 pub fn snapshots(
-    data: &Vec<DiagnosticData>,
+    data: &[DiagnosticData],
     parse_result: &ParseResult,
 ) -> (Vec<SnapshotTrigger>, act::WarningVec) {
     parse_result.reset_state();
@@ -117,7 +117,7 @@ pub fn all_selectors(parse: &ParseResult) -> Vec<String> {
 }
 
 pub fn evaluate_int_math(expression: &str) -> Result<i64, Error> {
-    return metric_value_to_int(MetricState::evaluate_math(expression));
+    metric_value_to_int(MetricState::evaluate_math(expression))
 }
 
 pub fn metric_value_to_int(metric_value: MetricValue) -> Result<i64, Error> {
@@ -141,7 +141,7 @@ mod test {
         fn file(name: &str, source: Source, contents: &str) -> DiagnosticData {
             DiagnosticData::new(name.to_string(), source, contents.to_string()).unwrap()
         }
-        assert_eq!(time_from_snapshot(&vec![]), None);
+        assert_eq!(time_from_snapshot(&[]), None);
         // DiagnosticData can't be created with invalid JSON.
         let files = vec![file("foo.json", Source::Annotations, r#"{"a":"b"}"#)];
         assert_eq!(time_from_snapshot(&files), None);

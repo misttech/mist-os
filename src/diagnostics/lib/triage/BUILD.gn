@@ -60,6 +60,8 @@ rustc_library("triage") {
   deps = lib_deps
 
   sources = library_sources
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_test("triage-lib-unittests") {
@@ -70,6 +72,8 @@ rustc_test("triage-lib-unittests") {
          ] + lib_deps
 
   sources = library_sources
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 group("tests") {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::act::{Action, ActionResults, Severity};
+use crate::act::{Action, ActionResults, Gauge, Severity};
 use crate::metrics::fetch::FileDataFetcher;
 use crate::metrics::metric_value::MetricValue;
 
@@ -35,13 +35,9 @@ pub trait Plugin {
                     Severity::Warning => results.warnings.push(alert.print),
                     Severity::Error => results.errors.push(alert.print),
                 },
-                Action::Gauge(gauge) => {
-                    if let Some(metric_value) = gauge.value.cached_value.into_inner() {
-                        if let MetricValue::String(raw_value) = metric_value {
-                            if let Some(tag) = gauge.tag {
-                                results.gauges.push(format!("{}: {}", tag, raw_value));
-                            }
-                        }
+                Action::Gauge(Gauge { tag: Some(tag), value, .. }) => {
+                    if let Some(MetricValue::String(raw_value)) = value.cached_value.into_inner() {
+                        results.gauges.push(format!("{}: {}", tag, raw_value));
                     }
                 }
                 _ => (),

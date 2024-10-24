@@ -10,7 +10,7 @@ use itertools::Itertools;
 
 pub struct MemoryPlugin();
 
-const SELECTOR: &'static str = "INSPECT:core/memory_monitor:root:current_digest";
+const SELECTOR: &str = "INSPECT:core/memory_monitor:root:current_digest";
 
 impl Plugin for MemoryPlugin {
     fn name(&self) -> &'static str {
@@ -45,7 +45,7 @@ impl Plugin for MemoryPlugin {
                         if value.is_empty() || name == "Free" || name == "timestamp" {
                             return None;
                         }
-                        let numeric = value.trim_matches(|c: char| !c.is_digit(10));
+                        let numeric = value.trim_matches(|c: char| !c.is_ascii_digit());
                         let (mult, parsed) = if value.ends_with("k") {
                             (1_000f64, numeric.parse::<f64>().ok())
                         } else if value.ends_with("M") {

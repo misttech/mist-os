@@ -66,11 +66,7 @@ impl From<LogCommand> for LogFilterCriteria {
             exclude_tags: cmd.exclude_tags,
             pid: cmd.pid,
             tid: cmd.tid,
-            interest_selectors: cmd
-                .select
-                .into_iter()
-                .chain(cmd.set_severity.into_iter())
-                .collect(),
+            interest_selectors: cmd.select.into_iter().chain(cmd.set_severity).collect(),
         }
     }
 }
@@ -119,7 +115,7 @@ impl LogFilterCriteria {
     fn parse_tags(value: &str) -> Vec<&str> {
         let mut tags = Vec::new();
         let mut current = value;
-        if current.chars().next() != Some('[') {
+        if !current.starts_with('[') {
             return tags;
         }
         loop {
@@ -141,7 +137,7 @@ impl LogFilterCriteria {
 
     fn match_synthetic_klog_tags(&self, klog_str: &str) -> bool {
         let tags = Self::parse_tags(klog_str);
-        self.tags.iter().any(|f| tags.iter().filter(|t| t.contains(f)).next().is_some())
+        self.tags.iter().any(|f| tags.iter().any(|t| t.contains(f)))
     }
 
     /// Returns true if the given `LogsData` matches the moniker string.
@@ -158,8 +154,7 @@ impl LogFilterCriteria {
             .interest_selectors
             .iter()
             .filter(|s| data.moniker.matches_component_selector(&s.selector).unwrap_or(false))
-            .map(|selector| selector.interest.min_severity)
-            .flatten()
+            .filter_map(|selector| selector.interest.min_severity)
             .min()
             .unwrap_or(self.min_severity.into());
         if data.metadata.severity < min_severity {
@@ -179,10 +174,7 @@ impl LogFilterCriteria {
         }
 
         if !self.moniker_filters.is_empty()
-            && !self
-                .moniker_filters
-                .iter()
-                .any(|f| Self::matches_filter_by_moniker_string(f, &data))
+            && !self.moniker_filters.iter().any(|f| Self::matches_filter_by_moniker_string(f, data))
         {
             return false;
         }
@@ -190,12 +182,12 @@ impl LogFilterCriteria {
         let msg = data.msg().unwrap_or("");
 
         if !self.filters.is_empty()
-            && !self.filters.iter().any(|f| Self::matches_filter_string(f, msg, &data))
+            && !self.filters.iter().any(|f| Self::matches_filter_string(f, msg, data))
         {
             return false;
         }
 
-        if self.excludes.iter().any(|f| Self::matches_filter_string(f, msg, &data)) {
+        if self.excludes.iter().any(|f| Self::matches_filter_string(f, msg, data)) {
             return false;
         }
 
@@ -271,7 +263,7 @@ mod test {
             exclude_tags: vec!["tag3".to_string()],
             ..empty_dump_command()
         };
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -326,7 +318,7 @@ mod test {
             ("other_selector", diagnostics_data::Severity::Debug, false),
             ("other_selector", diagnostics_data::Severity::Info, true),
         ];
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
         assert_eq!(criteria.min_severity, Severity::Info);
         for (moniker, severity, is_included) in expectations {
             let entry = make_log_entry(
@@ -363,7 +355,7 @@ mod test {
             ],
             ..LogCommand::default()
         };
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         for severity in severities {
             let entry = make_log_entry(
@@ -379,7 +371,7 @@ mod test {
                 .build()
                 .into(),
             );
-            assert_eq!(criteria.matches(&entry), true);
+            assert!(criteria.matches(&entry));
         }
     }
 
@@ -390,7 +382,7 @@ mod test {
             exclude_tags: vec!["tag3".to_string()],
             ..empty_dump_command()
         };
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -437,7 +429,7 @@ mod test {
     async fn test_severity_filter_with_debug() {
         let mut cmd = empty_dump_command();
         cmd.severity = Severity::Trace;
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -478,7 +470,7 @@ mod test {
     async fn test_pid_filter() {
         let mut cmd = empty_dump_command();
         cmd.pid = Some(123);
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -512,7 +504,7 @@ mod test {
             moniker: vec!["/core/network/netstack".to_string()],
             ..empty_dump_command()
         };
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -555,7 +547,7 @@ mod test {
     async fn test_tid_filter() {
         let mut cmd = empty_dump_command();
         cmd.tid = Some(123);
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -602,7 +594,7 @@ mod test {
             severity: Severity::Error,
             ..empty_dump_command()
         };
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -687,7 +679,7 @@ mod test {
     #[fuchsia::test]
     async fn test_criteria_klog_only() {
         let cmd = LogCommand { tag: vec!["component_manager".into()], ..empty_dump_command() };
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -760,7 +752,7 @@ mod test {
     #[fuchsia::test]
     async fn test_criteria_klog_tag_hack() {
         let cmd = LogCommand { kernel: true, ..empty_dump_command() };
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -789,7 +781,7 @@ mod test {
     #[test]
     fn filter_fiters_filename() {
         let cmd = LogCommand { filter: vec!["sometestfile".into()], ..empty_dump_command() };
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -808,7 +800,7 @@ mod test {
     #[fuchsia::test]
     async fn test_empty_criteria() {
         let cmd = empty_dump_command();
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -863,7 +855,7 @@ mod test {
     fn tag_matches_moniker_last_segment() {
         // When the tags are empty, the last segment of the moniker is treated as the tag.
         let cmd = LogCommand { tag: vec!["last_segment".to_string()], ..empty_dump_command() };
-        let criteria = LogFilterCriteria::try_from(cmd).unwrap();
+        let criteria = LogFilterCriteria::from(cmd);
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {

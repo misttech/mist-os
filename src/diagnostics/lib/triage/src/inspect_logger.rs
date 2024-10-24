@@ -18,11 +18,11 @@ mod target {
         }
     }
 
-    static LOGGER: LazyLock<LogHolder> = LazyLock::new(|| LogHolder::new());
+    static LOGGER: LazyLock<LogHolder> = LazyLock::new(LogHolder::new);
 
     /// Provides a `BoundedListNode` to store logged warnings and errors in.
     pub fn set_log_list_node(node: BoundedListNode) {
-        *(*LOGGER).list.lock().unwrap() = Some(node);
+        *LOGGER.list.lock().unwrap() = Some(node);
     }
 
     /// Logs a "warn" message to a list of messages in Inspect.
@@ -38,7 +38,7 @@ mod target {
     }
 
     fn log_problem(level: &str, message: &str, namespace: &str, name: &str, error: &str) {
-        let Some(ref mut list) = *(*LOGGER).list.lock().unwrap() else {
+        let Some(ref mut list) = *LOGGER.list.lock().unwrap() else {
             return;
         };
         inspect_log!(

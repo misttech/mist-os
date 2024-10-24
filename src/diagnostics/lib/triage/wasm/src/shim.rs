@@ -22,6 +22,7 @@ enum Value {
 }
 
 /// Object to manage lifetime of objects needed for Triage analysis.
+#[derive(Default)]
 pub struct TriageManager {
     next_unique_handle_id: Handle,
     values: HashMap<Handle, Value>,
@@ -44,7 +45,7 @@ macro_rules! take_value {
 
 impl TriageManager {
     pub fn new() -> TriageManager {
-        TriageManager { next_unique_handle_id: 0, values: HashMap::new() }
+        Self::default()
     }
 
     pub fn build_context(&mut self, configs: HashMap<String, String>) -> Result<Handle, Error> {

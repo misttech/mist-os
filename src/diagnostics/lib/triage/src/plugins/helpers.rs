@@ -17,18 +17,13 @@ where
     F: FnMut(Vec<WrappedMatch<'t>>),
 {
     for line in inputs.klog.lines.iter().chain(inputs.syslog.lines.iter()) {
-        match re.captures(line) {
-            Some(captures) => {
-                let mut parts: Vec<WrappedMatch<'t>> = vec![];
-                for capture in captures.iter() {
-                    if let Some(c) = capture {
-                        parts.push(WrappedMatch(c));
-                    }
-                }
-                match_fn(parts);
+        if let Some(captures) = re.captures(line) {
+            let mut parts: Vec<WrappedMatch<'t>> = vec![];
+            for capture in captures.iter().flatten() {
+                parts.push(WrappedMatch(capture));
             }
-            _ => {}
-        };
+            match_fn(parts);
+        }
     }
 }
 

@@ -62,8 +62,8 @@ pub struct ActionResults {
     pub sub_results: Vec<(String, Box<ActionResults>)>,
 }
 
-impl ActionResults {
-    pub fn new() -> ActionResults {
+impl Default for ActionResults {
+    fn default() -> Self {
         ActionResults {
             infos: Vec::new(),
             warnings: Vec::new(),
@@ -75,6 +75,12 @@ impl ActionResults {
             verbose: false,
             sub_results: Vec::new(),
         }
+    }
+}
+
+impl ActionResults {
+    pub fn new() -> ActionResults {
+        ActionResults::default()
     }
 
     pub fn all_issues(&self) -> impl Iterator<Item = &str> {
@@ -166,7 +172,7 @@ pub(crate) fn validate_action(
             if signature.len() > MAX_CRASH_SIGNATURE_LENGTH as usize {
                 bail!("Signature too long in {}", action_name);
             }
-            let repeat = ValueSource::try_from_expression_with_namespace(&repeat, namespace)?;
+            let repeat = ValueSource::try_from_expression_with_namespace(repeat, namespace)?;
             // Make sure repeat is a const int expression (cache the value if so)
             match repeat.metric {
                 Metric::Eval(repeat_expression) => {
@@ -479,7 +485,7 @@ impl ActionContext<'_> {
     }
 
     /// Update gauges.
-    fn update_gauges(&mut self, action: &Gauge, namespace: &String, name: &String) {
+    fn update_gauges(&mut self, action: &Gauge, namespace: &str, name: &str) {
         let value = self.metric_state.eval_action_metric(namespace, &action.value);
         match value {
             MetricValue::Problem(Problem::Ignore(_)) => {
@@ -512,7 +518,7 @@ mod test {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     #[fuchsia::test]

@@ -59,7 +59,7 @@ impl<'a> ActionResultFormatter<'a> {
             sorted_lines.sort();
             &sorted_lines
         } else {
-            &lines
+            lines
         };
         for line in output_lines {
             writeln!(f, "{line}")?;
@@ -84,7 +84,7 @@ impl<'a> ActionResultFormatter<'a> {
             }
             writeln!(f, "Plugin '{name}'")?;
             // TODO(https://fxbug.dev/42076794): use self.verbose flag correctly in plugins.
-            ActionResultFormatter::new(&result).write_text(f)?;
+            ActionResultFormatter::new(result).write_text(f)?;
         }
         Ok(())
     }
