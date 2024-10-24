@@ -141,6 +141,13 @@ class DeviceManager {
   zx::result<uint32_t> DmePeerGet(uint16_t mbi_attribute);
   zx::result<> DmeSet(uint16_t mbi_attribute, uint32_t value);
 
+  template <typename DescriptorReturnType>
+  zx::result<DescriptorReturnType> ReadDescriptor(DescriptorType descriptor, uint8_t index = 0);
+
+  zx::result<uint8_t> ReadFlag(Flags type);
+  zx::result<> SetFlag(Flags type);
+  zx::result<> ClearFlag(Flags type);
+
   zx::result<> SetPowerCondition(scsi::PowerCondition power_condition) TA_REQ(power_lock_);
 
   zx::result<bool> IsWriteBoosterBufferLifeTimeLeft();
