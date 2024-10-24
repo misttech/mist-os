@@ -82,32 +82,6 @@ zx_status_t FindEntryPoint(const void** base, smbios::EntryPointVersion* version
     }
     mapping->Destroy();
   }
-
-  // Fallback to non-EFI SMBIOS search if we haven't found it yet
-  constexpr uint64_t kSearchBase = 0x000f0000;
-  constexpr uint64_t kSearchEnd = 0x00100000;
-  auto result = MapRange(kSearchBase, kSearchEnd - kSearchBase);
-  if (result.is_error()) {
-    return result.status_value();
-  }
-  auto [mapping, vaddr] = ktl::move(*result);
-  for (paddr_t target = kSearchBase; target < kSearchEnd; target += 16) {
-    const uint8_t* p = reinterpret_cast<const uint8_t*>(vaddr) + (target - kSearchBase);
-    if (!memcmp(p, SMBIOS2_ANCHOR, strlen(SMBIOS2_ANCHOR))) {
-      *base = p;
-      *version = smbios::EntryPointVersion::V2_1;
-      gSmbiosPhys = target;
-      return ZX_OK;
-    }
-    if (!memcmp(p, SMBIOS3_ANCHOR, strlen(SMBIOS3_ANCHOR))) {
-      *base = p;
-      *version = smbios::EntryPointVersion::V3_0;
-      gSmbiosPhys = target;
-      return ZX_OK;
-    }
-  }
-
-  mapping->Destroy();
   return ZX_ERR_NOT_FOUND;
 }
 
