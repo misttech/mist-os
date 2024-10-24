@@ -25,6 +25,22 @@ class DenseMap : public std::map<_KeyType, _ValueType, Compare,
   explicit DenseMap(const util::Allocator<std::pair<const KeyType, ValueType>>& alloc =
                         util::Allocator<std::pair<const KeyType, ValueType>>())
       : Base(Compare(), alloc) {}
+
+  /// Retains only the elements specified by the predicate.
+  ///
+  /// In other words, remove all elements e for which f(&e) returns false. The
+  /// elements are visited in ascending key order.
+  template <typename RetainFn>
+  void key_ordered_retain(RetainFn&& fn) {
+    auto it = this->begin();
+    while (it != this->end()) {
+      if (!fn(it->second)) {
+        it = this->erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
 };
 
 }  // namespace util
