@@ -100,14 +100,17 @@ if (current_toolchain == default_toolchain) {
             root = "!!BUILD_DIR"
           }
 
+          product = {
+            index = "!!BUILD_DIR/product_bundles.json"
+          }
+
           # The "main" product bundle
           # Only define it if the variable exists since there are builds, such as SDK only,
           # that do not build any product bundles. In those builds, there is no product, so
           # it is OK to not set this value.
           if (defined(_product_path)) {
-            product = {
-              path = "!!BUILD_DIR/" + rebase_path(_product_path, root_out_dir)
-            }
+            product.path =
+                "!!BUILD_DIR/" + rebase_path(_product_path, root_out_dir)
           }
 
           # package repository

@@ -14,6 +14,7 @@ ffx_plugin("ffx_product_lookup") {
   sources = [ "src/lib.rs" ]
 
   deps = [
+    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
     "//src/developer/ffx/plugins/product/common:lib",
@@ -25,7 +26,7 @@ ffx_plugin("ffx_product_lookup") {
 
   test_deps = [
     "//src/lib/fuchsia",
-    "//src/lib/testing/temp_test_env",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
   ]
 }
