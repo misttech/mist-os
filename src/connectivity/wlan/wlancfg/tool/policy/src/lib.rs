@@ -8,7 +8,7 @@ use fidl::endpoints::create_proxy;
 use futures::future::BoxFuture;
 use futures::TryStreamExt;
 use {
-    fidl_fuchsia_wlan_common as fidl_wlan_common, fidl_fuchsia_wlan_policy as wlan_policy,
+    fidl_fuchsia_wlan_policy as wlan_policy,
     fidl_fuchsia_wlan_product_deprecatedconfiguration as wlan_deprecated,
 };
 
@@ -136,19 +136,19 @@ pub fn print_scan_results(scan_results: Vec<wlan_policy::ScanResult>) -> Result<
 
 /// Parses the return value from policy layer FIDL operations and prints a human-readable
 /// representation of the result.
-fn handle_request_status(status: fidl_wlan_common::RequestStatus) -> Result<(), Error> {
+fn handle_request_status(status: wlan_policy::RequestStatus) -> Result<(), Error> {
     match status {
-        fidl_wlan_common::RequestStatus::Acknowledged => Ok(()),
-        fidl_wlan_common::RequestStatus::RejectedNotSupported => {
+        wlan_policy::RequestStatus::Acknowledged => Ok(()),
+        wlan_policy::RequestStatus::RejectedNotSupported => {
             Err(format_err!("request failed: not supported"))
         }
-        fidl_wlan_common::RequestStatus::RejectedIncompatibleMode => {
+        wlan_policy::RequestStatus::RejectedIncompatibleMode => {
             Err(format_err!("request failed: incompatible mode"))
         }
-        fidl_wlan_common::RequestStatus::RejectedAlreadyInUse => {
+        wlan_policy::RequestStatus::RejectedAlreadyInUse => {
             Err(format_err!("request failed: already in use"))
         }
-        fidl_wlan_common::RequestStatus::RejectedDuplicateRequest => {
+        wlan_policy::RequestStatus::RejectedDuplicateRequest => {
             Err(format_err!("request failed: duplicate request."))
         }
     }
@@ -751,7 +751,7 @@ mod tests {
     fn send_client_request_status(
         exec: &mut TestExecutor,
         server: &mut wlan_policy::ClientControllerRequestStream,
-        response: fidl_wlan_common::RequestStatus,
+        response: wlan_policy::RequestStatus,
     ) {
         let poll = exec.run_until_stalled(&mut server.next());
         let request = match poll {
@@ -879,7 +879,7 @@ mod tests {
     fn send_ap_request_status(
         exec: &mut TestExecutor,
         server: &mut wlan_policy::AccessPointControllerRequestStream,
-        response: fidl_wlan_common::RequestStatus,
+        response: wlan_policy::RequestStatus,
     ) {
         let poll = exec.run_until_stalled(&mut server.next());
         let request = match poll {
@@ -1050,7 +1050,7 @@ mod tests {
         send_client_request_status(
             &mut exec,
             &mut test_values.client_stream,
-            fidl_wlan_common::RequestStatus::Acknowledged,
+            wlan_policy::RequestStatus::Acknowledged,
         );
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
@@ -1071,7 +1071,7 @@ mod tests {
         send_client_request_status(
             &mut exec,
             &mut test_values.client_stream,
-            fidl_wlan_common::RequestStatus::RejectedNotSupported,
+            wlan_policy::RequestStatus::RejectedNotSupported,
         );
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
@@ -1092,7 +1092,7 @@ mod tests {
         send_client_request_status(
             &mut exec,
             &mut test_values.client_stream,
-            fidl_wlan_common::RequestStatus::Acknowledged,
+            wlan_policy::RequestStatus::Acknowledged,
         );
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
@@ -1113,7 +1113,7 @@ mod tests {
         send_client_request_status(
             &mut exec,
             &mut test_values.client_stream,
-            fidl_wlan_common::RequestStatus::RejectedNotSupported,
+            wlan_policy::RequestStatus::RejectedNotSupported,
         );
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
@@ -1460,7 +1460,7 @@ mod tests {
         send_client_request_status(
             &mut exec,
             &mut test_values.client_stream,
-            fidl_wlan_common::RequestStatus::Acknowledged,
+            wlan_policy::RequestStatus::Acknowledged,
         );
 
         // The client should now wait for events from the listener.  Send a Connecting update.
@@ -1511,7 +1511,7 @@ mod tests {
         send_client_request_status(
             &mut exec,
             &mut test_values.client_stream,
-            fidl_wlan_common::RequestStatus::Acknowledged,
+            wlan_policy::RequestStatus::Acknowledged,
         );
 
         // The client should now wait for events from the listener.  Send a Connecting update.
@@ -1618,7 +1618,7 @@ mod tests {
         send_client_request_status(
             &mut exec,
             &mut test_values.client_stream,
-            fidl_wlan_common::RequestStatus::Acknowledged,
+            wlan_policy::RequestStatus::Acknowledged,
         );
 
         // The client should now wait for events from the listener
@@ -1779,7 +1779,7 @@ mod tests {
         send_ap_request_status(
             &mut exec,
             &mut test_values.ap_stream,
-            fidl_wlan_common::RequestStatus::RejectedNotSupported,
+            wlan_policy::RequestStatus::RejectedNotSupported,
         );
 
         // Run the request to completion
@@ -1803,7 +1803,7 @@ mod tests {
         send_ap_request_status(
             &mut exec,
             &mut test_values.ap_stream,
-            fidl_wlan_common::RequestStatus::Acknowledged,
+            wlan_policy::RequestStatus::Acknowledged,
         );
 
         // Run the request to completion
@@ -1827,7 +1827,7 @@ mod tests {
         send_ap_request_status(
             &mut exec,
             &mut test_values.ap_stream,
-            fidl_wlan_common::RequestStatus::RejectedNotSupported,
+            wlan_policy::RequestStatus::RejectedNotSupported,
         );
 
         // Run the request to completion
@@ -1852,7 +1852,7 @@ mod tests {
         send_ap_request_status(
             &mut exec,
             &mut test_values.ap_stream,
-            fidl_wlan_common::RequestStatus::Acknowledged,
+            wlan_policy::RequestStatus::Acknowledged,
         );
 
         // Progress the future so that it waits for AP state updates
@@ -1893,7 +1893,7 @@ mod tests {
         send_ap_request_status(
             &mut exec,
             &mut test_values.ap_stream,
-            fidl_wlan_common::RequestStatus::Acknowledged,
+            wlan_policy::RequestStatus::Acknowledged,
         );
 
         // Progress the future so that it waits for AP state updates

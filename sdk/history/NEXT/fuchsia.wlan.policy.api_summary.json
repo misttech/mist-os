@@ -56,7 +56,7 @@
         "kind": "struct/member",
         "name": "fuchsia.wlan.policy/AccessPointControllerStartAccessPointResponse.status",
         "ordinal": "1",
-        "type": "fuchsia.wlan.common/RequestStatus"
+        "type": "fuchsia.wlan.policy/RequestStatus"
     },
     {
         "kind": "struct",
@@ -76,7 +76,7 @@
         "kind": "struct/member",
         "name": "fuchsia.wlan.policy/AccessPointControllerStopAccessPointResponse.status",
         "ordinal": "1",
-        "type": "fuchsia.wlan.common/RequestStatus"
+        "type": "fuchsia.wlan.policy/RequestStatus"
     },
     {
         "kind": "struct",
@@ -311,7 +311,7 @@
         "kind": "struct/member",
         "name": "fuchsia.wlan.policy/ClientControllerConnectResponse.status",
         "ordinal": "1",
-        "type": "fuchsia.wlan.common/RequestStatus"
+        "type": "fuchsia.wlan.policy/RequestStatus"
     },
     {
         "kind": "struct",
@@ -363,7 +363,7 @@
         "kind": "struct/member",
         "name": "fuchsia.wlan.policy/ClientControllerStartClientConnectionsResponse.status",
         "ordinal": "1",
-        "type": "fuchsia.wlan.common/RequestStatus"
+        "type": "fuchsia.wlan.policy/RequestStatus"
     },
     {
         "kind": "struct",
@@ -373,7 +373,7 @@
         "kind": "struct/member",
         "name": "fuchsia.wlan.policy/ClientControllerStopClientConnectionsResponse.status",
         "ordinal": "1",
-        "type": "fuchsia.wlan.common/RequestStatus"
+        "type": "fuchsia.wlan.policy/RequestStatus"
     },
     {
         "kind": "struct",
@@ -759,6 +759,37 @@
     {
         "kind": "enum",
         "name": "fuchsia.wlan.policy/OperatingState",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.policy/RequestStatus.ACKNOWLEDGED",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.policy/RequestStatus.REJECTED_ALREADY_IN_USE",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.policy/RequestStatus.REJECTED_DUPLICATE_REQUEST",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.policy/RequestStatus.REJECTED_INCOMPATIBLE_MODE",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.policy/RequestStatus.REJECTED_NOT_SUPPORTED",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.wlan.policy/RequestStatus",
         "strictness": "strict",
         "type": "uint32"
     },

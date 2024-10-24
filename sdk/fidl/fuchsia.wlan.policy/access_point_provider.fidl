@@ -42,6 +42,15 @@ closed protocol AccessPointListener {
 closed protocol AccessPointController {
     /// Enables wlan to initiate AccessPoint operation using the provided network
     /// configuration, connectivity mode and band.
+    @available(added=NEXT)
+    strict StartAccessPoint(struct {
+        config NetworkConfig;
+        mode ConnectivityMode;
+        band OperatingBand;
+    }) -> (struct {
+        status RequestStatus;
+    });
+    @available(replaced=NEXT)
     strict StartAccessPoint(struct {
         config NetworkConfig;
         mode ConnectivityMode;
@@ -51,6 +60,14 @@ closed protocol AccessPointController {
     });
 
     /// Deactivate AccessPoint operation for a specified network configuration.
+    @available(added=NEXT)
+    strict StopAccessPoint(struct {
+        config NetworkConfig;
+    }) -> (struct {
+        status RequestStatus;
+    });
+
+    @available(replaced=NEXT)
     strict StopAccessPoint(struct {
         config NetworkConfig;
     }) -> (struct {

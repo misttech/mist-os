@@ -11,13 +11,13 @@ use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, IfaceMana
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::listener;
 use fidl::epitaph::ChannelEpitaphExt;
+use fidl_fuchsia_wlan_policy as fidl_policy;
 use futures::lock::{Mutex, MutexGuard};
 use futures::prelude::*;
 use futures::select;
 use futures::stream::FuturesUnordered;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 pub mod connection_selection;
 pub mod roaming;
@@ -220,7 +220,7 @@ async fn handle_client_request_connect(
     iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
     saved_networks: SavedNetworksPtr,
     network: &fidl_policy::NetworkIdentifier,
-) -> fidl_common::RequestStatus {
+) -> fidl_policy::RequestStatus {
     let network_config = match saved_networks
         .lookup(&NetworkIdentifier::new(
             client_types::Ssid::from_bytes_unchecked(network.ssid.clone()),
@@ -232,7 +232,7 @@ async fn handle_client_request_connect(
         Some(config) => config,
         None => {
             error!("Requested network not found in saved networks");
-            return fidl_common::RequestStatus::RejectedNotSupported;
+            return fidl_policy::RequestStatus::RejectedNotSupported;
         }
     };
 
@@ -248,10 +248,10 @@ async fn handle_client_request_connect(
 
     let mut iface_manager = iface_manager.lock().await;
     match iface_manager.connect(connect_req).await {
-        Ok(_) => fidl_common::RequestStatus::Acknowledged,
+        Ok(_) => fidl_policy::RequestStatus::Acknowledged,
         Err(e) => {
             error!("failed to connect: {:?}", e);
-            fidl_common::RequestStatus::RejectedIncompatibleMode
+            fidl_policy::RequestStatus::RejectedIncompatibleMode
         }
     }
 }
@@ -471,18 +471,18 @@ fn reject_provider_request(req: fidl_policy::ClientProviderRequest) -> Result<()
 /// Allows client operations to be performed.
 async fn handle_client_request_start_client_connections(
     iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
-) -> fidl_common::RequestStatus {
+) -> fidl_policy::RequestStatus {
     let mut iface_manager = iface_manager.lock().await;
     if let Err(e) = iface_manager.start_client_connections().await {
         warn!("encountered an error while starting client connections: {:?}", e);
     }
-    fidl_common::RequestStatus::Acknowledged
+    fidl_policy::RequestStatus::Acknowledged
 }
 
 /// Stops all active client connections and disallows future client operations.
 async fn handle_client_request_stop_client_connections(
     iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
-) -> fidl_common::RequestStatus {
+) -> fidl_policy::RequestStatus {
     let mut iface_manager = iface_manager.lock().await;
     if let Err(e) = iface_manager
         .stop_client_connections(client_types::DisconnectReason::FidlStopClientConnectionsRequest)
@@ -490,7 +490,7 @@ async fn handle_client_request_stop_client_connections(
     {
         warn!("encountered an error while stopping client connections: {:?}", e);
     }
-    fidl_common::RequestStatus::Acknowledged
+    fidl_policy::RequestStatus::Acknowledged
 }
 
 #[cfg(test)]
@@ -785,7 +785,7 @@ mod tests {
 
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::RejectedNotSupported))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::RejectedNotSupported))
         );
 
         // Unknown network should not have been saved by saved networks manager
@@ -828,7 +828,7 @@ mod tests {
         // Verify that the connect call is acknowledged.
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -865,7 +865,7 @@ mod tests {
         // Verify that the connect call is acknowledged.
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -902,7 +902,7 @@ mod tests {
         // Verify that the connect call is acknowledged.
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -952,7 +952,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::RejectedNotSupported))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::RejectedNotSupported))
         );
     }
 
@@ -994,7 +994,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -1028,7 +1028,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut start_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
 
         // A message should be sent to telemetry.
@@ -1046,7 +1046,7 @@ mod tests {
         // Verify that the connect call is acknowledged.
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
 
         // The client state machine will immediately query for status.
@@ -1068,7 +1068,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut stop_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -1619,7 +1619,7 @@ mod tests {
 
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
 
         // Ensure second controller is not operable. Issue connect request.
@@ -1653,7 +1653,7 @@ mod tests {
 
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -1804,7 +1804,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::RejectedIncompatibleMode))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::RejectedIncompatibleMode))
         );
     }
 
@@ -1937,7 +1937,7 @@ mod tests {
 
         assert_variant!(
             exec.run_until_stalled(&mut connect_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -1963,7 +1963,7 @@ mod tests {
         let mut fut = pin!(fut);
         assert_variant!(
             exec.run_until_stalled(&mut fut),
-            Poll::Ready(fidl_common::RequestStatus::Acknowledged)
+            Poll::Ready(fidl_policy::RequestStatus::Acknowledged)
         );
     }
 
@@ -1989,7 +1989,7 @@ mod tests {
         let mut fut = pin!(fut);
         assert_variant!(
             exec.run_until_stalled(&mut fut),
-            Poll::Ready(fidl_common::RequestStatus::Acknowledged)
+            Poll::Ready(fidl_policy::RequestStatus::Acknowledged)
         );
     }
 }

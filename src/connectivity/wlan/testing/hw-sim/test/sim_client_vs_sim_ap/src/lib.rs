@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_fuchsia_wlan_tap::WlantapPhyProxy;
 use fidl_test_wlan_realm::WlanConfig;
 use futures::channel::oneshot;
@@ -19,7 +20,6 @@ use wlan_hw_sim::{
     wait_until_client_state, Beacon, NetworkConfigBuilder, AP_MAC_ADDR, AP_SSID, CLIENT_MAC_ADDR,
     ETH_DST_MAC, WLANCFG_DEFAULT_AP_CHANNEL,
 };
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 const PASS_PHRASE: &str = "wpa2duel";
 
@@ -37,7 +37,7 @@ async fn initiate_connect(
 ) {
     // Issue the connect request.
     let response = client_controller.connect(config).await.expect("connecting via wlancfg");
-    assert_eq!(response, fidl_common::RequestStatus::Acknowledged);
+    assert_eq!(response, fidl_policy::RequestStatus::Acknowledged);
 
     // Monitor the update stream for the connected notification.
     wait_until_client_state(&mut update_stream, |update| {

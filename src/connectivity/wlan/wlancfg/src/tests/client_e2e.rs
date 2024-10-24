@@ -562,7 +562,7 @@ fn prepare_client_interface(
         &mut test_values.internal_objects.internal_futures,
         &mut start_connections_fut,
     );
-    assert_variant!(start_connections_resp, Ok(fidl_common::RequestStatus::Acknowledged));
+    assert_variant!(start_connections_resp, Ok(fidl_policy::RequestStatus::Acknowledged));
 
     iface_sme_stream
 }
@@ -1126,7 +1126,7 @@ fn test_connect_to_new_network() {
     // Check that connect request was acknowledged.
     let connect_fut_resp =
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, connect_fut);
-    assert_variant!(connect_fut_resp, Ok(fidl_common::RequestStatus::Acknowledged));
+    assert_variant!(connect_fut_resp, Ok(fidl_policy::RequestStatus::Acknowledged));
 
     // Check for a listener update saying we're both connected and connecting.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
@@ -1794,7 +1794,7 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
             &mut test_values.internal_objects.internal_futures,
             &mut stop_connections_fut,
         );
-        assert_variant!(stop_connections_resp, Ok(fidl_common::RequestStatus::Acknowledged));
+        assert_variant!(stop_connections_resp, Ok(fidl_policy::RequestStatus::Acknowledged));
 
         // Check for a listener update saying client connections are disabled.
         let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
