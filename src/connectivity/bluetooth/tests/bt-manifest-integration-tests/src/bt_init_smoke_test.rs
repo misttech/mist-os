@@ -323,6 +323,7 @@ async fn bt_init_component_topology() {
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
+                .capability(Capability::dictionary("diagnostics"))
                 .from(Ref::parent())
                 .to(&bt_init)
                 .to(Ref::collection(BT_HOST_COLLECTION.to_string()))
