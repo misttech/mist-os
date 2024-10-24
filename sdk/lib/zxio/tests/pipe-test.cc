@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/zx/socket.h>
 #include <lib/zxio/cpp/inception.h>
 #include <lib/zxio/zxio.h>
+#include <zircon/rights.h>
 
 #include <memory>
 
@@ -43,6 +45,84 @@ TEST(Pipe, CreateWithAllocator) {
   zxio_t* io = &storage->io;
 
   ASSERT_OK(zxio_close(io, /*should_wait=*/true));
+}
+
+TEST(Pipe, FlagsGetDefault) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(socket0.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  // By default, socket supports IO (Read + Write).
+  uint32_t raw_flags{};
+  ASSERT_OK(zxio_flags_get(io, &raw_flags));
+  fuchsia_io::wire::OpenFlags flags{raw_flags};
+  EXPECT_TRUE(flags & fuchsia_io::wire::OpenFlags::kRightReadable);
+  EXPECT_TRUE(flags & fuchsia_io::wire::OpenFlags::kRightWritable);
+}
+
+TEST(Pipe, FlagsGetReadOnly) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+  zx::socket duplicate_readonly_socket;
+  ASSERT_OK(socket0.duplicate(ZX_RIGHTS_BASIC | ZX_RIGHT_READ, &duplicate_readonly_socket));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(duplicate_readonly_socket.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  uint32_t raw_flags{};
+  ASSERT_OK(zxio_flags_get(io, &raw_flags));
+  fuchsia_io::wire::OpenFlags flags{raw_flags};
+  EXPECT_TRUE(flags & fuchsia_io::wire::OpenFlags::kRightReadable);
+  EXPECT_FALSE(flags & fuchsia_io::wire::OpenFlags::kRightWritable);
+}
+
+TEST(Pipe, FlagsGetNoIO) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+  zx::socket duplicate_socket;
+  ASSERT_OK(socket0.duplicate(ZX_RIGHTS_BASIC, &duplicate_socket));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(duplicate_socket.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  uint32_t raw_flags{};
+  ASSERT_OK(zxio_flags_get(io, &raw_flags));
+  fuchsia_io::wire::OpenFlags flags{raw_flags};
+  EXPECT_FALSE(flags & fuchsia_io::wire::OpenFlags::kRightReadable);
+  EXPECT_FALSE(flags & fuchsia_io::wire::OpenFlags::kRightWritable);
+}
+
+TEST(Pipe, FlagsSetWithValidInputFlags) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(socket0.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  fuchsia_io::wire::OpenFlags flags =
+      fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable;
+  ASSERT_OK(zxio_flags_set(io, static_cast<uint32_t>(flags)));
+}
+
+TEST(Pipe, FlagsSetWithInvalidInputFlagsIsError) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+  zx::socket duplicate_socket;
+  ASSERT_OK(socket0.duplicate(ZX_RIGHTS_BASIC | ZX_RIGHT_WRITE, &duplicate_socket));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(duplicate_socket.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  fuchsia_io::wire::OpenFlags flags =
+      fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable;
+  EXPECT_STATUS(zxio_flags_set(io, static_cast<uint32_t>(flags)), ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST(Pipe, Basic) {

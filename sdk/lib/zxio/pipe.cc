@@ -8,6 +8,7 @@
 #include <lib/zxio/ops.h>
 #include <sys/stat.h>
 #include <zircon/compiler.h>
+#include <zircon/syscalls/object.h>
 
 #include <algorithm>
 
@@ -211,7 +212,48 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
     *out_code = 0;
     return ZX_OK;
   };
+
   ops.getpeername = ops.getsockname;
+
+  ops.flags_get = [](zxio_t* io, uint32_t* out_flags) {
+    zx_info_handle_basic info;
+    zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
+                                                           sizeof(info), nullptr, nullptr);
+    if (status != ZX_OK) {
+      return status;
+    }
+    ZX_ASSERT(info.type == ZX_OBJ_TYPE_SOCKET);
+    fuchsia_io::wire::OpenFlags flags{};
+    if (info.rights & ZX_RIGHT_READ) {
+      flags |= fuchsia_io::wire::OpenFlags::kRightReadable;
+    }
+    if (info.rights & ZX_RIGHT_WRITE) {
+      flags |= fuchsia_io::wire::OpenFlags::kRightWritable;
+    }
+    *out_flags = static_cast<uint32_t>(flags);
+    return ZX_OK;
+  };
+
+  ops.flags_set = [](zxio_t* io, uint32_t flags) {
+    zx_info_handle_basic info;
+    zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
+                                                           sizeof(info), nullptr, nullptr);
+    if (status != ZX_OK) {
+      return status;
+    }
+
+    bool set_readable = flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable);
+    bool set_writable = flags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightWritable);
+
+    bool is_readable = info.rights & ZX_RIGHT_READ;
+    bool is_writable = info.rights & ZX_RIGHT_WRITE;
+
+    // Ensure that the supported flags (readable, writeable) match the rights on the socket.
+    if ((set_readable != is_readable) || (set_writable != is_writable)) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+    return ZX_OK;
+  };
 
   return ops;
 }();
