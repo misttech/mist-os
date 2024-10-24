@@ -98,6 +98,7 @@ function subprocess_pid() {
   ps --ppid "$$" | grep -w "${tool_basename:0:15}" | cut -d\  -f 1
 }
 
+pids_not_found=0
 shutdown_pids=()
 
 # Tag json with the unique fx build id, if it is set.  Print to stdout.
@@ -118,7 +119,10 @@ then
   # Terminating the 'vmstat' process should cascade to the other downstream
   # processes via SIGPIPE.
   readonly vmstat_pid="$(subprocess_pid "$vmstat_base")"
-  shutdown_pids+=( "$vmstat_pid" )
+  if [[ -n "$vmstat_pid" ]]
+  then shutdown_pids+=( "$vmstat_pid" )
+  else pids_not_found=1
+  fi
 fi
 
 if [[ -n "$ifconfig_logfile" ]]
@@ -135,12 +139,28 @@ then
   # Terminating the 'ifconfig_loop.sh' process should cascade to its
   # subprocess and the rest of the pipe.
   readonly ifconfig_pid="$(subprocess_pid "$ifconfig_base")"
-  shutdown_pids+=( "$ifconfig_pid" )
+  if [[ -n "ifconfig_pid" ]]
+  then shutdown_pids+=( "$ifconfig_pid" )
+  else pids_not_found=1
+  fi
 fi
 
 # Terminate vmstat and ifconfig when main command is complete (or interrupted).
 function shutdown() {
-  kill "${shutdown_pids[@]}"
+  if [[ "$pids_not_found" > 0 ]]
+  then cat <<EOF
+[$script] Warning: Unable to find at least one of the backgrounded subprocesses
+that need to be terminated, so some residual subprocesses may still be running.
+Look for potentially unwanted subprocesses to kill with 'ps T'.
+See also known issue b/375201428.
+If this issue persists, you can:
+  fx build-profile disable
+  file a go/fuchsia-build-bug
+EOF
+  fi
+  if [[ "${#shutdown_pids[@]}" > 0 ]]
+  then kill "${shutdown_pids[@]}"
+  fi
 }
 trap shutdown EXIT
 
