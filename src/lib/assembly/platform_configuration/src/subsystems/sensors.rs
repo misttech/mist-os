@@ -14,7 +14,9 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for SensorsSubsystemCon
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if starnix_config.enabled && *context.feature_set_level == FeatureSupportLevel::Standard {
-            if *context.build_type == BuildType::Eng {
+            // TODO(b/370576398): Remove sensors playback from UserDebug.
+            if *context.build_type == BuildType::Eng || *context.build_type == BuildType::UserDebug
+            {
                 builder.platform_bundle("sensors_framework_eng");
             } else {
                 builder.platform_bundle("sensors_framework");
