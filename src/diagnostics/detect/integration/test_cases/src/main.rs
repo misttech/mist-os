@@ -3,22 +3,25 @@
 // found in the LICENSE file.
 
 /**
- * This program integration-tests the triage-detect program using the OpaqueTest library
- * to inject a fake CrashReporter, ArchiveAccessor, and config-file directory.
- *
- * triage-detect will be able to fetch Diagnostic data, evaluate it according to the .triage
- * files it finds, and request whatever crash reports are appropriate. Meanwhile, the fakes
- * will be writing TestEvent entries to a stream for later evaluation.
- *
- * Each integration test is stored in a file whose name starts with "test". This supplies:
- * 1) Some number of Diagnostic data strings. When the program tries to fetch Diagnostic data
- *  after these strings are exhausted, the fake ArchiveAccessor writes to a special "done" channel
- *  to terminate the test.
- * 2) Some number of config files to place in the fake directory.
- * 3) A vector of vectors of crash report signatures. The inner vector should match the crash
- *  report requests sent between each fetch of Diagnostic data. Order of the inner vector does
- *  not matter, but duplicates do matter.
- */
+This program integration-tests the triage-detect program using the OpaqueTest library
+to inject a fake CrashReporter, ArchiveAccessor, and config-file directory.
+
+triage-detect will be able to fetch Diagnostic data, evaluate it according to the .triage
+files it finds, and request whatever crash reports are appropriate. Meanwhile, the fakes
+will be writing TestEvent entries to a stream for later evaluation.
+
+Each integration test is stored in a file whose name starts with "test". This supplies:
+
+1) Some number of Diagnostic data strings. When the program tries to fetch Diagnostic data
+   after these strings are exhausted, the fake ArchiveAccessor writes to a special "done" channel
+   to terminate the test.
+
+2) Some number of config files to place in the fake directory.
+
+3) A vector of vectors of crash report signatures. The inner vector should match the crash
+   report requests sent between each fetch of Diagnostic data. Order of the inner vector does
+   not matter, but duplicates do matter.
+*/
 use anyhow::Error;
 use fidl::endpoints;
 // fidl_fuchsia_testing is unrelated to fidl_fuchsia_testing_harness
@@ -107,7 +110,7 @@ async fn get_n_events(
         if let Some(Ok(event)) = stream.next().await {
             let event = TestEvent::from(event);
             match event {
-                TestEvent::OnDone | TestEvent::OnBail => {
+                TestEvent::Done | TestEvent::Bail => {
                     // Record the event so tests can assert whether we bailed early.
                     events.push(event);
                     return events;
@@ -125,10 +128,9 @@ async fn get_n_events(
     events
 }
 
-fn assert_events_eq(expected: &Vec<TestEvent>, actual: &Vec<TestEvent>) {
-    if let Some(index) = find_first_different_index(&expected, &actual) {
-        assert!(
-            false,
+fn assert_events_eq(expected: &[TestEvent], actual: &[TestEvent]) {
+    if let Some(index) = find_first_different_index(expected, actual) {
+        panic!(
             "\n\n\
              Wanted events: {:?}\n\
              Got events:    {:?}\n\
@@ -141,7 +143,7 @@ fn assert_events_eq(expected: &Vec<TestEvent>, actual: &Vec<TestEvent>) {
     }
 }
 
-fn find_first_different_index(left: &Vec<TestEvent>, right: &Vec<TestEvent>) -> Option<usize> {
+fn find_first_different_index(left: &[TestEvent], right: &[TestEvent]) -> Option<usize> {
     match left.iter().zip(right.iter()).position(|(l, r)| l != r) {
         Some(index) => Some(index),
         None => {
@@ -161,9 +163,9 @@ fn find_first_different_index(left: &Vec<TestEvent>, right: &Vec<TestEvent>) -> 
 // {C, A, FETCH, D, B, FETCH, G} are sorted as:
 // {A, C, FETCH, B, D, FETCH, G}.
 fn compare_crash_signatures_only(prev: &TestEvent, next: &TestEvent) -> Ordering {
-    if let TestEvent::OnCrashReport { crash_signature, .. } = prev {
+    if let TestEvent::CrashReport { crash_signature, .. } = prev {
         let left = crash_signature;
-        if let TestEvent::OnCrashReport { crash_signature, .. } = next {
+        if let TestEvent::CrashReport { crash_signature, .. } = next {
             let right = crash_signature;
             return left.partial_cmp(right).unwrap();
         }
@@ -200,13 +202,13 @@ impl TestData {
     }
 
     pub fn add_triage_config(mut self, config_js: impl Into<String>) -> Self {
-        let triage_configs = self.realm_options.triage_configs.get_or_insert_with(|| vec![]);
+        let triage_configs = self.realm_options.triage_configs.get_or_insert_with(Vec::new);
         triage_configs.push(create_vmo(config_js));
         self
     }
 
     pub fn add_inspect_data(mut self, inspect_data_js: impl Into<String>) -> Self {
-        let inspect_data = self.realm_options.inspect_data.get_or_insert_with(|| vec![]);
+        let inspect_data = self.realm_options.inspect_data.get_or_insert_with(Vec::new);
         inspect_data.push(create_vmo(inspect_data_js));
         self
     }
@@ -230,27 +232,27 @@ impl TestData {
 // A TriageDetectEventsEvent representation that allows us to compare events.
 #[derive(Debug, PartialEq)]
 pub(crate) enum TestEvent {
-    OnBail,
-    OnDiagnosticFetch,
-    OnDone,
-    OnCrashReport { crash_signature: String, crash_program_name: String },
-    OnCrashReportingProductRegistration { product_name: String, program_name: String },
+    Bail,
+    DiagnosticFetch,
+    Done,
+    CrashReport { crash_signature: String, crash_program_name: String },
+    CrashReportingProductRegistration { product_name: String, program_name: String },
 }
 
 impl From<ftest::TriageDetectEventsEvent> for TestEvent {
     fn from(event: ftest::TriageDetectEventsEvent) -> Self {
         match event {
-            ftest::TriageDetectEventsEvent::OnDone {} => TestEvent::OnDone,
-            ftest::TriageDetectEventsEvent::OnBail {} => TestEvent::OnBail,
-            ftest::TriageDetectEventsEvent::OnDiagnosticFetch {} => TestEvent::OnDiagnosticFetch,
+            ftest::TriageDetectEventsEvent::OnDone {} => TestEvent::Done,
+            ftest::TriageDetectEventsEvent::OnBail {} => TestEvent::Bail,
+            ftest::TriageDetectEventsEvent::OnDiagnosticFetch {} => TestEvent::DiagnosticFetch,
             ftest::TriageDetectEventsEvent::OnCrashReport {
                 crash_signature,
                 crash_program_name,
-            } => TestEvent::OnCrashReport { crash_signature, crash_program_name },
+            } => TestEvent::CrashReport { crash_signature, crash_program_name },
             ftest::TriageDetectEventsEvent::OnCrashReportingProductRegistration {
                 product_name,
                 program_name,
-            } => TestEvent::OnCrashReportingProductRegistration { product_name, program_name },
+            } => TestEvent::CrashReportingProductRegistration { product_name, program_name },
             _ => panic!("unknown event {:?}", event),
         }
     }
