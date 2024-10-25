@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::event::{TraceEvent, TraceEventQueue};
 use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
-
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::InputBuffer;
 use starnix_core::vfs::{
@@ -14,7 +14,7 @@ use starnix_logging::CATEGORY_ATRACE;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 /// trace_marker, used by applications to write trace events
 struct TraceMarkerFileSource;
@@ -28,14 +28,16 @@ impl DynamicFileSource for TraceMarkerFileSource {
 pub struct TraceMarkerFile {
     source: DynamicFile<TraceMarkerFileSource>,
     event_stacks: Mutex<HashMap<u64, Vec<(String, zx::MonotonicTicks)>>>,
+    queue: Arc<TraceEventQueue>,
 }
 
 impl TraceMarkerFile {
-    pub fn new_node() -> impl FsNodeOps {
+    pub fn new_node(queue: Arc<TraceEventQueue>) -> impl FsNodeOps {
         SimpleFileNode::new(move || {
             Ok(Self {
                 source: DynamicFile::new(TraceMarkerFileSource {}),
                 event_stacks: Mutex::new(HashMap::new()),
+                queue: queue.clone(),
             })
         })
     }
@@ -49,15 +51,27 @@ impl FileOps for TraceMarkerFile {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        if let Some(context) = TraceCategoryContext::acquire(CATEGORY_ATRACE) {
-            let bytes = data.read_all()?;
-            if let Ok(mut event_stacks) = self.event_stacks.lock() {
-                let now = zx::MonotonicTicks::get();
-                if let Some(atrace_event) = ATraceEvent::parse(&String::from_utf8_lossy(&bytes)) {
+        let bytes = data.read_all()?;
+        if let Some(atrace_event) = ATraceEvent::parse(&String::from_utf8_lossy(&bytes)) {
+            if self.queue.is_enabled() {
+                let timestamp = zx::MonotonicInstant::get();
+                let trace_event = TraceEvent::new(
+                    self.queue.prev_timestamp(),
+                    timestamp,
+                    current_task.get_pid(),
+                    &bytes,
+                );
+                self.queue.push_event(trace_event, timestamp)?;
+            }
+            // TODO(https://fxbug.dev/357665908): Remove forwarding of atrace events to trace
+            // manager when dependencies have been migrated.
+            if let Some(context) = TraceCategoryContext::acquire(CATEGORY_ATRACE) {
+                if let Ok(mut event_stacks) = self.event_stacks.lock() {
+                    let now = zx::MonotonicTicks::get();
                     match atrace_event {
                         ATraceEvent::Begin { pid, name } => {
                             event_stacks
@@ -100,7 +114,6 @@ impl FileOps for TraceMarkerFile {
                     }
                 }
             }
-            Ok(bytes.len())
         } else {
             // Ideally clearing should only be done once when we see tracing
             // stop, but the trace observer thread is behind the perfetto_consumer
@@ -120,8 +133,8 @@ impl FileOps for TraceMarkerFile {
             if let Ok(mut event_stacks) = self.event_stacks.lock() {
                 event_stacks.clear();
             }
-            Ok(data.drain())
         }
+        return Ok(bytes.len());
     }
 }
 
@@ -168,7 +181,7 @@ impl<'a> ATraceEvent<'a> {
 mod tests {
     use super::*;
 
-    #[test]
+    #[fuchsia::test]
     fn atrace_event_parsing() {
         assert_eq!(
             ATraceEvent::parse("B|1636|slice_name"),

@@ -18,6 +18,7 @@ rustc_library("tracefs") {
   with_unit_tests = true
 
   sources = [
+    "event.rs",
     "fs.rs",
     "lib.rs",
     "tracing_directory.rs",
@@ -38,9 +39,13 @@ rustc_library("tracefs") {
     "//src/starnix/lib/starnix-types",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:zerocopy",
   ]
 
-  test_deps = [ "//src/graphics/lib/magma/src/libmagma" ]
+  test_deps = [
+    "//src/graphics/lib/magma/src/libmagma",
+    "//src/lib/fuchsia",
+  ]
 }
 
 fuchsia_unittest_package("starnix-tracefs-tests") {
