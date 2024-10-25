@@ -173,6 +173,10 @@ class PowerLevelTransition {
  public:
   // Returns an invalid transition.
   static constexpr PowerLevelTransition Invalid() { return {}; }
+  static constexpr PowerLevelTransition Zero() {
+    return PowerLevelTransition(
+        zx_processor_power_level_transition_t{.latency = 0, .energy_nj = 0});
+  }
 
   constexpr PowerLevelTransition() = default;
   explicit constexpr PowerLevelTransition(const zx_processor_power_level_transition_t& transition)

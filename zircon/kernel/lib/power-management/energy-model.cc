@@ -44,10 +44,6 @@ zx::result<PowerModel> PowerModel::Create(
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  if (transitions.size() < 1) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
   if (transitions.size() > levels.size() * levels.size()) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -87,8 +83,10 @@ zx::result<PowerModel> PowerModel::Create(
   // transitions by more than half, since any element below the main diagonal would be equivalent to
   // its mirror, and the diagonal itself would be 0.
   fbl::Vector<PowerLevelTransition> power_level_transitions;
-  power_level_transitions.resize(levels.size() * levels.size(), PowerLevelTransition::Invalid(),
-                                 &ac);
+  PowerLevelTransition default_value =
+      transitions.empty() ? PowerLevelTransition::Zero() : PowerLevelTransition::Invalid();
+
+  power_level_transitions.resize(levels.size() * levels.size(), default_value, &ac);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
