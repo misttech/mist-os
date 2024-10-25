@@ -710,7 +710,10 @@ go_library("github.com/tent/canonical-json-go") {
 go_library("go.starlark.net") {
   name = "go.starlark.net/..."
   source_dir = "vendor/go.starlark.net"
-  deps = [ ":github.com/chzyer/readline" ]
+  deps = [
+    ":github.com/chzyer/readline",
+    ":golang.org/x/sys",
+  ]
   sources = [
     "cmd/starlark/starlark.go",
     "internal/compile/compile.go",

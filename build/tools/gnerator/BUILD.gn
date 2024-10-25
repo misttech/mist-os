@@ -1,0 +1,27 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/go/go_binary.gni")
+import("//build/go/go_library.gni")
+import("//build/go/go_test.gni")
+
+if (is_host) {
+  go_library("gnerator") {
+    sources = [ "gnerator.go" ]
+    deps = [ "//third_party/golibs:go.starlark.net" ]
+  }
+
+  go_binary("cmd") {
+    sources = [ "cmd/main.go" ]
+    output_name = "gnerator"
+    deps = [ ":gnerator" ]
+  }
+
+  go_test("gnerator_tests") {
+    library = ":gnerator"
+    sources = [ "gnerator_test.go" ]
+    output_name = "gnerator_tests"
+    deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
+  }
+}
