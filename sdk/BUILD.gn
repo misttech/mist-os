@@ -250,9 +250,9 @@ if (!is_host) {
   # though the dependencies are very different in each of those cases.
   #
   # Due to limitations of the build system at the GN/Bazel boundary, this cannot
-  # contain testonly atoms. Libraries and packages for use in tests absolutely
-  # belong in the IDK, but unfortunately, before they can be added, the
-  # `testonly` attribute must be removed.
+  # contain testonly atoms. See https://fxbug.dev/42070088.
+  # Libraries and packages for use in tests absolutely belong in the IDK, but
+  # the `testonly` attribute must be removed before they can be added.
   sdk_molecule("fuchsia_idk_atoms") {
     visibility += [ "//vendor/*" ]
 
