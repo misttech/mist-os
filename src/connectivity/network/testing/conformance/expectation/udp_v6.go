@@ -37,10 +37,12 @@ var udpV6Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]ou
 }
 
 var udpV6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
-	{1, 1}:  Pass,
-	{2, 1}:  Pass,
-	{2, 2}:  Pass,
-	{2, 3}:  Pass,
+	{1, 1}: Pass,
+	{2, 1}: Pass,
+	{2, 2}: Pass,
+	// TODO(https://fxbug.dev/341128580): Should pass once UDP source port = 0 is handled properly
+	// in filtering.
+	{2, 3}:  Fail,
 	{2, 4}:  Pass,
 	{2, 5}:  Pass,
 	{2, 6}:  Pass,
