@@ -36,6 +36,11 @@
             to: [ "#realm-factory" ],
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [ "#realm-factory" ],
+        },
+        {
             protocol: [ "fuchsia.ui.test.context.ScenicRealmFactory" ],
             from: "#realm-factory",
             to: [ "#validator" ],
