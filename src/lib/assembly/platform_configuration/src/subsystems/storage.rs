@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::Context;
+use anyhow::{ensure, Context};
 use assembly_component_id_index::ComponentIdIndexBuilder;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
@@ -20,6 +20,16 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         storage_config: &StorageConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        if matches!(
+            context.feature_set_level,
+            FeatureSupportLevel::Bootstrap | FeatureSupportLevel::Embeddable
+        ) {
+            ensure!(
+                storage_config.filesystems.image_mode == FilesystemImageMode::NoImage,
+                "Bootstrap and Embeddable products must use filesystems.image_mode='no_image'"
+            );
+        }
+
         // Include legacy paver implementation in all feature sets above "embeddable" if the board
         // doesn't include it. Embeddable doesn't support paving.
         if *context.feature_set_level != FeatureSupportLevel::Embeddable

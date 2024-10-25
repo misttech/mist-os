@@ -44,12 +44,11 @@ template("bad_signature_update") {
     system_version_file =
         "//src/security/tests/pkg_test/assemblies/v0_version.txt"
 
-    # Calculated on local build from 2022-02-08. See equivalent
-    # access_ota_blob_as_executable rule for details.
+    # This size was found by building and viewing the actual size in the error.
     if (use_fxfs_blob) {
-      assembly_fxfs_image_size_bytes = 57819136
+      assembly_fxfs_image_size_bytes = 72515584
     } else {
-      fvm_truncate_to_length = 57819136
+      fvm_truncate_to_length = 72515584
     }
   }
 
