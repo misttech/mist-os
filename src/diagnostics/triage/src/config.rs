@@ -43,7 +43,7 @@ pub struct ProgramStateHolder {
 pub fn initialize(options: Options) -> Result<ProgramStateHolder, Error> {
     let Options { data_directory, output_format, config_files, tags, exclude_tags } = options;
 
-    if config_files.len() == 0 {
+    if config_files.is_empty() {
         bail!("Need at least one config file; use --config");
     }
 
@@ -51,7 +51,7 @@ pub fn initialize(options: Options) -> Result<ProgramStateHolder, Error> {
         config_from_files(&config_files, &ActionTagDirective::from_tags(tags, exclude_tags))?;
     parse_result.validate()?;
 
-    let diagnostic_data = diagnostics_from_directory(&Path::new(&data_directory))?;
+    let diagnostic_data = diagnostics_from_directory(Path::new(&data_directory))?;
 
     Ok(ProgramStateHolder { parse_result, diagnostic_data, output_format })
 }

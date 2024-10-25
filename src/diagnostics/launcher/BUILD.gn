@@ -26,6 +26,8 @@ rustc_binary("bin") {
   deps = launcher_deps
 
   sources = launcher_sources
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 # The Detect integration test needs a "with fake time" version of Launcher.
@@ -42,4 +44,6 @@ rustc_binary("bin_with_fake_time") {
   non_rust_deps = [ "//src/lib/fake-clock/lib" ]
 
   visibility = [ "//src/diagnostics/detect/integration/target:*" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }

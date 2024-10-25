@@ -93,7 +93,7 @@ pub fn config_from_files<T: AsRef<Path>>(
         }
     }
 
-    ParseResult::new(&config_file_map, &action_tag_directive_from_tags)
+    ParseResult::new(&config_file_map, action_tag_directive_from_tags)
 }
 
 fn base_name(path: &Path) -> Result<String, Error> {

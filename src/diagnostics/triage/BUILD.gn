@@ -107,6 +107,8 @@ rustc_library("triage_app_lib") {
     "src/file_io.rs",
     "src/lib.rs",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_test("triage_lib_test") {
@@ -132,6 +134,8 @@ rustc_test("triage_lib_test") {
     "src/test.rs",
     "src/test/integration.rs",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("triage_bin") {
@@ -152,6 +156,8 @@ rustc_binary("triage_bin") {
       "profile",
     ]
   }
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 install_host_tools("install") {
