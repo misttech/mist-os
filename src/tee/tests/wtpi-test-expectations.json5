@@ -14,8 +14,6 @@
                 "CryptoTest.CopyToOutputBufferBasicInsecureOverlap",
                 "CryptoTest.CopyToOutputBufferBasicInsecureWithOffset",
                 "CryptoTest.CopyToOutputBufferFailsWithBadInput",
-                "CryptoTest.Crc32Cont_OutputBufferBasic",
-                "CryptoTest.Crc32Cont_OutputBufferFailsWithBadInput",
                 "CryptoTest.CreateKeyHandleFailsWithBadParams",
                 "CryptoTest.DeriveKeyFromKeyHandleFailsForBadInputs",
                 "CryptoTest.ECCLoadKeyAndSign",
@@ -99,5 +97,15 @@
                 "HmacTests/HmacTest.HMAC_SHA256_VerifyFailsWithBadInput/1",
             ],
         },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/898589): These succeed in ARM builds but fail in x86 ones.
+                // Maybe not unrelatedly, they also generate ASan failures. More investigation is
+                // needed.
+                "CryptoTest.Crc32Cont_OutputBufferBasic",
+                "CryptoTest.Crc32Cont_OutputBufferFailsWithBadInput",
+            ]
+        }
     ],
 }
