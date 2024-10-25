@@ -26,7 +26,6 @@ rustc_test("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/syslog/rust:syslog-listener",
-    "//src/sys/lib/component-events",
     "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

@@ -14,9 +14,5 @@
         {
             protocol: [ "fuchsia.archivist.test.RealmFactory" ],
         },
-        {
-            event_stream: "stopped",
-            from: "parent",
-        },
     ],
 }

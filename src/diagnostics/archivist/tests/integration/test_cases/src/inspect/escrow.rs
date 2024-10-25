@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{test_topology, utils};
+use crate::test_topology;
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_data::{InspectData, InspectHandleName};
 use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
@@ -15,7 +15,6 @@ const PUPPET_NAME: &str = "puppet";
 #[fuchsia::test]
 async fn escrow_inspect_data() {
     const REALM_NAME: &str = "escrow_inspect_data";
-    let mut stop_checker = utils::StopChecker::new().await;
 
     let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         realm_name: Some(REALM_NAME.into()),
@@ -24,6 +23,17 @@ async fn escrow_inspect_data() {
     })
     .await
     .unwrap();
+
+    let stop_watcher = realm_proxy
+        .connect_to_protocol::<ftest::StopWatcherMarker>()
+        .await
+        .expect("connect to stop watcher");
+    let stop_waiter = stop_watcher
+        .watch_component(PUPPET_NAME, ftest::ExitStatus::Clean)
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
 
     // Publish some inspect in the puppet.
     let child_puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME).await.unwrap();
@@ -54,11 +64,7 @@ async fn escrow_inspect_data() {
         })
         .await
         .unwrap();
-    stop_checker
-        .wait_for_component_to_stop(&format!(
-            "realm_factory/realm_builder:{REALM_NAME}/test/{PUPPET_NAME}"
-        ))
-        .await;
+    stop_waiter.wait().await.expect("puppet stops");
 
     // Assert that we can read the escrowed data event after the component has stopped.
     let data = read_data(&realm_proxy, RetryConfig::always()).await.pop().unwrap();

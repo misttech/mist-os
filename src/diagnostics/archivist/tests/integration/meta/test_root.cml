@@ -34,14 +34,13 @@
             availability: "optional",
         },
         {
-            event_stream: [ "stopped" ],
-            from: "parent",
-            to: [ "#test_cases" ],
-        },
-        {
-            event_stream: [ "capability_requested" ],
+            event_stream: [
+                "capability_requested",
+                "stopped",
+            ],
             from: "parent",
             to: [ "#realm_factory" ],
+            scope: "#realm_factory",
         },
     ],
     expose: [

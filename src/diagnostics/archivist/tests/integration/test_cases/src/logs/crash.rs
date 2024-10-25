@@ -15,10 +15,6 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
     const PUPPET_NAME: &str = "puppet";
     const PUPPET_CRASH_MESSAGE: &str = "this is an expected panic";
     const LOG_MESSAGE: &str = "logged before crashing";
-    let puppet_moniker: String =
-        format!("realm_factory/realm_builder:{REALM_NAME}/test/{PUPPET_NAME}");
-
-    let mut stop_checker = utils::StopChecker::new().await;
 
     // Create the test realm.
     let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
@@ -28,6 +24,17 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
     })
     .await
     .expect("create test topology");
+
+    let stop_watcher = realm_proxy
+        .connect_to_protocol::<ftest::StopWatcherMarker>()
+        .await
+        .expect("connect to stop watcher");
+    let stop_waiter = stop_watcher
+        .watch_component(PUPPET_NAME, ftest::ExitStatus::Crash)
+        .await
+        .expect("subscribe to component crash")
+        .into_proxy()
+        .unwrap();
 
     // Connect to the puppet, tell it to log some messages and then crash itself.
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME)
@@ -44,7 +51,7 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
     let mut found_log_message = false;
     let mut found_crash_message = false;
 
-    let mut logs = crate::utils::snapshot_and_stream_logs(&realm_proxy).await;
+    let mut logs = utils::snapshot_and_stream_logs(&realm_proxy).await;
 
     // Check for the log message.
     while let Some(Ok(logs_data)) = logs.next().await {
@@ -65,7 +72,7 @@ async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {
     }
 
     puppet.crash(PUPPET_CRASH_MESSAGE)?;
-    stop_checker.wait_for_component_to_crash(&puppet_moniker).await;
+    stop_waiter.wait().await.expect("puppet crashes");
     drop(realm_proxy); // Closes the puppet's log stream so we don't loop forever.
 
     // Check for the panic message.

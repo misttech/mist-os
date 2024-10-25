@@ -17,6 +17,7 @@ use {
 
 const ARCHIVIST_URL: &str = "#meta/archivist.cm";
 const PUPPET_URL: &str = "puppet#meta/puppet.cm";
+const STOP_WATCHER_URL: &str = "stop_watcher#meta/stop_watcher.cm";
 
 #[derive(Default)]
 pub(crate) struct ArchivistRealmFactory;
@@ -153,6 +154,7 @@ impl ArchivistRealmFactory {
                     .capability(
                         Capability::event_stream("capability_requested").with_scope(&test_realm),
                     )
+                    .capability(Capability::event_stream("stopped").with_scope(&test_realm))
                     .from(Ref::parent())
                     .to(&test_realm),
             )
@@ -163,6 +165,34 @@ impl ArchivistRealmFactory {
                     .capability(Capability::event_stream("capability_requested"))
                     .from(Ref::parent())
                     .to(&archivist),
+            )
+            .await?;
+
+        // Install the stop watcher component.
+        let stop_watcher =
+            test_realm.add_child("stop-watcher", STOP_WATCHER_URL, ChildOptions::new()).await?;
+        test_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::event_stream("stopped"))
+                    .from(Ref::parent())
+                    .to(&stop_watcher),
+            )
+            .await?;
+        test_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<StopWatcherMarker>())
+                    .from(&stop_watcher)
+                    .to(Ref::parent()),
+            )
+            .await?;
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<StopWatcherMarker>())
+                    .from(&test_realm)
+                    .to(Ref::parent()),
             )
             .await?;
 

@@ -80,6 +80,7 @@ fuchsia_package("pkg") {
     # whereas the inspect data for a subpackaged component uses a stable,
     # relative URL for this property.
     "puppet",
+    "stop_watcher",
   ]
 }
 
