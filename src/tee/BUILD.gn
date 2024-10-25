@@ -8,6 +8,7 @@ import("//build/components/fuchsia_package.gni")
 group("tests") {
   testonly = true
   deps = [
+    "binder-proxy:tests",
     "lib:tests",
     "manager:tests",
     "runtime:tests",
