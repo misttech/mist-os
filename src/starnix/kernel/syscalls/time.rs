@@ -166,7 +166,7 @@ pub fn sys_clock_nanosleep(
             );
             return error!(EINVAL);
         }
-        _ => return error!(EOPNOTSUPP),
+        _ => return error!(ENOTSUP),
     }
 
     let request = current_task.read_object(user_request)?;
