@@ -37,6 +37,9 @@ libc_source_set("musl-glue.basic") {
     "__dso_handle",
   ]
 
+  # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
+  defines = [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
+
   sources = [
     "_dl_log_write.cc",
     "_dl_phdr_report_globals.cc",
