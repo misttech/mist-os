@@ -20,8 +20,7 @@ struct BaseWlanFullmacServerForStartup
   explicit BaseWlanFullmacServerForStartup(
       fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImpl> server_end) {
     binding_.emplace(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()),
-                     std::move(server_end), this,
-                     [](auto f) { FDF_LOG(INFO, "BaseWlanFullmacServer unbinding"); });
+                     std::move(server_end), this, fidl::kIgnoreBindingClosure);
   }
 
   void Start(StartRequest& request, StartCompleter::Sync& completer) override {
