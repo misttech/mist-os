@@ -273,7 +273,7 @@ pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno
                 Ok(selinux_hooks::TaskAttrs::for_sid(
                     security_server
                         .security_context_to_sid(context.into())
-                        .map_err(|_| errno!(EINVAL))?,
+                        .map_err(|e| errno!(EINVAL, format!("{:?}", e)))?,
                 ))
             },
             || Ok(selinux_hooks::TaskAttrs::for_selinux_disabled()),
