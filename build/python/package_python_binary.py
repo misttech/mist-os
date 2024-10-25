@@ -128,9 +128,14 @@ def main() -> int:
         f.write(
             f"""
 import sys
+import inspect
 from {main_module} import *
 
-sys.exit({args.main_callable}())
+if inspect.iscoroutinefunction({args.main_callable}):
+    import asyncio
+    asyncio.run({args.main_callable}())
+else:
+    sys.exit({args.main_callable}())
 """
         )
 
