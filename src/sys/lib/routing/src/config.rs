@@ -8,7 +8,7 @@ use crate::capability_source::{
     CapabilitySource, CapabilityToCapabilitySource, ComponentCapability, ComponentSource,
 };
 use crate::component_instance::ComponentInstanceInterface;
-use crate::{RouteRequest, RoutingError, SpecificRouterResponse};
+use crate::{RouteRequest, RouterResponse, RoutingError};
 use cm_rust::FidlIntoNative;
 use sandbox::Data;
 use std::sync::Arc;
@@ -85,9 +85,9 @@ where
         metadata: request_metadata::config_metadata(use_config.availability),
     };
     let data = match router.route(Some(request), false).await? {
-        SpecificRouterResponse::<Data>::Capability(d) => d,
-        SpecificRouterResponse::<Data>::Unavailable => return Ok(use_config.default.clone()),
-        SpecificRouterResponse::<Data>::Debug(_) => {
+        RouterResponse::<Data>::Capability(d) => d,
+        RouterResponse::<Data>::Unavailable => return Ok(use_config.default.clone()),
+        RouterResponse::<Data>::Debug(_) => {
             return Err(RoutingError::RouteUnexpectedDebug {
                 type_name: cm_rust::CapabilityTypeName::Config,
                 moniker: component.moniker().clone().into(),

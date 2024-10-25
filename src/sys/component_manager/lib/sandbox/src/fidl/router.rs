@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fidl::RemotableCapability;
-use crate::{
-    Capability, CapabilityBound, Dict, DirEntry, Request, SpecificRouter, SpecificRouterResponse,
-};
+use crate::{Capability, CapabilityBound, Dict, DirEntry, Request, Router, RouterResponse};
 use fidl::AsHandleRef;
 use futures::future::BoxFuture;
 use router_error::{Explain, RouterError};
@@ -26,30 +24,28 @@ impl From<Request> for fsandbox::RouteRequest {
     }
 }
 
-impl TryFrom<fsandbox::DictionaryRouterRouteResponse> for SpecificRouterResponse<Dict> {
+impl TryFrom<fsandbox::DictionaryRouterRouteResponse> for RouterResponse<Dict> {
     type Error = crate::RemoteError;
 
     fn try_from(resp: fsandbox::DictionaryRouterRouteResponse) -> Result<Self, Self::Error> {
         Ok(match resp {
             fsandbox::DictionaryRouterRouteResponse::Dictionary(dict) => {
-                SpecificRouterResponse::<Dict>::Capability(dict.try_into()?)
+                RouterResponse::<Dict>::Capability(dict.try_into()?)
             }
-            fsandbox::DictionaryRouterRouteResponse::Unavailable(_) => {
-                SpecificRouterResponse::Unavailable
-            }
+            fsandbox::DictionaryRouterRouteResponse::Unavailable(_) => RouterResponse::Unavailable,
         })
     }
 }
 
-/// Binds a Route request from fidl to the Rust [SpecificRouter::Route] API. Shared by
-/// [SpecificRouter] server implementations.
+/// Binds a Route request from fidl to the Rust [Router::Route] API. Shared by
+/// [Router] server implementations.
 pub(crate) async fn route_from_fidl<T, R>(
-    router: &SpecificRouter<T>,
+    router: &Router<T>,
     payload: fsandbox::RouteRequest,
 ) -> Result<R, fsandbox::RouterError>
 where
     T: CapabilityBound,
-    R: TryFrom<SpecificRouterResponse<T>, Error = fsandbox::RouterError>,
+    R: TryFrom<RouterResponse<T>, Error = fsandbox::RouterError>,
 {
     let resp = match (payload.requesting, payload.metadata) {
         (Some(token), Some(metadata)) => {
@@ -120,7 +116,7 @@ pub fn dict_routers_to_dir_entry(scope: &ExecutionScope, dict: &Dict) -> Dict {
     out
 }
 
-impl<T: CapabilityBound + Clone> SpecificRouter<T>
+impl<T: CapabilityBound + Clone> Router<T>
 where
     Capability: From<T>,
 {
@@ -134,7 +130,7 @@ where
         for<'a> F: Fn(&'a RouterError) -> Option<BoxFuture<'a, ()>> + Send + Sync + 'static,
     {
         struct RouterEntry<T: CapabilityBound, F: 'static + Send + Sync> {
-            router: SpecificRouter<T>,
+            router: Router<T>,
             entry_type: fio::DirentType,
             scope: ExecutionScope,
             errors_fn: F,
@@ -176,11 +172,11 @@ where
 
                 // Request a capability from the `router`.
                 let result = match self.router.route(None, false).await {
-                    Ok(SpecificRouterResponse::<T>::Capability(c)) => Ok(Capability::from(c)),
-                    Ok(SpecificRouterResponse::<T>::Unavailable) => {
+                    Ok(RouterResponse::<T>::Capability(c)) => Ok(Capability::from(c)),
+                    Ok(RouterResponse::<T>::Unavailable) => {
                         return Err(zx::Status::NOT_FOUND);
                     }
-                    Ok(SpecificRouterResponse::<T>::Debug(_)) => {
+                    Ok(RouterResponse::<T>::Debug(_)) => {
                         // This shouldn't happen.
                         return Err(zx::Status::INTERNAL);
                     }

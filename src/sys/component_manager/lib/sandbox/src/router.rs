@@ -41,10 +41,10 @@ impl Request {
     }
 }
 
-/// Types that implement [`SpecificRoutable`] let the holder asynchronously request capabilities
+/// Types that implement [`Routable`] let the holder asynchronously request capabilities
 /// from them.
 #[async_trait]
-pub trait SpecificRoutable<T>: Send + Sync
+pub trait Routable<T>: Send + Sync
 where
     T: CapabilityBound,
 {
@@ -52,12 +52,12 @@ where
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError>;
+    ) -> Result<RouterResponse<T>, RouterError>;
 }
 
-/// Response of a [SpecificRouter] request.
+/// Response of a [Router] request.
 #[derive(Debug)]
-pub enum SpecificRouterResponse<T: CapabilityBound> {
+pub enum RouterResponse<T: CapabilityBound> {
     /// Routing succeeded and returned this capability.
     Capability(T),
 
@@ -68,58 +68,55 @@ pub enum SpecificRouterResponse<T: CapabilityBound> {
     Debug(Data),
 }
 
-/// A [`SpecificRouter`] is a capability that lets the holder obtain other capabilities
-/// asynchronously. [`SpecificRouter`] is the object capability representation of
-/// [`SpecificRoutable`].
+/// A [`Router`] is a capability that lets the holder obtain other capabilities
+/// asynchronously. [`Router`] is the object capability representation of
+/// [`Routable`].
 ///
 /// During routing, a request usually traverses through the component topology,
 /// passing through several routers, ending up at some router that will fulfill
 /// the request instead of forwarding it upstream.
 ///
-/// [`SpecificRouter`] differs from [`Router`] in that it is parameterized on the capability
-/// type `T`. Instead of a [`Capability`], [`SpecificRouter`] returns a [`SpecificRouterResponse`].
-/// [`SpecificRouter`] will supersede [`Router`].
+/// [`Router`] differs from [`Router`] in that it is parameterized on the capability
+/// type `T`. Instead of a [`Capability`], [`Router`] returns a [`RouterResponse`].
+/// [`Router`] will supersede [`Router`].
 #[derive(Clone)]
-pub struct SpecificRouter<T: CapabilityBound> {
-    routable: Arc<dyn SpecificRoutable<T>>,
+pub struct Router<T: CapabilityBound> {
+    routable: Arc<dyn Routable<T>>,
 }
 
-impl CapabilityBound for SpecificRouter<crate::Connector> {
+impl CapabilityBound for Router<crate::Connector> {
     fn debug_typename() -> &'static str {
         "ConnectorRouter"
     }
 }
-impl CapabilityBound for SpecificRouter<crate::Data> {
+impl CapabilityBound for Router<crate::Data> {
     fn debug_typename() -> &'static str {
         "DataRouter"
     }
 }
-impl CapabilityBound for SpecificRouter<crate::DirEntry> {
+impl CapabilityBound for Router<crate::DirEntry> {
     fn debug_typename() -> &'static str {
         "DirEntryRouter"
     }
 }
-impl CapabilityBound for SpecificRouter<crate::Dict> {
+impl CapabilityBound for Router<crate::Dict> {
     fn debug_typename() -> &'static str {
         "DictionaryRouter"
     }
 }
 
-impl<T: CapabilityBound> fmt::Debug for SpecificRouter<T> {
+impl<T: CapabilityBound> fmt::Debug for Router<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO(https://fxbug.dev/329680070): Require `Debug` on `SpecificRoutable` trait.
-        f.debug_struct("SpecificRouter").field("routable", &"[some routable object]").finish()
+        // TODO(https://fxbug.dev/329680070): Require `Debug` on `Routable` trait.
+        f.debug_struct("Router").field("routable", &"[some routable object]").finish()
     }
 }
 
 /// Syntax sugar within the framework to express custom routing logic using a function
 /// that takes a request and returns such future.
-impl<T: CapabilityBound, F> SpecificRoutable<T> for F
+impl<T: CapabilityBound, F> Routable<T> for F
 where
-    F: Fn(
-            Option<Request>,
-            bool,
-        ) -> BoxFuture<'static, Result<SpecificRouterResponse<T>, RouterError>>
+    F: Fn(Option<Request>, bool) -> BoxFuture<'static, Result<RouterResponse<T>, RouterError>>
         + Send
         + Sync
         + 'static,
@@ -129,7 +126,7 @@ where
         &'a self,
         request: Option<Request>,
         debug: bool,
-    ) -> BoxFuture<'b, Result<SpecificRouterResponse<T>, RouterError>>
+    ) -> BoxFuture<'b, Result<RouterResponse<T>, RouterError>>
     where
         'a: 'b,
         Self: 'b,
@@ -139,19 +136,19 @@ where
 }
 
 #[async_trait]
-impl<T: CapabilityBound> SpecificRoutable<T> for SpecificRouter<T> {
+impl<T: CapabilityBound> Routable<T> for Router<T> {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError> {
-        SpecificRouter::route(self, request, debug).await
+    ) -> Result<RouterResponse<T>, RouterError> {
+        Router::route(self, request, debug).await
     }
 }
 
-impl<T: CapabilityBound> SpecificRouter<T> {
-    /// Package a [`SpecificRoutable`] object into a [`SpecificRouter`].
-    pub fn new(routable: impl SpecificRoutable<T> + 'static) -> Self {
+impl<T: CapabilityBound> Router<T> {
+    /// Package a [`Routable`] object into a [`Router`].
+    pub fn new(routable: impl Routable<T> + 'static) -> Self {
         Self { routable: Arc::new(routable) }
     }
 
@@ -172,12 +169,12 @@ impl<T: CapabilityBound> SpecificRouter<T> {
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError> {
+    ) -> Result<RouterResponse<T>, RouterError> {
         self.routable.route(request, debug).await
     }
 }
 
-impl<T: Clone + CapabilityBound> SpecificRouter<T> {
+impl<T: Clone + CapabilityBound> Router<T> {
     /// Creates a router that will always resolve with the provided capability.
     // TODO: Should this require debug info?
     pub fn new_ok(c: impl Into<T>) -> Self {
@@ -192,13 +189,13 @@ struct OkRouter<T: Clone + CapabilityBound> {
 }
 
 #[async_trait]
-impl<T: Clone + CapabilityBound> SpecificRoutable<T> for OkRouter<T> {
+impl<T: Clone + CapabilityBound> Routable<T> for OkRouter<T> {
     async fn route(
         &self,
         _request: Option<Request>,
         _debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError> {
-        Ok(SpecificRouterResponse::Capability(self.v.clone()))
+    ) -> Result<RouterResponse<T>, RouterError> {
+        Ok(RouterResponse::Capability(self.v.clone()))
     }
 }
 
@@ -208,13 +205,13 @@ struct DebugRouter {
 }
 
 #[async_trait]
-impl<T: CapabilityBound> SpecificRoutable<T> for DebugRouter {
+impl<T: CapabilityBound> Routable<T> for DebugRouter {
     async fn route(
         &self,
         _request: Option<Request>,
         _debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError> {
-        Ok(SpecificRouterResponse::Debug(self.v.clone()))
+    ) -> Result<RouterResponse<T>, RouterError> {
+        Ok(RouterResponse::Debug(self.v.clone()))
     }
 }
 
@@ -224,12 +221,12 @@ struct ErrRouter {
 }
 
 #[async_trait]
-impl<T: CapabilityBound> SpecificRoutable<T> for ErrRouter {
+impl<T: CapabilityBound> Routable<T> for ErrRouter {
     async fn route(
         &self,
         _request: Option<Request>,
         _debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError> {
+    ) -> Result<RouterResponse<T>, RouterError> {
         Err(self.v.clone())
     }
 }

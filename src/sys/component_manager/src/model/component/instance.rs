@@ -58,8 +58,8 @@ use hooks::{CapabilityReceiver, EventPayload};
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::RouterError;
 use sandbox::{
-    Capability, Connector, Dict, DirEntry, RemotableCapability, Request, SpecificRoutable,
-    SpecificRouter, SpecificRouterResponse, WeakInstanceToken,
+    Capability, Connector, Dict, DirEntry, RemotableCapability, Request, Routable, Router,
+    RouterResponse, WeakInstanceToken,
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -439,12 +439,8 @@ impl ResolvedInstanceState {
                 component: WeakComponentInstanceInterface<ComponentInstance>,
                 source_path: Path,
                 capability: ComponentCapability,
-            ) -> SpecificRouter<Dict> {
-                SpecificRouter::<Dict>::new(ProgramDictionaryRouter {
-                    component,
-                    source_path,
-                    capability,
-                })
+            ) -> Router<Dict> {
+                Router::<Dict>::new(ProgramDictionaryRouter { component, source_path, capability })
             }
 
             fn new_outgoing_dir_connector_router(
@@ -452,7 +448,7 @@ impl ResolvedInstanceState {
                 component: &Arc<ComponentInstance>,
                 decl: &cm_rust::ComponentDecl,
                 capability: &cm_rust::CapabilityDecl,
-            ) -> SpecificRouter<Connector> {
+            ) -> Router<Connector> {
                 ResolvedInstanceState::make_program_outgoing_connector_router(
                     component, decl, capability,
                 )
@@ -463,7 +459,7 @@ impl ResolvedInstanceState {
                 component: &Arc<ComponentInstance>,
                 decl: &cm_rust::ComponentDecl,
                 capability: &cm_rust::CapabilityDecl,
-            ) -> SpecificRouter<DirEntry> {
+            ) -> Router<DirEntry> {
                 ResolvedInstanceState::make_program_outgoing_dir_entry_router(
                     component, decl, capability,
                 )
@@ -497,11 +493,9 @@ impl ResolvedInstanceState {
         component: &Arc<ComponentInstance>,
         component_decl: &ComponentDecl,
         capability_decl: &cm_rust::CapabilityDecl,
-    ) -> SpecificRouter<Connector> {
+    ) -> Router<Connector> {
         if component_decl.get_runner().is_none() {
-            return SpecificRouter::<Connector>::new_error(
-                OpenOutgoingDirError::InstanceNonExecutable,
-            );
+            return Router::<Connector>::new_error(OpenOutgoingDirError::InstanceNonExecutable);
         }
         let name = capability_decl.name();
         let path = capability_decl.path().expect("must have path").to_string();
@@ -544,24 +538,22 @@ impl ResolvedInstanceState {
         };
         match capability_decl {
             CapabilityDecl::Protocol(p) => match p.delivery {
-                DeliveryType::Immediate => SpecificRouter::<Connector>::new(hook),
+                DeliveryType::Immediate => Router::<Connector>::new(hook),
                 DeliveryType::OnReadable => hook.on_readable(component.execution_scope.clone()),
             },
-            _ => SpecificRouter::<Connector>::new(hook),
+            _ => Router::<Connector>::new(hook),
         }
     }
 
-    /// Creates a `SpecificRouter<DirEntry>` that requests the specified capability from the
+    /// Creates a `Router<DirEntry>` that requests the specified capability from the
     /// program's outgoing directory.
     pub fn make_program_outgoing_dir_entry_router(
         component: &Arc<ComponentInstance>,
         component_decl: &ComponentDecl,
         capability_decl: &cm_rust::CapabilityDecl,
-    ) -> SpecificRouter<DirEntry> {
+    ) -> Router<DirEntry> {
         if component_decl.get_runner().is_none() {
-            return SpecificRouter::<DirEntry>::new_error(
-                OpenOutgoingDirError::InstanceNonExecutable,
-            );
+            return Router::<DirEntry>::new_error(OpenOutgoingDirError::InstanceNonExecutable);
         }
         let name = capability_decl.name();
         let path = capability_decl.path().expect("must have path").to_string();
@@ -575,7 +567,7 @@ impl ResolvedInstanceState {
         let dir_entry =
             DirEntry::new(Arc::new(SubNode::new(outgoing_dir_entry, relative_path, entry_type)));
         // DirEntry-based capabilities don't need to support CapabilityRequested.
-        SpecificRouter::<DirEntry>::new(DirEntryOutgoingRouter {
+        Router::<DirEntry>::new(DirEntryOutgoingRouter {
             source: component.as_weak(),
             name: name.clone(),
             dir_entry,
@@ -1048,9 +1040,7 @@ impl ResolvedInstanceState {
         }
     }
 
-    fn get_child_component_output_dictionary_routers(
-        &self,
-    ) -> HashMap<ChildName, SpecificRouter<Dict>> {
+    fn get_child_component_output_dictionary_routers(&self) -> HashMap<ChildName, Router<Dict>> {
         self.children.iter().map(|(name, child)| (name.clone(), child.component_output())).collect()
     }
 
@@ -1261,12 +1251,12 @@ struct CapabilityRequestedHook {
 
 #[async_trait]
 
-impl SpecificRoutable<Connector> for CapabilityRequestedHook {
+impl Routable<Connector> for CapabilityRequestedHook {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<Connector>, RouterError> {
+    ) -> Result<RouterResponse<Connector>, RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
 
         fn cm_unexpected() -> RouterError {
@@ -1300,7 +1290,7 @@ impl SpecificRoutable<Connector> for CapabilityRequestedHook {
         });
         source.hooks.dispatch(&event).await;
         let resp = if debug {
-            SpecificRouterResponse::<Connector>::Debug(
+            RouterResponse::<Connector>::Debug(
                 CapabilitySource::Component(ComponentSource {
                     capability: self.capability_decl.clone().into(),
                     moniker: self.source.moniker.clone(),
@@ -1309,9 +1299,9 @@ impl SpecificRoutable<Connector> for CapabilityRequestedHook {
                 .expect("failed to convert capability source to Data"),
             )
         } else if receiver.is_taken() {
-            SpecificRouterResponse::<Connector>::Capability(sender)
+            RouterResponse::<Connector>::Capability(sender)
         } else {
-            SpecificRouterResponse::<Connector>::Capability(self.connector.clone())
+            RouterResponse::<Connector>::Capability(self.connector.clone())
         };
         Ok(resp)
     }
@@ -1326,12 +1316,12 @@ struct DirEntryOutgoingRouter {
 }
 
 #[async_trait]
-impl SpecificRoutable<DirEntry> for DirEntryOutgoingRouter {
+impl Routable<DirEntry> for DirEntryOutgoingRouter {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<DirEntry>, RouterError> {
+    ) -> Result<RouterResponse<DirEntry>, RouterError> {
         fn cm_unexpected() -> RouterError {
             RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
         }
@@ -1356,7 +1346,7 @@ impl SpecificRoutable<DirEntry> for DirEntryOutgoingRouter {
             return Err(cm_unexpected());
         };
         let resp = if debug {
-            SpecificRouterResponse::<DirEntry>::Debug(
+            RouterResponse::<DirEntry>::Debug(
                 CapabilitySource::Component(ComponentSource {
                     capability: self.capability_decl.clone().into(),
                     moniker: self.source.moniker.clone(),
@@ -1365,7 +1355,7 @@ impl SpecificRoutable<DirEntry> for DirEntryOutgoingRouter {
                 .expect("failed to convert capability source to Data"),
             )
         } else {
-            SpecificRouterResponse::<DirEntry>::Capability(self.dir_entry.clone())
+            RouterResponse::<DirEntry>::Capability(self.dir_entry.clone())
         };
         Ok(resp)
     }
@@ -1378,12 +1368,12 @@ struct ProgramDictionaryRouter {
 }
 
 #[async_trait]
-impl SpecificRoutable<Dict> for ProgramDictionaryRouter {
+impl Routable<Dict> for ProgramDictionaryRouter {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<Dict>, RouterError> {
+    ) -> Result<RouterResponse<Dict>, RouterError> {
         if debug {
             let source = CapabilitySource::Component(ComponentSource {
                 capability: self.capability.clone(),
@@ -1394,7 +1384,7 @@ impl SpecificRoutable<Dict> for ProgramDictionaryRouter {
             let Capability::Data(data) = cap else {
                 panic!("failed to convert capability source to Debug");
             };
-            return Ok(SpecificRouterResponse::<Dict>::Debug(data));
+            return Ok(RouterResponse::<Dict>::Debug(data));
         }
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         fn open_error(e: OpenOutgoingDirError) -> OpenError {

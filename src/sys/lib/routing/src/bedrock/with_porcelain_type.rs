@@ -8,10 +8,7 @@ use async_trait::async_trait;
 use cm_rust::CapabilityTypeName;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
-use sandbox::{
-    Capability, CapabilityBound, Data, Request, SpecificRoutable, SpecificRouter,
-    SpecificRouterResponse,
-};
+use sandbox::{Capability, CapabilityBound, Data, Request, Routable, Router, RouterResponse};
 
 pub fn is_supported(porcelain_type: &CapabilityTypeName) -> bool {
     matches!(porcelain_type, CapabilityTypeName::Protocol | CapabilityTypeName::Config)
@@ -30,18 +27,18 @@ pub trait WithPorcelainType {
 
 #[derive(Debug, Clone)]
 struct RouterWithPorcelainType<T: CapabilityBound> {
-    router: SpecificRouter<T>,
+    router: Router<T>,
     porcelain_type: CapabilityTypeName,
     moniker: ExtendedMoniker,
 }
 
 #[async_trait]
-impl<T: CapabilityBound> SpecificRoutable<T> for RouterWithPorcelainType<T> {
+impl<T: CapabilityBound> Routable<T> for RouterWithPorcelainType<T> {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError> {
+    ) -> Result<RouterResponse<T>, RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let RouterWithPorcelainType { router, porcelain_type, moniker } = self;
         let Capability::Data(Data::String(capability_type)) = request
@@ -72,7 +69,7 @@ impl<T: CapabilityBound> SpecificRoutable<T> for RouterWithPorcelainType<T> {
     }
 }
 
-impl<T: CapabilityBound> WithPorcelainType for SpecificRouter<T> {
+impl<T: CapabilityBound> WithPorcelainType for Router<T> {
     fn with_porcelain_type(
         self,
         porcelain_type: CapabilityTypeName,
@@ -82,7 +79,7 @@ impl<T: CapabilityBound> WithPorcelainType for SpecificRouter<T> {
             return self;
         }
 
-        SpecificRouter::<T>::new(RouterWithPorcelainType::<T> {
+        Router::<T>::new(RouterWithPorcelainType::<T> {
             router: self,
             porcelain_type,
             moniker: moniker.into(),
@@ -121,7 +118,7 @@ mod tests {
     #[fuchsia::test]
     async fn porcelain_type_good() {
         let source = Data::String("hello".to_string());
-        let base = SpecificRouter::<Data>::new_ok(source);
+        let base = Router::<Data>::new_ok(source);
         let proxy = base.with_porcelain_type(CapabilityTypeName::Protocol, Moniker::root());
         let metadata = protocol_metadata(Availability::Optional);
         let capability = proxy
@@ -129,7 +126,7 @@ mod tests {
             .await
             .unwrap();
         let capability = match capability {
-            SpecificRouterResponse::<Data>::Capability(d) => d,
+            RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
         assert_eq!(capability, Data::String("hello".to_string()));
@@ -138,7 +135,7 @@ mod tests {
     #[fuchsia::test]
     async fn porcelain_type_bad() {
         let source = Data::String("hello".to_string());
-        let base = SpecificRouter::<Data>::new_ok(source);
+        let base = Router::<Data>::new_ok(source);
         let proxy = base.with_porcelain_type(CapabilityTypeName::Protocol, Moniker::root());
         let metadata = Dict::new();
         metadata

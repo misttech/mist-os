@@ -64,7 +64,7 @@ use {
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
-    sandbox::{Connector, SpecificRouter, SpecificRouterResponse, WeakInstanceToken},
+    sandbox::{Connector, Router, RouterResponse, WeakInstanceToken},
     std::{
         collections::HashSet,
         pin::pin,
@@ -3256,8 +3256,8 @@ async fn source_component_stopping_when_routing() {
     let route_and_open_fut = async {
         // Route the capability.
         let cap = output.get_capability(&RelativePath::new("foo").unwrap()).unwrap();
-        let cap = SpecificRouter::<Connector>::try_from(cap).unwrap();
-        let Ok(SpecificRouterResponse::Capability(conn)) = cap
+        let cap = Router::<Connector>::try_from(cap).unwrap();
+        let Ok(RouterResponse::Capability(conn)) = cap
             .route(
                 Some(sandbox::Request {
                     target: root.as_weak().into(),
@@ -3321,8 +3321,8 @@ async fn source_component_stopped_after_routing_before_open() {
     let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
 
     let cap = output.get_capability(&RelativePath::new("foo").unwrap()).unwrap();
-    let cap = SpecificRouter::<Connector>::try_from(cap).unwrap();
-    let Ok(SpecificRouterResponse::Capability(conn)) = cap
+    let cap = Router::<Connector>::try_from(cap).unwrap();
+    let Ok(RouterResponse::Capability(conn)) = cap
         .route(
             Some(sandbox::Request {
                 target: root.as_weak().into(),
@@ -3391,8 +3391,8 @@ async fn source_component_shutdown_after_routing_before_open() {
     // Request a capability from the component.
     let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
     let cap = output.get_capability(&RelativePath::new("foo").unwrap()).unwrap();
-    let cap = SpecificRouter::<Connector>::try_from(cap).unwrap();
-    let Ok(SpecificRouterResponse::Capability(conn)) = cap
+    let cap = Router::<Connector>::try_from(cap).unwrap();
+    let Ok(RouterResponse::Capability(conn)) = cap
         .route(
             Some(sandbox::Request {
                 target: root.as_weak().into(),

@@ -53,8 +53,7 @@ use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
 use sandbox::{
-    Capability, Connector, Data, Dict, DirEntry, Message, Request, SpecificRoutable,
-    SpecificRouter, SpecificRouterResponse,
+    Capability, Connector, Data, Dict, DirEntry, Message, Request, Routable, Router, RouterResponse,
 };
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
@@ -518,8 +517,8 @@ impl ComponentInstance {
                 //
                 // TODO(https://fxbug.dev/319542502): Consider using the external router types
                 let router: Capability = match value {
-                    Capability::Connector(s) => SpecificRouter::<Connector>::new_ok(s).into(),
-                    Capability::Data(d) => SpecificRouter::<Data>::new_ok(d).into(),
+                    Capability::Connector(s) => Router::<Connector>::new_ok(s).into(),
+                    Capability::Data(d) => Router::<Data>::new_ok(d).into(),
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
@@ -998,27 +997,25 @@ impl ComponentInstance {
     }
 
     /// Returns a router that delegates to the component output dict.
-    pub(super) fn component_output(self: &Arc<Self>) -> SpecificRouter<Dict> {
+    pub(super) fn component_output(self: &Arc<Self>) -> Router<Dict> {
         #[derive(Debug)]
         struct ComponentOutput {
             component: WeakComponentInstance,
         }
 
         #[async_trait]
-        impl SpecificRoutable<Dict> for ComponentOutput {
+        impl Routable<Dict> for ComponentOutput {
             async fn route(
                 &self,
                 _request: Option<Request>,
                 _debug: bool,
-            ) -> Result<SpecificRouterResponse<Dict>, RouterError> {
+            ) -> Result<RouterResponse<Dict>, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
-                Ok(SpecificRouterResponse::<Dict>::Capability(
-                    component.get_component_output_dict().await?,
-                ))
+                Ok(RouterResponse::<Dict>::Capability(component.get_component_output_dict().await?))
             }
         }
 
-        SpecificRouter::<Dict>::new(ComponentOutput { component: self.as_weak() })
+        Router::<Dict>::new(ComponentOutput { component: self.as_weak() })
     }
 
     /// Opens this instance's exposed directory if it has been resolved.
@@ -1341,7 +1338,7 @@ probably not intended: {}",
         let resolver_proxy = match resp {
             // Built-in resolver are hosted by a LaunchTaskOnReceive, which returns a Connector
             // capability for new routes.
-            SpecificRouterResponse::<Connector>::Capability(resolver_connector) => {
+            RouterResponse::<Connector>::Capability(resolver_connector) => {
                 let (proxy, server_end) = create_proxy::<fresolution::ResolverMarker>().unwrap();
                 resolver_connector.send(Message { channel: server_end.into_channel() }).map_err(
                     |_| {
@@ -1353,7 +1350,7 @@ probably not intended: {}",
                 )?;
                 proxy
             }
-            SpecificRouterResponse::<Connector>::Unavailable => {
+            RouterResponse::<Connector>::Unavailable => {
                 return Err(ResolverError::routing_error(
                     RoutingError::RouteUnexpectedUnavailable {
                         type_name: CapabilityTypeName::Resolver,
@@ -1361,7 +1358,7 @@ probably not intended: {}",
                     },
                 ));
             }
-            SpecificRouterResponse::<Connector>::Debug(_) => {
+            RouterResponse::<Connector>::Debug(_) => {
                 return Err(ResolverError::routing_error(RoutingError::RouteUnexpectedDebug {
                     type_name: CapabilityTypeName::Resolver,
                     moniker: self.moniker.clone().into(),

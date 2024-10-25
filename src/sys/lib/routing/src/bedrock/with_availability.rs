@@ -9,21 +9,21 @@ use cm_types::Availability;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
-use sandbox::{CapabilityBound, Request, SpecificRoutable, SpecificRouter, SpecificRouterResponse};
+use sandbox::{CapabilityBound, Request, Routable, Router, RouterResponse};
 
 struct AvailabilityRouter<T: CapabilityBound> {
-    router: SpecificRouter<T>,
+    router: Router<T>,
     availability: Availability,
     moniker: ExtendedMoniker,
 }
 
 #[async_trait]
-impl<T: CapabilityBound> SpecificRoutable<T> for AvailabilityRouter<T> {
+impl<T: CapabilityBound> Routable<T> for AvailabilityRouter<T> {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError> {
+    ) -> Result<RouterResponse<T>, RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let AvailabilityRouter { router, availability, moniker } = self;
         // The availability of the request must be compatible with the
@@ -59,17 +59,13 @@ pub trait WithAvailability {
     ) -> Self;
 }
 
-impl<T: CapabilityBound> WithAvailability for SpecificRouter<T> {
+impl<T: CapabilityBound> WithAvailability for Router<T> {
     fn with_availability(
         self,
         moniker: impl Into<ExtendedMoniker>,
         availability: Availability,
     ) -> Self {
-        SpecificRouter::<T>::new(AvailabilityRouter {
-            availability,
-            router: self,
-            moniker: moniker.into(),
-        })
+        Router::<T>::new(AvailabilityRouter { availability, router: self, moniker: moniker.into() })
     }
 }
 
@@ -99,7 +95,7 @@ mod tests {
     #[fuchsia::test]
     async fn availability_good() {
         let source = Data::String("hello".to_string());
-        let base = SpecificRouter::<Data>::new_ok(source);
+        let base = Router::<Data>::new_ok(source);
         let proxy =
             base.with_availability(ExtendedMoniker::ComponentManager, Availability::Optional);
         let metadata = Dict::new();
@@ -109,7 +105,7 @@ mod tests {
             .await
             .unwrap();
         let capability = match capability {
-            SpecificRouterResponse::<Data>::Capability(d) => d,
+            RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
         assert_eq!(capability, Data::String("hello".to_string()));
@@ -118,7 +114,7 @@ mod tests {
     #[fuchsia::test]
     async fn availability_bad() {
         let source = Data::String("hello".to_string());
-        let base = SpecificRouter::<Data>::new_ok(source);
+        let base = Router::<Data>::new_ok(source);
         let proxy =
             base.with_availability(ExtendedMoniker::ComponentManager, Availability::Optional);
         let metadata = Dict::new();

@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use router_error::RouterError;
-use sandbox::{CapabilityBound, Request, SpecificRoutable, SpecificRouter, SpecificRouterResponse};
+use sandbox::{CapabilityBound, Request, Routable, Router, RouterResponse};
 
 use crate::error::{ErrorReporter, RouteRequestErrorInfo};
 
@@ -18,18 +18,18 @@ pub trait WithErrorReporter {
 }
 
 struct RouterWithErrorReporter<T: CapabilityBound, R: ErrorReporter> {
-    router: SpecificRouter<T>,
+    router: Router<T>,
     route_request: RouteRequestErrorInfo,
     error_reporter: R,
 }
 
 #[async_trait]
-impl<T: CapabilityBound, R: ErrorReporter> SpecificRoutable<T> for RouterWithErrorReporter<T, R> {
+impl<T: CapabilityBound, R: ErrorReporter> Routable<T> for RouterWithErrorReporter<T, R> {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError> {
+    ) -> Result<RouterResponse<T>, RouterError> {
         match self.router.route(request, debug).await {
             Ok(res) => Ok(res),
             Err(err) => {
@@ -40,7 +40,7 @@ impl<T: CapabilityBound, R: ErrorReporter> SpecificRoutable<T> for RouterWithErr
     }
 }
 
-impl<T: CapabilityBound> WithErrorReporter for SpecificRouter<T> {
+impl<T: CapabilityBound> WithErrorReporter for Router<T> {
     fn with_error_reporter(
         self,
         route_request: RouteRequestErrorInfo,

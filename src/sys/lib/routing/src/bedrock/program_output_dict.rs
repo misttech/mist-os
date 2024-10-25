@@ -10,10 +10,7 @@ use async_trait::async_trait;
 use cm_rust::NativeIntoFidl;
 use cm_types::Path;
 use router_error::RouterError;
-use sandbox::{
-    Connector, Data, Dict, DirEntry, Request, SpecificRoutable, SpecificRouter,
-    SpecificRouterResponse,
-};
+use sandbox::{Connector, Data, Dict, DirEntry, Request, Routable, Router, RouterResponse};
 use std::sync::Arc;
 use tracing::warn;
 
@@ -25,7 +22,7 @@ pub trait ProgramOutputGenerator<C: ComponentInstanceInterface + 'static> {
         component: WeakComponentInstanceInterface<C>,
         path: Path,
         capability: ComponentCapability,
-    ) -> SpecificRouter<Dict>;
+    ) -> Router<Dict>;
 
     /// Get an outgoing directory router for `capability` that returns [Connector]. `capability`
     /// should be a type that maps to [Connector].
@@ -34,7 +31,7 @@ pub trait ProgramOutputGenerator<C: ComponentInstanceInterface + 'static> {
         component: &Arc<C>,
         decl: &cm_rust::ComponentDecl,
         capability: &cm_rust::CapabilityDecl,
-    ) -> SpecificRouter<Connector>;
+    ) -> Router<Connector>;
 
     /// Get an outgoing directory router for `capability` that returns [DirEntry]. `capability`
     /// should be a type that maps to [DirEntry].
@@ -43,7 +40,7 @@ pub trait ProgramOutputGenerator<C: ComponentInstanceInterface + 'static> {
         component: &Arc<C>,
         decl: &cm_rust::ComponentDecl,
         capability: &cm_rust::CapabilityDecl,
-    ) -> SpecificRouter<DirEntry>;
+    ) -> Router<DirEntry>;
 }
 
 pub fn build_program_output_dictionary<C: ComponentInstanceInterface + 'static>(
@@ -124,7 +121,7 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
             let data =
                 sandbox::Data::Bytes(fidl::persist(&c.value.clone().native_into_fidl()).unwrap());
             match program_output_dict
-                .insert_capability(capability.name(), SpecificRouter::<Data>::new_ok(data).into())
+                .insert_capability(capability.name(), Router::<Data>::new_ok(data).into())
             {
                 Ok(()) => (),
                 Err(e) => {
@@ -178,27 +175,27 @@ fn make_simple_dict_router<C: ComponentInstanceInterface + 'static>(
     dict: Dict,
     component: &Arc<C>,
     decl: &cm_rust::DictionaryDecl,
-) -> SpecificRouter<Dict> {
+) -> Router<Dict> {
     struct DictRouter {
         dict: Dict,
         source: CapabilitySource,
     }
     #[async_trait]
-    impl SpecificRoutable<Dict> for DictRouter {
+    impl Routable<Dict> for DictRouter {
         async fn route(
             &self,
             _request: Option<Request>,
             debug: bool,
-        ) -> Result<SpecificRouterResponse<Dict>, RouterError> {
+        ) -> Result<RouterResponse<Dict>, RouterError> {
             if debug {
-                Ok(SpecificRouterResponse::Debug(
+                Ok(RouterResponse::Debug(
                     self.source
                         .clone()
                         .try_into()
                         .expect("failed to convert capability source to dictionary"),
                 ))
             } else {
-                Ok(SpecificRouterResponse::Capability(self.dict.clone().into()))
+                Ok(RouterResponse::Capability(self.dict.clone().into()))
             }
         }
     }
@@ -206,5 +203,5 @@ fn make_simple_dict_router<C: ComponentInstanceInterface + 'static>(
         capability: ComponentCapability::Dictionary(decl.clone()),
         moniker: component.moniker().clone(),
     });
-    SpecificRouter::<Dict>::new(DictRouter { dict, source })
+    Router::<Dict>::new(DictRouter { dict, source })
 }

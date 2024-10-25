@@ -51,8 +51,7 @@ use itertools::Itertools;
 use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
 use router_error::Explain;
 use sandbox::{
-    Capability, CapabilityBound, Connector, Data, Dict, Request, SpecificRoutable, SpecificRouter,
-    SpecificRouterResponse,
+    Capability, CapabilityBound, Connector, Data, Dict, Request, Routable, Router, RouterResponse,
 };
 use std::sync::Arc;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx_status as zx};
@@ -502,11 +501,11 @@ async fn route_capability_inner<T, C>(
 where
     C: ComponentInstanceInterface + 'static,
     T: CapabilityBound,
-    SpecificRouter<T>: TryFrom<Capability>,
+    Router<T>: TryFrom<Capability>,
 {
     let router = dictionary
         .get_capability(path)
-        .and_then(|c| SpecificRouter::<T>::try_from(c).ok())
+        .and_then(|c| Router::<T>::try_from(c).ok())
         .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {
             moniker: target.moniker().clone().into(),
             name: path.iter_segments().join("/"),
@@ -515,18 +514,18 @@ where
 }
 
 async fn perform_route<T, C>(
-    router: impl SpecificRoutable<T>,
+    router: impl Routable<T>,
     metadata: Dict,
     target: &Arc<C>,
 ) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
     T: CapabilityBound,
-    SpecificRouter<T>: TryFrom<Capability>,
+    Router<T>: TryFrom<Capability>,
 {
     let request = Request { target: WeakComponentInstanceInterface::new(target).into(), metadata };
     let data = match router.route(Some(request), true).await? {
-        SpecificRouterResponse::<T>::Debug(d) => d,
+        RouterResponse::<T>::Debug(d) => d,
         _ => panic!("Debug route did not return a debug response"),
     };
     Ok(RouteSource::new(data.try_into().unwrap()))

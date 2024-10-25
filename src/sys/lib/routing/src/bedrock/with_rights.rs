@@ -9,21 +9,21 @@ use async_trait::async_trait;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
-use sandbox::{CapabilityBound, Request, SpecificRoutable, SpecificRouter, SpecificRouterResponse};
+use sandbox::{CapabilityBound, Request, Routable, Router, RouterResponse};
 
 struct RightsRouter<T: CapabilityBound> {
-    router: SpecificRouter<T>,
+    router: Router<T>,
     rights: Rights,
     moniker: ExtendedMoniker,
 }
 
 #[async_trait]
-impl<T: CapabilityBound> SpecificRoutable<T> for RightsRouter<T> {
+impl<T: CapabilityBound> Routable<T> for RightsRouter<T> {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, router_error::RouterError> {
+    ) -> Result<RouterResponse<T>, router_error::RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let RightsRouter { router, rights, moniker } = self;
         let request_rights =
@@ -45,9 +45,9 @@ pub trait WithRights {
     fn with_rights(self, moniker: impl Into<ExtendedMoniker>, rights: Rights) -> Self;
 }
 
-impl<T: CapabilityBound> WithRights for SpecificRouter<T> {
+impl<T: CapabilityBound> WithRights for Router<T> {
     fn with_rights(self, moniker: impl Into<ExtendedMoniker>, rights: Rights) -> Self {
-        SpecificRouter::<T>::new(RightsRouter { rights, router: self, moniker: moniker.into() })
+        Router::<T>::new(RightsRouter { rights, router: self, moniker: moniker.into() })
     }
 }
 
@@ -78,7 +78,7 @@ mod tests {
     #[fuchsia::test]
     async fn rights_good() {
         let source = Data::String("hello".to_string());
-        let base = SpecificRouter::<Data>::new_ok(source);
+        let base = Router::<Data>::new_ok(source);
         let proxy = base.with_rights(ExtendedMoniker::ComponentManager, fio::RW_STAR_DIR.into());
         let metadata = Dict::new();
         metadata.set_rights(fio::R_STAR_DIR.into());
@@ -87,7 +87,7 @@ mod tests {
             .await
             .unwrap();
         let capability = match capability {
-            SpecificRouterResponse::<Data>::Capability(d) => d,
+            RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
         assert_eq!(capability, Data::String("hello".to_string()));
@@ -96,7 +96,7 @@ mod tests {
     #[fuchsia::test]
     async fn rights_bad() {
         let source = Data::String("hello".to_string());
-        let base = SpecificRouter::<Data>::new_ok(source);
+        let base = Router::<Data>::new_ok(source);
         let proxy = base.with_rights(ExtendedMoniker::ComponentManager, fio::R_STAR_DIR.into());
         let metadata = Dict::new();
         metadata.set_rights(fio::RW_STAR_DIR.into());

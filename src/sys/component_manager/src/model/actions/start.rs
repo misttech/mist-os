@@ -27,9 +27,7 @@ use hooks::{EventPayload, RuntimeInfo};
 use moniker::Moniker;
 use router_error::RouterError;
 use routing::bedrock::request_metadata::runner_metadata;
-use sandbox::{
-    Capability, Connector, Dict, Message, Request, SpecificRouter, SpecificRouterResponse,
-};
+use sandbox::{Capability, Connector, Dict, Message, Request, Router, RouterResponse};
 use serve_processargs::NamespaceBuilder;
 use std::sync::Arc;
 use tracing::warn;
@@ -445,7 +443,7 @@ pub fn should_return_early(
 /// Returns None if the component's decl does not specify a runner.
 async fn open_runner(
     component: &Arc<ComponentInstance>,
-    runner_router: SpecificRouter<Connector>,
+    runner_router: Router<Connector>,
     runner_name: Name,
 ) -> Result<Option<RemoteRunner>, StartActionError> {
     // Open up a channel to the runner.
@@ -463,7 +461,7 @@ async fn open_runner(
     match &runner_capability {
         // Built-in runners are hosted by a LaunchTaskOnReceive, which returns a Connector
         // capability for new routes.
-        SpecificRouterResponse::<Connector>::Capability(runner_connector) => {
+        RouterResponse::<Connector>::Capability(runner_connector) => {
             let (proxy, server_end) = create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
             runner_connector.send(Message { channel: server_end.into_channel() }).map_err(
                 |_| StartActionError::ResolveRunnerError {

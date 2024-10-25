@@ -23,7 +23,7 @@ use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::{Explain, RouterError};
-use sandbox::{Capability, SpecificRouterResponse};
+use sandbox::{Capability, RouterResponse};
 use std::cmp::Ordering;
 use std::sync::{Arc, Weak};
 use tracing::warn;
@@ -430,7 +430,7 @@ impl RouteRequest {
         let res = match router {
             Capability::ConnectorRouter(router) => {
                 router.route(None, true).await.and_then(|resp| match resp {
-                    SpecificRouterResponse::Debug(data) => Ok(data),
+                    RouterResponse::Debug(data) => Ok(data),
                     _ => {
                         warn!("[route_validator] Route did not return debug info");
                         Err(RouterError::Internal)
@@ -439,7 +439,7 @@ impl RouteRequest {
             }
             Capability::DictionaryRouter(router) => {
                 router.route(None, true).await.and_then(|resp| match resp {
-                    SpecificRouterResponse::Debug(data) => Ok(data),
+                    RouterResponse::Debug(data) => Ok(data),
                     _ => {
                         warn!("[route_validator] Route did not return debug info");
                         Err(RouterError::Internal)
@@ -448,7 +448,7 @@ impl RouteRequest {
             }
             Capability::DirEntryRouter(router) => {
                 router.route(None, true).await.and_then(|resp| match resp {
-                    SpecificRouterResponse::Debug(data) => Ok(data),
+                    RouterResponse::Debug(data) => Ok(data),
                     _ => {
                         warn!("[route_validator] Route did not return debug info");
                         Err(RouterError::Internal)
@@ -457,7 +457,7 @@ impl RouteRequest {
             }
             Capability::DataRouter(router) => {
                 router.route(None, true).await.and_then(|resp| match resp {
-                    SpecificRouterResponse::Debug(data) => Ok(data),
+                    RouterResponse::Debug(data) => Ok(data),
                     _ => {
                         warn!("[route_validator] Route did not return debug info");
                         Err(RouterError::Internal)

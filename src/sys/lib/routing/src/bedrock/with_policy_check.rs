@@ -11,7 +11,7 @@ use moniker::ExtendedMoniker;
 use router_error::RouterError;
 #[cfg(not(target_os = "fuchsia"))]
 use sandbox::Capability;
-use sandbox::{CapabilityBound, Request, SpecificRoutable, SpecificRouter, SpecificRouterResponse};
+use sandbox::{CapabilityBound, Request, Routable, Router, RouterResponse};
 
 /// If the metadata for a route contains a Data::Uint64 value under this key with a value greater
 /// than 0, then no policy checks will be performed. This behavior is limited to non-fuchsia
@@ -42,7 +42,7 @@ pub trait WithPolicyCheck {
     ) -> Self;
 }
 
-impl<T: CapabilityBound> WithPolicyCheck for SpecificRouter<T> {
+impl<T: CapabilityBound> WithPolicyCheck for Router<T> {
     fn with_policy_check<C: ComponentInstanceInterface + 'static>(
         self,
         capability_source: CapabilitySource,
@@ -55,7 +55,7 @@ impl<T: CapabilityBound> WithPolicyCheck for SpecificRouter<T> {
 pub struct PolicyCheckRouter<C: ComponentInstanceInterface + 'static, T: CapabilityBound> {
     capability_source: CapabilitySource,
     policy_checker: GlobalPolicyChecker,
-    router: SpecificRouter<T>,
+    router: Router<T>,
     _phantom_data: std::marker::PhantomData<C>,
 }
 
@@ -63,7 +63,7 @@ impl<C: ComponentInstanceInterface + 'static, T: CapabilityBound> PolicyCheckRou
     pub fn new(
         capability_source: CapabilitySource,
         policy_checker: GlobalPolicyChecker,
-        router: SpecificRouter<T>,
+        router: Router<T>,
     ) -> Self {
         Self {
             capability_source,
@@ -75,14 +75,14 @@ impl<C: ComponentInstanceInterface + 'static, T: CapabilityBound> PolicyCheckRou
 }
 
 #[async_trait]
-impl<C: ComponentInstanceInterface + 'static, T: CapabilityBound> SpecificRoutable<T>
+impl<C: ComponentInstanceInterface + 'static, T: CapabilityBound> Routable<T>
     for PolicyCheckRouter<C, T>
 {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<SpecificRouterResponse<T>, RouterError> {
+    ) -> Result<RouterResponse<T>, RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         #[cfg(not(target_os = "fuchsia"))]
         if let Ok(Some(Capability::Data(sandbox::Data::Uint64(num)))) =

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::SpecificRouter;
+use crate::Router;
 use from_enum::FromEnum;
 use router_error::Explain;
 use std::fmt::Debug;
@@ -85,10 +85,10 @@ pub enum Capability {
     Data(crate::Data),
     Directory(crate::Directory),
     Handle(crate::Handle),
-    ConnectorRouter(crate::SpecificRouter<crate::Connector>),
-    DictionaryRouter(crate::SpecificRouter<crate::Dict>),
-    DirEntryRouter(crate::SpecificRouter<crate::DirEntry>),
-    DataRouter(crate::SpecificRouter<crate::Data>),
+    ConnectorRouter(crate::Router<crate::Connector>),
+    DictionaryRouter(crate::Router<crate::Dict>),
+    DirEntryRouter(crate::Router<crate::DirEntry>),
+    DataRouter(crate::Router<crate::Data>),
     Instance(crate::WeakInstanceToken),
     DirEntry(crate::DirEntry),
 }
@@ -122,10 +122,10 @@ impl Capability {
     pub fn debug_typename(&self) -> &'static str {
         match self {
             Self::Connector(_) => crate::Connector::debug_typename(),
-            Self::ConnectorRouter(_) => crate::SpecificRouter::<crate::Connector>::debug_typename(),
-            Self::DictionaryRouter(_) => crate::SpecificRouter::<crate::Dict>::debug_typename(),
-            Self::DirEntryRouter(_) => crate::SpecificRouter::<crate::DirEntry>::debug_typename(),
-            Self::DataRouter(_) => crate::SpecificRouter::<crate::Data>::debug_typename(),
+            Self::ConnectorRouter(_) => crate::Router::<crate::Connector>::debug_typename(),
+            Self::DictionaryRouter(_) => crate::Router::<crate::Dict>::debug_typename(),
+            Self::DirEntryRouter(_) => crate::Router::<crate::DirEntry>::debug_typename(),
+            Self::DataRouter(_) => crate::Router::<crate::Data>::debug_typename(),
             Self::Dictionary(_) => crate::Dict::debug_typename(),
             Self::Data(_) => crate::Data::debug_typename(),
             Self::Unit(_) => crate::Unit::debug_typename(),
@@ -214,7 +214,7 @@ impl TryFrom<Capability> for crate::Unit {
     }
 }
 
-impl TryFrom<Capability> for SpecificRouter<crate::Dict> {
+impl TryFrom<Capability> for Router<crate::Dict> {
     type Error = ();
 
     fn try_from(c: Capability) -> Result<Self, Self::Error> {
@@ -225,7 +225,7 @@ impl TryFrom<Capability> for SpecificRouter<crate::Dict> {
     }
 }
 
-impl TryFrom<Capability> for SpecificRouter<crate::DirEntry> {
+impl TryFrom<Capability> for Router<crate::DirEntry> {
     type Error = ();
 
     fn try_from(c: Capability) -> Result<Self, Self::Error> {
@@ -236,7 +236,7 @@ impl TryFrom<Capability> for SpecificRouter<crate::DirEntry> {
     }
 }
 
-impl TryFrom<Capability> for SpecificRouter<crate::Connector> {
+impl TryFrom<Capability> for Router<crate::Connector> {
     type Error = ();
 
     fn try_from(c: Capability) -> Result<Self, Self::Error> {
@@ -247,7 +247,7 @@ impl TryFrom<Capability> for SpecificRouter<crate::Connector> {
     }
 }
 
-impl TryFrom<Capability> for SpecificRouter<crate::Data> {
+impl TryFrom<Capability> for Router<crate::Data> {
     type Error = ();
 
     fn try_from(c: Capability) -> Result<Self, Self::Error> {

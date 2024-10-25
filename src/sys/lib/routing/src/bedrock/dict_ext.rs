@@ -9,8 +9,8 @@ use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
 use sandbox::{
-    Capability, CapabilityBound, Connector, Data, Dict, DirEntry, Request, SpecificRoutable,
-    SpecificRouter, SpecificRouterResponse,
+    Capability, CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router,
+    RouterResponse,
 };
 use std::fmt::Debug;
 
@@ -31,10 +31,10 @@ pub trait DictExt {
         &self,
         path: &impl IterablePath,
         not_found_error: RoutingError,
-    ) -> SpecificRouter<T>
+    ) -> Router<T>
     where
         T: CapabilityBound,
-        SpecificRouter<T>: TryFrom<Capability>;
+        Router<T>: TryFrom<Capability>;
 
     /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
     fn insert_capability(
@@ -53,7 +53,7 @@ pub trait DictExt {
     /// Note that the return value can contain any capability type, instead of a parameterized `T`.
     /// This is because some callers work with a generic capability and don't care about the
     /// specific type. Callers who do care can use `TryFrom` to cast to the expected
-    /// [SpecificRouterResponse] type.
+    /// [RouterResponse] type.
     async fn get_with_request<'a>(
         &self,
         moniker: &ExtendedMoniker,
@@ -63,7 +63,7 @@ pub trait DictExt {
     ) -> Result<Option<GenericRouterResponse>, RouterError>;
 }
 
-/// The analogue of a [SpecificRouterResponse] that can hold any type of capability. This is the
+/// The analogue of a [RouterResponse] that can hold any type of capability. This is the
 /// return type of [DictExt::get_with_request].
 #[derive(Debug)]
 pub enum GenericRouterResponse {
@@ -77,7 +77,7 @@ pub enum GenericRouterResponse {
     Debug(Data),
 }
 
-impl<T: CapabilityBound> TryFrom<GenericRouterResponse> for SpecificRouterResponse<T> {
+impl<T: CapabilityBound> TryFrom<GenericRouterResponse> for RouterResponse<T> {
     // Returns the capability's debug typename.
     type Error = &'static str;
 
@@ -85,10 +85,10 @@ impl<T: CapabilityBound> TryFrom<GenericRouterResponse> for SpecificRouterRespon
         let r = match r {
             GenericRouterResponse::Capability(c) => {
                 let debug_name = c.debug_typename();
-                SpecificRouterResponse::<T>::Capability(c.try_into().map_err(|_| debug_name)?)
+                RouterResponse::<T>::Capability(c.try_into().map_err(|_| debug_name)?)
             }
-            GenericRouterResponse::Unavailable => SpecificRouterResponse::<T>::Unavailable,
-            GenericRouterResponse::Debug(d) => SpecificRouterResponse::<T>::Debug(d),
+            GenericRouterResponse::Unavailable => RouterResponse::<T>::Unavailable,
+            GenericRouterResponse::Debug(d) => RouterResponse::<T>::Debug(d),
         };
         Ok(r)
     }
@@ -121,10 +121,10 @@ impl DictExt for Dict {
         &self,
         path: &impl IterablePath,
         not_found_error: RoutingError,
-    ) -> SpecificRouter<T>
+    ) -> Router<T>
     where
         T: CapabilityBound,
-        SpecificRouter<T>: TryFrom<Capability>,
+        Router<T>: TryFrom<Capability>,
     {
         let mut segments = path.iter_segments();
         let root = segments.next().expect("path must be nonempty");
@@ -135,41 +135,39 @@ impl DictExt for Dict {
         }
 
         #[async_trait]
-        impl<T: CapabilityBound> SpecificRoutable<T> for ErrorRouter {
+        impl<T: CapabilityBound> Routable<T> for ErrorRouter {
             async fn route(
                 &self,
                 _request: Option<Request>,
                 _debug: bool,
-            ) -> Result<SpecificRouterResponse<T>, RouterError> {
+            ) -> Result<RouterResponse<T>, RouterError> {
                 Err(self.not_found_error.clone())
             }
         }
 
         /// This uses the same algorithm as [LazyGet], but that is implemented for
-        /// [SpecificRouter<Dict>] while this is implemented for [Router]. This duplication will go
-        /// away once [Router] is replaced with [SpecificRouter].
+        /// [Router<Dict>] while this is implemented for [Router]. This duplication will go
+        /// away once [Router] is replaced with [Router].
         #[derive(Debug)]
         struct ScopedDictRouter<P: IterablePath + Debug + 'static> {
-            router: SpecificRouter<Dict>,
+            router: Router<Dict>,
             path: P,
             not_found_error: RoutingError,
         }
 
         #[async_trait]
-        impl<P: IterablePath + Debug + 'static, T: CapabilityBound> SpecificRoutable<T>
-            for ScopedDictRouter<P>
-        {
+        impl<P: IterablePath + Debug + 'static, T: CapabilityBound> Routable<T> for ScopedDictRouter<P> {
             async fn route(
                 &self,
                 request: Option<Request>,
                 debug: bool,
-            ) -> Result<SpecificRouterResponse<T>, RouterError> {
+            ) -> Result<RouterResponse<T>, RouterError> {
                 // If `debug` is true, that should only apply to the capability at `path`.
                 // Here we're looking up the containing dictionary, so set `debug = false`, to
                 // obtain the actual Dict and not its debug info.
                 let init_request = request.as_ref().map(|r| r.try_clone()).transpose()?;
                 match self.router.route(init_request, false).await? {
-                    SpecificRouterResponse::<Dict>::Capability(dict) => {
+                    RouterResponse::<Dict>::Capability(dict) => {
                         let moniker: ExtendedMoniker = self.not_found_error.clone().into();
                         let resp =
                             dict.get_with_request(&moniker, &self.path, request, debug).await?;
@@ -194,31 +192,22 @@ impl DictExt for Dict {
 
         if segments.next().is_none() {
             // No nested lookup necessary.
-            let Some(router) = self
-                .get(root)
-                .ok()
-                .flatten()
-                .and_then(|cap| SpecificRouter::<T>::try_from(cap).ok())
+            let Some(router) =
+                self.get(root).ok().flatten().and_then(|cap| Router::<T>::try_from(cap).ok())
             else {
-                return SpecificRouter::<T>::new(ErrorRouter {
-                    not_found_error: not_found_error.into(),
-                });
+                return Router::<T>::new(ErrorRouter { not_found_error: not_found_error.into() });
             };
             return router;
         }
 
         let Some(cap) = self.get(root).ok().flatten() else {
-            return SpecificRouter::<T>::new(ErrorRouter {
-                not_found_error: not_found_error.into(),
-            });
+            return Router::<T>::new(ErrorRouter { not_found_error: not_found_error.into() });
         };
         let router = match cap {
-            Capability::Dictionary(d) => SpecificRouter::<Dict>::new_ok(d),
+            Capability::Dictionary(d) => Router::<Dict>::new_ok(d),
             Capability::DictionaryRouter(r) => r,
             _ => {
-                return SpecificRouter::<T>::new(ErrorRouter {
-                    not_found_error: not_found_error.into(),
-                });
+                return Router::<T>::new(ErrorRouter { not_found_error: not_found_error.into() });
             }
         };
 
@@ -226,11 +215,7 @@ impl DictExt for Dict {
         let _ = segments.next().unwrap();
         let path = RelativePath::from(segments.map(|s| s.clone()).collect::<Vec<_>>());
 
-        SpecificRouter::<T>::new(ScopedDictRouter {
-            router,
-            path,
-            not_found_error: not_found_error.into(),
-        })
+        Router::<T>::new(ScopedDictRouter { router, path, not_found_error: not_found_error.into() })
     }
 
     fn insert_capability(
@@ -337,13 +322,13 @@ impl DictExt for Dict {
                         current_dict = d;
                     }
                     Capability::DictionaryRouter(r) => match r.route(request, false).await? {
-                        SpecificRouterResponse::<Dict>::Capability(d) => {
+                        RouterResponse::<Dict>::Capability(d) => {
                             current_dict = d;
                         }
-                        SpecificRouterResponse::<Dict>::Unavailable => {
+                        RouterResponse::<Dict>::Unavailable => {
                             return Ok(Some(GenericRouterResponse::Unavailable));
                         }
-                        SpecificRouterResponse::<Dict>::Debug(d) => {
+                        RouterResponse::<Dict>::Debug(d) => {
                             // This shouldn't happen (we passed debug=false). Just pass it up
                             // the chain so the caller can decide how to deal with it.
                             return Ok(Some(GenericRouterResponse::Debug(d)));
@@ -360,44 +345,44 @@ impl DictExt for Dict {
                 }
             } else {
                 // We've reached the end of our path. The last capability should have type
-                // `T` or `SpecificRouter<T>`.
+                // `T` or `Router<T>`.
                 //
                 // There's a bit of repetition here because this function supports multiple router
                 // types.
                 let capability: Capability = match capability {
                     Capability::DictionaryRouter(r) => match r.route(request, debug).await? {
-                        SpecificRouterResponse::<Dict>::Capability(c) => c.into(),
-                        SpecificRouterResponse::<Dict>::Unavailable => {
+                        RouterResponse::<Dict>::Capability(c) => c.into(),
+                        RouterResponse::<Dict>::Unavailable => {
                             return Ok(Some(GenericRouterResponse::Unavailable));
                         }
-                        SpecificRouterResponse::<Dict>::Debug(d) => {
+                        RouterResponse::<Dict>::Debug(d) => {
                             return Ok(Some(GenericRouterResponse::Debug(d)));
                         }
                     },
                     Capability::ConnectorRouter(r) => match r.route(request, debug).await? {
-                        SpecificRouterResponse::<Connector>::Capability(c) => c.into(),
-                        SpecificRouterResponse::<Connector>::Unavailable => {
+                        RouterResponse::<Connector>::Capability(c) => c.into(),
+                        RouterResponse::<Connector>::Unavailable => {
                             return Ok(Some(GenericRouterResponse::Unavailable));
                         }
-                        SpecificRouterResponse::<Connector>::Debug(d) => {
+                        RouterResponse::<Connector>::Debug(d) => {
                             return Ok(Some(GenericRouterResponse::Debug(d)));
                         }
                     },
                     Capability::DataRouter(r) => match r.route(request, debug).await? {
-                        SpecificRouterResponse::<Data>::Capability(c) => c.into(),
-                        SpecificRouterResponse::<Data>::Unavailable => {
+                        RouterResponse::<Data>::Capability(c) => c.into(),
+                        RouterResponse::<Data>::Unavailable => {
                             return Ok(Some(GenericRouterResponse::Unavailable));
                         }
-                        SpecificRouterResponse::<Data>::Debug(d) => {
+                        RouterResponse::<Data>::Debug(d) => {
                             return Ok(Some(GenericRouterResponse::Debug(d)));
                         }
                     },
                     Capability::DirEntryRouter(r) => match r.route(request, debug).await? {
-                        SpecificRouterResponse::<DirEntry>::Capability(c) => c.into(),
-                        SpecificRouterResponse::<DirEntry>::Unavailable => {
+                        RouterResponse::<DirEntry>::Capability(c) => c.into(),
+                        RouterResponse::<DirEntry>::Unavailable => {
                             return Ok(Some(GenericRouterResponse::Unavailable));
                         }
-                        SpecificRouterResponse::<DirEntry>::Debug(d) => {
+                        RouterResponse::<DirEntry>::Debug(d) => {
                             return Ok(Some(GenericRouterResponse::Debug(d)));
                         }
                     },
