@@ -237,6 +237,14 @@ pub fn sys_reboot(
         return error!(EPERM);
     }
 
+    let arg_bytes = if matches!(cmd, LINUX_REBOOT_CMD_RESTART2) {
+        // This is an arbitrary limit that should be large enough.
+        const MAX_REBOOT_ARG_LEN: usize = 256;
+        current_task.read_c_string_to_vec(UserCString::new(arg), MAX_REBOOT_ARG_LEN)?
+    } else {
+        FsString::default()
+    };
+
     let proxy = connect_to_protocol_sync::<fpower::AdminMarker>().or_else(|_| error!(EINVAL))?;
 
     match cmd {
@@ -262,11 +270,6 @@ pub fn sys_reboot(
         }
 
         LINUX_REBOOT_CMD_RESTART | LINUX_REBOOT_CMD_RESTART2 => {
-            // This is an arbitrary limit that should be large enough.
-            const MAX_REBOOT_ARG_LEN: usize = 256;
-            let arg_bytes = current_task
-                .read_c_string_to_vec(UserCString::new(arg), MAX_REBOOT_ARG_LEN)
-                .unwrap_or_default();
             let reboot_args: Vec<_> = arg_bytes.split_str(b",").collect();
 
             if reboot_args.contains(&&b"bootloader"[..]) {
