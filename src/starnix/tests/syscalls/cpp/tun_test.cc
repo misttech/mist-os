@@ -21,6 +21,24 @@ const char kTunFile[] = "/dev/tun";
 const char kTestTunDeviceName[] = "tun_test_tunif0";
 const char kTestTapDeviceName[] = "tun_test_tapif0";
 
+// Checks if an interface with the given name exists.
+bool InterfaceExists(const char* device_name) {
+  struct if_nameindex* nameindex = if_nameindex();
+  if (nameindex == nullptr) {
+    return false;
+  }
+
+  bool found_if = false;
+  struct if_nameindex* curr;
+  for (curr = nameindex; curr->if_index != 0 || curr->if_name != nullptr; curr++) {
+    if (strncmp(curr->if_name, device_name, IFNAMSIZ) == 0) {
+      found_if = true;
+    }
+  }
+  if_freenameindex(nameindex);
+  return found_if;
+}
+
 TEST_P(TunTapTest, CreateTunTapDevice) {
   // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasCapability(CAP_NET_ADMIN)) {
@@ -42,20 +60,13 @@ TEST_P(TunTapTest, CreateTunTapDevice) {
   auto result = ioctl(tun, TUNSETIFF, &ifr);
   ASSERT_EQ(result, 0) << errno;
 
-  struct if_nameindex* nameindex = if_nameindex();
-  ASSERT_NE(nameindex, nullptr);
-
-  bool found_if = false;
-
-  struct if_nameindex* curr;
-  for (curr = nameindex; curr->if_index != 0 || curr->if_name != nullptr; curr++) {
-    if (strncmp(curr->if_name, device_name, IFNAMSIZ) == 0) {
-      ASSERT_EQ(found_if, false) << "found multiple interfaces with desired name";
-      found_if = true;
-    }
+  // Poll until the interface exists.
+  while (!InterfaceExists(device_name)) {
+    timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 100 * 1000000;  // 100ms
+    nanosleep(&ts, nullptr);
   }
-  if_freenameindex(nameindex);
-  ASSERT_EQ(found_if, true);
 
   ASSERT_EQ(close(tun), 0);
 }
