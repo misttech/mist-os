@@ -30,14 +30,11 @@ const SAMPLER_BINDER_ALIAS: &str = "fuchsia.component.SamplerBinder";
 const INSTANCE_ID_INDEX_NAME: &str = "component_id_index";
 
 pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance, Error> {
-    let sampler_component_name =
-        options.sampler_component_name.as_ref().map(|s| s.as_str()).unwrap_or("sampler");
-    let single_counter_name =
-        options.single_counter_name.as_ref().map(|s| s.as_str()).unwrap_or("single_counter");
-    let fake_cobalt_name =
-        options.fake_cobalt_name.as_ref().map(|s| s.as_str()).unwrap_or("fake_cobalt");
+    let sampler_component_name = options.sampler_component_name.as_deref().unwrap_or("sampler");
+    let single_counter_name = options.single_counter_name.as_deref().unwrap_or("single_counter");
+    let fake_cobalt_name = options.fake_cobalt_name.as_deref().unwrap_or("fake_cobalt");
     let test_archivist_name =
-        options.test_archivist_name.as_ref().map(|s| s.as_str()).unwrap_or("test_case_archivist");
+        options.test_archivist_name.as_deref().unwrap_or("test_case_archivist");
     let builder = RealmBuilder::new().await?;
     let mocks_server = builder
         .add_local_child(

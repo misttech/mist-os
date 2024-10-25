@@ -48,6 +48,8 @@ rustc_library("lib") {
     "src/executor.rs",
     "src/lib.rs",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 # Test package for the unit test from the

@@ -28,7 +28,7 @@ pub(crate) fn id_file_vmo() -> zx::Vmo {
         InstanceId::from_str("2222222233334444111111111111111111111111111111111111111111112222")
             .unwrap();
     index.insert(Moniker::try_from("not_listed_1").unwrap(), id).unwrap();
-    let index_fidl: ComponentIdIndex = index.try_into().unwrap();
+    let index_fidl: ComponentIdIndex = ComponentIdIndex::from(index);
     let index_bytes = persist(&index_fidl).unwrap();
     let vmo = zx::Vmo::create(index_bytes.len() as u64).unwrap();
     vmo.write(&index_bytes, 0).unwrap();

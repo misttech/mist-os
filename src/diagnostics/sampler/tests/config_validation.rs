@@ -13,7 +13,7 @@ async fn validate_sampler_configs() {
     // validate whatever config files are present without requiring projects to be generated.
     SamplerConfigBuilder::default()
         .minimum_sample_rate_sec(60)
-        .sampler_dir(&config_directory)
+        .sampler_dir(config_directory)
         .fire_dir(fire_directory)
         .load()
         .expect("Sampler and FIRE config validation");
