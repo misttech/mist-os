@@ -5,7 +5,6 @@
 use crate::constants::PKG_PATH;
 use crate::model::component::{ComponentInstance, Package, WeakComponentInstance};
 use crate::model::routing::legacy::RouteRequestExt;
-use crate::model::routing::router_ext::RouterExt;
 use crate::model::routing::{report_routing_failure, BedrockUseRouteRequest};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::mapper::NoopRouteMapper;

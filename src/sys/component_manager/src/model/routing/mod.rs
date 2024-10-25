@@ -6,7 +6,6 @@ mod bedrock;
 pub mod legacy;
 pub mod open;
 pub mod providers;
-pub mod router_ext;
 pub mod service;
 pub use ::routing::error::RoutingError;
 pub use open::*;

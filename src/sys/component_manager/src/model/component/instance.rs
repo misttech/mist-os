@@ -15,7 +15,7 @@ use crate::model::escrow::{self, EscrowedState};
 use crate::model::namespace::create_namespace;
 use crate::model::routing::legacy::RouteRequestExt;
 use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
-use crate::model::routing::{self, router_ext, RoutingFailureErrorReporter};
+use crate::model::routing::{self, RoutingFailureErrorReporter};
 use crate::model::start::Start;
 use crate::model::storage::build_storage_admin_dictionary;
 use crate::model::token::{InstanceToken, InstanceTokenState};
@@ -685,7 +685,7 @@ impl ResolvedInstanceState {
     pub async fn get_exposed_dict(&self) -> &Dict {
         let create_exposed_dict = async {
             let component = self.weak_component.upgrade().unwrap();
-            let dict = router_ext::dict_routers_to_dir_entry(
+            let dict = sandbox::dict_routers_to_dir_entry(
                 &component.execution_scope,
                 &self.sandbox.component_output_dict,
             );

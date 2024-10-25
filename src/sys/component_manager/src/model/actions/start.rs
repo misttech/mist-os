@@ -8,7 +8,6 @@ use crate::model::actions::{Action, ActionKey};
 use crate::model::component::instance::{InstanceState, StartedInstanceState};
 use crate::model::component::{ComponentInstance, IncomingCapabilities, StartReason};
 use crate::model::namespace::create_namespace;
-use crate::model::routing::router_ext::RouterExt;
 use crate::runner::RemoteRunner;
 use ::namespace::Entry as NamespaceEntry;
 use ::routing::component_instance::ComponentInstanceInterface;
