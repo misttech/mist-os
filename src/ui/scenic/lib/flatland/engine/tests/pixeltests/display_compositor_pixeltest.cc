@@ -936,7 +936,10 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
     for (int i = 0; i < kNumTries; i++) {
       // Grab the capture vmo data.
       std::vector<uint8_t> read_values;
-      CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+      // We do not release the capture image as it's used in future attempts.
+      // The capture image will be cleaned up after all attempts are finished.
+      CaptureDisplayOutput(capture_info, capture_image_id, &read_values,
+                           /* release_capture_image= */ false);
 
       // Compare the capture vmo data to the texture data above.
       if (CaptureCompare(read_values, write_bytes, GetParam(), display->height_in_px(),
@@ -946,8 +949,17 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
     }
     return false;
   }();
-
   EXPECT_TRUE(images_are_same);
+
+  // Manually clean up the capture since we didn't in CaptureDisplayOutput.
+  const fuchsia_hardware_display::ImageId fidl_capture_image_id =
+      scenic_impl::ToDisplayFidlImageId(capture_image_id);
+  const fit::result<fidl::OneWayStatus> release_result = (*display_coordinator)
+                                                             ->ReleaseImage({{
+                                                                 .image_id = fidl_capture_image_id,
+                                                             }});
+  EXPECT_TRUE(release_result.is_ok())
+      << "Failed to call FIDL ReleaseImage: " << release_result.error_value();
 }
 
 // Test color conversion on the display hardware.
@@ -1801,108 +1813,119 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   renderer->WaitIdle();
 
   // Make sure the render target has the same data as what's being put on the display.
-  MapHostPointer(render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
-                 [&](const uint8_t* vmo_host, uint32_t num_bytes) {
-                   const uint32_t display_bytes_per_row =
-                       utils::GetBytesPerRow(render_target_info.settings(), display->width_in_px());
-                   EXPECT_EQ(0U, display_bytes_per_row % 4);
-                   const uint32_t display_width_including_padding = display_bytes_per_row / 4;
+  MapHostPointer(
+      render_target_info, /*vmo_index*/ 0, HostPointerAccessMode::kReadOnly,
+      [&](const uint8_t* vmo_host, uint32_t num_bytes) {
+        const uint32_t display_bytes_per_row =
+            utils::GetBytesPerRow(render_target_info.settings(), display->width_in_px());
+        EXPECT_EQ(0U, display_bytes_per_row % 4);
+        const uint32_t display_width_including_padding = display_bytes_per_row / 4;
 
-                   bool images_are_same = [&]() -> bool {
-                     // The amlogic capture IP block can sometimes be flaky.
-                     // If the images aren't the same, retry a single time.
-                     static constexpr int kNumTries = 2;
+        bool images_are_same = [&]() -> bool {
+          // The amlogic capture IP block can sometimes be flaky.
+          // If the images aren't the same, retry a single time.
+          static constexpr int kNumTries = 2;
 
-                     for (int i = 0; i < kNumTries; i++) {
-                       // Grab the capture vmo data.
-                       std::vector<uint8_t> read_values;
-                       CaptureDisplayOutput(capture_info, capture_image_id, &read_values);
+          for (int i = 0; i < kNumTries; i++) {
+            // Grab the capture vmo data.
+            std::vector<uint8_t> read_values;
+            // We do not release the capture image as it's used in future attempts.
+            // The capture image will be cleaned up after all attempts are finished.
+            CaptureDisplayOutput(capture_info, capture_image_id, &read_values,
+                                 /* release_capture_image= */ false);
 
-                       // Compare the capture vmo data to the values we are expecting.
-                       if (CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), GetParam(),
-                                          display->height_in_px(), display->width_in_px())) {
-                         return true;
-                       }
-                     }
-                     return false;
-                   }();
+            // Compare the capture vmo data to the values we are expecting.
+            if (CaptureCompare(read_values, cpp20::span(vmo_host, num_bytes), GetParam(),
+                               display->height_in_px(), display->width_in_px())) {
+              return true;
+            }
+          }
+          return false;
+        }();
+        EXPECT_TRUE(images_are_same);
 
-                   EXPECT_TRUE(images_are_same);
+        // Manually clean up the capture since we didn't in CaptureDisplayOutput.
+        const fuchsia_hardware_display::ImageId fidl_capture_image_id =
+            scenic_impl::ToDisplayFidlImageId(capture_image_id);
+        const fit::result<fidl::OneWayStatus> result = (*display_coordinator)
+                                                           ->ReleaseImage({{
+                                                               .image_id = fidl_capture_image_id,
+                                                           }});
+        EXPECT_TRUE(result.is_ok()) << "Failed to call FIDL ReleaseImage: " << result.error_value();
 
-                   // |vmo_host| has BGRA sequence in pixel values.
-                   auto get_pixel = [&display, display_bytes_per_row](const uint8_t* vmo_host,
-                                                                      uint32_t x,
-                                                                      uint32_t y) -> uint32_t {
-                     EXPECT_LT(x, display->width_in_px());
-                     EXPECT_LT(y, display->height_in_px());
+        // |vmo_host| has BGRA sequence in pixel values.
+        auto get_pixel = [&display, display_bytes_per_row](const uint8_t* vmo_host, uint32_t x,
+                                                           uint32_t y) -> uint32_t {
+          EXPECT_LT(x, display->width_in_px());
+          EXPECT_LT(y, display->height_in_px());
 
-                     uint32_t index = y * display_bytes_per_row + x * 4;
-                     auto b = vmo_host[index];
-                     auto g = vmo_host[index + 1];
-                     auto r = vmo_host[index + 2];
-                     auto a = vmo_host[index + 3];
-                     return (b << 24) | (g << 16) | (r << 8) | a;
-                   };
+          uint32_t index = y * display_bytes_per_row + x * 4;
+          auto b = vmo_host[index];
+          auto g = vmo_host[index + 1];
+          auto r = vmo_host[index + 2];
+          auto a = vmo_host[index + 3];
+          return (b << 24) | (g << 16) | (r << 8) | a;
+        };
 
-                   // Pack a BGRA pixel into a uint32_t.
-                   auto make_bgra_pixel = [](uint32_t r, uint32_t g, uint32_t b, uint32_t a) {
-                     return (b << 24) | (g << 16) | (r << 8) | a;
-                   };
+        // Pack a BGRA pixel into a uint32_t.
+        auto make_bgra_pixel = [](uint32_t r, uint32_t g, uint32_t b, uint32_t a) {
+          return (b << 24) | (g << 16) | (r << 8) | a;
+        };
 
-                   // There should be a total of 20 white pixels (4 for the normal white square and
-                   // 16 for the magnified white square).
-                   uint32_t num_pixels = num_bytes / 4;
-                   const uint32_t kWhiteColor = 0xFFFFFFFF;
-                   const uint32_t kBlueColor = 0xFF0000FF;
+        // There should be a total of 20 white pixels (4 for the normal white square and
+        // 16 for the magnified white square).
+        uint32_t num_pixels = num_bytes / 4;
+        const uint32_t kWhiteColor = 0xFFFFFFFF;
+        const uint32_t kBlueColor = 0xFF0000FF;
 
-                   // Verify the colors of the 4 pixels in the unmagnified rect.
-                   EXPECT_EQ(kBlueColor, get_pixel(vmo_host, 0, 0));
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 1, 0));
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 0, 1));
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 1, 1));
+        // Verify the colors of the 4 pixels in the unmagnified rect.
+        EXPECT_EQ(kBlueColor, get_pixel(vmo_host, 0, 0));
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 1, 0));
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 0, 1));
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 1, 1));
 
-                   // Verify the colors of the 16 pixels in the magnified rect.
-                   // (top row)
-                   EXPECT_EQ(kBlueColor, get_pixel(vmo_host, 10, 0));
-                   EXPECT_EQ(make_bgra_pixel(137, 137, 255, 255), get_pixel(vmo_host, 11, 0));
-                   EXPECT_EQ(make_bgra_pixel(225, 225, 255, 255), get_pixel(vmo_host, 12, 0));
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 13, 0));
-                   // (2nd row)
-                   EXPECT_EQ(make_bgra_pixel(137, 137, 255, 255), get_pixel(vmo_host, 10, 1));
-                   EXPECT_EQ(make_bgra_pixel(177, 177, 255, 255), get_pixel(vmo_host, 11, 1));
-                   EXPECT_EQ(make_bgra_pixel(233, 233, 255, 255), get_pixel(vmo_host, 12, 1));
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 13, 1));
-                   // (3nd row)
-                   EXPECT_EQ(make_bgra_pixel(225, 225, 255, 255), get_pixel(vmo_host, 10, 2));
-                   EXPECT_EQ(make_bgra_pixel(233, 233, 255, 255), get_pixel(vmo_host, 11, 2));
-                   EXPECT_EQ(make_bgra_pixel(248, 248, 255, 255), get_pixel(vmo_host, 12, 2));
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 13, 2));
-                   // (bottom row)
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 10, 3));
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 11, 3));
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 12, 3));
-                   EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 13, 3));
+        // Verify the colors of the 16 pixels in the magnified rect.
+        // (top row)
+        EXPECT_EQ(kBlueColor, get_pixel(vmo_host, 10, 0));
+        EXPECT_EQ(make_bgra_pixel(137, 137, 255, 255), get_pixel(vmo_host, 11, 0));
+        EXPECT_EQ(make_bgra_pixel(225, 225, 255, 255), get_pixel(vmo_host, 12, 0));
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 13, 0));
+        // (2nd row)
+        EXPECT_EQ(make_bgra_pixel(137, 137, 255, 255), get_pixel(vmo_host, 10, 1));
+        EXPECT_EQ(make_bgra_pixel(177, 177, 255, 255), get_pixel(vmo_host, 11, 1));
+        EXPECT_EQ(make_bgra_pixel(233, 233, 255, 255), get_pixel(vmo_host, 12, 1));
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 13, 1));
+        // (3nd row)
+        EXPECT_EQ(make_bgra_pixel(225, 225, 255, 255), get_pixel(vmo_host, 10, 2));
+        EXPECT_EQ(make_bgra_pixel(233, 233, 255, 255), get_pixel(vmo_host, 11, 2));
+        EXPECT_EQ(make_bgra_pixel(248, 248, 255, 255), get_pixel(vmo_host, 12, 2));
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 13, 2));
+        // (bottom row)
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 10, 3));
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 11, 3));
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 12, 3));
+        EXPECT_EQ(kWhiteColor, get_pixel(vmo_host, 13, 3));
 
-                   // Verify that all of the rest of the pixels (except for the 20 above) are black.
-                   uint32_t num_black = 0;
-                   const uint32_t kBlackColor = 0x00000000;
-                   for (uint32_t x = 0; x < display->width_in_px(); x++) {
-                     for (uint32_t y = 0; y < display->height_in_px(); y++) {
-                       const uint32_t i = y * display_width_including_padding + x;
+        // Verify that all of the rest of the pixels (except for the 20 above) are black.
+        uint32_t num_black = 0;
+        const uint32_t kBlackColor = 0x00000000;
+        for (uint32_t x = 0; x < display->width_in_px(); x++) {
+          for (uint32_t y = 0; y < display->height_in_px(); y++) {
+            const uint32_t i = y * display_width_including_padding + x;
 
-                       // |vmo_host| has BGRA sequence in pixel values.
-                       auto b = vmo_host[(i * 4)];
-                       auto g = vmo_host[(i * 4) + 1];
-                       auto r = vmo_host[(i * 4) + 2];
-                       auto a = vmo_host[(i * 4) + 3];
-                       uint32_t val = (b << 24) | (g << 16) | (r << 8) | a;
-                       if (val == kBlackColor) {
-                         num_black++;
-                       }
-                     }
-                   }
-                   EXPECT_EQ(num_black, display->width_in_px() * display->height_in_px() - 20U);
-                 });
+            // |vmo_host| has BGRA sequence in pixel values.
+            auto b = vmo_host[(i * 4)];
+            auto g = vmo_host[(i * 4) + 1];
+            auto r = vmo_host[(i * 4) + 2];
+            auto a = vmo_host[(i * 4) + 3];
+            uint32_t val = (b << 24) | (g << 16) | (r << 8) | a;
+            if (val == kBlackColor) {
+              num_black++;
+            }
+          }
+        }
+        EXPECT_EQ(num_black, display->width_in_px() * display->height_in_px() - 20U);
+      });
 }
 
 // Pixeltest for ensuring rotation and flipping are applied correctly.
