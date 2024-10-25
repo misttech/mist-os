@@ -293,10 +293,10 @@ class WlanPolicyFCTests(unittest.TestCase):
                     client_controller.connect.reset_mock()
                     client_controller.connect.return_value = resp
                     if expected:
-                        resp = self.wlan_policy_obj.connect(
+                        connect_resp = self.wlan_policy_obj.connect(
                             _TEST_SSID, SecurityType.NONE
                         )
-                        self.assertEqual(resp, expected)
+                        self.assertEqual(connect_resp, expected)
                     else:
                         with self.assertRaises(HoneydewWlanError):
                             self.wlan_policy_obj.connect(

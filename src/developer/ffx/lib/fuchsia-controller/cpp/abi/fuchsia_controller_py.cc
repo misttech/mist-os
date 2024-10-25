@@ -593,21 +593,25 @@ PyObject *connect_handle_notifier(PyObject *self, PyObject *Py_UNUSED(arg)) {
 
 PyObject *context_target_wait(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
-  uint64_t seconds = 0;
+  uint64_t timeout_seconds = 0;
   bool offline = false;
-  // The python docs state "K" converts to "unsigned long long" so static assert they're
-  // matching the expected ABI.
+  // The python docs state "K" converts to "unsigned long long" so static assert they're matching
+  // the expected ABI.
   //
   // https://docs.python.org/3/c-api/arg.html#numbers
+  //
+  // TODO(https://fxbug.dev/346628306): Consider moving this assertion, and possibly others like it,
+  // to the top of this file. There may also be another approach that uses types like
+  // ctypes.c_uint64.
   static_assert(sizeof(uint64_t) == sizeof(unsigned long long));  // NOLINT
-  if (!PyArg_ParseTuple(args, "OKb", &obj, &seconds, &offline)) {
+  if (!PyArg_ParseTuple(args, "OKb", &obj, &timeout_seconds, &offline)) {
     return nullptr;
   }
   auto context = DowncastPyObject<PythonContext>(obj);
   if (!context) {
     return nullptr;
   }
-  zx_status_t status = ffx_target_wait(context->context(), seconds, offline);
+  zx_status_t status = ffx_target_wait(context->context(), timeout_seconds, offline);
   if (status != ZX_OK) {
     mod::dump_python_err();
     return nullptr;

@@ -256,8 +256,8 @@ PyTypeObject *ZxStatusType_Create() {
   if (constants == nullptr) {
     return nullptr;
   }
-  auto res =
-      PyTypeCast(PyErr_NewException("fuchsia_controller_py.ZxStatus", PyExc_Exception, constants));
+  auto res = PyTypeCast(
+      PyErr_NewException("fuchsia_controller_internal.ZxStatus", PyExc_Exception, constants));
   if (res == nullptr) {
     return nullptr;
   }

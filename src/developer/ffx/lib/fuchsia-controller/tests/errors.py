@@ -3,14 +3,7 @@
 # found in the LICENSE file.
 import unittest
 
-from fuchsia_controller_py import (
-    Channel,
-    Event,
-    Handle,
-    HandleTypeError,
-    Socket,
-    ZxStatus,
-)
+from fuchsia_controller_py import ZxStatus
 
 
 class Errors(unittest.TestCase):
@@ -65,22 +58,6 @@ class Errors(unittest.TestCase):
         ]:
             err = ZxStatus(ZxStatus.__dict__[test_case])
             self.assertEqual(repr(err), test_case)
-
-    def test_wrong_handle_type_handle(self):
-        with self.assertRaises(HandleTypeError):
-            _ = Handle("woops")
-
-    def test_wrong_handle_type_channel(self):
-        with self.assertRaises(HandleTypeError):
-            _ = Channel("woops")
-
-    def test_wrong_handle_type_socket(self):
-        with self.assertRaises(HandleTypeError):
-            _ = Socket("woops")
-
-    def test_wrong_handle_type_event(self):
-        with self.assertRaises(HandleTypeError):
-            _ = Event("woops")
 
     def test_raw_value_matches(self):
         err = ZxStatus(ZxStatus.ZX_ERR_NEXT)

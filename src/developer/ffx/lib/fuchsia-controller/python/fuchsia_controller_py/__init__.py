@@ -2,30 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import typing
-
 import fuchsia_controller_internal
 from fuchsia_controller_internal import ZxStatus
 
+__all__ = ["ZxStatus"]
 
-class HandleTypeError(TypeError):
-    """Error for reporting an error with an unrecognized handle type."""
-
-    def __init__(self, handle):
-        super().__init__(
-            f"Handle '{handle}' of type '{type(handle).__name__}' not recognized as a handle type object"
-        )
-
-
-def _is_handle_type(obj):
-    """Determines if this is some kind of usable handle type."""
-
-    # This can probably be made simpler with some kind of inheritance scheme.
-    return (
-        isinstance(obj, Handle)
-        or isinstance(obj, Socket)
-        or isinstance(obj, Channel)
-    )
+from typing import Self
 
 
 def connect_handle_notifier() -> int:
@@ -38,22 +20,30 @@ class Handle:
     This is used to bootstrap processes for FIDL interactions.
     """
 
-    def __init__(self, handle):
-        if _is_handle_type(handle):
-            handle = handle.take()
+    _handle: fuchsia_controller_internal.InternalHandle | None
+
+    def __init__(
+        self, handle: int | Self | fuchsia_controller_internal.InternalHandle
+    ):
         if isinstance(handle, int):
             self._handle = fuchsia_controller_internal.handle_from_int(handle)
-        elif isinstance(handle, fuchsia_controller_internal.InternalHandle):
-            self._handle = handle
+        elif isinstance(handle, Handle):
+            self._handle = fuchsia_controller_internal.handle_from_int(
+                handle.take()
+            )
         else:
-            raise HandleTypeError(handle)
+            self._handle = handle
 
     def as_int(self) -> int:
         """Returns the underlying handle as an integer."""
+        if self._handle is None:
+            raise ValueError("Handle is already closed")
         return fuchsia_controller_internal.handle_as_int(self._handle)
 
     def koid(self) -> int:
         """Returns the underlying kernel object ID."""
+        if self._handle is None:
+            raise ValueError("Handle is already closed")
         return fuchsia_controller_internal.handle_koid(self._handle)
 
     def take(self) -> int:
@@ -62,9 +52,11 @@ class Handle:
         This invalidates the underlying channel. Used for sending a handle
         through FIDL function calls.
         """
+        if self._handle is None:
+            raise ValueError("Handle is already closed")
         return fuchsia_controller_internal.handle_take(self._handle)
 
-    def close(self):
+    def close(self) -> None:
         """Releases the underlying handle."""
         self._handle = None
 
@@ -86,15 +78,19 @@ class Socket:
     handle.
     """
 
-    def __init__(self, handle):
-        if _is_handle_type(handle):
-            handle = handle.take()
+    _socket: fuchsia_controller_internal.InternalHandle | None
+
+    def __init__(
+        self, handle: int | Handle | fuchsia_controller_internal.InternalHandle
+    ):
         if isinstance(handle, int):
-            self._handle = fuchsia_controller_internal.socket_from_int(handle)
-        elif isinstance(handle, fuchsia_controller_internal.InternalHandle):
-            self._handle = handle
+            self._socket = fuchsia_controller_internal.socket_from_int(handle)
+        elif isinstance(handle, Handle):
+            self._socket = fuchsia_controller_internal.socket_from_int(
+                handle.take()
+            )
         else:
-            raise HandleTypeError(handle)
+            self._socket = handle
 
     def write(self, buffer: bytes) -> int:
         """Writes data to the socket.
@@ -108,15 +104,21 @@ class Socket:
         Raises:
             TypeError: If data is not the correct type.
         """
-        return fuchsia_controller_internal.socket_write(self._handle, buffer)
+        if self._socket is None:
+            raise ValueError("Socket is already closed")
+        return fuchsia_controller_internal.socket_write(self._socket, buffer)
 
     def read(self) -> bytes:
         """Reads data from the socket."""
-        return fuchsia_controller_internal.socket_read(self._handle)
+        if self._socket is None:
+            raise ValueError("Socket is already closed")
+        return fuchsia_controller_internal.socket_read(self._socket)
 
     def as_int(self) -> int:
         """Returns the underlying socket as an integer."""
-        return fuchsia_controller_internal.socket_as_int(self._handle)
+        if self._socket is None:
+            raise ValueError("Socket is already closed")
+        return fuchsia_controller_internal.socket_as_int(self._socket)
 
     def take(self) -> int:
         """Takes the underlying fidl handle, setting it internally to zero.
@@ -124,18 +126,22 @@ class Socket:
         This invalidates the underlying socket. Used for sending a handle
         through FIDL function calls.
         """
-        return fuchsia_controller_internal.socket_take(self._handle)
+        if self._socket is None:
+            raise ValueError("Socket is already closed")
+        return fuchsia_controller_internal.socket_take(self._socket)
 
     def koid(self) -> int:
         """Returns the underlying kernel object ID."""
-        return fuchsia_controller_internal.socket_koid(self._handle)
+        if self._socket is None:
+            raise ValueError("Socket is already closed")
+        return fuchsia_controller_internal.socket_koid(self._socket)
 
-    def close(self):
+    def close(self) -> None:
         """Releases the underlying handle."""
-        self._handle = None
+        self._socket = None
 
     @classmethod
-    def create(cls, options=None) -> tuple["Socket", "Socket"]:
+    def create(cls, options: int | None = None) -> tuple["Socket", "Socket"]:
         """Classmethod for creating a pair of socket.
 
         The returned sockets are connected bidirectionally.
@@ -157,7 +163,7 @@ class IsolateDir:
     once it goes out of scope.
     """
 
-    def __init__(self, dir: typing.Optional[str] = None) -> None:
+    def __init__(self, dir: str | None = None) -> None:
         self._handle = fuchsia_controller_internal.isolate_dir_create(dir)
 
     def directory(self) -> str:
@@ -174,11 +180,14 @@ class Context:
     This is the necessary object for interacting with a Fuchsia device.
     """
 
+    _handle: fuchsia_controller_internal.InternalHandle | None
+    _directory: IsolateDir
+
     def __init__(
         self,
         config: dict[str, str] | None = None,
         isolate_dir: IsolateDir | None = None,
-        target: typing.Optional[str] = None,
+        target: str | None = None,
     ) -> None:
         if isolate_dir is None:
             isolate_dir = IsolateDir()
@@ -187,21 +196,23 @@ class Context:
         )
         self._directory = isolate_dir
 
-    def target_wait(self, timeout: int, offline=False) -> bool:
+    def target_wait(self, timeout: int, offline: bool = False) -> None:
         """Waits for the target to be ready.
 
         Args:
             timeout: The timeout in seconds. Zero is interpreted as an infinite
                      timeout.
 
-        Returns:
-            True if the target is ready, False otherwise.
+        Raises:
+            RuntimeError if target is not ready within the timeout.
         """
-        return fuchsia_controller_internal.context_target_wait(
+        if self._handle is None:
+            raise ValueError("Context is already closed")
+        fuchsia_controller_internal.context_target_wait(
             self._handle, timeout, offline
         )
 
-    def config_get_string(self, key) -> str:
+    def config_get_string(self, key: str) -> str:
         """Looks up a string from the context's config environment.
 
         This is the same config that ffx uses. If there is an IsolateDir in use,
@@ -213,6 +224,8 @@ class Context:
             config, and said value can be converted into a string.
             Otherwise None is returned.
         """
+        if self._handle is None:
+            raise ValueError("Context is already closed")
         return fuchsia_controller_internal.context_config_get_string(
             self._handle, key
         )
@@ -229,6 +242,8 @@ class Context:
         Returns:
             A FIDL client for the device proxy.
         """
+        if self._handle is None:
+            raise ValueError("Context is already closed")
         return Channel(
             fuchsia_controller_internal.context_connect_device_proxy(
                 self._handle, moniker, capability_name
@@ -241,13 +256,15 @@ class Context:
         Returns:
             A FIDL client for the remote control proxy.
         """
+        if self._handle is None:
+            raise ValueError("Context is already closed")
         return Channel(
             fuchsia_controller_internal.context_connect_remote_control_proxy(
                 self._handle
             )
         )
 
-    def close(self):
+    def close(self) -> None:
         """Releases the underlying handle."""
         self._handle = None
 
@@ -260,22 +277,26 @@ class Channel:
     of the underlying handle.
     """
 
-    def __init__(self, handle):
-        if _is_handle_type(handle):
-            handle = handle.take()
+    _channel: fuchsia_controller_internal.InternalHandle | None
+
+    def __init__(
+        self, handle: int | Handle | fuchsia_controller_internal.InternalHandle
+    ):
         if isinstance(handle, int):
-            self._handle = fuchsia_controller_internal.channel_from_int(handle)
-        elif isinstance(handle, fuchsia_controller_internal.InternalHandle):
-            self._handle = handle
+            self._channel = fuchsia_controller_internal.channel_from_int(handle)
+        elif isinstance(handle, Handle):
+            self._channel = fuchsia_controller_internal.channel_from_int(
+                handle.take()
+            )
         else:
-            raise HandleTypeError(handle)
+            self._channel = handle
 
     def write(
         self,
         encoded_fidl_message: tuple[
             bytes, list[tuple[int, int, int, int, int]]
         ],
-    ) -> int:
+    ) -> None:
         """Writes data to the channel.
 
         Args:
@@ -286,13 +307,18 @@ class Channel:
                                   `zx_handle_disposition_t`, e.g. operation, handle, type, rights,
                                   and result. See `//zircon/system/public/zircon/types.h`.
 
-        Returns:
-            The number of bytes written.
-
         Raises:
             TypeError: If data is not the correct type.
         """
-        encoded_handles = b"".join(
+        if self._channel is None:
+            raise ValueError("Channel is already closed")
+
+        # TODO(https://fxbug.dev/346628306): Each handle disposition must be encoded because the
+        # fuchsia_controller_internal C extension performs a memcpy into each actual
+        # zx_handle_disposition_t. We should consider creating a HandleDisposition type or changing
+        # the tuple type to tuple[c_uint32, c_uint32, c_uint32, c_uint32, c_int32] to ensure the
+        # caller passes correctly sized 4 byte integers.
+        encoded_handle_dispositions = b"".join(
             [
                 x.to_bytes(4, byteorder="little")
                 for handle_desc in encoded_fidl_message[1]
@@ -300,22 +326,28 @@ class Channel:
             ]
         )
         return fuchsia_controller_internal.channel_write(
-            self._handle, encoded_fidl_message[0], encoded_handles
+            self._channel, encoded_fidl_message[0], encoded_handle_dispositions
         )
 
-    def read(self) -> typing.Tuple[bytes, typing.List[Handle]]:
+    def read(self) -> tuple[bytes, list[Handle]]:
         """Reads data from the channel."""
-        retval = fuchsia_controller_internal.channel_read(self._handle)
+        if self._channel is None:
+            raise ValueError("Channel is already closed")
+        retval = fuchsia_controller_internal.channel_read(self._channel)
         # Convert internal Handle objects to Python Handle objects
-        return (retval[0], list(map(Handle, retval[1])))
+        return (retval[0], [Handle(x) for x in retval[1]])
 
     def as_int(self) -> int:
         """Returns the underlying channel as an integer."""
-        return fuchsia_controller_internal.channel_as_int(self._handle)
+        if self._channel is None:
+            raise ValueError("Channel is already closed")
+        return fuchsia_controller_internal.channel_as_int(self._channel)
 
     def koid(self) -> int:
         """Returns the underlying kernel object ID."""
-        return fuchsia_controller_internal.channel_koid(self._handle)
+        if self._channel is None:
+            raise ValueError("Channel is already closed")
+        return fuchsia_controller_internal.channel_koid(self._channel)
 
     def take(self) -> int:
         """Takes the underlying fidl handle, setting it internally to zero.
@@ -323,13 +355,15 @@ class Channel:
         This invalidates the underlying channel. Used for sending a handle
         through FIDL function calls.
         """
-        return fuchsia_controller_internal.channel_take(self._handle)
+        if self._channel is None:
+            raise ValueError("Channel is already closed")
+        return fuchsia_controller_internal.channel_take(self._channel)
 
-    def close(self):
+    def close(self) -> None:
         """Releases the underlying handle."""
-        self._handle = None
+        self._channel = None
 
-    def close_with_epitaph(self, epitaph: int):
+    def close_with_epitaph(self, epitaph: int) -> None:
         """Sends an epitaph to the channel before closing it."""
         # Header txid: 0u32
         msg = bytearray(b"\x00\x00\x00\x00")
@@ -375,33 +409,47 @@ class Event:
     the underlying handle.
     """
 
-    def __init__(self, handle=None):
+    _event: fuchsia_controller_internal.InternalHandle | None
+
+    def __init__(
+        self,
+        handle: int
+        | Handle
+        | fuchsia_controller_internal.InternalHandle
+        | None = None,
+    ):
         if handle is None:
-            self._handle = fuchsia_controller_internal.event_create()
+            self._event = fuchsia_controller_internal.event_create()
             return
 
-        if _is_handle_type(handle):
-            handle = handle.take()
         if isinstance(handle, int):
-            self._handle = fuchsia_controller_internal.channel_from_int(handle)
-        elif isinstance(handle, fuchsia_controller_internal.InternalHandle):
-            self._handle = handle
+            self._event = fuchsia_controller_internal.event_from_int(handle)
+        elif isinstance(handle, Handle):
+            self._event = fuchsia_controller_internal.handle_from_int(
+                handle.take()
+            )
         else:
-            raise HandleTypeError(handle)
+            self._event = handle
 
     def signal_peer(self, clear_mask: int, set_mask: int) -> None:
         """Attempts to signal a peer on the other side of this event."""
+        if self._event is None:
+            raise ValueError("Event is already closed")
         fuchsia_controller_internal.event_signal_peer(
-            self._handle, clear_mask, set_mask
+            self._event, clear_mask, set_mask
         )
 
     def as_int(self) -> int:
         """Returns the underlying channel as an integer."""
-        return fuchsia_controller_internal.event_as_int(self._handle)
+        if self._event is None:
+            raise ValueError("Event is already closed")
+        return fuchsia_controller_internal.event_as_int(self._event)
 
     def koid(self) -> int:
         """Returns the underlying kernel object ID."""
-        return fuchsia_controller_internal.event_koid(self._handle)
+        if self._event is None:
+            raise ValueError("Event is already closed")
+        return fuchsia_controller_internal.event_koid(self._event)
 
     def take(self) -> int:
         """Takes the underlying fidl handle, setting it internally to zero.
@@ -409,14 +457,16 @@ class Event:
         This invalidates the underlying event. Used for sending a handle
         through FIDL function calls.
         """
-        return fuchsia_controller_internal.event_take(self._handle)
+        if self._event is None:
+            raise ValueError("Event is already closed")
+        return fuchsia_controller_internal.event_take(self._event)
 
-    def close(self):
+    def close(self) -> None:
         """Releases the underlying handle."""
         self._handle = None
 
     @classmethod
-    def create(cls) -> tuple["Channel", "Channel"]:
+    def create(cls) -> tuple["Event", "Event"]:
         """Classmethod for creating a pair of events.
 
         The returned event objects are connected bidirectionally.

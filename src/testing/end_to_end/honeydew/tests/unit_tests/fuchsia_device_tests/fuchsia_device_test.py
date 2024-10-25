@@ -17,6 +17,7 @@ import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
 import fidl.fuchsia_hwinfo as f_hwinfo
 import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fuchsia_controller
+from fuchsia_controller_py import ZxStatus
 from parameterized import param, parameterized
 
 from honeydew import errors
@@ -125,11 +126,9 @@ def _file_read_result(data: f_io.Transfer) -> f_io.ReadableReadResult:
     return ret
 
 
-def _file_attr_resp(
-    status: fuchsia_controller.ZxStatus, size: int
-) -> f_io.NodeGetAttrResponse:
+def _file_attr_resp(status: ZxStatus, size: int) -> f_io.NodeGetAttrResponse:
     return f_io.NodeGetAttrResponse(
-        s=status,
+        s=status.raw(),
         attributes=f_io.NodeAttributes(
             content_size=size,
             # The args below are arbitrary.
@@ -1165,8 +1164,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._build_info property when the get_info
         FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
-        mock_buildinfo_provider.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
+        mock_buildinfo_provider.side_effect = ZxStatus(
+            ZxStatus.ZX_ERR_INVALID_ARGS
         )
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
@@ -1223,9 +1222,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._device_info property when the get_info
         FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
-        mock_hwinfo_device.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        )
+        mock_hwinfo_device.side_effect = ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS)
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
             _: dict[str, Any] = self.fd_fc_obj._device_info_from_fidl
@@ -1281,9 +1278,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._product_info property when the get_info
         FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
-        mock_hwinfo_product.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        )
+        mock_hwinfo_product.side_effect = ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS)
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
             _ = self.fd_fc_obj._product_info
@@ -1351,8 +1346,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         self.fd_fc_obj.fuchsia_controller.ctx = mock.Mock()
 
-        mock_rcs_log_message.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
+        mock_rcs_log_message.side_effect = ZxStatus(
+            ZxStatus.ZX_ERR_INVALID_ARGS
         )
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
@@ -1400,9 +1395,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._send_reboot_command() when the reboot
         FIDL call raises a non-ZX_ERR_PEER_CLOSED error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
-        mock_admin_reboot.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        )
+        mock_admin_reboot.side_effect = ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS)
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
             self.fd_fc_obj._send_reboot_command()
@@ -1428,9 +1421,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._send_reboot_command() when the reboot
         FIDL call raises a ZX_ERR_PEER_CLOSED error.  This error should not
         result in `FuchsiaControllerError` being raised."""
-        mock_admin_reboot.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_PEER_CLOSED
-        )
+        mock_admin_reboot.side_effect = ZxStatus(ZxStatus.ZX_ERR_PEER_CLOSED)
         # pylint: disable=protected-access
         self.fd_fc_obj._send_reboot_command()
 
@@ -1446,7 +1437,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         f_io.File.Client,
         "get_attr",
         new_callable=mock.AsyncMock,
-        return_value=_file_attr_resp(fuchsia_controller.ZxStatus.ZX_OK, 15),
+        return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
     @mock.patch.object(
         f_io.File.Client,
@@ -1497,9 +1488,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "get_snapshot",
         new_callable=mock.AsyncMock,
         # Raise arbitrary failure.
-        side_effect=fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        ),
+        side_effect=ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS),
     )
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -1544,9 +1533,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "get_attr",
         new_callable=mock.AsyncMock,
         # Raise arbitrary failure.
-        side_effect=fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        ),
+        side_effect=ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS),
     )
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -1590,9 +1577,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         f_io.File.Client,
         "get_attr",
         new_callable=mock.AsyncMock,
-        return_value=_file_attr_resp(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS, 0
-        ),
+        return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS), 0),
     )
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -1636,15 +1621,13 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         f_io.File.Client,
         "get_attr",
         new_callable=mock.AsyncMock,
-        return_value=_file_attr_resp(fuchsia_controller.ZxStatus.ZX_OK, 15),
+        return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
     @mock.patch.object(
         f_io.File.Client,
         "read",
         new_callable=mock.AsyncMock,
-        side_effect=fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        ),
+        side_effect=ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS),
     )
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -1689,7 +1672,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "get_attr",
         new_callable=mock.AsyncMock,
         # File reports size of 15 bytes.
-        return_value=_file_attr_resp(fuchsia_controller.ZxStatus.ZX_OK, 15),
+        return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
     @mock.patch.object(
         f_io.File.Client,
