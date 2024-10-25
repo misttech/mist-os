@@ -12,6 +12,7 @@
 #include <lib/ktrace.h>
 #include <lib/root_resource_filter.h>
 #include <lib/zbi-format/driver-config.h>
+#include <string.h>
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -544,11 +545,7 @@ void ArmGicInitEarly(const zbi_dcfg_arm_gic_v3_driver_t& config) {
     return;
   }
 
-  dprintf(SPEW,
-          "GICv3: IPI base %u, MMIO phys %#lx, GICD offset %#lx, "
-          "GICR offset/stride %#lx/%#lx\n",
-          ipi_base, mmio_phys, arm_gicv3_gicd_offset, arm_gicv3_gicr_offset, arm_gicv3_gicr_stride);
-  dprintf(SPEW, "GICv3: kernel address %#lx\n", arm_gicv3_gic_base);
+  dprintf(SPEW, "GICv3, IPI base %u\n", ipi_base);
 
   pdev_register_interrupts(&gic_ops);
 
