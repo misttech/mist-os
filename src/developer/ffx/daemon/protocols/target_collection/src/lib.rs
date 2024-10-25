@@ -366,20 +366,31 @@ impl FidlProtocol for TargetCollectionProtocol {
                 let result = match target_collection.query_single_connected_target(&query) {
                     Ok(Some(target)) => Ok(target),
                     Ok(None) => {
-                        let can_discover = ffx_target::is_discovery_enabled(&self.context).await;
-                        if can_discover {
-                            target_collection
-                                // OpenTarget is called on behalf of the user.
-                                .discover_target(&query)
-                                .await
-                                .map_err(|_| ffx::OpenTargetError::QueryAmbiguous)
-                                .map(|t| target_collection.use_target(t, "OpenTarget request"))
-                        } else {
-                            match query {
-                                TargetInfoQuery::Addr(_) | TargetInfoQuery::Serial(_) => {
-                                    self.add_and_use_target(&target_collection, &node, query).await
-                                }
-                                _ => {
+                        match query {
+                            // If we have enough information in the request to
+                            // try to connect to the target, just add the target
+                            // automatically.
+                            TargetInfoQuery::Addr(_) | TargetInfoQuery::Serial(_) => {
+                                self.add_and_use_target(&target_collection, &node, query).await
+                            }
+                            _ => {
+                                // If we don't have enough information, but
+                                // discovery is enabled, then try to discover
+                                // the target based on the query. Otherwise,
+                                // fail with TargetNotFound.
+                                let can_discover =
+                                    ffx_target::is_discovery_enabled(&self.context).await;
+                                if can_discover {
+                                    target_collection
+                                        // OpenTarget is called on behalf of
+                                        // the user.
+                                        .discover_target(&query)
+                                        .await
+                                        .map_err(|_| ffx::OpenTargetError::QueryAmbiguous)
+                                        .map(|t| {
+                                            target_collection.use_target(t, "OpenTarget request")
+                                        })
+                                } else {
                                     tracing::warn!("OpenTarget(query:?): daemon discovery is turned off, so client should only be sending already-resolved addresses (Addr or Serial)");
                                     Err(ffx::OpenTargetError::TargetNotFound)
                                 }
@@ -788,6 +799,7 @@ mod tests {
     use assert_matches::assert_matches;
     use async_channel::{Receiver, Sender};
     use ffx_config::{query, ConfigLevel};
+    use fidl_fuchsia_developer_ffx::TargetQuery;
     use fidl_fuchsia_net::{IpAddress, Ipv6Address};
     use futures::channel::oneshot::channel;
     use protocols::testing::FakeDaemonBuilder;
@@ -796,8 +808,9 @@ mod tests {
     use std::path::Path;
     use std::str::FromStr;
     use tempfile::tempdir;
+    use timeout::timeout;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_mdns_non_fastboot() {
         let local_node = overnet_core::Router::new(None).unwrap();
         let t = Target::new_named("this-is-a-thing");
@@ -815,7 +828,7 @@ mod tests {
         assert_matches!(t.get_connection_state(), TargetConnectionState::Mdns(t) if t > before_update);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_mdns_fastboot() {
         let local_node = overnet_core::Router::new(None).unwrap();
         let t = Target::new_named("this-is-a-thing");
@@ -920,7 +933,7 @@ mod tests {
             .unwrap();
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_protocol_integration() {
         let env = ffx_config::test_init().await.unwrap();
         let temp = tempdir().expect("cannot get tempdir");
@@ -1038,14 +1051,14 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_fastboot_target_no_serial() {
         let tc = Rc::new(TargetCollection::new());
         handle_fastboot_target(&tc, ffx::FastbootTarget::default());
         assert_eq!(tc.targets(None).len(), 0, "target collection should remain empty");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_fastboot_target() {
         let tc = Rc::new(TargetCollection::new());
         handle_fastboot_target(
@@ -1089,7 +1102,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_persisted_manual_target_remove() {
         let env = ffx_config::test_init().await.unwrap();
         let temp = tempdir().expect("cannot get tempdir");
@@ -1136,7 +1149,7 @@ mod tests {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_target() {
         let env = ffx_config::test_init().await.unwrap();
         let temp = tempdir().expect("cannot get tempdir");
@@ -1163,7 +1176,7 @@ mod tests {
         assert_eq!(target.addrs().into_iter().next(), Some(target_addr));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_ephemeral_target() {
         let env = ffx_config::test_init().await.unwrap();
         let temp = tempdir().expect("cannot get tempdir");
@@ -1186,7 +1199,7 @@ mod tests {
         assert_eq!(target.addrs().into_iter().next(), Some(target_addr));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_target_with_port() {
         let env = ffx_config::test_init().await.unwrap();
         let temp = tempdir().expect("cannot get tempdir");
@@ -1213,7 +1226,7 @@ mod tests {
         assert_eq!(target.addrs().into_iter().next(), Some(target_addr));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_ephemeral_target_with_port() {
         let env = ffx_config::test_init().await.unwrap();
         let temp = tempdir().expect("cannot get tempdir");
@@ -1236,7 +1249,7 @@ mod tests {
         assert_eq!(target.addrs().into_iter().next(), Some(target_addr));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_persisted_manual_target_add() {
         let env = ffx_config::test_init().await.unwrap();
         let temp = tempdir().expect("cannot get tempdir");
@@ -1273,7 +1286,7 @@ mod tests {
         assert_eq!(tc_impl.borrow().manual_targets.get().await.unwrap(), json!(map));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_persisted_ephemeral_target_add() {
         let env = ffx_config::test_init().await.unwrap();
         let temp = tempdir().expect("cannot get tempdir");
@@ -1315,7 +1328,7 @@ mod tests {
         assert!(target.unwrap().as_u64().unwrap() > now);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_persisted_manual_target_load() {
         let env = ffx_config::test_init().await.unwrap();
         let temp = tempdir().expect("cannot get tempdir");
@@ -1377,5 +1390,34 @@ mod tests {
             .unwrap()
             .expect("Could not find target");
         assert_eq!(target.ssh_address(), Some("127.0.0.1:8024".parse::<SocketAddr>().unwrap()));
+    }
+
+    #[fuchsia::test]
+    async fn test_dynamic_open_target() {
+        // Without doing an "add", we can still do an "open" if the target is specified
+        // with IP:port
+        let _env = ffx_config::test_init().await.unwrap();
+
+        let tc_impl = Rc::new(RefCell::new(TargetCollectionProtocol::default()));
+        let fake_daemon = FakeDaemonBuilder::new()
+            .register_fidl_protocol::<FakeMdns>()
+            .register_fidl_protocol::<FakeFastboot>()
+            .inject_fidl_protocol(tc_impl.clone())
+            .build();
+        let (_client, server) = fidl::endpoints::create_endpoints::<ffx::TargetMarker>();
+        let target_query = TargetQuery {
+            string_matcher: Some("127.0.0.1:12345".to_string()),
+            ..TargetQuery::default()
+        };
+        let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
+        // When this _doesn't_ work, we end up trying to discover the
+        // device, a process which never completes
+        timeout(Duration::from_secs(1), async {
+            proxy.open_target(&target_query, server).await.unwrap().unwrap();
+        })
+        .await
+        .unwrap();
+        let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
+        assert_eq!(1, target_collection.targets(None).len());
     }
 }
