@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
+        "driver_component/driver.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/dwc3.so",
         bind: "meta/bind/dwc3.bindbc",
         colocate: "true",
-        compat: "driver/dwc3.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },

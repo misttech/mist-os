@@ -33,24 +33,24 @@ source_set("dwc3-common") {
     "dwc3.cc",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/logging/cpp",
+    "//sdk/lib/driver/platform-device/cpp",
     "//sdk/lib/fit",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/driver",
-    "//src/devices/usb/lib/usb",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/usb/lib/usb:usb-dfv2-compat-logging",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
-    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
+    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server-dfv2-compat-logging",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
@@ -68,9 +68,7 @@ fuchsia_driver("dwc3-driver") {
   deps = [
     ":dwc3-common",
     ":dwc3_bind",
-    "//src/devices/bin/driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
   ]
 }
 
@@ -93,11 +91,12 @@ test("dwc3-test-bin") {
   deps = [
     ":dwc3-common",
     ":dwc3_bind",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//src/devices/bus/testing/fake-pdev",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/testing/fake-mmio-reg",
-    "//src/devices/testing/mock-ddk",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
   ]
 }
 

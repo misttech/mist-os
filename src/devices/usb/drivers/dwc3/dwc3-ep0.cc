@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 #include <fbl/auto_lock.h>
 
@@ -54,7 +55,7 @@ void Dwc3::Ep0QueueSetupLocked() {
 }
 
 void Dwc3::Ep0StartEndpoints() {
-  zxlogf(DEBUG, "Dwc3::Ep0StartEndpoints");
+  FDF_LOG(DEBUG, "Dwc3::Ep0StartEndpoints");
 
   ep0_.in.type = USB_ENDPOINT_CONTROL;
   ep0_.in.interval = 0;
@@ -89,8 +90,8 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
 
       memcpy(&setup, vaddr, sizeof(setup));
 
-      zxlogf(DEBUG, "got setup: type: 0x%02X req: %d value: %d index: %d length: %d",
-             setup.bm_request_type, setup.b_request, setup.w_value, setup.w_index, setup.w_length);
+      FDF_LOG(DEBUG, "got setup: type: 0x%02X req: %d value: %d index: %d length: %d",
+              setup.bm_request_type, setup.b_request, setup.w_value, setup.w_index, setup.w_length);
 
       const bool is_out = ((setup.bm_request_type & USB_DIR_MASK) == USB_DIR_OUT);
       if (setup.w_length > 0 && is_out) {
@@ -101,14 +102,14 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
       } else {
         zx::result<size_t> status = HandleEp0Setup(setup, vaddr, ep0_.buffer->size());
         if (status.is_error()) {
-          zxlogf(DEBUG, "HandleSetup returned %s", zx_status_get_string(status.error_value()));
+          FDF_LOG(DEBUG, "HandleSetup returned %s", zx_status_get_string(status.error_value()));
           CmdEpSetStall(ep0_.out);
           Ep0QueueSetupLocked();
           break;
         }
 
         const size_t actual = status.value();
-        zxlogf(DEBUG, "HandleSetup success: actual %zu", actual);
+        FDF_LOG(DEBUG, "HandleSetup success: actual %zu", actual);
         if (setup.w_length > 0) {
           // queue a write for the data phase
           CacheFlush(ep0_.buffer.get(), 0, actual);
@@ -200,7 +201,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
       break;
     case Ep0::State::Status:
     default:
-      zxlogf(ERROR, "ready unhandled state %u", static_cast<uint32_t>(ep0_.state));
+      FDF_LOG(ERROR, "ready unhandled state %u", static_cast<uint32_t>(ep0_.state));
       break;
   }
 }
@@ -216,13 +217,11 @@ zx::result<size_t> Dwc3::HandleEp0Setup(const fdescriptor::wire::UsbSetup& setup
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
-    size_t actual = 0;
-    zx_status_t status = DciIntfControl(&setup, in_buf, in_len, out_buf, out_len, &actual);
-    if (status == ZX_OK) {
-      return zx::ok(actual);
-    } else {
-      return zx::error(status);
+    zx::result<size_t> result = DciIntfControl(&setup, in_buf, in_len, out_buf, out_len);
+    if (result.is_error()) {
+      return result.take_error();
     }
+    return zx::ok(result.value());
   };
 
   if (setup.bm_request_type == (USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE)) {

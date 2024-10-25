@@ -4,12 +4,16 @@
 
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.dci/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
 #include <zircon/syscalls.h>
@@ -26,7 +30,7 @@ namespace dwc3 {
 namespace fdci = fuchsia_hardware_usb_dci;
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 namespace fendpoint = fuchsia_hardware_usb_endpoint;
-namespace fio = fuchsia_io;
+namespace fpdev = fuchsia_hardware_platform_device;
 
 zx_status_t CacheFlushCommon(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length,
                              uint32_t flush_options) {
@@ -46,107 +50,104 @@ zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t 
   return CacheFlushCommon(buffer, offset, length, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
 }
 
-zx_status_t Dwc3::Create(void* ctx, zx_device_t* parent) {
-  auto dev = std::make_unique<Dwc3>(parent, fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  if (zx_status_t status = dev->AcquirePDevResources(); status != ZX_OK) {
-    zxlogf(ERROR, "Dwc3 Create failed (%s)", zx_status_get_string(status));
-    return status;
+zx::result<> Dwc3::Start() {
+  {  // Compat server initialization.
+    auto result = compat_.Initialize(incoming(), outgoing(), node_name(), name(),
+                                     compat::ForwardMetadata::All());
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "compat_.Initalize(): %s", result.status_string());
+      return result.take_error();
+    }
   }
 
-  zx::result<fidl::ClientEnd<fio::Directory>> result{dev->ServeProtocol()};
-  if (result.is_error()) {
-    zxlogf(ERROR, "Dwc3::ServeProtocol(): %s", result.status_string());
-    return result.status_value();
+  if (zx_status_t status = AcquirePDevResources(); status != ZX_OK) {
+    FDF_LOG(ERROR, "AcquirePDevResources: %s", zx_status_get_string(status));
+    return zx::error(status);
   }
 
-  zx_device_str_prop_t props[] = {
-      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
-                           bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_VID_DESIGNWARE),
+  auto handler = bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure);
 
-      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
-                           bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3),
+  auto serve_result =
+      outgoing()->AddService<fdci::UsbDciService>(fdci::UsbDciService::InstanceHandler({
+          .device = std::move(handler),
+      }));
+
+  if (serve_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add service: %s", serve_result.status_string());
+    return serve_result.take_error();
+  }
+
+  if (zx_status_t status = Init(); status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  auto props = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_VID_DESIGNWARE),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                        bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3),
   };
 
-  std::array offers = {
-      fdci::UsbDciService::Name,
-  };
+  auto offers = compat_.CreateOffers2();
+  offers.push_back(fdf::MakeOffer2<fdci::UsbDciService>());
 
-  if (zx_status_t status = dev->DdkAdd(ddk::DeviceAddArgs("dwc3")
-                                           .set_str_props(props)
-                                           .forward_metadata(parent, DEVICE_METADATA_MAC_ADDRESS)
-                                           .forward_metadata(parent, DEVICE_METADATA_SERIAL_NUMBER)
-                                           .set_fidl_service_offers(offers)
-                                           .set_outgoing_dir(result.value().TakeChannel()));
-      status != ZX_OK) {
-    zxlogf(ERROR, "DdkAdd failed: %s", zx_status_get_string(status));
-    return status;
+  auto child = AddChild(name(), props, offers);
+  if (child.is_error()) {
+    FDF_LOG(ERROR, "AddChild(): %s", child.status_string());
+    return child.take_error();
   }
+  child_.Bind(std::move(*child));
 
-  // devmgr is now in charge of the device.
-  [[maybe_unused]] auto* _ = dev.release();
-  return ZX_OK;
+  return zx::ok();
 }
 
 zx_status_t Dwc3::AcquirePDevResources() {
-  pdev_ = ddk::PDevFidl::FromFragment(parent());
+  auto pdev = incoming()->Connect<fpdev::Service::Device>("pdev");
+  if (pdev.is_error()) {
+    FDF_LOG(ERROR, "fidl::CreateEndpoints<fpdev::Service>(): %s", pdev.status_string());
+    return pdev.error_value();
+  }
+  pdev_ = fdf::PDev{std::move(*pdev)};
+
   if (!pdev_.is_valid()) {
-    zxlogf(ERROR, "Could not get platform device protocol");
+    FDF_LOG(ERROR, "Could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (zx_status_t status = pdev_.MapMmio(0, &mmio_); status != ZX_OK) {
-    zxlogf(ERROR, "MapMmio failed: %s", zx_status_get_string(status));
-    return status;
+  auto mmio = pdev_.MapMmio(0);
+  if (mmio.is_error()) {
+    FDF_LOG(ERROR, "MapMmio failed: %s", mmio.status_string());
+    return mmio.error_value();
   }
+  mmio_ = std::move(*mmio);
 
-  if (zx_status_t status = pdev_.GetBti(0, &bti_); status != ZX_OK) {
-    zxlogf(ERROR, "GetBti failed: %s", zx_status_get_string(status));
-    return status;
+  auto bti = pdev_.GetBti(0);
+  if (bti.is_error()) {
+    FDF_LOG(ERROR, "GetBti failed: %s", bti.status_string());
+    return bti.error_value();
   }
+  bti_ = std::move(*bti);
 
-  if (zx_status_t status = pdev_.GetInterrupt(0, 0, &irq_); status != ZX_OK) {
-    zxlogf(ERROR, "GetInterrupt failed: %s", zx_status_get_string(status));
-    return status;
+  auto irq = pdev_.GetInterrupt(0, 0);
+  if (irq.is_error()) {
+    FDF_LOG(ERROR, "GetInterrupt failed: %s", irq.status_string());
+    return irq.error_value();
   }
+  irq_ = std::move(*irq);
 
   if (zx_status_t status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &irq_port_);
       status != ZX_OK) {
-    zxlogf(ERROR, "zx::port::create failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "zx::port::create failed: %s", zx_status_get_string(status));
     return status;
   }
 
   if (zx_status_t status = irq_.bind(irq_port_, 0, ZX_INTERRUPT_BIND); status != ZX_OK) {
-    zxlogf(ERROR, "irq bind to port failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "irq bind to port failed: %s", zx_status_get_string(status));
     return status;
   }
   irq_bound_to_port_ = true;
 
   return ZX_OK;
-}
-
-zx::result<fidl::ClientEnd<fio::Directory>> Dwc3::ServeProtocol() {
-  zx::result result =
-      outgoing_.AddService<fdci::UsbDciService>(fdci::UsbDciService::InstanceHandler({
-          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
-      }));
-
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service: %s", result.status_string());
-    return zx::error(result.status_value());
-  }
-
-  auto endpoints{fidl::CreateEndpoints<fio::Directory>()};
-  if (endpoints.is_error()) {
-    return zx::error(endpoints.status_value());
-  }
-
-  result = outgoing_.Serve(std::move(endpoints->server));
-  if (result.is_error()) {
-    zxlogf(ERROR, "outgoing_.Serve(): %s", result.status_string());
-    return zx::error(result.status_value());
-  }
-
-  return zx::ok(std::move(endpoints->client));
 }
 
 zx_status_t Dwc3::Init() {
@@ -160,14 +161,14 @@ zx_status_t Dwc3::Init() {
     // Now that we have our registers, check to make sure that we are running on
     // a version of the hardware that we support.
     if (zx_status_t status = CheckHwVersion(); status != ZX_OK) {
-      zxlogf(ERROR, "CheckHwVersion failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "CheckHwVersion failed: %s", zx_status_get_string(status));
       return status;
     }
 
     // Now that we have our registers, reset the hardware.  This will ensure that
     // we are starting from a known state moving forward.
     if (zx_status_t status = ResetHw(); status != ZX_OK) {
-      zxlogf(ERROR, "HW Reset Failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "HW Reset Failed: %s", zx_status_get_string(status));
       return status;
     }
 
@@ -177,8 +178,8 @@ zx_status_t Dwc3::Init() {
   }
 
   if (ep_count < (kUserEndpointStartNum + 1)) {
-    zxlogf(ERROR, "HW supports only %u physical endpoints, but at least %u are needed to operate.",
-           ep_count, (kUserEndpointStartNum + 1));
+    FDF_LOG(ERROR, "HW supports only %u physical endpoints, but at least %u are needed to operate.",
+            ep_count, (kUserEndpointStartNum + 1));
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -189,7 +190,7 @@ zx_status_t Dwc3::Init() {
   // release the quarantine on any pages which may have been previously pinned
   // by this BTI.
   if (zx_status_t status = bti_.release_quarantine(); status != ZX_OK) {
-    zxlogf(ERROR, "Release quarantine failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Release quarantine failed: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -204,7 +205,7 @@ zx_status_t Dwc3::Init() {
   zx_status_t status = dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEventBufferSize,
                                                                            12, &event_buffer_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "dma_buffer init fails: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "dma_buffer init fails: %s", zx_status_get_string(status));
     return status;
   }
   CacheFlushInvalidate(event_buffer_.get(), 0, kEventBufferSize);
@@ -219,13 +220,13 @@ zx_status_t Dwc3::Init() {
     zx_status_t status =
         dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEp0BufferSize, 12, &ep0_.buffer);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "ep0_buffer init failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "ep0_buffer init failed: %s", zx_status_get_string(status));
       return status;
     }
   }
 
   if (zx_status_t status = Ep0Init(); status != ZX_OK) {
-    zxlogf(ERROR, "Ep0Init init failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Ep0Init init failed: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -259,10 +260,11 @@ void Dwc3::ReleaseResources() {
         // pinned pages are quarantined instead of being returned to the page
         // pool.
         if (has_pinned_memory_) {
-          zxlogf(ERROR,
-                 "Failed to place HW into reset during shutdown (%s), self-terminating in order to "
-                 "ensure quarantine",
-                 zx_status_get_string(status));
+          FDF_LOG(
+              ERROR,
+              "Failed to place HW into reset during shutdown (%s), self-terminating in order to "
+              "ensure quarantine",
+              zx_status_get_string(status));
           ZX_ASSERT(false);
         }
       }
@@ -310,7 +312,7 @@ zx_status_t Dwc3::CheckHwVersion() {
   // Format defined by section 1.3.44 of the DWC3 Programming Guide
   if (!is_ascii_digit(c1) || !is_ascii_digit(c2) || !is_ascii_digit(c3) ||
       (!is_ascii_letter(c4) && (c4 != '*'))) {
-    zxlogf(ERROR, "Unrecognized USB IP Version 0x%08x", ip_version);
+    FDF_LOG(ERROR, "Unrecognized USB IP Version 0x%08x", ip_version);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -318,11 +320,11 @@ zx_status_t Dwc3::CheckHwVersion() {
   const int minor = ((c2 - '0') * 10) + (c3 - '0');
 
   if (major != 1) {
-    zxlogf(ERROR, "Unsupported USB IP Version %d.%02d%c", major, minor, c4);
+    FDF_LOG(ERROR, "Unsupported USB IP Version %d.%02d%c", major, minor, c4);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zxlogf(INFO, "Detected DWC3 IP version %d.%02d%c", major, minor, c4);
+  FDF_LOG(INFO, "Detected DWC3 IP version %d.%02d%c", major, minor, c4);
   return ZX_OK;
 }
 
@@ -409,7 +411,7 @@ void Dwc3::ResetConfiguration() {
 }
 
 void Dwc3::HandleResetEvent() {
-  zxlogf(INFO, "Dwc3::HandleResetEvent");
+  FDF_LOG(INFO, "Dwc3::HandleResetEvent");
 
   Ep0Reset();
 
@@ -462,7 +464,7 @@ void Dwc3::HandleConnectionDoneEvent() {
         ep0_max_packet = 512;
         break;
       default:
-        zxlogf(ERROR, "unsupported speed %u", speed);
+        FDF_LOG(ERROR, "unsupported speed %u", speed);
         break;
     }
   }
@@ -489,7 +491,7 @@ void Dwc3::HandleConnectionDoneEvent() {
 }
 
 void Dwc3::HandleDisconnectedEvent() {
-  zxlogf(INFO, "Dwc3::HandleDisconnectedEvent");
+  FDF_LOG(INFO, "Dwc3::HandleDisconnectedEvent");
 
   {
     fbl::AutoLock ep0_lock(&ep0_.lock);
@@ -511,16 +513,7 @@ void Dwc3::HandleDisconnectedEvent() {
   }
 }
 
-void Dwc3::DdkInit(ddk::InitTxn txn) {
-  if (zx_status_t status = Init(); status != ZX_OK) {
-    txn.Reply(status);
-  } else {
-    zxlogf(INFO, "Dwc3 Init Succeeded");
-    txn.Reply(ZX_OK);
-  }
-}
-
-void Dwc3::DdkUnbind(ddk::UnbindTxn txn) {
+void Dwc3::Stop() {
   if (irq_thread_started_.load()) {
     zx_status_t status = SignalIrqThread(IrqSignal::Exit);
     // if we can't signal the thread, we are not going to be able to shut down
@@ -530,19 +523,14 @@ void Dwc3::DdkUnbind(ddk::UnbindTxn txn) {
     irq_thread_started_.store(false);
   }
 
-  txn.Reply();
-}
-
-void Dwc3::DdkRelease() {
   ReleaseResources();
-  delete this;
 }
 
 void Dwc3::ConnectToEndpoint(ConnectToEndpointRequest& request,
                              ConnectToEndpointCompleter::Sync& completer) {
   zx_status_t status{init_done_.Wait(zx::deadline_after(kEndpointDeadline))};
   if (status == ZX_ERR_TIMED_OUT) {
-    zxlogf(ERROR, "Init() runtime exceeds deadline");
+    FDF_LOG(ERROR, "Init() runtime exceeds deadline");
     completer.Reply(fit::as_error(status));
     return;
   }
@@ -561,7 +549,7 @@ void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Syn
   fbl::AutoLock lock(&dci_lock_);
 
   if (dci_intf_.is_valid()) {
-    zxlogf(ERROR, "%s: DCI Interface already set", __func__);
+    FDF_LOG(ERROR, "%s: DCI Interface already set", __func__);
     completer.Reply(zx::error(ZX_ERR_BAD_STATE));
     return;
   }
@@ -596,7 +584,7 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
   uint8_t ep_type = usb_ep_type2(request.ep_descriptor());
 
   if (ep_type == USB_ENDPOINT_ISOCHRONOUS) {
-    zxlogf(ERROR, "isochronous endpoints are not supported");
+    FDF_LOG(ERROR, "isochronous endpoints are not supported");
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
     return;
   }
@@ -604,7 +592,7 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
   fbl::AutoLock lock(&uep->ep.lock);
 
   if (zx_status_t status = uep->fifo.Init(bti_); status != ZX_OK) {
-    zxlogf(ERROR, "fifo init failed %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "fifo init failed %s", zx_status_get_string(status));
     completer.Reply(zx::error(status));
     return;
   }
@@ -683,23 +671,22 @@ void Dwc3::EndpointClearStall(EndpointClearStallRequest& request,
   }
 }
 
-zx_status_t Dwc3::CommonCancelAll(uint8_t ep_addr) {
+zx::result<> Dwc3::CommonCancelAll(uint8_t ep_addr) {
   const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
   if (uep == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  return UserEpCancelAll(*uep);
+  if (zx_status_t status = UserEpCancelAll(*uep); status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok();
 }
 
 void Dwc3::CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) {
-  if (zx_status_t status = CommonCancelAll(request.ep_address()); status != ZX_OK) {
-    completer.Reply(zx::error(status));
-  } else {
-    completer.Reply(zx::ok());
-  }
+  completer.Reply(CommonCancelAll(request.ep_address()));
 }
 
 void Dwc3::DciIntfSetSpeed(fdescriptor::wire::UsbSpeed speed) {
@@ -708,9 +695,9 @@ void Dwc3::DciIntfSetSpeed(fdescriptor::wire::UsbSpeed speed) {
   fidl::Arena arena;
   auto result = dci_intf_.buffer(arena)->SetSpeed(speed);
   if (!result.ok()) {
-    zxlogf(ERROR, "(framework) SetSpeed(): %s", result.status_string());
+    FDF_LOG(ERROR, "(framework) SetSpeed(): %s", result.status_string());
   } else if (result->is_error()) {
-    zxlogf(ERROR, "SetSpeed(): %s", zx_status_get_string(result->error_value()));
+    FDF_LOG(ERROR, "SetSpeed(): %s", zx_status_get_string(result->error_value()));
   }
 }
 
@@ -720,15 +707,15 @@ void Dwc3::DciIntfSetConnected(bool connected) {
   fidl::Arena arena;
   auto result = dci_intf_.buffer(arena)->SetConnected(connected);
   if (!result.ok()) {
-    zxlogf(ERROR, "(framework) SetConnected(): %s", result.status_string());
+    FDF_LOG(ERROR, "(framework) SetConnected(): %s", result.status_string());
   } else if (result->is_error()) {
-    zxlogf(ERROR, "SetConnected(): %s", zx_status_get_string(result->error_value()));
+    FDF_LOG(ERROR, "SetConnected(): %s", zx_status_get_string(result->error_value()));
   }
 }
 
-zx_status_t Dwc3::DciIntfControl(const fdescriptor::wire::UsbSetup* setup,
-                                 const uint8_t* write_buffer, size_t write_size,
-                                 uint8_t* read_buffer, size_t read_size, size_t* read_actual) {
+zx::result<size_t> Dwc3::DciIntfControl(const fdescriptor::wire::UsbSetup* setup,
+                                        const uint8_t* write_buffer, size_t write_size,
+                                        uint8_t* read_buffer, size_t read_size) {
   ZX_ASSERT(dci_intf_.is_valid());
 
   auto fwrite =
@@ -738,12 +725,12 @@ zx_status_t Dwc3::DciIntfControl(const fdescriptor::wire::UsbSetup* setup,
   auto result = dci_intf_.buffer(arena)->Control(*setup, fwrite);
 
   if (!result.ok()) {
-    zxlogf(ERROR, "(framework) Control(): %s", result.status_string());
-    return ZX_ERR_INTERNAL;
+    FDF_LOG(ERROR, "(framework) Control(): %s", result.status_string());
+    return zx::error(ZX_ERR_INTERNAL);
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "Control(): %s", zx_status_get_string(result->error_value()));
-    return result->error_value();
+    FDF_LOG(ERROR, "Control(): %s", zx_status_get_string(result->error_value()));
+    return result->take_error();
   }
 
   // A lightweight byte-span is used to make it easier to process the read data.
@@ -751,15 +738,17 @@ zx_status_t Dwc3::DciIntfControl(const fdescriptor::wire::UsbSetup* setup,
 
   // Don't blow out caller's buffer.
   if (read_data.size_bytes() > read_size) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
+
+  size_t read_actual{0};
 
   if (!read_data.empty()) {
     std::memcpy(read_buffer, read_data.data(), read_data.size_bytes());
-    *read_actual = read_data.size_bytes();
+    read_actual = read_data.size_bytes();
   }
 
-  return ZX_OK;
+  return zx::ok(read_actual);
 }
 
 void Dwc3::EpServer::GetInfo(GetInfoCompleter::Sync& completer) {
@@ -783,7 +772,7 @@ void Dwc3::EpServer::GetInfo(GetInfoCompleter::Sync& completer) {
       break;
     default:
       // In theory, this should never happen unless a new EP type is added to the spec.
-      zxlogf(ERROR, "unknown usb endpoint type: 0x%xd", uep_->ep.type);
+      FDF_LOG(ERROR, "unknown usb endpoint type: 0x%xd", uep_->ep.type);
       completer.Reply(zx::error(ZX_ERR_BAD_STATE));
   }
 
@@ -801,12 +790,12 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
 
     if (!uep_->ep.enabled) {
       status = ZX_ERR_BAD_STATE;
-      zxlogf(ERROR, "Dwc3: ep(%u) not enabled!", uep_->ep.ep_num);
+      FDF_LOG(ERROR, "Dwc3: ep(%u) not enabled!", uep_->ep.ep_num);
     }
 
     if (status == ZX_OK && freq->data()->size() != 1) {
       status = ZX_ERR_INVALID_ARGS;
-      zxlogf(ERROR, "scatter-gather not implemented");
+      FDF_LOG(ERROR, "scatter-gather not implemented");
     }
 
     if (status == ZX_OK && uep_->ep.IsOutput()) {
@@ -815,17 +804,17 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
 
       if (length == 0 || (length % uep_->ep.max_packet_size) != 0) {
         status = ZX_ERR_INVALID_ARGS;
-        zxlogf(ERROR, "Dwc3: OUT transfers must be multiple of max packet size (len %ld mps %hu)",
-               length, uep_->ep.max_packet_size);
+        FDF_LOG(ERROR, "Dwc3: OUT transfers must be multiple of max packet size (len %ld mps %hu)",
+                length, uep_->ep.max_packet_size);
       }
     }
 
     if (status != ZX_OK) {
-      zxlogf(ERROR, "failing request with status %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "failing request with status %s", zx_status_get_string(status));
       RequestComplete(status, 0, std::move(freq));
 
       if (status = dwc3_->SignalIrqThread(IrqSignal::Wakeup); status != ZX_OK) {
-        zxlogf(DEBUG, "Failed to signal IRQ thread %s", zx_status_get_string(status));
+        FDF_LOG(DEBUG, "Failed to signal IRQ thread %s", zx_status_get_string(status));
       }
       continue;
     }
@@ -840,20 +829,9 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
 }
 
 void Dwc3::EpServer::CancelAll(CancelAllCompleter::Sync& completer) {
-  if (zx_status_t status = dwc3_->CommonCancelAll(uep_->ep.ep_num); status != ZX_OK) {
-    completer.Reply(zx::error(status));
-  } else {
-    completer.Reply(zx::ok());
-  }
+  completer.Reply(dwc3_->CommonCancelAll(uep_->ep.ep_num));
 }
-
-static constexpr zx_driver_ops_t driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = Dwc3::Create;
-  return ops;
-}();
 
 }  // namespace dwc3
 
-ZIRCON_DRIVER(dwc3, dwc3::driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(dwc3::Dwc3);
