@@ -133,7 +133,6 @@ lazy_static_visibility = [
   "//src/session/bin/element_manager:*",
   "//src/session/bin/session_manager:*",
   "//src/session/lib/realm_management:*",
-  "//src/settings/service:*",
   "//src/storage/fxfs/platform:*",
   "//src/storage/lib/block_client/rust:*",
   "//src/sys/component_manager:*",
