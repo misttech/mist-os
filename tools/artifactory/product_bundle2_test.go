@@ -49,8 +49,8 @@ func TestProductBundle2Uploads(t *testing.T) {
 			},
 			{
 				Type:   "blobs",
-				Local:  "blobs/1",
-				Remote: "1",
+				Local:  "blobs",
+				Remote: "",
 				Entries: []ArtifactEntry{
 					{
 						Name: "abc",
@@ -103,8 +103,8 @@ func TestProductBundle2Uploads(t *testing.T) {
     },
     {
       "type": "blobs",
-      "local": "blobs/1",
-      "remote": "BLOBS/1",
+      "local": "blobs",
+      "remote": "BLOBS",
       "entries": [
         {
           "name": "abc"
@@ -136,8 +136,8 @@ func TestProductBundle2Uploads(t *testing.T) {
 			Signed:      true,
 		},
 		{
-			Source:      filepath.Join(dir, "blobs/1"),
-			Destination: filepath.Join("BLOBS/1"),
+			Source:      filepath.Join(dir, "blobs"),
+			Destination: filepath.Join("BLOBS"),
 			Deduplicate: true,
 			Signed:      true,
 		},

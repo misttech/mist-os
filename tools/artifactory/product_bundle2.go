@@ -85,7 +85,7 @@ func uploadsFromProductBundle(mods productBundlesModules, transferManifestPath s
 	for _, entry := range transferManifest.Entries {
 		remote := ""
 		if entry.Type == "files" {
-			remote = path.Join(productBundleRemote, entry.Remote)
+			remote = productBundleRemote
 			for _, artifact := range entry.Entries {
 				uploads = append(uploads, Upload{
 					Source:      path.Join(mods.BuildDir(), transferManifestParentPath, entry.Local, artifact.Name),
@@ -94,7 +94,7 @@ func uploadsFromProductBundle(mods productBundlesModules, transferManifestPath s
 				})
 			}
 		} else if entry.Type == "blobs" {
-			remote = path.Join(blobsRemote, entry.Remote)
+			remote = blobsRemote
 			uploads = append(uploads, Upload{
 				Source:      path.Join(mods.BuildDir(), transferManifestParentPath, entry.Local),
 				Destination: remote,
