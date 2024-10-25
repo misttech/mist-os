@@ -171,8 +171,6 @@ python_library("fidl_bindings") {
 }
 
 python_binary("example") {
-  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
-  enable_mypy = false
   main_source = "python/example.py"
   deps = [
     ":fidl_bindings",
