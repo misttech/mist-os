@@ -21,7 +21,7 @@
         },
         {
             config: [ "fuchsia.power.UseSuspender" ],
-            from: "void",
+            from: "parent",
             to: "#system-activity-governor",
             availability: "optional",
         },

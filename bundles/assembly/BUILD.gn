@@ -4040,6 +4040,7 @@ assembly_input_bundle("power_framework_sag") {
 #
 assembly_input_bundle("power_framework_testing_sag") {
   bootfs_packages = [
+    "//src/power/system-activity-governor:config-use-suspender",
     "//src/power/system-activity-governor/fake:package",
     "//src/power/testing/fake-suspend:fake-suspend-pkg",
   ]

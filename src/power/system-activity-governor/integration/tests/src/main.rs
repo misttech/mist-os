@@ -10,6 +10,7 @@ use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::create_endpoints;
 use fidl::{AsHandleRef, HandleBased};
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
+use fidl_test_systemactivitygovernor::RealmOptions;
 use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc;
 use futures::{FutureExt, StreamExt};
@@ -42,13 +43,7 @@ async fn set_up_default_suspender(device: &tsc::DeviceProxy) {
 }
 
 async fn create_realm() -> Result<(RealmProxyClient, String)> {
-    let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    let (client, server) = create_endpoints();
-    let result = realm_factory
-        .create_realm(server)
-        .await?
-        .map_err(realm_proxy_client::Error::OperationError)?;
-    Ok((RealmProxyClient::from(client), result))
+    create_realm_ext(RealmOptions { use_suspender: Some(true), ..Default::default() }).await
 }
 
 async fn create_realm_ext(options: ftest::RealmOptions) -> Result<(RealmProxyClient, String)> {
@@ -224,6 +219,41 @@ macro_rules! block_until_inspect_matches {
             fasync::Timer::new(fasync::MonotonicInstant::after(RESTART_DELAY)).await;
         }
     }};
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_with_no_suspender_returns_not_supported_after_suspend_attempt(
+) -> Result<()> {
+    let (realm, activity_governor_moniker) =
+        create_realm_ext(ftest::RealmOptions { use_suspender: Some(false), ..Default::default() })
+            .await?;
+    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
+    let suspend_controller = create_suspend_topology(&realm).await?;
+
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            config: contains {
+                use_suspender: false,
+            }
+        }
+    );
+
+    lease(&suspend_controller, 1).await?;
+
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(1), current_stats.fail_count);
+    assert_eq!(Some(zx::Status::NOT_SUPPORTED.into_raw()), current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+    Ok(())
 }
 
 #[fuchsia::test]

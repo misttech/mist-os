@@ -16,6 +16,7 @@ use fuchsia_inspect::health::Reporter;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use sag_config::Config;
 use std::rc::Rc;
+use std::time::Duration;
 use zx::MonotonicDuration;
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
@@ -23,6 +24,7 @@ use {
 };
 
 const SUSPEND_DEVICE_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(10);
+const SUSPENDER_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(3);
 
 async fn connect_to_suspender() -> Result<fhsuspend::SuspenderProxy> {
     let service_dir =
@@ -136,18 +138,19 @@ async fn main() -> Result<()> {
     tracing::info!(?config, "config");
 
     let suspender = if config.use_suspender {
-        // TODO(https://fxbug.dev/361403498): Re-attempt to connect to suspender indefinitely once
-        // dependents have aligned on the use of structured config for SAG.
-        tracing::info!("Attempting to connect to suspender...");
-        match connect_to_suspender().await {
-            Ok(s) => {
-                tracing::info!("Connected to suspender");
-                Some(s)
+        loop {
+            tracing::info!("Attempting to connect to suspender...");
+            match connect_to_suspender().await {
+                Ok(s) => {
+                    tracing::info!("Connected to suspender");
+                    break Some(s);
+                }
+                Err(e) => {
+                    tracing::error!("Unable to connect to suspender protocol: {e:?}");
+                }
             }
-            Err(e) => {
-                tracing::warn!("Unable to connect to suspender protocol: {e:?}");
-                None
-            }
+            // Delay retry for some time to reduce log spam.
+            fuchsia_async::Timer::new(SUSPENDER_CONNECT_RETRY_DELAY).await;
         }
     } else {
         tracing::info!("Skipping connecting to suspender.");
