@@ -34,7 +34,8 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::range_ext::RangeExt;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::restricted_aspace::{
-    RESTRICTED_ASPACE_BASE, RESTRICTED_ASPACE_HIGHEST_ADDRESS, RESTRICTED_ASPACE_SIZE,
+    RESTRICTED_ASPACE_BASE, RESTRICTED_ASPACE_HIGHEST_ADDRESS, RESTRICTED_ASPACE_RANGE,
+    RESTRICTED_ASPACE_SIZE,
 };
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
@@ -92,10 +93,7 @@ fn usercopy() -> Option<&'static usercopy::Usercopy> {
         if UNIFIED_ASPACES_ENABLED {
             // ASUMPTION: All Starnix managed Linux processes have the same
             // restricted mode address range.
-            Some(
-                usercopy::Usercopy::new(RESTRICTED_ASPACE_BASE..RESTRICTED_ASPACE_HIGHEST_ADDRESS)
-                    .unwrap(),
-            )
+            Some(usercopy::Usercopy::new(RESTRICTED_ASPACE_RANGE).unwrap())
         } else {
             None
         }

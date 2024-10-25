@@ -6,7 +6,7 @@
 // to a 4 byte boundary and must be within the restricted address space range.
 
 use starnix_uapi::errors::{error, Errno};
-use starnix_uapi::restricted_aspace::RESTRICTED_ASPACE_HIGHEST_ADDRESS;
+use starnix_uapi::restricted_aspace::RESTRICTED_ASPACE_RANGE;
 use starnix_uapi::user_address::UserAddress;
 use std::fmt;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -32,8 +32,8 @@ impl TryFrom<usize> for FutexAddress {
         if value % 4 != 0 {
             return error!(EINVAL);
         }
-        // Futex addresses cannot be above the top of the restricted address space range.
-        if value > RESTRICTED_ASPACE_HIGHEST_ADDRESS {
+        // Futex addresses cannot be outside of the restricted address space range.
+        if !RESTRICTED_ASPACE_RANGE.contains(&value) {
             return error!(EFAULT);
         }
         Ok(FutexAddress(value))
@@ -69,6 +69,7 @@ impl fmt::Debug for FutexAddress {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use starnix_uapi::restricted_aspace::RESTRICTED_ASPACE_HIGHEST_ADDRESS;
 
     #[::fuchsia::test]
     fn test_misaligned_address() {
@@ -78,7 +79,7 @@ mod tests {
 
     #[::fuchsia::test]
     fn test_normal_mode_address() {
-        let result = FutexAddress::try_from(RESTRICTED_ASPACE_HIGHEST_ADDRESS + 4096);
+        let result = FutexAddress::try_from(RESTRICTED_ASPACE_HIGHEST_ADDRESS);
         assert!(result.is_err());
     }
 
