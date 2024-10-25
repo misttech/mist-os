@@ -4,7 +4,6 @@
 
 use crate::context::LowpanCtlContext;
 use crate::prelude::*;
-use openthread::ot;
 
 /// Contains the arguments decoded for the `dataset` command.
 #[derive(FromArgs, PartialEq, Debug)]
@@ -72,9 +71,9 @@ impl DatasetGetCommand {
             match self.format {
                 DatasetFormat::RawTlvs => println!("{}", hex::encode(tlvs)),
                 DatasetFormat::Rust => {
-                    let tlvs = ot::OperationalDatasetTlvs::try_from_slice(&tlvs)?;
+                    // let tlvs = ot::OperationalDatasetTlvs::try_from_slice(&tlvs)?;
 
-                    println!("{:#?}", tlvs.try_to_dataset()?);
+                    println!("not supported, please use `lowpanctl otcli dataset active -x`");
                 }
             };
         } else {
