@@ -209,14 +209,14 @@ class __TA_CAPABILITY("mutex") Lock {
   // State type when lock validation or metadata is enabled.
   struct AvailableState {
     template <typename... Args>
-    explicit AvailableState(LockClassId id, Args&&... args)
+    explicit constexpr AvailableState(LockClassId id, Args&&... args)
         : id_{id}, lock_(std::forward<Args>(args)...) {
       if constexpr (has_set_lock_class_id_v<LockType>) {
         lock_.SetLockClassId(id);
       }
     }
 
-    LockClassId id() const { return id_; }
+    constexpr LockClassId id() const { return id_; }
 
     LockClassId id_;
     LockType lock_;
@@ -225,7 +225,8 @@ class __TA_CAPABILITY("mutex") Lock {
   // State type when validation and metadata is disabled.
   struct UnavailableState {
     template <typename... Args>
-    explicit UnavailableState(LockClassId id, Args&&... args) : lock_(std::forward<Args>(args)...) {
+    explicit constexpr UnavailableState(LockClassId id, Args&&... args)
+        : lock_(std::forward<Args>(args)...) {
       if constexpr (has_set_lock_class_id_v<LockType>) {
         lock_.SetLockClassId(id);
       }
