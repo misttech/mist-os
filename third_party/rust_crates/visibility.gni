@@ -163,7 +163,6 @@ lazy_static_visibility = [
   "//src/sys/time/testing/example:*",
   "//src/sys/time/time_test_client:*",
   "//src/sys/time/timekeeper:*",
-  "//src/tee/*",
   "//src/testing/fidl/intl_property_manager:*",
   "//src/testing/pkgstats:*",
   "//src/testing/sl4f:*",
