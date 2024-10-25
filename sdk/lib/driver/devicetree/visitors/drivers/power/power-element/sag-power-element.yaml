@@ -41,9 +41,6 @@ properties:
                 $ref: power-element.yaml#/definitions/power-level
             additionalProperties: false
 
-      execution-resume-latency-element:
-        $ref: "power-element.yaml#/patternProperties/^[a-zA-Z0-9-]*-element$"
-
       wake-handling-element:
         $ref: "power-element.yaml#/patternProperties/^[a-zA-Z0-9-]*-element$"
         properties:
@@ -71,7 +68,6 @@ properties:
     additionalProperties: false
     required:
       - execution-state-element
-      - execution-resume-latency-element
       - wake-handling-element
       - application-activity-element
 
@@ -95,10 +91,6 @@ examples:
             active-level {
               level = <2>;
             };
-          };
-        };
-        execution-resume-latency-element {
-          power-levels {
           };
         };
         wake-handling-element {

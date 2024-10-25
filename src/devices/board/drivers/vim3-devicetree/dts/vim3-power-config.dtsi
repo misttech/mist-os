@@ -26,10 +26,6 @@
 					};
 				};
 			};
-			execution-resume-latency-element {
-				power-levels {
-				};
-			};
 			wake-handling-element {
 				power-levels {
 					sag_wake_inactive: inactive-level {

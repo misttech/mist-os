@@ -156,9 +156,6 @@ zx::result<ParentElement> ParentElement::FromFidl(
         case fuchsia_hardware_power::SagElement::kExecutionState:
           sag = SagElement::kExecutionState;
           break;
-        case fuchsia_hardware_power::SagElement::kExecutionResumeLatency:
-          sag = SagElement::kExecutionResumeLatency;
-          break;
         case fuchsia_hardware_power::SagElement::kWakeHandling:
           sag = SagElement::kWakeHandling;
           break;
@@ -192,9 +189,6 @@ zx::result<ParentElement> ParentElement::FromFidl(
       switch (src.sag()) {
         case fuchsia_hardware_power::wire::SagElement::kExecutionState:
           sag = SagElement::kExecutionState;
-          break;
-        case fuchsia_hardware_power::wire::SagElement::kExecutionResumeLatency:
-          sag = SagElement::kExecutionResumeLatency;
           break;
         case fuchsia_hardware_power::wire::SagElement::kWakeHandling:
           sag = SagElement::kWakeHandling;

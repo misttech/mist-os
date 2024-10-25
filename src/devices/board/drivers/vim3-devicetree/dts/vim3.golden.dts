@@ -996,12 +996,6 @@
 				};
 			};
 
-			execution-resume-latency-element {
-
-				power-levels {
-				};
-			};
-
 			execution-state-element {
 
 				power-levels {

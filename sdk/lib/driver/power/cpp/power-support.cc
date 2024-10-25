@@ -254,17 +254,6 @@ fit::result<Error> GetTokensFromSag(ElementDependencyMap& dependencies, TokenMap
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
         break;
-      case SagElement::kExecutionResumeLatency:
-        if (elements->has_execution_resume_latency() &&
-            elements->execution_resume_latency().has_assertive_dependency_token()) {
-          zx::event copy;
-          elements->execution_resume_latency().assertive_dependency_token().duplicate(
-              ZX_RIGHT_SAME_RIGHTS, &copy);
-          tokens.emplace(std::make_pair(parent, std::move(copy)));
-        } else {
-          return fit::error(Error::DEPENDENCY_NOT_FOUND);
-        }
-        break;
       case SagElement::kWakeHandling:
         if (elements->has_wake_handling() &&
             elements->wake_handling().has_assertive_dependency_token()) {
