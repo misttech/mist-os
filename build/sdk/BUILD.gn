@@ -136,14 +136,19 @@ _partner_idk_unstable_source_sets_list_testonly = [
 ]
 
 # Ensure the lists are mutually exclusive.
-_unstable_source_sets = _partner_idk_unstable_source_sets_list +
-                        _partner_idk_unstable_source_sets_list_testonly
-assert(_partner_idk_source_sets_list + _unstable_source_sets -
-       _unstable_source_sets == _partner_idk_source_sets_list)
-assert(_partner_idk_unstable_source_sets_list +
-       _partner_idk_unstable_source_sets_list_testonly -
-       _partner_idk_unstable_source_sets_list_testonly ==
-       _partner_idk_unstable_source_sets_list)
+_unstable_partner_idk_source_sets =
+    _partner_idk_unstable_source_sets_list +
+    _partner_idk_unstable_source_sets_list_testonly
+assert(
+    _partner_idk_source_sets_list + _unstable_partner_idk_source_sets -
+        _unstable_partner_idk_source_sets == _partner_idk_source_sets_list,
+    "A source set appears in both stable and unstable lists. If adding a a stable source set to a list, remove it from the unstable list.")
+assert(
+    _partner_idk_unstable_source_sets_list +
+        _partner_idk_unstable_source_sets_list_testonly -
+        _partner_idk_unstable_source_sets_list_testonly ==
+        _partner_idk_unstable_source_sets_list,
+    "An unstable source set appears in both normal and testonly lists. Remove it from one of the lists.")
 
 # Ensure no testonly atoms are in the non-test lists.
 group("partner_idk_source_sets") {

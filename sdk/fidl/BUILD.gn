@@ -320,10 +320,12 @@ group("sdk_partner_internal_libs_allowlist") {
 }
 
 # Ensure the lists are mutually exclusive.
-assert(_partner_idk_fidl_libraries_targets_list +
-       _partner_internal_fidl_libraries_targets_list -
-       _partner_internal_fidl_libraries_targets_list ==
-       _partner_idk_fidl_libraries_targets_list)
+assert(
+    _partner_idk_fidl_libraries_targets_list +
+        _partner_internal_fidl_libraries_targets_list -
+        _partner_internal_fidl_libraries_targets_list ==
+        _partner_idk_fidl_libraries_targets_list,
+    "A FIDL library appears in more than one SDK category list. If adding a library to a category, remove it from the other.")
 
 group("internal_only_idk_libs_allowlist") {
   visibility = []
