@@ -232,12 +232,12 @@ mod tests {
 
         let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::new(remote.into_channel()),
-        );
+        let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
+        let object_request =
+            vfs::ObjectRequest::new3(flags, &Default::default(), remote.into_channel());
+        object_request.handle(|object_request| {
+            dir.open3(scope, vfs::path::Path::dot(), flags, object_request)
+        });
 
         let path = wait_for_device_with(&dir_proxy, |DeviceInfo { filename, topological_path }| {
             (topological_path == "/dev/test2/x/dev").then(|| filename.to_string())
@@ -256,12 +256,12 @@ mod tests {
 
         let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::new(remote.into_channel()),
-        );
+        let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
+        let object_request =
+            vfs::ObjectRequest::new3(flags, &Default::default(), remote.into_channel());
+        object_request.handle(|object_request| {
+            dir.open3(scope, vfs::path::Path::dot(), flags, object_request)
+        });
 
         let stream = watch_for_files(&dir_proxy).await.unwrap();
         futures::pin_mut!(stream);
@@ -292,12 +292,12 @@ mod tests {
 
         let (dir_proxy, remote) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::new(remote.into_channel()),
-        );
+        let flags: fio::Flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE;
+        let object_request =
+            vfs::ObjectRequest::new3(flags, &Default::default(), remote.into_channel());
+        object_request.handle(|object_request| {
+            dir.open3(scope, vfs::path::Path::dot(), flags, object_request)
+        });
 
         let path = wait_for_device_with(&dir_proxy, |DeviceInfo { filename, topological_path }| {
             (topological_path == "/dev/test2/x/dev").then(|| filename.to_string())
@@ -316,12 +316,18 @@ mod tests {
                 "dir" => vfs::pseudo_directory! {},
             },
         };
-        let () = root.open(
-            vfs::execution_scope::ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        );
+        let flags: fio::Flags =
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::Flags::PERM_EXECUTE;
+        let object_request =
+            vfs::ObjectRequest::new3(flags, &Default::default(), server.into_channel());
+        object_request.handle(|object_request| {
+            root.clone().open3(
+                vfs::execution_scope::ExecutionScope::new(),
+                vfs::path::Path::dot(),
+                fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::Flags::PERM_EXECUTE,
+                object_request,
+            )
+        });
 
         let directory = recursive_wait_and_open_directory(&client, "test/dir").await.unwrap();
         let () = directory.close().await.unwrap().unwrap();
@@ -334,12 +340,18 @@ mod tests {
         let root = vfs::pseudo_directory! {
             "test" => vfs::pseudo_directory! {},
         };
-        let () = root.open(
-            vfs::execution_scope::ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            vfs::path::Path::dot(),
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        );
+        let flags: fio::Flags =
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::Flags::PERM_EXECUTE;
+        let object_request =
+            vfs::ObjectRequest::new3(flags, &Default::default(), server.into_channel());
+        object_request.handle(|object_request| {
+            root.open3(
+                vfs::execution_scope::ExecutionScope::new(),
+                vfs::path::Path::dot(),
+                flags,
+                object_request,
+            )
+        });
 
         let directory = recursive_wait_and_open_directory(&client, "/test").await.unwrap();
         let () = directory.close().await.unwrap().unwrap();

@@ -140,17 +140,10 @@ zx::result<zx::channel> RecursiveWaitForFileHelper(const int dir_fd, std::string
     }
     return zx::ok(std::move(client));
   }
-#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   if (zx_status_t status = fdio_open3_at(
           channel, std::string(target).c_str(),
           static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory), server.release());
       status != ZX_OK) {
-#else
-  if (zx_status_t status = fdio_open_at(
-          channel, std::string(target).c_str(),
-          static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory), server.release());
-      status != ZX_OK) {
-#endif
     return zx::error(status);
   }
 
@@ -226,9 +219,9 @@ zx::result<zx::channel> RecursiveWaitForFile(const char* path, zx::duration time
     return zx::error(status);
   }
 
-  if (zx_status_t status = fdio_open(std::string(directory).c_str(),
-                                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory),
-                                     server.release());
+  if (zx_status_t status = fdio_open3(
+          std::string(directory).c_str(),
+          static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory), server.release());
       status != ZX_OK) {
     return zx::error(status);
   }
