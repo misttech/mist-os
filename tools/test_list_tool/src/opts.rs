@@ -37,6 +37,11 @@ pub struct Opt {
     /// If set, do not fail if there are errors with device tests.
     /// This may be desired for use from scripts that prefer to simply skip those tests.
     pub ignore_device_test_errors: bool,
+
+    #[structopt(long = "single-threaded")]
+    /// If set, do not parallelize reads.
+    /// This is useful for debugging.
+    pub single_threaded: bool,
 }
 
 impl Opt {
