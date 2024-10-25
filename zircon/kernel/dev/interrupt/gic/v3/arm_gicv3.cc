@@ -23,6 +23,7 @@
 #include <dev/interrupt/arm_gic_common.h>
 #include <dev/interrupt/arm_gic_hw_interface.h>
 #include <dev/interrupt/arm_gicv3_init.h>
+#include <dev/interrupt/arm_gicv3_regs.h>
 #include <kernel/cpu.h>
 #include <kernel/stats.h>
 #include <kernel/thread.h>
@@ -38,31 +39,28 @@
 #define IFRAME_PC(frame) ((frame)->elr)
 
 // Values read from the config.
-static uint64_t mmio_phys = 0;
 vaddr_t arm_gicv3_gic_base = 0;
 uint64_t arm_gicv3_gicd_offset = 0;
 uint64_t arm_gicv3_gicr_offset = 0;
 uint64_t arm_gicv3_gicr_stride = 0;
-static uint32_t ipi_base = 0;
 
-// this header uses the arm_gicv3_gic_* variables above
-#include <dev/interrupt/arm_gicv3_regs.h>
+namespace {
 
-static uint gic_max_int;
+uint64_t mmio_phys = 0;
+uint32_t ipi_base = 0;
+uint32_t gic_max_int;
 
-static bool gic_is_valid_interrupt(unsigned int vector, uint32_t flags) {
-  return (vector < gic_max_int);
-}
+bool gic_is_valid_interrupt(unsigned int vector, uint32_t flags) { return (vector < gic_max_int); }
 
-static uint32_t gic_get_base_vector() {
+uint32_t gic_get_base_vector() {
   // ARM Generic Interrupt Controller v3&4 chapter 2.2
   // INTIDs 0-15 are local CPU interrupts
   return 16;
 }
 
-static uint32_t gic_get_max_vector() { return gic_max_int; }
+uint32_t gic_get_max_vector() { return gic_max_int; }
 
-static bool gic_wait_for_mask(uint64_t reg, uint64_t mask, uint64_t expect) {
+bool gic_wait_for_mask(uint64_t reg, uint64_t mask, uint64_t expect) {
   int count = 1000000;
   while ((arm_gicv3_read32(reg) & mask) != expect) {
     count -= 1;
@@ -75,16 +73,16 @@ static bool gic_wait_for_mask(uint64_t reg, uint64_t mask, uint64_t expect) {
   return true;
 }
 
-static void gic_wait_for_rwp(uint64_t reg) {
+void gic_wait_for_rwp(uint64_t reg) {
   // Maintain the current log message for RWP timeouts.
   if (!gic_wait_for_mask(reg, GICD_CTLR_RWP, 0)) {
     LTRACEF("arm_gicv3: rwp timeout 0x%x\n", arm_gicv3_read32(reg));
   }
 }
 
-static void gic_set_enable(uint vector, bool enable) {
-  int reg = vector / 32;
-  uint32_t mask = (uint32_t)(1ULL << (vector % 32));
+void gic_set_enable(uint vector, bool enable) {
+  uint32_t reg = vector / 32;
+  uint32_t mask = static_cast<uint32_t>(1ULL << (vector % 32));
   if (vector < 32) {
     cpu_num_t cpu_id = arch_curr_cpu_num();
     if (enable) {
@@ -106,7 +104,7 @@ static void gic_set_enable(uint vector, bool enable) {
 // Redistributors for each PE need to woken up before they will
 // distribute interrupts.
 // https://developer.arm.com/documentation/198123/0302/Configuring-the-Arm-GIC
-static void gic_redistributor_sleep(bool sleep) {
+void gic_redistributor_sleep(bool sleep) {
   cpu_num_t cpu = arch_curr_cpu_num();
   DEBUG_ASSERT(arch_ints_disabled());
 
@@ -122,7 +120,7 @@ static void gic_redistributor_sleep(bool sleep) {
   gic_wait_for_mask(GICR_WAKER(cpu), WAKER_CHILDREN_ASLEEP, val);
 }
 
-static void gic_init_percpu_early() {
+void gic_init_percpu_early() {
   cpu_num_t cpu = arch_curr_cpu_num();
 
   // wake up the redistributor
@@ -154,7 +152,7 @@ static void gic_init_percpu_early() {
   gic_write_igrpen(1);
 }
 
-static zx_status_t gic_init() {
+zx_status_t gic_init() {
   LTRACE_ENTRY;
 
   DEBUG_ASSERT(arch_ints_disabled());
@@ -212,7 +210,7 @@ static zx_status_t gic_init() {
   return ZX_OK;
 }
 
-static zx_status_t arm_gic_sgi(unsigned int irq, unsigned int flags, unsigned int cpu_mask) {
+zx_status_t arm_gic_sgi(unsigned int irq, unsigned int flags, unsigned int cpu_mask) {
   LTRACEF("irq %u, flags %u, cpu_mask %#x\n", irq, flags, cpu_mask);
 
   if (flags != ARM_GIC_SGI_FLAG_NS) {
@@ -262,7 +260,7 @@ static zx_status_t arm_gic_sgi(unsigned int irq, unsigned int flags, unsigned in
   return ZX_OK;
 }
 
-static zx_status_t gic_mask_interrupt(unsigned int vector) {
+zx_status_t gic_mask_interrupt(unsigned int vector) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= gic_max_int) {
@@ -274,7 +272,7 @@ static zx_status_t gic_mask_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-static zx_status_t gic_unmask_interrupt(unsigned int vector) {
+zx_status_t gic_unmask_interrupt(unsigned int vector) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= gic_max_int) {
@@ -286,7 +284,7 @@ static zx_status_t gic_unmask_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-static zx_status_t gic_deactivate_interrupt(unsigned int vector) {
+zx_status_t gic_deactivate_interrupt(unsigned int vector) {
   if (vector >= gic_max_int) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -297,8 +295,8 @@ static zx_status_t gic_deactivate_interrupt(unsigned int vector) {
   return ZX_OK;
 }
 
-static zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
-                                           enum interrupt_polarity pol) {
+zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
+                                    enum interrupt_polarity pol) {
   LTRACEF("vector %u, trigger mode %d, polarity %d\n", vector, tm, pol);
 
   if (vector <= 15 || vector >= gic_max_int) {
@@ -327,8 +325,8 @@ static zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_t
   return ZX_OK;
 }
 
-static zx_status_t gic_get_interrupt_config(unsigned int vector, enum interrupt_trigger_mode* tm,
-                                            enum interrupt_polarity* pol) {
+zx_status_t gic_get_interrupt_config(unsigned int vector, enum interrupt_trigger_mode* tm,
+                                     enum interrupt_polarity* pol) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= gic_max_int) {
@@ -345,18 +343,18 @@ static zx_status_t gic_get_interrupt_config(unsigned int vector, enum interrupt_
   return ZX_OK;
 }
 
-static zx_status_t gic_set_affinity(unsigned int vector, cpu_mask_t mask) {
+zx_status_t gic_set_affinity(unsigned int vector, cpu_mask_t mask) {
   LTRACEF("vector %u, mask %#x\n", vector, mask);
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-static unsigned int gic_remap_interrupt(unsigned int vector) {
+unsigned int gic_remap_interrupt(unsigned int vector) {
   LTRACEF("vector %u\n", vector);
   return vector;
 }
 
 // called from assembly
-static void gic_handle_irq(iframe_t* frame) {
+void gic_handle_irq(iframe_t* frame) {
   // get the current vector
   uint32_t iar = gic_read_iar();
   unsigned vector = iar & 0x3ff;
@@ -386,11 +384,11 @@ static void gic_handle_irq(iframe_t* frame) {
   LTRACEF_LEVEL(2, "cpu %u exit\n", arch_curr_cpu_num());
 }
 
-static zx_status_t gic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {
+zx_status_t gic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {
   uint gic_ipi_num = ipi + ipi_base;
 
   // filter out targets outside of the range of cpus we care about
-  target &= (cpu_mask_t)(((1UL << arch_max_num_cpus()) - 1));
+  target &= static_cast<cpu_mask_t>(((1UL << arch_max_num_cpus()) - 1));
   if (target != 0) {
     LTRACEF("target 0x%x, gic_ipi %u\n", target, gic_ipi_num);
     arm_gic_sgi(gic_ipi_num, ARM_GIC_SGI_FLAG_NS, target);
@@ -399,7 +397,7 @@ static zx_status_t gic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {
   return ZX_OK;
 }
 
-static void arm_ipi_halt_handler(void*) {
+void arm_ipi_halt_handler(void*) {
   LTRACEF("cpu %u\n", arch_curr_cpu_num());
 
   arch_disable_ints();
@@ -408,7 +406,7 @@ static void arm_ipi_halt_handler(void*) {
   }
 }
 
-static void gic_init_percpu() {
+void gic_init_percpu() {
   mp_set_curr_cpu_online(true);
   unmask_interrupt(MP_IPI_GENERIC + ipi_base);
   unmask_interrupt(MP_IPI_RESCHEDULE + ipi_base);
@@ -416,13 +414,13 @@ static void gic_init_percpu() {
   unmask_interrupt(MP_IPI_HALT + ipi_base);
 }
 
-static void gic_shutdown() {
+void gic_shutdown() {
   // Turn off all GIC0 interrupts at the distributor.
   arm_gicv3_write32(GICD_CTLR, 0);
 }
 
 // Returns true if any PPIs are enabled on the calling CPU.
-[[maybe_unused]] static bool is_ppi_enabled() {
+[[maybe_unused]] bool is_ppi_enabled() {
   DEBUG_ASSERT(arch_ints_disabled());
 
   // PPIs are 16-31.
@@ -430,15 +428,12 @@ static void gic_shutdown() {
 
   cpu_num_t cpu_num = arch_curr_cpu_num();
   uint32_t reg = arm_gicv3_read32(GICR_ICENABLER0(cpu_num));
-  if ((reg & mask) != 0) {
-    return true;
-  }
 
-  return false;
+  return (reg & mask);
 }
 
 // Returns true if any SPIs are enabled on the calling CPU.
-[[maybe_unused]] static bool is_spi_enabled() {
+[[maybe_unused]] bool is_spi_enabled() {
   DEBUG_ASSERT(arch_ints_disabled());
 
   cpu_num_t cpu_num = arch_curr_cpu_num();
@@ -458,7 +453,7 @@ static void gic_shutdown() {
   return false;
 }
 
-static void gic_shutdown_cpu() {
+void gic_shutdown_cpu() {
   DEBUG_ASSERT(arch_ints_disabled());
 
   // If we're running on a secondary CPU there's a good chance this CPU will be powered off shortly
@@ -482,27 +477,25 @@ static void gic_shutdown_cpu() {
   gic_redistributor_sleep(true);
 }
 
-static bool gic_msi_is_supported() { return false; }
+bool gic_msi_is_supported() { return false; }
 
-static bool gic_msi_supports_masking() { return false; }
+bool gic_msi_supports_masking() { return false; }
 
-static void gic_msi_mask_unmask(const msi_block_t* block, uint msi_id, bool mask) {
+void gic_msi_mask_unmask(const msi_block_t* block, uint msi_id, bool mask) { PANIC_UNIMPLEMENTED; }
+
+zx_status_t gic_msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool is_msix,
+                                msi_block_t* out_block) {
   PANIC_UNIMPLEMENTED;
 }
 
-static zx_status_t gic_msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool is_msix,
-                                       msi_block_t* out_block) {
+void gic_msi_free_block(msi_block_t* block) { PANIC_UNIMPLEMENTED; }
+
+void gic_msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler,
+                              void* ctx) {
   PANIC_UNIMPLEMENTED;
 }
 
-static void gic_msi_free_block(msi_block_t* block) { PANIC_UNIMPLEMENTED; }
-
-static void gic_msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler,
-                                     void* ctx) {
-  PANIC_UNIMPLEMENTED;
-}
-
-static const struct pdev_interrupt_ops gic_ops = {
+const struct pdev_interrupt_ops gic_ops = {
     .mask = gic_mask_interrupt,
     .unmask = gic_unmask_interrupt,
     .deactivate = gic_deactivate_interrupt,
@@ -526,6 +519,8 @@ static const struct pdev_interrupt_ops gic_ops = {
     .msi_free_block = gic_msi_free_block,
     .msi_register_handler = gic_msi_register_handler,
 };
+
+}  // anonymous namespace
 
 void ArmGicInitEarly(const zbi_dcfg_arm_gic_v3_driver_t& config) {
   ASSERT(config.mmio_phys);

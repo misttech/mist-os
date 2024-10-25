@@ -11,7 +11,9 @@
 #include <dev/interrupt/arm_gic_common.h>
 #include <dev/interrupt/arm_gic_hw_interface.h>
 
-static const struct arm_gic_hw_interface_ops* gic_ops = nullptr;
+namespace {
+const arm_gic_hw_interface_ops* gic_ops = nullptr;
+}  // anonymous namespace
 
 zx_status_t gic_get_gicv(paddr_t* gicv_paddr) { return gic_ops->get_gicv(gicv_paddr); }
 
@@ -33,4 +35,4 @@ uint8_t gic_get_num_pres() { return gic_ops->get_num_pres(); }
 
 uint8_t gic_get_num_lrs() { return gic_ops->get_num_lrs(); }
 
-void arm_gic_hw_interface_register(const struct arm_gic_hw_interface_ops* ops) { gic_ops = ops; }
+void arm_gic_hw_interface_register(const arm_gic_hw_interface_ops* ops) { gic_ops = ops; }

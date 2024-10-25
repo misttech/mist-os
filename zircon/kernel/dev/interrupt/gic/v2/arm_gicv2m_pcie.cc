@@ -22,9 +22,11 @@
 #include <fbl/ref_ptr.h>
 #include <pdev/interrupt.h>
 
+namespace {
+
 class ArmGicV2PciePlatformSupport : public PciePlatformInterface {
  public:
-  ArmGicV2PciePlatformSupport(bool has_msi_gic)
+  explicit ArmGicV2PciePlatformSupport(bool has_msi_gic)
       : PciePlatformInterface(has_msi_gic ? MsiSupportLevel::MSI_WITH_MASKING
                                           : MsiSupportLevel::NONE) {}
 
@@ -45,9 +47,11 @@ class ArmGicV2PciePlatformSupport : public PciePlatformInterface {
   }
 };
 
-static lazy_init::LazyInit<ArmGicV2PciePlatformSupport, lazy_init::CheckType::None,
-                           lazy_init::Destructor::Disabled>
+lazy_init::LazyInit<ArmGicV2PciePlatformSupport, lazy_init::CheckType::None,
+                    lazy_init::Destructor::Disabled>
     g_platform_pcie_support;
+
+}  // anonymous namespace
 
 void arm_gicv2_pcie_init(bool use_msi) {
   // based on whether or not ZBI says we support MSI, initialize the v2m allocator

@@ -16,12 +16,12 @@
  * Structure used to hold information about a GICv2m register frame
  * @see arm_gicv2m_get_frame_info
  */
-typedef struct arm_gicv2m_frame_info {
+struct arm_gicv2m_frame_info_t {
   uint start_spi_id; /** The first valid SPI ID in the frame */
   uint end_spi_id;   /** The last valid SPI ID in the frame */
   paddr_t doorbell;  /** The physical address of the doorbell register */
   uint32_t iid;      /** The value of the Interface ID register */
-} arm_gicv2m_frame_info_t;
+};
 
 /**
  * Support for the MSI extensions to the GICv2 architecture.  See the ARM Server

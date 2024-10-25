@@ -8,7 +8,6 @@
 #include "arm_gicv3_pcie.h"
 
 #if WITH_KERNEL_PCIE
-#include <inttypes.h>
 #include <lib/lazy_init/lazy_init.h>
 #include <lib/zbi-format/driver-config.h>
 #include <trace.h>
@@ -20,9 +19,11 @@
 #include <lk/init.h>
 #include <pdev/interrupt.h>
 
-static lazy_init::LazyInit<NoMsiPciePlatformInterface, lazy_init::CheckType::None,
-                           lazy_init::Destructor::Disabled>
+namespace {
+lazy_init::LazyInit<NoMsiPciePlatformInterface, lazy_init::CheckType::None,
+                    lazy_init::Destructor::Disabled>
     g_platform_pcie_support;
+}  // anonymous namespace
 
 void arm_gicv3_pcie_init() {
   // When GICv3 MSI support is added, add a handler to register the deny
