@@ -4,7 +4,7 @@
 
 import unittest
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Sequence
 
 from dataclasses_json_lite import config, dataclass_json
 
@@ -17,15 +17,28 @@ class DataclassesJsonLite(unittest.TestCase):
             number: int
             numbers: List[int]
             maybe_number: Optional[int] = None
+            maybe_number2: int | None = None
 
         self.assertEquals(
-            MyClass(number=12, numbers=[1, 2, 3], maybe_number=None),
+            MyClass(
+                number=12,
+                numbers=[1, 2, 3],
+                maybe_number=None,
+                maybe_number2=None,
+            ),
             MyClass.from_dict(dict(number=12, numbers=[1, 2, 3])),  # type: ignore[attr-defined]
         )
         self.assertEquals(
-            MyClass(number=12, numbers=[1, 2, 3], maybe_number=13),
+            MyClass(
+                number=12, numbers=[1, 2, 3], maybe_number=13, maybe_number2=14
+            ),
             MyClass.from_dict(  # type: ignore[attr-defined]
-                dict(number=12, numbers=[1, 2, 3], maybe_number=13)
+                dict(
+                    number=12,
+                    numbers=[1, 2, 3],
+                    maybe_number=13,
+                    maybe_number2=14,
+                )
             ),
         )
 
@@ -35,10 +48,11 @@ class DataclassesJsonLite(unittest.TestCase):
         class MyClass:
             number: int = field(metadata=config(field_name="n"))
             numbers: List[int] = field(metadata=config(field_name="ns"))
+            numbers2: Sequence[int] = field(metadata=config(field_name="ns2"))
 
         self.assertEquals(
-            MyClass(number=12, numbers=[1, 2, 3]),
-            MyClass.from_dict(dict(n=12, ns=[1, 2, 3])),  # type: ignore[attr-defined]
+            MyClass(number=12, numbers=[1, 2, 3], numbers2=[2, 3]),
+            MyClass.from_dict(dict(n=12, ns=[1, 2, 3], ns2=[2, 3])),  # type: ignore[attr-defined]
         )
 
     def test_sub_class(self) -> None:

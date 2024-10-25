@@ -23,6 +23,8 @@ The configuration also makes possible to override the conversion from json to th
 """
 import dataclasses
 import sys
+import types
+from collections import abc
 from enum import Enum
 from typing import (
     Any,
@@ -64,12 +66,13 @@ def _identity(x: Any) -> Any:
 
 
 def _default_decoder(cls: type, field_type: type) -> Callable[[Any], Any]:
-    if get_origin(field_type) is list:
+    origin = get_origin(field_type)
+    if origin is list or origin is abc.Sequence:
         inner_types = get_args(field_type)
         assert len(inner_types) == 1, f"Supports only list with one type"
         inner_decoder = _default_decoder(cls, inner_types[0])
         return lambda json_data: [inner_decoder(e) for e in json_data]
-    elif get_origin(field_type) is Union:
+    elif origin is Union or origin is types.UnionType:
         inner_type, likely_null = get_args(field_type)
         assert likely_null is type(None), "Supports only Optional"
         return _default_decoder(cls, inner_type)
