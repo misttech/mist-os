@@ -7,7 +7,6 @@ package targets
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"go.fuchsia.dev/fuchsia/tools/qemu"
 )
@@ -59,8 +58,9 @@ func (b *crosvmCommandBuilder) SetCPUCount(count int) {
 	b.cmd = append(b.cmd, "--cpus", fmt.Sprintf("num-cores=%d", count))
 }
 
+// crosvm emulates a PC-style ns8250 by default.
 func (b *crosvmCommandBuilder) AddSerial() {
-	b.cmd = append(b.cmd, "--serial", "type=stdout")
+	b.cmd = append(b.cmd, "--serial", "type=stdout,stdin,hardware=serial,earlycon")
 }
 
 func (b *crosvmCommandBuilder) AddBlockDevice(blk BlockDevice) {
@@ -82,18 +82,14 @@ func (b *crosvmCommandBuilder) BuildFFXConfig() (*qemu.Config, error) {
 }
 
 func (b *crosvmCommandBuilder) BuildInvocation() ([]string, error) {
-	// An empty directory where crosvm can do chroot for jailing each virtio
-	// device.
-	pivotRoot, err := os.MkdirTemp("", "crosvm-pivot-root")
-	if err != nil {
-		return nil, fmt.Errorf("unable to make crosvm pivot root: %w", err)
-	}
-
 	cmd := []string{
 		b.binary,
 		"run",
-		"--pivot-root", pivotRoot,
+
+		// We are unlikely to have the CAP_SYS_ADMIN capability, so forgo sandboxing.
+		"--disable-sandbox",
 	}
+
 	cmd = append(cmd, b.cmd...)
 	for _, arg := range b.kernelArgs {
 		cmd = append(cmd, "--params", arg)
