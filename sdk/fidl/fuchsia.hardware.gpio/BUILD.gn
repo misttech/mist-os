@@ -6,7 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.gpio") {
   sdk_category = "partner"
-  stable = false
+  stable = true
   sdk_area = "Drivers"
   sources = [ "gpio.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
