@@ -6,9 +6,11 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.request") {
   sources = [ "request.fidl" ]
+  sdk_category = "partner"
+  stable = false
+  sdk_area = "Drivers"
   public_deps = [
-    # TODO(https://fxbug.dev/42178882): migrate usb descriptor to FIDL
-    "//sdk/banjo/fuchsia.hardware.usb.descriptor",
+    "//sdk/fidl/fuchsia.hardware.usb.descriptor",
     "//zircon/vdso/zx",
   ]
 }

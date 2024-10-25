@@ -6,6 +6,9 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.endpoint") {
   sources = [ "endpoint.fidl" ]
+  sdk_category = "partner"
+  stable = false
+  sdk_area = "Drivers"
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.usb.request",
     "//zircon/vdso/zx",

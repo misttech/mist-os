@@ -8,7 +8,7 @@ fidl("fuchsia.hardware.usb.request") {
   sources = [ "usb-request.fidl" ]
   public_deps = [
     "//sdk/banjo/ddk.hw.physiter",
-    "//sdk/banjo/fuchsia.hardware.usb.descriptor",
+    "//sdk/fidl/fuchsia.hardware.usb.descriptor",
     "//zircon/vdso/zx",
   ]
   enable_banjo = true

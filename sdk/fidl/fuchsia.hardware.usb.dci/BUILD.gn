@@ -6,8 +6,11 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.dci") {
   sources = [ "usb-dci.fidl" ]
+  sdk_category = "partner"
+  stable = false
+  sdk_area = "Drivers"
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.usb.descriptor",
+    "//sdk/fidl/fuchsia.hardware.usb.descriptor",
     "//sdk/fidl/fuchsia.hardware.usb.endpoint",
     "//zircon/vdso/zx",
   ]
