@@ -1602,6 +1602,11 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_sticky_bit(current_task, child)?;
+        if child.is_dir() {
+            security::check_fs_node_rmdir_access(current_task, self, child)?;
+        } else {
+            security::check_fs_node_unlink_access(current_task, self, child)?;
+        }
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().unlink(&mut locked, self, current_task, name, child)?;
         self.update_ctime_mtime();

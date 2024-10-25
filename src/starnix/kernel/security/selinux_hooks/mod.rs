@@ -10,7 +10,7 @@ use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntry, DirEntryHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode,
-    PathBuilder, ValueOrSize, XattrOp,
+    PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
 use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
@@ -295,6 +295,19 @@ pub(super) fn fs_node_init_on_create(
     Ok(xattr)
 }
 
+/// Returns a tuple with the `current_task`'s SID and the SID for files created by it.
+fn get_current_and_file_sids(current_task: &CurrentTask) -> (SecurityId, SecurityId) {
+    let (current_sid, fscreate_sid) = {
+        let attrs = &current_task.read().security_state.attrs;
+        (attrs.current_sid, attrs.fscreate_sid)
+    };
+    let file_sid = fscreate_sid.unwrap_or_else(
+        // TODO: https://fxbug.dev/375381156 - Calculate the new file's SID here.
+        || SecurityId::initial(InitialSid::File),
+    );
+    (current_sid, file_sid)
+}
+
 /// Helper used by filesystem node creation checks to validate that `current_task` has necessary
 /// permissions to create a new node under the specified `parent`.
 fn may_create(
@@ -302,16 +315,9 @@ fn may_create(
     current_task: &CurrentTask,
     parent: &FsNode,
 ) -> Result<(), Errno> {
-    let (current_sid, fscreate_sid) = {
-        let attrs = &current_task.read().security_state.attrs;
-        (attrs.current_sid, attrs.fscreate_sid)
-    };
-    let parent_sid = fs_node_effective_sid(parent);
-    let file_sid = fscreate_sid.unwrap_or_else(
-        // TODO: Calculate the new file's SID here.
-        || SecurityId::initial(InitialSid::File),
-    );
     let permission_check = security_server.as_permission_check();
+    let (current_sid, file_sid) = get_current_and_file_sids(current_task);
+    let parent_sid = fs_node_effective_sid(parent);
     let filesystem_sid = match &*parent.fs().security_state.state.0.lock() {
         FileSystemLabelState::Labeled { label } => Ok(label.sid),
         _ => error!(EPERM),
@@ -355,19 +361,54 @@ fn may_link(
     parent: &FsNode,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
-    let (current_sid, fscreate_sid) = {
-        let attrs = &current_task.read().security_state.attrs;
-        (attrs.current_sid, attrs.fscreate_sid)
-    };
-    let file_sid = fscreate_sid.unwrap_or_else(
-        // TODO: Calculate the new file's SID here.
-        || SecurityId::initial(InitialSid::File),
-    );
+    let (current_sid, file_sid) = get_current_and_file_sids(current_task);
     let parent_sid = fs_node_effective_sid(parent);
 
     check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
     check_permission(&permission_check, current_sid, parent_sid, DirPermission::AddName)?;
     check_permission(&permission_check, current_sid, file_sid, FilePermission::Link)?;
+    Ok(())
+}
+
+/// Helper that checks whether the current task can unlink or rmdir a file or directory.
+/// If [`operation`] is [`UnlinkKind::Directory`] this will check permissions for rmdir;
+/// otherwise for unlink.
+/// Called by [`check_fs_node_unlink_access`] and [`check_fs_node_rmdir_access`] .
+fn may_unlink_or_rmdir(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    operation: UnlinkKind,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let (current_sid, file_sid) = get_current_and_file_sids(current_task);
+    let parent_sid = fs_node_effective_sid(parent);
+
+    check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
+
+    todo_check_permission!(
+        TODO("https://fxbug.dev/375590486", "Check rmdir permission."),
+        &permission_check,
+        current_sid,
+        parent_sid,
+        DirPermission::RemoveName
+    )?;
+    match operation {
+        UnlinkKind::NonDirectory => todo_check_permission!(
+            TODO("https://fxbug.dev/375381156", "Check unlink permission."),
+            &permission_check,
+            current_sid,
+            file_sid,
+            FilePermission::Unlink
+        )?,
+        UnlinkKind::Directory => todo_check_permission!(
+            TODO("https://fxbug.dev/375381156", "Check rmdir permission."),
+            &permission_check,
+            current_sid,
+            file_sid,
+            DirPermission::RemoveDir
+        )?,
+    }
     Ok(())
 }
 
@@ -416,7 +457,7 @@ pub(super) fn check_fs_node_mknod_access(
     may_create(security_server, current_task, parent)
 }
 
-/// Validate that `current_task` has  the permission to create a new hard link to a file.
+/// Validate that `current_task` has the permission to create a new hard link to a file.
 pub(super) fn check_fs_node_link_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -424,6 +465,30 @@ pub(super) fn check_fs_node_link_access(
     _child: &FsNode,
 ) -> Result<(), Errno> {
     may_link(security_server, current_task, parent)
+}
+
+/// Validate that `current_task` has the permission to remove a hard link to a file.
+pub(super) fn check_fs_node_unlink_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    child: &FsNode,
+) -> Result<(), Errno> {
+    assert!(!child.is_dir());
+
+    may_unlink_or_rmdir(security_server, current_task, parent, UnlinkKind::NonDirectory)
+}
+
+/// Validate that `current_task` has the permission to remove a directory.
+pub(super) fn check_fs_node_rmdir_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    child: &FsNode,
+) -> Result<(), Errno> {
+    assert!(child.is_dir());
+
+    may_unlink_or_rmdir(security_server, current_task, parent, UnlinkKind::Directory)
 }
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`

@@ -284,6 +284,10 @@ class_permission_enum! {
         // keep-sorted start
         /// Permission to add a file to the directory.
         AddName("add_name"),
+        /// Permission to remove a directory.
+        RemoveDir("rmdir"),
+        /// Permission to remove an entry from a directory.
+        RemoveName("remove_name"),
         /// Search access to the directory.
         Search("search"),
         // keep-sorted end

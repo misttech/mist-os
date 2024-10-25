@@ -212,6 +212,30 @@ pub fn check_fs_node_link_access(
     })
 }
 
+/// Validate that `current_task` has the permission to remove a hard link to a file.
+/// Corresponds to the `security_inode_unlink()` hook.
+pub fn check_fs_node_unlink_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    child: &FsNode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_unlink_access(security_server, current_task, parent, child)
+    })
+}
+
+/// Validate that `current_task` has the permission to remove a directory.
+/// Corresponds to the `security_inode_rmdir()` hook.
+pub fn check_fs_node_rmdir_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    child: &FsNode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_rmdir_access(security_server, current_task, parent, child)
+    })
+}
+
 /// Return the default initial `TaskState` for kernel tasks.
 pub fn task_alloc_for_kernel() -> TaskState {
     TaskState { attrs: selinux_hooks::TaskAttrs::for_kernel() }
