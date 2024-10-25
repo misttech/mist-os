@@ -16,6 +16,7 @@ pub mod example_config;
 pub mod fonts_config;
 pub mod forensics_config;
 pub mod graphics_config;
+pub mod health_check_config;
 pub mod icu_config;
 pub mod intl_config;
 pub mod kernel_config;
@@ -189,6 +190,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for USB peripheral.
     #[serde(default)]
     pub usb: usb_config::UsbConfig,
+
+    /// Platform configuration options for OTA Health Checks.
+    #[serde(default)]
+    pub health_check: health_check_config::HealthCheckConfig,
 }
 
 // LINT.IfChange

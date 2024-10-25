@@ -114,6 +114,22 @@ struct Config {
     enable_introspection: Option<bool>,
     abi_revision_policy: Option<AbiRevisionPolicy>,
     vmex_source: Option<VmexSource>,
+    health_check: Option<HealthCheck>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+struct HealthCheck {
+    pub monikers: Option<Vec<String>>,
+}
+
+impl Into<component_internal::HealthCheck> for HealthCheck {
+    fn into(self) -> component_internal::HealthCheck {
+        component_internal::HealthCheck {
+            monikers: self.monikers.clone(),
+            ..component_internal::HealthCheck::default()
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -443,6 +459,7 @@ impl TryFrom<Config> for component_internal::Config {
                 .map(Into::into),
             abi_revision_policy: config.abi_revision_policy.map(Into::into),
             vmex_source: config.vmex_source.map(Into::into),
+            health_check: config.health_check.map(Into::into),
             ..Default::default()
         })
     }
@@ -557,6 +574,7 @@ impl Config {
             ),
             abi_revision_policy: merge_field!(self, another, abi_revision_policy),
             vmex_source: merge_field!(self, another, vmex_source),
+            health_check: merge_field!(self, another, health_check),
         })
     }
 
@@ -866,6 +884,7 @@ mod tests {
             builtin_boot_resolver: "boot",
             realm_builder_resolver_and_runner: "namespace",
             vmex_source: "namespace",
+            health_check: { monikers : ["/block/an/update", "/check/before/committing"]},
         }"#;
         let config = compile_str(input).expect("failed to compile");
         assert_eq!(
@@ -979,6 +998,13 @@ mod tests {
                     component_internal::RealmBuilderResolverAndRunner::Namespace
                 ),
                 vmex_source: Some(component_internal::VmexSource::Namespace),
+                health_check: Some(component_internal::HealthCheck {
+                    monikers: Some(vec![
+                        "/block/an/update".to_string(),
+                        "/check/before/committing".to_string()
+                    ]),
+                    ..Default::default()
+                }),
                 ..Default::default()
             }
         );

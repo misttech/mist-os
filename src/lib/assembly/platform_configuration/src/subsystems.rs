@@ -273,6 +273,7 @@ fn configure_subsystems(
         policy: &product.component_policy,
         development_support: &platform.development_support,
         starnix: &platform.starnix,
+        health_check: &platform.health_check,
     };
     component::ComponentSubsystem::define_configuration(
         &context_base.for_subsystem("component"),

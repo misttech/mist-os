@@ -88,6 +88,15 @@ type Config = table {
     /// Where to obtain the vmex resource from, if this component_manager is hosting bootfs.
     /// If not present, defaults to `VmexSource::SYSTEM_RESOURCE`.
     20: vmex_source VmexSource;
+
+    /// Information about the health checks during the update process.
+    21: health_check HealthCheck;
+};
+
+/// Information about the health checks during the update process.
+type HealthCheck = table {
+    /// Component monikers that must be healthy in order to complete an OTA update.
+    1: monikers vector<string:fuchsia.component.MAX_NAME_LENGTH>;
 };
 
 /// The enforcement and validation policy to apply to component target ABI revisions.
