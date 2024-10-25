@@ -322,9 +322,9 @@ class CpuBreakdownTest(unittest.TestCase):
     def test_group_by_process_name(self) -> None:
         model = self.construct_trace_model()
 
-        processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
-        breakdown = processor.process_metrics()
-        consolidated_breakdown = processor.group_by_process_name(breakdown)
+        processor = cpu_breakdown.CpuBreakdownMetricsProcessor()
+        breakdown = processor.process_freeform_metrics(model)
+        consolidated_breakdown = cpu_breakdown.group_by_process_name(breakdown)
         self.assertEqual(len(consolidated_breakdown), 4)
 
         # Make it easier to compare breakdown results.
@@ -373,8 +373,8 @@ class CpuBreakdownTest(unittest.TestCase):
         with self.assertLogs(
             "CpuBreakdownMetricsProcessor", level="WARNING"
         ) as context_manager:
-            processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
-            breakdown = processor.process_metrics()
+            processor = cpu_breakdown.CpuBreakdownMetricsProcessor()
+            breakdown = processor.process_freeform_metrics(model)
 
         self.assertEqual(len(breakdown), 2)
 
