@@ -2249,10 +2249,10 @@ pub struct zx_processor_power_level_t {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_processor_power_level_transition_t {
-    pub from: u8,
-    pub to: u8,
     pub latency: zx_duration_t,
     pub energy: u64,
+    pub from: u8,
+    pub to: u8,
     pub padding: [u8; 6],
 }
 
