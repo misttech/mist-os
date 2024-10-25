@@ -17,6 +17,19 @@ type WaitItem = resource struct {
     pending Signals;
 };
 
+@next
+type PowerDomainInfo = struct {
+    /// Mask of CPUs part of this power domain.
+    cpus array<uint64, 8>;
+    /// Id used to register this domain.
+    domain_id uint32;
+    /// Number of registered idle power levels.
+    idle_power_levels uint8;
+    /// Number of registered active power levels.
+    active_power_levels uint8;
+    padding1 array<uint8, 2>;
+};
+
 @transport("Syscall")
 closed protocol Object {
     /// ## Summary
@@ -1988,18 +2001,44 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_iob_region_info_t[n]`
     ///
+    /// ```c
     /// struct zx_iob_region_info_t {
-    ///     // The region description, with potentially swapped access bits.
+    ///     /// The region description, with potentially swapped access bits.
     ///     zx_iob_region_t region;
     ///     /// The koid of the underlying memory object.
     ///     zx_koid_t koid;
     /// };
+    /// ```
     ///
     /// Access modifier bits are swapped, such that the Ep0 access bits reflect
     /// the access of the endpoint making the query and the Ep1 bits reflect the
     /// access of the other endpoint, making it possible to determine the access
     /// of the local and remote handles without knowing which handles were Ep0
     /// and Ep1 when created.
+    ///
+    ///
+    /// ### ZX_INFO_POWER_DOMAINS
+    ///
+    /// Returns information about each registered power domain as an array of
+    /// `zx_power_domain_info_t`
+    ///
+    /// *handle* type: `Resource` (Specifically, the info resource)
+    ///
+    /// *buffer* type: `zx_power_domain_info_t[n]`
+    ///
+    ///```c
+    ///  typedef struct zx_power_domain_info {
+    ///     /// CPUs part of this power domain.
+    ///     zx_cpu_set_t cpus;
+    ///     /// Id of the power domain.
+    ///     uint32_t domain_id;
+    ///     /// Number of idle power levels in this power domain.
+    ///     uint8_t idle_power_levels;
+    ///     /// Number of active power levels in this power domain.
+    ///     uint8_t active_power_levels;
+    ///     uint8_t padding1[2];
+    /// } zx_power_domain_info_t;
+    ///```
     ///
     /// ## Rights
     ///
@@ -2052,6 +2091,8 @@ closed protocol Object {
     /// If *topic* is `ZX_INFO_MSI`, *handle* must be of type `ZX_OBJ_TYPE_MSI` and have `ZX_RIGHT_INSPECT`.
     ///
     /// If *topic* is `ZX_INFO_TASK_RUNTIME`, *handle* must be of type `ZX_OBJ_TYPE_THREAD`, `ZX_OBJ_TYPE_PROCESS`, or `ZX_OBJ_TYPE_JOB`, and have `ZX_RIGHT_INSPECT`.
+    ///
+    /// If *topic* is `ZX_INFO_POWER_DOMAINS`, *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_INFO_BASE`.
     ///
     /// ## Return value
     ///
