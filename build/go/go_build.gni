@@ -33,10 +33,6 @@ declare_args() {
 #
 # Parameters
 #
-#   gopackages (optional)
-#     List of packages to build. Exactly one of gopackages or library must be
-#     set.
-#
 #   library (optional)
 #     Alternative to gopackages, a library GN label corresponding to the
 #     package to build.
@@ -89,6 +85,8 @@ declare_args() {
 #   output_dir (optional)
 #     Directory that the resulting binary should be placed in.
 #     See: `gn help output_dir`
+#
+#   Deprecated: gopackages
 #
 template("go_build") {
   main_target_name = target_name
@@ -260,6 +258,12 @@ template("go_build") {
       "--golibs-dir",
       rebase_path("//third_party/golibs", root_build_dir),
     ]
+
+    if (defined(invoker.go_sources)) {
+      sources += invoker.go_sources
+      args += [ "--go-sources" ]
+      args += rebase_path(invoker.go_sources, root_build_dir)
+    }
 
     if (sysroot != "") {
       if (is_fuchsia) {

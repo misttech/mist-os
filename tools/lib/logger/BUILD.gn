@@ -6,14 +6,11 @@ import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 
 go_library("logger") {
-  sources = [
-    "logger.go",
-    "logger_test.go",
-  ]
-
+  sources = [ "logger.go" ]
   deps = [ "//tools/lib/color" ]
 }
 
 go_test("logger_tests") {
   library = ":logger"
+  sources = [ "logger_test.go" ]
 }

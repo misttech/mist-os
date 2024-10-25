@@ -21,7 +21,6 @@ group("tests") {
   deps = [
     "//tools/debug/bloaty:bloaty_tests",
     "//tools/debug/breakpad:breakpad_tests",
-    "//tools/debug/buildidtool:tests",
     "//tools/debug/covargs:tests",
     "//tools/debug/debugsyms:tests($host_toolchain)",
     "//tools/debug/elflib:elflib_tests($host_toolchain)",

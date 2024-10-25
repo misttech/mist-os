@@ -3,9 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/go/go_binary.gni")
-import("//build/go/go_library.gni")
 
-go_library("main") {
+go_binary("buildidtool") {
   source_dir = "cmd"
   sources = [ "main.go" ]
   deps = [
@@ -13,12 +12,4 @@ go_library("main") {
     "//tools/lib/color",
     "//tools/lib/logger",
   ]
-}
-
-go_binary("buildidtool") {
-  library = ":main"
-}
-
-group("tests") {
-  testonly = true
 }

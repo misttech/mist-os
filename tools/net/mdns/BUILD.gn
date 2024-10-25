@@ -6,10 +6,7 @@ import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 
 go_library("mdns") {
-  sources = [
-    "mdns.go",
-    "mdns_test.go",
-  ]
+  sources = [ "mdns.go" ]
   deps = [
     "//third_party/golibs:golang.org/x/net",
     "//tools/lib/logger",
@@ -18,9 +15,9 @@ go_library("mdns") {
 
 go_test("mdns_tests") {
   library = ":mdns"
+  sources = [ "mdns_test.go" ]
+  deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
 
   # TODO(awdavies): The default name conflicts w/ the connectivity service.
   output_name = "mdns_tools_test"
-
-  deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
 }

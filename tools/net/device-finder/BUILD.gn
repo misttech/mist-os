@@ -10,7 +10,6 @@ go_library("main") {
   source_dir = "cmd"
   sources = [
     "common.go",
-    "dev_finder_test.go",
     "dnssderrors.go",
     "dnssdfinder.go",
     "dnssdfinder.h",
@@ -36,6 +35,7 @@ go_binary("device-finder") {
 
 go_test("dev_finder_tests") {
   library = ":main"
+  sources = [ "cmd/dev_finder_test.go" ]
   deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
 }
 

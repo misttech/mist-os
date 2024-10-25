@@ -111,6 +111,12 @@ def main():
         nargs="*",
         default=[],
     )
+    parser.add_argument(
+        "--go-sources",
+        help="List of Go source files to include during compilation",
+        nargs="*",
+        default=[],
+    )
     parser.add_argument("--binname", help="Output file", required=True)
     parser.add_argument(
         "--output-path",
@@ -199,59 +205,72 @@ def main():
         os.path.join(dst_vendor, "modules.txt"),
     )
 
-    if args.go_dep_files:
-        # Create a GOPATH for the packages dependency tree.
-        for dst, src in sorted(get_sources(args.go_dep_files).items()):
-            # This path is later used in go commands that run in cwd=gopath_src.
-            src = os.path.abspath(src)
-            if not args.is_test and src.endswith("_test.go"):
-                continue
+    if args.package:
+        package = args.package
+    elif args.library_metadata:
+        with open(args.library_metadata) as f:
+            package = json.load(f)["package"]
 
-            # If the destination is part of the "main module", strip off the
-            # module path. Otherwise, put it in the vendor directory.
-            if dst.startswith(FUCHSIA_MODULE):
-                dst = os.path.relpath(dst, FUCHSIA_MODULE)
-            else:
-                dst = os.path.join("vendor", dst)
+    files_to_link = [
+        (os.path.join(package, os.path.basename(f)), f) for f in args.go_sources
+    ] + (
+        list(get_sources(args.go_dep_files).items())
+        if args.go_dep_files
+        else []
+    )
 
-            if dst.endswith("/..."):
-                # When a directory and all its subdirectories must be made available, map
-                # the directory directly.
-                dst = dst[:-4]
-            elif os.path.isfile(src):
-                # When sources are explicitly listed in the BUILD.gn file, each `src` will
-                # be a path to a file that must be mapped directly.
-                #
-                # Paths with /.../ in the middle designate go packages that include
-                # subpackages, but also explicitly list all their source files.
-                #
-                # The construction of these paths is done in the go list invocation, so we
-                # remove these sentinel values here.
-                dst = dst.replace("/.../", "/")
-            else:
-                raise ValueError(f"Invalid go_dep entry: {dst=}, {src=}")
+    # Create a GOPATH for the packages dependency tree.
+    for dst, src in sorted(files_to_link):
+        # This path is later used in go commands that run in cwd=gopath_src.
+        src = os.path.abspath(src)
+        if not args.is_test and src.endswith("_test.go"):
+            continue
 
-            dstdir = os.path.join(gopath_src, dst)
+        # If the destination is part of the "main module", strip off the
+        # module path. Otherwise, put it in the vendor directory.
+        if dst.startswith(FUCHSIA_MODULE):
+            dst = os.path.relpath(dst, FUCHSIA_MODULE)
+        else:
+            dst = os.path.join("vendor", dst)
 
-            # Make a symlink to the src directory or file.
-            parent = os.path.dirname(dstdir)
-            if not os.path.exists(parent):
-                os.makedirs(parent)
-            # hardlink regular files instead of symlinking to handle non-Go
-            # files that we want to embed using //go:embed, which doesn't
-            # support symlinks.
-            # TODO(https://fxbug.dev/42162237): Add a separate mechanism for
-            # declaring embedded files, and only hardlink those files
-            # instead of hardlinking all sources.
-            if os.path.isdir(src):
-                os.symlink(src, dstdir)
-            else:
-                try:
-                    os.link(src, dstdir)
-                except OSError:
-                    # Hardlinking may fail, for example if `src` is in a
-                    # separate filesystem on a mounted device.
-                    shutil.copyfile(src, dstdir)
+        if dst.endswith("/..."):
+            # When a directory and all its subdirectories must be made available, map
+            # the directory directly.
+            dst = dst[:-4]
+        elif os.path.isfile(src):
+            # When sources are explicitly listed in the BUILD.gn file, each `src` will
+            # be a path to a file that must be mapped directly.
+            #
+            # Paths with /.../ in the middle designate go packages that include
+            # subpackages, but also explicitly list all their source files.
+            #
+            # The construction of these paths is done in the go list invocation, so we
+            # remove these sentinel values here.
+            dst = dst.replace("/.../", "/")
+        else:
+            raise ValueError(f"Invalid go_dep entry: {dst=}, {src=}")
+
+        dstdir = os.path.join(gopath_src, dst)
+
+        # Make a symlink to the src directory or file.
+        parent = os.path.dirname(dstdir)
+        if not os.path.exists(parent):
+            os.makedirs(parent)
+        # hardlink regular files instead of symlinking to handle non-Go
+        # files that we want to embed using //go:embed, which doesn't
+        # support symlinks.
+        # TODO(https://fxbug.dev/42162237): Add a separate mechanism for
+        # declaring embedded files, and only hardlink those files
+        # instead of hardlinking all sources.
+        if os.path.isdir(src):
+            os.symlink(src, dstdir)
+        else:
+            try:
+                os.link(src, dstdir)
+            except OSError:
+                # Hardlinking may fail, for example if `src` is in a
+                # separate filesystem on a mounted device.
+                shutil.copyfile(src, dstdir)
 
     cflags = []
     if args.sysroot:
@@ -341,12 +360,6 @@ def main():
         env["CXX_FOR_TARGET"] = env["CXX"]
 
     go_tool = os.path.join(build_goroot, "bin", "go")
-
-    if args.package:
-        package = args.package
-    elif args.library_metadata:
-        with open(args.library_metadata) as f:
-            package = json.load(f)["package"]
 
     if args.vet:
         subprocess.run(

@@ -41,6 +41,9 @@ def print_fences():
     print(
         "fxr/1098532 triggers a Bazel error where SDK header changes don't trigger rebuilds, see http://b/356347441"
     )
+    print(
+        "fxr/1139175 triggers a hard-to-debug Ninja no-op flake in CI/CQ, see https://fxbug.dev/375300815"
+    )
 
 
 def main():

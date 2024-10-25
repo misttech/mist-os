@@ -6,13 +6,11 @@ import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 
 go_library("color") {
-  sources = [
-    "color.go",
-    "color_test.go",
-  ]
+  sources = [ "color.go" ]
   deps = [ "//tools/lib/isatty" ]
 }
 
 go_test("color_tests") {
   library = ":color"
+  sources = [ "color_test.go" ]
 }
