@@ -14,6 +14,33 @@ use vfs::directory::entry::{self, DirectoryEntry, DirectoryEntryAsync, EntryInfo
 use vfs::execution_scope::ExecutionScope;
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, zx};
 
+impl From<Request> for fsandbox::RouteRequest {
+    fn from(request: Request) -> Self {
+        let (token, server) = zx::EventPair::create();
+        request.target.register(token.get_koid().unwrap(), server);
+        fsandbox::RouteRequest {
+            requesting: Some(fsandbox::InstanceToken { token }),
+            metadata: Some(request.metadata.into()),
+            ..Default::default()
+        }
+    }
+}
+
+impl TryFrom<fsandbox::DictionaryRouterRouteResponse> for SpecificRouterResponse<Dict> {
+    type Error = crate::RemoteError;
+
+    fn try_from(resp: fsandbox::DictionaryRouterRouteResponse) -> Result<Self, Self::Error> {
+        Ok(match resp {
+            fsandbox::DictionaryRouterRouteResponse::Dictionary(dict) => {
+                SpecificRouterResponse::<Dict>::Capability(dict.try_into()?)
+            }
+            fsandbox::DictionaryRouterRouteResponse::Unavailable(_) => {
+                SpecificRouterResponse::Unavailable
+            }
+        })
+    }
+}
+
 /// Binds a Route request from fidl to the Rust [SpecificRouter::Route] API. Shared by
 /// [SpecificRouter] server implementations.
 pub(crate) async fn route_from_fidl<T, R>(

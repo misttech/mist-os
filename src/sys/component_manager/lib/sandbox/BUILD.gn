@@ -58,7 +58,6 @@ rustc_library("sandbox") {
     "src/fidl/instance_token.rs",
     "src/fidl/mod.rs",
     "src/fidl/receiver.rs",
-    "src/fidl/router.rs",
     "src/fidl/specific_router.rs",
     "src/fidl/store.rs",
     "src/fidl/unit.rs",
@@ -66,7 +65,6 @@ rustc_library("sandbox") {
     "src/instance_token.rs",
     "src/lib.rs",
     "src/receiver.rs",
-    "src/router.rs",
     "src/specific_router.rs",
     "src/unit.rs",
   ]

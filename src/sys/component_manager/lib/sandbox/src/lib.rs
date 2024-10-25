@@ -13,7 +13,6 @@ mod directory;
 mod handle;
 mod instance_token;
 mod receiver;
-mod router;
 mod specific_router;
 mod unit;
 
@@ -29,8 +28,9 @@ pub use self::directory::Directory;
 pub use self::handle::Handle;
 pub use self::instance_token::{WeakInstanceToken, WeakInstanceTokenAny};
 pub use self::receiver::Receiver;
-pub use self::router::{Request, Routable, Router};
-pub use self::specific_router::{SpecificRoutable, SpecificRouter, SpecificRouterResponse};
+pub use self::specific_router::{
+    Request, SpecificRoutable, SpecificRouter, SpecificRouterResponse,
+};
 pub use self::unit::Unit;
 
 #[cfg(target_os = "fuchsia")]

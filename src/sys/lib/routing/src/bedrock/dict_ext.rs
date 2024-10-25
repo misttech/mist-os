@@ -365,15 +365,6 @@ impl DictExt for Dict {
                 // There's a bit of repetition here because this function supports multiple router
                 // types.
                 let capability: Capability = match capability {
-                    Capability::Router(_) => {
-                        // Generic router is not supported here.
-                        return Err(RoutingError::BedrockWrongCapabilityType {
-                            expected: "Not a Router".into(),
-                            actual: capability.debug_typename().into(),
-                            moniker: moniker.clone(),
-                        }
-                        .into());
-                    }
                     Capability::DictionaryRouter(r) => match r.route(request, debug).await? {
                         SpecificRouterResponse::<Dict>::Capability(c) => c.into(),
                         SpecificRouterResponse::<Dict>::Unavailable => {

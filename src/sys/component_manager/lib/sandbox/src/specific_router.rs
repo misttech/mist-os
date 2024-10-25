@@ -2,13 +2,44 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{CapabilityBound, Data, Request};
+use crate::{Capability, CapabilityBound, Data, Dict, WeakInstanceToken};
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use router_error::RouterError;
 use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
+
+/// [`Request`] contains metadata around how to obtain a capability.
+#[derive(Debug)]
+pub struct Request {
+    /// A reference to the requesting component.
+    pub target: WeakInstanceToken,
+
+    /// Metadata associated with the request.
+    pub metadata: Dict,
+}
+
+impl Request {
+    /// Clones the [`Request`] where the metadata [`Dict`] is a shallow copy. As a
+    /// result, the metadata [`Dict`] must not contain a nested [`Dict`] otherwise a
+    /// [`RouterError::InvalidArgs`] error will be returned.
+    pub fn try_clone(&self) -> Result<Self, RouterError> {
+        self.metadata
+            .enumerate()
+            .find_map(|(_, v)| {
+                match v {
+                    // Since Dictionaries are shallow copied, throw an error if
+                    // there is a nested Dictionary.
+                    Ok(Capability::Dictionary(_)) => Some(Err::<Self, _>(RouterError::InvalidArgs)),
+                    _ => None,
+                }
+            })
+            .transpose()?;
+        let metadata = self.metadata.shallow_copy().map_err(|()| RouterError::InvalidArgs)?;
+        Ok(Self { target: self.target.clone(), metadata })
+    }
+}
 
 /// Types that implement [`SpecificRoutable`] let the holder asynchronously request capabilities
 /// from them.

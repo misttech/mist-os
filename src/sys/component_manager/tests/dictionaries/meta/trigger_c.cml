@@ -12,7 +12,7 @@
             dictionary: "dynamic",
 
             // fidl.test.components.Trigger-d is provided by the dynamic dictionary.
-            path: "/svc/fuchsia.component.sandbox.Router",
+            path: "/svc/fuchsia.component.sandbox.DictionaryRouter",
         },
         { dictionary: "dict" },
         { protocol: "fidl.test.components.Trigger" },

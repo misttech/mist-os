@@ -1267,7 +1267,7 @@ async fn offer_dictionary_to_dictionary() {
 async fn dictionary_from_program() {
     // Tests a dictionary that is backed by the program.
 
-    const ROUTER_PATH: &str = "/svc/fuchsia.component.sandbox.Router";
+    const ROUTER_PATH: &str = "/svc/fuchsia.component.sandbox.DictionaryRouter";
     let components = vec![
         (
             "root",
@@ -1334,19 +1334,25 @@ async fn dictionary_from_program() {
     root_out_dir.add_entry(
         ROUTER_PATH.parse().unwrap(),
         vfs::service::endpoint(move |scope, channel| {
-            let server_end: ServerEnd<fsandbox::RouterMarker> = channel.into_zx_channel().into();
+            let server_end: ServerEnd<fsandbox::DictionaryRouterMarker> =
+                channel.into_zx_channel().into();
             let mut stream = server_end.into_stream().unwrap();
             let store = dict_store2.clone();
             scope.spawn(async move {
                 while let Ok(Some(request)) = stream.try_next().await {
                     match request {
-                        fsandbox::RouterRequest::Route { payload: _, responder } => {
+                        fsandbox::DictionaryRouterRequest::Route { payload: _, responder } => {
                             let dup_dict_id = dict_id + 1;
                             store.duplicate(dict_id, dup_dict_id).await.unwrap().unwrap();
                             let capability = store.export(dup_dict_id).await.unwrap().unwrap();
-                            let _ = responder.send(Ok(capability));
+                            let fsandbox::Capability::Dictionary(dict) = capability else {
+                                panic!("capability was not a dictionary? {capability:?}");
+                            };
+                            let _ = responder.send(Ok(
+                                fsandbox::DictionaryRouterRouteResponse::Dictionary(dict),
+                            ));
                         }
-                        fsandbox::RouterRequest::_UnknownMethod { .. } => {
+                        fsandbox::DictionaryRouterRequest::_UnknownMethod { .. } => {
                             unimplemented!()
                         }
                     }

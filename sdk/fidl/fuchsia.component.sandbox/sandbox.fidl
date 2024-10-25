@@ -55,11 +55,10 @@ type Capability = flexible resource union {
     6: directory_connector Connector;
     7: directory client_end:fuchsia.io.Directory;
     8: dir_entry DirEntry;
-    9: router client_end:Router;
-    10: connector_router client_end:ConnectorRouter;
-    11: dictionary_router client_end:DictionaryRouter;
-    12: dir_entry_router client_end:DirEntryRouter;
-    13: data_router client_end:DataRouter;
+    9: connector_router client_end:ConnectorRouter;
+    10: dictionary_router client_end:DictionaryRouter;
+    11: dir_entry_router client_end:DirEntryRouter;
+    12: data_router client_end:DataRouter;
 };
 
 /// The maximum length of a dictionary key. This should coincide with
@@ -488,10 +487,10 @@ type InstanceToken = resource struct {
 @available(added=HEAD)
 type RouteRequest = resource table {
     /// The component that is requesting the capability. May be omitted for a default request
-    /// (see [Router.Route]).
+    /// (see `*Router.Route`).
     1: requesting InstanceToken;
     /// Metadata associated with this capability request. May be omitted for a default request
-    /// (see [Router.Route]).
+    /// (see `*Router.Route`).
     2: metadata DictionaryRef;
 };
 
@@ -509,23 +508,6 @@ type RouterError = flexible enum : uint32 {
     /// An internal error occurred.
     INTERNAL = 4;
 };
-
-/// A router allows a client to request a capability.
-@discoverable
-@available(added=HEAD)
-open protocol Router {
-    /// Requests a capability from this [Router]. Subsequent calls to [Router] are not required to
-    /// return duplicates of the same capability.
-    ///
-    /// [RouteRequest] supplies information about the component requesting the capability and
-    /// metadata about the capability to request. If the [Router] supports it, [RouteRequest] may be
-    /// empty in which case the [Router] will infer the request. If the [Router] does not support
-    /// this, an attempt to pass an empty request should return `RouterError.INVALID_ARGS`.
-    flexible Route(RouteRequest) -> (resource struct {
-        capability Capability;
-    }) error RouterError;
-};
-
 
 @available(added=HEAD)
 type Unavailable = struct {};

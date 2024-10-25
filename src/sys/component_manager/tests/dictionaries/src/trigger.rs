@@ -17,7 +17,7 @@ use {
 };
 
 enum IncomingRequest {
-    Router(fsandbox::RouterRequestStream),
+    Router(fsandbox::DictionaryRouterRequestStream),
     Trigger(ftest::TriggerRequestStream),
 }
 
@@ -63,13 +63,20 @@ async fn main() {
                 IncomingRequest::Router(mut stream) => {
                     while let Ok(Some(request)) = stream.try_next().await {
                         match request {
-                            fsandbox::RouterRequest::Route { payload: _, responder } => {
+                            fsandbox::DictionaryRouterRequest::Route { payload: _, responder } => {
                                 let dup_dict_id = dict_id + 1;
                                 store.duplicate(dict_id, dup_dict_id).await.unwrap().unwrap();
                                 let capability = store.export(dup_dict_id).await.unwrap().unwrap();
-                                let _ = responder.send(Ok(capability));
+                                let fsandbox::Capability::Dictionary(dict) = capability else {
+                                    panic!("capability was not a dictionary? {capability:?}");
+                                };
+                                let _ = responder.send(Ok(
+                                    fsandbox::DictionaryRouterRouteResponse::Dictionary(dict),
+                                ));
                             }
-                            fsandbox::RouterRequest::_UnknownMethod { .. } => unimplemented!(),
+                            fsandbox::DictionaryRouterRequest::_UnknownMethod { .. } => {
+                                unimplemented!()
+                            }
                         }
                     }
                 }

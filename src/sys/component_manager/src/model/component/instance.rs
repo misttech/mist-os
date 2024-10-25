@@ -1408,7 +1408,8 @@ impl SpecificRoutable<Dict> for ProgramDictionaryRouter {
         })?;
         let dir_entry = component.get_outgoing();
 
-        let (inner_router, server_end) = create_proxy::<fsandbox::RouterMarker>().unwrap();
+        let (inner_router, server_end) =
+            create_proxy::<fsandbox::DictionaryRouterMarker>().unwrap();
         dir_entry.open(
             ExecutionScope::new(),
             fio::OpenFlags::empty(),
@@ -1416,22 +1417,11 @@ impl SpecificRoutable<Dict> for ProgramDictionaryRouter {
                 .expect("path must be valid"),
             server_end.into_channel(),
         );
-        let cap = inner_router
+        let resp = inner_router
             .route(request.into())
             .await
             .map_err(|e| open_error(OpenOutgoingDirError::Fidl(e)))?
             .map_err(RouterError::from)?;
-        let capability = Capability::try_from(cap).map_err(|_| {
-            RoutingError::BedrockRemoteCapability { moniker: self.component.moniker.clone() }
-        })?;
-        let Capability::Dictionary(dict) = capability else {
-            return Err(RoutingError::BedrockWrongCapabilityType {
-                moniker: self.component.moniker.clone().into(),
-                actual: capability.debug_typename().into(),
-                expected: "Dictionary".into(),
-            }
-            .into());
-        };
-        Ok(SpecificRouterResponse::<Dict>::Capability(dict))
+        resp.try_into().map_err(|e| RouterError::NotFound(Arc::new(e)))
     }
 }

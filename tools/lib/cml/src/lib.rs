@@ -2548,7 +2548,7 @@ pub struct Capability {
     /// the protocol `fuchsia.component.resolution.Resolver`.
     ///
     /// For `dictionary`, this is optional. If provided, it is a path to a
-    /// `fuchsia.component.sandbox/Router` served by the program which should return a
+    /// `fuchsia.component.sandbox/DictionaryRouter` served by the program which should return a
     /// `fuchsia.component.sandbox/DictionaryRef`, by which the program may dynamically provide
     /// a dictionary from itself. If this is set for `dictionary`, `offer` to this dictionary
     /// is not allowed.
