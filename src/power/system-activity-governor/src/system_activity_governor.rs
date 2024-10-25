@@ -2,25 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::cpu_manager::{CpuManager, SuspendResumeListener, SuspendStatsUpdater};
 use anyhow::Result;
 use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
 use fidl::endpoints::{create_endpoints, Proxy};
-use fidl_fuchsia_hardware_suspend::{
-    self as fhsuspend, SuspenderSuspendResponse as SuspendResponse,
-};
 use fidl_fuchsia_power_system::{
     self as fsystem, ApplicationActivityLevel, CpuLevel, ExecutionStateLevel, WakeHandlingLevel,
 };
 use fuchsia_inspect::{IntProperty as IInt, Node as INode, Property, UintProperty as IUint};
-use fuchsia_inspect_contrib::nodes::{BoundedListNode as IRingBuffer, NodeTimeExt};
+use fuchsia_inspect_contrib::nodes::NodeTimeExt;
 use futures::future::FutureExt;
-use futures::lock::Mutex;
 use futures::prelude::*;
 use power_broker_client::{
     basic_update_fn_factory, run_power_element, LeaseHelper, PowerElementContext,
 };
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use zx::{AsHandleRef, HandleBased};
 use {
@@ -38,230 +35,11 @@ enum BootControlLevel {
     Active,
 }
 
-/// The result of a suspend request.
-#[derive(Debug, PartialEq)]
-pub enum SuspendResult {
-    /// Suspend request succeeded.
-    Success,
-    /// Suspend request was not allowed at the time it was triggered.
-    NotAllowed,
-    /// Suspend request failed.
-    Fail,
-}
-
 impl From<BootControlLevel> for fbroker::PowerLevel {
     fn from(bc: BootControlLevel) -> Self {
         match bc {
             BootControlLevel::Inactive => 0,
             BootControlLevel::Active => 1,
-        }
-    }
-}
-
-#[async_trait(?Send)]
-pub trait SuspendResumeListener {
-    /// Gets the manager of suspend stats.
-    fn suspend_stats(&self) -> &SuspendStatsManager;
-    /// Leases (Execution State, Suspending). Called after system suspension ends.
-    async fn on_suspend_ended(&self, suspend_suceeded: bool);
-    /// Notify the listeners that system suspension is about to begin
-    async fn notify_on_suspend(&self);
-    /// Notify the listeners of suspend results.
-    async fn notify_suspend_ended(&self);
-    /// Notify the listeners of a suspend failure.
-    async fn notify_on_suspend_fail(&self);
-    /// Notify the listeners of a suspend success.
-    async fn notify_on_resume(&self);
-}
-
-// TODO(https://fxbug.dev/372779207): Move CpuManager-related types out of this file for better
-// organization and encapsulation.
-
-/// Controls access to CPU power element and suspend management.
-struct CpuManagerInner {
-    /// The context used to manage the CPU power element.
-    cpu: Rc<PowerElementContext>,
-    /// The FIDL proxy to the device used to trigger system suspend.
-    suspender: Option<fhsuspend::SuspenderProxy>,
-    /// The suspend state index that will be passed to the suspender when system suspend is
-    /// triggered.
-    suspend_state_index: u64,
-    /// The flag used to track whether suspension is allowed based on CPU's power level.
-    /// If true, CPU has transitioned from a higher power state to CpuLevel::Inactive
-    /// and is still at the CpuLevel::Inactive power level.
-    suspend_allowed: bool,
-}
-
-/// Manager of the CPU power element and suspend logic.
-pub struct CpuManager {
-    /// State of the CPU power element and suspend controls.
-    inner: Mutex<CpuManagerInner>,
-    /// SuspendResumeListener object to notify of suspend/resume.
-    suspend_resume_listener: OnceCell<Rc<dyn SuspendResumeListener>>,
-    _inspect_node: RefCell<IRingBuffer>,
-}
-
-impl CpuManager {
-    /// Creates a new CpuManager.
-    pub fn new(
-        cpu: Rc<PowerElementContext>,
-        suspender: Option<fhsuspend::SuspenderProxy>,
-        inspect: INode,
-    ) -> Self {
-        Self {
-            inner: Mutex::new(CpuManagerInner {
-                cpu,
-                suspender,
-                suspend_state_index: 0,
-                suspend_allowed: false,
-            }),
-            suspend_resume_listener: OnceCell::new(),
-            _inspect_node: RefCell::new(IRingBuffer::new(inspect, 128)),
-        }
-    }
-
-    /// Sets the suspend resume listener.
-    /// The listener can only be set once. Subsequent calls will result in a panic.
-    pub fn set_suspend_resume_listener(
-        &self,
-        suspend_resume_listener: Rc<dyn SuspendResumeListener>,
-    ) {
-        self.suspend_resume_listener
-            .set(suspend_resume_listener)
-            .map_err(|_| anyhow::anyhow!("suspend_resume_listener is already set"))
-            .unwrap();
-    }
-
-    /// Updates the power level of the CPU power element.
-    ///
-    /// Returns a Result that indicates whether the system should suspend or not.
-    /// If an error occurs while updating the power level, the error is forwarded to the caller.
-    pub async fn update_current_level(&self, required_level: fbroker::PowerLevel) -> Result<bool> {
-        tracing::debug!(?required_level, "update_current_level: acquiring inner lock");
-        let mut inner = self.inner.lock().await;
-
-        tracing::debug!(?required_level, "update_current_level: updating current level");
-        let res = inner.cpu.current_level.update(required_level).await;
-        if let Err(error) = res {
-            tracing::warn!(?error, "update_current_level: current_level.update failed");
-            return Err(error.into());
-        }
-
-        // After other elements have been informed of required_level for cpu,
-        // check whether the system can be suspended.
-        if required_level == CpuLevel::Inactive.into_primitive() {
-            tracing::debug!("beginning suspend process for cpu");
-            inner.suspend_allowed = true;
-            return Ok(true);
-        } else {
-            inner.suspend_allowed = false;
-            return Ok(false);
-        }
-    }
-
-    /// Gets a copy of the name of the CPU power element.
-    pub async fn name(&self) -> String {
-        self.inner.lock().await.cpu.name().to_string()
-    }
-
-    /// Gets a copy of the RequiredLevelProxy of the CPU power element.
-    pub async fn required_level_proxy(&self) -> fbroker::RequiredLevelProxy {
-        self.inner.lock().await.cpu.required_level.clone()
-    }
-
-    /// Attempts to suspend the system.
-    ///
-    /// Returns an enum representing the result of the suspend attempt.
-    pub async fn trigger_suspend(&self) -> SuspendResult {
-        let listener = self.suspend_resume_listener.get().unwrap();
-        let mut suspend_failed = false;
-        {
-            tracing::debug!("trigger_suspend: acquiring inner lock");
-            let inner = self.inner.lock().await;
-            if !inner.suspend_allowed {
-                tracing::info!("Suspend not allowed");
-                return SuspendResult::NotAllowed;
-            }
-
-            self._inspect_node.borrow_mut().add_entry(|node| {
-                node.record_int(fobs::SUSPEND_ATTEMPTED_AT, zx::BootInstant::get().into_nanos());
-            });
-            // LINT.IfChange
-            tracing::info!("Suspending");
-            // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
-
-            let response = if let Some(suspender) = inner.suspender.as_ref() {
-                // LINT.IfChange
-                fuchsia_trace::duration!(c"power", c"system-activity-governor:suspend");
-                // LINT.ThenChange(//src/performance/lib/trace_processing/metrics/suspend.py)
-                Some(
-                    suspender
-                        .suspend(&fhsuspend::SuspenderSuspendRequest {
-                            state_index: Some(inner.suspend_state_index),
-                            ..Default::default()
-                        })
-                        .await,
-                )
-            } else {
-                None
-            };
-            // LINT.IfChange
-            tracing::info!(?response, "Resuming");
-            // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
-            self._inspect_node.borrow_mut().add_entry(|node| {
-                let time = zx::BootInstant::get().into_nanos();
-                if let Some(Ok(Ok(SuspendResponse { suspend_duration: Some(duration), .. }))) =
-                    response
-                {
-                    node.record_int(fobs::SUSPEND_RESUMED_AT, time);
-                    node.record_int(fobs::SUSPEND_LAST_TIMESTAMP, duration);
-                } else {
-                    node.record_int(fobs::SUSPEND_FAILED_AT, time);
-                }
-            });
-
-            listener.suspend_stats().update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
-                let stats = stats_opt.as_mut().expect("stats is uninitialized");
-
-                match response {
-                    Some(Ok(Ok(res))) => {
-                        stats.last_time_in_suspend = res.suspend_duration;
-                        stats.last_time_in_suspend_operations = res.suspend_overhead;
-
-                        if stats.last_time_in_suspend.is_some() {
-                            stats.success_count = stats.success_count.map(|c| c + 1);
-                        } else {
-                            tracing::warn!("Failed to suspend in Suspender");
-                            suspend_failed = true;
-                            stats.fail_count = stats.fail_count.map(|c| c + 1);
-                        }
-                    }
-                    Some(error) => {
-                        tracing::warn!(?error, "Failed to suspend");
-                        stats.fail_count = stats.fail_count.map(|c| c + 1);
-                        suspend_failed = true;
-
-                        if let Ok(Err(error)) = error {
-                            stats.last_failed_error = Some(error);
-                        }
-                    }
-                    None => {
-                        tracing::warn!("No suspender available, suspend was a no-op");
-                        stats.fail_count = stats.fail_count.map(|c| c + 1);
-                        stats.last_failed_error = Some(zx::sys::ZX_ERR_NOT_SUPPORTED);
-                    }
-                }
-                true
-            });
-        }
-        // At this point, the suspend request is no longer in flight and has been handled. With
-        // `inner` going out of scope, other tasks can modify flags and update the power level of
-        // CPU power element.
-        listener.on_suspend_ended(!suspend_failed).await;
-        if suspend_failed {
-            SuspendResult::Fail
-        } else {
-            SuspendResult::Success
         }
     }
 }
@@ -337,12 +115,14 @@ impl SuspendStatsManager {
             last_time_in_suspend_operations_node,
         }
     }
+}
 
-    fn update<UpdateFn>(&self, update: UpdateFn)
-    where
-        UpdateFn: FnOnce(&mut Option<fsuspend::SuspendStats>) -> bool,
-    {
-        self.stats_publisher.update(|stats_opt| {
+impl SuspendStatsUpdater for SuspendStatsManager {
+    fn update<'a>(
+        &self,
+        update: Box<dyn FnOnce(&mut Option<fsuspend::SuspendStats>) -> bool + 'a>,
+    ) {
+        self.stats_publisher.update(|stats_opt: &mut Option<fsuspend::SuspendStats>| {
             let success = update(stats_opt);
 
             self.inspect_node.atomic_update(|_| {
@@ -874,7 +654,7 @@ impl SystemActivityGovernor {
 
         register_element_status_endpoint(
             "cpu",
-            &self.cpu_manager.inner.lock().await.cpu,
+            self.cpu_manager.cpu().await.as_ref(),
             &mut endpoints,
         );
 
@@ -1043,7 +823,7 @@ impl SystemActivityGovernor {
 
 #[async_trait(?Send)]
 impl SuspendResumeListener for SystemActivityGovernor {
-    fn suspend_stats(&self) -> &SuspendStatsManager {
+    fn suspend_stats(&self) -> &dyn SuspendStatsUpdater {
         &self.suspend_stats
     }
 

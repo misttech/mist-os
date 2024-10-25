@@ -2,20 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::system_activity_governor::{CpuManager, SystemActivityGovernor};
+use crate::cpu_manager::CpuManager;
+use crate::system_activity_governor::SystemActivityGovernor;
 use anyhow::Result;
 use async_lock::OnceCell;
 use fuchsia_inspect::Node as INode;
-use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::future::LocalBoxFuture;
-use futures::{FutureExt, StreamExt};
-use power_broker_client::{run_power_element, LeaseDependency, LeaseHelper, PowerElementContext};
+use futures::StreamExt;
+use power_broker_client::{LeaseDependency, LeaseHelper, PowerElementContext};
 use std::rc::Rc;
 use zx::{HandleBased, Rights};
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
-    fidl_fuchsia_power_observability as fobs, fidl_fuchsia_power_system as fsystem,
-    fuchsia_async as fasync,
+    fidl_fuchsia_power_system as fsystem, fuchsia_async as fasync,
 };
 
 /// SystemActivityGovernorFactory is a function trait used to construct a new
@@ -86,9 +85,7 @@ where
             inspect_root.create_child("suspend_events"),
         ));
 
-        let (suspend_tx, suspend_rx) = mpsc::channel(1);
-        run_suspend_task(cpu_manager.clone(), inspect_root, suspend_rx);
-        run_cpu(cpu_manager.clone(), &power_elements_node2, suspend_tx);
+        cpu_manager.run(&inspect_root, &power_elements_node2);
 
         tracing::info!("Leasing CPU power element");
         let cpu_lease = LeaseHelper::new(
@@ -275,56 +272,4 @@ where
             }
         }
     }
-}
-
-fn run_suspend_task(
-    cpu_manager: Rc<CpuManager>,
-    inspect_node: INode,
-    mut suspend_signal: Receiver<()>,
-) {
-    fasync::Task::local(async move {
-        let _unhandled_suspend_failures_node =
-            inspect_node.create_uint(fobs::UNHANDLED_SUSPEND_FAILURES_COUNT, 0);
-        loop {
-            tracing::debug!("awaiting suspend signals");
-            suspend_signal.next().await;
-            tracing::debug!("attempting to suspend");
-            tracing::info!("trigger_suspend result: {:?}", cpu_manager.trigger_suspend().await);
-        }
-    })
-    .detach();
-}
-
-fn run_cpu(
-    cpu_manager: Rc<CpuManager>,
-    power_elements_node: &INode,
-    suspend_signaller: Sender<()>,
-) {
-    let cpu_node = power_elements_node.create_child("cpu");
-
-    fasync::Task::local(async move {
-        let element_name = cpu_manager.name().await;
-        let required_level = cpu_manager.required_level_proxy().await;
-
-        run_power_element(
-            &element_name,
-            &required_level,
-            fsystem::CpuLevel::Inactive.into_primitive(),
-            Some(cpu_node),
-            Box::new(move |new_power_level: fbroker::PowerLevel| {
-                let cpu_manager = cpu_manager.clone();
-                let mut suspend_signaller = suspend_signaller.clone();
-
-                async move {
-                    let update_res = cpu_manager.update_current_level(new_power_level).await;
-                    if let Ok(true) = update_res {
-                        let _ = suspend_signaller.start_send(());
-                    }
-                }
-                .boxed_local()
-            }),
-        )
-        .await;
-    })
-    .detach();
 }

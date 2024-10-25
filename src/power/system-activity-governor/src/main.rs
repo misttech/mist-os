@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod cpu_element_manager;
+mod cpu_manager;
 mod system_activity_governor;
 
 use crate::cpu_element_manager::{CpuElementManager, SystemActivityGovernorFactory};

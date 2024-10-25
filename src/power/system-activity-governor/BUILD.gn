@@ -10,6 +10,7 @@ rustc_binary("bin") {
   edition = "2021"
   sources = [
     "src/cpu_element_manager.rs",
+    "src/cpu_manager.rs",
     "src/main.rs",
     "src/system_activity_governor.rs",
   ]
