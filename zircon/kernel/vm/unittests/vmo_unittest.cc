@@ -4455,6 +4455,46 @@ static bool vmo_skip_range_update_test() {
   END_TEST;
 }
 
+// Test stream functionality in kernel objects.
+static bool vmo_user_stream_size_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  // 4 page VMO.
+  fbl::RefPtr<VmObjectPaged> vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, 4 * PAGE_SIZE, &vmo));
+
+  {
+    Guard<CriticalMutex> guard{vmo->lock()};
+    EXPECT_EQ(vmo->size_locked(), (uint64_t)4 * PAGE_SIZE);
+    // Should not have an allocated stream size.
+    auto result = vmo->user_content_size_locked();
+    EXPECT_FALSE(result.has_value());
+  }
+
+  // Give VMO a user-defined stream size of 2 pages.
+  fbl::RefPtr<ContentSizeManager> csm;
+  auto csm_result = ContentSizeManager::Create(2 * PAGE_SIZE);
+  ASSERT_OK(csm_result.status_value());
+  csm = ktl::move(*csm_result);
+
+  vmo->SetUserContentSize(csm);
+
+  {
+    Guard<CriticalMutex> guard{vmo->lock()};
+    auto result = vmo->user_content_size_locked();
+    ASSERT_TRUE(result.has_value());
+    const uint64_t stream_size = result.value();
+    EXPECT_EQ(stream_size, (uint64_t)2 * PAGE_SIZE);
+
+    // VMO size should be unchanged.
+    EXPECT_EQ(vmo->size_locked(), (uint64_t)4 * PAGE_SIZE);
+  }
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vmo_tests)
 VM_UNITTEST(vmo_create_test)
 VM_UNITTEST(vmo_create_maximum_size)
@@ -4520,6 +4560,7 @@ VM_UNITTEST(vmo_snapshot_modified_test)
 VM_UNITTEST(vmo_pin_race_loaned_test)
 VM_UNITTEST(vmo_prefetch_compressed_pages_test)
 VM_UNITTEST(vmo_skip_range_update_test)
+VM_UNITTEST(vmo_user_stream_size_test)
 UNITTEST_END_TESTCASE(vmo_tests, "vmo", "VmObject tests")
 
 }  // namespace vm_unittest

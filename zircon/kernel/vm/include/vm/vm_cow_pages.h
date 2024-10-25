@@ -348,6 +348,10 @@ class VmCowPages final : public VmHierarchyBase,
     user_content_size_ = ktl::move(csm);
   }
 
+  fbl::RefPtr<ContentSizeManager> GetUserContentSizeLocked() TA_REQ(lock()) {
+    return user_content_size_;
+  }
+
   class LookupCursor;
   // See VmObjectPaged::GetLookupCursorLocked
   zx::result<LookupCursor> GetLookupCursorLocked(uint64_t offset, uint64_t max_len) TA_REQ(lock());

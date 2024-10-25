@@ -68,6 +68,19 @@ class VmObjectPaged final : public VmObject {
 
   uint64_t size_locked() const override TA_REQ(lock()) { return cow_pages_locked()->size_locked(); }
 
+  // Queries the user defined content size, which is distinct from the VMO size. Content size is
+  // byte-aligned and is not guaranteed to be in the range of the VMO. The lock does not not guard
+  // the user changing the value via a syscall, so multiple calls under the same lock acquisition
+  // can have different results.
+  ktl::optional<uint64_t> user_content_size_locked() TA_REQ(lock()) {
+    auto csm = cow_pages_locked()->GetUserContentSizeLocked();
+    if (!csm) {
+      return ktl::nullopt;
+    }
+
+    return csm->GetContentSize();
+  }
+
   bool is_contiguous() const override { return (options_ & kContiguous); }
   bool is_resizable() const override { return (options_ & kResizable); }
   bool is_discardable() const override { return (options_ & kDiscardable); }
