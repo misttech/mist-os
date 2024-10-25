@@ -87,11 +87,10 @@ void AtomHelper::SubmitCommandBuffer(How how, uint8_t atom_number, uint8_t atom_
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_execute_immediate_commands(connection_, context_id_,
                                                                          1, &command_buffer));
 
-  constexpr uint64_t kOneSecondPerNs = 1000000000;
   magma_poll_item_t item = {.handle = magma_connection_get_notification_channel_handle(connection_),
                             .type = MAGMA_POLL_TYPE_HANDLE,
                             .condition = MAGMA_POLL_CONDITION_READABLE};
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(&item, 1, kOneSecondPerNs));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(&item, 1, std::numeric_limits<uint64_t>::max()));
 
   magma_arm_mali_status status;
   uint64_t status_size;
