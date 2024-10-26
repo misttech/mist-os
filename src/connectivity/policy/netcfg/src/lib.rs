@@ -58,6 +58,7 @@ use self::devices::DeviceInfo;
 use self::errors::{accept_error, ContextExt as _};
 use self::filter::{FilterControl, FilterEnabledState};
 use self::interface::DeviceInfoRef;
+use self::masquerade::MasqueradeHandler;
 
 /// Interface Identifier
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -545,14 +546,6 @@ impl InterfaceState {
     }
 }
 
-enum MasqueradeHandler {
-    Deprecated(masquerade::Masquerade),
-    // TODO(https://fxbug.dev/331264840): Once NAT is supported in
-    // fuchsia.net.filter, implement equivalent Masquerade
-    // functionality for it.
-    Current(()),
-}
-
 /// Network Configuration state.
 pub struct NetCfg<'a> {
     stack: fnet_stack::StackProxy,
@@ -1025,15 +1018,7 @@ impl<'a> NetCfg<'a> {
             "dns watchers should be empty"
         );
 
-        // TODO(https://fxbug.dev/331264840): Once NAT is supported in
-        // fuchsia.net.filter, make Masquerade functional over the
-        // fuchsia.net.filter.deprecated and fuchsia.net.filter APIs.
-        let mut masquerade_handler = match &self.filter_control {
-            FilterControl::Deprecated(filter) => {
-                MasqueradeHandler::Deprecated(masquerade::Masquerade::new(filter.clone()))
-            }
-            FilterControl::Current(_) => MasqueradeHandler::Current(()),
-        };
+        let mut masquerade_handler = MasqueradeHandler::default();
 
         // Serve fuchsia.net.virtualization/Control.
         let mut fs = ServiceFs::new_local();
@@ -1299,23 +1284,17 @@ impl<'a> NetCfg<'a> {
                     RequestStream::Dhcpv6PrefixProvider(req_stream) => {
                         dhcpv6_prefix_provider_requests.push(req_stream);
                     }
-                    RequestStream::Masquerade(req_stream) => match masquerade_handler {
-                        MasqueradeHandler::Deprecated(handler) => {
-                            handler
-                                .handle_event(
-                                    masquerade::Event::FactoryRequestStream(req_stream),
-                                    masquerade_events,
-                                    &mut self.filter_enabled_state,
-                                    &self.interface_states,
-                                )
-                                .await
-                        }
-                        MasqueradeHandler::Current(_) => warn!(
-                            "TODO(https://fxbug.dev/331264840): dropping \
-                            masquerade request stream, not yet supported \
-                            with fuchsia.net.filter"
-                        ),
-                    },
+                    RequestStream::Masquerade(req_stream) => {
+                        masquerade_handler
+                            .handle_event(
+                                masquerade::Event::FactoryRequestStream(req_stream),
+                                masquerade_events,
+                                &mut self.filter_control,
+                                &mut self.filter_enabled_state,
+                                &self.interface_states,
+                            )
+                            .await
+                    }
                     RequestStream::DnsServerWatcher(req_stream) => {
                         dns_server_watcher_incoming_requests.handle_request_stream(req_stream);
                     }
@@ -1457,23 +1436,17 @@ impl<'a> NetCfg<'a> {
                     .context("handle virtualization event")
                     .or_else(errors::Error::accept_non_fatal)?;
             }
-            ProvisioningEvent::MasqueradeEvent(event) => match masquerade_handler {
-                MasqueradeHandler::Deprecated(handler) => {
-                    handler
-                        .handle_event(
-                            event,
-                            masquerade_events,
-                            &mut self.filter_enabled_state,
-                            &self.interface_states,
-                        )
-                        .await
-                }
-                MasqueradeHandler::Current(_) => warn!(
-                    "TODO(https://fxbug.dev/331264840): dropping masquerade event {:?},\
-                    not yet supported with fuchsia.net.filter",
-                    event
-                ),
-            },
+            ProvisioningEvent::MasqueradeEvent(event) => {
+                masquerade_handler
+                    .handle_event(
+                        event,
+                        masquerade_events,
+                        &mut self.filter_control,
+                        &mut self.filter_enabled_state,
+                        &self.interface_states,
+                    )
+                    .await
+            }
         };
         return Ok(());
     }

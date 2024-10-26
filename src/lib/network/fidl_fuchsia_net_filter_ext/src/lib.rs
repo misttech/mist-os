@@ -498,7 +498,7 @@ impl TryFrom<fnet_filter::InterfaceMatcher> for InterfaceMatcher {
 /// This type witnesses to the invariant that the prefix length of the subnet is
 /// no greater than the number of bits in the IP address, and that no host bits
 /// in the network address are set.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Subnet(fnet::Subnet);
 
 impl Subnet {
