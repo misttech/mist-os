@@ -304,6 +304,13 @@ template("dts") {
 # This compiles the device-tree, performs verification, and also defines
 # assembly_inputs metadata for this target.
 #
+# There are two public targets -
+# 1. The main target compiles the devicetree source and runs all the necessary
+#    verification checks.
+#
+# 2. The target "$target_name.assembly_inputs" can be used to include the
+#    devicetree into assembly artifacts.
+#
 # Parameters
 #
 #   * sources
@@ -334,7 +341,7 @@ template("dts") {
 #
 #
 template("devicetree") {
-  # main_target = target_name
+  main_target = target_name
   compiled_dtb_target = "$target_name.dtb"
 
   decompiled_dts_target = "_devicetree.$target_name.decompiled"
@@ -361,11 +368,11 @@ template("devicetree") {
                            ])
     outputs = _dtb_path
 
-    # visibility = [
-    #   ":${assembly_inputs_target}",
-    #   ":${decompiled_dts_target}",
-    #   ":${main_target}",
-    # ]
+    visibility = [
+      ":${assembly_inputs_target}",
+      ":${decompiled_dts_target}",
+      ":${main_target}",
+    ]
   }
 
   # Decompile the compiled DTS so we can use it for the golden comparison.
@@ -390,7 +397,7 @@ template("devicetree") {
       },
     ]
 
-    # visibility = [ ":${main_target}" ]
+    visibility = [ ":${main_target}" ]
   }
 
   generated_file(assembly_inputs_target) {
@@ -403,7 +410,7 @@ template("devicetree") {
     output_conversion = "json"
     deps = [ ":${compiled_dtb_target}" ]
 
-    outputs = [ "${target_out_dir}/assembly_inputs.json" ]
+    outputs = [ "${target_out_dir}/${main_target}.assembly_inputs.json" ]
 
     metadata = {
       assembly_inputs = [
@@ -416,8 +423,8 @@ template("devicetree") {
 
   group(target_name) {
     public_deps = [
-      ":$compiled_dtb_target",
-      ":$golden_dts_target",
+      ":${compiled_dtb_target}",
+      ":${golden_dts_target}",
     ]
   }
 }
