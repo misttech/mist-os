@@ -45,20 +45,22 @@ impl Default for AbstractObjectClass {
     }
 }
 
+/// Declares an `enum` and implements an `all_variants()` API for it.
 macro_rules! enumerable_enum {
-    ($(#[$meta:meta])* $name:ident {
-        $($(#[$variant_meta:meta])* $variant:ident),*,
+    ($(#[$meta:meta])* $name:ident $(extends $common_name:ident)? {
+        $($(#[$variant_meta:meta])* $variant:ident,)*
     }) => {
         $(#[$meta])*
         pub enum $name {
-            $($(#[$variant_meta])* $variant),*
+            $($(#[$variant_meta])* $variant,)*
+            $(Common($common_name),)?
         }
 
         impl $name {
             pub fn all_variants() -> Vec<Self> {
-                vec![
-                    $($name::$variant),*
-                ]
+                let all_variants = vec![$($name::$variant),*];
+                $(let mut all_variants = all_variants; all_variants.extend($common_name::all_variants().into_iter().map(Self::Common));)?
+                all_variants
             }
         }
     }
@@ -95,6 +97,7 @@ enumerable_enum! {
 }
 
 impl ObjectClass {
+    /// Returns the name used to refer to this object class in the SELinux binary policy.
     pub fn name(&self) -> &'static str {
         match self {
             // keep-sorted start
@@ -128,7 +131,7 @@ impl From<String> for AbstractObjectClass {
 enumerable_enum! {
     /// A well-known file-like class in SELinux policy that has a particular meaning in policy
     /// enforcement hooks.
-    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
     FileClass {
         // keep-sorted start
         /// The SELinux "blk_file" object class.
@@ -236,27 +239,67 @@ permission_enum! {
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     Permission {
         // keep-sorted start
-        /// Permissions for the well-known SELinux "dir" object class.
+        /// Permissions for the well-known SELinux "blk_file" file-like object class.
+        Block(BlockFilePermission),
+        /// Permissions for the well-known SELinux "chr_file" file-like object class.
+        Character(CharacterFilePermission),
+        /// Permissions for the well-known SELinux "dir" file-like object class.
         Dir(DirPermission),
+        /// Permissions for the well-known SELinux "fifo_file" file-like object class.
+        Fifo(FifoFilePermission),
         /// Permissions for the well-known SELinux "file" object class.
         File(FilePermission),
         /// Permissions for the well-known SELinux "filesystem" object class.
         FileSystem(FileSystemPermission),
+        /// Permissions for the well-known SELinux "lnk_file" file-like object class.
+        Link(LinkFilePermission),
         /// Permissions for the well-known SELinux "process" object class.
         Process(ProcessPermission),
         /// Permissions for access to parts of the "selinuxfs" used to administer and query SELinux.
         Security(SecurityPermission),
+        /// Permissions for the well-known SELinux "sock_file" file-like object class.
+        Socket(SocketPermission),
         // keep-sorted end
     }
 }
 
-macro_rules! class_permission_enum {
-    ($(#[$meta:meta])* $name:ident {
-        $($(#[$variant_meta:meta])* $variant:ident ($variant_name:literal)),*,
+/// Helper used to define an enum of permission values, with specified names.
+/// Uses of this macro should not rely on "extends", which is solely for use to express permission
+/// inheritance in `class_permission_enum`.
+macro_rules! common_permission_enum {
+    ($(#[$meta:meta])* $name:ident $(extends $common_name:ident)? {
+        $($(#[$variant_meta:meta])* $variant:ident ($variant_name:literal),)*
     }) => {
         enumerable_enum! {
-            $(#[$meta])* $name {
-                $($(#[$variant_meta])* $variant),*,
+            $(#[$meta])* $name $(extends $common_name)? {
+                $($(#[$variant_meta])* $variant,)*
+            }
+        }
+
+        impl $name {
+            fn name(&self) -> &'static str {
+                match self {
+                    $($name::$variant => $variant_name,)*
+                    $(Self::Common(v) => {let v:$common_name = v.clone(); v.name()},)?
+                }
+            }
+        }
+    }
+}
+
+/// Helper used to declare the set of named permissions associated with an SELinux class.
+/// The `ClassType` trait is implemented on the declared `enum`, enabling values to be wrapped into
+/// the generic `Permission` container.
+/// If an "extends" type is specified then a `Common` enum case is added, encapsulating the values
+/// of that underlying permission type. This is used to represent e.g. SELinux "dir" class deriving
+/// a basic set of permissions from the common "file" symbol.
+macro_rules! class_permission_enum {
+    ($(#[$meta:meta])* $name:ident $(extends $common_name:ident)? {
+        $($(#[$variant_meta:meta])* $variant:ident ($variant_name:literal),)*
+    }) => {
+        common_permission_enum! {
+            $(#[$meta])* $name $(extends $common_name)? {
+                $($(#[$variant_meta])* $variant ($variant_name),)*
             }
         }
 
@@ -265,14 +308,58 @@ macro_rules! class_permission_enum {
                 Permission::from(self.clone()).class()
             }
         }
+    }
+}
 
-        impl $name {
-            fn name(&self) -> &'static str {
-                match self {
-                    $($name::$variant => $variant_name),*
-                }
-            }
+common_permission_enum! {
+    /// Permissions common to all file-like object classes (e.g. "lnk_file", "dir"). These are
+    /// combined with a specific `FileClass` by policy enforcement hooks, to obtain class-affine
+    /// permission values to check.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CommonFilePermission {
+        // keep-sorted start
+        /// Permission to create a file.
+        Create("create"),
+        /// Permissions to create hard link.
+        Link("link"),
+        /// Permission to open a file.
+        Open("open"),
+        /// Permission to delete a file or remove a hard link.
+        Unlink("unlink"),
+        // keep-sorted end
+    }
+}
+
+impl CommonFilePermission {
+    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
+    /// "allow" rules for the correct target object class.
+    pub fn for_class(&self, class: FileClass) -> Permission {
+        match class {
+            FileClass::Block => BlockFilePermission::Common(self.clone()).into(),
+            FileClass::Character => CharacterFilePermission::Common(self.clone()).into(),
+            FileClass::Dir => DirPermission::Common(self.clone()).into(),
+            FileClass::Fifo => FifoFilePermission::Common(self.clone()).into(),
+            FileClass::File => FilePermission::Common(self.clone()).into(),
+            FileClass::Link => LinkFilePermission::Common(self.clone()).into(),
+            FileClass::Socket => SocketPermission::Common(self.clone()).into(),
         }
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "blk_file" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    BlockFilePermission extends CommonFilePermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "chr_file" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CharacterFilePermission extends CommonFilePermission {
     }
 }
 
@@ -280,7 +367,7 @@ class_permission_enum! {
     /// A well-known "dir" class permission in SELinux policy that has a particular meaning in
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    DirPermission {
+    DirPermission extends CommonFilePermission {
         // keep-sorted start
         /// Permission to add a file to the directory.
         AddName("add_name"),
@@ -295,24 +382,24 @@ class_permission_enum! {
 }
 
 class_permission_enum! {
+    /// A well-known "fifo_file" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    FifoFilePermission extends CommonFilePermission {
+    }
+}
+
+class_permission_enum! {
     /// A well-known "file" class permission in SELinux policy that has a particular meaning in
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    FilePermission {
+    FilePermission extends CommonFilePermission {
         // keep-sorted start
-        /// Permission to create a file.
-        Create("create"),
         /// Permission to use a file as an entry point into the new domain on transition.
         Entrypoint("entrypoint"),
         /// Permission to use a file as an entry point to the calling domain without performing a
         /// transition.
         ExecuteNoTrans("execute_no_trans"),
-        /// Permissions to create hard link.
-        Link("link"),
-        /// Permission to open a file.
-        Open("open"),
-        /// Permission to delete a file or remove a hard link.
-        Unlink("unlink"),
         // keep-sorted end
     }
 }
@@ -326,6 +413,14 @@ class_permission_enum! {
         /// Permission to associate a file to the filesystem.
         Associate("associate"),
         // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "lnk_file" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    LinkFilePermission extends CommonFilePermission {
     }
 }
 
@@ -402,6 +497,14 @@ class_permission_enum! {
         SetEnforce("setenforce"),
         // keep-sorted end
      }
+}
+
+class_permission_enum! {
+    /// A well-known "sock_file" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    SocketPermission extends CommonFilePermission {
+    }
 }
 
 /// Initial Security Identifier (SID) values defined by the SELinux Reference Policy.

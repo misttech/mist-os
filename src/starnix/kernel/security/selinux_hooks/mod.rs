@@ -17,7 +17,7 @@ use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::policy::FsUseType;
 use selinux::{
-    ClassPermission, DirPermission, FileClass, FilePermission, FileSystemLabel,
+    ClassPermission, CommonFilePermission, DirPermission, FileClass, FileSystemLabel,
     FileSystemLabelingScheme, FileSystemMountOptions, FileSystemPermission, InitialSid,
     ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
@@ -301,6 +301,7 @@ fn may_create(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
+    new_file_mode: FileMode, // Only used to determine the file class.
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
     let (current_sid, fscreate_sid) = {
@@ -316,6 +317,7 @@ fn may_create(
         FileSystemLabelState::Labeled { label } => Ok(label.sid),
         _ => error!(EPERM),
     }?;
+    let new_file_type = file_class_from_file_mode(new_file_mode)?;
     todo_check_permission!(
         TODO("https://fxbug.dev/374910392", "Check search permission."),
         &permission_check,
@@ -335,7 +337,7 @@ fn may_create(
         &permission_check,
         current_sid,
         file_sid,
-        FilePermission::Create
+        CommonFilePermission::Create.for_class(new_file_type)
     )?;
     todo_check_permission!(
         TODO("https://fxbug.dev/375381156", "Check associate permission."),
@@ -359,10 +361,16 @@ fn may_link(
     let current_sid = current_task.read().security_state.attrs.current_sid;
     let parent_sid = fs_node_effective_sid(parent);
     let file_sid = fs_node_effective_sid(existing_node);
+    let file_class = file_class_from_file_mode(existing_node.info().mode)?;
 
     check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
     check_permission(&permission_check, current_sid, parent_sid, DirPermission::AddName)?;
-    check_permission(&permission_check, current_sid, file_sid, FilePermission::Link)?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        file_sid,
+        CommonFilePermission::Link.for_class(file_class),
+    )?;
     Ok(())
 }
 
@@ -393,13 +401,14 @@ fn may_unlink_or_rmdir(
     )?;
 
     let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
     match operation {
         UnlinkKind::NonDirectory => todo_check_permission!(
             TODO("https://fxbug.dev/375381156", "Check unlink permission."),
             &permission_check,
             current_sid,
             file_sid,
-            FilePermission::Unlink
+            CommonFilePermission::Unlink.for_class(file_class)
         )?,
         UnlinkKind::Directory => todo_check_permission!(
             TODO("https://fxbug.dev/375381156", "Check rmdir permission."),
@@ -418,9 +427,9 @@ pub(super) fn check_fs_node_create_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
-    _mode: FileMode,
+    mode: FileMode,
 ) -> Result<(), Errno> {
-    may_create(security_server, current_task, parent)
+    may_create(security_server, current_task, parent, mode)
 }
 
 /// Validate that `current_task` has permission to create a symlink to `old_path` in the `parent`
@@ -431,7 +440,7 @@ pub(super) fn check_fs_node_symlink_access(
     parent: &FsNode,
     _old_path: &FsStr,
 ) -> Result<(), Errno> {
-    may_create(security_server, current_task, parent)
+    may_create(security_server, current_task, parent, FileMode::IFLNK)
 }
 
 /// Validate that `current_task` has permission to create a new directory in the `parent` directory,
@@ -440,9 +449,9 @@ pub(super) fn check_fs_node_mkdir_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
-    _mode: FileMode,
+    mode: FileMode,
 ) -> Result<(), Errno> {
-    may_create(security_server, current_task, parent)
+    may_create(security_server, current_task, parent, mode)
 }
 
 /// Validate that `current_task` has permission to create a new special file, socket or pipe, in the
@@ -451,10 +460,10 @@ pub(super) fn check_fs_node_mknod_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
-    _mode: FileMode,
+    mode: FileMode,
     _device_id: DeviceType,
 ) -> Result<(), Errno> {
-    may_create(security_server, current_task, parent)
+    may_create(security_server, current_task, parent, mode)
 }
 
 /// Validate that `current_task` has the permission to create a new hard link to a file.
