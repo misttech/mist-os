@@ -320,10 +320,14 @@ common_permission_enum! {
         // keep-sorted start
         /// Permission to create a file.
         Create("create"),
+        /// Permission to query attributes, including uid, gid and extended attributes.
+        GetAttr("getattr"),
         /// Permissions to create hard link.
         Link("link"),
         /// Permission to open a file.
         Open("open"),
+        /// Permission to modify attributes, including uid, gid and extended attributes.
+        SetAttr("setattr"),
         /// Permission to delete a file or remove a hard link.
         Unlink("unlink"),
         // keep-sorted end

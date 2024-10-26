@@ -2190,6 +2190,7 @@ impl FsNode {
         if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
             return security::fs_node_getsecurity(current_task, self, name, max_size);
         }
+        security::check_fs_node_getxattr_access(current_task, self, name)?;
         self.check_access(
             current_task,
             mount,
@@ -2214,6 +2215,7 @@ impl FsNode {
         if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
             return security::fs_node_setsecurity(current_task, self, name, value, op);
         }
+        security::check_fs_node_setxattr_access(current_task, self, name, value, op)?;
         self.check_access(
             current_task,
             mount,
@@ -2230,6 +2232,8 @@ impl FsNode {
         mount: &MountInfo,
         name: &FsStr,
     ) -> Result<(), Errno> {
+        // TODO: Is removing security.* xattrs allowed at all?
+        security::check_fs_node_removexattr_access(current_task, self, name)?;
         self.check_access(
             current_task,
             mount,
@@ -2245,6 +2249,7 @@ impl FsNode {
         current_task: &CurrentTask,
         max_size: usize,
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        security::check_fs_node_listxattr_access(current_task, self)?;
         Ok(self.ops().list_xattrs(self, current_task, max_size)?.map(|mut v| {
             v.retain(|name| {
                 self.check_trusted_attribute_access(current_task, name.as_ref(), || errno!(EPERM))

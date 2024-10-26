@@ -497,6 +497,59 @@ pub fn sb_umount(
     })
 }
 
+pub fn check_fs_node_setxattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    name: &FsStr,
+    value: &FsStr,
+    op: XattrOp,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_setxattr_access(
+            security_server,
+            current_task,
+            fs_node,
+            name,
+            value,
+            op,
+        )
+    })
+}
+
+pub fn check_fs_node_getxattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    name: &FsStr,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_getxattr_access(security_server, current_task, fs_node, name)
+    })
+}
+
+pub fn check_fs_node_listxattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_listxattr_access(security_server, current_task, fs_node)
+    })
+}
+
+pub fn check_fs_node_removexattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    name: &FsStr,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_removexattr_access(
+            security_server,
+            current_task,
+            fs_node,
+            name,
+        )
+    })
+}
+
 /// Returns the value of the specified "security.*" attribute for `fs_node`.
 /// If SELinux is enabled then requests for the "security.selinux" attribute will return the
 /// Security Context corresponding to the SID with which `fs_node` has been labelled, even if the

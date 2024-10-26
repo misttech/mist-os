@@ -500,6 +500,77 @@ pub(super) fn check_fs_node_rmdir_access(
     may_unlink_or_rmdir(security_server, current_task, parent, child, UnlinkKind::Directory)
 }
 
+pub(super) fn check_fs_node_setxattr_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    _name: &FsStr,
+    _value: &FsStr,
+    _op: XattrOp,
+) -> Result<(), Errno> {
+    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+    check_permission(
+        &security_server.as_permission_check(),
+        current_sid,
+        file_sid,
+        CommonFilePermission::SetAttr.for_class(file_class),
+    )
+}
+
+pub(super) fn check_fs_node_getxattr_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    _name: &FsStr,
+) -> Result<(), Errno> {
+    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+    check_permission(
+        &security_server.as_permission_check(),
+        current_sid,
+        file_sid,
+        CommonFilePermission::GetAttr.for_class(file_class),
+    )
+}
+
+pub(super) fn check_fs_node_listxattr_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+) -> Result<(), Errno> {
+    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+    check_permission(
+        &security_server.as_permission_check(),
+        current_sid,
+        file_sid,
+        CommonFilePermission::GetAttr.for_class(file_class),
+    )
+}
+
+pub(super) fn check_fs_node_removexattr_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    _name: &FsStr,
+) -> Result<(), Errno> {
+    // TODO: https://fxbug.dev/364568818 - Verify the correct permission check here; is removing a
+    // security.* attribute even allowed?
+    let current_sid = current_task.read().security_state.attrs.current_sid;
+    let file_sid = fs_node_effective_sid(fs_node);
+    let file_class = file_class_from_file_mode(fs_node.info().mode)?;
+    check_permission(
+        &security_server.as_permission_check(),
+        current_sid,
+        file_sid,
+        CommonFilePermission::SetAttr.for_class(file_class),
+    )
+}
+
 /// Returns the Security Context corresponding to the SID with which `FsNode`
 /// is labelled, otherwise delegates to the node's [`crate::vfs::FsNodeOps`].
 pub(super) fn fs_node_getsecurity(
