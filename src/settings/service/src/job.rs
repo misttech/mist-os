@@ -42,7 +42,7 @@ payload_convert!(Job, Payload);
 ///
 /// [Jobs]: Job
 pub(super) type StoreHandleMapping = HashMap<Signature, data::StoreHandle>;
-type PinStream<T> = Pin<Box<dyn Stream<Item = T> + Send>>;
+type PinStream<T> = Pin<Box<dyn Stream<Item = T>>>;
 type SourceStreamHandle = Arc<Mutex<Option<PinStream<Result<Job, source::Error>>>>>;
 
 /// The data payload that can be sent to the [Job Manager](crate::job::manager::Manager).
@@ -102,10 +102,10 @@ pub mod work {
         /// [Sequential] loads are run in order after [Loads](Load) from [Jobs](crate::job::Job)
         /// of the same [Signature](crate::job::Signature) that preceded them. These [Loads](Load)
         /// share a common data store, which can be used to share information.
-        Sequential(Box<dyn Sequential + Send + Sync>, Signature),
+        Sequential(Box<dyn Sequential>, Signature),
         /// [Independent] loads are run as soon as there is availability to run as dictated by the
         /// containing [Job's](crate::job::Job) handler.
-        Independent(Box<dyn Independent + Send + Sync>),
+        Independent(Box<dyn Independent>),
     }
 
     /// Possible error conditions that can be encountered during work execution.
@@ -154,7 +154,7 @@ pub mod work {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     pub trait Sequential {
         /// Called when the [Job](super::Job) processing is ready for the encapsulated
         /// [work::Load](super::work::Load) be executed. The provided [StoreHandle](data::StoreHandle)
@@ -167,7 +167,7 @@ pub mod work {
         ) -> Result<(), Error>;
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     pub trait Independent {
         /// Called when a [work::Load](super::work::Load) should run. All workload specific logic should
         /// be encompassed in this method.
@@ -323,7 +323,7 @@ impl Info {
     /// Prepares the components necessary for a [Job] to execute and then returns a future to
     /// execute the [Job] workload with them. These components include a messenger for communicating
     /// with the system and the store associated with the [Job's](Job) group if applicable.
-    async fn prepare_execution<F: FnOnce(Self) + Send + 'static>(
+    async fn prepare_execution<F: FnOnce(Self)>(
         mut self,
         delegate: &mut message::Delegate,
         stores: &mut StoreHandleMapping,

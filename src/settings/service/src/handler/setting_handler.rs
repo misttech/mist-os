@@ -11,7 +11,7 @@ use crate::{payload_convert, trace, trace_guard};
 use async_trait::async_trait;
 use core::convert::TryFrom;
 use fuchsia_async as fasync;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use settings_storage::storage_factory::StorageFactory as StorageFactoryTrait;
 use std::borrow::Cow;
@@ -90,8 +90,8 @@ pub enum Event {
 }
 
 #[allow(dead_code)]
-pub(crate) trait StorageFactory: StorageFactoryTrait + Send + Sync {}
-impl<T: StorageFactoryTrait + Send + Sync> StorageFactory for T {}
+pub(crate) trait StorageFactory: StorageFactoryTrait {}
+impl<T: StorageFactoryTrait> StorageFactory for T {}
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum ControllerError {
@@ -139,23 +139,23 @@ pub enum ControllerError {
     ExitError,
 }
 
-pub(crate) type BoxedController = Box<dyn controller::Handle + Send + Sync>;
+pub(crate) type BoxedController = Box<dyn controller::Handle>;
 pub(crate) type BoxedControllerResult = Result<BoxedController, ControllerError>;
 
 pub(crate) type GenerateController =
-    Box<dyn Fn(Arc<ClientImpl>) -> BoxFuture<'static, BoxedControllerResult> + Send + Sync>;
+    Box<dyn Fn(Arc<ClientImpl>) -> LocalBoxFuture<'static, BoxedControllerResult>>;
 
 pub(crate) mod controller {
     use super::*;
 
-    #[async_trait]
-    #[allow(dead_code)]
+    #[async_trait(?Send)]
+    #[cfg(test)]
     pub(crate) trait Create: Sized {
         async fn create(client: Arc<ClientImpl>) -> Result<Self, ControllerError>;
     }
 
-    #[async_trait]
-    pub(crate) trait Handle: Send {
+    #[async_trait(?Send)]
+    pub(crate) trait Handle {
         /// Handles an incoming request and returns its result. If the request is not supported
         /// by this implementation, then None is returned.
         async fn handle(&self, request: Request) -> Option<SettingHandlerResult>;
@@ -219,7 +219,7 @@ impl ClientImpl {
         let mut controller = generate_controller(Arc::clone(&client)).await?;
 
         // Process MessageHub requests
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let _ = &context;
             let id = fuchsia_trace::Id::new();
             trace!(
@@ -347,15 +347,13 @@ pub mod persist {
     use settings_storage::device_storage::DeviceStorageConvertible;
     use settings_storage::UpdateState;
 
-    pub trait Storage: DeviceStorageConvertible + Into<SettingInfo> + Send + Sync {}
-    impl<T: DeviceStorageConvertible + Into<SettingInfo> + Send + Sync> Storage for T {}
+    pub trait Storage: DeviceStorageConvertible + Into<SettingInfo> {}
+    impl<T: DeviceStorageConvertible + Into<SettingInfo>> Storage for T {}
 
     pub(crate) mod controller {
-        use std::future::Future;
-
         use super::*;
 
-        #[async_trait]
+        #[async_trait(?Send)]
         pub(crate) trait Create: Sized {
             /// Creates the controller.
             async fn create(handler: ClientProxy) -> Result<Self, ControllerError>;
@@ -369,16 +367,15 @@ pub mod persist {
                 -> Result<Self, ControllerError>;
         }
 
+        #[async_trait(?Send)]
         pub(crate) trait CreateWithAsync: Sized {
             type Data;
 
             /// Creates the controller with additional data.
-            fn create_with(
+            async fn create_with(
                 handler: ClientProxy,
                 data: Self::Data,
-            ) -> impl Future<Output = Result<Self, ControllerError>> + Send
-            where
-                Self: Send;
+            ) -> Result<Self, ControllerError>;
         }
     }
 
@@ -540,8 +537,8 @@ pub mod persist {
         _data: PhantomData<C>,
     }
 
-    impl<C: controller::Create + super::controller::Handle + Send + Sync + 'static> Handler<C> {
-        pub(crate) fn spawn(context: Context) -> BoxFuture<'static, ControllerGenerateResult> {
+    impl<C: controller::Create + super::controller::Handle + 'static> Handler<C> {
+        pub(crate) fn spawn(context: Context) -> LocalBoxFuture<'static, ControllerGenerateResult> {
             Box::pin(async move {
                 let setting_type = context.setting_type;
 
@@ -566,13 +563,13 @@ pub mod persist {
 
     impl<'a, C, O> Handler<C>
     where
-        C: controller::CreateWith<Data = O> + super::controller::Handle + Send + Sync + 'static,
-        O: Clone + Send + Sync + 'static,
+        C: controller::CreateWith<Data = O> + super::controller::Handle + 'static,
+        O: Clone + 'static,
     {
         pub(crate) fn spawn_with(
             context: Context,
             data: O,
-        ) -> BoxFuture<'static, ControllerGenerateResult> {
+        ) -> LocalBoxFuture<'static, ControllerGenerateResult> {
             Box::pin(async move {
                 let setting_type = context.setting_type;
 
@@ -601,17 +598,13 @@ pub mod persist {
 
     impl<'a, C, O> Handler<C>
     where
-        C: controller::CreateWithAsync<Data = O>
-            + super::controller::Handle
-            + Send
-            + Sync
-            + 'static,
-        O: Clone + Send + Sync + 'static,
+        C: controller::CreateWithAsync<Data = O> + super::controller::Handle + 'static,
+        O: Clone + 'static,
     {
         pub(crate) fn spawn_with_async(
             context: Context,
             data: O,
-        ) -> BoxFuture<'static, ControllerGenerateResult> {
+        ) -> LocalBoxFuture<'static, ControllerGenerateResult> {
             Box::pin(async move {
                 let setting_type = context.setting_type;
 

@@ -29,7 +29,7 @@ impl RestoreAgent {
         };
 
         let mut receptor = context.receptor;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Ok((Payload::Invocation(invocation), client)) =
                 receptor.next_of::<Payload>().await
             {

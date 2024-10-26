@@ -21,7 +21,7 @@ use crate::setup::types::SetConfigurationInterfacesParams;
 
 use async_trait::async_trait;
 use fuchsia_trace as ftrace;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -29,7 +29,7 @@ use std::sync::Arc;
 pub type ControllerGenerateResult = Result<(), anyhow::Error>;
 
 pub(crate) type GenerateHandler =
-    Box<dyn Fn(Context) -> BoxFuture<'static, ControllerGenerateResult> + Send + Sync>;
+    Box<dyn Fn(Context) -> LocalBoxFuture<'static, ControllerGenerateResult>>;
 
 pub type Response = Result<Option<SettingInfo>, Error>;
 
@@ -275,7 +275,7 @@ pub enum SettingHandlerFactoryError {
 
 /// A factory capable of creating a handler for a given setting on-demand. If no
 /// viable handler can be created, None will be returned.
-#[async_trait]
+#[async_trait(?Send)]
 pub(crate) trait SettingHandlerFactory {
     async fn generate(
         &mut self,

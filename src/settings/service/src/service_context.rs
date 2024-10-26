@@ -9,14 +9,14 @@ use anyhow::{format_err, Error};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
-use futures::future::{BoxFuture, OptionFuture};
+use futures::future::{LocalBoxFuture, OptionFuture};
 use glob::glob;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::future::Future;
 
 pub type GenerateService =
-    Box<dyn Fn(&str, zx::Channel) -> BoxFuture<'static, Result<(), Error>> + Send + Sync>;
+    Box<dyn Fn(&str, zx::Channel) -> LocalBoxFuture<'static, Result<(), Error>>>;
 
 /// A wrapper around service operations, allowing redirection to a nested
 /// environment.

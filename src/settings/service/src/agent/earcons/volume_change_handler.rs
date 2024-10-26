@@ -70,7 +70,7 @@ impl VolumeChangeHandler {
                 HashMap::new()
             };
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let mut handler = Self {
                 common_earcons_params: params,
                 last_user_volumes,
@@ -241,7 +241,7 @@ impl VolumeChangeHandler {
         let common_earcons_params = self.common_earcons_params.clone();
 
         let publisher = self.publisher.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             // Connect to the SoundPlayer if not already connected.
             connect_to_sound_player(
                 publisher,

@@ -79,7 +79,7 @@ impl Service for HardwareLightService {
         let simple_values = self.simple_values.clone();
         let brightness_values = self.brightness_values.clone();
         let rgb_values = self.rgb_values.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(req) = request_stream.try_next().await.unwrap() {
                 match req {
                     LightRequest::GetNumLights { responder } => responder

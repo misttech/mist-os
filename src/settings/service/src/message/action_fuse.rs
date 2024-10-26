@@ -7,7 +7,7 @@ use futures::lock::Mutex;
 use std::sync::Arc;
 
 /// Closure definition for an action that can be triggered by ActionFuse.
-pub type TriggeredAction = Box<dyn FnOnce() + Send + Sync + 'static>;
+pub type TriggeredAction = Box<dyn FnOnce()>;
 /// The reference-counted handle to an ActionFuse. When all references go out of
 /// scope, the action will be triggered (if not defused).
 pub type ActionFuseHandle = Arc<Mutex<ActionFuse>>;
@@ -30,7 +30,7 @@ impl ActionFuse {
 
     /// Suppresses the action from automatically executing.
     pub(crate) fn defuse(handle: ActionFuseHandle) {
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let mut fuse = handle.lock().await;
             fuse.actions = None;
         })

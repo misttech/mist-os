@@ -80,7 +80,7 @@ impl SettingTypeUsageInspectAgent {
         let mut agent =
             SettingTypeUsageInspectAgent { inspect_node: node, api_call_counts: HashMap::new() };
 
-        fasync::Task::spawn({
+        fasync::Task::local({
             async move {
             let _ = &context;
             let id = fuchsia_trace::Id::new();

@@ -176,7 +176,7 @@ pub(crate) mod testing {
         async fn initialize_storage_for_key_with_loader(
             &self,
             key: &'static str,
-            loader: Box<dyn Any + Send + Sync + 'static>,
+            loader: Box<dyn Any>,
         ) {
             match &mut *self.device_storage_cache.lock().await {
                 InitializationState::Initializing(initial_keys, _) => {
@@ -221,7 +221,6 @@ pub(crate) mod testing {
         }
     }
 
-    #[async_trait::async_trait]
     impl StorageFactory for InMemoryStorageFactory {
         type Storage = DeviceStorage;
 
@@ -233,16 +232,14 @@ pub(crate) mod testing {
             Ok(())
         }
 
-        async fn initialize_with_loader<T>(
-            &self,
-            loader: impl DefaultLoader<Result = T::Data> + Send + Sync + 'static,
-        ) -> Result<(), Error>
+        async fn initialize_with_loader<T, L>(&self, loader: L) -> Result<(), Error>
         where
             T: StorageAccess<Storage = DeviceStorage>,
+            L: DefaultLoader<Result = T::Data> + 'static,
         {
             self.initialize_storage_for_key_with_loader(
                 T::STORAGE_KEY,
-                Box::new(loader) as Box<dyn Any + Send + Sync + 'static>,
+                Box::new(loader) as Box<dyn Any>,
             )
             .await;
             Ok(())
@@ -258,7 +255,7 @@ pub(crate) mod testing {
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
         let stats = Arc::new(Mutex::new(StashStats::new()));
         let stats_clone = stats.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let mut stored_value: Option<Value> = None;
             let mut stored_key: Option<String> = None;
 

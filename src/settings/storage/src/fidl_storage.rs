@@ -45,7 +45,7 @@ pub struct FidlStorage {
     /// Map of [`FidlStorageConvertible`] keys to their typed storage.
     typed_storage_map: HashMap<&'static str, TypedStorage>,
 
-    typed_loader_map: HashMap<&'static str, Box<dyn Any + Send + Sync + 'static>>,
+    typed_loader_map: HashMap<&'static str, Box<dyn Any>>,
 
     /// If true, reads will be returned from the data in memory rather than reading from storage.
     caching_enabled: bool,
@@ -143,7 +143,7 @@ impl FidlStorage {
         files_generator: G,
     ) -> Result<(Self, Vec<Task<()>>), Error>
     where
-        I: IntoIterator<Item = (&'static str, Option<Box<dyn Any + Send + Sync>>)>,
+        I: IntoIterator<Item = (&'static str, Option<Box<dyn Any>>)>,
         G: Fn(&'static str) -> Result<(String, String), Error>,
     {
         let mut typed_storage_map = HashMap::new();
@@ -166,7 +166,7 @@ impl FidlStorage {
                 TypedStorage { flush_sender, cached_storage: Arc::clone(&cached_storage) };
 
             // Each key has an independent flush queue.
-            let sync_task = Task::spawn(Self::synchronize_task(
+            let sync_task = Task::local(Self::synchronize_task(
                 Clone::clone(&storage_dir),
                 cached_storage,
                 flush_receiver,
@@ -1043,7 +1043,7 @@ mod tests {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         // Call spawn in a future since we have to be in an executor context to call spawn.
-        let task = fasync::Task::spawn(FidlStorage::synchronize_task(
+        let task = fasync::Task::local(FidlStorage::synchronize_task(
             Clone::clone(&storage_dir),
             Arc::clone(&cached_storage),
             receiver,

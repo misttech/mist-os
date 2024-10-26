@@ -26,7 +26,7 @@ pub(crate) struct SettingHandlerFactoryImpl {
     context_id_counter: Arc<AtomicU64>,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl SettingHandlerFactory for SettingHandlerFactoryImpl {
     async fn generate(
         &mut self,
@@ -145,14 +145,14 @@ mod tests {
         client: Arc<ClientImpl>,
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl Create for TestController {
         async fn create(client: Arc<ClientImpl>) -> Result<Self, ControllerError> {
             Ok(Self { client })
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl Handle for TestController {
         // Not relevant.
         async fn handle(&self, _request: Request) -> Option<SettingHandlerResult> {

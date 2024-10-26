@@ -392,7 +392,7 @@ impl data_controller::CreateWith for InputController {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for InputController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {
@@ -583,7 +583,7 @@ mod tests {
             .expect("Unable to create agent messenger");
 
         // Spawn a task that mimics the storage agent by responding to read/write calls.
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             loop {
                 if let Ok((payload, message_client)) = storage_receptor.next_payload().await {
                     if let Ok(StoragePayload::Request(storage_request)) =

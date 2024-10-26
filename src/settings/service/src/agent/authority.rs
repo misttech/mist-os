@@ -129,11 +129,11 @@ mod tests {
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
 
-    fn create(context: Context) -> futures::future::BoxFuture<'static, ()> {
+    fn create(context: Context) -> futures::future::LocalBoxFuture<'static, ()> {
         Box::pin(async move {
             let _ = &context;
             let mut receptor = context.receptor;
-            fasync::Task::spawn(async move {
+            fasync::Task::local(async move {
                 while let Ok((Payload::Invocation(_), client)) = receptor.next_of::<Payload>().await
                 {
                     let _ =

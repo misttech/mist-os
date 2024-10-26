@@ -71,7 +71,7 @@ pub(super) async fn play_sound<'a>(
     let sound_player_proxy = sound_player_proxy.clone();
     // This fasync thread is needed so that the earcons sounds can play rapidly and not wait
     // for the previous sound to finish to send another request.
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         if let Err(e) =
             call_async!(sound_player_proxy => play_sound(id, AudioRenderUsage::Background)).await
         {

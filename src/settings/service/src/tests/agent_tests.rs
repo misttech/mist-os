@@ -13,7 +13,7 @@ use crate::{service, EnvironmentBuilder};
 use core::fmt::{Debug, Formatter};
 use fuchsia_async as fasync;
 use futures::channel::mpsc::UnboundedSender;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use rand::Rng;
@@ -87,10 +87,10 @@ impl TestAgent {
         let agent_clone = agent.clone();
 
         let creation_func = CreationFunc::Dynamic(Arc::new(
-            move |mut context: Context| -> BoxFuture<'static, ()> {
+            move |mut context: Context| -> LocalBoxFuture<'static, ()> {
                 let agent = agent_clone.clone();
                 Box::pin(async move {
-                    fasync::Task::spawn(async move {
+                    fasync::Task::local(async move {
                         let _ = &context;
                         while let Ok((Payload::Invocation(invocation), client)) =
                             context.receptor.next_of::<Payload>().await
@@ -156,7 +156,7 @@ async fn test_environment_startup() {
 
     {
         let service_agent = service_agent.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             // Wait for the initialization agent to receive invocation
             if let Some((id, _, tx)) = startup_rx.next().await {
                 // Verify the correct agent was invoked.
@@ -169,7 +169,7 @@ async fn test_environment_startup() {
         .detach();
     }
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         // Wait for service agent to receive notification
         if let Some((id, _, tx)) = service_rx.next().await {
             // Verify the correct agent was invoked
@@ -206,7 +206,7 @@ async fn test_sequential() {
     let agent_ids =
         create_agents(12, LifespanTarget::Initialization, &mut authority, tx.clone()).await;
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         // Process the agent callbacks, making sure they are received in the right
         // order and acknowledging the acks. Note that this is a chain reaction.
         // Processing the first agent is necessary before the second can receive its
@@ -245,7 +245,7 @@ async fn test_simultaneous() {
     let agent_ids =
         create_agents(12, LifespanTarget::Initialization, &mut authority, tx.clone()).await;
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         // Ensure that each agent has received the invocation. Note that we are not
         // acknowledging the invocations here. Each agent should be notified
         // regardless of order.
@@ -300,7 +300,7 @@ async fn test_err_handling() {
     )
     .await;
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         // Ensure the first agent received an invocation, acknowledge with an error.
         if let Some((id, _, tx)) = rx.next().await {
             assert_eq!(agent_1_id, id);

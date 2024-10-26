@@ -47,7 +47,7 @@ impl CameraWatcherAgent {
         };
 
         let mut receptor = context.receptor;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let id = fuchsia_trace::Id::new();
             let guard = trace_guard!(id, c"camera watcher agent");
             while let Ok((payload, client)) = receptor.next_of::<Payload>().await {
@@ -82,7 +82,7 @@ impl CameraWatcherAgent {
                     recipient_settings: self.recipient_settings.clone(),
                     sw_muted: false,
                 };
-                fasync::Task::spawn(async move {
+                fasync::Task::local(async move {
                     let id = fuchsia_trace::Id::new();
                     // Here we don't care about hw_muted state because the input service would pick
                     // up mute changes directly from the switch. We care about sw changes because

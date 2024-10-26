@@ -97,7 +97,7 @@ impl MessageHub {
             exit_tx,
         };
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let id = ftrace::Id::new();
 
             trace!(id, c"message hub");

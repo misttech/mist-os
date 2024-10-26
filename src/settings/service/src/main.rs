@@ -110,7 +110,7 @@ fn main() -> Result<(), Error> {
     // result of the startup. Since main is a synchronous function, we cannot
     // block here and therefore continue without waiting for the result.
 
-    let fs = ServiceFs::new();
+    let fs = ServiceFs::new_local();
 
     EnvironmentBuilder::new(Arc::new(storage_factory))
         .configuration(configuration)

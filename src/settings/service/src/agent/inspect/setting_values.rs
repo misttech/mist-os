@@ -130,7 +130,7 @@ impl SettingValuesInspectAgent {
             _setting_types_inspect_info: setting_types_inspect_info,
         };
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let _ = &context;
             let event = receptor.fuse();
             let agent_event = context.receptor.fuse();

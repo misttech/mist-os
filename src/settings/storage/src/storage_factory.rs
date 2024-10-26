@@ -11,6 +11,7 @@ use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io::DirectoryProxy;
 use fidl_fuchsia_stash::StoreProxy;
 use futures::lock::Mutex;
+use futures::Future;
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -27,28 +28,25 @@ impl Sealed for NoneT {}
 
 /// `DeviceStorageFactory` abstracts over how to initialize and retrieve the `DeviceStorage`
 /// instance.
-#[async_trait::async_trait]
 pub trait StorageFactory {
     /// The storage type used to manage persisted data.
     type Storage;
 
     /// Initialize the storage to be able to manage storage for objects of type T.
     /// This will return an Error once `get_store` is called the first time.
-    async fn initialize<T>(&self) -> Result<(), Error>
+    fn initialize<T>(&self) -> impl Future<Output = Result<(), Error>>
     where
         T: StorageAccess<Storage = Self::Storage>;
 
     /// Initialize the storage to be able to manage storage for objects of type T.
     /// This will return an Error once `get_store` is called the first time.
-    async fn initialize_with_loader<T>(
-        &self,
-        loader: impl DefaultLoader<Result = T::Data> + Send + Sync + 'static,
-    ) -> Result<(), Error>
+    fn initialize_with_loader<T, L>(&self, loader: L) -> impl Future<Output = Result<(), Error>>
     where
-        T: StorageAccess<Storage = Self::Storage>;
+        T: StorageAccess<Storage = Self::Storage>,
+        L: DefaultLoader<Result = T::Data> + 'static;
 
     /// Retrieve the store singleton instance.
-    async fn get_store(&self) -> Arc<Self::Storage>;
+    fn get_store(&self) -> impl Future<Output = Arc<Self::Storage>>;
 }
 
 /// A trait for describing which storages an item needs access to.
@@ -85,7 +83,7 @@ pub enum InitializationState<T, U = ()> {
     /// This represents the state of the factory before the first request to get
     /// [`DeviceStorage`]. It maintains a list of all keys that might be used for
     /// storage.
-    Initializing(HashMap<&'static str, Option<Box<dyn Any + Send + Sync>>>, U),
+    Initializing(HashMap<&'static str, Option<Box<dyn Any>>>, U),
     /// A temporary state used to help in the conversion from [Initializing] to [Initialized]. This
     /// value is never intended to be read, but is necessary to keep the memory valid while
     /// ownership is taken of the values in [Initializing], but before the values in [Initialized]
@@ -157,7 +155,7 @@ impl StashDeviceStorageFactory {
     async fn initialize_storage_with_loader(
         &self,
         key: &'static str,
-        loader: Box<dyn Any + Send + Sync + 'static>,
+        loader: Box<dyn Any>,
     ) -> Result<(), Error> {
         match &mut *self.device_storage_cache.lock().await {
             InitializationState::Initializing(initial_keys, ()) => {
@@ -172,7 +170,6 @@ impl StashDeviceStorageFactory {
     }
 }
 
-#[async_trait::async_trait]
 impl StorageFactory for StashDeviceStorageFactory {
     type Storage = DeviceStorage;
 
@@ -183,18 +180,12 @@ impl StorageFactory for StashDeviceStorageFactory {
         self.initialize_storage(T::STORAGE_KEY).await
     }
 
-    async fn initialize_with_loader<T>(
-        &self,
-        loader: impl DefaultLoader<Result = T::Data> + Send + Sync + 'static,
-    ) -> Result<(), Error>
+    async fn initialize_with_loader<T, L>(&self, loader: L) -> Result<(), Error>
     where
         T: StorageAccess<Storage = DeviceStorage>,
+        L: DefaultLoader<Result = T::Data> + 'static,
     {
-        self.initialize_storage_with_loader(
-            T::STORAGE_KEY,
-            Box::new(loader) as Box<dyn Any + Send + Sync + 'static>,
-        )
-        .await
+        self.initialize_storage_with_loader(T::STORAGE_KEY, Box::new(loader) as Box<dyn Any>).await
     }
 
     async fn get_store(&self) -> Arc<DeviceStorage> {
@@ -255,7 +246,7 @@ impl FidlStorageFactory {
     async fn initialize_storage_with_loader(
         &self,
         key: &'static str,
-        loader: Box<dyn Any + Send + Sync + 'static>,
+        loader: Box<dyn Any>,
     ) -> Result<(), Error> {
         match &mut *self.device_storage_cache.lock().await {
             InitializationState::Initializing(initial_keys, _) => {
@@ -270,7 +261,6 @@ impl FidlStorageFactory {
     }
 }
 
-#[async_trait::async_trait]
 impl StorageFactory for FidlStorageFactory {
     type Storage = FidlStorage;
 
@@ -281,18 +271,12 @@ impl StorageFactory for FidlStorageFactory {
         self.initialize_storage(T::STORAGE_KEY).await
     }
 
-    async fn initialize_with_loader<T>(
-        &self,
-        loader: impl DefaultLoader<Result = T::Data> + Send + Sync + 'static,
-    ) -> Result<(), Error>
+    async fn initialize_with_loader<T, L>(&self, loader: L) -> Result<(), Error>
     where
         T: StorageAccess<Storage = FidlStorage>,
+        L: DefaultLoader<Result = T::Data> + 'static,
     {
-        self.initialize_storage_with_loader(
-            T::STORAGE_KEY,
-            Box::new(loader) as Box<dyn Any + Send + Sync + 'static>,
-        )
-        .await
+        self.initialize_storage_with_loader(T::STORAGE_KEY, Box::new(loader) as Box<dyn Any>).await
     }
 
     async fn get_store(&self) -> Arc<FidlStorage> {

@@ -65,7 +65,7 @@ impl RequestInfo {
     /// Adds a closure that will be triggered when the recipient for a response
     /// to the request goes out of scope. This allows for the message handler to
     /// know when the recipient is no longer valid.
-    async fn bind_to_scope(&mut self, trigger_fn: Box<dyn FnOnce() + Sync + Send>) {
+    async fn bind_to_scope(&mut self, trigger_fn: Box<dyn FnOnce()>) {
         self.client.bind_to_recipient(ActionFuse::create(trigger_fn)).await;
     }
 }
@@ -127,7 +127,7 @@ pub(crate) struct SettingProxy {
     next_request_id: usize,
 
     /// Factory for generating a new controller to service requests.
-    handler_factory: Arc<Mutex<dyn SettingHandlerFactory + Send + Sync>>,
+    handler_factory: Arc<Mutex<dyn SettingHandlerFactory>>,
     /// Messenger factory for communication with service components.
     delegate: service::message::Delegate,
     /// Messenger to send messages to controllers.
@@ -172,7 +172,7 @@ impl SettingProxy {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn create(
         setting_type: SettingType,
-        handler_factory: Arc<Mutex<dyn SettingHandlerFactory + Send + Sync>>,
+        handler_factory: Arc<Mutex<dyn SettingHandlerFactory>>,
         delegate: service::message::Delegate,
         max_attempts: u64,
         teardown_timeout: MonotonicDuration,
@@ -228,7 +228,7 @@ impl SettingProxy {
         };
 
         // Main task loop for receiving and processing incoming messages.
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let id = ftrace::Id::new();
             trace!(
                 id,
@@ -691,7 +691,7 @@ impl SettingProxy {
 
         let proxy_request_sender_clone = self.proxy_request_sender.clone();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             trace!(id, c"response");
             while let Some(message_event) = receptor.next().await {
                 let handler_result = match message_event {
@@ -765,7 +765,7 @@ impl SettingProxy {
         self.teardown_cancellation = Some(cancellation_tx);
         let sender = self.proxy_request_sender.clone();
         let teardown_timeout = self.teardown_timeout;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let timeout = fuchsia_async::Timer::new(crate::clock::now() + teardown_timeout).fuse();
             futures::pin_mut!(cancellation_rx, timeout);
             futures::select! {

@@ -89,7 +89,7 @@ impl Manager {
         // 1) Receiving new sources to process
         // 2) Accepting and processing new jobs from sources
         // 3) Executing jobs and handling the their results
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let id = ftrace::Id::new();
             trace!(id, c"job_manager");
             let source_fuse = receptor.fuse();
@@ -181,7 +181,7 @@ impl Manager {
         let stream_fut = job_stream
             .map(move |val| (source_id, Some(val)))
             .chain(async move { (source_id, None) }.into_stream())
-            .boxed()
+            .boxed_local()
             .into_future();
         self.job_futures.push(stream_fut);
         self.event_publisher.send_event(Event::Source(SourceEvent::Start(source_id)));
@@ -335,7 +335,7 @@ mod tests {
         }
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -403,7 +403,7 @@ mod tests {
             .expect("Should be able to queue requests");
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -457,7 +457,7 @@ mod tests {
             .expect("Should be able to queue requests");
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -541,7 +541,7 @@ mod tests {
             .expect("Should be able to queue requests");
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -563,7 +563,7 @@ mod tests {
 
     // This implementation can be used to imitate a hanging get by delaying or never sending a
     // message across its channel.
-    #[async_trait]
+    #[async_trait(?Send)]
     impl job::work::Sequential for WaitingWorkload {
         async fn execute(
             self: Box<Self>,
@@ -606,7 +606,7 @@ mod tests {
             ))))
             .expect("Should be able to send queue");
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -630,7 +630,7 @@ mod tests {
             .expect("Should be able to send queue");
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -670,7 +670,7 @@ mod tests {
             )))
             .expect("Should be able to send queue");
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 

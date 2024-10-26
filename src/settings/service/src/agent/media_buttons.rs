@@ -45,7 +45,7 @@ impl MediaButtonsAgent {
         };
 
         let mut receptor = context.receptor;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Ok((Payload::Invocation(invocation), client)) =
                 receptor.next_of::<Payload>().await
             {
@@ -79,7 +79,7 @@ impl MediaButtonsAgent {
             messenger: self.messenger.clone(),
             recipient_settings: self.recipient_settings.clone(),
         };
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(event) = input_rx.next().await {
                 let id = ftrace::Id::new();
                 event_handler.handle_event(event, id);
@@ -124,7 +124,7 @@ impl EventHandler {
                 HandlerPayload::Request(setting_request.clone()).into(),
                 Audience::Address(service::Address::Handler(*setting_type)),
             );
-            fasync::Task::spawn(async move {
+            fasync::Task::local(async move {
                 let _ = receptor.next_payload().await;
                 drop(guard);
             })

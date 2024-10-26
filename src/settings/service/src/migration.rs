@@ -413,7 +413,7 @@ impl FileGenerator {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 pub(crate) trait Migration {
     fn id(&self) -> u64;
     async fn migrate(&self, file_generator: FileGenerator) -> Result<(), MigrationError>;
@@ -429,16 +429,16 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl_fuchsia_io::DirectoryMarker;
-    use futures::future::BoxFuture;
+    use futures::future::LocalBoxFuture;
     use futures::FutureExt;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl<T> Migration for (u64, T)
     where
-        T: Fn(FileGenerator) -> BoxFuture<'static, Result<(), MigrationError>> + Send + Sync,
+        T: Fn(FileGenerator) -> LocalBoxFuture<'static, Result<(), MigrationError>>,
     {
         fn id(&self) -> u64 {
             self.0
@@ -457,10 +457,10 @@ mod tests {
     fn cannot_register_same_id_twice() {
         let mut builder = MigrationManagerBuilder::new();
         builder
-            .register((ID, Box::new(|_| async move { Ok(()) }.boxed())))
+            .register((ID, Box::new(|_| async move { Ok(()) }.boxed_local())))
             .expect("should register once");
         let result = builder
-            .register((ID, Box::new(|_| async move { Ok(()) }.boxed())))
+            .register((ID, Box::new(|_| async move { Ok(()) }.boxed_local())))
             .map_err(|e| format!("{e:}"));
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "migration with id 20220130120000 already registered");
@@ -509,7 +509,7 @@ mod tests {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -555,7 +555,7 @@ mod tests {
                             migration_ran.store(true, Ordering::SeqCst);
                             Err(MigrationError::NoData)
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -623,7 +623,7 @@ mod tests {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -640,7 +640,7 @@ mod tests {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -678,7 +678,7 @@ mod tests {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -714,7 +714,7 @@ mod tests {
                             initial_migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -732,7 +732,7 @@ mod tests {
                             second_migration_ran.store(true, Ordering::SeqCst);
                             Err(MigrationError::NoData)
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -772,7 +772,7 @@ mod tests {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -794,7 +794,7 @@ mod tests {
                                 .expect("can wite file");
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -856,7 +856,7 @@ mod tests {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))

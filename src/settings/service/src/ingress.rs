@@ -22,7 +22,7 @@ pub(crate) mod registration {
     use super::fidl;
     use crate::base::Dependency;
     use crate::job::source::Seeder;
-    use fuchsia_component::server::{ServiceFsDir, ServiceObj};
+    use fuchsia_component::server::{ServiceFsDir, ServiceObjLocal};
     use std::collections::HashSet;
 
     /// [Registrar] defines the medium over which communication occurs. Each entry includes a
@@ -32,9 +32,9 @@ pub(crate) mod registration {
         Fidl(fidl::Register),
         /// This value is reserved for testing purposes.
         #[cfg(test)]
-        Test(Box<dyn FnOnce() + Send + Sync>),
+        Test(Box<dyn FnOnce()>),
         #[cfg(test)]
-        TestWithSeeder(Box<dyn FnOnce(&Seeder) + Send + Sync>),
+        TestWithSeeder(Box<dyn FnOnce(&Seeder)>),
     }
 
     impl Registrar {
@@ -43,7 +43,7 @@ pub(crate) mod registration {
         pub fn register(
             self,
             job_seeder: &Seeder,
-            service_dir: &mut ServiceFsDir<'_, ServiceObj<'_, ()>>,
+            service_dir: &mut ServiceFsDir<'_, ServiceObjLocal<'_, ()>>,
         ) {
             match self {
                 Registrar::Fidl(register_fn) => {
@@ -92,7 +92,7 @@ pub(crate) mod registration {
         pub(crate) fn register(
             self,
             job_seeder: &Seeder,
-            service_dir: &mut ServiceFsDir<'_, ServiceObj<'_, ()>>,
+            service_dir: &mut ServiceFsDir<'_, ServiceObjLocal<'_, ()>>,
         ) {
             self.registrar.register(job_seeder, service_dir);
         }
@@ -121,7 +121,7 @@ mod tests {
             [dependency].into(),
         );
 
-        let mut fs = ServiceFs::new();
+        let mut fs = ServiceFs::new_local();
 
         // Verify added dependency.
         assert!(registrant.get_dependencies().contains(&dependency));

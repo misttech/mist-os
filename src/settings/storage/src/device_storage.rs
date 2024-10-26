@@ -79,15 +79,8 @@ struct CachedStorage {
 /// implement conversion/cleanup logic. Adding optional fields to a struct is not breaking, but
 /// removing fields, renaming fields, or adding non-optional fields are.
 ///
-/// The [`Storage`] trait has [`Send`] and [`Sync`] requirements, so they have to be carried here
-/// as well. This was not necessary before because rust could determine the additional trait
-/// requirements at compile-time just for when the [`Storage`] trait was used. We don't get that
-/// benefit anymore once we hide the type.
-///
 /// [`Storage`]: super::setting_handler::persist::Storage
-pub trait DeviceStorageCompatible:
-    Serialize + DeserializeOwned + Clone + PartialEq + Any + Send + Sync
-{
+pub trait DeviceStorageCompatible: Serialize + DeserializeOwned + Clone + PartialEq + Any {
     type Loader: DefaultDispatcher<Self>;
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
@@ -184,9 +177,9 @@ where
     }
 }
 
-type MappingFn = Box<dyn FnOnce(&(dyn Any + Send + Sync)) -> String + Send>;
-type TypeErasedData = dyn Any + Send + Sync + 'static;
-type TypeErasedLoader = dyn Any + Send + Sync + 'static;
+type MappingFn = Box<dyn FnOnce(&(dyn Any)) -> String>;
+type TypeErasedData = dyn Any;
+type TypeErasedLoader = dyn Any;
 
 impl DeviceStorage {
     /// Construct a device storage from the iteratable item, which will produce the keys for
@@ -224,7 +217,7 @@ impl DeviceStorage {
 
                     let inspect_handle = Arc::clone(&inspect_handle);
                     // Each key has an independent flush queue.
-                    Task::spawn(async move {
+                    Task::local(async move {
                         let mut next_allowed_flush = MonotonicInstant::now();
                         let mut next_flush_timer = pin!(OptionFuture::from(None).fuse());
                         let flush_requested = flush_receiver.fuse();
@@ -372,7 +365,7 @@ impl DeviceStorage {
             T::KEY,
             new_value.serialize_to(),
             Box::new(new_value.clone()) as Box<TypeErasedData>,
-            Box::new(|any: &(dyn Any + Send + Sync)| {
+            Box::new(|any: &(dyn Any)| {
                 // Attempt to downcast the `dyn Any` to its original type. If `T` was not its
                 // original type, then we want to panic because there's a compile-time issue
                 // with overlapping keys.
@@ -599,7 +592,7 @@ mod tests {
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let value_to_get = TestStruct { value: VALUE1 };
 
             #[allow(clippy::single_match)]
@@ -633,7 +626,7 @@ mod tests {
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             #[allow(clippy::single_match)]
             while let Some(req) = stash_stream.try_next().await.unwrap() {
                 #[allow(unreachable_patterns)]
@@ -663,7 +656,7 @@ mod tests {
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             #[allow(clippy::single_match)]
             while let Some(req) = stash_stream.try_next().await.unwrap() {
                 #[allow(unreachable_patterns)]
@@ -832,7 +825,7 @@ mod tests {
         let (stash_proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
 
-        let spawned = fasync::Task::spawn(async move {
+        let spawned = fasync::Task::local(async move {
             while let Some(request) = stream.next().await {
                 match request {
                     Ok(StoreAccessorRequest::GetValue { key, responder }) => {
@@ -1045,7 +1038,7 @@ mod tests {
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             #[allow(clippy::single_match)]
             while let Some(req) = stash_stream.try_next().await.unwrap() {
                 #[allow(unreachable_patterns)]

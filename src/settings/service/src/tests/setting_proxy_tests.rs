@@ -122,7 +122,7 @@ impl SettingHandler {
         }));
 
         let handler_clone = handler.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(event) = receptor.next().await {
                 match event {
                     MessageEvent::Message(
@@ -192,7 +192,7 @@ impl FakeFactory {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl SettingHandlerFactory for FakeFactory {
     async fn generate(
         &mut self,
@@ -507,7 +507,7 @@ async fn test_request_order() {
 
 struct ErrorFactory;
 
-#[async_trait]
+#[async_trait(?Send)]
 impl SettingHandlerFactory for ErrorFactory {
     async fn generate(
         &mut self,

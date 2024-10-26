@@ -8,7 +8,7 @@ use crate::service::message::Receptor;
 use crate::service_context::ServiceContext;
 use crate::{event, payload_convert, service};
 
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -73,7 +73,7 @@ impl PartialEq for Invocation {
     }
 }
 
-pub type AgentFuture = BoxFuture<'static, ()>;
+pub type AgentFuture = LocalBoxFuture<'static, ()>;
 
 /// Supported types of [Agent] creation functions.
 pub enum CreationFunc {

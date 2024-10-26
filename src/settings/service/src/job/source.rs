@@ -55,10 +55,10 @@ impl Seeder {
     where
         Job: TryFrom<J, Error = E2>,
         Error: From<E> + From<E2>,
-        T: Stream<Item = Result<J, E>> + Send + 'static,
+        T: Stream<Item = Result<J, E>> + 'static,
     {
         // Convert the incoming stream into the expected types for a Job source.
-        let mapped_stream: Pin<Box<dyn Stream<Item = Result<Job, Error>> + Send>> = source
+        let mapped_stream: Pin<Box<dyn Stream<Item = Result<Job, Error>>>> = source
             .map(|result| {
                 result
                     // First convert the error type from the result so we can be compatible
@@ -69,7 +69,7 @@ impl Seeder {
                     // but the types still need to align.
                     .and_then(|j| Job::try_from(j).map_err(Error::from))
             })
-            .boxed();
+            .boxed_local();
 
         // Send the source stream to the manager.
         let _ = self.messenger.message(
@@ -86,9 +86,9 @@ pub enum Error {
     #[error("Unexpected error")]
     Unexpected(fidl::Error),
     #[error("Invalid input")]
-    InvalidInput(Box<dyn ErrorResponder + Send>),
+    InvalidInput(Box<dyn ErrorResponder>),
     #[error("Invalid policy input")]
-    InvalidPolicyInput(Box<dyn PolicyErrorResponder + Send>),
+    InvalidPolicyInput(Box<dyn PolicyErrorResponder>),
     #[error("Unsupported API call")]
     Unsupported,
 }
@@ -252,7 +252,7 @@ impl Handler {
     }
 
     /// Returns true if any job is executed, false otherwise.
-    pub(crate) async fn execute_next<F: FnOnce(job::Info) + Send + 'static>(
+    pub(crate) async fn execute_next<F: FnOnce(job::Info) + 'static>(
         &mut self,
         delegate: &mut Delegate,
         callback: F,
@@ -266,7 +266,7 @@ impl Handler {
                     job_info.prepare_execution(delegate, &mut self.stores, callback).await;
                 drop(guard);
 
-                fasync::Task::spawn(execution).detach();
+                fasync::Task::local(execution).detach();
                 return true;
             }
         }

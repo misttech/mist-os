@@ -18,7 +18,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 #[cfg(test)]
 use fuchsia_component::server::ProtocolConnector;
-use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObj};
+use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
 #[cfg(test)]
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
@@ -214,10 +214,7 @@ fn init_storage_dir() -> DirectoryProxy {
 
 /// The [EnvironmentBuilder] aggregates the parameters surrounding an [environment](Environment) and
 /// ultimately spawns an environment based on them.
-pub struct EnvironmentBuilder<
-    'a,
-    T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static,
-> {
+pub struct EnvironmentBuilder<'a, T: StorageFactory<Storage = DeviceStorage>> {
     configuration: Option<ServiceConfiguration>,
     agent_blueprints: Vec<AgentCreator>,
     event_subscriber_blueprints: Vec<event::subscriber::BlueprintHandle>,
@@ -237,9 +234,7 @@ pub struct EnvironmentBuilder<
     light_configuration: Option<DefaultSetting<LightHardwareConfiguration, &'static str>>,
 }
 
-impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
-    EnvironmentBuilder<'a, T>
-{
+impl<'a, T: StorageFactory<Storage = DeviceStorage> + 'static> EnvironmentBuilder<'a, T> {
     /// Construct a new [EnvironmentBuilder] using `storage_factory` to construct the storage for
     /// the future [Environment].
     pub fn new(storage_factory: Arc<T>) -> Self {
@@ -400,9 +395,10 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
     /// components are spawned and ready to handle events and FIDL requests.
     async fn prepare_env(
         mut self,
-        mut fs: ServiceFs<ServiceObj<'_, ()>>,
+        mut fs: ServiceFs<ServiceObjLocal<'_, ()>>,
         runtime: Runtime,
-    ) -> Result<(ServiceFs<ServiceObj<'_, ()>>, Delegate, Seeder, HashSet<Entity>), Error> {
+    ) -> Result<(ServiceFs<ServiceObjLocal<'_, ()>>, Delegate, Seeder, HashSet<Entity>), Error>
+    {
         let service_dir = match runtime {
             Runtime::Service => fs.dir("svc"),
             #[cfg(test)]
@@ -540,7 +536,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
     pub fn spawn(
         self,
         mut executor: fasync::LocalExecutor,
-        fs: ServiceFs<ServiceObj<'_, ()>>,
+        fs: ServiceFs<ServiceObjLocal<'_, ()>>,
     ) -> Result<(), Error> {
         let (mut fs, ..) = executor
             .run_singlethreaded(self.prepare_env(fs, Runtime::Service))
@@ -554,11 +550,11 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
     #[cfg(test)]
     pub async fn spawn_nested(self, env_name: &'static str) -> Result<Environment, Error> {
         let (mut fs, delegate, job_seeder, entities) = self
-            .prepare_env(ServiceFs::new(), Runtime::Nested(env_name))
+            .prepare_env(ServiceFs::new_local(), Runtime::Nested(env_name))
             .await
             .context("Failed to prepare env")?;
         let connector = Some(fs.create_protocol_connector()?);
-        fasync::Task::spawn(fs.collect()).detach();
+        fasync::Task::local(fs.collect()).detach();
 
         Ok(Environment::new(connector, delegate, job_seeder, entities))
     }
@@ -608,7 +604,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         if components.contains(&SettingType::Audio) {
             let audio_loader = audio_loader.expect("Audio storage requires audio loader");
             device_storage_factory
-                .initialize_with_loader::<AudioController>(audio_loader.clone())
+                .initialize_with_loader::<AudioController, _>(audio_loader.clone())
                 .await
                 .expect("storage should still be initializing");
             factory_handle.register(
@@ -622,7 +618,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
         // Display
         if components.contains(&SettingType::Display) {
             device_storage_factory
-                .initialize_with_loader::<DisplayController>(
+                .initialize_with_loader::<DisplayController, _>(
                     display_loader.expect("Display storage requires display loader"),
                 )
                 .await
@@ -766,7 +762,7 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static>
 /// support the components specified in the components HashSet.
 #[allow(clippy::too_many_arguments)]
 async fn create_environment<'a, T, F>(
-    mut service_dir: ServiceFsDir<'_, ServiceObj<'a, ()>>,
+    mut service_dir: ServiceFsDir<'_, ServiceObjLocal<'a, ()>>,
     delegate: service::message::Delegate,
     job_seeder: Seeder,
     components: HashSet<SettingType>,
@@ -781,8 +777,8 @@ async fn create_environment<'a, T, F>(
     listener_logger: Arc<Mutex<ListenerInspectLogger>>,
 ) -> Result<HashSet<Entity>, Error>
 where
-    T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static,
-    F: StorageFactory<Storage = FidlStorage> + Send + Sync + 'static,
+    T: StorageFactory<Storage = DeviceStorage> + 'static,
+    F: StorageFactory<Storage = FidlStorage> + 'static,
 {
     for blueprint in event_subscriber_blueprints {
         blueprint.create(delegate.clone()).await;

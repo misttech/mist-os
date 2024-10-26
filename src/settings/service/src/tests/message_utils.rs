@@ -5,11 +5,10 @@
 use crate::message::base::MessageEvent;
 use crate::message::message_client::MessageClient;
 use crate::message::receptor::Receptor;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::StreamExt;
 
-pub(crate) type ClientFn =
-    Box<dyn FnOnce(MessageClient) -> BoxFuture<'static, ()> + Send + Sync + 'static>;
+pub(crate) type ClientFn = Box<dyn FnOnce(MessageClient) -> LocalBoxFuture<'static, ()>>;
 
 /// Ensures the payload matches expected value and invokes an action closure.
 /// If a client_fn is not provided, the message is acknowledged.

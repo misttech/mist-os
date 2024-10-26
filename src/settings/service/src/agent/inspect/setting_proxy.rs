@@ -214,7 +214,7 @@ impl SettingProxyInspectAgent {
                 ),
         };
 
-        fasync::Task::spawn({
+        fasync::Task::local({
             async move {
             let _ = &context;
             let id = fuchsia_trace::Id::new();

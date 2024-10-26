@@ -132,14 +132,14 @@ impl FactoryResetManager {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Create for FactoryResetController {
     async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
         Ok(Self { handle: FactoryResetManager::from_client(client).await? })
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl Handle for FactoryResetController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {

@@ -96,7 +96,7 @@ impl Service for AudioCoreService {
 
         let streams_clone = self.audio_streams.clone();
         let suppress_client_errors = self.suppress_client_errors;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let fused_exit = rx.fuse();
             futures::pin_mut!(fused_exit);
 
@@ -150,7 +150,7 @@ fn process_volume_control_stream(
     suppress_client_errors: bool,
 ) {
     let mut stream = volume_control.into_stream().expect("volume control stream error");
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         while let Some(req) = stream.try_next().await.unwrap() {
             #[allow(unreachable_patterns)]
             match req {

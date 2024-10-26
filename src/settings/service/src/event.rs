@@ -166,13 +166,13 @@ impl Publisher {
 
 pub(crate) mod subscriber {
     use super::*;
-    use futures::future::BoxFuture;
+    use futures::future::LocalBoxFuture;
 
     pub type BlueprintHandle = Arc<dyn Blueprint>;
 
     /// The Subscriber Blueprint is used for spawning new subscribers on demand
     /// in the environment.
     pub trait Blueprint {
-        fn create(&self, delegate: service::message::Delegate) -> BoxFuture<'static, ()>;
+        fn create(&self, delegate: service::message::Delegate) -> LocalBoxFuture<'static, ()>;
     }
 }

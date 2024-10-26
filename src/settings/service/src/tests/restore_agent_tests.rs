@@ -14,7 +14,7 @@ use crate::tests::fakes::base::create_setting_handler;
 use crate::tests::fakes::service_registry::ServiceRegistry;
 use crate::tests::scaffold::event::subscriber::Blueprint;
 use crate::{service, EnvironmentBuilder};
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use std::sync::Arc;
 
@@ -27,7 +27,7 @@ async fn create_event_environment() -> Arc<Mutex<Option<Receptor>>> {
     // Upon environment initialization, the subscriber will capture the event receptor.
     let create_subscriber = Arc::new({
         let event_receptor = Arc::clone(&event_receptor);
-        move |delegate: service::message::Delegate| -> BoxFuture<'static, ()> {
+        move |delegate: service::message::Delegate| -> LocalBoxFuture<'static, ()> {
             let event_receptor = Arc::clone(&event_receptor);
             Box::pin(async move {
                 let mut event_receptor = event_receptor.lock().await;
@@ -51,7 +51,7 @@ async fn create_event_environment() -> Arc<Mutex<Option<Receptor>>> {
 // Helper function for bringing up an environment with a single handler for a
 // single SettingType and validating the environment initialization result.
 async fn verify_restore_handling(
-    response_generate: Box<dyn Fn() -> SettingHandlerResult + Send + Sync + 'static>,
+    response_generate: Box<dyn Fn() -> SettingHandlerResult>,
     success: bool,
 ) {
     let counter: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));

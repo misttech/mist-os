@@ -88,6 +88,7 @@ impl StorageAccess for LightController {
     const STORAGE_KEY: &'static str = LightInfo::KEY;
 }
 
+#[async_trait(?Send)]
 impl data_controller::CreateWithAsync for LightController {
     type Data = Arc<std::sync::Mutex<DefaultSetting<LightHardwareConfiguration, &'static str>>>;
     async fn create_with(client: ClientProxy, data: Self::Data) -> Result<Self, ControllerError> {
@@ -99,7 +100,7 @@ impl data_controller::CreateWithAsync for LightController {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for LightController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {
@@ -539,7 +540,7 @@ mod tests {
             .expect("Unable to create agent messenger");
 
         // Spawn a task that mimics the storage agent by responding to read/write calls.
-        fuchsia_async::Task::spawn(async move {
+        fuchsia_async::Task::local(async move {
             loop {
                 if let Ok((payload, message_client)) = storage_receptor.next_payload().await {
                     if let Ok(StoragePayload::Request(storage_request)) =
@@ -634,7 +635,7 @@ mod tests {
             .expect("Unable to create agent messenger");
 
         // Spawn a task that mimics the storage agent by responding to read/write calls.
-        fuchsia_async::Task::spawn(async move {
+        fuchsia_async::Task::local(async move {
             loop {
                 if let Ok((payload, message_client)) = storage_receptor.next_payload().await {
                     if let Ok(StoragePayload::Request(storage_request)) =

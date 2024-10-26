@@ -90,7 +90,7 @@ impl Beacon {
             event_rx,
             ActionFuse::create(Box::new(move || {
                 let sentinel = sentinel.clone();
-                fasync::Task::spawn(async move {
+                fasync::Task::local(async move {
                     timeout_abort_client.abort();
                     sentinel.lock().await.trigger().await;
                 })
@@ -111,7 +111,7 @@ impl Beacon {
                 timeout_abort_server,
             );
 
-            fasync::Task::spawn(abortable_timeout.unwrap_or_else(|_| ())).detach();
+            fasync::Task::local(abortable_timeout.unwrap_or_else(|_| ())).detach();
         }
         (beacon, receptor)
     }

@@ -254,7 +254,7 @@ impl VolumeController {
                         // proxy we have exited. The proxy will then cleanup this
                         // AudioController.
                         let client = client.clone();
-                        fasync::Task::spawn(async move {
+                        fasync::Task::local(async move {
                             trace!(id, c"stream exit");
                             client
                                 .notify(Event::Exited(Err(ControllerError::UnexpectedError(
@@ -297,7 +297,7 @@ impl data_controller::CreateWith for AudioController {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for AudioController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {

@@ -65,7 +65,7 @@ impl Service for InputDeviceRegistryService {
             return Err(format_err!("exiting early"));
         }
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(req) = manager_stream.try_next().await.unwrap() {
                 if let fidl_fuchsia_ui_policy::DeviceListenerRegistryRequest::RegisterListener {
                     listener,

@@ -22,7 +22,7 @@ const CONTROLLER_ERROR_DEPENDENCY: &str = "fuchsia.media.audio";
 const UNKNOWN_INSPECT_STRING: &str = "unknown";
 
 /// Closure definition for an action that can be triggered by ActionFuse.
-pub(crate) type ExitAction = Arc<dyn Fn() + Send + Sync + 'static>;
+pub(crate) type ExitAction = Arc<dyn Fn()>;
 
 // Stores an AudioStream and a VolumeControl proxy bound to the AudioCore
 // service for |stored_stream|'s stream type. |proxy| is set to None if it
@@ -191,7 +191,7 @@ impl StreamVolumeControl {
         let publisher_clone = self.publisher.clone();
         let mut volume_events = vol_control_proxy.take_event_stream();
         let early_exit_action = self.early_exit_action.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let id = ftrace::Id::new();
             trace!(id, c"bind volume handler");
             loop {

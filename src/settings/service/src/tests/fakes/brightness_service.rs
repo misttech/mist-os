@@ -53,7 +53,7 @@ impl Service for BrightnessService {
         let brightness_handle = self.manual_brightness.clone();
         let num_changes_handle = self.num_changes.clone();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(req) = manager_stream.try_next().await.unwrap() {
                 match req {
                     fidl_fuchsia_ui_brightness::ControlRequest::WatchCurrentBrightness {

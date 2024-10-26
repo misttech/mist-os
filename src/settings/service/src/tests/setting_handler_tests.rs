@@ -38,7 +38,7 @@ macro_rules! gen_data_controller {
         /// defers to a Control type for how to behave.
         struct $name;
 
-        #[async_trait]
+        #[async_trait(?Send)]
         impl data_controller::Create for $name {
             async fn create(_: DataClientProxy) -> Result<Self, ControllerError> {
                 if $succeed {
@@ -49,7 +49,7 @@ macro_rules! gen_data_controller {
             }
         }
 
-        #[async_trait]
+        #[async_trait(?Send)]
         impl controller::Handle for $name {
             async fn handle(&self, _: Request) -> Option<SettingHandlerResult> {
                 return None;
@@ -193,7 +193,7 @@ async fn test_write_notify() {
     .await;
 }
 
-async fn verify_write_behavior<S: DeviceStorageCompatible + Into<SettingInfo> + Send + Sync>(
+async fn verify_write_behavior<S: DeviceStorageCompatible + Into<SettingInfo>>(
     proxy: &mut persist::ClientProxy,
     value: S,
     notified: bool,
@@ -238,7 +238,7 @@ impl StateController {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for StateController {
     async fn handle(&self, _: Request) -> Option<SettingHandlerResult> {
         None
@@ -256,7 +256,7 @@ impl controller::Handle for StateController {
 
 struct BlankController {}
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for BlankController {
     async fn handle(&self, _: Request) -> Option<SettingHandlerResult> {
         return None;
@@ -466,7 +466,7 @@ struct StubController {
     request_mapping: Vec<(Request, SettingHandlerResult)>,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for StubController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         self.request_mapping.iter().find(|(key, _)| *key == request).map(|(_, x)| x.clone())

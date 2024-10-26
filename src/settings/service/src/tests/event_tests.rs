@@ -8,7 +8,7 @@ use crate::tests::scaffold;
 use crate::{event, service, EnvironmentBuilder};
 use assert_matches::assert_matches;
 use fuchsia_async as fasync;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use std::sync::Arc;
 
@@ -29,24 +29,25 @@ async fn test_agent_event_propagation() {
 
     // Upon instantiation, the subscriber will capture the event message
     // delegate.
-    let create_subscriber =
-        Arc::new(move |captured_delegate: service::message::Delegate| -> BoxFuture<'static, ()> {
+    let create_subscriber = Arc::new(
+        move |captured_delegate: service::message::Delegate| -> LocalBoxFuture<'static, ()> {
             let delegate = cloned_delegate.clone();
             Box::pin(async move {
                 *delegate.lock().await = Some(captured_delegate);
             })
-        });
+        },
+    );
 
     // This agent simply captures the context and returns unhandled for all
     // subsequent invocations (allowing the authority to progress).
 
-    let f = Arc::new(move |mut context: Context| -> BoxFuture<'static, ()> {
+    let f = Arc::new(move |mut context: Context| -> LocalBoxFuture<'static, ()> {
         let publisher_capture = publisher_capture.clone();
 
         Box::pin(async move {
             *publisher_capture.lock().await = Some(context.get_publisher());
 
-            fasync::Task::spawn(async move {
+            fasync::Task::local(async move {
                 let _ = &context;
                 while let Ok((Payload::Invocation(_), client)) =
                     context.receptor.next_of::<Payload>().await

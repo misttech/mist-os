@@ -44,8 +44,8 @@ pub(crate) fn create_registrar<T, F>(
     fidl_storage_factory: Arc<F>,
 ) -> AgentCreator
 where
-    T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static,
-    F: StorageFactory<Storage = FidlStorage> + Send + Sync + 'static,
+    T: StorageFactory<Storage = DeviceStorage> + 'static,
+    F: StorageFactory<Storage = FidlStorage> + 'static,
 {
     AgentCreator {
         debug_id: "StorageAgent",
@@ -61,8 +61,8 @@ where
 
 pub(crate) struct StorageAgent<T, F>
 where
-    T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static,
-    F: StorageFactory<Storage = FidlStorage> + Send + Sync + 'static,
+    T: StorageFactory<Storage = DeviceStorage>,
+    F: StorageFactory<Storage = FidlStorage>,
 {
     /// The factory for creating a messenger to receive messages.
     delegate: service::message::Delegate,
@@ -72,8 +72,8 @@ where
 
 impl<T, F> StorageAgent<T, F>
 where
-    T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static,
-    F: StorageFactory<Storage = FidlStorage> + Send + Sync + 'static,
+    T: StorageFactory<Storage = DeviceStorage> + 'static,
+    F: StorageFactory<Storage = FidlStorage> + 'static,
 {
     async fn create(
         context: Context,
@@ -88,7 +88,7 @@ where
 
         let unordered = FuturesUnordered::new();
         unordered.push(context.receptor.into_future());
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let id = ftrace::Id::new();
             trace!(id, c"storage_agent");
             storage_agent.handle_messages(id, unordered).await

@@ -37,7 +37,7 @@ impl Service for RecoveryPolicy {
 
         let local_reset_allowed_handle = self.is_local_reset_allowed.clone();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(req) = manager_stream.try_next().await.unwrap() {
                 // Support future expansion of FIDL.
                 #[allow(unreachable_patterns)]

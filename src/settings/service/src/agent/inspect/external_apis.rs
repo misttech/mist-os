@@ -188,7 +188,7 @@ impl ExternalApiInspectAgent {
             api_calls: ManagedInspectMap::<ExternalApiCallsWrapper>::with_node(node),
         };
 
-        fasync::Task::spawn({
+        fasync::Task::local({
             async move {
                 let _ = &context;
                 let id = fuchsia_trace::Id::new();

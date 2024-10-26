@@ -70,7 +70,7 @@ impl Service for Camera3Service {
         let has_camera_device = Arc::clone(&self.has_camera_device);
         let delay_camera_device = Arc::clone(&self.delay_camera_device);
         let mut watch_count = 0;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(req) = device_watcher_stream.try_next().await.unwrap() {
                 // Support future expansion of FIDL.
                 #[allow(unreachable_patterns)]
@@ -106,7 +106,7 @@ impl Service for Camera3Service {
                     } => {
                         let mut stream = request.into_stream().unwrap();
                         let camera_sw_muted = Arc::clone(&camera_sw_muted);
-                        fasync::Task::spawn(async move {
+                        fasync::Task::local(async move {
                             while let Some(req) = stream.try_next().await.unwrap() {
                                 // Support future expansion of FIDL.
                                 match req {

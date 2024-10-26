@@ -50,7 +50,7 @@ impl Agent {
             messenger: context.create_messenger().await.expect("messenger should be created"),
         };
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let _ = &context;
             while let Ok((Payload::Invocation(invocation), client)) =
                 context.receptor.next_of::<Payload>().await

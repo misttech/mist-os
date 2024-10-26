@@ -118,7 +118,7 @@ pub(crate) async fn monitor_media_buttons(
     // TODO(https://fxbug.dev/42058092) This independent spawn is necessary! For some reason removing this or
     // merging it with the spawn below causes devices to lock up on input button events. Figure out
     // whether this can be removed or left as-is as part of the linked bug.
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         if let Err(error) = call_async!(presenter_service => register_listener(client_end)).await {
             tracing::error!(
                 "Registering media button listener with presenter service failed {:?}",
@@ -128,7 +128,7 @@ pub(crate) async fn monitor_media_buttons(
     })
     .detach();
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         while let Some(Ok(media_request)) = stream.next().await {
             // Support future expansion of FIDL
             #[allow(clippy::single_match)]

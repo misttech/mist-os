@@ -22,7 +22,7 @@ use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_settings::{DisplayMarker, DisplayProxy, IntlMarker};
 use fuchsia_async::{Task, TestExecutor};
 use fuchsia_inspect::component;
-use futures::future::{self, BoxFuture};
+use futures::future::{self, LocalBoxFuture};
 use futures::lock::Mutex;
 use std::sync::Arc;
 use zx::{self as zx, Status};
@@ -207,7 +207,7 @@ fn validate_restore_with_brightness_controller(
 #[fuchsia::test(allow_stalls = false)]
 async fn test_display_failure() {
     let service_gen =
-        |service_name: &str, channel: zx::Channel| -> BoxFuture<'static, Result<()>> {
+        |service_name: &str, channel: zx::Channel| -> LocalBoxFuture<'static, Result<()>> {
             match service_name {
                 fidl_fuchsia_ui_brightness::ControlMarker::PROTOCOL_NAME => {
                     // This stream is closed immediately

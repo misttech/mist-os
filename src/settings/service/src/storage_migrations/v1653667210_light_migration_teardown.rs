@@ -12,7 +12,7 @@ const LIGHT_KEY: &str = "settings_light_info";
 /// Deletes old Light settings data from stash.
 pub(crate) struct V1653667210LightMigrationTeardown(pub(crate) StoreProxy);
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl Migration for V1653667210LightMigrationTeardown {
     fn id(&self) -> u64 {
         1653667210
@@ -54,7 +54,7 @@ mod tests {
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
         let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
         let commit_called = Arc::new(AtomicBool::new(false));
-        let task = fasync::Task::spawn({
+        let task = fasync::Task::local({
             let commit_called = Arc::clone(&commit_called);
             async move {
                 let mut tasks = vec![];
@@ -62,7 +62,7 @@ mod tests {
                     if let StoreRequest::CreateAccessor { accessor_request, .. } = request {
                         let mut request_stream =
                             accessor_request.into_stream().expect("should be able to get stream");
-                        tasks.push(fasync::Task::spawn({
+                        tasks.push(fasync::Task::local({
                             let commit_called = Arc::clone(&commit_called);
                             async move {
                                 while let Some(Ok(request)) = request_stream.next().await {
@@ -110,13 +110,13 @@ mod tests {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
         let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
-        let task = fasync::Task::spawn(async move {
+        let task = fasync::Task::local(async move {
             let mut tasks = vec![];
             while let Some(Ok(request)) = request_stream.next().await {
                 if let StoreRequest::CreateAccessor { accessor_request, .. } = request {
                     let mut request_stream =
                         accessor_request.into_stream().expect("should be able to get stream");
-                    tasks.push(fasync::Task::spawn(async move {
+                    tasks.push(fasync::Task::local(async move {
                         while let Some(Ok(request)) = request_stream.next().await {
                             match request {
                                 StoreAccessorRequest::DeleteValue { .. } => {
