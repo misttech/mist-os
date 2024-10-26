@@ -17,6 +17,7 @@ source_set("udp_serde") {
   sources = [ "udp_serde.cc" ]
   public_deps = udp_serde_public_deps
   public = [ "udp_serde.h" ]
+  deps = [ "//sdk/lib/zxio:udp_socket_private" ]
 }
 
 # Shared library for use by golang targets. Fuchsia's build system doesn't
@@ -28,6 +29,7 @@ shared_library("udp_serde_for_cgo") {
   sources = [ "udp_serde.cc" ]
   public = [ "udp_serde.h" ]
   public_deps = udp_serde_public_deps
+  deps = [ "//sdk/lib/zxio:udp_socket_private" ]
 }
 
 source_set("udp_serde_test_util") {
