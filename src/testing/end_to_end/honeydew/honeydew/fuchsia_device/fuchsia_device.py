@@ -22,21 +22,6 @@ import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fcp
 
 from honeydew import errors
-from honeydew.affordances.connectivity.wlan.utils import types as wlan_types
-from honeydew.affordances.connectivity.wlan.wlan import (
-    wlan,
-    wlan_using_fc,
-    wlan_using_sl4f,
-)
-from honeydew.affordances.connectivity.wlan.wlan_policy import (
-    wlan_policy,
-    wlan_policy_using_fc,
-    wlan_policy_using_sl4f,
-)
-from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
-    wlan_policy_ap,
-    wlan_policy_ap_using_fc,
-)
 from honeydew.affordances.ffx import inspect as inspect_ffx
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
@@ -53,6 +38,13 @@ from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
 from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
 )
+from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
+from honeydew.affordances.fuchsia_controller.wlan import (
+    wlan_policy as wlan_policy_fc,
+)
+from honeydew.affordances.fuchsia_controller.wlan import (
+    wlan_policy_ap as wlan_policy_ap_fc,
+)
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
 )
@@ -65,6 +57,8 @@ from honeydew.affordances.sl4f.bluetooth.profiles import (
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_sl4f,
 )
+from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
+from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.interfaces.affordances import inspect as inspect_interface
 from honeydew.interfaces.affordances import rtc, session, tracing
 from honeydew.interfaces.affordances.bluetooth.profiles import (
@@ -77,6 +71,11 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_le as bluetooth_le_interface,
 )
 from honeydew.interfaces.affordances.ui import screenshot, user_input
+from honeydew.interfaces.affordances.wlan import (
+    wlan,
+    wlan_policy,
+    wlan_policy_ap,
+)
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
@@ -102,6 +101,7 @@ from honeydew.transports import serial_using_unix_socket
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.typing import bluetooth as bluetooth_types
 from honeydew.typing import custom_types
+from honeydew.typing import wlan as wlan_types
 from honeydew.utils import common, properties
 
 _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
@@ -537,12 +537,12 @@ class FuchsiaDevice(
             self._get_wlan_affordances_implementation()
             == wlan_types.Implementation.SL4F
         ):
-            return wlan_policy_using_sl4f.WlanPolicy(
+            return wlan_policy_sl4f.WlanPolicy(
                 device_name=self.device_name,
                 sl4f=self.sl4f,
             )
         else:
-            return wlan_policy_using_fc.WlanPolicy(
+            return wlan_policy_fc.WlanPolicy(
                 device_name=self.device_name,
                 ffx=self.ffx,
                 fuchsia_controller=self.fuchsia_controller,
@@ -557,7 +557,7 @@ class FuchsiaDevice(
         Returns:
             wlan_policy_ap.WlanPolicyAp object
         """
-        return wlan_policy_ap_using_fc.WlanPolicyAp(
+        return wlan_policy_ap_fc.WlanPolicyAp(
             device_name=self.device_name,
             ffx=self.ffx,
             fuchsia_controller=self.fuchsia_controller,
@@ -576,11 +576,9 @@ class FuchsiaDevice(
             self._get_wlan_affordances_implementation()
             == wlan_types.Implementation.SL4F
         ):
-            return wlan_using_sl4f.Wlan(
-                device_name=self.device_name, sl4f=self.sl4f
-            )
+            return wlan_sl4f.Wlan(device_name=self.device_name, sl4f=self.sl4f)
         else:
-            return wlan_using_fc.Wlan(
+            return wlan_fc.Wlan(
                 device_name=self.device_name,
                 ffx=self.ffx,
                 fuchsia_controller=self.fuchsia_controller,

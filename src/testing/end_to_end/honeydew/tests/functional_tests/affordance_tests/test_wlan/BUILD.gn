@@ -2,21 +2,162 @@
 # Use of this source code is governed by a BSD-style license that can be found
 # in the LICENSE file.
 
-# TODO(https://fxbug.dev/374190056): Remove this file after updating builder config files to point
-# to //src/testing/end_to_end:wlan_* groups
+import("//build/python/python_mobly_test.gni")
+import("//build/testing/environments.gni")
 
+if (is_host) {
+  python_mobly_test("wlan_policy_test_sl4f") {
+    main_source = "test_wlan_policy.py"
+    sources = [ "utils.py" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+      "//third_party/antlion",
+    ]
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "sl4f"
+        }
+      }
+    }
+    environments = [ wlan_vim3_ap_env ]
+  }
+
+  python_mobly_test("wlan_test_sl4f") {
+    main_source = "test_wlan.py"
+    sources = [ "utils.py" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+      "//third_party/antlion",
+    ]
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "sl4f"
+        }
+      }
+    }
+    environments = [ wlan_vim3_ap_env ]
+    test_data_deps =
+        [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
+  }
+
+  python_mobly_test("wlan_policy_ap_test_fc") {
+    main_source = "test_wlan_policy_ap.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+      "//third_party/antlion",
+    ]
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "fuchsia-controller"
+        }
+      }
+    }
+    environments = [ wlan_vim3_ap_env ]
+    test_data_deps =
+        [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
+  }
+
+  python_mobly_test("wlan_policy_test_fc") {
+    main_source = "test_wlan_policy.py"
+    sources = [ "utils.py" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+      "//third_party/antlion",
+    ]
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "fuchsia-controller"
+        }
+      }
+    }
+    environments = [ wlan_vim3_ap_env ]
+    test_data_deps =
+        [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
+  }
+
+  python_mobly_test("wlan_test_fc") {
+    main_source = "test_wlan.py"
+    sources = [ "utils.py" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+      "//third_party/antlion",
+    ]
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "fuchsia-controller"
+        }
+      }
+    }
+    environments = [ wlan_vim3_ap_env ]
+    test_data_deps =
+        [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
+  }
+}
+
+# Package groups for WLAN.
+group("wlan_packages") {
+  testonly = true
+  public_deps = [ "../../../../:sl4f_packages" ]
+}
+
+group("test_wlan_policy_sl4f") {
+  testonly = true
+  public_deps = [
+    ":wlan_policy_test_sl4f($host_toolchain)",
+    "../../../../:sl4f_packages",
+  ]
+}
+
+group("test_wlan_sl4f") {
+  testonly = true
+  public_deps = [
+    ":wlan_test_sl4f($host_toolchain)",
+    "../../../../:sl4f_packages",
+  ]
+}
+
+# Test groups for WLAN.
 group("core_vim3_stable_sl4f_tests") {
   testonly = true
-  public_deps = [ "//src/testing/end_to_end:wlan_core_vim3_stable_sl4f_tests" ]
+  public_deps = [ ":test_wlan_policy_sl4f" ]
 }
 
 group("core_vim3_unstable_sl4f_tests") {
   testonly = true
-  public_deps =
-      [ "//src/testing/end_to_end:wlan_core_vim3_unstable_sl4f_tests" ]
+  public_deps = [
+    ":test_wlan_sl4f",
+    ":wlan_policy_ap_test_fc($host_toolchain)",
+    ":wlan_policy_test_fc($host_toolchain)",
+    ":wlan_test_fc($host_toolchain)",
+  ]
 }
 
 group("core_vim3_staging_sl4f_tests") {
   testonly = true
-  public_deps = [ "//src/testing/end_to_end:wlan_core_vim3_staging_sl4f_tests" ]
+  public_deps = [
+    ":core_vim3_stable_sl4f_tests",
+    ":core_vim3_unstable_sl4f_tests",
+  ]
+}
+
+# Group containing all of the WLAN affordance functional test cases and its dependencies.
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":test_wlan_policy_sl4f",
+    ":test_wlan_sl4f",
+    ":wlan_policy_ap_test_fc($host_toolchain)",
+    ":wlan_policy_test_fc($host_toolchain)",
+    ":wlan_test_fc($host_toolchain)",
+  ]
 }

@@ -1,10 +1,6 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
-# TODO(https://fxbug.dev/374190056) - This file will be deleted after updating antlion to point to
-# new honeydew wlan affordances folder structure
-
 """Data types used by wlan affordance."""
 
 from __future__ import annotations
@@ -790,9 +786,9 @@ class Authentication:
         """Convert to a fuchsia.wlan.common.security/Authentication."""
         return f_wlan_common_security.Authentication(
             protocol=self.protocol,
-            credentials=(
-                self.credentials.to_fidl() if self.credentials else None
-            ),
+            credentials=self.credentials.to_fidl()
+            if self.credentials
+            else None,
         )
 
 
@@ -1121,11 +1117,9 @@ class AccessPointState:
             mode=ConnectivityMode.from_fidl(fidl.mode),
             band=OperatingBand.from_fidl(fidl.band),
             frequency=fidl.frequency,
-            clients=(
-                ConnectedClientInformation.from_fidl(fidl.clients)
-                if fidl.clients
-                else None
-            ),
+            clients=ConnectedClientInformation.from_fidl(fidl.clients)
+            if fidl.clients
+            else None,
             id=NetworkIdentifier.from_fidl(fidl.id),
         )
 

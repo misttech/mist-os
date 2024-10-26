@@ -6,9 +6,6 @@
 import abc
 from collections.abc import Callable
 
-from honeydew.affordances.connectivity.wlan.wlan import wlan
-from honeydew.affordances.connectivity.wlan.wlan_policy import wlan_policy
-from honeydew.affordances.connectivity.wlan.wlan_policy_ap import wlan_policy_ap
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller,
 )
@@ -25,6 +22,11 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_gap,
 )
 from honeydew.interfaces.affordances.ui import screenshot, user_input
+from honeydew.interfaces.affordances.wlan import (
+    wlan,
+    wlan_policy,
+    wlan_policy_ap,
+)
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )

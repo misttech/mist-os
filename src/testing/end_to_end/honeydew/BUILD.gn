@@ -32,20 +32,6 @@ python_library("honeydew_no_testonly") {
   sources = [
     "__init__.py",
     "affordances/__init__.py",
-    "affordances/connectivity/wlan/__init__.py",
-    "affordances/connectivity/wlan/utils/errors.py",
-    "affordances/connectivity/wlan/utils/types.py",
-    "affordances/connectivity/wlan/wlan/__init__.py",
-    "affordances/connectivity/wlan/wlan/wlan.py",
-    "affordances/connectivity/wlan/wlan/wlan_using_fc.py",
-    "affordances/connectivity/wlan/wlan/wlan_using_sl4f.py",
-    "affordances/connectivity/wlan/wlan_policy/__init__.py",
-    "affordances/connectivity/wlan/wlan_policy/wlan_policy.py",
-    "affordances/connectivity/wlan/wlan_policy/wlan_policy_using_fc.py",
-    "affordances/connectivity/wlan/wlan_policy/wlan_policy_using_sl4f.py",
-    "affordances/connectivity/wlan/wlan_policy_ap/__init__.py",
-    "affordances/connectivity/wlan/wlan_policy_ap/wlan_policy_ap.py",
-    "affordances/connectivity/wlan/wlan_policy_ap/wlan_policy_ap_using_fc.py",
     "affordances/ffx/__init__.py",
     "affordances/ffx/inspect.py",
     "affordances/ffx/session.py",
@@ -64,6 +50,10 @@ python_library("honeydew_no_testonly") {
     "affordances/fuchsia_controller/tracing.py",
     "affordances/fuchsia_controller/ui/__init__.py",
     "affordances/fuchsia_controller/ui/user_input.py",
+    "affordances/fuchsia_controller/wlan/__init__.py",
+    "affordances/fuchsia_controller/wlan/wlan.py",
+    "affordances/fuchsia_controller/wlan/wlan_policy.py",
+    "affordances/fuchsia_controller/wlan/wlan_policy_ap.py",
     "affordances/power/__init__.py",
     "affordances/power/system_power_state_controller/__init__.py",
     "affordances/power/system_power_state_controller/system_power_state_controller.py",
@@ -74,6 +64,9 @@ python_library("honeydew_no_testonly") {
     "affordances/sl4f/bluetooth/profiles/__init__.py",
     "affordances/sl4f/bluetooth/profiles/bluetooth_avrcp.py",
     "affordances/sl4f/bluetooth/profiles/bluetooth_gap.py",
+    "affordances/sl4f/wlan/__init__.py",
+    "affordances/sl4f/wlan/wlan.py",
+    "affordances/sl4f/wlan/wlan_policy.py",
     "auxiliary_devices/__init__.py",
     "auxiliary_devices/power_switch_dmc.py",
     "errors.py",
@@ -94,6 +87,9 @@ python_library("honeydew_no_testonly") {
     "interfaces/affordances/ui/__init__.py",
     "interfaces/affordances/ui/screenshot.py",
     "interfaces/affordances/ui/user_input.py",
+    "interfaces/affordances/wlan/wlan.py",
+    "interfaces/affordances/wlan/wlan_policy.py",
+    "interfaces/affordances/wlan/wlan_policy_ap.py",
     "interfaces/auxiliary_devices/__init__.py",
     "interfaces/auxiliary_devices/power_switch.py",
     "interfaces/device_classes/__init__.py",
@@ -210,10 +206,6 @@ group("unit_tests") {
 
   if (host_os != "mac") {
     public_deps += [
-      "honeydew/affordances/connectivity/wlan/utils/tests/unit_tests:tests",
-      "honeydew/affordances/connectivity/wlan/wlan/tests/unit_tests:tests",
-      "honeydew/affordances/connectivity/wlan/wlan_policy/tests/unit_tests:tests",
-      "honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/unit_tests:tests",
       "honeydew/affordances/power/system_power_state_controller/tests/unit_tests:tests",
       "tests/unit_tests:tests",
     ]
@@ -227,9 +219,6 @@ group("functional_tests") {
 
   if (host_os != "mac") {
     public_deps += [
-      "honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests/test_wlan:tests",
-      "honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests/test_wlan_policy:tests",
-      "honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests/test_wlan_policy_ap:tests",
       "honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:tests",
       "tests/functional_tests:tests",
     ]

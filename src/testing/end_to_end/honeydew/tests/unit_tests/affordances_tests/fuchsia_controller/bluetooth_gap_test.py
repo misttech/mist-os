@@ -154,7 +154,7 @@ class BluetoothGapTest(unittest.TestCase):
         )
         assert self.bluetooth_gap_obj._pairing_delegate_server is not None
         self.bluetooth_gap_obj._pairing_controller_proxy.set_pairing_delegate.assert_called_with(
-            input=1, output=1, delegate=mock.ANY
+            input=1, output=1, delegate=1
         )
 
     @parameterized.expand(

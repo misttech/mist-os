@@ -12,7 +12,7 @@ from ipaddress import IPv4Address, IPv6Address
 import fidl.fuchsia_net as f_net
 import fidl.fuchsia_net_interfaces as f_net_interfaces
 
-from honeydew.affordances.connectivity.wlan.utils.types import MacAddress
+from honeydew.typing.wlan import MacAddress
 
 
 # Not all fields of fuchsia.net.interfaces/Properties are added below.
