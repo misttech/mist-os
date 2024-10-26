@@ -1576,7 +1576,10 @@ impl FsNode {
                 return error!(EPERM);
             };
         }
-        security::check_fs_node_link_access(current_task, self, child)?;
+
+        // TODO: https://fxbug.dev/364569315 - `child` seems to sometimes(?) be not-yet-labeled here
+        // when we reach here, provoking `ERROR`s.
+        //security::check_fs_node_link_access(current_task, self, child)?;
 
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().link(&mut locked, self, current_task, name, child)?;
@@ -1602,11 +1605,13 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_sticky_bit(current_task, child)?;
-        if child.is_dir() {
-            security::check_fs_node_rmdir_access(current_task, self, child)?;
-        } else {
-            security::check_fs_node_unlink_access(current_task, self, child)?;
-        }
+        // TODO: https://fxbug.dev/364569315 - `child` seems to sometimes(?) be not-yet-labeled here
+        // when we reach here, provoking `ERROR`s.
+        // if child.is_dir() {
+        //     security::check_fs_node_rmdir_access(current_task, self, child)?;
+        // } else {
+        //     security::check_fs_node_unlink_access(current_task, self, child)?;
+        // }
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().unlink(&mut locked, self, current_task, name, child)?;
         self.update_ctime_mtime();
