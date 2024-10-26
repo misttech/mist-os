@@ -4,6 +4,7 @@
 
 #include "tools/fidl/fidlc/src/source_manager.h"
 
+#include <errno.h>
 #include <sys/stat.h>
 
 #include <utility>
