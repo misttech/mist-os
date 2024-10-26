@@ -346,6 +346,8 @@ impl Node {
 
     /// Creates a new lazy child with the given `name` and `callback`.
     /// `callback` will be invoked each time the component's Inspect is read.
+    /// `callback` is expected to create a new Inspector and return it;
+    /// its contents will be rooted at the intended location (the `self` node).
     #[must_use]
     pub fn create_lazy_child<F>(&self, name: impl Into<StringReference>, callback: F) -> LazyNode
     where
@@ -373,6 +375,8 @@ impl Node {
 
     /// Records a new lazy child with the given `name` and `callback`.
     /// `callback` will be invoked each time the component's Inspect is read.
+    /// `callback` is expected to create a new Inspector and return it;
+    /// its contents will be rooted at the intended location (the `self` node).
     pub fn record_lazy_child<F>(&self, name: impl Into<StringReference>, callback: F)
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
@@ -383,6 +387,8 @@ impl Node {
 
     /// Creates a new inline lazy node with the given `name` and `callback`.
     /// `callback` will be invoked each time the component's Inspect is read.
+    /// `callback` is expected to create a new Inspector and return it;
+    /// its contents will be rooted at the intended location (the `self` node).
     #[must_use]
     pub fn create_lazy_values<F>(&self, name: impl Into<StringReference>, callback: F) -> LazyNode
     where
@@ -410,6 +416,8 @@ impl Node {
 
     /// Records a new inline lazy node with the given `name` and `callback`.
     /// `callback` will be invoked each time the component's Inspect is read.
+    /// `callback` is expected to create a new Inspector and return it;
+    /// its contents will be rooted at the intended location (the `self` node).
     pub fn record_lazy_values<F>(&self, name: impl Into<StringReference>, callback: F)
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
