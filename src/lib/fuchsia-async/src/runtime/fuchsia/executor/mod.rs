@@ -13,4 +13,4 @@ pub use common::EHandle;
 pub use local::{LocalExecutor, TestExecutor};
 pub use packets::{PacketReceiver, ReceiverRegistration};
 pub use send::SendExecutor;
-pub use time::{MonotonicDuration, MonotonicInstant};
+pub use time::{BootInstant, MonotonicDuration, MonotonicInstant};

@@ -7,7 +7,7 @@
 //! This module contains the `Timer` type which is a future that will resolve
 //! at a particular point in the future.
 
-use crate::runtime::{EHandle, MonotonicInstant, WakeupTime};
+use crate::runtime::{BootInstant, EHandle, MonotonicInstant, WakeupTime};
 use crate::PacketReceiver;
 use fuchsia_sync::Mutex;
 
@@ -56,23 +56,57 @@ impl TimeInterface for MonotonicInstant {
     }
 }
 
+impl TimeInterface for BootInstant {
+    type Timeline = zx::BootTimeline;
+
+    fn from_nanos(nanos: i64) -> Self {
+        Self::from_nanos(nanos)
+    }
+
+    fn into_nanos(self) -> i64 {
+        self.into_nanos()
+    }
+
+    fn zx_instant(nanos: i64) -> zx::BootInstant {
+        zx::BootInstant::from_nanos(nanos)
+    }
+
+    fn now() -> i64 {
+        BootInstant::from_zx(zx::BootInstant::get()).into_nanos()
+    }
+}
+
 impl WakeupTime for std::time::Instant {
-    fn into_time(self) -> MonotonicInstant {
+    fn into_timer(self) -> Timer {
         let now_as_instant = std::time::Instant::now();
         let now_as_time = MonotonicInstant::now();
-        now_as_time + self.saturating_duration_since(now_as_instant).into()
+        EHandle::local()
+            .mono_timers()
+            .new_timer(now_as_time + self.saturating_duration_since(now_as_instant).into())
     }
 }
 
 impl WakeupTime for MonotonicInstant {
-    fn into_time(self) -> MonotonicInstant {
-        self
+    fn into_timer(self) -> Timer {
+        EHandle::local().mono_timers().new_timer(self)
+    }
+}
+
+impl WakeupTime for BootInstant {
+    fn into_timer(self) -> Timer {
+        EHandle::local().boot_timers().new_timer(self)
     }
 }
 
 impl WakeupTime for zx::MonotonicInstant {
-    fn into_time(self) -> MonotonicInstant {
-        self.into()
+    fn into_timer(self) -> Timer {
+        EHandle::local().mono_timers().new_timer(self.into())
+    }
+}
+
+impl WakeupTime for zx::BootInstant {
+    fn into_timer(self) -> Timer {
+        EHandle::local().boot_timers().new_timer(self.into())
     }
 }
 
@@ -83,7 +117,7 @@ pub struct Timer(TimerState);
 impl Timer {
     /// Create a new timer scheduled to fire at `time`.
     pub fn new(time: impl WakeupTime) -> Self {
-        EHandle::local().timers().new_timer(time)
+        time.into_timer()
     }
 
     /// Reset the `Timer` to a fire at a new time.
@@ -240,6 +274,8 @@ impl StateRef {
 ///
 /// This is a stream of events resolving at a rate of once-per interval.  This generates an event
 /// for *every* elapsed duration, even if multiple have elapsed since last polled.
+///
+/// TODO(https://fxbug.dev/375632319): This is lack of BootInstant support.
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct Interval {
@@ -301,16 +337,28 @@ impl Timers<MonotonicInstant> {
             inner: Mutex::new(Inner { timers: Heap::default(), async_wait: false }),
             port_key,
             fake,
-            timer: zx::Timer::<zx::MonotonicTimeline>::create(),
+            timer: zx::MonotonicTimer::create(),
+        }
+    }
+}
+
+impl Timers<BootInstant> {
+    pub fn new(port_key: u64, fake: bool) -> Self {
+        Self {
+            inner: Mutex::new(Inner { timers: Heap::default(), async_wait: false }),
+            port_key,
+            fake,
+            timer: zx::BootTimer::create(),
         }
     }
 }
 
 impl<T: TimeInterface> Timers<T> {
-    fn new_timer(self: &Arc<Self>, time: impl WakeupTime) -> Timer {
+    pub fn new_timer(self: &Arc<Self>, time: T) -> Timer {
+        let nanos = time.into_nanos();
         Timer(TimerState {
             timers: self.clone(),
-            nanos: UnsafeCell::new(time.into_time().into_nanos()),
+            nanos: UnsafeCell::new(nanos),
             waker: AtomicWaker::new(),
             state: AtomicU8::new(0),
             index: UnsafeCell::new(HeapIndex::NULL),
@@ -672,12 +720,31 @@ mod test {
     use std::pin::pin;
     use zx::MonotonicDuration;
 
-    #[test]
-    fn shorter_fires_first() {
+    trait TestTimeInterface:
+        TimeInterface
+        + WakeupTime
+        + std::ops::Sub<zx::Duration<Self::Timeline>, Output = Self>
+        + std::ops::Add<zx::Duration<Self::Timeline>, Output = Self>
+    {
+        fn after(duration: zx::Duration<Self::Timeline>) -> Self;
+    }
+
+    impl TestTimeInterface for MonotonicInstant {
+        fn after(duration: zx::MonotonicDuration) -> Self {
+            Self::after(duration)
+        }
+    }
+
+    impl TestTimeInterface for BootInstant {
+        fn after(duration: zx::BootDuration) -> Self {
+            Self::after(duration)
+        }
+    }
+
+    fn test_shorter_fires_first<T: TestTimeInterface>() {
         let mut exec = LocalExecutor::new();
-        let shorter =
-            pin!(Timer::new(MonotonicInstant::after(MonotonicDuration::from_millis(100))));
-        let longer = pin!(Timer::new(MonotonicInstant::after(MonotonicDuration::from_seconds(1))));
+        let shorter = pin!(Timer::new(T::after(zx::Duration::<T::Timeline>::from_millis(100))));
+        let longer = pin!(Timer::new(T::after(zx::Duration::<T::Timeline>::from_seconds(1))));
         match exec.run_singlethreaded(future::select(shorter, longer)) {
             Either::Left(_) => {}
             Either::Right(_) => panic!("wrong timer fired"),
@@ -685,17 +752,44 @@ mod test {
     }
 
     #[test]
-    fn shorter_fires_first_multithreaded() {
+    fn shorter_fires_first() {
+        test_shorter_fires_first::<MonotonicInstant>();
+        test_shorter_fires_first::<BootInstant>();
+    }
+
+    fn test_shorter_fires_first_multithreaded<T: TestTimeInterface>() {
         SendExecutor::new(4).run(async {
-            let shorter =
-                pin!(Timer::new(MonotonicInstant::after(MonotonicDuration::from_millis(100))));
-            let longer =
-                pin!(Timer::new(MonotonicInstant::after(MonotonicDuration::from_seconds(1))));
+            let shorter = pin!(Timer::new(T::after(zx::Duration::<T::Timeline>::from_millis(100))));
+            let longer = pin!(Timer::new(T::after(zx::Duration::<T::Timeline>::from_seconds(1))));
             match future::select(shorter, longer).await {
                 Either::Left(_) => {}
                 Either::Right(_) => panic!("wrong timer fired"),
             }
         });
+    }
+
+    #[test]
+    fn shorter_fires_first_multithreaded() {
+        test_shorter_fires_first_multithreaded::<MonotonicInstant>();
+        test_shorter_fires_first_multithreaded::<BootInstant>();
+    }
+
+    fn test_timer_before_now_fires_immediately<T: TestTimeInterface>() {
+        let mut exec = TestExecutor::new();
+        let now = T::now();
+        let before = pin!(Timer::new(T::from_nanos(now - 1)));
+        let after = pin!(Timer::new(T::from_nanos(now + 1)));
+        assert_matches!(
+            exec.run_singlethreaded(futures::future::select(before, after)),
+            Either::Left(_),
+            "Timer in the past should fire first"
+        );
+    }
+
+    #[test]
+    fn timer_before_now_fires_immediately() {
+        test_timer_before_now_fires_immediately::<MonotonicInstant>();
+        test_timer_before_now_fires_immediately::<BootInstant>();
     }
 
     #[test]
@@ -707,19 +801,6 @@ mod test {
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         exec.set_fake_time(deadline);
         assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut future));
-    }
-
-    #[test]
-    fn timer_before_now_fires_immediately() {
-        let mut exec = TestExecutor::new();
-        let now = MonotonicInstant::now();
-        let before = pin!(Timer::new(now - MonotonicDuration::from_nanos(1)));
-        let after = pin!(Timer::new(now + MonotonicDuration::from_nanos(1)));
-        assert_matches!(
-            exec.run_singlethreaded(futures::future::select(before, after)),
-            Either::Left(_),
-            "Timer in the past should fire first"
-        );
     }
 
     #[test]
@@ -792,7 +873,7 @@ mod test {
     #[test]
     fn timer_heap() {
         let _exec = TestExecutor::new_with_fake_time();
-        let timers = Arc::new(Timers::new(0, true));
+        let timers = Arc::new(Timers::<MonotonicInstant>::new(0, true));
 
         let mut timer_futures = Vec::new();
         let mut nanos: Vec<_> = (0..1000).collect();
@@ -835,7 +916,7 @@ mod test {
     #[test]
     fn timer_heap_with_same_time() {
         let _exec = TestExecutor::new_with_fake_time();
-        let timers = Arc::new(Timers::new(0, true));
+        let timers = Arc::new(Timers::<MonotonicInstant>::new(0, true));
 
         let mut timer_futures = Vec::new();
         let mut nanos: Vec<_> = (1..100).collect();

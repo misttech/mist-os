@@ -117,6 +117,112 @@ impl DurationExt for zx::MonotonicDuration {
     }
 }
 
+/// A time relative to the executor's clock on the boot timeline.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[repr(transparent)]
+pub struct BootInstant(zx::BootInstant);
+
+impl BootInstant {
+    /// Return the current time according to the system boot clock. Advances while the system
+    /// is suspended.
+    ///
+    /// This function does not support fake time from a `TestExecutor`.
+    // TODO(https://fxbug.dev/375631801): FakeTime in the TestExecutor does not support boot
+    // time yet.
+    pub fn now() -> Self {
+        BootInstant::from_zx(zx::BootInstant::get())
+    }
+
+    /// Compute a deadline for the time in the future that is the
+    /// given `Duration` away. Similar to `zx::BootInstant::after`,
+    /// saturates on overflow instead of wrapping around.
+    ///
+    /// This function does not support fake time from a `TestExecutor`.
+    // TODO(https://fxbug.dev/375631801): FakeTime in the TestExecutor does not support boot
+    // time yet.
+    pub fn after(duration: zx::BootDuration) -> Self {
+        Self::now() + duration
+    }
+
+    /// Convert from `zx::BootInstant`.
+    pub const fn from_zx(t: zx::BootInstant) -> Self {
+        BootInstant(t)
+    }
+
+    /// Convert into `zx::BootInstant`.
+    pub const fn into_zx(self) -> zx::BootInstant {
+        self.0
+    }
+
+    /// Convert from nanoseconds.
+    pub const fn from_nanos(nanos: i64) -> Self {
+        Self::from_zx(zx::BootInstant::from_nanos(nanos))
+    }
+
+    /// Convert to nanoseconds.
+    pub const fn into_nanos(self) -> i64 {
+        self.0.into_nanos()
+    }
+
+    /// The maximum time.
+    pub const INFINITE: BootInstant = BootInstant(zx::BootInstant::INFINITE);
+
+    /// The minimum time.
+    pub const INFINITE_PAST: BootInstant = BootInstant(zx::BootInstant::INFINITE_PAST);
+}
+
+impl From<zx::BootInstant> for BootInstant {
+    fn from(t: zx::BootInstant) -> BootInstant {
+        BootInstant(t)
+    }
+}
+
+impl From<BootInstant> for zx::BootInstant {
+    fn from(t: BootInstant) -> zx::BootInstant {
+        t.0
+    }
+}
+
+impl ops::Add<zx::BootDuration> for BootInstant {
+    type Output = BootInstant;
+    fn add(self, d: zx::BootDuration) -> BootInstant {
+        BootInstant(self.0 + d)
+    }
+}
+
+impl ops::Add<BootInstant> for zx::BootDuration {
+    type Output = BootInstant;
+    fn add(self, t: BootInstant) -> BootInstant {
+        BootInstant(self + t.0)
+    }
+}
+
+impl ops::Sub<zx::BootDuration> for BootInstant {
+    type Output = BootInstant;
+    fn sub(self, d: zx::BootDuration) -> BootInstant {
+        BootInstant(self.0 - d)
+    }
+}
+
+impl ops::Sub<BootInstant> for BootInstant {
+    type Output = zx::BootDuration;
+    fn sub(self, t: BootInstant) -> zx::BootDuration {
+        self.0 - t.0
+    }
+}
+
+impl ops::AddAssign<zx::BootDuration> for BootInstant {
+    fn add_assign(&mut self, d: zx::BootDuration) {
+        self.0.add_assign(d)
+    }
+}
+
+impl ops::SubAssign<zx::BootDuration> for BootInstant {
+    fn sub_assign(&mut self, d: zx::BootDuration) {
+        self.0.sub_assign(d)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

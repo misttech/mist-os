@@ -32,7 +32,7 @@ pub use task_group::*;
 // Fuchsia specific exports.
 #[cfg(target_os = "fuchsia")]
 pub use self::fuchsia::{
-    executor::{EHandle, PacketReceiver, ReceiverRegistration},
+    executor::{BootInstant, EHandle, PacketReceiver, ReceiverRegistration},
     timer::Interval,
 };
 
@@ -63,28 +63,37 @@ pub trait DurationExt {
 
 /// The time when a Timer should wakeup.
 pub trait WakeupTime {
-    /// Convert this time into a fuchsia_async::MonotonicInstant.
+    /// Create a timer based on this time.
+    ///
     /// This is allowed to be inaccurate, but the inaccuracy must make the wakeup time later,
     /// never earlier.
-    fn into_time(self) -> MonotonicInstant;
+    fn into_timer(self) -> Timer;
 }
 
+#[cfg(target_os = "fuchsia")]
 impl WakeupTime for std::time::Duration {
-    fn into_time(self) -> MonotonicInstant {
-        MonotonicInstant::now() + self.into()
+    fn into_timer(self) -> Timer {
+        EHandle::local().mono_timers().new_timer(MonotonicInstant::now() + self.into())
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl WakeupTime for std::time::Duration {
+    fn into_timer(self) -> Timer {
+        Timer(async_io::Timer::at(MonotonicInstant::now() + self.into()))
     }
 }
 
 #[cfg(target_os = "fuchsia")]
 impl WakeupTime for MonotonicDuration {
-    fn into_time(self) -> MonotonicInstant {
-        MonotonicInstant::after(self)
+    fn into_timer(self) -> Timer {
+        EHandle::local().mono_timers().new_timer(MonotonicInstant::after(self))
     }
 }
 
 impl DurationExt for std::time::Duration {
     fn after_now(self) -> MonotonicInstant {
-        self.into_time()
+        MonotonicInstant::now() + self.into()
     }
 }
 
@@ -97,7 +106,7 @@ pub trait TimeoutExt: Future + Sized {
         WT: WakeupTime,
         OT: FnOnce() -> Self::Output,
     {
-        OnTimeout { timer: Timer::new(time), future: self, on_timeout: Some(on_timeout) }
+        OnTimeout { timer: time.into_timer(), future: self, on_timeout: Some(on_timeout) }
     }
 
     /// Wraps the future in a stall-guard, calling `on_stalled` to produce a result
@@ -109,7 +118,7 @@ pub trait TimeoutExt: Future + Sized {
         OS: FnOnce() -> Self::Output,
     {
         OnStalled {
-            timer: Timer::new(timeout),
+            timer: timeout.into_timer(),
             future: self,
             timeout,
             on_stalled: Some(on_stalled),
@@ -181,7 +190,7 @@ where
         match this.timer.as_mut().poll(cx) {
             Poll::Ready(()) => {}
             Poll::Pending => {
-                this.timer.set(Timer::new(*this.timeout));
+                this.timer.set(this.timeout.into_timer());
                 ready!(this.timer.as_mut().poll(cx));
             }
         }
