@@ -7,8 +7,10 @@ use crate::task::{
     CurrentTask, GenericDuration, HrTimer, HrTimerHandle, TargetTime, ThreadGroup, Timeline,
     TimerId, TimerWakeup,
 };
+use crate::time::utc::estimate_monotonic_deadline_from_utc;
 use crate::vfs::timer::TimerOps;
-use fuchsia_async::MonotonicDuration;
+use assert_matches::assert_matches;
+
 use futures::stream::AbortHandle;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;
@@ -128,17 +130,31 @@ impl IntervalTimer {
                 // relative to the monotonic clock is off. Drop the guard before blocking so
                 // that the target time can be updated.
                 let target_time = { self.state.lock().target_time };
-                let target_monotonic = target_time.estimate_monotonic();
-                let now = zx::MonotonicInstant::get();
-                if now >= target_monotonic {
-                    break now - target_monotonic;
+                let now = self.timeline.now();
+                if now >= target_time {
+                    break now
+                        .delta(&target_time)
+                        .expect("timer timeline and target time are comparable");
                 }
                 if let Some(hr_timer) = &self.hr_timer {
+                    assert_matches!(
+                        target_time,
+                        TargetTime::BootInstant(_) | TargetTime::RealTime(_),
+                        "monotonic times can't be alarm deadlines",
+                    );
                     if let Err(e) = hr_timer.start(system_task, None, target_time) {
                         log_error!("Failed to start the HrTimer to trigger wakeup: {e}");
                     }
                 }
-                fuchsia_async::Timer::new(target_monotonic).await;
+
+                match target_time {
+                    TargetTime::Monotonic(t) => fuchsia_async::Timer::new(t).await,
+                    TargetTime::BootInstant(t) => fuchsia_async::Timer::new(t).await,
+                    // TODO(https://fxbug.dev/369653367): estimate boot deadline from utc
+                    TargetTime::RealTime(t) => {
+                        fuchsia_async::Timer::new(estimate_monotonic_deadline_from_utc(t)).await
+                    }
+                }
             };
             if !self.state.lock().armed {
                 return;
@@ -292,7 +308,7 @@ impl IntervalTimer {
 
         TimerRemaining {
             remainder: std::cmp::max(
-                MonotonicDuration::ZERO,
+                fuchsia_async::MonotonicDuration::ZERO,
                 guard
                     .target_time
                     .delta(&self.timeline.now())

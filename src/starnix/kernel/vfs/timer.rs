@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::fuchsia::ZxTimer;
+use crate::fs::fuchsia::{BootZxTimer, MonotonicZxTimer};
 use crate::power::OnWakeOps;
 use crate::task::{
     CurrentTask, EventHandler, GenericDuration, HandleWaitCanceler, HrTimer, SignalHandler,
@@ -76,9 +76,18 @@ impl TimerFile {
         timeline: Timeline,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
-        let timer: Arc<dyn TimerOps> = match wakeup_type {
-            TimerWakeup::Regular => Arc::new(ZxTimer::new()),
-            TimerWakeup::Alarm => Arc::new(HrTimer::new()),
+        let timer: Arc<dyn TimerOps> = match (wakeup_type, timeline) {
+            // TODO(https://fxbug.dev/369653367): real time should use BootZxTimer
+            (TimerWakeup::Regular, Timeline::Monotonic | Timeline::RealTime) => {
+                Arc::new(MonotonicZxTimer::new())
+            }
+            (TimerWakeup::Regular, Timeline::BootInstant) => Arc::new(BootZxTimer::new()),
+            (TimerWakeup::Alarm, Timeline::BootInstant | Timeline::RealTime) => {
+                Arc::new(HrTimer::new())
+            }
+            (TimerWakeup::Alarm, Timeline::Monotonic) => {
+                unreachable!("monotonic times cannot be alarm deadlines")
+            }
         };
 
         Ok(Anon::new_file(
