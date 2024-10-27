@@ -383,13 +383,20 @@ template("sdk_source_set") {
     deps = sdk_deps
   }
 
-  # As described at the top of this file, this atom does NOT build the
-  # underlying source files.
-  # Ensure the behavior matches this documentation.
-  # Both could be changed if it makes sense.
-  assert_no_deps = [ ":${main_target_name}" ]
-
   sdk_atom(sdk_target_name) {
+    # As described at the top of this file, this atom does NOT build the
+    # underlying source files.
+    # Ensure the behavior matches this documentation.
+    # Both could be changed if it makes sense.
+    #
+    # When plasa is enabled, the atom's `${sdk_target_name}_meta_copy` sub-target depends on
+    # the `${sdk_target_name}_plasa` target, which indirectly depends on
+    # `main_target_name`. Rather than trying to handle the `assert_no_deps` in
+    # `sdk_atom()`, just skip it in when generating plasa artifacts.
+    if (!generate_plasa_artifacts) {
+      assert_no_deps = [ ":${main_target_name}" ]
+    }
+
     forward_variables_from(invoker,
                            [
                              "source_dir",
