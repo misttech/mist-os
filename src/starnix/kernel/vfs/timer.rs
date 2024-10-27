@@ -77,11 +77,10 @@ impl TimerFile {
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
         let timer: Arc<dyn TimerOps> = match (wakeup_type, timeline) {
-            // TODO(https://fxbug.dev/369653367): real time should use BootZxTimer
-            (TimerWakeup::Regular, Timeline::Monotonic | Timeline::RealTime) => {
-                Arc::new(MonotonicZxTimer::new())
+            (TimerWakeup::Regular, Timeline::Monotonic) => Arc::new(MonotonicZxTimer::new()),
+            (TimerWakeup::Regular, Timeline::BootInstant | Timeline::RealTime) => {
+                Arc::new(BootZxTimer::new())
             }
-            (TimerWakeup::Regular, Timeline::BootInstant) => Arc::new(BootZxTimer::new()),
             (TimerWakeup::Alarm, Timeline::BootInstant | Timeline::RealTime) => {
                 Arc::new(HrTimer::new())
             }

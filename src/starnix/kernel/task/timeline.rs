@@ -78,10 +78,7 @@ impl TargetTime {
     pub fn estimate_boot(&self) -> Option<zx::BootInstant> {
         match self {
             TargetTime::BootInstant(t) => Some(*t),
-            // TODO(https://fxbug.dev/369653367): estimate_boot_deadline_from_utc
-            TargetTime::RealTime(t) => Some(zx::BootInstant::from_nanos(
-                utc::estimate_monotonic_deadline_from_utc(*t).into_nanos(),
-            )),
+            TargetTime::RealTime(t) => Some(utc::estimate_boot_deadline_from_utc(*t)),
             // It's not possible to estimate how long suspensions will be.
             TargetTime::Monotonic(_) => None,
         }

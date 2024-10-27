@@ -7,7 +7,7 @@ use crate::task::{
     CurrentTask, GenericDuration, HrTimer, HrTimerHandle, TargetTime, ThreadGroup, Timeline,
     TimerId, TimerWakeup,
 };
-use crate::time::utc::estimate_monotonic_deadline_from_utc;
+use crate::time::utc::estimate_boot_deadline_from_utc;
 use crate::vfs::timer::TimerOps;
 use assert_matches::assert_matches;
 
@@ -150,9 +150,8 @@ impl IntervalTimer {
                 match target_time {
                     TargetTime::Monotonic(t) => fuchsia_async::Timer::new(t).await,
                     TargetTime::BootInstant(t) => fuchsia_async::Timer::new(t).await,
-                    // TODO(https://fxbug.dev/369653367): estimate boot deadline from utc
                     TargetTime::RealTime(t) => {
-                        fuchsia_async::Timer::new(estimate_monotonic_deadline_from_utc(t)).await
+                        fuchsia_async::Timer::new(estimate_boot_deadline_from_utc(t)).await
                     }
                 }
             };
