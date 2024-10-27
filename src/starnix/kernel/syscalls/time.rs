@@ -77,9 +77,13 @@ pub fn sys_clock_gettime(
                 profile_duration!("GetUtcInstant");
                 utc_now().into_nanos()
             }
-            CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW | CLOCK_BOOTTIME => {
+            CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW => {
                 profile_duration!("GetMonotonic");
                 zx::MonotonicInstant::get().into_nanos()
+            }
+            CLOCK_BOOTTIME => {
+                profile_duration!("GetBootTime");
+                zx::BootInstant::get().into_nanos()
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 profile_duration!("GetThreadCpuTime");
