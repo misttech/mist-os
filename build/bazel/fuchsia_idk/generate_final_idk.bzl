@@ -35,7 +35,7 @@ def _generate_final_idk_impl(ctx):
     # e.g. @<repo_name>//<package>:<name> --> <package>/<name>
     sed_pattern = "s|@{repo_name}//\\([^:]*\\):\\(.*\\)|\\1/\\2|g".format(repo_name = ctx.label.repo_name)
 
-    content = """#!/usr/bin/bash
+    content = """#!/bin/bash
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.

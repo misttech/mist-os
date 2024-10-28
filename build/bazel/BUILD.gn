@@ -130,36 +130,8 @@ action("generate_main_workspace") {
 # properly populated by Bazel. The symlink has a stable path of
 # $BAZEL_TOPDIR/fuchsia_sdk while the actual location of the repository
 # depends on Bazel internals (e.g. whether BzlMod is enabled or not).
-action("generate_fuchsia_sdk_repository") {
-  script = "//build/bazel/scripts/generate-fuchsia-sdk-symlink.py"
-  outputs = [ "$bazel_main_top_dir/fuchsia_sdk" ]
-  deps = [
-    ":generate_main_workspace",
-    "//build/bazel/bazel_sdk:verify_fuchsia_sdk_repository",
-  ]
-  inputs = get_target_outputs(deps[0])
-  args = [
-    "--bazel-launcher",
-    rebase_path(inputs[0], root_build_dir),
-    "--output-symlink",
-    rebase_path(outputs[0], root_build_dir),
-  ]
-  metadata = {
-    # Used by the //:bazel_sdk_info build API module target.
-    bazel_sdk_info = [
-      {
-        location = rebase_path(outputs[0], root_build_dir)
-      },
-    ]
-  }
-
-  # This script invokes Bazel directly. Use console pool to prevent
-  # concurrent bazel invocations.
-  pool = "//:console($default_toolchain)"
-
-  # This cannot be hermetic as well since it creates a ton of
-  # files in the output base that cannot be listed in advance.
-  hermetic_deps = false
+group("generate_fuchsia_sdk_repository") {
+  deps = [ ":final_fuchsia_in_tree_sdk" ]
 }
 
 # Generate a symlink that points to the final version of the in-tree IDK
@@ -186,6 +158,36 @@ bazel_action("final_fuchsia_in_tree_idk") {
       ninja = "fuchsia_in_tree_idk"
     },
   ]
+}
+
+# Generate a symlink that points to the final version of the Bazel SDK
+# used by the platform build.
+bazel_action("final_fuchsia_in_tree_sdk") {
+  command = "build"
+  bazel_targets = [
+    "//build/bazel/bazel_sdk:final_fuchsia_in_tree_sdk",
+    "//build/bazel/bazel_sdk:verify_final_fuchsia_in_tree_sdk",
+  ]
+  deps = [ "//build/bazel/bazel_sdk:bazel_in_tree_idk.bazel_input" ]
+
+  # We want the symlink to appear as $BUILD_DIR/gen/build/bazel/fuchsia_sdk
+  ninja_base_dir = target_gen_dir
+
+  final_symlink_outputs = [
+    {
+      bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
+      ninja = "fuchsia_sdk"
+    },
+  ]
+
+  metadata = {
+    # Used by the //:bazel_sdk_info build API module target.
+    bazel_sdk_info = [
+      {
+        location = rebase_path("$target_gen_dir/fuchsia_sdk", root_build_dir)
+      },
+    ]
+  }
 }
 
 # Generate content hash files for python and Clang toolchains.
@@ -280,6 +282,7 @@ group("bazel_action_allowlist") {
   # Bazel build related targets
   visibility += [
     "//build/bazel:final_fuchsia_in_tree_idk",
+    "//build/bazel:final_fuchsia_in_tree_sdk",
     "//build/bazel/assembly:verify_assembly_configs.bazel_build_group",
     "//build/bazel/bazel_sdk:verify_fuchsia_sdk_repository",
     "//build/bazel/bazel_sdk/docs:docs.bazel_build_group",

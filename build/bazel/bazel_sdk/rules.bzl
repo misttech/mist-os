@@ -18,9 +18,30 @@ def _find_root_directory(files, suffix):
 def _generate_bazel_sdk(ctx):
     output_dir = ctx.actions.declare_directory(ctx.label.name)
 
-    input_idk_path = _find_root_directory(ctx.files.idk_export_dir, "/meta/manifest.json")
-    if not input_idk_path:
-        fail("IDK meta/manifest.json file missing from %s" % ctx.attr.idk_export_dir)
+    inputs = [ctx.file._buildifier_tool]
+
+    if ctx.attr.idk_export_dir:
+        if ctx.attr.idk_export_label:
+            fail("Only define one of idk_export_dir or idk_export_label when calling this rule!")
+
+        input_idk_files = ctx.files.idk_export_dir
+        input_idk_path = _find_root_directory(input_idk_files, "/meta/manifest.json")
+        if not input_idk_path:
+            fail("IDK meta/manifest.json file missing from %s" % ctx.attr.idk_export_dir)
+        inputs.extend(input_idk_files)
+
+    elif ctx.attr.idk_export_label:
+        # When a build produces a single TreeArtifact, its DefaultInfo.files should be
+        # a depset that contains a single File item that covers the whole directory.
+        input_idk_depset = ctx.attr.idk_export_label[DefaultInfo].files
+        input_idk_files = input_idk_depset.to_list()
+        if len(input_idk_files) != 1:
+            fail("More than one file listed ad idk_export_label: %s" % ctx.attr.idk.export_label)
+
+        input_idk_path = input_idk_files[0].path
+        inputs = depset(inputs, transitive = [input_idk_depset])
+    else:
+        fail("Define idk_export_dir or idk_export_label when calling this rule!")
 
     ctx.actions.run(
         executable = ctx.executable._idk_to_bazel_script,
@@ -30,9 +51,9 @@ def _generate_bazel_sdk(ctx):
             "--output-sdk",
             output_dir.path,
             "--buildifier",
-            ctx.file._buildifier_tool.short_path,
+            ctx.file._buildifier_tool.path,
         ],
-        inputs = ctx.files.idk_export_dir + [ctx.file._buildifier_tool],
+        inputs = inputs,
         outputs = [output_dir],
         execution_requirements = {
             # The input IDK has more than 10,000 files in it, and should
@@ -50,13 +71,15 @@ def _generate_bazel_sdk(ctx):
     return DefaultInfo(files = depset([output_dir]))
 
 generate_bazel_sdk = rule(
-    doc = """Generate a Bazel SDK at build time from an input IDK directory.""",
+    doc = """Generate a Bazel SDK at build time from an input IDK directory. Setting either idk_export_dir or idk_export_label is mandatory.""",
     implementation = _generate_bazel_sdk,
     attrs = {
         "idk_export_dir": attr.label(
             doc = "Path to IDK export directory, must point to filegroup()",
-            mandatory = True,
             allow_files = True,
+        ),
+        "idk_export_label": attr.label(
+            doc = "Label to a target generatinf an IDK export directory as a TreeArtifact",
         ),
         "_idk_to_bazel_script": attr.label(
             default = "//build/bazel/bazel_sdk:idk_to_bazel_sdk",

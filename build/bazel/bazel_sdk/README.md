@@ -361,7 +361,7 @@ a function invoked in a build action:
 |       [fuchsia_sdk_repository()]                      [[fuchsia_sdk_repository()]]
 |                   |                                                |
 |                   v                                                v
-|              @fuchsia_sdk                       //build/bazel/bazel_sdk:final_fuchsia_sdk
+|              @fuchsia_sdk                   //build/bazel/bazel_sdk:final_fuchsia_in_tree_sdk
 |
 |
 |
