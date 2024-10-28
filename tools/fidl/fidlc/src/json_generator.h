@@ -148,8 +148,10 @@ class JSONGenerator : public JsonWriter<JSONGenerator> {
   void GenerateDeclarationsEntry(int count, const Name& name, std::string_view decl_kind);
   void GenerateDeclarationsMember(const Compilation::Declarations& declarations,
                                   Position position = Position::kSubsequent);
-  void GenerateExternalDeclarationsEntry(int count, const Name& name, std::string_view decl_kind,
-                                         std::optional<Resourceness> maybe_resourceness);
+  void GenerateExternalDeclarationsEntry(
+      int count, const Name& name, std::string_view decl_kind,
+      std::optional<Resourceness> maybe_resourceness = std::nullopt,
+      const std::optional<TypeShape>& maybe_type_shape = std::nullopt);
   void GenerateExternalDeclarationsMember(const Compilation::Declarations& declarations,
                                           Position position = Position::kSubsequent);
   void GenerateProtocolImplementationLocations(const Protocol& value);

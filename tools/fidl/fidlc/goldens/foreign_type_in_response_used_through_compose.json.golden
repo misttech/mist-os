@@ -18,7 +18,16 @@
       "declarations": {
         "test.bottom/Foo": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         }
       }
     },
@@ -30,7 +39,16 @@
         },
         "test.middle/MiddleGetFooResponse": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         }
       }
     }

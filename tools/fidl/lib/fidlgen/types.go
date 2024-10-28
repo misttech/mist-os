@@ -1726,6 +1726,8 @@ type DeclInfo struct {
 	Type DeclType `json:"kind"`
 	// Present for structs, tables, and unions.
 	*Resourceness `json:"resource,omitempty"`
+	// Present for bits, enums, structs, tables, unions, overlays, and newtypes
+	TypeShapeV2 *TypeShape `json:"type_shape_v2,omitempty"`
 }
 
 type DeclMap map[EncodedCompoundIdentifier]DeclType
