@@ -1577,9 +1577,7 @@ impl FsNode {
             };
         }
 
-        // TODO: https://fxbug.dev/364569315 - `child` seems to sometimes(?) be not-yet-labeled here
-        // when we reach here, provoking `ERROR`s.
-        //security::check_fs_node_link_access(current_task, self, child)?;
+        security::check_fs_node_link_access(current_task, self, child)?;
 
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().link(&mut locked, self, current_task, name, child)?;
