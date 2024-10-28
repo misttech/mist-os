@@ -4,8 +4,9 @@
 
 #include "src/ui/input/drivers/goldfish_sensor/parser.h"
 
-#include <cerrno>
+#include <stdlib.h>
 
+#include <cerrno>
 namespace goldfish::sensor {
 
 namespace {
