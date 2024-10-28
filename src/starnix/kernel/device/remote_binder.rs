@@ -596,6 +596,56 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         Ok(())
     }
 
+    /// Serve the ContainerPowerController protocol.
+    async fn serve_container_power_controller(
+        server_end: ServerEnd<fbinder::ContainerPowerControllerMarker>,
+        proxy_event: zx::EventPair,
+        kernel: Arc<Kernel>,
+        service_name: &str,
+    ) -> Result<(), Error> {
+        async fn handle_request(
+            event: fbinder::ContainerPowerControllerRequest,
+            proxy_event: &zx::EventPair,
+            kernel: &Arc<Kernel>,
+            wake_lock_name: &str,
+        ) -> Result<(), Error> {
+            match event {
+                fbinder::ContainerPowerControllerRequest::Wake { payload, .. } => {
+                    if let Some(wake_lock) = payload.wake_lock {
+                        kernel.suspend_resume_manager.add_lock(wake_lock_name);
+                        let kernel_clone = kernel.clone();
+                        let wake_lock_name = wake_lock_name.to_owned();
+                        kernel.kthreads.spawn_future(async move {
+                            fasync::OnSignals::new(&wake_lock, zx::Signals::EVENTPAIR_PEER_CLOSED)
+                                .await
+                                .unwrap();
+                            kernel_clone.suspend_resume_manager.remove_lock(&wake_lock_name);
+                        });
+                    }
+
+                    if let Some(baton) = payload.power_baton {
+                        // Since we received this message, we know that the kernel is awake and
+                        // it's acceptable to drop the baton.
+                        // Manually call `drop` just to be explicit (and leave a comment).
+                        drop(baton);
+                    }
+                }
+                unknown => log_warn!("Unknown ContainerPowerController request: {:#?}", unknown),
+            };
+            crate::power::clear_wake_proxy_signal(proxy_event);
+            Ok(())
+        }
+
+        server_end
+            .into_stream()
+            .unwrap()
+            .map(|result| result.context("failed fbinder::ContainerPowerControllerRequest request"))
+            .try_for_each_concurrent(None, |event| {
+                handle_request(event, &proxy_event, &kernel, service_name)
+            })
+            .await
+    }
+
     /// Serve the LutexController protocol.
     async fn serve_lutex_controller(
         kernel: Arc<Kernel>,
@@ -919,10 +969,16 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             fbinder::RemoteControllerSynchronousProxy::new(remote_controller_client.into_channel());
         let (dev_binder_server_end, dev_binder_client_end) = zx::Channel::create();
         let (lutex_controller_server_end, lutex_controller_client_end) = zx::Channel::create();
+
+        let (power_controller_server_end, power_controller_client_end) = zx::Channel::create();
+        let (power_controller_server_end, power_controller_event) =
+            crate::power::create_proxy_for_wake_events(power_controller_server_end, format!("hal"));
+
         remote_controller
             .start(fbinder::RemoteControllerStartRequest {
                 dev_binder: Some(dev_binder_client_end.into()),
                 lutex_controller: Some(lutex_controller_client_end.into()),
+                container_power_controller: Some(power_controller_client_end.into()),
                 ..Default::default()
             })
             .map_err(|_| errno!(EINVAL))?;
@@ -939,16 +995,23 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             let Some((kernel, drop_waiter)) = kernel_and_drop_waiter else {
                 return;
             };
-            // Start the 2 servers.
+            // Start the 3 servers.
             let dev_binder_future = handle.clone().serve_dev_binder(dev_binder_server_end.into());
             let lutex_controller_future =
-                Self::serve_lutex_controller(kernel, lutex_controller_server_end.into());
-            // Wait until both are done, or the task exits.
-            let (binder_result, lutex_controller_result) = futures::join!(
-                future_or_task_end(&drop_waiter, dev_binder_future),
-                future_or_task_end(&drop_waiter, lutex_controller_future)
+                Self::serve_lutex_controller(kernel.clone(), lutex_controller_server_end.into());
+            let power_controller_future = Self::serve_container_power_controller(
+                power_controller_server_end.into(),
+                power_controller_event,
+                kernel,
+                &service_name,
             );
-            let result = binder_result.and(lutex_controller_result);
+            // Wait until both are done, or the task exits.
+            let (binder_result, lutex_controller_result, power_controller_result) = futures::join!(
+                future_or_task_end(&drop_waiter, dev_binder_future),
+                future_or_task_end(&drop_waiter, lutex_controller_future),
+                future_or_task_end(&drop_waiter, power_controller_future)
+            );
+            let result = binder_result.and(lutex_controller_result).and(power_controller_result);
             if let Err(e) = &result {
                 log_error!("Error when servicing the DevBinder protocol: {e:#}");
             }
@@ -1052,6 +1115,7 @@ mod tests {
     use crate::device::binder::tests::run_process_accessor;
     use crate::device::binder::BinderFs;
     use crate::mm::MemoryAccessor;
+    use crate::power::{KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL};
     use crate::testing::*;
     use crate::vfs::{FileSystemOptions, WhatToMount};
     use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
@@ -1327,5 +1391,68 @@ mod tests {
             binder
         })
         .await
+    }
+
+    async fn wait_for_kernel_proxy_and_clear(event: &zx::EventPair) {
+        fasync::OnSignals::new(&event, KERNEL_PROXY_EVENT_SIGNAL).await.unwrap();
+        event.as_handle_ref().signal(KERNEL_PROXY_EVENT_SIGNAL, zx::Signals::empty()).unwrap();
+    }
+
+    #[::fuchsia::test]
+    async fn container_power_controller() {
+        let (kernel, _init_task) = create_kernel_and_task();
+
+        let (power_controller, power_controller_server_end) =
+            fidl::endpoints::create_proxy().unwrap();
+        let (event, event_remote) = zx::EventPair::create();
+        let _server_task = fasync::Task::local(async move {
+            let result = RemoteBinderHandle::<TestRemoteControllerConnector>::serve_container_power_controller(power_controller_server_end, event_remote, kernel, "test").await;
+            assert_matches::assert_matches!(result, Ok(_));
+        });
+
+        // Check that `wake` signals correctly.
+        event.as_handle_ref().signal(zx::Signals::empty(), RUNNER_PROXY_EVENT_SIGNAL).unwrap();
+        power_controller
+            .wake(fbinder::ContainerPowerControllerWakeRequest { ..Default::default() })
+            .unwrap();
+        wait_for_kernel_proxy_and_clear(&event).await;
+        assert_matches::assert_matches!(
+            event.wait_handle(RUNNER_PROXY_EVENT_SIGNAL, zx::MonotonicInstant::INFINITE_PAST),
+            Err(_)
+        );
+    }
+
+    #[test]
+    fn container_power_controller_drop_wake_lock() {
+        let mut exec = fasync::TestExecutor::new();
+        let (kernel, _init_task) = create_kernel_and_task();
+
+        let (power_controller, power_controller_server_end) =
+            fidl::endpoints::create_proxy().unwrap();
+        let (event, event_remote) = zx::EventPair::create();
+        let kernel_clone = kernel.clone();
+        let _server_task = fasync::Task::local(async move {
+            let result = RemoteBinderHandle::<TestRemoteControllerConnector>::serve_container_power_controller(power_controller_server_end, event_remote, kernel_clone, "test").await;
+            assert_matches::assert_matches!(result, Ok(_));
+        });
+
+        // Take a wake lock and check that the runner signal is no longer cleared.
+        event.as_handle_ref().signal(zx::Signals::empty(), RUNNER_PROXY_EVENT_SIGNAL).unwrap();
+        let (wake_lock, wake_lock_remote) = zx::EventPair::create();
+        power_controller
+            .wake(fbinder::ContainerPowerControllerWakeRequest {
+                wake_lock: Some(wake_lock_remote),
+                ..Default::default()
+            })
+            .unwrap();
+        exec.run_singlethreaded(wait_for_kernel_proxy_and_clear(&event));
+
+        // Check that we already have the lock.
+        assert!(!kernel.suspend_resume_manager.add_lock("test"));
+
+        // Drop our lock, run the executor, and check that the lock dropped.
+        drop(wake_lock);
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+        assert!(kernel.suspend_resume_manager.add_lock("test"));
     }
 }
