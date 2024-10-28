@@ -330,14 +330,13 @@ mod test {
         let auth = pbms::AuthFlowChoice::NoAuth;
         let product_dir = tmp.path().join("download");
         let base_url = Some(format!("file:{}", tmp.path().display()));
-        let version = Some(String::from("fake_version"));
         let cmd = DownloadCommand {
             force,
             auth,
             manifest_url,
             product_dir,
             base_url,
-            version,
+            version: None,
             branch: None,
         };
 

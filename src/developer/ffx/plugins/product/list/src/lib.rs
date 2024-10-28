@@ -109,47 +109,42 @@ pub async fn resolve_branch_to_base_urls<I>(
 where
     I: structured_ui::Interface,
 {
-    let base_urls: Vec<String> =
-        context.get(CONFIG_BASE_URLS).context("get config CONFIG_BASE_URLS")?;
-
-    // If branch is not provided, use version to build base_urls
-    if branch.is_none() {
-        let version = match version {
-            Some(version) => version,
-            None => {
-                let sdk = context.get_sdk().await.context("getting sdk env context")?;
-                match sdk.get_version() {
-                    SdkVersion::Version(version) => version.to_string(),
-                    SdkVersion::InTree => {
-                        return_user_error!(
-                            "Using in-tree sdk. Please specify the version through '--version'"
-                        )
-                    }
-                    SdkVersion::Unknown => {
-                        return_user_error!(
-                            "Unable to determine SDK version. Please specify the version through '--version'")
-                    }
+    let prefix = match (branch, version) {
+        (Some(_), Some(_)) => {
+            return_user_error!("Cannot provide version and branch at the same time")
+        }
+        (None, Some(version)) => version,
+        (Some(branch), None) => match BRANCH_TO_PREFIX_MAPPING.get(branch.as_str()) {
+            Some(version) => version.to_string(),
+            None => return_user_error!("Branch value is not supported!"),
+        },
+        (None, None) => {
+            let sdk = context.get_sdk().await.context("getting sdk env context")?;
+            match sdk.get_version() {
+                // For version of SDK, we trim the version to date section.
+                // e.g. if the version is 24.20241023.2.1, we will trim it
+                // into 24.20241023. This is because the product version
+                // does not always align with the sdk version.
+                SdkVersion::Version(version) => version[..11].to_string(),
+                SdkVersion::InTree => {
+                    return_user_error!(
+                        "Using in-tree sdk. Please specify the version through '--version'"
+                    )
+                }
+                SdkVersion::Unknown => {
+                    return_user_error!(
+                        "Unable to determine SDK version. Please specify the version through '--version'")
                 }
             }
-        };
-        return Ok(base_urls.iter().map(|x| format!("{}/{}", x, version)).collect::<Vec<_>>());
-    }
+        }
+    };
+    let prefix = format!("development/{}", &prefix);
 
-    // If branch is not none, resolve it to latest available version.
-
-    // Error out if both version and branch are provided.
-    if version.is_some() {
-        return_user_error!("Cannot provide version and branch at the same time");
-    }
-
-    let branch = branch.unwrap();
     let mut result = Vec::new();
+    let base_urls: Vec<String> =
+        context.get(CONFIG_BASE_URLS).context("get config CONFIG_BASE_URLS")?;
     for base_url in base_urls {
         let (bucket, _) = split_gs_url(&base_url).context("Splitting gs URL.")?;
-        let prefix = format!(
-            "development/{}",
-            BRANCH_TO_PREFIX_MAPPING.get(branch.as_str()).expect("Branch value is not supported!")
-        );
         let version = get_latest_version(bucket, &prefix, auth, ui, &client).await?;
         result.push(format!("{}/{}", base_url, version));
     }
@@ -196,16 +191,22 @@ pub async fn pb_list_impl<I>(
 where
     I: structured_ui::Interface,
 {
+    let mut products = Vec::new();
     // If the product.index is specified, we will use local product_bundles.json
     let index: String = context.get(PRODUCT_BUNDLE_INDEX_KEY)?;
     if Path::new(&index).is_file() {
         let pm = std::fs::read_to_string(index)?;
-        return Ok(serde_json::from_str::<ProductManifest>(&pm)
-            .map_err(|e| bug!("Parsing json {:?}: {e}", pm))?);
+        let prods = serde_json::from_str::<ProductManifest>(&pm)
+            .map_err(|e| bug!("Parsing json {:?}: {e}", pm))?;
+        products.extend(prods);
+
+        // If version is not explicitly passed in, directly return
+        if version.is_none() && branch.is_none() {
+            return Ok(products);
+        }
     }
 
     let client = Client::initial()?;
-    let mut products = Vec::new();
 
     let base_urls = if let Some(base_url) = override_base_url {
         vec![base_url]
@@ -222,6 +223,9 @@ where
         });
         products.extend(prods);
     }
+    products.dedup_by_key(|i| i.name.clone());
+    products.sort_by_key(|i| i.product_version.clone());
+    products.reverse();
     Ok(products)
 }
 
@@ -305,7 +309,7 @@ mod test {
         let pbs = pb_list_impl(
             &AuthFlowChoice::Default,
             Some(format!("file:{}", tmp.path().display())),
-            Some(String::from("fake_version")),
+            None,
             None,
             &ui,
             &env.context,
@@ -344,7 +348,7 @@ mod test {
             cmd: ListCommand {
                 auth: AuthFlowChoice::Default,
                 base_url: Some(format!("file:{}", tmp.path().display())),
-                version: Some("fake_version".into()),
+                version: None,
                 branch: None,
             },
             context: env.context.clone(),

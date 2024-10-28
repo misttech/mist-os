@@ -16,7 +16,8 @@ use std::path::PathBuf;
     example = "\
     Sample invocations:
 
-    // Download core.vim3 of current ffx version.
+    // Download core.vim3 based on current ffx version. Note it will download
+    // the latest version of the date section.
     ffx product download core.vim3 ~/local_pb
 
     // Download core.vim3 with version 19.20240302.2.1

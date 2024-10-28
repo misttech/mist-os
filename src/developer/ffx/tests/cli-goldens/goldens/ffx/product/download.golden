@@ -2,7 +2,7 @@
   "name": "download",
   "description": "Download Product Bundle from GCS.",
   "examples": [
-    "Sample invocations:\n\n    // Download core.vim3 of current ffx version.\n    ffx product download core.vim3 ~/local_pb\n\n    // Download core.vim3 with version 19.20240302.2.1\n    ffx product download core.vim3 ~/local_pb --version 19.20240302.2.1\n\n    // Download core.vim3 for latest version of f18\n    ffx product download core.vim3 ~/local_pb --branch f18 --force\n\n    Auth flow choices for --auth include:\n\n      `--auth no-auth` do not use auth.\n      `--auth pkce` to use PKCE auth flow (requires GUI browser).\n      `--auth device-experimental` to use device flow.\n      `--auth <path/to/exe>` run tool at given path which will print an access\n        token to stdout and exit 0.\n      `--auth default` let the tool decide which auth flow to use.\n    "
+    "Sample invocations:\n\n    // Download core.vim3 based on current ffx version. Note it will download\n    // the latest version of the date section.\n    ffx product download core.vim3 ~/local_pb\n\n    // Download core.vim3 with version 19.20240302.2.1\n    ffx product download core.vim3 ~/local_pb --version 19.20240302.2.1\n\n    // Download core.vim3 for latest version of f18\n    ffx product download core.vim3 ~/local_pb --branch f18 --force\n\n    Auth flow choices for --auth include:\n\n      `--auth no-auth` do not use auth.\n      `--auth pkce` to use PKCE auth flow (requires GUI browser).\n      `--auth device-experimental` to use device flow.\n      `--auth <path/to/exe>` run tool at given path which will print an access\n        token to stdout and exit 0.\n      `--auth default` let the tool decide which auth flow to use.\n    "
   ],
   "flags": [
     {
