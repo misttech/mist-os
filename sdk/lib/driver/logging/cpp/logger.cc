@@ -247,4 +247,97 @@ void Logger::logvf(FuchsiaLogSeverity severity, cpp20::span<std::string> tags, c
   }
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD) && __cplusplus >= 202002L
+namespace {
+template <typename T, std::size_t N>
+class array_output_iterator {
+ public:
+  using iterator_category = std::output_iterator_tag;
+  using value_type = T;
+  using difference_type = std::ptrdiff_t;
+  using pointer = T*;
+  using reference = T&;
+
+  explicit array_output_iterator(std::array<T, N>& arr, size_t& actual_size)
+      : arr_(arr), actual_size_(actual_size) {}
+
+  array_output_iterator(array_output_iterator&& other)
+      : arr_(other.arr_), actual_size_(other.actual_size_), index_(other.index_) {}
+  array_output_iterator& operator=(array_output_iterator&& other) {
+    arr_ = other.arr_;
+    actual_size_ = other.actual_size_;
+    index_ = other.index_;
+    return *this;
+  }
+
+  array_output_iterator& operator=(const T& value) {
+    if (index_ < N) {
+      arr_[index_] = value;
+    }
+    return *this;
+  }
+
+  reference operator*() { return arr_[index_]; }
+  array_output_iterator& operator++() {
+    ++index_;
+    actual_size_++;
+    return *this;
+  }
+  array_output_iterator operator++(int) {
+    auto tmp = *this;
+    ++index_;
+    actual_size_++;
+    return tmp;
+  }
+
+ private:
+  std::array<T, N>& arr_;
+  size_t& actual_size_;
+  size_t index_ = 0;
+};
+
+template <typename T, size_t N>
+array_output_iterator(std::array<T, N>&, size_t&) -> array_output_iterator<T, N>;
+}  // namespace
+
+void Logger::vlog(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
+                  std::string_view fmt, std::format_args args) {
+  if (severity < severity_.load()) {
+    return;
+  }
+  constexpr size_t kFormatStringLength = 1024;
+  std::array<char, kFormatStringLength> fmt_buffer;
+  size_t actual_size = 0;
+
+  std::vformat_to(array_output_iterator(fmt_buffer, actual_size), fmt, args);
+  if (actual_size == 0) {
+    return;
+  }
+
+  uint32_t dropped = dropped_logs_.exchange(0, std::memory_order_relaxed);
+
+  if (actual_size >= kFormatStringLength) {
+    // truncated
+    constexpr char kEllipsis[] = "...";
+    constexpr size_t kEllipsisSize = sizeof(kEllipsis);
+    snprintf(fmt_buffer.data() + kFormatStringLength - kEllipsisSize, kEllipsisSize, kEllipsis);
+  }
+  fmt_buffer[kFormatStringLength - 1] = 0;
+
+  file = StripFile(file, severity);
+  flog::LogBuffer buffer;
+  BeginRecord(buffer, severity, file, line,
+              std::string_view(fmt_buffer.data(), std::min(actual_size, kFormatStringLength)),
+              dropped);
+  if (tag) {
+    buffer.WriteKeyValue("tag", tag);
+  }
+  FlushRecord(buffer, dropped);
+
+  if (severity == FUCHSIA_LOG_FATAL) {
+    abort();
+  }
+}
+#endif
+
 }  // namespace fdf
