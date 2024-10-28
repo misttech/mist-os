@@ -20,6 +20,7 @@ use pkg::{config as pkg_config, ServerMode};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::io::Write as _;
+use std::time::Duration;
 
 mod server;
 
@@ -117,9 +118,15 @@ impl FfxMain for ServerStartTool {
                 args.extend(server::to_argv(&self.cmd));
 
                 if let Some(log_basename) = self.log_basename() {
-                    return daemonize(&args, log_basename, self.context.clone(), true)
+                    daemonize(&args, log_basename, self.context.clone(), true)
                         .await
-                        .map_err(Into::into);
+                        .map_err(|e| bug!(e))?;
+                    return server::wait_for_start(
+                        self.context.clone(),
+                        self.cmd,
+                        Duration::from_secs(30),
+                    )
+                    .await;
                 } else {
                     return_bug!("Cannot daemonize repository server without a log file basename");
                 }

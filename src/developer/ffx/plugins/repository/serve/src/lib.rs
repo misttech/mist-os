@@ -169,7 +169,10 @@ $ ffx doctor --restart-daemon"#,
     }
 }
 
-fn get_repo_base_name(cmd_line: &Option<String>, context: &EnvironmentContext) -> Result<String> {
+pub fn get_repo_base_name(
+    cmd_line: &Option<String>,
+    context: &EnvironmentContext,
+) -> Result<String> {
     if let Some(repo_name) = cmd_line.as_ref() {
         return Ok(repo_name.to_string());
     } else {
