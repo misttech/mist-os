@@ -19,10 +19,20 @@
     ],
     use: [
         {
+            // How long the http client will wait when it is idle before it escrows
+            // its FIDL connections back to the framework and exits. If the value is
+            // negative, then the http client will not stop due to idling.
+            //
+            // The definition of idleness is:
+            // - The main outgoing directory connection don't have pending requests.
+            // - There are no additional outgoing directory connections.
+            // - The `fuchsia.net.http.Loader` connections don't have pending requests.
+            // - There are no `fuchsia.net.http.LoaderClient` connections.
             config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
             key: "stop_on_idle_timeout_millis",
             type: "int64",
-            availability: "transitional",
+            availability: "optional",
+            default: -1,
         },
         {
             directory: "root-ssl-certificates",
@@ -41,16 +51,4 @@
             from: "self",
         },
     ],
-    config: {
-        // How long the http client will wait when it is idle before it escrows
-        // its FIDL connections back to the framework and exits. If the value is
-        // negative, then the http client will not stop due to idling.
-        //
-        // The definition of idleness is:
-        // - The main outgoing directory connection don't have pending requests.
-        // - There are no additional outgoing directory connections.
-        // - The `fuchsia.net.http.Loader` connections don't have pending requests.
-        // - There are no `fuchsia.net.http.LoaderClient` connections.
-        stop_on_idle_timeout_millis: { type: "int64" },
-    },
 }

@@ -48,14 +48,6 @@ network_unified_binary_regular_and_gub_components("component") {
   component_name = "http-client"
   cm_label = ":manifest"
   gub_deps = [ ":http_client" ]
-  non_gub_deps = [ ":default_config_value" ]
-}
-
-fuchsia_structured_config_values("default_config_value") {
-  cm_label = ":manifest"
-  values = {
-    stop_on_idle_timeout_millis = -1
-  }
 }
 
 fuchsia_structured_config_rust_lib("http_client_config") {
