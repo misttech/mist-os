@@ -155,7 +155,7 @@
 		interrupts = <GIC_SPI 3 GIC_IRQ_MODE_EDGE_RISING>,
 			<GIC_SPI 89 GIC_IRQ_MODE_EDGE_RISING>,
 			<GIC_SPI 86 GIC_IRQ_MODE_EDGE_RISING>;
-		iommus = <&dummy_iommu 15>;
+		iommus = <&dummy_iommu 13>;
 		smcs = <2 1 0>;
 		gpios = <&gpio_expander 0 0>,
 			<&gpio A311D_GPIOH(2) 0>;

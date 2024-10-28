@@ -338,7 +338,7 @@
 			compatible = "generic-xhci";
 			reg = <0x0 A311D_USB0_BASE 0x0 A311D_USB0_LENGTH>;
 			interrupts = <GIC_SPI 30 GIC_IRQ_MODE_EDGE_RISING>;
-			iommus = <&dummy_iommu 6>;
+			iommus = <&dummy_iommu 4>;
 			phys = <&usb_phy>;
 			phy-names = "xhci-phy";
 		};
