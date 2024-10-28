@@ -93,10 +93,6 @@ async fn use_protocol_from_dictionary() {
         )
         .await;
     }
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -155,10 +151,6 @@ async fn use_protocol_from_dictionary_not_used() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -249,10 +241,6 @@ async fn use_protocol_from_dictionary_not_found() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -325,10 +313,6 @@ async fn use_directory_from_dictionary_not_supported() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -408,10 +392,6 @@ async fn expose_directory_from_dictionary_not_supported() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -514,10 +494,6 @@ async fn use_protocol_from_nested_dictionary() {
         )
         .await;
     }
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -618,10 +594,6 @@ async fn offer_protocol_from_dictionary() {
         )
         .await;
     }
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -681,10 +653,6 @@ async fn offer_protocol_from_dictionary_not_found() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -863,10 +831,6 @@ async fn offer_protocol_from_nested_dictionary() {
         )
         .await;
     }
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -939,10 +903,6 @@ async fn expose_protocol_from_dictionary() {
         )
         .await;
     }
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -998,10 +958,6 @@ async fn expose_protocol_from_dictionary_not_found() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -1089,10 +1045,6 @@ async fn expose_protocol_from_nested_dictionary() {
         )
         .await;
     }
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -1149,10 +1101,6 @@ async fn dictionary_in_exposed_dir() {
         )
         .await;
     }
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -1257,10 +1205,6 @@ async fn offer_dictionary_to_dictionary() {
         )
         .await;
     }
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -1389,10 +1333,6 @@ async fn dictionary_from_program() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -1467,10 +1407,6 @@ async fn use_from_dictionary_availability_attenuated() {
         CheckUse::Protocol { path: "/svc/B".parse().unwrap(), expected_res: ExpectedResult::Ok },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -1582,10 +1518,6 @@ async fn use_from_dictionary_availability_invalid() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -1658,10 +1590,6 @@ async fn offer_from_dictionary_availability_attenuated() {
         CheckUse::Protocol { path: "/svc/B".parse().unwrap(), expected_res: ExpectedResult::Ok },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -1796,10 +1724,6 @@ async fn offer_from_dictionary_availability_invalid() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -1880,10 +1804,6 @@ async fn expose_from_dictionary_availability_attenuated() {
         CheckUse::Protocol { path: "/svc/B".parse().unwrap(), expected_res: ExpectedResult::Ok },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
 
 #[fuchsia::test]
@@ -2010,8 +1930,4 @@ async fn expose_from_dictionary_availability_invalid() {
         },
     )
     .await;
-
-    // TODO(https://fxbug.dev/362533841): Exit the test process now to guarantee lsan check
-    // is run. This won't be necessary once the attached bug is fixed.
-    std::process::exit(0);
 }
