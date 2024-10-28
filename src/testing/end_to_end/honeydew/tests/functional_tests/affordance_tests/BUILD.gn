@@ -14,6 +14,5 @@ group("tests") {
     "test_session:tests",
     "test_tracing:tests",
     "test_ui:tests",
-    "test_wlan:tests",
   ]
 }

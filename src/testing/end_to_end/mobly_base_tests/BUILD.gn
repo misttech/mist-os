@@ -73,6 +73,17 @@ if (is_host) {
     ]
     library_deps = [ ":fuchsia_base_test" ]
   }
+
+  python_library("wlan_base_test") {
+    enable_mypy = true
+    testonly = true
+    source_root = "wlan_base_test"
+    sources = [
+      "__init__.py",
+      "wlan_base_test.py",
+    ]
+    library_deps = [ ":fuchsia_base_test" ]
+  }
 }
 
 group("fuchsia_power_base_test_packages") {
