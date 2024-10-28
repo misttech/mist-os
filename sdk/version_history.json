@@ -57,7 +57,7 @@
             },
             "17": {
                 "abi_revision": "0x30FA7BA4F2FF24E0",
-                "status": "supported"
+                "status": "unsupported"
             },
             "18": {
                 "abi_revision": "0x8C83EBE28BA345FC",
@@ -73,7 +73,7 @@
             },
             "21": {
                 "abi_revision": "0x9C462E1B5EF9AE5F",
-                "status": "supported"
+                "status": "unsupported"
             },
             "22": {
                 "abi_revision": "0xEE3BE92BE27C6DEB",
