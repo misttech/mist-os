@@ -638,8 +638,32 @@ TEST_F(MapGrowsdownTest, MapNoreplaceInGuardRegion) {
   ASSERT_EQ(errno, EEXIST);
 }
 
+TEST_F(MapGrowsdownTest, MapHintInGuardRegion) {
+  // Make a MAP_GROWSDOWN mapping slightly below the top of the playground area.
+  size_t initial_grows_down_size = 2 * page_size();
+  intptr_t grow_low_offset = playground_size() - 16 * page_size();
+
+  void* grow_initial_low_address =
+      MapRelative(grow_low_offset, initial_grows_down_size, PROT_READ, MAP_GROWSDOWN);
+  ASSERT_NE(grow_initial_low_address, MAP_FAILED)
+      << "mmap failed: " << strerror(errno) << "(" << errno << ")";
+  ASSERT_EQ(grow_initial_low_address, OffsetToAddress(grow_low_offset));
+
+  // The page immediately below grow_low_address is the highest guard page. Try making a new mapping
+  // in this region.
+  intptr_t highest_guard_region_page_offset = grow_low_offset - page_size();
+  std::byte* highest_guard_region_page_address = OffsetToAddress(highest_guard_region_page_offset);
+  void* rv = mmap(highest_guard_region_page_address, page_size(), PROT_READ,
+                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(rv, MAP_FAILED);
+  ASSERT_NE(rv, highest_guard_region_page_address);
+
+  // Unmap our new mapping, which could have been placed outside the playground.
+  SAFE_SYSCALL(munmap(rv, page_size()));
+}
+
 TEST_F(MapGrowsdownTest, MprotectBeforeGrow) {
-  // Reduce the production on the low page of the growsdown region to read-only
+  // Reduce the protection on the low page of the growsdown region to read-only
   SAFE_SYSCALL(mprotect(OffsetToAddress(initial_grows_down_low_offset()), page_size(),
                         PROT_READ | PROT_GROWSDOWN));
 

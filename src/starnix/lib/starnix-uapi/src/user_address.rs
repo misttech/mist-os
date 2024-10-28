@@ -58,6 +58,10 @@ impl UserAddress {
     pub fn saturating_add(&self, rhs: usize) -> Self {
         UserAddress(self.0.saturating_add(rhs as u64))
     }
+
+    pub fn saturating_sub(&self, rhs: usize) -> Self {
+        UserAddress(self.0.saturating_sub(rhs as u64))
+    }
 }
 
 impl Default for UserAddress {

@@ -74,6 +74,8 @@ pub fn init_usercopy() {
     let _ = usercopy();
 }
 
+const GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS: usize = 256;
+
 #[cfg(target_arch = "x86_64")]
 const ASLR_RANDOM_BITS: usize = 27;
 
@@ -398,6 +400,17 @@ impl Mapping {
         }
     }
 
+    fn inflate_to_include_guard_pages(&self, range: &Range<UserAddress>) -> Range<UserAddress> {
+        let start = if self.flags.contains(MappingFlags::GROWSDOWN) {
+            range
+                .start
+                .saturating_sub(*PAGE_SIZE as usize * GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS)
+        } else {
+            range.start
+        };
+        start..range.end
+    }
+
     /// Converts a `UserAddress` to an offset in this mapping's memory object.
     fn address_to_offset(&self, addr: UserAddress) -> u64 {
         match &self.backing {
@@ -666,18 +679,42 @@ fn map_in_vmar(
 }
 
 impl MemoryManagerState {
+    /// Returns occupied address ranges that intersect with the given range.
+    ///
+    /// An address range is "occupied" if (a) there is already a mapping in that range or (b) there
+    /// is a GROWSDOWN mapping <= 256 pages above that range. The 256 pages below a GROWSDOWN
+    /// mapping is the "guard region." The memory manager avoids mapping memory in the guard region
+    /// in some circumstances to preserve space for the GROWSDOWN mapping to grow down.
+    fn get_occupied_address_ranges<'a>(
+        &'a self,
+        subrange: &'a Range<UserAddress>,
+    ) -> impl Iterator<Item = Range<UserAddress>> + 'a {
+        let query_range = subrange.start
+            ..(subrange
+                .end
+                .saturating_add(*PAGE_SIZE as usize * GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS));
+        self.mappings.intersection(query_range).filter_map(|(range, mapping)| {
+            let occupied_range = mapping.inflate_to_include_guard_pages(range);
+            if occupied_range.start < subrange.end && subrange.start < occupied_range.end {
+                Some(occupied_range)
+            } else {
+                None
+            }
+        })
+    }
+
     fn count_possible_placements(
         &self,
         length: usize,
         subrange: &Range<UserAddress>,
     ) -> Option<usize> {
-        let mut mappings_in_range = self.mappings.intersection(subrange);
+        let mut occupied_ranges = self.get_occupied_address_ranges(subrange);
         let mut possible_placements = 0;
         // If the allocation is placed at the first available address, every page that is left
         // before the next mapping or the end of subrange is +1 potential placement.
         let mut first_fill_end = subrange.start.checked_add(length)?;
         while first_fill_end <= subrange.end {
-            let Some((mapping, _)) = mappings_in_range.next() else {
+            let Some(mapping) = occupied_ranges.next() else {
                 possible_placements += (subrange.end - first_fill_end) / (*PAGE_SIZE as usize) + 1;
                 break;
             };
@@ -697,9 +734,9 @@ impl MemoryManagerState {
     ) -> Option<UserAddress> {
         let mut candidate =
             Range { start: subrange.start, end: subrange.start.checked_add(length)? };
-        let mut mappings_in_range = self.mappings.intersection(subrange);
+        let mut occupied_ranges = self.get_occupied_address_ranges(subrange);
         loop {
-            let Some((mapping, _)) = mappings_in_range.next() else {
+            let Some(mapping) = occupied_ranges.next() else {
                 // No more mappings: treat the rest of the index as an offset.
                 let res =
                     candidate.start.checked_add(chosen_placement_idx * *PAGE_SIZE as usize)?;
@@ -749,16 +786,20 @@ impl MemoryManagerState {
 
         loop {
             // Is there a next mapping? If not, the candidate is already good.
-            let Some((mapping, _)) = map_iter.next_back() else {
+            let Some((occupied_range, mapping)) = map_iter.next_back() else {
                 return Some(candidate.start);
             };
+            let occupied_range = mapping.inflate_to_include_guard_pages(occupied_range);
             // If it doesn't overlap, the gap is big enough to fit.
-            if mapping.end <= candidate.start {
+            if occupied_range.end <= candidate.start {
                 return Some(candidate.start);
             }
             // If there was a mapping in the way, the next range to consider will be `length` bytes
             // below.
-            candidate = Range { start: mapping.start.checked_sub(length)?, end: mapping.start };
+            candidate = Range {
+                start: occupied_range.start.checked_sub(length)?,
+                end: occupied_range.start,
+            };
         }
     }
 
@@ -767,7 +808,7 @@ impl MemoryManagerState {
         let Some(hint_end) = hint_addr.checked_add(length) else {
             return false;
         };
-        self.mappings.intersection(&(hint_addr..hint_end)).next().is_none()
+        self.get_occupied_address_ranges(&(hint_addr..hint_end)).next().is_none()
     }
 
     // Map the memory without updating `self.mappings`.
@@ -1781,6 +1822,27 @@ impl MemoryManagerState {
         Ok(result)
     }
 
+    /// Finds the next mapping at or above the given address if that mapping has the
+    /// MappingFlags::GROWSDOWN flag.
+    ///
+    /// If such a mapping exists, this function returns the address at which that mapping starts
+    /// and the mapping itself.
+    fn next_mapping_if_growsdown(&self, addr: UserAddress) -> Option<(UserAddress, &Mapping)> {
+        match self.mappings.iter_starting_at(&addr).next() {
+            Some((range, mapping)) => {
+                if range.contains(&addr) {
+                    // |addr| is already contained within a mapping, nothing to grow.
+                    None
+                } else if !mapping.flags.contains(MappingFlags::GROWSDOWN) {
+                    None
+                } else {
+                    Some((range.start, mapping))
+                }
+            }
+            None => None,
+        }
+    }
+
     /// Determines if an access at a given address could be covered by extending a growsdown mapping and
     /// extends it if possible. Returns true if the given address is covered by a mapping.
     pub fn extend_growsdown_mapping_to_address(
@@ -1789,35 +1851,19 @@ impl MemoryManagerState {
         is_write: bool,
     ) -> Result<bool, Error> {
         profile_duration!("ExtendGrowsDown");
-        let (mapping_to_grow, mapping_low_addr) = match self.mappings.iter_starting_at(&addr).next()
-        {
-            Some((range, mapping)) => {
-                if range.contains(&addr) {
-                    // |addr| is already contained within a mapping, nothing to grow.
-                    return Ok(false);
-                }
-                if !mapping.flags.contains(MappingFlags::GROWSDOWN) {
-                    return Ok(false);
-                }
-                (mapping, range.start)
-            }
-            None => return Ok(false),
+        let Some((mapping_low_addr, mapping_to_grow)) = self.next_mapping_if_growsdown(addr) else {
+            return Ok(false);
         };
         if is_write && !mapping_to_grow.can_write() {
             // Don't grow a read-only GROWSDOWN mapping for a write fault, it won't work.
             return Ok(false);
         }
-        // TODO(https://fxbug.dev/42179751): Once we add a guard region below a growsdown mapping we will need to move that
-        // before attempting to map the grown area.
         let low_addr = addr - (addr.ptr() as u64 % *PAGE_SIZE);
         let high_addr = mapping_low_addr;
         let length = high_addr
             .ptr()
             .checked_sub(low_addr.ptr())
             .ok_or_else(|| anyhow!("Invalid growth range"))?;
-        // TODO(https://fxbug.dev/42179751): - Instead of making a new memory object, perhaps a
-        // growsdown mapping should be oversized to start with the end mapped. Then on extension
-        // we could map further down in the memory object for as long as we had space.
         let memory =
             Arc::new(MemoryObject::from(zx::Vmo::create(length as u64).map_err(|s| match s {
                 zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => {
@@ -4849,6 +4895,30 @@ mod tests {
                 addr.unwrap()
             );
         }
+        assert_eq!(mm.state.read().find_random_unused_range(page_size, &subrange_ten), None);
+    }
+
+    #[::fuchsia::test]
+    async fn test_grows_down_near_aspace_base() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let mm = current_task.mm();
+
+        let page_count = 10;
+
+        let page_size = *PAGE_SIZE as usize;
+        let addr = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE) + page_count * page_size;
+        assert_eq!(
+            map_memory_with_flags(
+                &mut locked,
+                &current_task,
+                addr,
+                page_size as u64,
+                MAP_ANONYMOUS | MAP_PRIVATE | MAP_GROWSDOWN
+            ),
+            addr
+        );
+
+        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)..addr;
         assert_eq!(mm.state.read().find_random_unused_range(page_size, &subrange_ten), None);
     }
 
