@@ -190,6 +190,14 @@ impl PartitionTableEntry {
     }
 }
 
+#[derive(Eq, thiserror::Error, Clone, Debug, PartialEq)]
+pub enum FormatError {
+    #[error("Invalid arguments")]
+    InvalidArguments,
+    #[error("No space")]
+    NoSpace,
+}
+
 /// Serializes the partition table, and updates `header` to reflect the changes (including computing
 /// the CRC).  Returns the raw bytes of the partition table.
 /// Fails if any of the entries in `entries` are invalid.
@@ -198,38 +206,41 @@ pub fn serialize_partition_table(
     block_size: usize,
     num_blocks: u64,
     entries: &[PartitionTableEntry],
-) -> Result<Vec<u8>, Error> {
+) -> Result<Vec<u8>, FormatError> {
     let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
     let partition_table_len = header.part_size as usize * entries.len();
-    let partition_table_len =
-        partition_table_len.checked_next_multiple_of(block_size).ok_or(anyhow!("Overflow"))?;
+    let partition_table_len = partition_table_len
+        .checked_next_multiple_of(block_size)
+        .ok_or(FormatError::InvalidArguments)?;
     let partition_table_blocks = (partition_table_len / block_size) as u64;
     let mut partition_table = vec![0u8; partition_table_len];
     let mut partition_table_view = &mut partition_table[..];
+    // The first two blocks are resered for the PMBR and the primary GPT header.
     let first_usable = partition_table_blocks + 2;
+    // The last block is reserved for the backup GPT header.  We subtract one more to get to the
+    // offset of the last usable block.
     let last_usable = num_blocks.saturating_sub(partition_table_blocks + 2);
-    ensure!(
-        first_usable <= last_usable,
-        "GPT metadata too big (need {} blocks for each copy, but only {} blocks available",
-        first_usable,
-        num_blocks
-    );
-    let mut used_ranges = vec![(0, first_usable), (last_usable, num_blocks)];
+    if first_usable > last_usable {
+        return Err(FormatError::NoSpace);
+    }
+    let mut used_ranges = vec![0..first_usable, last_usable + 1..num_blocks];
     let part_size = header.part_size as usize;
     for entry in entries {
         let part_raw = entry.as_bytes();
         assert!(part_raw.len() == part_size);
         if !entry.is_empty() {
-            entry.ensure_integrity()?;
-            used_ranges.push((entry.first_lba, entry.last_lba));
+            entry.ensure_integrity().map_err(|_| FormatError::InvalidArguments)?;
+            used_ranges.push(entry.first_lba..entry.last_lba + 1);
             partition_table_view[..part_raw.len()].copy_from_slice(part_raw);
         }
         digest.write(part_raw);
         partition_table_view = &mut partition_table_view[part_size..];
     }
-    used_ranges.sort();
+    used_ranges.sort_by_key(|range| range.start);
     for ranges in used_ranges.windows(2) {
-        ensure!(ranges[0].1 <= ranges[1].0, "Partition range overlaps other region");
+        if ranges[0].end > ranges[1].start {
+            return Err(FormatError::InvalidArguments);
+        }
     }
     header.first_usable = first_usable;
     header.last_usable = last_usable;

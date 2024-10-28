@@ -40,8 +40,14 @@ closed protocol PartitionsManager {
 };
 
 type PartitionInfo = struct {
+    // Must be non-empty.
     name string:fuchsia.hardware.block.partition.NAME_LENGTH;
+    // Must be non-zero.
     type_guid fuchsia.hardware.block.partition.Guid;
+    // Must be non-zero.
+    instance_guid fuchsia.hardware.block.partition.Guid;
+    // The target range must not overlap with any other partition or the GPT metadata.
+    start_block uint64;
     num_blocks uint64;
     flags uint64;
 };
@@ -56,9 +62,9 @@ closed protocol PartitionsAdmin {
     /// This function is only intended to be used in product configurations where nothing is
     /// actively using any partitions, so there's no need to make this operation graceful.
     ///
-    /// Partitions are allocated contiguously and in the provided order.  Random instance GUIDs are
-    /// assigned.  Empty entries are permitted (i.e. all fields set to 0) and will result in an
-    /// empty slot in the partition table, which allows the table size to be set appropriately.
+    /// Partitions table entries are assigned in the specified order.  Empty entries are permitted
+    /// (i.e. all fields set to 0) and will result in an empty slot in the partition table, which
+    /// allows the table size to be set appropriately.
     strict ResetPartitionTable(struct {
         partitions vector<PartitionInfo>:MAX_PARTITIONS;
     }) -> () error zx.Status;
