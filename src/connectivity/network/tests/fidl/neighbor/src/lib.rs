@@ -833,7 +833,8 @@ async fn neigh_remove_entry_not_found<N: Netstack>(name: &str) {
 
 #[netstack_test]
 #[variant(N, Netstack)]
-async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
+#[variant(I, Ip)]
+async fn neigh_add_remove_entry<N: Netstack, I: Ip>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -865,11 +866,16 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
     );
     assert_entries(&mut alice_iter, [ItemMatch::Idle]).await;
 
+    let (alice_ip, bob_ip) = match I::VERSION {
+        IpVersion::V4 => (ALICE_IP, BOB_IP),
+        IpVersion::V6 => (alice.ipv6, bob.ipv6),
+    };
+
     // Check error conditions.
     // Add and remove entry not supported on loopback.
     assert_eq!(
         controller
-            .add_entry(alice.loopback_id, &BOB_IP, &BOB_MAC)
+            .add_entry(alice.loopback_id, &bob_ip, &BOB_MAC)
             .await
             .expect("add_entry FIDL error")
             .map_err(zx::Status::from_raw),
@@ -877,7 +883,7 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
     );
     assert_eq!(
         controller
-            .remove_entry(alice.loopback_id, &BOB_IP)
+            .remove_entry(alice.loopback_id, &bob_ip)
             .await
             .expect("add_entry FIDL error")
             .map_err(zx::Status::from_raw),
@@ -886,7 +892,7 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
     // Add entry and remove entry return not found on non-existing interface.
     assert_eq!(
         controller
-            .add_entry(alice.ep.id() + 100, &BOB_IP, &BOB_MAC)
+            .add_entry(alice.ep.id() + 100, &bob_ip, &BOB_MAC)
             .await
             .expect("add_entry FIDL error")
             .map_err(zx::Status::from_raw),
@@ -894,7 +900,7 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
     );
     assert_eq!(
         controller
-            .remove_entry(alice.ep.id() + 100, &BOB_IP)
+            .remove_entry(alice.ep.id() + 100, &bob_ip)
             .await
             .expect("add_entry FIDL error")
             .map_err(zx::Status::from_raw),
@@ -903,86 +909,52 @@ async fn neigh_add_remove_entry<N: Netstack>(name: &str) {
     // Remove entry returns not found for non-existing entry.
     assert_eq!(
         controller
-            .remove_entry(alice.ep.id(), &BOB_IP)
+            .remove_entry(alice.ep.id(), &bob_ip)
             .await
             .expect("add_entry FIDL error")
             .map_err(zx::Status::from_raw),
         Err(zx::Status::NOT_FOUND)
     );
 
-    // Add static entries and verify that they're listable.
+    // Add a static entry and verify that it is listable.
     let () = controller
-        .add_entry(alice.ep.id(), &BOB_IP, &BOB_MAC)
+        .add_entry(alice.ep.id(), &bob_ip, &BOB_MAC)
         .await
         .expect("add_entry FIDL error")
         .map_err(zx::Status::from_raw)
         .expect("add_entry failed");
-    let () = controller
-        .add_entry(alice.ep.id(), &bob.ipv6, &BOB_MAC)
-        .await
-        .expect("add_entry FIDL error")
-        .map_err(zx::Status::from_raw)
-        .expect("add_entry failed");
-
-    let static_entry_ipv4 = EntryMatch {
+    let static_entry = EntryMatch {
         interface: alice.ep.id(),
-        neighbor: BOB_IP,
-        state: fidl_fuchsia_net_neighbor::EntryState::Static,
-        mac: Some(BOB_MAC),
-    };
-    let static_entry_ipv6 = EntryMatch {
-        interface: alice.ep.id(),
-        neighbor: bob.ipv6.clone(),
+        neighbor: bob_ip,
         state: fidl_fuchsia_net_neighbor::EntryState::Static,
         mac: Some(BOB_MAC),
     };
 
-    assert_entries(
-        &mut alice_iter,
-        [ItemMatch::Added(static_entry_ipv4.clone()), ItemMatch::Added(static_entry_ipv6.clone())],
-    )
-    .await;
+    assert_entries(&mut alice_iter, [ItemMatch::Added(static_entry.clone())]).await;
 
-    let () = exchange_dgrams(&alice, &bob).await;
-    for expect in [FrameMetadata::Udp(BOB_IP), FrameMetadata::Udp(bob.ipv6)].iter() {
-        assert_eq!(
-            meta_stream
-                .try_next()
-                .await
-                .expect("failed to read from fake endpoint")
-                .expect("fake endpoint stream ended unexpectedly"),
-            *expect
-        );
-    }
+    let () = exchange_dgram(&alice, alice_ip, &bob, bob_ip).await;
+    assert_eq!(
+        meta_stream
+            .try_next()
+            .await
+            .expect("failed to read from fake endpoint")
+            .expect("fake endpoint stream ended unexpectedly"),
+        FrameMetadata::Udp(bob_ip)
+    );
 
-    // Remove both entries and check that the list is empty afterwards.
+    // Remove the entry and check that the list is empty afterwards.
     let () = controller
-        .remove_entry(alice.ep.id(), &BOB_IP)
+        .remove_entry(alice.ep.id(), &bob_ip)
         .await
         .expect("remove_entry FIDL error")
         .map_err(zx::Status::from_raw)
         .expect("remove_entry failed");
-    let () = controller
-        .remove_entry(alice.ep.id(), &bob.ipv6)
-        .await
-        .expect("remove_entry FIDL error")
-        .map_err(zx::Status::from_raw)
-        .expect("remove_entry failed");
-
-    assert_entries(
-        &mut alice_iter,
-        [
-            ItemMatch::Removed(static_entry_ipv4.clone()),
-            ItemMatch::Removed(static_entry_ipv6.clone()),
-        ],
-    )
-    .await;
+    assert_entries(&mut alice_iter, [ItemMatch::Removed(static_entry.clone())]).await;
 
     // Exchange datagrams again and assert that new solicitation requests were
     // sent (ignoring any UDP metadata this time).
-    let () = exchange_dgrams(&alice, &bob).await;
-    assert_eq!(next_solicitation_resolution(&mut meta_stream).await, BOB_IP);
-    assert_eq!(next_solicitation_resolution(&mut meta_stream).await, bob.ipv6);
+    let () = exchange_dgram(&alice, alice_ip, &bob, bob_ip).await;
+    assert_eq!(next_solicitation_resolution(&mut meta_stream).await, bob_ip);
 }
 
 #[netstack_test]
