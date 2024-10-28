@@ -785,7 +785,7 @@ constexpr auto LocalTrace = TraceEnabled<enabled>{};
 constexpr auto TraceAlways = TraceEnabled<true>{};
 constexpr auto TraceNever = TraceEnabled<false>{};
 
-static inline uint64_t ktrace_timestamp() { return current_ticks(); }
+static inline uint64_t ktrace_timestamp() { return current_boot_ticks(); }
 
 // Bring the fxt literal operators into the global scope.
 using fxt::operator""_category;
@@ -800,7 +800,7 @@ inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context,
                          const fxt::InternedString& label, uint64_t a, uint64_t b) {
   if constexpr (enabled) {
     if (ktrace_thunks::category_enabled("kernel:probe"_category)) {
-      ktrace_thunks::fxt_instant("kernel:probe"_category, current_ticks(),
+      ktrace_thunks::fxt_instant("kernel:probe"_category, current_boot_ticks(),
                                  ThreadRefFromContext(context), fxt::StringRef{label},
                                  fxt::Argument{"arg0"_intern, a}, fxt::Argument{"arg1"_intern, b});
     }
