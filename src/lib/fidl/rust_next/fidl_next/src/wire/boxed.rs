@@ -18,6 +18,13 @@ pub struct WireBox<'buf, T> {
     ptr: WirePointer<'buf, T>,
 }
 
+// SAFETY: `WireBox` doesn't add any restrictions on sending across thread boundaries, and so is
+// `Send` if `T` is `Send`.
+unsafe impl<T: Send> Send for WireBox<'_, T> {}
+
+// SAFETY: `WireBox` doesn't add any interior mutability, so it is `Sync` if `T` is `Sync`.
+unsafe impl<T: Sync> Sync for WireBox<'_, T> {}
+
 impl<T> Drop for WireBox<'_, T> {
     fn drop(&mut self) {
         if self.is_some() {

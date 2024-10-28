@@ -2,14 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Fuchsia-specific FIDL extensions.
+//! FIDL protocols.
 
-mod decoder;
-mod encoder;
+mod buffer;
+pub mod client;
+mod error;
+mod lockers;
+pub mod mpsc;
+pub mod server;
 mod transport;
 mod wire;
 
-pub use self::decoder::*;
-pub use self::encoder::*;
+pub use self::buffer::*;
+pub use self::client::make_client;
+pub use self::error::*;
+pub use self::server::make_server;
 pub use self::transport::*;
 pub use self::wire::*;

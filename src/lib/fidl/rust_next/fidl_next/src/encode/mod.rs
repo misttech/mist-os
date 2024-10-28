@@ -75,7 +75,7 @@ macro_rules! impl_primitive {
                 slot: Slot<'_, Self::EncodedOption<'_>>,
             ) -> Result<(), EncodeError> {
                 if let Some(value) = this {
-                    encoder.encode(value)?;
+                    encoder.encode_next(value)?;
                     WireBox::encode_present(slot);
                 } else {
                     WireBox::encode_absent(slot);
@@ -140,7 +140,7 @@ impl<E: ?Sized, T: Encode<E>> Encode<E> for Box<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::assert_encoded;
+    use crate::testing::assert_encoded;
 
     #[test]
     fn encode_bool() {

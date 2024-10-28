@@ -13,17 +13,26 @@ rustc_library("fidl_next") {
     "src/chunk.rs",
     "src/decode/error.rs",
     "src/decode/mod.rs",
-    "src/decoder/basic.rs",
-    "src/decoder/mod.rs",
+    "src/decoder.rs",
     "src/encode/error.rs",
     "src/encode/mod.rs",
-    "src/encoder/basic.rs",
-    "src/encoder/mod.rs",
+    "src/encoder.rs",
+    "src/endpoint.rs",
     "src/lib.rs",
     "src/owned.rs",
+    "src/protocol/buffer.rs",
+    "src/protocol/client.rs",
+    "src/protocol/error.rs",
+    "src/protocol/lockers.rs",
+    "src/protocol/mod.rs",
+    "src/protocol/mpsc.rs",
+    "src/protocol/server.rs",
+    "src/protocol/transport.rs",
+    "src/protocol/wire.rs",
     "src/slot.rs",
     "src/take.rs",
-    "src/test_util.rs",
+    "src/testing/mod.rs",
+    "src/testing/transport.rs",
     "src/wire/boxed.rs",
     "src/wire/envelope.rs",
     "src/wire/error.rs",
@@ -40,6 +49,10 @@ rustc_library("fidl_next") {
     "src/wire/vec/required.rs",
   ]
   deps = [
+    # Used for lock-free mpsc channel, but not for any APIs
+    "//third_party/rust_crates:futures",
+
+    # Meaningful dependencies
     "//third_party/rust_crates:munge",
     "//third_party/rust_crates:rend",
     "//third_party/rust_crates:thiserror",
@@ -51,13 +64,20 @@ rustc_library("fidl_next") {
       "src/fuchsia/decoder.rs",
       "src/fuchsia/encoder.rs",
       "src/fuchsia/mod.rs",
+      "src/fuchsia/transport/channel.rs",
+      "src/fuchsia/transport/mod.rs",
+      "src/fuchsia/wire/channel.rs",
       "src/fuchsia/wire/handle.rs",
       "src/fuchsia/wire/mod.rs",
     ]
-    deps += [ "//sdk/rust/zx" ]
+    deps += [
+      "//sdk/rust/zx",
+      "//src/lib/fuchsia-async",
+    ]
   }
 
   with_unit_tests = true
+  test_deps = [ "//src/lib/fuchsia-async" ]
 
   # NOTE: this library is still experimental
   visibility = [

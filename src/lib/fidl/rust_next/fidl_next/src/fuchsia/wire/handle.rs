@@ -11,9 +11,10 @@ pub use zx::Handle;
 use zx::sys::ZX_HANDLE_INVALID;
 use zx::HandleBased as _;
 
-use crate::encode::{self, EncodableOption, EncodeOption};
+use crate::fuchsia::{HandleDecoder, HandleEncoder};
 use crate::{
-    decode, munge, u32_le, Decode, Encodable, Encode, HandleDecoder, HandleEncoder, Slot, TakeFrom,
+    munge, u32_le, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError,
+    EncodeOption, Slot, TakeFrom,
 };
 
 /// A Zircon handle.
@@ -61,7 +62,7 @@ impl fmt::Debug for WireHandle {
 }
 
 unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireHandle {
-    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), decode::DecodeError> {
+    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { encoded } = slot.as_mut());
 
         match encoded.to_native() {
@@ -71,7 +72,7 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireHandle {
                 munge!(let Self { mut decoded } = slot);
                 decoded.write(handle.into_raw());
             }
-            e => return Err(decode::DecodeError::InvalidHandlePresence(e)),
+            e => return Err(DecodeError::InvalidHandlePresence(e)),
         }
         Ok(())
     }
@@ -134,9 +135,9 @@ impl<E: HandleEncoder + ?Sized> Encode<E> for Handle {
         &mut self,
         encoder: &mut E,
         slot: Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), encode::EncodeError> {
+    ) -> Result<(), EncodeError> {
         if self.is_invalid() {
-            Err(encode::EncodeError::InvalidRequiredHandle)
+            Err(EncodeError::InvalidRequiredHandle)
         } else {
             let handle = replace(self, Handle::invalid());
             encoder.push_handle(handle)?;
@@ -155,7 +156,7 @@ impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Handle {
         this: Option<&mut Self>,
         encoder: &mut E,
         slot: Slot<'_, Self::EncodedOption<'_>>,
-    ) -> Result<(), encode::EncodeError> {
+    ) -> Result<(), EncodeError> {
         if let Some(handle) = this {
             let handle = replace(handle, Handle::invalid());
             encoder.push_handle(handle)?;

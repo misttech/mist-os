@@ -9,7 +9,8 @@ use core::str::{from_utf8, from_utf8_unchecked, from_utf8_unchecked_mut};
 use munge::munge;
 
 use crate::{
-    decode, encode, Decode, Decoder, Encodable, Encode, Encoder, Slot, TakeFrom, WireVector,
+    Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, Encoder, Slot, TakeFrom,
+    WireVector,
 };
 
 /// A FIDL string
@@ -73,7 +74,7 @@ impl fmt::Debug for WireString<'_> {
 }
 
 unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireString<'buf> {
-    fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), decode::DecodeError> {
+    fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut vec } = slot);
 
         WireVector::decode(vec.as_mut(), decoder)?;
@@ -93,7 +94,7 @@ impl<E: Encoder + ?Sized> Encode<E> for String {
         &mut self,
         encoder: &mut E,
         slot: Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), encode::EncodeError> {
+    ) -> Result<(), EncodeError> {
         encoder.write(self.as_bytes());
         WireString::encode_present(slot, self.len() as u64);
         Ok(())
