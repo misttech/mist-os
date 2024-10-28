@@ -14,6 +14,10 @@
 #include <iosfwd>
 #include <optional>
 
+#if __cplusplus >= 202002L
+#include <format>
+#endif
+
 namespace fidl {
 
 // Reason for a failed operation, or how the endpoint was unbound from the
@@ -418,6 +422,9 @@ class [[nodiscard]] Status {
   friend class UnbindInfo;
   friend std::ostream& operator<<(std::ostream& ostream, const Status& result);
   friend struct fidl::internal::DisplayError<fidl::Status>;
+#if __cplusplus >= 202002L
+  friend struct std::formatter<fidl::Status>;
+#endif
 
   __ALWAYS_INLINE
   constexpr Status(zx_status_t status, ::fidl::Reason reason, const char* error)
@@ -442,6 +449,23 @@ template <>
 struct fidl::internal::DisplayError<fidl::Status> {
   static size_t Format(const fidl::Status& value, char* destination, size_t capacity);
 };
+
+}  // namespace fidl
+
+#if __cplusplus >= 202002L
+template <>
+struct std::formatter<fidl::Status> : std::formatter<std::string_view> {
+  auto format(const fidl::Status& result, std::format_context& ctx) const {
+    std::array<char, 256> buf;
+    size_t length = result.FormatImpl(&*buf.begin(), sizeof(buf), /* from_unbind_info */ false);
+    std::string_view temp(&*buf.begin(), length);
+
+    return std::formatter<std::string_view>::format(temp, ctx);
+  }
+};
+#endif
+
+namespace fidl {
 
 // |OneWayStatus| represents the result of a one-way FIDL operation:
 // - One-way client call.
