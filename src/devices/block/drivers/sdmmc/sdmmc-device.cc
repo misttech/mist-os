@@ -176,7 +176,7 @@ zx_status_t SdmmcDevice::Init(bool use_fidl) {
     return status;
   }
 
-  FDF_LOGL(DEBUG, logger(), "host caps dma %d 8-bit bus %d max_transfer_size %" PRIu64 "",
+  FDF_LOGL(DEBUG, logger(), "host caps dma %d 8-bit bus %d max_transfer_size %" PRIu32 "",
            UseDma() ? 1 : 0, (host_info().caps & SDMMC_HOST_CAP_BUS_WIDTH_8) ? 1 : 0,
            host_info().max_transfer_size);
 
