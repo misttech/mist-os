@@ -185,7 +185,9 @@ _testing_product_config_json = {
         }},
     },
     "product": {
-        "session_url": "fuchsia-pkg://fuchsia.com/test_session#meta/test_session.cm",
+        "session": {
+            "url": "fuchsia-pkg://fuchsia.com/test_session#meta/test_session.cm",
+        },
     },
 }
 
