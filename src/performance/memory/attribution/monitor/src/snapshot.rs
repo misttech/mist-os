@@ -45,7 +45,7 @@ impl AttributionSnapshot {
     pub fn new(
         attribution_state: AttributionState,
         kernel_resources: KernelResources,
-        memory_stats: fkernel::MemoryStatsExtended,
+        memory_stats: fkernel::MemoryStats,
         compression_stats: fkernel::MemoryStatsCompression,
     ) -> AttributionSnapshot {
         // Compute the capacity needed for |principals| and |attributions| to avoid reallocations

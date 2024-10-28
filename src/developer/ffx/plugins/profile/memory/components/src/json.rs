@@ -372,7 +372,7 @@ impl JsonConvertible for fplugin::KernelStatistics {
         Some(Self {
             memory_stats: obj
                 .get("memory_stats")
-                .map(|v| fkernel::MemoryStatsExtended::from_json(v))
+                .map(|v| fkernel::MemoryStats::from_json(v))
                 .flatten(),
             compression_stats: obj
                 .get("compression_stats")
@@ -383,23 +383,28 @@ impl JsonConvertible for fplugin::KernelStatistics {
     }
 }
 
-impl JsonConvertible for fkernel::MemoryStatsExtended {
+impl JsonConvertible for fkernel::MemoryStats {
     fn to_json(&self) -> Value {
         json!({
             "total_bytes": self.total_bytes.to_json(),
             "free_bytes": self.free_bytes.to_json(),
+            "free_loaned_bytes": self.free_loaned_bytes.to_json(),
             "wired_bytes": self.wired_bytes.to_json(),
             "total_heap_bytes": self.total_heap_bytes.to_json(),
             "free_heap_bytes": self.free_heap_bytes.to_json(),
             "vmo_bytes": self.vmo_bytes.to_json(),
-            "vmo_pager_total_bytes": self.vmo_pager_total_bytes.to_json(),
-            "vmo_pager_newest_bytes": self.vmo_pager_newest_bytes.to_json(),
-            "vmo_pager_oldest_bytes": self.vmo_pager_oldest_bytes.to_json(),
-            "vmo_discardable_locked_bytes": self.vmo_discardable_locked_bytes.to_json(),
-            "vmo_discardable_unlocked_bytes": self.vmo_discardable_unlocked_bytes.to_json(),
             "mmu_overhead_bytes": self.mmu_overhead_bytes.to_json(),
             "ipc_bytes": self.ipc_bytes.to_json(),
+            "cache_bytes": self.cache_bytes.to_json(),
+            "slab_bytes": self.slab_bytes.to_json(),
+            "zram_bytes": self.zram_bytes.to_json(),
             "other_bytes": self.other_bytes.to_json(),
+            "vmo_reclaim_total_bytes": self.vmo_reclaim_total_bytes.to_json(),
+            "vmo_reclaim_newest_bytes": self.vmo_reclaim_newest_bytes.to_json(),
+            "vmo_reclaim_oldest_bytes": self.vmo_reclaim_oldest_bytes.to_json(),
+            "vmo_reclaim_disabled_bytes": self.vmo_reclaim_disabled_bytes.to_json(),
+            "vmo_discardable_locked_bytes": self.vmo_discardable_locked_bytes.to_json(),
+            "vmo_discardable_unlocked_bytes": self.vmo_discardable_unlocked_bytes.to_json(),
         })
     }
 
@@ -410,20 +415,31 @@ impl JsonConvertible for fkernel::MemoryStatsExtended {
         Some(Self {
             total_bytes: obj.get("total_bytes").map(|v| u64::from_json(v)).flatten(),
             free_bytes: obj.get("free_bytes").map(|v| u64::from_json(v)).flatten(),
+            free_loaned_bytes: obj.get("free_loaned_bytes").map(|v| u64::from_json(v)).flatten(),
             wired_bytes: obj.get("wired_bytes").map(|v| u64::from_json(v)).flatten(),
             total_heap_bytes: obj.get("total_heap_bytes").map(|v| u64::from_json(v)).flatten(),
             free_heap_bytes: obj.get("free_heap_bytes").map(|v| u64::from_json(v)).flatten(),
             vmo_bytes: obj.get("vmo_bytes").map(|v| u64::from_json(v)).flatten(),
-            vmo_pager_total_bytes: obj
-                .get("vmo_pager_total_bytes")
+            mmu_overhead_bytes: obj.get("mmu_overhead_bytes").map(|v| u64::from_json(v)).flatten(),
+            ipc_bytes: obj.get("ipc_bytes").map(|v| u64::from_json(v)).flatten(),
+            cache_bytes: obj.get("cache_bytes").map(|v| u64::from_json(v)).flatten(),
+            slab_bytes: obj.get("slab_bytes").map(|v| u64::from_json(v)).flatten(),
+            zram_bytes: obj.get("zram_bytes").map(|v| u64::from_json(v)).flatten(),
+            other_bytes: obj.get("other_bytes").map(|v| u64::from_json(v)).flatten(),
+            vmo_reclaim_total_bytes: obj
+                .get("vmo_reclaim_total_bytes")
                 .map(|v| u64::from_json(v))
                 .flatten(),
-            vmo_pager_newest_bytes: obj
-                .get("vmo_pager_newest_bytes")
+            vmo_reclaim_newest_bytes: obj
+                .get("vmo_reclaim_newest_bytes")
                 .map(|v| u64::from_json(v))
                 .flatten(),
-            vmo_pager_oldest_bytes: obj
-                .get("vmo_pager_oldest_bytes")
+            vmo_reclaim_oldest_bytes: obj
+                .get("vmo_reclaim_oldest_bytes")
+                .map(|v| u64::from_json(v))
+                .flatten(),
+            vmo_reclaim_disabled_bytes: obj
+                .get("vmo_reclaim_disabled_bytes")
                 .map(|v| u64::from_json(v))
                 .flatten(),
             vmo_discardable_locked_bytes: obj
@@ -434,9 +450,6 @@ impl JsonConvertible for fkernel::MemoryStatsExtended {
                 .get("vmo_discardable_unlocked_bytes")
                 .map(|v| u64::from_json(v))
                 .flatten(),
-            mmu_overhead_bytes: obj.get("mmu_overhead_bytes").map(|v| u64::from_json(v)).flatten(),
-            ipc_bytes: obj.get("ipc_bytes").map(|v| u64::from_json(v)).flatten(),
-            other_bytes: obj.get("other_bytes").map(|v| u64::from_json(v)).flatten(),
             ..Default::default()
         })
     }
@@ -713,37 +726,42 @@ mod tests {
                 "2_vmo".to_owned(),
             ]),
             kernel_statistics: Some(fplugin::KernelStatistics {
-                memory_stats: Some(fidl_fuchsia_kernel::MemoryStatsExtended {
+                memory_stats: Some(fidl_fuchsia_kernel::MemoryStats {
                     total_bytes: Some(1),
                     free_bytes: Some(2),
-                    wired_bytes: Some(3),
-                    total_heap_bytes: Some(4),
-                    free_heap_bytes: Some(5),
-                    vmo_bytes: Some(6),
-                    vmo_pager_total_bytes: Some(7),
-                    vmo_pager_newest_bytes: Some(8),
-                    vmo_pager_oldest_bytes: Some(9),
-                    vmo_discardable_locked_bytes: Some(10),
-                    vmo_discardable_unlocked_bytes: Some(11),
-                    mmu_overhead_bytes: Some(12),
-                    ipc_bytes: Some(13),
-                    other_bytes: Some(14),
+                    free_loaned_bytes: Some(3),
+                    wired_bytes: Some(4),
+                    total_heap_bytes: Some(5),
+                    free_heap_bytes: Some(6),
+                    vmo_bytes: Some(7),
+                    mmu_overhead_bytes: Some(8),
+                    ipc_bytes: Some(9),
+                    cache_bytes: Some(10),
+                    slab_bytes: Some(11),
+                    zram_bytes: Some(12),
+                    other_bytes: Some(13),
+                    vmo_reclaim_total_bytes: Some(14),
+                    vmo_reclaim_newest_bytes: Some(15),
+                    vmo_reclaim_oldest_bytes: Some(16),
+                    vmo_reclaim_disabled_bytes: Some(17),
+                    vmo_discardable_locked_bytes: Some(18),
+                    vmo_discardable_unlocked_bytes: Some(19),
                     ..Default::default()
                 }),
                 compression_stats: Some(fidl_fuchsia_kernel::MemoryStatsCompression {
-                    uncompressed_storage_bytes: Some(15),
-                    compressed_storage_bytes: Some(16),
-                    compressed_fragmentation_bytes: Some(17),
-                    compression_time: Some(18),
-                    decompression_time: Some(19),
-                    total_page_compression_attempts: Some(20),
-                    failed_page_compression_attempts: Some(21),
-                    total_page_decompressions: Some(22),
-                    compressed_page_evictions: Some(23),
-                    eager_page_compressions: Some(24),
-                    memory_pressure_page_compressions: Some(25),
-                    critical_memory_page_compressions: Some(26),
-                    pages_decompressed_unit_ns: Some(27),
+                    uncompressed_storage_bytes: Some(101),
+                    compressed_storage_bytes: Some(102),
+                    compressed_fragmentation_bytes: Some(103),
+                    compression_time: Some(104),
+                    decompression_time: Some(105),
+                    total_page_compression_attempts: Some(106),
+                    failed_page_compression_attempts: Some(107),
+                    total_page_decompressions: Some(108),
+                    compressed_page_evictions: Some(109),
+                    eager_page_compressions: Some(110),
+                    memory_pressure_page_compressions: Some(111),
+                    critical_memory_page_compressions: Some(112),
+                    pages_decompressed_unit_ns: Some(113),
                     pages_decompressed_within_log_time: Some([0, 1, 2, 3, 4, 5, 6, 7]),
                     ..Default::default()
                 }),
@@ -751,10 +769,288 @@ mod tests {
             }),
             ..Default::default()
         };
-        let json_value = example_snapshot.to_json();
-        let actual_snapshot = fplugin::Snapshot::from_json(&json_value)
+        let expected_snapshot_json = r#"
+            {
+                "attributions": [
+                    [
+                        0,
+                        0,
+                        [
+                            {
+                                "kernel_object": 1000
+                            }
+                        ]
+                    ],
+                    [
+                        0,
+                        1,
+                        [
+                            {
+                                "kernel_object": 1004
+                            }
+                        ]
+                    ],
+                    [
+                        0,
+                        2,
+                        [
+                            {
+                                "kernel_object": 1008
+                            }
+                        ]
+                    ],
+                    [
+                        1,
+                        3,
+                        [
+                            {
+                                "kernel_object": 1007
+                            }
+                        ]
+                    ]
+                ],
+                "kernel_statistics": {
+                    "compression_stats": {
+                        "compressed_fragmentation_bytes": 103,
+                        "compressed_page_evictions": 109,
+                        "compressed_storage_bytes": 102,
+                        "compression_time": 104,
+                        "critical_memory_page_compressions": 112,
+                        "decompression_time": 105,
+                        "eager_page_compressions": 110,
+                        "failed_page_compression_attempts": 107,
+                        "memory_pressure_page_compressions": 111,
+                        "pages_decompressed_unit_ns": 113,
+                        "pages_decompressed_within_log_time": [
+                            0,
+                            1,
+                            2,
+                            3,
+                            4,
+                            5,
+                            6,
+                            7
+                        ],
+                        "total_page_compression_attempts": 106,
+                        "total_page_decompressions": 108,
+                        "uncompressed_storage_bytes": 101
+                    },
+                    "memory_stats": {
+                        "cache_bytes": 10,
+                        "free_bytes": 2,
+                        "free_heap_bytes": 6,
+                        "free_loaned_bytes": 3,
+                        "ipc_bytes": 9,
+                        "mmu_overhead_bytes": 8,
+                        "other_bytes": 13,
+                        "slab_bytes": 11,
+                        "total_bytes": 1,
+                        "total_heap_bytes": 5,
+                        "vmo_bytes": 7,
+                        "vmo_discardable_locked_bytes": 18,
+                        "vmo_discardable_unlocked_bytes": 19,
+                        "vmo_reclaim_disabled_bytes": 17,
+                        "vmo_reclaim_newest_bytes": 15,
+                        "vmo_reclaim_oldest_bytes": 16,
+                        "vmo_reclaim_total_bytes": 14,
+                        "wired_bytes": 4,
+                        "zram_bytes": 12
+                    }
+                },
+                "principals": [
+                    [
+                        0,
+                        {
+                            "component": "root"
+                        },
+                        "runnable",
+                        null
+                    ],
+                    [
+                        1,
+                        {
+                            "component": "runner"
+                        },
+                        "runnable",
+                        0
+                    ],
+                    [
+                        2,
+                        {
+                            "component": "component 2"
+                        },
+                        "runnable",
+                        0
+                    ],
+                    [
+                        3,
+                        {
+                            "component": "component 3"
+                        },
+                        "runnable",
+                        1
+                    ]
+                ],
+                "resource_names": [
+                    "root_job",
+                    "root_process",
+                    "root_vmo",
+                    "shared_vmo",
+                    "runner_job",
+                    "runner_process",
+                    "runner_vmo",
+                    "component_vmo",
+                    "component_2_job",
+                    "2_process",
+                    "2_vmo"
+                ],
+                "resources": [
+                    [
+                        1000,
+                        0,
+                        {
+                            "job": [
+                                [
+                                    1004,
+                                    1008
+                                ],
+                                [
+                                    1001
+                                ]
+                            ]
+                        }
+                    ],
+                    [
+                        1001,
+                        1,
+                        {
+                            "process": [
+                                [
+                                    1002,
+                                    1003
+                                ],
+                                null
+                            ]
+                        }
+                    ],
+                    [
+                        1002,
+                        2,
+                        {
+                            "vmo": [
+                                1024,
+                                2048,
+                                null
+                            ]
+                        }
+                    ],
+                    [
+                        1003,
+                        3,
+                        {
+                            "vmo": [
+                                1024,
+                                2048,
+                                null
+                            ]
+                        }
+                    ],
+                    [
+                        1004,
+                        4,
+                        {
+                            "job": [
+                                [],
+                                [
+                                    1005
+                                ]
+                            ]
+                        }
+                    ],
+                    [
+                        1005,
+                        5,
+                        {
+                            "process": [
+                                [
+                                    1006,
+                                    1007
+                                ],
+                                null
+                            ]
+                        }
+                    ],
+                    [
+                        1006,
+                        6,
+                        {
+                            "vmo": [
+                                1024,
+                                2048,
+                                null
+                            ]
+                        }
+                    ],
+                    [
+                        1007,
+                        7,
+                        {
+                            "vmo": [
+                                1024,
+                                2048,
+                                null
+                            ]
+                        }
+                    ],
+                    [
+                        1008,
+                        8,
+                        {
+                            "job": [
+                                [],
+                                [
+                                    1009
+                                ]
+                            ]
+                        }
+                    ],
+                    [
+                        1009,
+                        9,
+                        {
+                            "process": [
+                                [
+                                    1010,
+                                    1003
+                                ],
+                                null
+                            ]
+                        }
+                    ],
+                    [
+                        1010,
+                        10,
+                        {
+                            "vmo": [
+                                1024,
+                                2048,
+                                null
+                            ]
+                        }
+                    ]
+                ]
+            }
+        "#;
+        let actual_json_value = example_snapshot.to_json();
+        assert_eq!(
+            actual_json_value,
+            serde_json::from_str::<Value>(expected_snapshot_json).unwrap()
+        );
+
+        let actual_snapshot = fplugin::Snapshot::from_json(&actual_json_value)
             .context("Unable to deserialize snapshot")
             .unwrap();
+
         assert_eq!(example_snapshot, actual_snapshot);
     }
 }

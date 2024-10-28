@@ -145,6 +145,6 @@ type Mapping = table {
 
 /// Kernel internal and system-wide memory statistics.
 type KernelStatistics = table {
-    1: memory_stats fuchsia.kernel.MemoryStatsExtended;
+    1: memory_stats fuchsia.kernel.MemoryStats;
     2: compression_stats fuchsia.kernel.MemoryStatsCompression;
 };
