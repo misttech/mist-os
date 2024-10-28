@@ -710,7 +710,7 @@ pub struct Transaction<'a> {
     new_objects: BTreeSet<(u64, u64)>,
 
     /// Any data checksums which should be evaluated when replaying this transaction.
-    checksums: Vec<(Range<u64>, Vec<Checksum>)>,
+    checksums: Vec<(Range<u64>, Vec<Checksum>, bool)>,
 }
 
 impl<'a> Transaction<'a> {
@@ -799,11 +799,11 @@ impl<'a> Transaction<'a> {
         self.mutations.replace(txn_mutation).map(|m| m.mutation)
     }
 
-    pub fn add_checksum(&mut self, range: Range<u64>, checksums: Vec<Checksum>) {
-        self.checksums.push((range, checksums));
+    pub fn add_checksum(&mut self, range: Range<u64>, checksums: Vec<Checksum>, first_write: bool) {
+        self.checksums.push((range, checksums, first_write));
     }
 
-    pub fn take_checksums(&mut self) -> Vec<(Range<u64>, Vec<Checksum>)> {
+    pub fn take_checksums(&mut self) -> Vec<(Range<u64>, Vec<Checksum>, bool)> {
         std::mem::replace(&mut self.checksums, Vec::new())
     }
 

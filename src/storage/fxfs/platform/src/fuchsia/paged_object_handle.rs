@@ -2574,4 +2574,137 @@ mod tests {
 
         fixture.close().await;
     }
+
+    #[fuchsia::test]
+    async fn test_file_allocate_write_restart() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let page_size = zx::system_get_page_size() as u64;
+        file.allocate(0, page_size * 4, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let write_data = (0..20).cycle().take(page_size as usize).collect::<Vec<_>>();
+        let write_data_alternate = (0..15).cycle().take(page_size as usize).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        assert_eq!(
+            file.write_at(&write_data, page_size * 2)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        // Sync will make a transaction with whatever we have written. Make sure that there are
+        // multiple transactions hitting the same blocks, to try and trip up the replay.
+        assert_eq!(
+            file.write_at(&write_data_alternate, 0)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        assert_eq!(
+            file.write_at(&write_data_alternate, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        assert_eq!(
+            file.read_at(page_size, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            write_data_alternate,
+        );
+        assert_eq!(
+            file.read_at(page_size, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            write_data_alternate,
+        );
+        assert_eq!(
+            file.read_at(page_size, page_size * 2)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            write_data,
+        );
+        assert_eq!(
+            file.read_at(page_size, page_size * 3)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            vec![0; page_size as usize],
+        );
+
+        let device = fixture.close().await;
+
+        let fixture = TestFixture::new_with_device(device).await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        assert_eq!(
+            file.read_at(page_size, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap(),
+            write_data_alternate,
+        );
+        assert_eq!(
+            file.read_at(page_size, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            write_data_alternate,
+        );
+        assert_eq!(
+            file.read_at(page_size, page_size * 2)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            write_data,
+        );
+        assert_eq!(
+            file.read_at(page_size, page_size * 3)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            vec![0; page_size as usize],
+        );
+
+        fixture.close().await;
+    }
 }
