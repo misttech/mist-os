@@ -11,6 +11,8 @@
 
 #include "fuchsia/feedback/cpp/fidl.h"
 #include "src/developer/forensics/feedback/annotations/types.h"
+#include "src/developer/forensics/testing/gpretty_printers.h"
+#include "src/developer/forensics/utils/errors.h"
 
 namespace fuchsia::feedback {
 
@@ -22,6 +24,8 @@ bool operator==(const Annotation& lhs, const Annotation& rhs) {
 
 namespace forensics::feedback {
 namespace {
+
+using ::testing::UnorderedElementsAreArray;
 
 TEST(EncodeTest, AnnotationsAsFidl) {
   const auto annotations = Encode<fuchsia::feedback::Annotations>(Annotations({
@@ -37,12 +41,35 @@ TEST(EncodeTest, AnnotationsAsFidl) {
 
   ASSERT_TRUE(annotations.has_annotations());
   EXPECT_EQ(annotations.annotations(), expected);
+
+  ASSERT_TRUE(annotations.has_annotations2());
+  EXPECT_EQ(annotations.annotations2(), expected);
 }
 
 TEST(EncodeTest, EmptyAnnotationsAsFidl) {
   const auto annotations = Encode<fuchsia::feedback::Annotations>(Annotations({}));
 
   EXPECT_FALSE(annotations.has_annotations());
+  EXPECT_FALSE(annotations.has_annotations2());
+}
+
+TEST(EncodeTest, AnnotationsAsFidlLargeSize) {
+  Annotations annotations;
+  std::vector<fuchsia::feedback::Annotation> expected;
+
+  for (uint32_t i = 0; i < fuchsia::feedback::MAX_NUM_ANNOTATIONS2_PROVIDED; ++i) {
+    const std::string key = "key" + std::to_string(i);
+    annotations.insert({key, ErrorOrString("fake_value")});
+    expected.push_back({key, "fake_value"});
+  }
+
+  const auto fidl_annotations = Encode<fuchsia::feedback::Annotations>(annotations);
+
+  ASSERT_TRUE(fidl_annotations.has_annotations());
+  EXPECT_THAT(fidl_annotations.annotations(), UnorderedElementsAreArray(expected));
+
+  ASSERT_TRUE(fidl_annotations.has_annotations2());
+  EXPECT_THAT(fidl_annotations.annotations2(), UnorderedElementsAreArray(expected));
 }
 
 TEST(EncodeTest, AnnotationsAsString) {

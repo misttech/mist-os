@@ -129,7 +129,11 @@ void DataProvider::GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
         // Add the annotations to the FIDL object and as file in the snapshot itself.
         if (auto fidl = feedback::Encode<fuchsia::feedback::Annotations>(annotations);
             fidl.has_annotations()) {
+          // TODO(https://fxbug.dev/374183399): Remove call to set_annotations.
           snapshot.set_annotations(fidl.annotations());
+          if (fidl.has_annotations2()) {
+            snapshot.set_annotations2(fidl.annotations2());
+          }
         }
 
         if (archive.vmo().is_valid()) {

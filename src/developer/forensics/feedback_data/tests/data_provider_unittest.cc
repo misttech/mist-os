@@ -49,6 +49,14 @@
 #include "third_party/rapidjson/include/rapidjson/document.h"
 #include "third_party/rapidjson/include/rapidjson/schema.h"
 
+namespace fuchsia::feedback {
+
+bool operator==(const Annotation& lhs, const Annotation& rhs) {
+  return lhs.key == rhs.key && lhs.value == rhs.value;
+}
+
+}  // namespace fuchsia::feedback
+
 namespace forensics {
 namespace feedback_data {
 namespace {
@@ -554,6 +562,22 @@ TEST_F(DataProviderTest, GetSnapshot_ErrorAnnotationsNotInFidl) {
 
   Snapshot snapshot = GetSnapshot();
   EXPECT_FALSE(snapshot.has_annotations());
+}
+
+TEST_F(DataProviderTest, GetSnapshotAnnotationsInFidl) {
+  SetUpDataProvider(kDefaultAnnotations, /*attachment_allowlist=*/{},
+                    {{"annotation1", ErrorOrString("value1")}});
+
+  Snapshot snapshot = GetSnapshot();
+
+  const std::vector<fuchsia::feedback::Annotation> expected_annotations = {
+      {"annotation1", "value1"}};
+
+  ASSERT_TRUE(snapshot.has_annotations());
+  EXPECT_EQ(snapshot.annotations(), expected_annotations);
+
+  ASSERT_TRUE(snapshot.has_annotations2());
+  EXPECT_EQ(snapshot.annotations2(), expected_annotations);
 }
 
 TEST_F(DataProviderTest, GetSnapshotUnfilteredAnnotations_DoesNotFilterMissingAnnotations) {

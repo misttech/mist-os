@@ -51,7 +51,10 @@ Attachment BuildAttachment(const std::string& key) {
 void DataProvider::GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
                                GetSnapshotCallback callback) {
   Snapshot snapshot;
+
+  // TODO(https://fxbug.dev/374183399): Remove call to set_annotations.
   snapshot.set_annotations(BuildFidlAnnotations(annotations_));
+  snapshot.set_annotations2(BuildFidlAnnotations(annotations_));
   snapshot.set_archive(BuildAttachment(snapshot_key_));
   callback(std::move(snapshot));
 }
@@ -75,7 +78,10 @@ void DataProviderReturnsNoAnnotation::GetSnapshotInternal(
 
 void DataProviderReturnsNoAttachment::GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
                                                   GetSnapshotCallback callback) {
-  callback(std::move(Snapshot().set_annotations(BuildFidlAnnotations(annotations_))));
+  // TODO(https://fxbug.dev/374183399): Remove call to set_annotations.
+  callback(std::move(Snapshot()
+                         .set_annotations(BuildFidlAnnotations(annotations_))
+                         .set_annotations2(BuildFidlAnnotations(annotations_))));
 }
 
 void DataProviderReturnsNoAttachment::GetSnapshotInternal(
@@ -148,7 +154,10 @@ void DataProviderReturnsOnDemand::PopSnapshotCallback() {
   FX_CHECK(!snapshot_callbacks_.empty());
 
   Snapshot snapshot;
+
+  // TODO(https://fxbug.dev/374183399): Remove call to set_annotations.
   snapshot.set_annotations(BuildFidlAnnotations(annotations_));
+  snapshot.set_annotations2(BuildFidlAnnotations(annotations_));
   snapshot.set_archive(BuildAttachment(snapshot_key_));
 
   snapshot_callbacks_.front()(std::move(snapshot));
