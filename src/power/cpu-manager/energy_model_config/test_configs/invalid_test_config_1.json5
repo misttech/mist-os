@@ -1,11 +1,13 @@
 // `DomainDependent` is not a valid `option`.
 [
     {
-        cpu_set: [
-            0,
-            1,
-        ],
-        power_domain_id: 0,
+        power_domain: {
+            cpu_set: [
+                0,
+                1,
+            ],
+            domain_id: 0,
+        },
         power_levels: [
             {
                 option: 'DomainDependent',

@@ -1,11 +1,13 @@
 // power_level_transition to an invalid power level index.
 [
     {
-        cpu_set: [
-            0,
-            1,
-        ],
-        power_domain_id: 0,
+        power_domain: {
+            cpu_set: [
+                0,
+                1,
+            ],
+            domain_id: 0,
+        },
         power_levels: [
             {
                 option: 'DomainIndependent',

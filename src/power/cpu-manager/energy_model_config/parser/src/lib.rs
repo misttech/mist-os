@@ -8,9 +8,9 @@ use std::fs::File;
 use std::io::Read as _;
 use std::path::Path;
 use zx_types::{
-    zx_cpu_set_t, zx_processor_power_level_t, zx_processor_power_level_transition_t,
-    ZX_CPU_SET_BITS_PER_WORD, ZX_CPU_SET_MAX_CPUS, ZX_MAX_NAME_LEN,
-    ZX_PROCESSOR_POWER_CONTROL_ARM_PSCI, ZX_PROCESSOR_POWER_CONTROL_ARM_WFI,
+    zx_cpu_set_t, zx_processor_power_domain_t, zx_processor_power_level_t,
+    zx_processor_power_level_transition_t, ZX_CPU_SET_BITS_PER_WORD, ZX_CPU_SET_MAX_CPUS,
+    ZX_MAX_NAME_LEN, ZX_PROCESSOR_POWER_CONTROL_ARM_PSCI, ZX_PROCESSOR_POWER_CONTROL_ARM_WFI,
     ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER, ZX_PROCESSOR_POWER_CONTROL_RISCV_SBI,
     ZX_PROCESSOR_POWER_CONTROL_RISCV_WFI, ZX_PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT,
 };
@@ -24,8 +24,14 @@ use zx_types::{
 /// The parser expects a JSON5 file of the following format:
 ///     [
 ///         {
-///             cpu_set: [1, 2, 3],
-///             power_domain_id: 0,
+///             power_domain: {
+///                 cpu_set: [
+///                     1,
+///                     2,
+///                     3,
+///                 ],
+///                 domain_id: 0,
+///             },
 ///             power_levels: [
 ///                 {
 ///                     processing_rate: 200,
@@ -52,8 +58,13 @@ use zx_types::{
 ///             ],
 ///         },
 ///         {
-///             cpu_set: [0, 4],
-///             power_domain_id: 1,
+///             power_domain: {
+///                 cpu_set: [
+///                     0,
+///                     4,
+///                 ],
+///                 domain_id: 1,
+///             },
 ///             power_levels: {
 ///                 option: 'DomainIndependent',
 ///                 processing_rate: 200,
@@ -70,11 +81,8 @@ use zx_types::{
 /// Defines a Json compatible energy model struct of a specific set of CPUs.
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct PowerLevelDomainJson {
-    // A vector of CPU indexes.
-    pub cpu_set: Vec<u16>,
-
-    // A unique identifier for all CPUs in the cpu_set.
-    pub power_domain_id: u64,
+    // Represents CPUs that are a subset of a domain.
+    pub power_domain: PowerDomain,
 
     // Power levels are implicitly enumerated as the indices of `power_levels`.
     pub power_levels: Vec<PowerLevel>,
@@ -84,6 +92,14 @@ pub struct PowerLevelDomainJson {
     // An absent transition between levels is assumed to indicate that there
     // is no energy or latency cost borne by performing it.
     pub power_level_transitions: Vec<PowerLevelTransition>,
+}
+
+#[derive(Deserialize, Debug, Clone, PartialEq)]
+pub struct PowerDomain {
+    // A vector of CPU indexes.
+    pub cpu_set: Vec<u16>,
+    // A unique identifier for all CPUs in the cpu_set.
+    pub domain_id: u32,
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
@@ -143,13 +159,12 @@ impl PowerLevelDomainJson {
 
 /// Represents the top level of an energy model structure.
 #[derive(Debug, Clone, PartialEq)]
-pub struct EnergyModel(Vec<PowerLevelDomain>);
+pub struct EnergyModel(pub Vec<PowerLevelDomain>);
 
 /// Zircon compatible version of PowerLevelDomainJson.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PowerLevelDomain {
-    pub cpu_set: zx_cpu_set_t,
-    pub power_domain_id: u64,
+    pub power_domain: zx_processor_power_domain_t,
     pub power_levels: Vec<zx_processor_power_level_t>,
     pub power_level_transitions: Vec<zx_processor_power_level_transition_t>,
 }
@@ -165,7 +180,7 @@ impl EnergyModel {
         for power_level_domain in power_level_domains.iter() {
             power_level_domain.validate().context(format!(
                 "Validation failed for power_domain {}",
-                power_level_domain.power_domain_id
+                power_level_domain.power_domain.domain_id
             ))?;
         }
 
@@ -182,8 +197,7 @@ impl TryFrom<PowerLevelDomainJson> for PowerLevelDomain {
     type Error = anyhow::Error;
     fn try_from(e: PowerLevelDomainJson) -> Result<Self, Error> {
         Ok(Self {
-            cpu_set: get_cpu_mask(e.cpu_set)?,
-            power_domain_id: e.power_domain_id,
+            power_domain: e.power_domain.try_into()?,
             power_levels: e
                 .power_levels
                 .into_iter()
@@ -195,6 +209,14 @@ impl TryFrom<PowerLevelDomainJson> for PowerLevelDomain {
                 .map(|s| s.into())
                 .collect(),
         })
+    }
+}
+
+impl TryFrom<PowerDomain> for zx_processor_power_domain_t {
+    type Error = anyhow::Error;
+    fn try_from(p: PowerDomain) -> Result<Self, Error> {
+        let cpus = get_cpu_mask(p.cpu_set)?;
+        Ok(Self { cpus, domain_id: p.domain_id, padding1: Default::default() })
     }
 }
 
