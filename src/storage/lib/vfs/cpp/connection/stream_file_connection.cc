@@ -41,7 +41,7 @@ zx_status_t StreamFileConnection::ReadInternal(void* data, size_t len, size_t* o
     return ZX_ERR_BAD_HANDLE;
   }
   if (len > fio::wire::kMaxBuf) {
-    return ZX_ERR_INVALID_ARGS;
+    return ZX_ERR_OUT_OF_RANGE;
   }
   zx_iovec_t vector = {
       .buffer = data,
@@ -72,7 +72,7 @@ zx_status_t StreamFileConnection::ReadAtInternal(void* data, size_t len, size_t 
     return ZX_ERR_BAD_HANDLE;
   }
   if (len > fio::wire::kMaxBuf) {
-    return ZX_ERR_INVALID_ARGS;
+    return ZX_ERR_OUT_OF_RANGE;
   }
   zx_iovec_t vector = {
       .buffer = data,

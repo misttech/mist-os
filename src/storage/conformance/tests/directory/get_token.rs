@@ -13,7 +13,9 @@ async fn get_token_with_sufficient_rights() {
         return;
     }
 
-    for dir_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in
+        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
+    {
         let root = root_directory(vec![]);
         let test_dir = harness.get_directory(root, dir_flags);
 
@@ -30,7 +32,7 @@ async fn get_token_with_insufficient_rights() {
         return;
     }
 
-    for dir_flags in harness.file_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
         let root = root_directory(vec![]);
         let test_dir = harness.get_directory(root, dir_flags);
 

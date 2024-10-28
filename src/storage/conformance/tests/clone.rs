@@ -13,13 +13,15 @@ use io_conformance_util::*;
 async fn clone_file_with_same_or_fewer_rights() {
     let harness = TestHarness::new().await;
 
-    for file_flags in harness.file_rights.valid_combos() {
+    for rights in harness.file_rights.rights_combinations() {
+        let file_rights = Rights::new(rights);
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
-        let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+        let file =
+            open_file_with_flags(&test_dir, file_rights.all_flags_deprecated(), TEST_FILE).await;
 
         // Clone using every subset of flags.
-        for clone_flags in Rights::new(file_flags).valid_combos() {
+        for clone_flags in file_rights.combinations_deprecated() {
             let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
             file.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
             let status = get_open_status(&proxy).await;
@@ -38,9 +40,9 @@ async fn clone_file_with_same_or_fewer_rights() {
 async fn clone_file_with_same_rights_flag() {
     let harness = TestHarness::new().await;
 
-    for file_flags in harness.file_rights.valid_combos() {
+    for file_flags in harness.file_rights.combinations_deprecated() {
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
 
         // Clone using CLONE_FLAG_SAME_RIGHTS.
@@ -62,14 +64,18 @@ async fn clone_file_with_same_rights_flag() {
 async fn clone_file_with_additional_rights() {
     let harness = TestHarness::new().await;
 
-    for file_flags in harness.file_rights.valid_combos() {
+    for rights in harness.file_rights.rights_combinations() {
+        let file_rights = Rights::new(rights);
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
-        let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+        let file =
+            open_file_with_flags(&test_dir, file_rights.all_flags_deprecated(), TEST_FILE).await;
 
         // Clone using every superset of flags, should fail.
-        for clone_flags in harness.file_rights.valid_combos_with(file_flags) {
-            if clone_flags == file_flags {
+        for clone_flags in
+            harness.file_rights.combinations_containing_deprecated(file_rights.all_rights())
+        {
+            if clone_flags == file_rights.all_flags_deprecated() {
                 continue;
             }
             let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
@@ -84,13 +90,14 @@ async fn clone_file_with_additional_rights() {
 async fn clone_directory_with_same_or_fewer_rights() {
     let harness = TestHarness::new().await;
 
-    for dir_flags in harness.dir_rights.valid_combos() {
+    for rights in harness.dir_rights.rights_combinations() {
+        let dir_rights = Rights::new(rights);
         let root = root_directory(vec![directory("dir", vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
-        let dir = open_dir_with_flags(&test_dir, dir_flags, "dir").await;
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+        let dir = open_dir_with_flags(&test_dir, dir_rights.all_flags_deprecated(), "dir").await;
 
         // Clone using every subset of flags.
-        for clone_flags in Rights::new(dir_flags).valid_combos() {
+        for clone_flags in Rights::new(dir_rights.all_rights()).combinations_deprecated() {
             let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
             dir.clone(clone_flags | fio::OpenFlags::DESCRIBE, server).expect("clone failed");
             let status = get_open_status(&proxy).await;
@@ -108,9 +115,9 @@ async fn clone_directory_with_same_or_fewer_rights() {
 async fn clone_directory_with_same_rights_flag() {
     let harness = TestHarness::new().await;
 
-    for dir_flags in harness.dir_rights.valid_combos() {
+    for dir_flags in harness.dir_rights.combinations_deprecated() {
         let root = root_directory(vec![directory("dir", vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         let dir = open_dir_with_flags(&test_dir, dir_flags, "dir").await;
 
         // Clone using CLONE_FLAG_SAME_RIGHTS.
@@ -132,14 +139,17 @@ async fn clone_directory_with_same_rights_flag() {
 async fn clone_directory_with_additional_rights() {
     let harness = TestHarness::new().await;
 
-    for dir_flags in harness.dir_rights.valid_combos() {
+    for rights in harness.dir_rights.rights_combinations() {
+        let dir_rights = Rights::new(rights);
         let root = root_directory(vec![directory("dir", vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
-        let dir = open_dir_with_flags(&test_dir, dir_flags, "dir").await;
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+        let dir = open_dir_with_flags(&test_dir, dir_rights.all_flags_deprecated(), "dir").await;
 
         // Clone using every superset of flags, should fail.
-        for clone_flags in harness.dir_rights.valid_combos_with(dir_flags) {
-            if clone_flags == dir_flags {
+        for clone_flags in
+            harness.dir_rights.combinations_containing_deprecated(dir_rights.all_rights())
+        {
+            if clone_flags == dir_rights.all_flags_deprecated() {
                 continue;
             }
             let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("create_proxy failed");
@@ -155,7 +165,7 @@ async fn clone2_file() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
     let file = test_dir
         .open3_node::<fio::FileMarker>(
             &TEST_FILE,
@@ -188,7 +198,7 @@ async fn clone2_file_node_reference() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
     let node = test_dir
         .open3_node::<fio::NodeMarker>(
             &TEST_FILE,
@@ -219,7 +229,7 @@ async fn clone2_directory() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![directory("dir", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
     let dir = test_dir
         .open3_node::<fio::DirectoryMarker>(
             "dir",
@@ -248,7 +258,7 @@ async fn clone2_directory_node_reference() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![directory("dir", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
     let node = test_dir
         .open3_node::<fio::NodeMarker>(
             "dir",

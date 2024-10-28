@@ -14,12 +14,14 @@ async fn rename_with_sufficient_rights() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in
+        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
+    {
         let root = root_directory(vec![
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         let src_dir = open_dir_with_flags(&test_dir, dir_flags, "src").await;
         let dest_dir = open_rw_dir(&test_dir, "dest").await;
         let dest_token = get_token(&dest_dir).await;
@@ -47,12 +49,12 @@ async fn rename_with_insufficient_rights() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in harness.file_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
         let root = root_directory(vec![
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         let src_dir = open_dir_with_flags(&test_dir, dir_flags, "src").await;
         let dest_dir = open_rw_dir(&test_dir, "dest").await;
         let dest_token = get_token(&dest_dir).await;
@@ -75,12 +77,14 @@ async fn rename_with_slash_in_path_fails() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in
+        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
+    {
         let root = root_directory(vec![
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         let src_dir = open_dir_with_flags(&test_dir, dir_flags, "src").await;
         let dest_dir = open_rw_dir(&test_dir, "dest").await;
 

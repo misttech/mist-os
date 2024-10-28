@@ -489,35 +489,7 @@ impl ToNodeOptions for NodeOptions {
 }
 
 fn flags_to_rights(flags: &fio::Flags) -> fio::Rights {
-    let mut rights = fio::Rights::empty();
-    if flags.contains(fio::Flags::PERM_READ) {
-        rights |= fio::Rights::READ_BYTES;
-    }
-    if flags.contains(fio::Flags::PERM_WRITE) {
-        rights |= fio::Rights::WRITE_BYTES;
-    }
-    if flags.contains(fio::Flags::PERM_EXECUTE) {
-        rights |= fio::Rights::EXECUTE;
-    }
-    if flags.contains(fio::Flags::PERM_SET_ATTRIBUTES) {
-        rights |= fio::Rights::UPDATE_ATTRIBUTES;
-    }
-    if flags.contains(fio::Flags::PERM_ENUMERATE) {
-        rights |= fio::Rights::ENUMERATE;
-    }
-    if flags.contains(fio::Flags::PERM_MODIFY) {
-        rights |= fio::Rights::MODIFY_DIRECTORY;
-    }
-    if flags.contains(fio::Flags::PERM_CONNECT) {
-        rights |= fio::Rights::CONNECT;
-    }
-    if flags.contains(fio::Flags::PERM_GET_ATTRIBUTES) {
-        rights |= fio::Rights::GET_ATTRIBUTES;
-    }
-    if flags.contains(fio::Flags::PERM_TRAVERSE) {
-        rights |= fio::Rights::TRAVERSE;
-    }
-    rights
+    fio::Rights::from_bits_truncate(flags.bits())
 }
 
 pub trait ToFlags {
@@ -527,6 +499,6 @@ pub trait ToFlags {
 impl ToFlags for fio::Operations {
     fn to_flags(&self) -> fio::Flags {
         // The constants in `fio::Operations` are aligned with those in `fio::Flags`.
-        fio::Flags::from_bits(self.bits()).unwrap()
+        fio::Flags::from_bits_truncate(self.bits())
     }
 }

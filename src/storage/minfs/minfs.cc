@@ -1414,6 +1414,10 @@ zx::result<> Mkfs(const MountOptions& options, Bcache* bc) {
 #endif
   if ((info.flags & kMinfsFlagFVM) == 0) {
     inodes = kMinfsDefaultInodeCount;
+    if (options.inode_count > 0) {
+      // TODO(https://fxbug.dev/375550868): should not be overriding inode count.
+      inodes = options.inode_count;
+    }
     blocks = bc->Maxblk();
   }
 

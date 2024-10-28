@@ -12,9 +12,9 @@ use io_conformance_util::*;
 async fn open_dir_without_describe_flag() {
     let harness = TestHarness::new().await;
     let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
-    for dir_flags in harness.dir_rights.valid_combos() {
+    for dir_flags in harness.dir_rights.combinations_deprecated() {
         assert_eq!(dir_flags & fio::OpenFlags::DESCRIBE, fio::OpenFlags::empty());
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
 
@@ -30,10 +30,10 @@ async fn open_dir_without_describe_flag() {
 async fn open_file_without_describe_flag() {
     let harness = TestHarness::new().await;
 
-    for file_flags in harness.file_rights.valid_combos() {
+    for file_flags in harness.file_rights.combinations_deprecated() {
         assert_eq!(file_flags & fio::OpenFlags::DESCRIBE, fio::OpenFlags::empty());
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
 
         test_dir
@@ -53,7 +53,7 @@ async fn open_file_without_describe_flag() {
 async fn open1_epitaph_no_describe() {
     let harness = TestHarness::new().await;
     let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
     root_dir
@@ -74,7 +74,7 @@ async fn open_path() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![directory("dir", vec![])]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     // Valid paths:
     for path in [".", "/", "/dir/"] {
@@ -102,7 +102,7 @@ async fn open_path() {
 async fn open_trailing_slash_with_not_directory() {
     let harness = TestHarness::new().await;
     let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
     assert_eq!(
         open_node_status::<fio::NodeMarker>(
             &root_dir,
@@ -135,7 +135,7 @@ async fn validate_file_rights() {
     let harness = TestHarness::new().await;
     // Create a test directory with a single File object, and ensure the directory has all rights.
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     // Opening as READABLE must succeed.
     open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
@@ -171,7 +171,7 @@ async fn validate_executable_file_rights() {
     }
     // Create a test directory with an ExecutableFile object, and ensure the directory has all rights.
     let root = root_directory(vec![executable_file(TEST_FILE)]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
     // Opening with READABLE/EXECUTABLE should succeed.
     open_node::<fio::NodeMarker>(
         &root_dir,
@@ -194,9 +194,9 @@ async fn open_dir_with_sufficient_rights() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
-    for dir_flags in harness.dir_rights.valid_combos() {
+    for dir_flags in harness.dir_rights.combinations_deprecated() {
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
         root_dir
             .open(
@@ -219,7 +219,7 @@ async fn open_dir_with_insufficient_rights() {
     let root = root_directory(vec![]);
     let root_dir = harness.get_directory(root, fio::OpenFlags::empty());
 
-    for dir_flags in harness.dir_rights.valid_combos() {
+    for dir_flags in harness.dir_rights.combinations_deprecated() {
         if dir_flags.is_empty() {
             continue;
         }
@@ -242,9 +242,9 @@ async fn open_dir_with_insufficient_rights() {
 async fn open_child_dir_with_same_rights() {
     let harness = TestHarness::new().await;
 
-    for dir_flags in harness.dir_rights.valid_combos() {
+    for dir_flags in harness.dir_rights.combinations_deprecated() {
         let root = root_directory(vec![directory("child", vec![])]);
-        let root_dir = harness.get_directory(root, harness.dir_rights.all());
+        let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
         let parent_dir = open_node::<fio::DirectoryMarker>(
             &root_dir,
@@ -306,7 +306,7 @@ async fn open_child_dir_with_extra_rights() {
 async fn open_child_dir_with_posix_flags() {
     let harness = TestHarness::new().await;
 
-    for dir_flags in harness.dir_rights.valid_combos() {
+    for dir_flags in harness.dir_rights.combinations_deprecated() {
         let root = root_directory(vec![directory("child", vec![])]);
         let root_dir = harness.get_directory(root, dir_flags);
         let readable = dir_flags & fio::OpenFlags::RIGHT_READABLE;
@@ -355,19 +355,19 @@ async fn open_file_with_extra_rights() {
     // Combinations to test of the form (directory flags, [file flag combinations]).
     // All file flags should have more rights than those of the directory flags.
     let test_right_combinations = [
-        (fio::OpenFlags::empty(), harness.file_rights.valid_combos()),
+        (fio::OpenFlags::empty(), harness.file_rights.combinations_deprecated()),
         (
             fio::OpenFlags::RIGHT_READABLE,
-            harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE),
+            harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES),
         ),
         (
             fio::OpenFlags::RIGHT_WRITABLE,
-            harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_READABLE),
+            harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES),
         ),
     ];
 
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     for (dir_flags, file_flag_combos) in test_right_combinations.iter() {
         let dir_proxy = open_node::<fio::DirectoryMarker>(
@@ -384,7 +384,8 @@ async fn open_file_with_extra_rights() {
             // Ensure the combination is valid (e.g. that file_flags is requesting more rights
             // than those in dir_flags).
             assert!(
-                (*file_flags & harness.dir_rights.all()) != (*dir_flags & harness.dir_rights.all()),
+                (*file_flags & harness.dir_rights.all_flags_deprecated())
+                    != (*dir_flags & harness.dir_rights.all_flags_deprecated()),
                 "Invalid test: file rights must exceed dir! (flags: dir = {:?}, file = {:?})",
                 *dir_flags,
                 *file_flags

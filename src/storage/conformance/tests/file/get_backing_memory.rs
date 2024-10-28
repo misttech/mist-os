@@ -13,7 +13,9 @@ async fn file_get_readable_memory_with_sufficient_rights() {
         return;
     }
 
-    for file_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_READABLE) {
+    for file_flags in
+        harness.file_rights.combinations_containing_deprecated(fio::Rights::READ_BYTES)
+    {
         // Should be able to get a readable VMO in default, exact, and private sharing modes.
         for sharing_mode in
             [fio::VmoFlags::empty(), fio::VmoFlags::SHARED_BUFFER, fio::VmoFlags::PRIVATE_CLONE]
@@ -48,7 +50,7 @@ async fn file_get_readable_memory_with_insufficient_rights() {
         return;
     }
 
-    for file_flags in harness.file_rights.valid_combos_without(fio::OpenFlags::RIGHT_READABLE) {
+    for file_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::READ_BYTES) {
         let file = file(TEST_FILE, TEST_FILE_CONTENTS.to_owned());
         assert_eq!(
             create_file_and_get_backing_memory(file, &harness, file_flags, fio::VmoFlags::READ)
@@ -69,7 +71,9 @@ async fn file_get_writable_memory_with_sufficient_rights() {
     const VMO_FLAGS: fio::VmoFlags =
         fio::VmoFlags::empty().union(fio::VmoFlags::WRITE).union(fio::VmoFlags::PRIVATE_CLONE);
 
-    for file_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
+    for file_flags in
+        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
+    {
         let file = file(TEST_FILE, TEST_FILE_CONTENTS.to_owned());
         let (vmo, _) = create_file_and_get_backing_memory(file, &harness, file_flags, VMO_FLAGS)
             .await
@@ -92,7 +96,8 @@ async fn file_get_writable_memory_with_insufficient_rights() {
     const VMO_FLAGS: fio::VmoFlags =
         fio::VmoFlags::empty().union(fio::VmoFlags::WRITE).union(fio::VmoFlags::PRIVATE_CLONE);
 
-    for file_flags in harness.file_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
+    for file_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES)
+    {
         let file = file(TEST_FILE, TEST_FILE_CONTENTS.to_owned());
         assert_eq!(
             create_file_and_get_backing_memory(file, &harness, file_flags, VMO_FLAGS)
@@ -139,7 +144,7 @@ async fn file_get_executable_memory_with_insufficient_rights() {
     }
     // We should fail to get the backing memory if the connection lacks execute rights.
     for file_flags in
-        harness.executable_file_rights.valid_combos_without(fio::OpenFlags::RIGHT_EXECUTABLE)
+        harness.executable_file_rights.combinations_without_deprecated(fio::Rights::EXECUTE)
     {
         let file = executable_file(TEST_FILE);
         assert_eq!(
@@ -152,7 +157,7 @@ async fn file_get_executable_memory_with_insufficient_rights() {
     // The fuchsia.io interface additionally specifies that GetBackingMemory should fail if
     // VmoFlags::EXECUTE is specified but connection lacks OPEN_RIGHT_READABLE.
     for file_flags in
-        harness.executable_file_rights.valid_combos_without(fio::OpenFlags::RIGHT_READABLE)
+        harness.executable_file_rights.combinations_without_deprecated(fio::Rights::READ_BYTES)
     {
         let file = executable_file(TEST_FILE);
         assert_eq!(
