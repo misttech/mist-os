@@ -623,11 +623,18 @@ pub(super) fn fs_node_setsecurity(
 
 /// Returns the `SecurityId` that should be used for SELinux access control checks against `fs_node`.
 fn fs_node_effective_sid(fs_node: &FsNode) -> SecurityId {
-    let ino = fs_node.info().ino;
-    get_cached_sid(&fs_node).unwrap_or_else(|| {
-        log_error!("Unlabeled FsNode@{} in {}", ino, fs_node.fs().name());
-        SecurityId::initial(InitialSid::Unlabeled)
-    })
+    if let Some(sid) = get_cached_sid(&fs_node) {
+        return sid;
+    }
+
+    let info = fs_node.info();
+    log_error!(
+        "Unlabeled FsNode@{} of class {:?} in {}",
+        info.ino,
+        file_class_from_file_mode(info.mode),
+        fs_node.fs().name()
+    );
+    SecurityId::initial(InitialSid::Unlabeled)
 }
 
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
