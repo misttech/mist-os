@@ -779,6 +779,11 @@ pub(super) fn file_system_resolve_security(
     Ok(())
 }
 
+/// Returns the security state for a new file object created by `current_task`.
+pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
+    FileObjectState { _sid: current_task.read().security_state.attrs.current_sid }
+}
+
 /// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
 /// initialization to be completed.
 pub(super) fn selinuxfs_policy_loaded(
@@ -876,6 +881,13 @@ impl TaskAttrs {
             sockcreate_sid: None,
         }
     }
+}
+
+/// Security state for a [`crate::vfs::FileObject`] instance. This currently just holds the SID
+/// that the [`crate::task::Task`] that created the file object had.
+#[derive(Debug)]
+pub(super) struct FileObjectState {
+    _sid: SecurityId,
 }
 
 /// Security state for a [`crate::vfs::FileSystem`] instance. This holds the security fields

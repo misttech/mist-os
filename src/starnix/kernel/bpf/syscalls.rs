@@ -80,7 +80,8 @@ fn reopen_bpf_fd(
 ) -> Result<SyscallResult, Errno> {
     let handle: BpfHandle = obj.into();
     // All BPF FDs have the CLOEXEC flag turned on by default.
-    let file = FileObject::new(Box::new(handle), node, open_flags | OpenFlags::CLOEXEC)?;
+    let file =
+        FileObject::new(current_task, Box::new(handle), node, open_flags | OpenFlags::CLOEXEC)?;
     Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
 }
 

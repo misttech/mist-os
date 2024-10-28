@@ -1044,8 +1044,7 @@ impl CurrentTask {
         let mut maybe_fd: Option<FdNumber> = None;
 
         if flags & SECCOMP_FILTER_FLAG_NEW_LISTENER != 0 {
-            let mut task_state = self.task.write();
-            maybe_fd = Some(task_state.seccomp_filters.create_listener(self)?);
+            maybe_fd = Some(SeccompFilterContainer::create_listener(self)?);
         }
 
         // We take the process lock here because we can't change any of the threads

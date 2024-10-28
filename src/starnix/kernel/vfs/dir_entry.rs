@@ -182,6 +182,7 @@ impl DirEntry {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         FileObject::new(
+            current_task,
             self.node.create_file_ops(locked, current_task, flags)?,
             NamespaceNode::new_anonymous(self.clone()),
             flags,

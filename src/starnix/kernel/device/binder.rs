@@ -7078,6 +7078,7 @@ pub mod tests {
         );
         let mut locked = locked.cast_locked::<DeviceOpen>();
         FileObject::new_anonymous(
+            current_task,
             binder_driver
                 .open(&mut locked, &current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
                 .expect("binder dev open failed"),

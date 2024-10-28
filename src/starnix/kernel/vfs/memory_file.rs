@@ -428,7 +428,7 @@ where
 
     let name = NamespaceNode::new_anonymous(DirEntry::new(node, None, local_name));
 
-    FileObject::new(ops, name, flags)
+    FileObject::new(current_task, ops, name, flags)
 }
 
 /// Sets memory size to `min_size` rounded to whole pages. Returns the new size of the VMO in bytes.

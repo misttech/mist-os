@@ -1035,6 +1035,7 @@ impl NamespaceNode {
         L: LockBefore<DeviceOpen>,
     {
         FileObject::new(
+            current_task,
             self.entry.node.open(locked, current_task, &self.mount, flags, access_check)?,
             self.clone(),
             flags,

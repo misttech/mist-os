@@ -5,6 +5,7 @@
 use crate::mm::memory::MemoryObject;
 use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags};
 use crate::power::OnWakeOps;
+use crate::security;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::file_server::serve_file;
@@ -1208,6 +1209,8 @@ pub struct FileObject {
     lease: Mutex<FileLeaseType>,
 
     _file_write_guard: Option<FileWriteGuard>,
+
+    _security_state: security::FileObjectState,
 }
 
 pub type FileHandle = Arc<FileReleaser>;
@@ -1222,12 +1225,13 @@ impl FileObject {
     ///
     /// The returned FileObject does not have a name.
     pub fn new_anonymous(
+        current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         node: FsNodeHandle,
         flags: OpenFlags,
     ) -> FileHandle {
         assert!(!node.fs().has_permanent_entries());
-        Self::new(ops, NamespaceNode::new_anonymous_unrooted(node), flags)
+        Self::new(current_task, ops, NamespaceNode::new_anonymous_unrooted(node), flags)
             .expect("Failed to create anonymous FileObject")
     }
 
@@ -1236,6 +1240,7 @@ impl FileObject {
     /// This function is not typically called directly. Instead, consider
     /// calling NamespaceNode::open.
     pub fn new(
+        current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         name: NamespaceNode,
         flags: OpenFlags,
@@ -1248,6 +1253,7 @@ impl FileObject {
         let fs = name.entry.node.fs();
         let kernel = fs.kernel.upgrade().ok_or_else(|| errno!(ENOENT))?;
         let id = FileObjectId(kernel.next_file_object_id.next());
+        let _security_state = security::file_alloc_security(current_task);
         let file = FileHandle::new_cyclic(|weak_handle| {
             Self {
                 weak_handle: weak_handle.clone(),
@@ -1261,6 +1267,7 @@ impl FileObject {
                 epoll_files: Default::default(),
                 lease: Default::default(),
                 _file_write_guard: file_write_guard,
+                _security_state,
             }
             .into()
         });

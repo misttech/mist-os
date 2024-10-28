@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
+use super::{selinux_hooks, FileObjectState, FileSystemState, ResolvedElfState, TaskState};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
@@ -234,6 +234,11 @@ pub fn check_fs_node_rmdir_access(
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_rmdir_access(security_server, current_task, parent, child)
     })
+}
+
+/// Returns the security state for a new file object created by `current_task`.
+pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
+    FileObjectState { _state: selinux_hooks::file_alloc_security(current_task) }
 }
 
 /// Return the default initial `TaskState` for kernel tasks.

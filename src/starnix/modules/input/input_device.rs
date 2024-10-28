@@ -156,6 +156,7 @@ impl InputDevice {
         };
         self.open_files.lock().push(Arc::downgrade(&input_file));
         let file_object = starnix_core::vfs::FileObject::new(
+            current_task,
             Box::new(input_file),
             current_task
                 .lookup_path_from_root(locked, ".".into())

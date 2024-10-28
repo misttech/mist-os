@@ -353,7 +353,7 @@ impl Socket {
             Anon,
             FsNodeInfo::new_factory(mode, current_task.as_fscred()),
         );
-        FileObject::new_anonymous(SocketFile::new(socket), node, open_flags)
+        FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags)
     }
 
     /// Returns the Socket that this FileHandle refers to. If this file is not a socket file,

@@ -403,7 +403,7 @@ pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), 
 
     let open = |flags: OpenFlags| {
         let ops = PipeFileObject { pipe: Arc::clone(pipe) };
-        Ok(FileObject::new_anonymous(Box::new(ops), Arc::clone(&node), flags))
+        Ok(FileObject::new_anonymous(current_task, Box::new(ops), Arc::clone(&node), flags))
     };
 
     Ok((open(OpenFlags::RDONLY)?, open(OpenFlags::WRONLY)?))

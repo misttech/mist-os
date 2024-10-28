@@ -39,7 +39,12 @@ impl Anon {
         info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
-        FileObject::new_anonymous(ops, fs.create_node(current_task, Anon, info), flags)
+        FileObject::new_anonymous(
+            current_task,
+            ops,
+            fs.create_node(current_task, Anon, info),
+            flags,
+        )
     }
 
     pub fn new_file(
