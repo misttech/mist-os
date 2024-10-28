@@ -7,7 +7,6 @@
             type: "skip",
             matchers: [
                 // TODO(https://fxbug.dev/42179751): Make these tests pass in Starnix then enable.
-                "MapGrowsdownTest.Mprotect*",
                 "MapGrowsdownTest.Syscall*",
 
                 // TODO(https://fxbug.dev/42080092): This test causes the test suite to fail on NUC.
@@ -28,6 +27,11 @@
         {
             type: "expect_failure",
             matchers: [
+                // TODO(https://fxbug.dev/42179751)
+                "MapGrowsdownTest.MprotectAfterGrow",
+                "MapGrowsdownTest.MprotectMixGrowsdownAndRegular",
+                "MapGrowsdownTest.MprotectOnAdjacentGrowsdownMapping",
+
                 // TODO(https://fxbug.dev/351037863)
                 "AshmemTest.SetNameOverflow",
 

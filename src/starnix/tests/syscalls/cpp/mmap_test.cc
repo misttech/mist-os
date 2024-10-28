@@ -806,6 +806,13 @@ TEST(Mprotect, ProtGrowsdownOnNonGrowsdownMapping) {
   EXPECT_EQ(errno, EINVAL);
 }
 
+TEST(Mprotect, UnalignedMprotectEnd) {
+  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void* rv = mmap(NULL, page_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(rv, MAP_FAILED) << "mmap failed: " << strerror(errno) << "(" << errno << ")";
+  EXPECT_EQ(mprotect(rv, 5, PROT_READ), 0);
+}
+
 TEST_F(MMapProcTest, MProtectIsThreadSafe) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {

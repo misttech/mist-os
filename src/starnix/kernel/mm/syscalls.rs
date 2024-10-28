@@ -81,7 +81,7 @@ pub fn do_mmap<L>(
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
+    let prot_flags = ProtectionFlags::from_access_bits(prot).ok_or_else(|| {
         track_stub!(TODO("https://fxbug.dev/322874211"), "mmap parse protection", prot);
         errno!(EINVAL)
     })?;

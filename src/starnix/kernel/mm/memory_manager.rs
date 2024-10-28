@@ -43,7 +43,7 @@ use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE,
     MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE,
-    PROT_EXEC, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
+    PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
 use static_assertions::const_assert_eq;
 use std::collections::HashMap;
@@ -154,10 +154,14 @@ bitflags! {
       const READ = PROT_READ;
       const WRITE = PROT_WRITE;
       const EXEC = PROT_EXEC;
+      const GROWSDOWN = PROT_GROWSDOWN;
     }
 }
 
 impl ProtectionFlags {
+    pub const ACCESS_FLAGS: Self =
+        Self::from_bits_truncate(Self::READ.bits() | Self::WRITE.bits() | Self::EXEC.bits());
+
     pub fn to_vmar_flags(self) -> zx::VmarFlags {
         let mut vmar_flags = zx::VmarFlags::empty();
         if self.contains(ProtectionFlags::READ) {
@@ -184,6 +188,22 @@ impl ProtectionFlags {
             prot_flags |= ProtectionFlags::EXEC;
         }
         prot_flags
+    }
+
+    pub fn from_access_bits(prot: u32) -> Option<Self> {
+        if let Some(flags) = ProtectionFlags::from_bits(prot) {
+            if flags.contains(Self::ACCESS_FLAGS.complement()) {
+                None
+            } else {
+                Some(flags)
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn to_access_prot_flags(&self) -> Self {
+        *self & Self::ACCESS_FLAGS
     }
 }
 
@@ -224,7 +244,13 @@ const_assert_eq!(MappingFlags::DONT_EXPAND.bits(), MappingOptions::DONT_EXPAND.b
 
 impl MappingFlags {
     fn prot_flags(&self) -> ProtectionFlags {
-        ProtectionFlags::from_bits_truncate(self.bits())
+        ProtectionFlags::from_bits_truncate(self.bits() & ProtectionFlags::ACCESS_FLAGS.bits())
+    }
+
+    fn with_prot_flags(&self, prot_flags: ProtectionFlags) -> Self {
+        let mapping_flags =
+            *self & (MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXEC).complement();
+        mapping_flags | Self::from_bits_truncate(prot_flags.to_access_prot_flags().bits())
     }
 
     #[cfg(feature = "alternate_anon_allocs")]
@@ -233,7 +259,8 @@ impl MappingFlags {
     }
 
     fn from_prot_flags_and_options(prot_flags: ProtectionFlags, options: MappingOptions) -> Self {
-        Self::from_bits_truncate(prot_flags.bits()) | Self::from_bits_truncate(options.bits() << 3)
+        Self::from_bits_truncate(prot_flags.to_access_prot_flags().bits())
+            | Self::from_bits_truncate(options.bits() << 3)
     }
 }
 
@@ -1559,14 +1586,40 @@ impl MemoryManagerState {
         prot_flags: ProtectionFlags,
     ) -> Result<(), Errno> {
         profile_duration!("Protect");
-        // TODO(https://fxbug.dev/42179751): If the mprotect flags include PROT_GROWSDOWN then the specified protection may
-        // extend below the provided address if the lowest mapping is a MAP_GROWSDOWN mapping. This function has to
-        // compute the potentially extended range before modifying the Zircon protections or metadata.
         let vmar_flags = prot_flags.to_vmar_flags();
+
+        let end = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?.round_up(*PAGE_SIZE)?;
 
         if self.check_has_unauthorized_splits(addr, length) {
             return error!(EINVAL);
         }
+
+        let prot_range = if prot_flags.contains(ProtectionFlags::GROWSDOWN) {
+            let mut start = addr;
+            for (range, mapping) in self.mappings.intersection(addr..end) {
+                // Ensure that all the mappings in the effected range have GROWSDOWN if
+                // PROT_GROWSDOWN was specified.
+                if !mapping.flags.contains(MappingFlags::GROWSDOWN) {
+                    return error!(EINVAL);
+                }
+                // From <https://man7.org/linux/man-pages/man2/mprotect.2.html>:
+                //
+                //   PROT_GROWSDOWN
+                //     Apply the protection mode down to the beginning of a
+                //     mapping that grows downward (which should be a stack
+                //     segment or a segment mapped with the MAP_GROWSDOWN flag
+                //     set).
+                if range.start < start {
+                    start = range.start;
+                }
+            }
+            start..end
+        } else {
+            addr..end
+        };
+
+        let addr = prot_range.start;
+        let length = prot_range.end - prot_range.start;
 
         // Make one call to mprotect to update all the zircon protections.
         // SAFETY: This is safe because the vmar belongs to a different process.
@@ -1584,16 +1637,11 @@ impl MemoryManagerState {
         })?;
 
         // Update the flags on each mapping in the range.
-        let end = (addr + length).round_up(*PAGE_SIZE)?;
-        let prot_range = addr..end;
         let mut updates = vec![];
-        for (range, mapping) in self.mappings.intersection(addr..end) {
+        for (range, mapping) in self.mappings.intersection(prot_range.clone()) {
             let range = range.intersect(&prot_range);
             let mut mapping = mapping.clone();
-            let new_flags = mapping.flags
-                & (MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXEC).complement()
-                | MappingFlags::from_bits_truncate(prot_flags.bits());
-            mapping.flags = new_flags;
+            mapping.flags = mapping.flags.with_prot_flags(prot_flags);
             updates.push((range, mapping));
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.

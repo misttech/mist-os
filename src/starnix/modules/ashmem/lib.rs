@@ -85,7 +85,7 @@ impl Ashmem {
         let state = AshmemState {
             size: 0,
             name: b"dev/ashmem\0".into(),
-            prot_flags: ProtectionFlags::all(),
+            prot_flags: ProtectionFlags::ACCESS_FLAGS,
             unpinned: RangeMap::<u32, bool>::new(),
             id: id,
         };
@@ -255,7 +255,7 @@ impl FileOps for Ashmem {
             ASHMEM_SET_PROT_MASK => {
                 let mut state = self.state.lock();
                 let prot_flags =
-                    ProtectionFlags::from_bits(arg.into()).ok_or_else(|| errno!(EINVAL))?;
+                    ProtectionFlags::from_access_bits(arg.into()).ok_or_else(|| errno!(EINVAL))?;
 
                 // Do not allow protections to be increased
                 if !state.prot_flags.contains(prot_flags) {
