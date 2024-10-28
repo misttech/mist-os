@@ -105,26 +105,6 @@ open protocol DevBinder {
     });
 };
 
-
-/// Protocol that allows a binder server to request changes to the container's power state.
-@discoverable
-open protocol ContainerPowerController {
-    /// This requests that the container wakes up to service requests.
-    flexible Wake(resource table {
-        /// (Optional): This represents a wake lease that the binder server has.
-        /// The container will ensure that this wake lease will be kept alive until
-        /// The container takes its wake lease.
-        1: power_baton zx.Handle;
-
-        /// (Optional): This creates a wake lock associated with this event pair.
-        /// The container will not go back to sleep until the other end of this event pair has been
-        /// closed.
-        /// If this does not exist, then the container can sleep when it chooses after handling the
-        /// Wake call.
-        2: wake_lock zx.Handle:EVENTPAIR;
-    });
-};
-
 /// Protocol that allows Starnix to control binder servers and clients in other
 /// Fuchsia components.
 @discoverable
@@ -134,7 +114,6 @@ open protocol RemoteController {
     flexible Start(resource table {
         1: dev_binder client_end:DevBinder;
         2: lutex_controller client_end:LutexController;
-        3: container_power_controller client_end:ContainerPowerController;
     });
 };
 
