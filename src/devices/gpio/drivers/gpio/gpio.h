@@ -18,11 +18,13 @@
 #include <string_view>
 
 #include <ddk/metadata/gpio.h>
+#include <fbl/intrusive_double_list.h>
+#include <fbl/ref_counted.h>
+#include <fbl/ref_ptr.h>
 
 namespace gpio {
 
-class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
-                   public fidl::WireServer<fuchsia_hardware_pin::Pin>,
+class GpioDevice : public fidl::WireServer<fuchsia_hardware_pin::Pin>,
                    public fidl::WireServer<fuchsia_hardware_pin::Debug> {
  public:
   GpioDevice(fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl, uint32_t pin,
@@ -42,19 +44,40 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
                          fdf::Logger& logger);
 
  private:
+  class GpioInstance : public fbl::RefCounted<GpioInstance>,
+                       public fbl::DoublyLinkedListable<fbl::RefPtr<GpioInstance>,
+                                                        fbl::NodeOptions::AllowRemoveFromContainer>,
+                       public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
+   public:
+    GpioInstance(async_dispatcher_t* dispatcher,
+                 fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server_end,
+                 fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl, uint32_t pin)
+        : binding_(dispatcher, std::move(server_end), this,
+                   fit::bind_member<&GpioInstance::OnUnbound>(this)),
+          pinimpl_(std::move(pinimpl)),
+          pin_(pin) {}
+
+   private:
+    void Read(ReadCompleter::Sync& completer) override;
+    void SetBufferMode(SetBufferModeRequestView request,
+                       SetBufferModeCompleter::Sync& completer) override;
+    void GetInterrupt(GetInterruptRequestView request,
+                      GetInterruptCompleter::Sync& completer) override;
+    void ConfigureInterrupt(fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
+                            ConfigureInterruptCompleter::Sync& completer) override;
+    void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override;
+
+    void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
+                               fidl::UnknownMethodCompleter::Sync& completer) override;
+
+    void OnUnbound(fidl::UnbindInfo info);
+
+    fidl::ServerBinding<fuchsia_hardware_gpio::Gpio> binding_;
+    fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl_;
+    const uint32_t pin_;
+  };
+
   void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_pin::Debug> server);
-
-  void Read(ReadCompleter::Sync& completer) override;
-  void SetBufferMode(SetBufferModeRequestView request,
-                     SetBufferModeCompleter::Sync& completer) override;
-  void GetInterrupt(GetInterruptRequestView request,
-                    GetInterruptCompleter::Sync& completer) override;
-  void ConfigureInterrupt(fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
-                          ConfigureInterruptCompleter::Sync& completer) override;
-  void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override;
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void Configure(fuchsia_hardware_pin::wire::PinConfigureRequest* request,
                  ConfigureCompleter::Sync& completer) override;
@@ -71,6 +94,8 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Debug> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void ConnectGpio(fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server);
+
   std::string pin_name() const {
     char name[20];
     snprintf(name, sizeof(name), "gpio-%u", pin_);
@@ -83,7 +108,7 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio>,
   const std::string name_;
 
   fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl_;
-  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> gpio_bindings_;
+  fbl::DoublyLinkedList<fbl::RefPtr<GpioInstance>> gpio_instances_;
   fidl::ServerBindingGroup<fuchsia_hardware_pin::Pin> pin_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_pin::Debug> debug_bindings_;
   compat::SyncInitializedDeviceServer compat_server_;

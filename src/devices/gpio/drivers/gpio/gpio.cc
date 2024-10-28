@@ -37,7 +37,7 @@ inline fit::result<zx_status_t> FidlResult(zx_status_t status) {
   return fit::error(status);
 }
 
-void GpioDevice::Read(ReadCompleter::Sync& completer) {
+void GpioDevice::GpioInstance::Read(ReadCompleter::Sync& completer) {
   fdf::Arena arena('GPIO');
   pinimpl_.buffer(arena)->Read(pin_).ThenExactlyOnce(
       fit::inline_callback<void(fdf::WireUnownedResult<fuchsia_hardware_pinimpl::PinImpl::Read>&),
@@ -53,8 +53,8 @@ void GpioDevice::Read(ReadCompleter::Sync& completer) {
           }));
 }
 
-void GpioDevice::SetBufferMode(SetBufferModeRequestView request,
-                               SetBufferModeCompleter::Sync& completer) {
+void GpioDevice::GpioInstance::SetBufferMode(SetBufferModeRequestView request,
+                                             SetBufferModeCompleter::Sync& completer) {
   fdf::Arena arena('GPIO');
   pinimpl_.buffer(arena)
       ->SetBufferMode(pin_, request->mode)
@@ -71,8 +71,8 @@ void GpioDevice::SetBufferMode(SetBufferModeRequestView request,
               }));
 }
 
-void GpioDevice::GetInterrupt(GetInterruptRequestView request,
-                              GetInterruptCompleter::Sync& completer) {
+void GpioDevice::GpioInstance::GetInterrupt(GetInterruptRequestView request,
+                                            GetInterruptCompleter::Sync& completer) {
   fdf::Arena arena('GPIO');
   pinimpl_.buffer(arena)
       ->GetInterrupt(pin_, request->options)
@@ -91,7 +91,7 @@ void GpioDevice::GetInterrupt(GetInterruptRequestView request,
               }));
 }
 
-void GpioDevice::ConfigureInterrupt(
+void GpioDevice::GpioInstance::ConfigureInterrupt(
     fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
     ConfigureInterruptCompleter::Sync& completer) {
   fdf::Arena arena('GPIO');
@@ -110,7 +110,7 @@ void GpioDevice::ConfigureInterrupt(
               }));
 }
 
-void GpioDevice::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
+void GpioDevice::GpioInstance::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
   fdf::Arena arena('GPIO');
   pinimpl_.buffer(arena)->ReleaseInterrupt(pin_).ThenExactlyOnce(
       fit::inline_callback<
@@ -125,11 +125,13 @@ void GpioDevice::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
           }));
 }
 
-void GpioDevice::handle_unknown_method(
+void GpioDevice::GpioInstance::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   FDF_LOG(ERROR, "Unknown Gpio method ordinal 0x%016lx", metadata.method_ordinal);
 }
+
+void GpioDevice::GpioInstance::OnUnbound(fidl::UnbindInfo info) { RemoveFromContainer(); }
 
 void GpioDevice::Configure(fuchsia_hardware_pin::wire::PinConfigureRequest* request,
                            ConfigureCompleter::Sync& completer) {
@@ -174,8 +176,7 @@ void GpioDevice::ConnectPin(fuchsia_hardware_pin::wire::DebugConnectPinRequest* 
 
 void GpioDevice::ConnectGpio(fuchsia_hardware_pin::wire::DebugConnectGpioRequest* request,
                              ConnectGpioCompleter::Sync& completer) {
-  gpio_bindings_.AddBinding(fidl_dispatcher_, std::move(request->server), this,
-                            fidl::kIgnoreBindingClosure);
+  ConnectGpio(std::move(request->server));
   completer.ReplySuccess();
 }
 
@@ -183,6 +184,11 @@ void GpioDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_pin::Debug> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   FDF_LOG(ERROR, "Unknown Debug method ordinal: 0x%016lx", metadata.method_ordinal);
+}
+
+void GpioDevice::ConnectGpio(fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server) {
+  gpio_instances_.push_front(fbl::MakeRefCounted<GpioInstance>(fidl_dispatcher_, std::move(server),
+                                                               pinimpl_.Clone(), pin_));
 }
 
 zx::result<> GpioDevice::AddServices(const std::shared_ptr<fdf::Namespace>& incoming,
@@ -198,8 +204,7 @@ zx::result<> GpioDevice::AddServices(const std::shared_ptr<fdf::Namespace>& inco
       .device =
           [&](fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server) {
             async::PostTask(fidl_dispatcher_, [this, server = std::move(server)]() mutable {
-              gpio_bindings_.AddBinding(fidl_dispatcher_, std::move(server), this,
-                                        fidl::kIgnoreBindingClosure);
+              ConnectGpio(std::move(server));
             });
           },
   });
