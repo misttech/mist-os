@@ -182,12 +182,12 @@ TEST_P(TruncateTest, ShrinkRace) {
       std::uniform_int_distribution distribution(0, 1000);
       usleep(distribution(random));
       const size_t buf_size = page_size * 2 + 100;
-      char buf[buf_size];
-      ssize_t result = read(fd.get(), buf, buf_size);
+      auto buf = std::make_unique<char[]>(buf_size);
+      ssize_t result = read(fd.get(), buf.get(), buf_size);
       EXPECT_TRUE(result == end || result == 0) << errno;
       if (result == end) {
-        EXPECT_EQ(memcmp(buf, zero.data(), zero.size()), 0);
-        EXPECT_EQ(memcmp(buf + offset, data, len), 0);
+        EXPECT_EQ(memcmp(buf.get(), zero.data(), zero.size()), 0);
+        EXPECT_EQ(memcmp(buf.get() + offset, data, len), 0);
       }
     });
     std::thread thread2([&] {

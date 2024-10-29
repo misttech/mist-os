@@ -459,8 +459,8 @@ TEST(TransactionTest, RemovePinnedVnodeContainsVnode) {
 TEST(TransactionTest, RemovePinnedVnodeContainsManyVnodes) {
   FakeMinfs minfs;
   size_t vnode_count = 4;
-  bool vnode_alive[vnode_count];
-  fbl::RefPtr<MockVnodeMinfs> vnodes[vnode_count];
+  auto vnode_alive = std::make_unique<bool[]>(vnode_count);
+  auto vnodes = std::make_unique<fbl::RefPtr<MockVnodeMinfs>[]>(vnode_count);
   Transaction transaction(&minfs);
 
   for (size_t i = 0; i < vnode_count; i++) {

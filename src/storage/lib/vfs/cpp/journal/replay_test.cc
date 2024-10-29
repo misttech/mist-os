@@ -676,13 +676,12 @@ class ReplayJournalTest : public ParseJournalTestFixture {
 
   // Take the contents of the pre-registered journal buffer and transfer it into the requested
   // vmoid.
-  void TransferEntryTo(vmoid_t vmoid, size_t offset, uint64_t length) {
-    char entry_buf[kBlockSize * length];
-    EXPECT_EQ(
-        registry()->GetVmo(kJournalVmoid).read(entry_buf, offset * kBlockSize, sizeof(entry_buf)),
-        ZX_OK);
-    EXPECT_EQ(registry()->GetVmo(vmoid).write(entry_buf, offset * kBlockSize, sizeof(entry_buf)),
+  void TransferEntryTo(vmoid_t vmoid, size_t offset, uint64_t block_count) {
+    const size_t len = kBlockSize * block_count;
+    auto entry_buf = std::make_unique<char[]>(len);
+    EXPECT_EQ(registry()->GetVmo(kJournalVmoid).read(entry_buf.get(), offset * kBlockSize, len),
               ZX_OK);
+    EXPECT_EQ(registry()->GetVmo(vmoid).write(entry_buf.get(), offset * kBlockSize, len), ZX_OK);
   }
 };
 

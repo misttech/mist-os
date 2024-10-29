@@ -136,18 +136,18 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
       case BLOCK_OPCODE_READ: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
-        uint8_t buffer[block_size];
-        memset(buffer, 0, block_size);
+        auto buffer = std::make_unique<uint8_t[]>(block_size);
+        memset(buffer.get(), 0, block_size);
         for (size_t j = 0; j < requests[i].length; j++) {
           uint64_t offset = (requests[i].dev_offset + j) * block_size;
-          zx_status_t status = block_device_.read(buffer, offset, block_size);
+          zx_status_t status = block_device_.read(buffer.get(), offset, block_size);
           if (status != ZX_OK) {
             FX_LOGS(ERROR) << "Read from device failed: offset=" << offset
                            << ", block_size=" << block_size;
             return status;
           }
           offset = (requests[i].vmo_offset + j) * block_size;
-          status = target_vmoid.write(buffer, offset, block_size);
+          status = target_vmoid.write(buffer.get(), offset, block_size);
           if (status != ZX_OK) {
             FX_LOGS(ERROR) << "Write to buffer failed: offset=" << offset
                            << ", block_size=" << block_size;
@@ -160,8 +160,8 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
       case BLOCK_OPCODE_WRITE: {
         vmoid_t vmoid = requests[i].vmoid;
         zx::vmo& target_vmoid = vmos_.at(vmoid);
-        uint8_t buffer[block_size];
-        memset(buffer, 0, block_size);
+        auto buffer = std::make_unique<uint8_t[]>(block_size);
+        memset(buffer.get(), 0, block_size);
         for (size_t j = 0; j < requests[i].length; j++) {
           if (write_block_limit_.has_value()) {
             if (write_block_count_ >= write_block_limit_) {
@@ -169,14 +169,14 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
             }
           }
           uint64_t offset = (requests[i].vmo_offset + j) * block_size;
-          zx_status_t status = target_vmoid.read(buffer, offset, block_size);
+          zx_status_t status = target_vmoid.read(buffer.get(), offset, block_size);
           if (status != ZX_OK) {
             FX_LOGS(ERROR) << "Read from buffer failed: offset=" << offset
                            << ", block_size=" << block_size;
             return status;
           }
           offset = (requests[i].dev_offset + j) * block_size;
-          status = block_device_.write(buffer, offset, block_size);
+          status = block_device_.write(buffer.get(), offset, block_size);
           if (status != ZX_OK) {
             FX_LOGS(ERROR) << "Write to device failed: offset=" << offset
                            << ", block_size=" << block_size;

@@ -91,40 +91,40 @@ DiskFormat DetectDiskFormatImpl(fidl::UnownedClientEnd<fblock::Block> device,
 
   ZX_DEBUG_ASSERT_MSG(buffer_size > 0, "Expected buffer_size to be greater than 0\n");
 
-  uint8_t data[buffer_size];
+  auto data = std::make_unique<uint8_t[]>(buffer_size);
   {
-    auto result = block_client::SingleReadBytes(device, data, buffer_size, 0);
+    auto result = block_client::SingleReadBytes(device, data.get(), buffer_size, 0);
     if (result != ZX_OK) {
       fprintf(stderr, "DetectDiskFormat: Error reading block device.\n");
       return kDiskFormatUnknown;
     }
   }
 
-  if (!memcmp(data, kFvmMagic, sizeof(kFvmMagic))) {
+  if (!memcmp(data.get(), kFvmMagic, sizeof(kFvmMagic))) {
     return kDiskFormatFvm;
   }
 
-  if (!memcmp(data, kZxcryptMagic, sizeof(kZxcryptMagic))) {
+  if (!memcmp(data.get(), kZxcryptMagic, sizeof(kZxcryptMagic))) {
     return kDiskFormatZxcrypt;
   }
 
-  if (!memcmp(data, kBlockVerityMagic, sizeof(kBlockVerityMagic))) {
+  if (!memcmp(data.get(), kBlockVerityMagic, sizeof(kBlockVerityMagic))) {
     return kDiskFormatBlockVerity;
   }
 
-  if (!memcmp(data + info.block_size, kGptMagic, sizeof(kGptMagic))) {
+  if (!memcmp(data.get() + info.block_size, kGptMagic, sizeof(kGptMagic))) {
     return kDiskFormatGpt;
   }
 
-  if (!memcmp(data, kMinfsMagic, sizeof(kMinfsMagic))) {
+  if (!memcmp(data.get(), kMinfsMagic, sizeof(kMinfsMagic))) {
     return kDiskFormatMinfs;
   }
 
-  if (!memcmp(data, kBlobfsMagic, sizeof(kBlobfsMagic))) {
+  if (!memcmp(data.get(), kBlobfsMagic, sizeof(kBlobfsMagic))) {
     return kDiskFormatBlobfs;
   }
 
-  if (!memcmp(data, kVbmetaMagic, sizeof(kVbmetaMagic))) {
+  if (!memcmp(data.get(), kVbmetaMagic, sizeof(kVbmetaMagic))) {
     return kDiskFormatVbmeta;
   }
 
@@ -132,7 +132,7 @@ DiskFormat DetectDiskFormatImpl(fidl::UnownedClientEnd<fblock::Block> device,
     return kDiskFormatF2fs;
   }
 
-  if (!memcmp(data, kFxfsMagic, sizeof(kFxfsMagic))) {
+  if (!memcmp(data.get(), kFxfsMagic, sizeof(kFxfsMagic))) {
     return kDiskFormatFxfs;
   }
 
@@ -153,11 +153,12 @@ DiskFormat DetectDiskFormatImpl(fidl::UnownedClientEnd<fblock::Block> device,
     fprintf(stderr, "DetectDiskFormat: did not recognize format.  Looked at:\n");
     // fvm, zxcrypt, minfs, and blobfs have their magic bytes at the start
     // of the block.
-    hexdump_very_ex(data, 16, 0, hexdump_stdio_printf, stderr);
+    hexdump_very_ex(data.get(), 16, 0, hexdump_stdio_printf, stderr);
     // MBR is two bytes at offset 0x1fe, but print 16 just for consistency
-    hexdump_very_ex(data + 0x1f0, 16, 0x1f0, hexdump_stdio_printf, stderr);
+    hexdump_very_ex(data.get() + 0x1f0, 16, 0x1f0, hexdump_stdio_printf, stderr);
     // GPT magic is stored one block in, so it can coexist with MBR.
-    hexdump_very_ex(data + info.block_size, 16, info.block_size, hexdump_stdio_printf, stderr);
+    hexdump_very_ex(data.get() + info.block_size, 16, info.block_size, hexdump_stdio_printf,
+                    stderr);
   }
 
   return kDiskFormatUnknown;

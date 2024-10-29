@@ -344,13 +344,13 @@ void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
     completer.Reply(ZX_ERR_BAD_HANDLE, fidl::VectorView<uint8_t>());
     return;
   }
-  uint8_t data[request->max_bytes];
+  auto data = std::make_unique<uint8_t[]>(request->max_bytes);
   size_t actual = 0;
   auto fs = vfs();
   zx_status_t status =
-      fs ? fs->Readdir(vnode().get(), &dircookie_, data, request->max_bytes, &actual)
+      fs ? fs->Readdir(vnode().get(), &dircookie_, data.get(), request->max_bytes, &actual)
          : ZX_ERR_CANCELED;
-  completer.Reply(status, fidl::VectorView<uint8_t>::FromExternal(data, actual));
+  completer.Reply(status, fidl::VectorView<uint8_t>::FromExternal(data.get(), actual));
 }
 
 void DirectoryConnection::Rewind(RewindCompleter::Sync& completer) {

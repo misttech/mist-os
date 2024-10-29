@@ -104,9 +104,6 @@ static_library("fake_device") {
     "//zircon/system/ulib/range",
     "//zircon/system/ulib/storage/buffer",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("block_client_unit_test") {
@@ -140,9 +137,6 @@ test("block_client_unit_test") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/range",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 test("block_client_ramdisk_test") {

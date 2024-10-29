@@ -273,9 +273,6 @@ test("fxfs-interop-fs") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 storage_driver_test_realm_v2_component("fxfs-interop-fs-tests") {

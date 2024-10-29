@@ -42,10 +42,10 @@ void InodeManager::Update(PendingWork* transaction, ino_t ino, const Inode* inod
 
   // Since host-side tools don't have "mapped vmos", just read / update /
   // write the single absolute inode block.
-  uint8_t inodata[BlockSize()];
-  (void)bc_->Readblk(inoblock_abs, inodata);
-  memcpy(inodata + off_of_ino, inode, kMinfsInodeSize);
-  (void)bc_->Writeblk(inoblock_abs, inodata);
+  auto inodata = std::make_unique<uint8_t[]>(BlockSize());
+  (void)bc_->Readblk(inoblock_abs, inodata.get());
+  memcpy(inodata.get() + off_of_ino, inode, kMinfsInodeSize);
+  (void)bc_->Writeblk(inoblock_abs, inodata.get());
 }
 
 const Allocator* InodeManager::GetInodeAllocator() const { return inode_allocator_.get(); }
@@ -53,10 +53,10 @@ const Allocator* InodeManager::GetInodeAllocator() const { return inode_allocato
 void InodeManager::Load(ino_t ino, Inode* out) const {
   // obtain the block of the inode table we need
   uint32_t off_of_ino = (ino % kMinfsInodesPerBlock) * kMinfsInodeSize;
-  uint8_t inodata[BlockSize()];
-  (void)bc_->Readblk(start_block_ + (ino / kMinfsInodesPerBlock), inodata);
+  auto inodata = std::make_unique<uint8_t[]>(BlockSize());
+  (void)bc_->Readblk(start_block_ + (ino / kMinfsInodesPerBlock), inodata.get());
   const Inode* inode =
-      reinterpret_cast<const Inode*>(reinterpret_cast<uintptr_t>(inodata) + off_of_ino);
+      reinterpret_cast<const Inode*>(reinterpret_cast<uintptr_t>(inodata.get()) + off_of_ino);
   memcpy(out, inode, kMinfsInodeSize);
 }
 

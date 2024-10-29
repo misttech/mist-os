@@ -163,7 +163,7 @@ TEST_P(AppendAtomicTest, MultiThreadedTest) {
   // - kWriteLength * kNumWrites of the character 'i' for all
   // values of i in the range [0, thread_count()).
   // - Those 'i's should be grouped in units of kWriteLength.
-  std::thread threads[thread_count()];
+  auto threads = std::vector<std::thread>(thread_count());
   for (int i = 0; i < thread_count(); i++) {
     threads[i] = std::thread([&append_atomic, i]() {
       fbl::unique_fd fd(
@@ -196,19 +196,20 @@ TEST_P(AppendAtomicTest, MultiThreadedTest) {
   ASSERT_EQ(fstat(fd.get(), &st), 0);
   ASSERT_EQ(st.st_size, static_cast<off_t>(kWriteLength * kNumWrites * thread_count()));
 
-  char buf[kWriteLength * kNumWrites * thread_count()];
-  ASSERT_EQ(read(fd.get(), buf, sizeof(buf)), static_cast<ssize_t>(sizeof(buf)));
+  const size_t kBufLen = kWriteLength * kNumWrites * thread_count();
+  auto buf = std::make_unique<char[]>(kBufLen);
+  ASSERT_EQ(read(fd.get(), buf.get(), kBufLen), static_cast<ssize_t>(kBufLen));
 
   std::vector<int> counts(thread_count() + 1);
-  for (size_t i = 0; i < sizeof(buf); i += kWriteLength) {
+  for (size_t i = 0; i < kBufLen; i += kWriteLength) {
     size_t val = static_cast<size_t>(buf[i]);
     EXPECT_NE(val, 0u) << "Found zeroes at offset " << i;
     ASSERT_LE(val, counts.size()) << "Read unexpected value from file";
     counts[val]++;
-    char tmp[kWriteLength];
-    memset(tmp, buf[i], sizeof(tmp));
+    auto tmp = std::make_unique<char[]>(kWriteLength);
+    memset(tmp.get(), buf[i], kWriteLength);
 
-    ASSERT_EQ(memcmp(&buf[i], tmp, sizeof(tmp)), 0) << "Non-atomic Append Detected";
+    ASSERT_EQ(memcmp(&buf[i], tmp.get(), kWriteLength), 0) << "Non-atomic Append Detected";
   }
 
   for (size_t i = 1; i < counts.size(); i++) {

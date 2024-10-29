@@ -250,10 +250,10 @@ TEST_P(BlobTest, WriteBlobWithSharedBlockInCompactFormat) {
 
     TestScopedVnodeOpen open(file);  // Must be open to read.
     size_t actual;
-    uint8_t data[info->size_data];
-    EXPECT_EQ(file->Read(&data, info->size_data, 0, &actual), ZX_OK);
+    auto data = std::make_unique<uint8_t[]>(info->size_data);
+    EXPECT_EQ(file->Read(data.get(), info->size_data, 0, &actual), ZX_OK);
     EXPECT_EQ(info->size_data, actual);
-    EXPECT_EQ(memcmp(data, info->data.get(), info->size_data), 0);
+    EXPECT_EQ(memcmp(data.get(), info->data.get(), info->size_data), 0);
   }
 }
 

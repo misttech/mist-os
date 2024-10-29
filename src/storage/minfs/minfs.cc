@@ -1517,10 +1517,10 @@ zx::result<> Mkfs(const MountOptions& options, Bcache* bc) {
   }
 
   // Write rootdir
-  uint8_t blk[info.BlockSize()];
-  memset(blk, 0, sizeof(blk));
-  InitializeDirectory(blk, kMinfsRootIno, kMinfsRootIno);
-  if (auto status = bc->Writeblk(info.dat_block + 1, blk); status.is_error()) {
+  auto blk = std::make_unique<uint8_t[]>(info.BlockSize());
+  memset(blk.get(), 0, info.BlockSize());
+  InitializeDirectory(blk.get(), kMinfsRootIno, kMinfsRootIno);
+  if (auto status = bc->Writeblk(info.dat_block + 1, blk.get()); status.is_error()) {
     FX_LOGS(ERROR) << "mkfs: Failed to write root directory: " << status.error_value();
     return status.take_error();
   }
@@ -1539,8 +1539,8 @@ zx::result<> Mkfs(const MountOptions& options, Bcache* bc) {
   // Write allocation bitmap
   for (uint32_t n = 0; n < abmblks; n++) {
     void* bmdata = fs::GetBlock(info.BlockSize(), abm.StorageUnsafe()->GetData(), n);
-    memcpy(blk, bmdata, info.BlockSize());
-    if (auto status = bc->Writeblk(info.abm_block + n, blk); status.is_error()) {
+    memcpy(blk.get(), bmdata, info.BlockSize());
+    if (auto status = bc->Writeblk(info.abm_block + n, blk.get()); status.is_error()) {
       return status.take_error();
     }
   }
@@ -1548,22 +1548,22 @@ zx::result<> Mkfs(const MountOptions& options, Bcache* bc) {
   // Write inode bitmap
   for (uint32_t n = 0; n < ibmblks; n++) {
     void* bmdata = fs::GetBlock(info.BlockSize(), ibm.StorageUnsafe()->GetData(), n);
-    memcpy(blk, bmdata, info.BlockSize());
-    if (auto status = bc->Writeblk(info.ibm_block + n, blk); status.is_error()) {
+    memcpy(blk.get(), bmdata, info.BlockSize());
+    if (auto status = bc->Writeblk(info.ibm_block + n, blk.get()); status.is_error()) {
       return status.take_error();
     }
   }
 
   // Write inodes
-  memset(blk, 0, sizeof(blk));
+  memset(blk.get(), 0, info.BlockSize());
   for (uint32_t n = 0; n < inoblks; n++) {
-    if (auto status = bc->Writeblk(info.ino_block + n, blk); status.is_error()) {
+    if (auto status = bc->Writeblk(info.ino_block + n, blk.get()); status.is_error()) {
       return status.take_error();
     }
   }
 
   // Setup root inode
-  Inode* ino = reinterpret_cast<Inode*>(blk);
+  Inode* ino = reinterpret_cast<Inode*>(blk.get());
   ino[kMinfsRootIno].magic = kMinfsMagicDir;
   ino[kMinfsRootIno].size = info.BlockSize();
   ino[kMinfsRootIno].block_count = 1;
@@ -1571,7 +1571,7 @@ zx::result<> Mkfs(const MountOptions& options, Bcache* bc) {
   ino[kMinfsRootIno].dirent_count = 2;
   ino[kMinfsRootIno].dnum[0] = 1;
   ino[kMinfsRootIno].create_time = GetTimeUTC();
-  (void)bc->Writeblk(info.ino_block, blk);
+  (void)bc->Writeblk(info.ino_block, blk.get());
 
   info.generation_count = 0;
   UpdateChecksum(&info);

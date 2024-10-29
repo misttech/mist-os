@@ -434,9 +434,9 @@ void CompareData(const uint8_t* data, const zx::vmo& vmo, size_t bytes) {
   ASSERT_EQ(vmo.get_size(&vmo_size), ZX_OK);
   ASSERT_GE(vmo_size, bytes);
 
-  uint8_t vmo_buffer[bytes];
-  ASSERT_EQ(vmo.read(vmo_buffer, 0, bytes), ZX_OK);
-  ASSERT_EQ(0, memcmp(vmo_buffer, data, bytes));
+  auto vmo_buffer = std::make_unique<uint8_t[]>(bytes);
+  ASSERT_EQ(vmo.read(vmo_buffer.get(), 0, bytes), ZX_OK);
+  ASSERT_EQ(0, memcmp(vmo_buffer.get(), data, bytes));
 }
 
 void RandomizeData(uint8_t* data, size_t bytes) {

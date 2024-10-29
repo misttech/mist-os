@@ -421,12 +421,12 @@ zx::result<> VnodeMinfs::ReadInternal(PendingWork* transaction, void* vdata, siz
       return bno_or.take_error();
     }
     if (bno_or.value() != 0) {
-      char bdata[fs_->BlockSize()];
-      if (auto status = fs_->ReadDat(bno_or.value(), bdata); status.is_error()) {
+      auto bdata = std::make_unique<char[]>(fs_->BlockSize());
+      if (auto status = fs_->ReadDat(bno_or.value(), bdata.get()); status.is_error()) {
         FX_LOGS(ERROR) << "Failed to read data block " << bno_or.value();
         return zx::error(ZX_ERR_IO);
       }
-      memcpy(data, bdata + adjust, xfer);
+      memcpy(data, bdata.get() + adjust, xfer);
     } else {
       // If the block is not allocated, just read zeros
       memset(data, 0, xfer);
@@ -508,16 +508,16 @@ zx::result<> VnodeMinfs::WriteInternal(Transaction* transaction, const uint8_t* 
       break;
     }
     ZX_DEBUG_ASSERT(bno_or.value() != 0);
-    char wdata[fs_->BlockSize()];
-    if (auto status = fs_->bc_->Readblk(bno_or.value() + fs_->Info().dat_block, wdata);
+    auto wdata = std::make_unique<char[]>(fs_->BlockSize());
+    if (auto status = fs_->bc_->Readblk(bno_or.value() + fs_->Info().dat_block, wdata.get());
         status.is_error()) {
       break;
     }
-    memcpy(wdata + adjust, data, xfer);
+    memcpy(wdata.get() + adjust, data, xfer);
     if (len < fs_->BlockSize() && max_size >= GetSize()) {
-      memset(wdata + adjust + xfer, 0, fs_->BlockSize() - (adjust + xfer));
+      memset(wdata.get() + adjust + xfer, 0, fs_->BlockSize() - (adjust + xfer));
     }
-    if (auto status = fs_->bc_->Writeblk(bno_or.value() + fs_->Info().dat_block, wdata);
+    if (auto status = fs_->bc_->Writeblk(bno_or.value() + fs_->Info().dat_block, wdata.get());
         status.is_error()) {
       break;
     }
@@ -697,7 +697,7 @@ zx::result<> VnodeMinfs::TruncateInternal(Transaction* transaction, size_t len) 
 
     // Write zeroes to the rest of the remaining block, if it exists
     if (len < GetSize()) {
-      char bdata[fs_->BlockSize()];
+      auto bdata = std::make_unique<uint8_t[]>(fs_->BlockSize());
       blk_t rel_bno = static_cast<blk_t>(len / fs_->BlockSize());
 
       if (auto bno_or = BlockGetReadable(rel_bno); bno_or.is_ok()) {
@@ -712,13 +712,13 @@ zx::result<> VnodeMinfs::TruncateInternal(Transaction* transaction, size_t len) 
 #ifdef __Fuchsia__
       bool allocated = (bno != 0);
       if (allocated || HasPendingAllocation(rel_bno)) {
-        if (zx_status_t status = vmo_.read(bdata, len - adjust, adjust); status != ZX_OK) {
+        if (zx_status_t status = vmo_.read(bdata.get(), len - adjust, adjust); status != ZX_OK) {
           FX_LOGS(ERROR) << "Truncate failed to read last block: " << status;
           return zx::error(ZX_ERR_IO);
         }
-        memset(bdata + adjust, 0, fs_->BlockSize() - adjust);
+        memset(bdata.get() + adjust, 0, fs_->BlockSize() - adjust);
 
-        if (zx_status_t status = vmo_.write(bdata, len - adjust, fs_->BlockSize());
+        if (zx_status_t status = vmo_.write(bdata.get(), len - adjust, fs_->BlockSize());
             status != ZX_OK) {
           FX_LOGS(ERROR) << "Truncate failed to write last block: " << status;
           return zx::error(ZX_ERR_IO);
@@ -735,11 +735,11 @@ zx::result<> VnodeMinfs::TruncateInternal(Transaction* transaction, size_t len) 
       }
 #else   // __Fuchsia__
       if (bno != 0) {
-        if (fs_->bc_->Readblk(bno + fs_->Info().dat_block, bdata).is_error()) {
+        if (fs_->bc_->Readblk(bno + fs_->Info().dat_block, bdata.get()).is_error()) {
           return zx::error(ZX_ERR_IO);
         }
-        memset(bdata + adjust, 0, fs_->BlockSize() - adjust);
-        if (fs_->bc_->Writeblk(bno + fs_->Info().dat_block, bdata).is_error()) {
+        memset(bdata.get() + adjust, 0, fs_->BlockSize() - adjust);
+        if (fs_->bc_->Writeblk(bno + fs_->Info().dat_block, bdata.get()).is_error()) {
           return zx::error(ZX_ERR_IO);
         }
       }
