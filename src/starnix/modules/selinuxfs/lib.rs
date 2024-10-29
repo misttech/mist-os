@@ -27,7 +27,7 @@ use selinux::{
     SecurityServer,
 };
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -35,7 +35,6 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased as _};
@@ -372,15 +371,20 @@ impl SeLinuxApiOps for CheckReqProtApi {
     }
 }
 
-/// "context" API which accepts a Security Context in a single `write()` operation, whose result indicates
-/// whether the supplied context was valid with respect to the current policy.
+/// "context" API which accepts a Security Context in a single `write()` operation, and validates
+/// it against the loaded policy. If the Context is invalid then the `write()` returns `EINVAL`,
+/// otherwise the Context may be read back from the file.
 struct ContextApi {
     security_server: Arc<SecurityServer>,
+    // Holds the SID representing the Security Context that the caller wrote to the file.
+    context_sid: Mutex<Option<SecurityId>>,
 }
 
 impl ContextApi {
     fn new_node(security_server: Arc<SecurityServer>) -> impl FsNodeOps {
-        SeLinuxApi::new_node(move || Ok(Self { security_server: security_server.clone() }))
+        SeLinuxApi::new_node(move || {
+            Ok(Self { security_server: security_server.clone(), context_sid: Mutex::default() })
+        })
     }
 }
 
@@ -390,13 +394,34 @@ impl SeLinuxApiOps for ContextApi {
     }
 
     fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
+        // If this instance was already written-to then fail the operation.
+        let mut context_sid = self.context_sid.lock();
+        if context_sid.is_some() {
+            return error!(EBUSY);
+        }
+
         // Validate that the `data` describe valid user, role, type, etc by attempting to create
         // a SID from it.
-        // TODO: https://fxbug.dev/362476447 - Provide a validate API that does not allocate a SID.
-        self.security_server
-            .security_context_to_sid(data.as_slice().into())
-            .map_err(|_| errno!(EINVAL))?;
+        *context_sid = Some(
+            self.security_server
+                .security_context_to_sid(data.as_slice().into())
+                .map_err(|_| errno!(EINVAL))?,
+        );
+
         Ok(())
+    }
+
+    fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
+        // Read returns the Security Context the caller previously wrote to the file, normalized
+        // as a consequence of the Context->SID->Context round-trip. If no Context had been written
+        // by the caller, then this API file behaves as though empty.
+        // TODO: https://fxbug.dev/319629153 - If `write()` failed due to an invalid Context then
+        // should `read()` also fail, or return an empty result?
+        let maybe_sid = *self.context_sid.lock();
+        let result = maybe_sid
+            .and_then(|sid| self.security_server.sid_to_security_context(sid))
+            .unwrap_or_default();
+        Ok(result.into())
     }
 }
 
@@ -426,13 +451,12 @@ impl BytesFileOps for InitialContextFile {
 }
 
 struct AccessApi {
-    seqno: u64,
+    result: Mutex<Vec<u8>>,
 }
 
 impl AccessApi {
     fn new_node() -> impl FsNodeOps {
-        static SEQUENCE_NO: AtomicU64 = AtomicU64::new(0);
-        SeLinuxApi::new_node(move || Ok(Self { seqno: SEQUENCE_NO.fetch_add(1, Ordering::SeqCst) }))
+        SeLinuxApi::new_node(move || Ok(Self { result: Mutex::default() }))
     }
 }
 
@@ -442,15 +466,24 @@ impl SeLinuxApiOps for AccessApi {
     }
 
     fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
+        let mut result = self.result.lock();
+        if !result.is_empty() {
+            return error!(EBUSY);
+        }
+
+        // Result format is: allowed decided auditallow auditdeny seqno flags
+        // Everything but seqno must be in hexadecimal format and represents a bits field.
         track_stub!(TODO("https://fxbug.dev/361551536"), "selinux access");
+        // `SEQ_NUMBER` should reflect the policy revision from which the result was calculated.
+        const SEQ_NUMBER: u32 = 1;
+        *result = format!("ffffffff ffffffff 0 ffffffff {} 0\n", SEQ_NUMBER).into_bytes();
+
         Ok(())
     }
 
     fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
-        // Format is: allowed decided auditallow auditdeny seqno flags
-        // Everything but seqno must be in hexadecimal format and represents a bits field.
-        let result = format!("ffffffff ffffffff 0 ffffffff {} 0\n", self.seqno);
-        Ok(result.into_bytes().into())
+        let result = self.result.lock().clone();
+        Ok(result.into())
     }
 }
 
