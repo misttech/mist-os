@@ -5,9 +5,9 @@
 use anyhow::{anyhow, Context, Error};
 use cm_types::Name;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_fs::file;
 use fuchsia_fs::file::ReadError;
 use fuchsia_fs::node::OpenError;
-use fuchsia_fs::{file, OpenFlags};
 use fuchsia_zbi::{ZbiParser, ZbiResult, ZbiType};
 use futures::prelude::*;
 use lazy_static::lazy_static;
@@ -80,12 +80,11 @@ impl Arguments {
 
         // This config file may not be present depending on the device, but errors besides file
         // not found should be surfaced.
-        let config =
-            match file::open_in_namespace_deprecated(BOOT_CONFIG_FILE, OpenFlags::RIGHT_READABLE) {
-                Ok(config) => Some(config),
-                Err(OpenError::Namespace(Status::NOT_FOUND)) => None,
-                Err(err) => return Err(anyhow!("Failed to open {}: {}", BOOT_CONFIG_FILE, err)),
-            };
+        let config = match file::open_in_namespace(BOOT_CONFIG_FILE, fio::PERM_READABLE) {
+            Ok(config) => Some(config),
+            Err(OpenError::Namespace(Status::NOT_FOUND)) => None,
+            Err(err) => return Err(anyhow!("Failed to open {}: {}", BOOT_CONFIG_FILE, err)),
+        };
 
         Arguments::new_from_sources(Env::new(), cmdline_args, image_args, config).await
     }
@@ -299,19 +298,16 @@ mod tests {
         let data = vec![0xfe];
 
         let tempdir = tempfile::TempDir::new().unwrap();
-        let dir = directory::open_in_namespace_deprecated(
+        let dir = directory::open_in_namespace(
             tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
 
-        let config = directory::open_file_deprecated(
-            &dir,
-            "file",
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
-        )
-        .await
-        .unwrap();
+        let config =
+            directory::open_file(&dir, "file", fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE)
+                .await
+                .unwrap();
         write(&config, data.clone()).await.unwrap();
 
         // Invalid config file.
@@ -366,29 +362,24 @@ mod tests {
         let image_args = vec![ZbiResult { bytes: b"arg3=img3\narg4=img4".to_vec(), extra: 0 }];
 
         let tempdir = tempfile::TempDir::new().unwrap();
-        let dir = directory::open_in_namespace_deprecated(
+        let dir = directory::open_in_namespace(
             tempdir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
 
         // Finally, overrides one of the two arguments passed via image args. Note the comment
         // which is ignored.
-        let config = directory::open_file_deprecated(
-            &dir,
-            "file",
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
-        )
-        .await
-        .unwrap();
+        let config =
+            directory::open_file(&dir, "file", fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE)
+                .await
+                .unwrap();
 
         // Write and flush to disk.
         write(&config, b"# Comment!\narg4=config4").await.unwrap();
         close(config).await.unwrap();
 
-        let config = directory::open_file_deprecated(&dir, "file", fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap();
+        let config = directory::open_file(&dir, "file", fio::PERM_READABLE).await.unwrap();
 
         let args = Arguments::new_from_sources(env, Some(cmdline), Some(image_args), Some(config))
             .await
