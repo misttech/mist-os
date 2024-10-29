@@ -36,6 +36,8 @@ class FuchsiaDeviceOperation(enum.StrEnum):
 
     IDLE_SUSPEND_TIMER_RESUME = "idle-suspend-timer-resume"
 
+    IDLE_SUSPEND_BUTTON_PRESS_RESUME = "idle-suspend-button-press-resume"
+
 
 class TestMethodExecutionFrequency(enum.StrEnum):
     """How often the test case method need to be executed in the revived test case."""
@@ -173,6 +175,13 @@ class TestCaseRevive(fuchsia_base_test.FuchsiaBaseTest):
 
                 fuchsia_device.power_cycle(
                     power_switch=self._power_switch, outlet=None
+                )
+            elif (
+                fuchsia_device_operation
+                == FuchsiaDeviceOperation.IDLE_SUSPEND_BUTTON_PRESS_RESUME
+            ):
+                raise ValueError(
+                    f"'{fuchsia_device_operation}' operation is not supported by 'TestCaseRevive'"
                 )
 
     def _logic_for_test_case_revive(
