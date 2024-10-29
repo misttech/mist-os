@@ -125,9 +125,16 @@ function setup_bazel_workspace() {
 
 function test_bazel_rbe() {
   setup_bazel_workspace
+  # Test authentication to RBE and BES (both share the same gcloud auth).
+  # Limit the number of upload retries to make this operation fail-fast.
   (
     cd "$BAZEL_TEST_DIR/workspace" &&
-      ../bazel --nohome_rc test --config=remote --config=resultstore :all
+      ../bazel --nohome_rc \
+          test \
+          --config=remote \
+          --config=resultstore \
+          --experimental_build_event_upload_max_retries=1 \
+          :all
   )
 }
 
