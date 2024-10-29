@@ -87,7 +87,7 @@ common_board_configuration = {
           "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
     }
     zbi = {
-      compression = "zstd.max"
+      compression = "zstd.17"
     }
     fvm = {
       blobfs = {
