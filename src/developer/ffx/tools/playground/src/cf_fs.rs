@@ -678,24 +678,21 @@ mod test {
         let root = CFDirectory::new_root(query);
         let proxy = vfs::directory::spawn_directory(root);
 
-        let root_file = fuchsia_fs::directory::open_file_deprecated(
-            &proxy,
-            "/core/foo/:ns/root_file",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
-        let top_dir_file = fuchsia_fs::directory::open_file_deprecated(
+        let root_file =
+            fuchsia_fs::directory::open_file(&proxy, "/core/foo/:ns/root_file", fio::PERM_READABLE)
+                .await
+                .unwrap();
+        let top_dir_file = fuchsia_fs::directory::open_file(
             &proxy,
             "/core/foo/:ns/top_dir/top_dir_file",
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .await
         .unwrap();
-        let bottom_dir_file = fuchsia_fs::directory::open_file_deprecated(
+        let bottom_dir_file = fuchsia_fs::directory::open_file(
             &proxy,
             "/core/foo/:ns/top_dir/bottom_dir/bottom_dir_file",
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .await
         .unwrap();
@@ -757,13 +754,10 @@ mod test {
 
         for instance in &instances {
             let instance_moniker = instance.moniker.as_deref().unwrap();
-            let proxy = fuchsia_fs::directory::open_directory_deprecated(
-                &proxy,
-                instance_moniker,
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .unwrap();
+            let proxy =
+                fuchsia_fs::directory::open_directory(&proxy, instance_moniker, fio::PERM_READABLE)
+                    .await
+                    .unwrap();
             let mut items = fuchsia_fs::directory::readdir(&proxy)
                 .await
                 .unwrap()
@@ -818,46 +812,31 @@ mod test {
             assert!(items.is_empty());
 
             let fuchsia_fs::node::OpenError::OpenError(url_isnt_a_folder) =
-                fuchsia_fs::directory::open_file_deprecated(
-                    &proxy,
-                    ".url/foo",
-                    fio::OpenFlags::RIGHT_READABLE,
-                )
-                .await
-                .unwrap_err()
+                fuchsia_fs::directory::open_file(&proxy, ".url/foo", fio::PERM_READABLE)
+                    .await
+                    .unwrap_err()
             else {
                 panic!();
             };
             assert_eq!(Status::NOT_DIR, url_isnt_a_folder);
 
-            let url = fuchsia_fs::directory::open_file_deprecated(
-                &proxy,
-                ".url",
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .unwrap();
+            let url =
+                fuchsia_fs::directory::open_file(&proxy, ".url", fio::PERM_READABLE).await.unwrap();
             assert_eq!(instance.url, fuchsia_fs::file::read_to_string(&url).await.ok());
 
-            let environment = fuchsia_fs::directory::open_file_deprecated(
-                &proxy,
-                ".environment",
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .unwrap();
+            let environment =
+                fuchsia_fs::directory::open_file(&proxy, ".environment", fio::PERM_READABLE)
+                    .await
+                    .unwrap();
             assert_eq!(
                 instance.environment,
                 fuchsia_fs::file::read_to_string(&environment).await.ok()
             );
 
-            let instance_id = fuchsia_fs::directory::open_file_deprecated(
-                &proxy,
-                ".instance_id",
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .unwrap();
+            let instance_id =
+                fuchsia_fs::directory::open_file(&proxy, ".instance_id", fio::PERM_READABLE)
+                    .await
+                    .unwrap();
             assert_eq!(
                 instance.instance_id,
                 fuchsia_fs::file::read_to_string(&instance_id).await.ok()
