@@ -18,21 +18,25 @@ use fuchsia_sync::RwLock;
 use futures::io::AsyncReadExt;
 use serde_json::{from_value, to_value, Value};
 
-// This list should be kept in sync with defaultCategories in //src/performance/traceutil/actions.go
+// This list should be kept in sync with //src/developer/ffx/plugins/trace/data/config.json which
+// is the source of truth for default categories.
+// LINT.IfChange
 const DEFAULT_CATEGORIES: &[&'static str] = &[
     "app",
     "audio",
     "benchmark",
     "blobfs",
+    "fxfs",
     "gfx",
     "input",
     "kernel:meta",
     "kernel:sched",
-    "ledger",
     "magma",
+    "memory:kernel",
     "minfs",
     "modular",
     "net",
+    "storage",
     "system_metrics",
     "view",
     "flutter",
@@ -46,6 +50,7 @@ const DEFAULT_CATEGORIES: &[&'static str] = &[
     "dart:profiler",
     "dart:vm",
 ];
+// LINT.ThenChange(/src/developer/ffx/plugins/trace/data/config.json)
 
 /// Perform tracing operations.
 ///
