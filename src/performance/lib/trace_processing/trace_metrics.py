@@ -147,16 +147,27 @@ class MetricsProcessor(abc.ABC):
         """
         return []
 
-    def process_freeform_metrics(self, model: trace_model.Model) -> JsonType:
+    def process_freeform_metrics(
+        self, model: trace_model.Model
+    ) -> JsonType | tuple[str, JsonType]:
         """Computes freeform metrics as JSON.
 
         This can output structured data, as opposite to `process_metrics` which return as list.
         These metrics are in addition to those produced by process_metrics()
 
+        This method returns a tuple of (filename, JsonType) so that processors can provide an
+        identifier more stable than its own classname for use when filing  freeform metrics. Since
+        filenames are included when freeform metrics are ingested into the metrics backend, basing
+        that name on a class name would mean that a refactor could unintentionally break downstream
+        consumers of metrics.
+
+        TODO(b/376097015): Return type is a union to support cross-repo dependencies.
+
         Args:
             model: trace events to be processed.
 
         Returns:
+            str: stable identifier to use in freeform metrics file name.
             JsonType: structure holding aggregated metrics, or None if not supported.
         """
         return None
@@ -179,5 +190,7 @@ class ConstantMetricsProcessor(MetricsProcessor):
     ) -> Sequence[TestCaseResult]:
         return self.results
 
-    def process_freeform_metrics(self, model: trace_model.Model) -> JsonType:
+    def process_freeform_metrics(
+        self, model: trace_model.Model
+    ) -> JsonType | tuple[str, JsonType]:
         return self.freeform_metrics

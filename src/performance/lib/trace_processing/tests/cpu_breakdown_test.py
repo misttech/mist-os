@@ -262,6 +262,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         processor = cpu.CpuMetricsProcessor()
         breakdown = processor.process_freeform_metrics(model)
+        assert isinstance(breakdown, list)
 
         self.assertEqual(len(breakdown), 5)
 
@@ -324,6 +325,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         processor = cpu.CpuMetricsProcessor()
         breakdown = processor.process_freeform_metrics(model)
+        assert isinstance(breakdown, list)
         consolidated_breakdown = cpu.group_by_process_name(breakdown)
         self.assertEqual(len(consolidated_breakdown), 4)
 
