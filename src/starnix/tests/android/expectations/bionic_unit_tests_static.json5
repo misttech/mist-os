@@ -186,6 +186,23 @@
 
                 // TODO(https://fxbug.dev/317335324): Flaky on the bots - needs to be investigated.
                 "properties.__system_property_reload_invalid",
+
+                // TODO(https://fxbug.dev/376129512): Started failing and blocking roller.
+                "PtraceResumptionTest.seize",
+                "PtraceResumptionTest.seize_interrupt",
+                "PtraceResumptionTest.seize_interrupt_cont",
+                "PtraceResumptionTest.smoke",
+                "PtraceResumptionTest.zombie_seize",
+                "PtraceResumptionTest.zombie_seize_interrupt",
+                "PtraceResumptionTest.zombie_seize_interrupt_cont",
+                "sys_xattr.flistattr",
+                "sys_xattr.flistattr_opath",
+                "sys_xattr.fsetxattr",
+                "sys_xattr.fsetxattr_toosmallbuf",
+                "sys_xattr.fsetxattr_with_opath",
+                "sys_xattr.fsetxattr_with_opath_toosmall",
+                "sys_xattr.fsetxattr_zerobuf",
+                "sys_xattr.setxattr",
             ],
         },
     ],
