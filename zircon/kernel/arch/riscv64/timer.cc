@@ -17,6 +17,7 @@
 
 #include <arch/riscv64/feature.h>
 #include <arch/riscv64/sbi.h>
+#include <arch/riscv64/timer.h>
 #include <ktl/algorithm.h>
 #include <ktl/atomic.h>
 #include <ktl/limits.h>
@@ -35,13 +36,6 @@ inline affine::Ratio riscv_generic_timer_compute_conversion_factors(uint32_t cnt
             cntpct_to_nsec.denominator());
   }
   return cntpct_to_nsec;
-}
-
-}  // anonymous namespace
-
-void riscv64_timer_exception() {
-  riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_STIE);
-  timer_tick();
 }
 
 zx_ticks_t riscv_sbi_current_ticks() { return riscv64_csr_read(RISCV64_CSR_TIME); }
@@ -86,6 +80,13 @@ const pdev_timer_ops riscv_sbi_timer_ops = {
     .stop = riscv_sbi_timer_stop,
     .shutdown = riscv_sbi_timer_shutdown,
 };
+
+}  // anonymous namespace
+
+void riscv64_timer_exception() {
+  riscv64_csr_clear(RISCV64_CSR_SIE, RISCV64_CSR_SIE_STIE);
+  timer_tick();
+}
 
 void riscv_generic_timer_init_early(const zbi_dcfg_riscv_generic_timer_driver_t &config) {
   timer_set_ticks_to_time_ratio(

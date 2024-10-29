@@ -156,10 +156,8 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
 
   void FlushAsid() const TA_REQ(lock_);
 
-  uint MmuFlagsFromPte(pte_t pte);
-
   // Returns true if the given level corresponds to the top level page table.
-  bool IsTopLevel(uint level) { return level == (RISCV64_MMU_PT_LEVELS - 1); }
+  static bool IsTopLevel(uint level) { return level == (RISCV64_MMU_PT_LEVELS - 1); }
 
   bool IsShared() const { return role_ == Riscv64AspaceRole::kShared; }
   bool IsRestricted() const { return role_ == Riscv64AspaceRole::kRestricted; }

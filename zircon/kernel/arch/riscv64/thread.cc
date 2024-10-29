@@ -6,8 +6,6 @@
 
 #include <align.h>
 #include <debug.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/types.h>
 #include <trace.h>
 #include <zircon/errors.h>
@@ -17,6 +15,7 @@
 #include <arch/riscv64/feature.h>
 #include <arch/riscv64/mp.h>
 #include <arch/riscv64/vector.h>
+#include <arch/thread.h>
 #include <arch/vm.h>
 #include <kernel/thread.h>
 

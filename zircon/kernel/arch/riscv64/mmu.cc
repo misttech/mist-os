@@ -156,6 +156,36 @@ pte_t mmu_flags_to_pte_attr(uint flags, bool global) {
   return attr;
 }
 
+// Convert leaf pte flags to mmu flags.
+uint mmu_flags_from_pte(pte_t pte) {
+  uint mmu_flags = 0;
+  mmu_flags |= (pte & RISCV64_PTE_U) ? ARCH_MMU_FLAG_PERM_USER : 0;
+  mmu_flags |= (pte & RISCV64_PTE_R) ? ARCH_MMU_FLAG_PERM_READ : 0;
+  mmu_flags |= (pte & RISCV64_PTE_W) ? ARCH_MMU_FLAG_PERM_WRITE : 0;
+  mmu_flags |= (pte & RISCV64_PTE_X) ? ARCH_MMU_FLAG_PERM_EXECUTE : 0;
+
+  // Svpbmt feature
+  if (gRiscvFeatures[arch::RiscvFeature::kSvpbmt]) {
+    switch (pte & RISCV64_PTE_PBMT_MASK) {
+      case RISCV64_PTE_PBMT_PMA:
+        // PMA state basically means default cache paramaters, as determined by physical address.
+        // Don't actually report it as CACHED here since we can't know here what the actual
+        // underlying physical range's type is.
+        break;
+      case RISCV64_PTE_PBMT_NC:
+        mmu_flags |= ARCH_MMU_FLAG_UNCACHED;
+        break;
+      case RISCV64_PTE_PBMT_IO:
+        mmu_flags |= ARCH_MMU_FLAG_UNCACHED_DEVICE;
+        break;
+      default:
+        panic("unexpected pte value %" PRIx64, pte);
+    }
+  }
+
+  return mmu_flags;
+}
+
 // Construct a non leaf page table entry.
 // For all inner page tables for the entire kernel hierarchy, set the global bit.
 constexpr pte_t mmu_non_leaf_pte(paddr_t pa, bool global) {
@@ -317,7 +347,8 @@ void SfenceVma(void* _args) {
 // even though it found no entries. However this is not the strategy employed here at the moment.
 class Riscv64ArchVmAspace::ConsistencyManager {
  public:
-  ConsistencyManager(Riscv64ArchVmAspace& aspace) TA_REQ(aspace.lock_) : aspace_(aspace) {}
+  explicit constexpr ConsistencyManager(Riscv64ArchVmAspace& aspace) TA_REQ(aspace.lock_)
+      : aspace_(aspace) {}
   ~ConsistencyManager() {
     Flush();
     if (!list_is_empty(&to_free_)) {
@@ -450,35 +481,6 @@ class Riscv64ArchVmAspace::ConsistencyManager {
   } pending_tlbs_[kMaxPendingTlbRuns];
 };
 
-uint Riscv64ArchVmAspace::MmuFlagsFromPte(pte_t pte) {
-  uint mmu_flags = 0;
-  mmu_flags |= (pte & RISCV64_PTE_U) ? ARCH_MMU_FLAG_PERM_USER : 0;
-  mmu_flags |= (pte & RISCV64_PTE_R) ? ARCH_MMU_FLAG_PERM_READ : 0;
-  mmu_flags |= (pte & RISCV64_PTE_W) ? ARCH_MMU_FLAG_PERM_WRITE : 0;
-  mmu_flags |= (pte & RISCV64_PTE_X) ? ARCH_MMU_FLAG_PERM_EXECUTE : 0;
-
-  // Svpbmt feature
-  if (gRiscvFeatures[arch::RiscvFeature::kSvpbmt]) {
-    switch (pte & RISCV64_PTE_PBMT_MASK) {
-      case RISCV64_PTE_PBMT_PMA:
-        // PMA state basically means default cache paramaters, as determined by physical address.
-        // Don't actually report it as CACHED here since we can't know here what the actual
-        // underlying physical range's type is.
-        break;
-      case RISCV64_PTE_PBMT_NC:
-        mmu_flags |= ARCH_MMU_FLAG_UNCACHED;
-        break;
-      case RISCV64_PTE_PBMT_IO:
-        mmu_flags |= ARCH_MMU_FLAG_UNCACHED_DEVICE;
-        break;
-      default:
-        panic("unexpected pte value %" PRIx64, pte);
-    }
-  }
-
-  return mmu_flags;
-}
-
 zx_status_t Riscv64ArchVmAspace::Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) {
   Guard<Mutex> al{AssertOrderedLock, &lock_, LockOrder()};
   return QueryLocked(vaddr, paddr, mmu_flags);
@@ -515,7 +517,7 @@ zx_status_t Riscv64ArchVmAspace::QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint
         *paddr = pte_addr + (vaddr & page_mask_per_level(level));
       }
       if (mmu_flags) {
-        *mmu_flags = MmuFlagsFromPte(pte);
+        *mmu_flags = mmu_flags_from_pte(pte);
       }
       LTRACEF("va 0x%lx, paddr 0x%lx, flags 0x%x\n", vaddr, paddr ? *paddr : ~0UL,
               mmu_flags ? *mmu_flags : ~0U);
@@ -622,11 +624,11 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
   // or via SBI) to the cores from that list to shoot down TLBs.
   const size_t size = count * PAGE_SIZE;
   if (IsKernel() || IsShared()) {
-    SfenceVmaArgs args{SfenceVmaArgs::Range{vaddr, size}};
+    SfenceVmaArgs args{.range = SfenceVmaArgs::Range{.base = vaddr, .size = size}};
     mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
   } else if (IsUser()) {
     // Flush just the aspace's asid
-    SfenceVmaArgs args{SfenceVmaArgs::Range{vaddr, size}, asid_};
+    SfenceVmaArgs args{.range = SfenceVmaArgs::Range{.base = vaddr, .size = size}, .asid = asid_};
     mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
   } else {
     PANIC_UNIMPLEMENTED;
@@ -1606,8 +1608,8 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
     DEBUG_ASSERT(aspace->type_ == Riscv64AspaceType::kUser);
 
     // Load the user space SATP with the translation table and user space ASID.
-    satp = ((uint64_t)RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
-           ((uint64_t)aspace->asid_ << RISCV64_SATP_ASID_SHIFT) |
+    satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
+           (static_cast<uint64_t>(aspace->asid_) << RISCV64_SATP_ASID_SHIFT) |
            (aspace->tt_phys_ >> PAGE_SIZE_SHIFT);
 
     [[maybe_unused]] uint32_t prev =
@@ -1623,8 +1625,8 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
     }
   } else {
     // Switching to the null aspace, which means kernel address space only.
-    satp = ((uint64_t)RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
-           ((uint64_t)kernel_asid() << RISCV64_SATP_ASID_SHIFT) |
+    satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
+           (static_cast<uint64_t>(kernel_asid()) << RISCV64_SATP_ASID_SHIFT) |
            (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
   }
   if (likely(old_aspace != nullptr)) {
@@ -1704,7 +1706,7 @@ namespace {
 // Load the kernel page tables and set the passed in asid
 void riscv64_switch_kernel_asid(uint16_t asid) {
   const uint64_t satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
-                        ((uint64_t)asid << RISCV64_SATP_ASID_SHIFT) |
+                        (static_cast<uint64_t>(asid) << RISCV64_SATP_ASID_SHIFT) |
                         (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
   riscv64_csr_write(RISCV64_CSR_SATP, satp);
 
