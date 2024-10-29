@@ -308,10 +308,14 @@ fn may_create(
         let attrs = &current_task.read().security_state.attrs;
         (attrs.current_sid, attrs.fscreate_sid)
     };
-    let file_sid = fscreate_sid.unwrap_or_else(
-        // TODO: https://fxbug.dev/375381156 - Calculate the new file's SID here.
-        || SecurityId::initial(InitialSid::File),
-    );
+
+    let file_sid = if let Some(sid) = fscreate_sid {
+        sid
+    } else {
+        track_stub!(TODO("https://fxbug.dev/375381156"), "Use new file's SID in may_create checks");
+        return Ok(());
+    };
+
     let parent_sid = fs_node_effective_sid(parent);
     let filesystem_sid = match &*parent.fs().security_state.state.0.lock() {
         FileSystemLabelState::Labeled { label } => Ok(label.sid),
