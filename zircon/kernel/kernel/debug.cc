@@ -41,6 +41,7 @@ static int cmd_threadstats(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_threadload(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_threadq(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_zmips(int argc, const cmd_args* argv, uint32_t flags);
+static int cmd_rppm(int argc, const cmd_args* argv, uint32_t flags);
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("thread", "manipulate kernel threads", &cmd_thread, CMD_AVAIL_ALWAYS)
@@ -48,6 +49,8 @@ STATIC_COMMAND("threadstats", "thread level statistics", &cmd_threadstats)
 STATIC_COMMAND("threadload", "toggle thread load display", &cmd_threadload)
 STATIC_COMMAND("threadq", "toggle thread queue display", &cmd_threadq)
 STATIC_COMMAND("zmips", "compute zmips of a cpu", &cmd_zmips)
+STATIC_COMMAND_MASKED("rppm", "runtime processor power management commands", &cmd_rppm,
+                      CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_END(kernel)
 
 static int cmd_thread(int argc, const cmd_args* argv, uint32_t flags) {
@@ -332,4 +335,92 @@ static int cmd_zmips(int argc, const cmd_args* argv, uint32_t flags) {
   thread->Join(&retcode, ZX_TIME_INFINITE);
 
   return retcode;
+}
+
+static int cmd_rppm(int argc, const cmd_args* argv, uint32_t flags) {
+  if (argc < 2) {
+  notenoughargs:
+    printf("not enough arguments\n");
+  badvalue:
+    printf("%s dump\n", argv[0].str);
+    printf("%s set-level <cpu id> <power level>\n", argv[0].str);
+    printf("%s req-level <cpu id> <power level>\n", argv[0].str);
+    printf("%s get-level <cpu id>\n", argv[0].str);
+    return -1;
+  }
+
+  if (!strcmp(argv[1].str, "dump")) {
+    percpu::ForEach([](cpu_num_t cpu, percpu* percpu) {
+      Scheduler& scheduler = percpu->scheduler;
+      fbl::RefPtr domain = scheduler.GetPowerDomainForTesting();
+      ktl::optional<uint8_t> current_power_level = scheduler.GetPowerLevel();
+
+      printf("CPU %u:\n", cpu);
+
+      if (domain) {
+        printf("  Power domain %u:\n", domain->id());
+        for (size_t index = 0; const auto& power_level : domain->model().levels()) {
+          printf("    %3zu. rate=%" PRIu64 " power=%" PRIu64 " nw control=%s\n", index++,
+                 power_level.processing_rate(), power_level.power_coefficient_nw(),
+                 ToString(power_level.control()));
+        }
+      } else {
+        printf("  No power domain set.\n");
+      }
+
+      if (current_power_level.has_value()) {
+        printf("  Current power level %u.\n", *current_power_level);
+      } else {
+        printf("  Current power level not set.\n");
+      }
+    });
+    return 0;
+  }
+
+  if (const bool is_set_level = !strcmp(argv[1].str, "set-level"),
+      is_req_level = !strcmp(argv[1].str, "req-level"),
+      is_get_level = !strcmp(argv[1].str, "get-level");
+      is_set_level || is_req_level || is_get_level) {
+    if (((is_set_level || is_req_level) && argc < 4) || (is_get_level && argc < 3)) {
+      goto notenoughargs;
+    }
+
+    if (argv[2].u >= percpu::processor_count()) {
+      printf("Invalid cpu id %" PRIu64 ". Valid values are in the range [0, %zu].\n", argv[2].u,
+             percpu::processor_count() - 1);
+      goto badvalue;
+    }
+    const cpu_num_t cpu = static_cast<cpu_num_t>(argv[2].u);
+
+    Scheduler& scheduler = percpu::Get(cpu).scheduler;
+
+    if (is_set_level || is_req_level) {
+      if (argv[3].u >= std::numeric_limits<uint8_t>::max()) {
+        printf("Invalid power level\n");
+        goto badvalue;
+      }
+      const uint8_t power_level = static_cast<uint8_t>(argv[3].u);
+
+      if (is_set_level) {
+        const zx::result result = scheduler.SetPowerLevel(power_level);
+        if (result.is_error()) {
+          printf("Failed to set power level: %d\n", result.status_value());
+        } else {
+          printf("Set CPU %u to power level %u\n", cpu, power_level);
+        }
+      } else if (is_req_level) {
+        scheduler.RequestPowerLevelForTesting(power_level);
+        printf("CPU %u request for power level %u posted.\n", cpu, power_level);
+      }
+    } else if (is_get_level) {
+      ktl::optional<uint8_t> maybe_power_level = scheduler.GetPowerLevel();
+      if (maybe_power_level.has_value()) {
+        printf("CPU %u at power level %u\n", cpu, maybe_power_level.value());
+      } else {
+        printf("CPU %u power level not set\n", cpu);
+      }
+    }
+  }
+
+  return 0;
 }

@@ -40,12 +40,29 @@ class PowerModel;
 
 // Enum representing supported control interfaces.
 enum class ControlInterface : uint64_t {
-  kArmWfi = ZX_PROCESSOR_POWER_CONTROL_ARM_WFI,
+  kCpuDriver = ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER,
   kArmPsci = ZX_PROCESSOR_POWER_CONTROL_ARM_PSCI,
+  kArmWfi = ZX_PROCESSOR_POWER_CONTROL_ARM_WFI,
   kRiscvSbi = ZX_PROCESSOR_POWER_CONTROL_RISCV_SBI,
   kRiscvWfi = ZX_PROCESSOR_POWER_CONTROL_RISCV_WFI,
-  kCpuDriver = ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER,
 };
+
+constexpr const char* ToString(ControlInterface control_interface) {
+  switch (control_interface) {
+    case ControlInterface::kCpuDriver:
+      return "CPU_DRIVER";
+    case ControlInterface::kArmPsci:
+      return "ARM_PSCI";
+    case ControlInterface::kArmWfi:
+      return "ARM_WFI";
+    case ControlInterface::kRiscvSbi:
+      return "RISCV_SBI";
+    case ControlInterface::kRiscvWfi:
+      return "RISCV_WFI";
+    default:
+      return "[unknown]";
+  }
+}
 
 // List of support control interfaces.
 static constexpr auto kSupportedControlInterfaces = cpp20::to_array(
