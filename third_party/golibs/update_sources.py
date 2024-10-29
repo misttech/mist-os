@@ -22,15 +22,16 @@ def is_source(f):
             f.endswith('.go') or f.endswith('.s') or f.endswith('.binpb'))
 
 
-def all_sources(golibs_dir, lib_name):
+def all_sources(golibs_dir, lib_name, recursive):
     """Returns all source paths to all source files of a library.
 
     Paths are relative to library root: vendor/{lib_name}
     """
     lib_root = os.path.join(golibs_dir, 'vendor', lib_name)
+    all_files = glob.glob(os.path.join(lib_root, '**', '*'), recursive=True) if recursive else glob.glob(os.path.join(lib_root, '*'))
     return (
         os.path.relpath(f, lib_root)
-        for f in glob.glob(os.path.join(lib_root, '**', '*'), recursive=True)
+        for f in all_files
         if is_source(f)
     )
 
@@ -57,8 +58,15 @@ def main():
 
         if stripped_line.startswith('go_library("'):
             lib_name = line.split('"')[1]
+            recursive = False
             print(line.rstrip())
             continue
+
+        # Go library targets with names ending with ... are aggregate libraries
+        # that contains multiple Go packages, and all of their sources should be
+        # recurisvely included.
+        if stripped_line.startswith('name =') and stripped_line.endswith('/..."'):
+            recursive = True
 
         if skip:
             if stripped_line.endswith(']'):
@@ -75,7 +83,7 @@ def main():
 
         # Add sources right before the target ends.
         if stripped_line == '}':
-            sources = all_sources(args.golibs_dir, lib_name)
+            sources = all_sources(args.golibs_dir, lib_name, recursive)
             print('  sources = [')
             print('\n'.join(f'    "{src}",' for src in sorted(sources)))
             print('  ]')

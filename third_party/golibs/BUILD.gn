@@ -454,6 +454,81 @@ go_library("github.com/google/go-cmp") {
   ]
 }
 
+go_library("github.com/google/go-cmp/cmp") {
+  name = "github.com/google/go-cmp/cmp"
+  source_dir = "vendor/github.com/google/go-cmp/cmp"
+  deps = [
+    ":github.com/google/go-cmp/cmp/internal/diff",
+    ":github.com/google/go-cmp/cmp/internal/flags",
+    ":github.com/google/go-cmp/cmp/internal/function",
+    ":github.com/google/go-cmp/cmp/internal/value",
+  ]
+  sources = [
+    "compare.go",
+    "export_panic.go",
+    "export_unsafe.go",
+    "options.go",
+    "path.go",
+    "report.go",
+    "report_compare.go",
+    "report_references.go",
+    "report_reflect.go",
+    "report_slices.go",
+    "report_text.go",
+    "report_value.go",
+  ]
+}
+
+go_library("github.com/google/go-cmp/cmp/cmpopts") {
+  name = "github.com/google/go-cmp/cmp/cmpopts"
+  source_dir = "vendor/github.com/google/go-cmp/cmp/cmpopts"
+  deps = [
+    ":github.com/google/go-cmp/cmp",
+    ":github.com/google/go-cmp/cmp/internal/function",
+  ]
+  sources = [
+    "equate.go",
+    "ignore.go",
+    "sort.go",
+    "struct_filter.go",
+    "xform.go",
+  ]
+}
+
+go_library("github.com/google/go-cmp/cmp/internal/diff") {
+  name = "github.com/google/go-cmp/cmp/internal/diff"
+  source_dir = "vendor/github.com/google/go-cmp/cmp/internal/diff"
+  deps = [ ":github.com/google/go-cmp/cmp/internal/flags" ]
+  sources = [
+    "debug_disable.go",
+    "debug_enable.go",
+    "diff.go",
+  ]
+}
+
+go_library("github.com/google/go-cmp/cmp/internal/flags") {
+  name = "github.com/google/go-cmp/cmp/internal/flags"
+  source_dir = "vendor/github.com/google/go-cmp/cmp/internal/flags"
+  sources = [ "flags.go" ]
+}
+
+go_library("github.com/google/go-cmp/cmp/internal/function") {
+  name = "github.com/google/go-cmp/cmp/internal/function"
+  source_dir = "vendor/github.com/google/go-cmp/cmp/internal/function"
+  sources = [ "func.go" ]
+}
+
+go_library("github.com/google/go-cmp/cmp/internal/value") {
+  name = "github.com/google/go-cmp/cmp/internal/value"
+  source_dir = "vendor/github.com/google/go-cmp/cmp/internal/value"
+  sources = [
+    "name.go",
+    "pointer_purego.go",
+    "pointer_unsafe.go",
+    "sort.go",
+  ]
+}
+
 go_library("github.com/google/uuid") {
   name = "github.com/google/uuid"
   source_dir = "vendor/github.com/google/uuid"
@@ -742,6 +817,71 @@ go_library("go.starlark.net") {
     "syntax/scan.go",
     "syntax/syntax.go",
     "syntax/walk.go",
+  ]
+}
+
+go_library("go.starlark.net/internal/spell") {
+  name = "go.starlark.net/internal/spell"
+  source_dir = "vendor/go.starlark.net/internal/spell"
+  sources = [ "spell.go" ]
+}
+
+go_library("go.starlark.net/internal/compile") {
+  name = "go.starlark.net/internal/compile"
+  source_dir = "vendor/go.starlark.net/internal/compile"
+  deps = [
+    ":go.starlark.net/resolve",
+    ":go.starlark.net/syntax",
+  ]
+  sources = [
+    "compile.go",
+    "serial.go",
+  ]
+}
+
+go_library("go.starlark.net/starlark") {
+  name = "go.starlark.net/starlark"
+  source_dir = "vendor/go.starlark.net/starlark"
+  deps = [
+    ":go.starlark.net/internal/compile",
+    ":go.starlark.net/internal/spell",
+    ":golang.org/x/sys",
+  ]
+  sources = [
+    "debug.go",
+    "empty.s",
+    "eval.go",
+    "hashtable.go",
+    "int.go",
+    "int_generic.go",
+    "int_posix64.go",
+    "interp.go",
+    "library.go",
+    "profile.go",
+    "unpack.go",
+    "value.go",
+  ]
+}
+
+go_library("go.starlark.net/resolve") {
+  name = "go.starlark.net/resolve"
+  source_dir = "vendor/go.starlark.net/resolve"
+  sources = [
+    "binding.go",
+    "resolve.go",
+  ]
+}
+
+go_library("go.starlark.net/syntax") {
+  name = "go.starlark.net/syntax"
+  source_dir = "vendor/go.starlark.net/syntax"
+  sources = [
+    "options.go",
+    "parse.go",
+    "quote.go",
+    "scan.go",
+    "syntax.go",
+    "walk.go",
   ]
 }
 

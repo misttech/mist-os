@@ -6,7 +6,6 @@
 
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
-#include <lib/power-management/controller-dpc.h>
 #include <lib/power-management/energy-model.h>
 #include <lib/power-management/kernel-registry.h>
 #include <lib/power-management/port-power-level-controller.h>
@@ -22,8 +21,10 @@
 
 #include <cstdint>
 
+#include <arch/ops.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
+#include <kernel/cpu.h>
 #include <kernel/deadline.h>
 #include <kernel/event.h>
 #include <kernel/thread.h>
@@ -34,239 +35,377 @@
 
 namespace {
 
+using power_management::ControlInterface;
 using power_management::PortPowerLevelController;
+using power_management::PowerDomain;
+using power_management::PowerLevelController;
 using power_management::PowerLevelUpdateRequest;
+using power_management::PowerModel;
+
+constexpr uint8_t kIdlePowerLevel = 0;
+constexpr uint8_t kLowPowerLevel = 1;
+constexpr uint8_t kMediumPowerLevel = 2;
+constexpr uint8_t kHighPowerLevel = 3;
+constexpr uint8_t kMaxPowerLevel = 4;
+
+constexpr auto kPowerLevels = cpp20::to_array<zx_processor_power_level_t>({
+    {
+        .options = 0,
+        .processing_rate = 0,                // 0%
+        .power_coefficient_nw = 10'000'000,  // 10 mW
+        .control_interface = cpp23::to_underlying(ControlInterface::kArmWfi),
+        .control_argument = kIdlePowerLevel,
+        .diagnostic_name = "wfi",
+    },
+    {
+        .options = 0,
+        .processing_rate = 250,               // 25%
+        .power_coefficient_nw = 100'000'000,  // 100 mW
+        .control_interface = cpp23::to_underlying(ControlInterface::kCpuDriver),
+        .control_argument = kLowPowerLevel,
+        .diagnostic_name = "OPP 1",
+    },
+    {
+        .options = 0,
+        .processing_rate = 500,               // 50%
+        .power_coefficient_nw = 250'000'000,  // 250 mW
+        .control_interface = cpp23::to_underlying(ControlInterface::kCpuDriver),
+        .control_argument = kMediumPowerLevel,
+        .diagnostic_name = "OPP 1",
+    },
+    {
+        .options = 0,
+        .processing_rate = 750,               // 75%
+        .power_coefficient_nw = 400'000'000,  // 400 mW
+        .control_interface = cpp23::to_underlying(ControlInterface::kCpuDriver),
+        .control_argument = kHighPowerLevel,
+        .diagnostic_name = "OPP 2",
+    },
+    {
+        .options = 0,
+        .processing_rate = 1000,              // 100%
+        .power_coefficient_nw = 600'000'000,  // 600 mW
+        .control_interface = cpp23::to_underlying(ControlInterface::kCpuDriver),
+        .control_argument = kMaxPowerLevel,
+        .diagnostic_name = "OPP 3",
+    },
+});
+
+constexpr auto kTransitions = cpp20::to_array<zx_processor_power_level_transition_t>({{}});
 
 bool PortPowerLevelControllerPost() {
   BEGIN_TEST;
-  KernelHandle<PortDispatcher> h;
-  zx_rights_t r = PortDispatcher::default_rights();
-  ASSERT_EQ(PortDispatcher::Create(0, &h, &r), ZX_OK);
-  PortPowerLevelController proxy(h.dispatcher());
-  ASSERT_TRUE(proxy.is_serving());
-  ASSERT_EQ(h.dispatcher()->current_handle_count(), 0u);
+
+  KernelHandle<PortDispatcher> handle;
+  zx_rights_t rights = PortDispatcher::default_rights();
+  ASSERT_EQ(PortDispatcher::Create(0, &handle, &rights), ZX_OK);
+
+  PortPowerLevelController controller(handle.dispatcher());
+  ASSERT_TRUE(controller.is_serving());
+  ASSERT_EQ(handle.dispatcher()->current_handle_count(), 0u);
+
   // Fake being owned by a process. We only care about the handle count.
-  auto decrese_handle_count = fit::defer([&]() { h.dispatcher()->decrement_handle_count(); });
-  h.dispatcher()->increment_handle_count();
-  PowerLevelUpdateRequest req = {
+  auto decrese_handle_count = fit::defer([&]() { handle.dispatcher()->decrement_handle_count(); });
+  handle.dispatcher()->increment_handle_count();
+
+  PowerLevelUpdateRequest request = {
       .domain_id = 0xFEE7,
       .target_id = 0x0B00,
-      .control = power_management::ControlInterface::kCpuDriver,
+      .control = ControlInterface::kCpuDriver,
       .control_argument = 0xF00D,
       .options = 4321,
   };
 
-  ASSERT_TRUE(proxy.Post(req).is_ok());
+  ASSERT_TRUE(controller.Post(request).is_ok());
 
   // Check a port with the domain id as key was queued.
-  ASSERT_TRUE(h.dispatcher()->CancelQueued(nullptr, req.domain_id));
+  ASSERT_TRUE(handle.dispatcher()->CancelQueued(nullptr, request.domain_id));
+
   END_TEST;
 }
 
 bool PortPowerLevelControllerStopServingOnZeroHandles() {
   BEGIN_TEST;
-  KernelHandle<PortDispatcher> h;
-  zx_rights_t r = PortDispatcher::default_rights();
-  ASSERT_EQ(PortDispatcher::Create(0, &h, &r), ZX_OK);
-  PortPowerLevelController proxy(h.dispatcher());
-  ASSERT_TRUE(proxy.is_serving());
-  ASSERT_EQ(h.dispatcher()->current_handle_count(), 0u);
+
+  KernelHandle<PortDispatcher> handle;
+  zx_rights_t rights = PortDispatcher::default_rights();
+  ASSERT_EQ(PortDispatcher::Create(0, &handle, &rights), ZX_OK);
+
+  PortPowerLevelController controller(handle.dispatcher());
+  ASSERT_TRUE(controller.is_serving());
+  ASSERT_EQ(handle.dispatcher()->current_handle_count(), 0u);
+
   // Fake being owned by a process. We only care about the handle count.
-  PowerLevelUpdateRequest req = {
+  PowerLevelUpdateRequest request = {
       .domain_id = 0xFEE7,
       .target_id = 0x0B00,
-      .control = power_management::ControlInterface::kCpuDriver,
+      .control = ControlInterface::kCpuDriver,
       .control_argument = 0xF00D,
       .options = 4321,
   };
 
-  ASSERT_TRUE(proxy.Post(req).is_error());
-  ASSERT_FALSE(proxy.is_serving());
+  ASSERT_TRUE(controller.Post(request).is_error());
+  ASSERT_FALSE(controller.is_serving());
+
   END_TEST;
 }
 
-// Fake PowerLevelController.
-
-class FakePowerLevelController final : public power_management::PowerLevelController {
+class FakePowerLevelController final : public PowerLevelController {
  public:
-  zx::result<> Post(const PowerLevelUpdateRequest& req) final {
+  zx::result<> Post(const PowerLevelUpdateRequest& request) final {
     count_++;
-    request_ = req;
+    request_ = request;
     signal_posted_.Signal(ZX_OK);
     return zx::ok();
   }
 
   uint64_t id() const final { return 0; }
 
-  zx_status_t Wait(Deadline dl) {
-    return signal_posted_.WaitDeadline(dl.when(), Interruptible::Yes);
+  zx_status_t Wait(Deadline deadline) {
+    return signal_posted_.WaitDeadline(deadline.when(), Interruptible::Yes);
   }
 
   auto& request() { return request_; }
-  int count() const { return count_; }
+  size_t count() const { return count_; }
 
  private:
-  Event signal_posted_;
-  int count_ = 0;
+  AutounsignalEvent signal_posted_;
+  ktl::atomic<size_t> count_ = 0;
   ktl::optional<PowerLevelUpdateRequest> request_ = ktl::nullopt;
 };
 
-bool ControllerDpcPostsUpdateWhenPending() {
+bool SchedulerFlushesPendingControlRequests() {
   BEGIN_TEST;
-  // Create a fake power domain, only thing that matters is the controller.
-  auto model = power_management::PowerModel();
+
+  // Use the scheduler for the current CPU to test the power level control functionality. It doesn't
+  // matter if the test thread remains on the same CPU, since power level requests can be initiated
+  // from a different CPU than the target CPU.
+  Scheduler& scheduler = percpu::GetCurrent().scheduler;
+
+  zx::result power_model = PowerModel::Create(kPowerLevels, kTransitions);
+  ASSERT_TRUE(power_model.is_ok());
+
   fbl::AllocChecker ac;
-  auto controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
+  fbl::RefPtr controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
   ASSERT_TRUE(ac.check());
-  auto domain = fbl::MakeRefCountedChecked<power_management::PowerDomain>(
-      &ac, 1, zx_cpu_set_t{.mask = {1}}, ktl::move(model), controller);
+
+  fbl::RefPtr domain = fbl::MakeRefCountedChecked<PowerDomain>(
+      &ac, 1, zx_cpu_set_t{.mask = {cpu_num_to_mask(scheduler.this_cpu())}},
+      ktl::move(*power_model), controller);
   ASSERT_TRUE(ac.check());
-  power_management::ControllerDpc::TransitionDetails details = {
-      .domain = domain,
-      .request =
-          PowerLevelUpdateRequest{
-              .domain_id = 1,
-              .target_id = 2,
-              .control = power_management::ControlInterface::kCpuDriver,
-              .control_argument = 123,
-              .options = 3,
-          },
-  };
 
-  power_management::ControllerDpc controller_dpc([&details]() { return details; });
-  controller_dpc.NotifyPendingUpdate();
-  ASSERT_EQ(controller->Wait(Deadline::after(zx_duration_from_msec(20))), ZX_OK);
-  ASSERT_EQ(controller->count(), 1);
+  // Set the current power domain, saving the previous domain to restore at the end of the test.
+  const ktl::optional<uint8_t> restore_power_level = scheduler.GetPowerLevel();
+  auto restore_domain = fit::defer([&, previous_domian = scheduler.ExchangePowerDomain(domain)] {
+    scheduler.ExchangePowerDomain(previous_domian);
+    if (restore_power_level.has_value()) {
+      DEBUG_ASSERT(scheduler.SetPowerLevel(*restore_power_level).is_ok());
+    }
+  });
+  ASSERT_EQ(domain.get(), scheduler.GetPowerDomainForTesting().get());
+  ASSERT_OK(scheduler.SetPowerLevel(kMaxPowerLevel).status_value());
 
-  auto req = controller->request();
-  ASSERT_TRUE(req);
-  EXPECT_EQ(req->control, details.request->control);
-  EXPECT_EQ(req->control_argument, details.request->control_argument);
-  EXPECT_EQ(req->domain_id, details.request->domain_id);
-  EXPECT_EQ(req->options, details.request->options);
-  EXPECT_EQ(req->target_id, details.request->target_id);
+  // Request a transition to each active power level.
+  for (size_t count = 0;
+       uint8_t power_level : {kLowPowerLevel, kMediumPowerLevel, kHighPowerLevel, kMaxPowerLevel}) {
+    scheduler.RequestPowerLevelForTesting(power_level);
 
-  END_TEST;
-}
+    ASSERT_EQ(controller->Wait(Deadline::infinite()), ZX_OK);
+    ASSERT_EQ(controller->count(), ++count);
 
-bool ControllerDpcTryQueueManyTimesIsOk() {
-  BEGIN_TEST;
-  // Create a fake power domain, only thing that matters is the controller.
-  auto model = power_management::PowerModel();
-  fbl::AllocChecker ac;
-  auto controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
-  ASSERT_TRUE(ac.check());
-  auto domain = fbl::MakeRefCountedChecked<power_management::PowerDomain>(
-      &ac, 1, zx_cpu_set_t{.mask = {1}}, ktl::move(model), controller);
-  ASSERT_TRUE(ac.check());
-  power_management::ControllerDpc::TransitionDetails details = {
-      .domain = domain,
-      .request =
-          PowerLevelUpdateRequest{
-              .domain_id = 1,
-              .target_id = 2,
-              .control = power_management::ControlInterface::kCpuDriver,
-              .control_argument = 123,
-              .options = 3,
-          },
-  };
+    ASSERT_TRUE(controller->request());
+    EXPECT_EQ(controller->request()->control, ControlInterface::kCpuDriver);
+    EXPECT_EQ(controller->request()->control_argument, power_level);
+    EXPECT_EQ(controller->request()->domain_id, domain->id());
+    EXPECT_EQ(controller->request()->options, 0u);
+    EXPECT_EQ(controller->request()->target_id, domain->id());
 
-  power_management::ControllerDpc controller_dpc([&details]() { return details; });
-  for (size_t i = 0; i < 150; ++i) {
-    controller_dpc.NotifyPendingUpdate();
+    // Simulate the controller acking the transition. Failing to ack the transition will cause this
+    // loop to get stuck in FakePowerLevelController::Wait if the requested transition matches the
+    // current power level (i.e. kMaxPowerLevel set above), since redundant requests are dropped.
+    ASSERT_OK(scheduler.SetPowerLevel(power_level).status_value());
+
+    controller->request().reset();
   }
-  ASSERT_EQ(controller->Wait(Deadline::after(zx_duration_from_msec(20))), ZX_OK);
 
-  ASSERT_GE(controller->count(), 1);
-  auto req = controller->request();
-  ASSERT_TRUE(req);
-  EXPECT_EQ(req->control, details.request->control);
-  EXPECT_EQ(req->control_argument, details.request->control_argument);
-  EXPECT_EQ(req->domain_id, details.request->domain_id);
-  EXPECT_EQ(req->options, details.request->options);
-  EXPECT_EQ(req->target_id, details.request->target_id);
+  // Requesting the same power level as the current power level should be ignored.
+  scheduler.RequestPowerLevelForTesting(kMaxPowerLevel);
+  EXPECT_EQ(controller->Wait(Deadline::after(zx_duration_from_sec(1))), ZX_ERR_TIMED_OUT);
 
   END_TEST;
 }
 
-bool ControllerDpcNoPendingRequestWhenNoneAvailable() {
+bool SchedulerElidesPendingControlRequests() {
   BEGIN_TEST;
-  // Create a fake power domain, only thing that matters is the controller.
-  auto model = power_management::PowerModel();
-  fbl::AllocChecker ac;
-  auto controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
-  ASSERT_TRUE(ac.check());
-  auto domain = fbl::MakeRefCountedChecked<power_management::PowerDomain>(
-      &ac, 1, zx_cpu_set_t{.mask = {1}}, ktl::move(model), controller);
-  ASSERT_TRUE(ac.check());
-  power_management::ControllerDpc::TransitionDetails details = {
-      .domain = domain,
-      .request = ktl::nullopt,
-  };
 
-  power_management::ControllerDpc controller_dpc([&details]() { return details; });
-  controller_dpc.NotifyPendingUpdate();
-  ASSERT_EQ(controller->Wait(Deadline::after(zx_duration_from_msec(30))), ZX_ERR_TIMED_OUT);
-  ASSERT_GE(controller->count(), 0);
+  // Use the scheduler for the current CPU to test the power level control functionality. It doesn't
+  // matter if the test thread remains on the same CPU, since power level requests can be initiated
+  // from a different CPU than the target CPU.
+  Scheduler& scheduler = percpu::GetCurrent().scheduler;
+
+  zx::result power_model = PowerModel::Create(kPowerLevels, kTransitions);
+  ASSERT_TRUE(power_model.is_ok());
+
+  fbl::AllocChecker ac;
+  fbl::RefPtr controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
+  ASSERT_TRUE(ac.check());
+
+  fbl::RefPtr domain = fbl::MakeRefCountedChecked<PowerDomain>(
+      &ac, 1, zx_cpu_set_t{.mask = {cpu_num_to_mask(scheduler.this_cpu())}},
+      ktl::move(*power_model), controller);
+  ASSERT_TRUE(ac.check());
+
+  // Set the current power domain, saving the previous domain to restore at the end of the test.
+  const ktl::optional<uint8_t> restore_power_level = scheduler.GetPowerLevel();
+  auto restore_domain = fit::defer([&, previous_domian = scheduler.ExchangePowerDomain(domain)] {
+    scheduler.ExchangePowerDomain(previous_domian);
+    if (restore_power_level.has_value()) {
+      DEBUG_ASSERT(scheduler.SetPowerLevel(*restore_power_level).is_ok());
+    }
+  });
+  ASSERT_EQ(domain.get(), scheduler.GetPowerDomainForTesting().get());
+  ASSERT_OK(scheduler.SetPowerLevel(kMaxPowerLevel).status_value());
+
+  for (size_t i = 0; i < 150; ++i) {
+    scheduler.RequestPowerLevelForTesting(kHighPowerLevel);
+  }
+
+  ASSERT_EQ(controller->Wait(Deadline::infinite()), ZX_OK);
+  ASSERT_GE(controller->count(), 1u);
+
+  ASSERT_TRUE(controller->request());
+  EXPECT_EQ(controller->request()->control, ControlInterface::kCpuDriver);
+  EXPECT_EQ(controller->request()->control_argument, kHighPowerLevel);
+  EXPECT_EQ(controller->request()->domain_id, domain->id());
+  EXPECT_EQ(controller->request()->options, 0u);
+  EXPECT_EQ(controller->request()->target_id, domain->id());
 
   END_TEST;
 }
 
-// Essentially a Timer that arms the timer. Close as we can get.
-bool ControllerDpcTryQueueFromIrqContext() {
+bool SchedulerCanPendControlRequestsInIrqContext() {
   BEGIN_TEST;
-  // Create a fake power domain, only thing that matters is the controller.
-  auto model = power_management::PowerModel();
+  // Use the scheduler for the current CPU to test the power level control functionality. It doesn't
+  // matter if the test thread remains on the same CPU, since power level requests can be initiated
+  // from a different CPU than the target CPU.
+  Scheduler& scheduler = percpu::GetCurrent().scheduler;
+
+  zx::result power_model = PowerModel::Create(kPowerLevels, kTransitions);
+  ASSERT_TRUE(power_model.is_ok());
+
   fbl::AllocChecker ac;
-  auto controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
+  fbl::RefPtr controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
   ASSERT_TRUE(ac.check());
-  auto domain = fbl::MakeRefCountedChecked<power_management::PowerDomain>(
-      &ac, 1, zx_cpu_set_t{.mask = {1}}, ktl::move(model), controller);
+
+  fbl::RefPtr domain = fbl::MakeRefCountedChecked<PowerDomain>(
+      &ac, 1, zx_cpu_set_t{.mask = {cpu_num_to_mask(scheduler.this_cpu())}},
+      ktl::move(*power_model), controller);
   ASSERT_TRUE(ac.check());
-  power_management::ControllerDpc::TransitionDetails details = {
-      .domain = domain,
-      .request =
-          PowerLevelUpdateRequest{
-              .domain_id = 1,
-              .target_id = 2,
-              .control = power_management::ControlInterface::kCpuDriver,
-              .control_argument = 123,
-              .options = 3,
-          },
+
+  // Set the current power domain, saving the previous domain to restore at the end of the test.
+  const ktl::optional<uint8_t> restore_power_level = scheduler.GetPowerLevel();
+  auto restore_domain = fit::defer([&, previous_domian = scheduler.ExchangePowerDomain(domain)] {
+    scheduler.ExchangePowerDomain(previous_domian);
+    if (restore_power_level.has_value()) {
+      DEBUG_ASSERT(scheduler.SetPowerLevel(*restore_power_level).is_ok());
+    }
+  });
+  ASSERT_EQ(domain.get(), scheduler.GetPowerDomainForTesting().get());
+  ASSERT_OK(scheduler.SetPowerLevel(kMaxPowerLevel).status_value());
+
+  auto timer_handler = +[](Timer* timer, zx_time_t now, void* arg) {
+    Scheduler* scheduler = static_cast<Scheduler*>(arg);
+    scheduler->RequestPowerLevelForTesting(kHighPowerLevel);
   };
 
-  power_management::ControllerDpc controller_dpc([&details]() { return details; });
+  Timer timer;
+  timer.Set(Deadline::infinite_past(), timer_handler, &scheduler);
 
-  static auto try_queue_from_irq_details = [](Timer* timer, zx_time_t now, void* arg) {
-    auto* controller_dpc = static_cast<power_management::ControllerDpc*>(arg);
-    controller_dpc->NotifyPendingUpdate();
-  };
+  ASSERT_EQ(controller->Wait(Deadline::infinite()), ZX_OK);
+  ASSERT_EQ(controller->count(), 1u);
 
-  Timer try_queue_timer;
-  try_queue_timer.Set(Deadline::after(ZX_TIME_INFINITE_PAST), try_queue_from_irq_details,
-                      &controller_dpc);
-  ASSERT_EQ(controller->Wait(Deadline::after(zx_duration_from_msec(20))), ZX_OK);
-  ASSERT_EQ(controller->count(), 1);
-  auto req = controller->request();
-  ASSERT_TRUE(req);
-  EXPECT_EQ(req->control, details.request->control);
-  EXPECT_EQ(req->control_argument, details.request->control_argument);
-  EXPECT_EQ(req->domain_id, details.request->domain_id);
-  EXPECT_EQ(req->options, details.request->options);
-  EXPECT_EQ(req->target_id, details.request->target_id);
+  ASSERT_TRUE(controller->request());
+  EXPECT_EQ(controller->request()->control, ControlInterface::kCpuDriver);
+  EXPECT_EQ(controller->request()->control_argument, kHighPowerLevel);
+  EXPECT_EQ(controller->request()->domain_id, domain->id());
+  EXPECT_EQ(controller->request()->options, 0u);
+  EXPECT_EQ(controller->request()->target_id, domain->id());
+
+  END_TEST;
+}
+
+bool SchedulerCanPendControlRequestsAcrossCpus() {
+  BEGIN_TEST;
+
+  if (arch_max_num_cpus() < 2) {
+    printf("Skipping test that requires more than one CPU.\n");
+    END_TEST;
+  }
+
+  // Use the scheduler for the current CPU to test the power level control functionality. It doesn't
+  // matter if the test thread remains on the same CPU, since power level requests can be initiated
+  // from a different CPU than the target CPU.
+  Scheduler& scheduler = percpu::GetCurrent().scheduler;
+
+  zx::result power_model = PowerModel::Create(kPowerLevels, kTransitions);
+  ASSERT_TRUE(power_model.is_ok());
+
+  fbl::AllocChecker ac;
+  fbl::RefPtr controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
+  ASSERT_TRUE(ac.check());
+
+  fbl::RefPtr domain = fbl::MakeRefCountedChecked<PowerDomain>(
+      &ac, 1, zx_cpu_set_t{.mask = {cpu_num_to_mask(scheduler.this_cpu())}},
+      ktl::move(*power_model), controller);
+  ASSERT_TRUE(ac.check());
+
+  // Set the current power domain, saving the previous domain to restore at the end of the test.
+  const ktl::optional<uint8_t> restore_power_level = scheduler.GetPowerLevel();
+  auto restore_domain = fit::defer([&, previous_domian = scheduler.ExchangePowerDomain(domain)] {
+    scheduler.ExchangePowerDomain(previous_domian);
+    if (restore_power_level.has_value()) {
+      DEBUG_ASSERT(scheduler.SetPowerLevel(*restore_power_level).is_ok());
+    }
+  });
+  ASSERT_EQ(domain.get(), scheduler.GetPowerDomainForTesting().get());
+  ASSERT_OK(scheduler.SetPowerLevel(kMaxPowerLevel).status_value());
+
+  // Move the test thread to a different CPU than the target scheduler serves.
+  const cpu_mask_t temporary_affinity =
+      Scheduler::PeekActiveMask() & ~cpu_num_to_mask(scheduler.this_cpu());
+  auto restore_affinity =
+      fit::defer([previous_affinity = Thread::Current::Get()->SetCpuAffinity(temporary_affinity)] {
+        Thread::Current::Get()->SetCpuAffinity(previous_affinity);
+      });
+  ASSERT_NE(scheduler.this_cpu(), arch_curr_cpu_num());
+
+  scheduler.RequestPowerLevelForTesting(kHighPowerLevel);
+
+  ASSERT_EQ(controller->Wait(Deadline::infinite()), ZX_OK);
+  ASSERT_EQ(controller->count(), 1u);
+
+  ASSERT_TRUE(controller->request());
+  EXPECT_EQ(controller->request()->control, ControlInterface::kCpuDriver);
+  EXPECT_EQ(controller->request()->control_argument, kHighPowerLevel);
+  EXPECT_EQ(controller->request()->domain_id, domain->id());
+  EXPECT_EQ(controller->request()->options, 0u);
+  EXPECT_EQ(controller->request()->target_id, domain->id());
+
   END_TEST;
 }
 
 UNITTEST_START_TESTCASE(pm_controller)
-UNITTEST("Controller queues port packet", PortPowerLevelControllerPost)
-UNITTEST("Controller stops serving when zero handles reached",
+UNITTEST("Port controller queues a packet.", PortPowerLevelControllerPost)
+UNITTEST("Port controller stops serving when there are zero handles.",
          PortPowerLevelControllerStopServingOnZeroHandles)
-UNITTEST("Controller DPC queues task.", ControllerDpcTryQueueManyTimesIsOk)
-UNITTEST("Controller DPC TryQueue called from IRQ context.", ControllerDpcTryQueueFromIrqContext)
-UNITTEST("Controller DPC its ok to be called many times.", ControllerDpcPostsUpdateWhenPending)
-UNITTEST("Controller DPC wont queue in DPC thread if no requests available.",
-         ControllerDpcNoPendingRequestWhenNoneAvailable)
-UNITTEST_END_TESTCASE(pm_controller, "pm_port_controller",
-                      "Validates power management port based power level controller.")
+UNITTEST("Scheduler flushes pending requests to the controller.",
+         SchedulerFlushesPendingControlRequests)
+UNITTEST("Scheduler elides multiple pending requests to the controller.",
+         SchedulerElidesPendingControlRequests)
+UNITTEST("Scheduler control requests may occur in IRQ context.",
+         SchedulerCanPendControlRequestsInIrqContext)
+UNITTEST("Scheduler control requests may pend from a different CPU.",
+         SchedulerCanPendControlRequestsAcrossCpus)
+UNITTEST_END_TESTCASE(pm_controller, "pm_controller", "Kernel CPU power level controller tests.")
 
 }  // namespace

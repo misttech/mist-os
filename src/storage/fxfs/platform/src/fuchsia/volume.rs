@@ -27,10 +27,9 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::{self, SyncOptions};
 use fxfs::log::*;
-use fxfs::object_handle::ObjectHandle;
-use fxfs::object_store::directory::{replace_child_with_object, Directory};
+use fxfs::object_store::directory::Directory;
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
-use fxfs::object_store::{HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore, Timestamp};
+use fxfs::object_store::{HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore};
 use std::future::Future;
 use std::pin::pin;
 use std::sync::{Arc, Mutex, Weak};
@@ -106,17 +105,6 @@ impl Default for MemoryPressureConfig {
     }
 }
 
-/// Holds all the state about current profile recording and replay.
-struct ProfileHolder {
-    state: Box<dyn ProfileState>,
-
-    /// The name for the ongoing recording upon completion.
-    recording_name: String,
-
-    /// The object id of the ongoing recording.
-    recording_object: u64,
-}
-
 /// FxVolume represents an opened volume. It is also a (weak) cache for all opened Nodes within the
 /// volume.
 pub struct FxVolume {
@@ -137,7 +125,7 @@ pub struct FxVolume {
 
     dirent_cache: DirentCache,
 
-    profile_state: Mutex<Option<ProfileHolder>>,
+    profile_state: Mutex<Option<Box<dyn ProfileState>>>,
 }
 
 #[fxfs_trace::trace]
@@ -186,58 +174,12 @@ impl FxVolume {
         &self.scope
     }
 
-    async fn place_file(self: &Arc<Self>, name: &str, object_id: u64) -> Result<(), Error> {
-        let profile_dir = self.get_profile_directory().await?;
-        let mut lock_keys =
-            lock_keys![LockKey::object(self.store().store_object_id(), profile_dir.object_id(),)];
-        // If we're replacing the old file we must lock that as well.
-        if let Some((id, descriptor)) = profile_dir.lookup(name).await? {
-            ensure!(matches!(descriptor, ObjectDescriptor::File), FxfsError::Inconsistent);
-            lock_keys.push(LockKey::object(self.store().store_object_id(), id));
-        }
-
-        let mut transaction =
-            self.store().filesystem().new_transaction(lock_keys, Options::default()).await?;
-        self.store.remove_from_graveyard(&mut transaction, object_id);
-        replace_child_with_object(
-            &mut transaction,
-            Some((object_id, ObjectDescriptor::File)),
-            (&profile_dir, name),
-            0,
-            Timestamp::now(),
-        )
-        .await?;
-        transaction.commit().await?;
-
-        Ok(())
-    }
-
-    /// Stops the profiling, returns a ProfileHolder if there is any finalizing left for the
-    /// recording. This may be used in a sync context during shutdown when we can't handle the
-    /// mutations to finalize the recording.
-    fn stop_profiler(&self) -> Option<ProfileHolder> {
-        let mut profile_state = self.profile_state.lock().unwrap();
-        // Clear recorder first to flush entries. Possibly a no-op.
-        self.pager.set_recorder(None);
-        if let Some(state) = &mut (*profile_state) {
-            // Stop profiler ensuring that the write handle is closed.
-            state.state.stop_profiler();
-            info!("Stopping profile activity for volume object {}.", self.store.store_object_id());
-        }
-        std::mem::take(&mut *profile_state)
-    }
-
     /// Stop profiling, recover resources from it and finalize recordings.
     pub async fn stop_profile_tasks(self: &Arc<Self>) {
-        // If there was a file being recorded, place it in the profile directory.
-        if let Some(holder) = self.stop_profiler() {
-            if let Err(e) = self.place_file(&holder.recording_name, holder.recording_object).await {
-                warn!(
-                    "Failed to commit new profile recording '{}': {:?}",
-                    &holder.recording_name, e
-                );
-            }
-        }
+        let Some(mut state) = self.profile_state.lock().unwrap().take() else { return };
+        state.wait_for_replay_to_finish().await;
+        self.pager.set_recorder(None);
+        let _ = state.wait_for_recording_to_finish().await;
     }
 
     /// Opens or creates the profile directory in the volume's internal directory.
@@ -295,32 +237,11 @@ impl FxVolume {
             None
         };
 
-        // Start a recording handle. Put it in the graveyard in case we can't properly complete it.
-        let mut transaction =
-            self.store().filesystem().new_transaction(lock_keys![], Options::default()).await?;
-        let recording_handle = Box::new(
-            ObjectStore::create_object(
-                self,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await?,
-        );
-        let recording_object = recording_handle.object_id();
-        self.store.add_to_graveyard(&mut transaction, recording_object);
-        transaction.commit().await?;
-
         let mut profile_state = self.profile_state.lock().unwrap();
-        if let Some(mut holder) = profile_state.take() {
-            warn!("Profile operations already in flight. Stopping and dropping the current ones");
-            holder.state.stop_profiler();
-        }
 
         info!("Recording new profile '{name}' for volume object {}", self.store.store_object_id());
         // Begin recording first to ensure that we capture any activity from the replay.
-        self.pager.set_recorder(Some(state.record_new(recording_handle)));
+        self.pager.set_recorder(Some(state.record_new(self, name)));
         if let Some(handle) = replay_handle {
             state.replay_profile(handle, self.clone());
             info!(
@@ -328,8 +249,7 @@ impl FxVolume {
                 self.store.store_object_id()
             );
         }
-        *profile_state =
-            Some(ProfileHolder { state, recording_name: name.to_owned(), recording_object });
+        *profile_state = Some(state);
         Ok(())
     }
 
@@ -345,7 +265,6 @@ impl FxVolume {
     }
 
     pub async fn terminate(&self) {
-        self.stop_profiler();
         self.dirent_cache.clear();
 
         // `NodeCache::terminate` will break any strong reference cycles contained within nodes

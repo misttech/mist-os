@@ -25,7 +25,7 @@ use async_trait::async_trait;
 use fuchsia_trace as ftrace;
 use futures::lock::Mutex;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub(crate) const DEFAULT_CAMERA_NAME: &str = "camera";
 pub(crate) const DEFAULT_MIC_NAME: &str = "microphone";
@@ -122,7 +122,7 @@ impl DeviceStorageCompatible for InputInfoSourcesV1 {
     const KEY: &'static str = "input_info_sources_v1";
 }
 
-type InputControllerInnerHandle = Arc<Mutex<InputControllerInner>>;
+type InputControllerInnerHandle = Rc<Mutex<InputControllerInner>>;
 
 /// Inner struct for the InputController.
 ///
@@ -365,7 +365,7 @@ impl InputController {
         input_device_config: InputConfiguration,
     ) -> Result<Self, ControllerError> {
         Ok(Self {
-            inner: Arc::new(Mutex::new(InputControllerInner {
+            inner: Rc::new(Mutex::new(InputControllerInner {
                 client,
                 input_device_state: InputState::new(),
                 input_device_config,
@@ -382,7 +382,7 @@ impl InputController {
 }
 
 impl data_controller::CreateWith for InputController {
-    type Data = Arc<std::sync::Mutex<DefaultSetting<InputConfiguration, &'static str>>>;
+    type Data = Rc<std::sync::Mutex<DefaultSetting<InputConfiguration, &'static str>>>;
     fn create_with(client: ClientProxy, data: Self::Data) -> Result<Self, ControllerError> {
         if let Ok(Some(config)) = data.lock().unwrap().load_default_value() {
             InputController::create_with_config(client, config)
@@ -392,7 +392,7 @@ impl data_controller::CreateWith for InputController {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for InputController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {
@@ -583,7 +583,7 @@ mod tests {
             .expect("Unable to create agent messenger");
 
         // Spawn a task that mimics the storage agent by responding to read/write calls.
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             loop {
                 if let Ok((payload, message_client)) = storage_receptor.next_payload().await {
                     if let Ok(StoragePayload::Request(storage_request)) =
@@ -657,11 +657,11 @@ mod tests {
         let default_setting = DefaultSetting::new(
             Some(InputConfiguration::default()),
             "/config/data/input_device_config.json",
-            Arc::new(std::sync::Mutex::new(config_logger)),
+            Rc::new(std::sync::Mutex::new(config_logger)),
         );
         let _controller = InputController::create_with(
             client_proxy,
-            Arc::new(std::sync::Mutex::new(default_setting)),
+            Rc::new(std::sync::Mutex::new(default_setting)),
         )
         .expect("Should have controller");
     }
@@ -685,11 +685,11 @@ mod tests {
         let signature = controller_messenger.get_signature();
 
         ClientProxy::new(
-            Arc::new(ClientImpl::for_test(
+            Rc::new(ClientImpl::for_test(
                 Default::default(),
                 controller_messenger,
                 signature,
-                Arc::new(service_context),
+                Rc::new(service_context),
                 SettingType::Input,
             )),
             SettingType::Input,

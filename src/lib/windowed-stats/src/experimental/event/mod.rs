@@ -18,8 +18,8 @@ use crate::experimental::clock::Timed;
 
 pub use crate::experimental::event::builder::{sample_data_record, SampleDataRecord};
 pub use crate::experimental::event::reactor::{
-    and, map_data_record, on_data_record, or, then, AndChain, IntoReactor, OrChain, Reactor,
-    ThenChain,
+    and, fail, map_data_record, on_data_record, or, respond, then, And, AndChain, Fail, Inspect,
+    IntoReactor, MapError, MapResponse, Or, OrChain, Reactor, Respond, Then, ThenChain,
 };
 
 impl<T> Timed<Event<T>> {
@@ -355,13 +355,13 @@ pub(crate) mod harness {
         )))
     }
 
-    /// A `Reactor` of only the unit type `()` that always returns `Ok`.
-    pub const fn ok(_: Timed<Event<()>>) -> Result<(), ()> {
+    /// A `Reactor` of only the unit type `()` that always responds with `Ok`.
+    pub const fn respond(_: Timed<Event<()>>) -> Result<(), ()> {
         Ok(())
     }
 
-    /// A `Reactor` of only the unit type `()` that always returns `Err`.
-    pub const fn error(_: Timed<Event<()>>) -> Result<(), ()> {
+    /// A `Reactor` of only the unit type `()` that always fails with `Err`.
+    pub const fn fail(_: Timed<Event<()>>) -> Result<(), ()> {
         Err(())
     }
 
@@ -383,7 +383,7 @@ mod tests {
 
     use crate::experimental::clock::Timed;
     use crate::experimental::event::harness::{self, ReactorExt as _};
-    use crate::experimental::event::{self, Event, Reactor, SuspendEvent, SystemEvent};
+    use crate::experimental::event::{self, DataEvent, Event, Reactor, SuspendEvent, SystemEvent};
     use crate::experimental::series::interpolation::LastSample;
     use crate::experimental::series::statistic::{Max, Sum};
     use crate::experimental::series::SamplingProfile;
@@ -394,7 +394,7 @@ mod tests {
     fn observes_event_assertion_observes_no_such_event_then_panics() {
         let _executor = harness::executor_at_time_zero();
 
-        let mut reactor = harness::ok.assert_observes_event(Event::from_data_record(()));
+        let mut reactor = harness::respond.assert_observes_event(Event::from_data_record(()));
         let _ = reactor.react(Timed::now(SystemEvent::Suspend(SuspendEvent::Sleep).into()));
     }
 
@@ -403,7 +403,7 @@ mod tests {
     fn reacts_times_assertion_reacts_too_few_times_then_panics() {
         let _executor = harness::executor_at_time_zero();
 
-        let mut reactor = harness::ok.assert_reacts_times(2);
+        let mut reactor = harness::respond.assert_reacts_times(2);
         let _ = reactor.react_to_data_record(());
     }
 
@@ -412,7 +412,7 @@ mod tests {
     fn reacts_times_assertion_reacts_too_many_times_then_panics() {
         let _executor = harness::executor_at_time_zero();
 
-        let mut reactor = harness::ok.assert_reacts_times(1);
+        let mut reactor = harness::respond.assert_reacts_times(1);
         let _ = reactor.react_to_data_record(());
         let _ = reactor.react_to_data_record(());
     }
@@ -422,17 +422,17 @@ mod tests {
         let _executor = harness::executor_at_time_zero();
 
         let mut reactor =
-            harness::ok.assert_reacts_times(1).then(harness::ok.assert_reacts_times(1));
+            harness::respond.assert_reacts_times(1).then(harness::respond.assert_reacts_times(1));
         let _ = reactor.react_to_data_record(());
 
         let mut reactor =
-            harness::error.assert_reacts_times(1).then(harness::ok.assert_reacts_times(1));
+            harness::fail.assert_reacts_times(1).then(harness::respond.assert_reacts_times(1));
         let _ = reactor.react_to_data_record(());
 
         let mut reactor = event::then((
-            harness::ok.assert_reacts_times(1),
-            harness::error.assert_reacts_times(1),
-            harness::ok.assert_reacts_times(1),
+            harness::respond.assert_reacts_times(1),
+            harness::fail.assert_reacts_times(1),
+            harness::respond.assert_reacts_times(1),
         ));
         let _ = reactor.react_to_data_record(());
     }
@@ -442,17 +442,17 @@ mod tests {
         let _executor = harness::executor_at_time_zero();
 
         let mut reactor =
-            harness::ok.assert_reacts_times(1).and(harness::ok.assert_reacts_times(1));
+            harness::respond.assert_reacts_times(1).and(harness::respond.assert_reacts_times(1));
         let _ = reactor.react_to_data_record(());
 
         let mut reactor =
-            harness::error.assert_reacts_times(1).and(harness::ok.assert_reacts_times(0));
+            harness::fail.assert_reacts_times(1).and(harness::respond.assert_reacts_times(0));
         let _ = reactor.react_to_data_record(());
 
         let mut reactor = event::and((
-            harness::ok.assert_reacts_times(1),
-            harness::error.assert_reacts_times(1),
-            harness::ok.assert_reacts_times(0),
+            harness::respond.assert_reacts_times(1),
+            harness::fail.assert_reacts_times(1),
+            harness::respond.assert_reacts_times(0),
         ));
         let _ = reactor.react_to_data_record(());
     }
@@ -461,19 +461,46 @@ mod tests {
     fn or_combinator_reacts_then_subsequent_reacts_only_on_err() {
         let _executor = harness::executor_at_time_zero();
 
-        let mut reactor = harness::ok.assert_reacts_times(1).or(harness::ok.assert_reacts_times(0));
+        let mut reactor =
+            harness::respond.assert_reacts_times(1).or(harness::respond.assert_reacts_times(0));
         let _ = reactor.react_to_data_record(());
 
         let mut reactor =
-            harness::error.assert_reacts_times(1).or(harness::error.assert_reacts_times(1));
+            harness::fail.assert_reacts_times(1).or(harness::fail.assert_reacts_times(1));
         let _ = reactor.react_to_data_record(());
 
         let mut reactor = event::or((
-            harness::error.assert_reacts_times(1),
-            harness::ok.assert_reacts_times(1),
-            harness::ok.assert_reacts_times(0),
+            harness::fail.assert_reacts_times(1),
+            harness::respond.assert_reacts_times(1),
+            harness::respond.assert_reacts_times(0),
         ));
         let _ = reactor.react_to_data_record(());
+    }
+
+    #[test]
+    fn map_data_record_then_subtree_reacts_to_mapped_record() {
+        let _executor = harness::executor_at_time_zero();
+
+        #[derive(Debug, Eq, PartialEq)]
+        struct Thread {
+            nominal: u128,
+            tpi: u128,
+        }
+
+        let thread = Thread { nominal: 1, tpi: 8 };
+        let mut observed = None;
+        let mut reactor = event::on_data_record::<&Thread, _>(event::map_data_record(
+            |thread: &Thread| &thread.tpi,
+            |event: Timed<Event<&u128>>| {
+                let (_, event) = event.into();
+                if let Event::Data(DataEvent { record: tpi, .. }) = event {
+                    observed = Some(*tpi);
+                }
+                Ok::<_, ()>(())
+            },
+        ));
+        let _ = reactor.react_to_data_record(&thread);
+        assert_eq!(observed, Some(8));
     }
 
     #[test]

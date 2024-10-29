@@ -12,7 +12,10 @@
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fake-bti/bti.h>
+#include <lib/fpromise/result.h>
+#include <lib/fpromise/single_threaded_executor.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/inspect/cpp/reader.h>
 
 #include <gtest/gtest.h>
 
@@ -47,6 +50,13 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
     return {reinterpret_cast<uint32_t*>(mapped_mmio_.start()), kMmioSize / sizeof(uint32_t)};
   }
 
+  void TriggerIrq(size_t timer_index) {
+    ASSERT_TRUE(timer_index < kNumberOfTimers);
+    ASSERT_EQ(
+        fake_interrupts_[*kTimerToIrqsIndexes[timer_index]].trigger(0, zx::clock::get_monotonic()),
+        ZX_OK);
+  }
+
   void TriggerAllIrqs() {
     for (size_t i = 0; i < AmlHrtimer::GetNumberOfIrqs(); ++i) {
       ASSERT_EQ(fake_interrupts_[i].trigger(0, zx::clock::get_monotonic()), ZX_OK);
@@ -55,7 +65,8 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
 
  private:
   static constexpr size_t kMmioSize = 0x10000;
-
+  std::optional<size_t> kTimerToIrqsIndexes[kNumberOfTimers] = {0, 1, 2, 3, std::nullopt,
+                                                                4, 5, 6, 7};
   void GetMmioById(GetMmioByIdRequest& request, GetMmioByIdCompleter::Sync& completer) override {
     if (request.index() != 0) {
       return completer.Reply(zx::error(ZX_ERR_OUT_OF_RANGE));
@@ -406,16 +417,54 @@ class DriverTest : public ::testing::Test {
   }
 
   void CheckLeaseRequested(size_t timer_id) {
-    driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
-      ASSERT_FALSE(env.power_broker().GetLeaseRequested());
-      env.platform_device().TriggerAllIrqs();
+    driver_test().RunInEnvironmentTypeContext(
+        [](TestEnvironment& env) { ASSERT_FALSE(env.power_broker().GetLeaseRequested()); });
+    fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease;
+    std::thread thread([this, timer_id, &lease]() {
+      auto result_start = client_->StartAndWait(
+          {timer_id, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+      ASSERT_FALSE(result_start.is_error());
+      ASSERT_TRUE(result_start->keep_alive().is_valid());
+      lease = std::move(result_start->keep_alive());
     });
-    auto result_start = client_->StartAndWait(
-        {timer_id, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
-    ASSERT_FALSE(result_start.is_error());
-    ASSERT_TRUE(result_start->keep_alive().is_valid());
+
+    // Wait until the driver has acquired the timer wait completer before triggering the IRQ.
+    bool has_wait_completer = false;
+    while (!has_wait_completer) {
+      driver_test().RunInDriverContext([timer_id, &has_wait_completer](AmlHrtimer& driver) {
+        has_wait_completer = driver.HasWaitCompleter(timer_id);
+      });
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+    }
+    driver_test().RunInEnvironmentTypeContext(
+        [timer_id](TestEnvironment& env) { env.platform_device().TriggerIrq(timer_id); });
+    thread.join();
     driver_test().RunInEnvironmentTypeContext(
         [](TestEnvironment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
+  }
+
+  void CheckInspect(const char* path, const char* type, uint64_t id, uint64_t data) {
+    driver_test().RunInDriverContext([&](AmlHrtimer& driver) {
+      auto& inspector = driver.inspect();
+      fpromise::single_threaded_executor executor;
+      executor.schedule_task(inspect::ReadFromInspector(inspector).then(
+          [&](fpromise::result<inspect::Hierarchy>& hierarchy) {
+            ASSERT_TRUE(hierarchy.is_ok());
+            const inspect::Hierarchy* events =
+                hierarchy.value().GetByPath({"hrtimer-trace", "events"});
+            ASSERT_TRUE(events);
+            const auto* event = events->GetByPath({path});
+            auto local_id = event->node().get_property<inspect::UintPropertyValue>("id")->value();
+            auto local_type =
+                event->node().get_property<inspect::StringPropertyValue>("type")->value();
+            auto local_data =
+                event->node().get_property<inspect::UintPropertyValue>("data")->value();
+            ASSERT_EQ(local_type.compare(type), 0);
+            ASSERT_EQ(local_id, id);
+            ASSERT_EQ(local_data, data);
+          }));
+      executor.run();
+    });
   }
 
   fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
@@ -564,6 +613,34 @@ TEST_F(DriverTest, StartStop) {
     // Timer E can't actually be stopped.
     ASSERT_EQ(env.platform_device().mmio()[0x3c64], 0x0000'0000UL);  // Timers F, G, H and I.
   });
+
+  CheckInspect("0", "Start", 0, 1);
+  CheckInspect("1", "StartHardware", 0, 1);
+  CheckInspect("2", "Start", 1, 1);
+  CheckInspect("3", "StartHardware", 1, 1);
+  CheckInspect("4", "Start", 2, 1);
+  CheckInspect("5", "StartHardware", 2, 1);
+  CheckInspect("6", "Start", 3, 1);
+  CheckInspect("7", "StartHardware", 3, 1);
+  CheckInspect("8", "Start", 4, 1);
+  CheckInspect("9", "StartHardware", 4, 0);  // Timer 4 does not set ticks in the HW.
+  CheckInspect("10", "Start", 5, 1);
+  CheckInspect("11", "StartHardware", 5, 1);
+  CheckInspect("12", "Start", 6, 1);
+  CheckInspect("13", "StartHardware", 6, 1);
+  CheckInspect("14", "Start", 7, 1);
+  CheckInspect("15", "StartHardware", 7, 1);
+  CheckInspect("16", "Start", 8, 1);
+  CheckInspect("17", "StartHardware", 8, 1);
+  CheckInspect("18", "Stop", 0, 0);
+  CheckInspect("19", "Stop", 1, 0);
+  CheckInspect("20", "Stop", 2, 0);
+  CheckInspect("21", "Stop", 3, 0);
+  CheckInspect("22", "Stop", 4, 0);
+  CheckInspect("23", "Stop", 5, 0);
+  CheckInspect("24", "Stop", 6, 0);
+  CheckInspect("25", "Stop", 7, 0);
+  CheckInspect("26", "Stop", 8, 0);
 }
 
 TEST_F(DriverTest, EventTriggering) {
@@ -815,31 +892,98 @@ TEST_F(DriverTest, PowerLeaseControl) {
 }
 
 TEST_F(DriverTest, StartAndWaitTriggering) {
+  std::vector<std::thread> threads;
+  for (auto& i : kTimersSupportWait) {
+    threads.emplace_back([this, i]() {
+      auto result_start = client_->StartAndWait(
+          {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+      ASSERT_FALSE(result_start.is_error());
+      ASSERT_TRUE(result_start->keep_alive().is_valid());
+    });
+
+    // Wait until the driver has acquired the timer wait completer before triggering the IRQ.
+    bool has_wait_completer = false;
+    while (!has_wait_completer) {
+      driver_test().RunInDriverContext([i, &has_wait_completer](AmlHrtimer& driver) {
+        has_wait_completer = driver.HasWaitCompleter(i);
+      });
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+    }
+  }
   driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
 
-  for (auto& i : kTimersSupportWait) {
-    auto result_start =
-        client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
-    ASSERT_FALSE(result_start.is_error());
-    ASSERT_TRUE(result_start->keep_alive().is_valid());
+  // Join the threads such that we check for timers triggered.
+  for (auto& thread : threads) {
+    thread.join();
   }
+
+  CheckInspect("0", "StartAndWait", 0, 0);
+  CheckInspect("1", "StartHardware", 0, 0);
+  CheckInspect("2", "StartAndWait", 1, 0);
+  CheckInspect("3", "StartHardware", 1, 0);
+  CheckInspect("4", "StartAndWait", 2, 0);
+  CheckInspect("5", "StartHardware", 2, 0);
+  CheckInspect("6", "StartAndWait", 3, 0);
+  CheckInspect("7", "StartHardware", 3, 0);
+  CheckInspect("8", "StartAndWait", 5, 0);
+  CheckInspect("9", "StartHardware", 5, 0);
+  CheckInspect("10", "StartAndWait", 6, 0);
+  CheckInspect("11", "StartHardware", 6, 0);
+  CheckInspect("12", "StartAndWait", 7, 0);
+  CheckInspect("13", "StartHardware", 7, 0);
+  CheckInspect("14", "StartAndWait", 8, 0);
+  CheckInspect("15", "StartHardware", 8, 0);
+  // Not checking TriggerIrqWait since we are not ordering IRQ triggers.
 }
 
 TEST_F(DriverTest, StartAndWait2Triggering) {
+  std::vector<std::thread> threads;
+  for (auto& i : kTimersSupportWait) {
+    threads.emplace_back([this, i]() {
+      zx::eventpair local_wake_lease, remote_wake_lease;
+      ASSERT_TRUE(fuchsia_power_system::LeaseToken::create(0, &local_wake_lease,
+                                                           &remote_wake_lease) == ZX_OK);
+      auto result_start =
+          client_->StartAndWait2({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL),
+                                  0, std::move(remote_wake_lease)});
+      ASSERT_FALSE(result_start.is_error());
+      ASSERT_TRUE(result_start->expiration_keep_alive().is_valid());
+    });
+    // Wait until the driver has acquired the timer wait completer before triggering the IRQ.
+    bool has_wait_completer = false;
+    while (!has_wait_completer) {
+      driver_test().RunInDriverContext([i, &has_wait_completer](AmlHrtimer& driver) {
+        has_wait_completer = driver.HasWaitCompleter(i);
+      });
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+    }
+  }
   driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
 
-  for (auto& i : kTimersSupportWait) {
-    zx::eventpair local_wake_lease, remote_wake_lease;
-    ASSERT_TRUE(fuchsia_power_system::LeaseToken::create(0, &local_wake_lease,
-                                                         &remote_wake_lease) == ZX_OK);
-    auto result_start =
-        client_->StartAndWait2({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
-                                std::move(remote_wake_lease)});
-    ASSERT_FALSE(result_start.is_error());
-    ASSERT_TRUE(result_start->expiration_keep_alive().is_valid());
+  // Join the threads such that we check for timers triggered.
+  for (auto& thread : threads) {
+    thread.join();
   }
+
+  CheckInspect("0", "StartAndWait2", 0, 0);
+  CheckInspect("1", "StartHardware", 0, 0);
+  CheckInspect("2", "StartAndWait2", 1, 0);
+  CheckInspect("3", "StartHardware", 1, 0);
+  CheckInspect("4", "StartAndWait2", 2, 0);
+  CheckInspect("5", "StartHardware", 2, 0);
+  CheckInspect("6", "StartAndWait2", 3, 0);
+  CheckInspect("7", "StartHardware", 3, 0);
+  CheckInspect("8", "StartAndWait2", 5, 0);
+  CheckInspect("9", "StartHardware", 5, 0);
+  CheckInspect("10", "StartAndWait2", 6, 0);
+  CheckInspect("11", "StartHardware", 6, 0);
+  CheckInspect("12", "StartAndWait2", 7, 0);
+  CheckInspect("13", "StartHardware", 7, 0);
+  CheckInspect("14", "StartAndWait2", 8, 0);
+  CheckInspect("15", "StartHardware", 8, 0);
+  // Not checking TriggerIrqWait2 since we are not ordering IRQ triggers.
 }
 
 TEST_F(DriverTest, RunningPowerElement) {
@@ -884,18 +1028,35 @@ TEST_F(DriverTest, RunningPowerElement) {
 }
 
 TEST_F(DriverTest, LeaseError) {
-  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
-    env.power_broker().SetLeaseError();
-    env.platform_device().TriggerAllIrqs();
-  });
+  driver_test().RunInEnvironmentTypeContext(
+      [](TestEnvironment& env) { env.power_broker().SetLeaseError(); });
 
+  std::vector<std::thread> threads;
   for (auto& i : kTimersSupportWait) {
-    auto result_start =
-        client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
-    ASSERT_TRUE(result_start.is_error());
-    ASSERT_TRUE(result_start.error_value().is_domain_error());
-    ASSERT_EQ(result_start.error_value().domain_error(),
-              fuchsia_hardware_hrtimer::DriverError::kBadState);
+    threads.emplace_back([this, i]() {
+      auto result_start = client_->StartAndWait(
+          {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+      ASSERT_TRUE(result_start.is_error());
+      ASSERT_TRUE(result_start.error_value().is_domain_error());
+      ASSERT_EQ(result_start.error_value().domain_error(),
+                fuchsia_hardware_hrtimer::DriverError::kBadState);
+    });
+
+    // Wait until the driver has acquired the timer wait completer before triggering the IRQ.
+    bool has_wait_completer = false;
+    while (!has_wait_completer) {
+      driver_test().RunInDriverContext([i, &has_wait_completer](AmlHrtimer& driver) {
+        has_wait_completer = driver.HasWaitCompleter(i);
+      });
+      zx::nanosleep(zx::deadline_after(zx::msec(1)));
+    }
+  }
+  driver_test().RunInEnvironmentTypeContext(
+      [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
+
+  // Join the threads such that we check for timers triggered.
+  for (auto& thread : threads) {
+    thread.join();
   }
 }
 
@@ -922,6 +1083,31 @@ TEST_F(DriverTest, StartAndWaitStop) {
     ASSERT_FALSE(result_start_stop.is_error());
     thread.join();
   }
+
+  CheckInspect("0", "StartAndWait", 0, 0);
+  CheckInspect("1", "StartHardware", 0, 0);
+  CheckInspect("2", "StopWait", 0, 0);
+  CheckInspect("3", "StartAndWait", 1, 0);
+  CheckInspect("4", "StartHardware", 1, 0);
+  CheckInspect("5", "StopWait", 1, 0);
+  CheckInspect("6", "StartAndWait", 2, 0);
+  CheckInspect("7", "StartHardware", 2, 0);
+  CheckInspect("8", "StopWait", 2, 0);
+  CheckInspect("9", "StartAndWait", 3, 0);
+  CheckInspect("10", "StartHardware", 3, 0);
+  CheckInspect("11", "StopWait", 3, 0);
+  CheckInspect("12", "StartAndWait", 5, 0);
+  CheckInspect("13", "StartHardware", 5, 0);
+  CheckInspect("14", "StopWait", 5, 0);
+  CheckInspect("15", "StartAndWait", 6, 0);
+  CheckInspect("16", "StartHardware", 6, 0);
+  CheckInspect("17", "StopWait", 6, 0);
+  CheckInspect("18", "StartAndWait", 7, 0);
+  CheckInspect("19", "StartHardware", 7, 0);
+  CheckInspect("20", "StopWait", 7, 0);
+  CheckInspect("21", "StartAndWait", 8, 0);
+  CheckInspect("22", "StartHardware", 8, 0);
+  CheckInspect("23", "StopWait", 8, 0);
 }
 
 TEST_F(DriverTest, StartAndWait2Stop) {
@@ -951,6 +1137,31 @@ TEST_F(DriverTest, StartAndWait2Stop) {
     ASSERT_FALSE(result_start_stop.is_error());
     thread.join();
   }
+
+  CheckInspect("0", "StartAndWait2", 0, 0);
+  CheckInspect("1", "StartHardware", 0, 0);
+  CheckInspect("2", "StopWait2", 0, 0);
+  CheckInspect("3", "StartAndWait2", 1, 0);
+  CheckInspect("4", "StartHardware", 1, 0);
+  CheckInspect("5", "StopWait2", 1, 0);
+  CheckInspect("6", "StartAndWait2", 2, 0);
+  CheckInspect("7", "StartHardware", 2, 0);
+  CheckInspect("8", "StopWait2", 2, 0);
+  CheckInspect("9", "StartAndWait2", 3, 0);
+  CheckInspect("10", "StartHardware", 3, 0);
+  CheckInspect("11", "StopWait2", 3, 0);
+  CheckInspect("12", "StartAndWait2", 5, 0);
+  CheckInspect("13", "StartHardware", 5, 0);
+  CheckInspect("14", "StopWait2", 5, 0);
+  CheckInspect("15", "StartAndWait2", 6, 0);
+  CheckInspect("16", "StartHardware", 6, 0);
+  CheckInspect("17", "StopWait2", 6, 0);
+  CheckInspect("18", "StartAndWait2", 7, 0);
+  CheckInspect("19", "StartHardware", 7, 0);
+  CheckInspect("20", "StopWait2", 7, 0);
+  CheckInspect("21", "StartAndWait2", 8, 0);
+  CheckInspect("22", "StartHardware", 8, 0);
+  CheckInspect("23", "StopWait2", 8, 0);
 }
 
 class DriverTestNoAutoStop : public ::testing::Test {
@@ -962,19 +1173,6 @@ class DriverTestNoAutoStop : public ::testing::Test {
         driver_test().ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
     ASSERT_EQ(ZX_OK, device_result.status_value());
     client_.Bind(std::move(device_result.value()));
-  }
-
-  void CheckLeaseRequested(size_t timer_id) {
-    driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
-      ASSERT_FALSE(env.power_broker().GetLeaseRequested());
-      env.platform_device().TriggerAllIrqs();
-    });
-    auto result_start = client_->StartAndWait(
-        {timer_id, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
-    ASSERT_FALSE(result_start.is_error());
-    ASSERT_TRUE(result_start->keep_alive().is_valid());
-    driver_test().RunInEnvironmentTypeContext(
-        [](TestEnvironment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
   }
 
   fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
@@ -1093,9 +1291,6 @@ class DriverTestNoPower : public ::testing::Test {
 };
 
 TEST_F(DriverTestNoPower, StartAndWaitTriggeringNoPower) {
-  driver_test().RunInEnvironmentTypeContext(
-      [](TestEnvironmentNoPower& env) { env.platform_device().TriggerAllIrqs(); });
-
   for (auto& i : kTimersSupportWait) {
     auto result_start =
         client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
@@ -1106,9 +1301,6 @@ TEST_F(DriverTestNoPower, StartAndWaitTriggeringNoPower) {
 }
 
 TEST_F(DriverTestNoPower, StartAndWait2TriggeringNoPower) {
-  driver_test().RunInEnvironmentTypeContext(
-      [](TestEnvironmentNoPower& env) { env.platform_device().TriggerAllIrqs(); });
-
   for (auto& i : kTimersSupportWait) {
     zx::eventpair local_wake_lease, remote_wake_lease;
     ASSERT_TRUE(fuchsia_power_system::LeaseToken::create(0, &local_wake_lease,

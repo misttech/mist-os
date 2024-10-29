@@ -916,7 +916,8 @@ void JSONGenerator::GenerateDeclarationsMember(const Compilation::Declarations& 
 
 void JSONGenerator::GenerateExternalDeclarationsEntry(
     int count, const Name& name, std::string_view decl_kind,
-    std::optional<Resourceness> maybe_resourceness) {
+    std::optional<Resourceness> maybe_resourceness,
+    const std::optional<TypeShape>& maybe_type_shape) {
   if (count == 0) {
     Indent();
     EmitNewlineWithIndent();
@@ -929,6 +930,9 @@ void JSONGenerator::GenerateExternalDeclarationsEntry(
     if (maybe_resourceness) {
       GenerateObjectMember("resource", *maybe_resourceness == Resourceness::kResource);
     }
+    if (maybe_type_shape) {
+      GenerateObjectMember("type_shape_v2", *maybe_type_shape);
+    }
   });
 }
 
@@ -938,41 +942,60 @@ void JSONGenerator::GenerateExternalDeclarationsMember(
   EmitObjectKey("declarations");
   GenerateObject([&]() {
     int count = 0;
-    for (const auto& decl : declarations.bits)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "bits", std::nullopt);
+    for (const auto& decl : declarations.bits) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "bits", std::nullopt,
+                                        decl->type_shape);
+    }
 
-    for (const auto& decl : declarations.consts)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "const", std::nullopt);
+    for (const auto& decl : declarations.consts) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "const");
+    }
 
-    for (const auto& decl : declarations.enums)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "enum", std::nullopt);
+    for (const auto& decl : declarations.enums) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "enum", std::nullopt,
+                                        decl->type_shape);
+    }
 
-    for (const auto& decl : declarations.resources)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "experimental_resource", std::nullopt);
+    for (const auto& decl : declarations.resources) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "experimental_resource");
+    }
 
-    for (const auto& decl : declarations.protocols)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "protocol", std::nullopt);
+    for (const auto& decl : declarations.protocols) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "protocol");
+    }
 
-    for (const auto& decl : declarations.services)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "service", std::nullopt);
+    for (const auto& decl : declarations.services) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "service");
+    }
 
-    for (const auto& decl : declarations.structs)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "struct", decl->resourceness);
+    for (const auto& decl : declarations.structs) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "struct", decl->resourceness,
+                                        decl->type_shape);
+    }
 
-    for (const auto& decl : declarations.tables)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "table", decl->resourceness);
+    for (const auto& decl : declarations.tables) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "table", decl->resourceness,
+                                        decl->type_shape);
+    }
 
-    for (const auto& decl : declarations.unions)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "union", decl->resourceness);
+    for (const auto& decl : declarations.unions) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "union", decl->resourceness,
+                                        decl->type_shape);
+    }
 
-    for (const auto& decl : declarations.overlays)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "overlays", decl->resourceness);
+    for (const auto& decl : declarations.overlays) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "overlays", decl->resourceness,
+                                        decl->type_shape);
+    }
 
-    for (const auto& decl : declarations.aliases)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "alias", std::nullopt);
+    for (const auto& decl : declarations.aliases) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "alias");
+    }
 
-    for (const auto& decl : declarations.new_types)
-      GenerateExternalDeclarationsEntry(count++, decl->name, "new_type", std::nullopt);
+    for (const auto& decl : declarations.new_types) {
+      GenerateExternalDeclarationsEntry(count++, decl->name, "new_type", std::nullopt,
+                                        decl->type_shape);
+    }
   });
 }
 

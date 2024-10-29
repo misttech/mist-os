@@ -32,6 +32,7 @@
 using fuchsia_acpi_tables::wire::kMaxAcpiTableEntries;
 using fuchsia_acpi_tables::wire::TableInfo;
 
+zx_paddr_t acpi_rsdp;
 zx_handle_t mmio_resource_handle;
 zx_handle_t ioport_resource_handle;
 zx_handle_t irq_resource_handle;
@@ -106,6 +107,33 @@ zx_status_t X86::Create(void* ctx, zx_device_t* parent, std::unique_ptr<X86>* ou
   ZX_ASSERT(zx_handle_duplicate(get_power_resource(parent), ZX_RIGHT_SAME_RIGHTS,
                                 &power_resource_handle) == ZX_OK);
 
+  auto client = DdkConnectRuntimeProtocol<fuchsia_hardware_platform_bus::Service::Firmware>(parent);
+  if (client.is_error()) {
+    return client.status_value();
+  }
+  fdf::Arena arena('FIRM');
+  auto result = fdf::WireCall(*client).buffer(arena)->GetFirmware(
+      fuchsia_hardware_platform_bus::FirmwareType::kAcpi);
+  if (!result.ok()) {
+    zxlogf(ERROR, "Failed to get acpi: %s", result.status_string());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "Failed to get acpi: %s", zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  auto& item = result->value()->blobs[0];
+  if (item.length != sizeof(acpi_rsdp)) {
+    zxlogf(ERROR, "Incorrect size for acpi rsdp: %lu", item.length);
+    return ZX_ERR_INTERNAL;
+  }
+  status = item.vmo.read(&acpi_rsdp, 0, sizeof(acpi_rsdp));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to read acpi vmo: %s", zx_status_get_string(status));
+    return status;
+  }
+
   fbl::AllocChecker ac;
   *out = fbl::make_unique_checked<X86>(&ac, parent, std::move(endpoints->client),
                                        std::make_unique<acpi::AcpiImpl>());
@@ -166,8 +194,13 @@ zx_status_t X86::Bind() {
   bootloader_info.vendor() = "<unknown>";
 
   // Load SMBIOS information.
+  auto client = DdkConnectRuntimeProtocol<fuchsia_hardware_platform_bus::Service::Firmware>();
+  if (client.is_error()) {
+    return client.status_value();
+  }
   smbios::SmbiosInfo smbios;
-  status = smbios.Load(zx::unowned_resource(get_mmio_resource(parent())));
+  status =
+      smbios.Load(zx::unowned_resource(get_mmio_resource(parent())), std::move(client.value()));
   if (status == ZX_OK) {
     SetField("board name", smbios.board_name(), board_info.board_name());
     SetField("vendor", smbios.vendor(), bootloader_info.vendor());

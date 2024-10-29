@@ -75,7 +75,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator,
       const std::shared_ptr<Renderer>& renderer,
       fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator, bool enable_display_composition,
-      uint32_t max_display_layers);
+      uint32_t max_display_layers, uint8_t visual_debugging_level);
 
   ~DisplayCompositor() override;
 
@@ -361,6 +361,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   ColorConversionStateMachine cc_state_machine_;
 
   const async_dispatcher_t* const main_dispatcher_;
+
+  uint8_t visual_debugging_level_ = 0;
 };
 
 }  // namespace flatland

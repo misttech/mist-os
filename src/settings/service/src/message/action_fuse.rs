@@ -4,13 +4,13 @@
 
 use fuchsia_async as fasync;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Closure definition for an action that can be triggered by ActionFuse.
-pub type TriggeredAction = Box<dyn FnOnce() + Send + Sync + 'static>;
+pub type TriggeredAction = Box<dyn FnOnce()>;
 /// The reference-counted handle to an ActionFuse. When all references go out of
 /// scope, the action will be triggered (if not defused).
-pub type ActionFuseHandle = Arc<Mutex<ActionFuse>>;
+pub type ActionFuseHandle = Rc<Mutex<ActionFuse>>;
 
 /// ActionFuse is a wrapper around a triggered action (a closure with no
 /// arguments and no return value). This action is invoked once the fuse goes
@@ -25,12 +25,12 @@ pub struct ActionFuse {
 impl ActionFuse {
     /// Returns an ActionFuse reference with the given TriggerAction.
     pub(crate) fn create(action: TriggeredAction) -> ActionFuseHandle {
-        Arc::new(Mutex::new(ActionFuse { actions: Some(action) }))
+        Rc::new(Mutex::new(ActionFuse { actions: Some(action) }))
     }
 
     /// Suppresses the action from automatically executing.
     pub(crate) fn defuse(handle: ActionFuseHandle) {
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let mut fuse = handle.lock().await;
             fuse.actions = None;
         })

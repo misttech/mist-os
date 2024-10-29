@@ -339,6 +339,7 @@ impl Drop for BlockServer {
 
 #[repr(C)]
 pub struct PartitionInfo {
+    pub start_block: u64,
     pub block_count: u64,
     pub block_size: u32,
     pub type_guid: [u8; 16],
@@ -358,7 +359,7 @@ type zx_status_t = zx::sys::zx_status_t;
 impl PartitionInfo {
     unsafe fn to_rust(&self) -> super::PartitionInfo {
         super::PartitionInfo {
-            block_count: self.block_count,
+            block_range: Some(self.start_block..self.start_block + self.block_count),
             type_guid: self.type_guid,
             instance_guid: self.instance_guid,
             name: if self.name.is_null() {

@@ -241,7 +241,13 @@ zx_status_t Ramdisk::BlockPartitionGetName(char* out_name, size_t capacity) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t Ramdisk::BlockPartitionGetFlags(uint64_t* out_flags) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t Ramdisk::BlockPartitionGetMetadata(partition_metadata_t* out_metadata) {
+  *out_metadata = partition_metadata_t{
+      .num_blocks = block_count_,
+  };
+  memcpy(&out_metadata->type_guid, type_guid_, ZBI_PARTITION_GUID_LEN);
+  return ZX_OK;
+}
 
 void Ramdisk::ProcessRequests() {
   block::BorrowedOperationQueue<> deferred_list;

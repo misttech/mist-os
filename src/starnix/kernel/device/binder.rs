@@ -38,6 +38,13 @@ use starnix_sync::{
     ResourceAccessorAddFile, RwLock, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::convert::IntoFidl as _;
+use starnix_types::ownership::{
+    release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, Share, TempRef,
+    WeakRef,
+};
+use starnix_types::user_buffer::UserBuffer;
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::arc_key::ArcKey;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -45,14 +52,9 @@ use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::{
-    release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, Share, TempRef,
-    WeakRef,
-};
 use starnix_uapi::union::struct_with_union_into_bytes;
 use starnix_uapi::user_address::{UserAddress, UserRef};
-use starnix_uapi::user_buffer::UserBuffer;
-use starnix_uapi::vfs::{default_statfs, FdEvents};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     binder_buffer_object, binder_driver_command_protocol,
     binder_driver_command_protocol_BC_ACQUIRE, binder_driver_command_protocol_BC_ACQUIRE_DONE,
@@ -2940,11 +2942,11 @@ impl ResourceAccessor for RemoteResourceAccessor {
                 };
                 if let Some(handle) = file.file {
                     return Ok((
-                        new_remote_file(current_task, handle, flags.into())?,
+                        new_remote_file(current_task, handle, flags.into_fidl())?,
                         FdFlags::empty(),
                     ));
                 } else {
-                    return Ok((new_null_file(current_task, flags.into()), FdFlags::empty()));
+                    return Ok((new_null_file(current_task, flags.into_fidl()), FdFlags::empty()));
                 }
             }
         }
@@ -2959,7 +2961,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
         _flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
         profile_duration!("RemoteAddFile");
-        let flags: fbinder::FileFlags = file.flags().into();
+        let flags: fbinder::FileFlags = file.flags().into_fidl();
         let handle = file.to_handle(current_task)?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle {
@@ -4752,8 +4754,8 @@ pub mod tests {
     }
 
     fn assert_flags_are_equivalent(f1: fbinder::FileFlags, f2: OpenFlags) {
-        assert_eq!(f1, f2.into());
-        assert_eq!(f2, f1.into());
+        assert_eq!(f1, f2.into_fidl());
+        assert_eq!(f2, f1.into_fidl());
     }
 
     #[::fuchsia::test]
@@ -7076,6 +7078,7 @@ pub mod tests {
         );
         let mut locked = locked.cast_locked::<DeviceOpen>();
         FileObject::new_anonymous(
+            current_task,
             binder_driver
                 .open(&mut locked, &current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
                 .expect("binder dev open failed"),

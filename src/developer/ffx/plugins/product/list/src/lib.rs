@@ -8,6 +8,7 @@
 use ::gcs::client::{Client, ProgressResponse};
 use anyhow::{Context, Result};
 use ffx_config::sdk::SdkVersion;
+use ffx_config::EnvironmentContext;
 use ffx_product_list_args::ListCommand;
 use fho::{bug, return_user_error, FfxMain, FfxTool, MachineWriter, ToolIO as _};
 use gcs::gs_url::split_gs_url;
@@ -19,11 +20,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{stderr, stdin, stdout, Write};
+use std::path::Path;
 use std::str::FromStr;
 use structured_ui::{Notice, Presentation};
 
 const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
 const CONFIG_BASE_URLS: &'static str = "pbms.base_urls";
+const PRODUCT_BUNDLE_INDEX_KEY: &str = "product.index";
 
 lazy_static! {
     static ref BRANCH_TO_PREFIX_MAPPING: HashMap<&'static str, &'static str> = hashmap! {
@@ -53,11 +56,13 @@ type ProductManifest = Vec<ProductBundle>;
 pub struct ProductListTool {
     #[command]
     pub cmd: ListCommand,
+
+    pub context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(ProductListTool);
 
-/// This plugin will get the info of repository inside product bundle.
+/// This plugin will get list the available product bundles.
 #[async_trait::async_trait(?Send)]
 impl FfxMain for ProductListTool {
     type Writer = MachineWriter<Vec<ProductBundle>>;
@@ -72,9 +77,15 @@ impl FfxMain for ProductListTool {
         let mut err_out = stderr();
         let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
 
-        let pbs =
-            pb_list_impl(&self.cmd.auth, self.cmd.base_url, self.cmd.version, self.cmd.branch, &ui)
-                .await?;
+        let pbs = pb_list_impl(
+            &self.cmd.auth,
+            self.cmd.base_url,
+            self.cmd.version,
+            self.cmd.branch,
+            &ui,
+            &self.context,
+        )
+        .await?;
         if writer.is_machine() {
             writer.machine(&pbs)?;
         } else {
@@ -93,55 +104,47 @@ pub async fn resolve_branch_to_base_urls<I>(
     auth: &AuthFlowChoice,
     ui: &I,
     client: &Client,
+    context: &EnvironmentContext,
 ) -> fho::Result<Vec<String>>
 where
     I: structured_ui::Interface,
 {
-    let base_urls = ffx_config::get::<Vec<String>, _>(CONFIG_BASE_URLS)
-        .context("get config CONFIG_BASE_URLS")?;
-
-    // If branch is not provided, use version to build base_urls
-    if branch.is_none() {
-        let version = match version {
-            Some(version) => version,
-            None => {
-                let sdk = ffx_config::global_env_context()
-                    .context("loading global environment context")?
-                    .get_sdk()
-                    .await
-                    .context("getting sdk env context")?;
-                match sdk.get_version() {
-                    SdkVersion::Version(version) => version.to_string(),
-                    SdkVersion::InTree => {
-                        return_user_error!(
-                            "Using in-tree sdk. Please specify the version through '--version'"
-                        )
-                    }
-                    SdkVersion::Unknown => {
-                        return_user_error!(
-                            "Unable to determine SDK version. Please specify the version through '--version'")
-                    }
+    let prefix = match (branch, version) {
+        (Some(_), Some(_)) => {
+            return_user_error!("Cannot provide version and branch at the same time")
+        }
+        (None, Some(version)) => version,
+        (Some(branch), None) => match BRANCH_TO_PREFIX_MAPPING.get(branch.as_str()) {
+            Some(version) => version.to_string(),
+            None => return_user_error!("Branch value is not supported!"),
+        },
+        (None, None) => {
+            let sdk = context.get_sdk().await.context("getting sdk env context")?;
+            match sdk.get_version() {
+                // For version of SDK, we trim the version to date section.
+                // e.g. if the version is 24.20241023.2.1, we will trim it
+                // into 24.20241023. This is because the product version
+                // does not always align with the sdk version.
+                SdkVersion::Version(version) => version[..11].to_string(),
+                SdkVersion::InTree => {
+                    return_user_error!(
+                        "Using in-tree sdk. Please specify the version through '--version'"
+                    )
+                }
+                SdkVersion::Unknown => {
+                    return_user_error!(
+                        "Unable to determine SDK version. Please specify the version through '--version'")
                 }
             }
-        };
-        return Ok(base_urls.iter().map(|x| format!("{}/{}", x, version)).collect::<Vec<_>>());
-    }
+        }
+    };
+    let prefix = format!("development/{}", &prefix);
 
-    // If branch is not none, resolve it to latest available version.
-
-    // Error out if both version and branch are provided.
-    if version.is_some() {
-        return_user_error!("Cannot provide version and branch at the same time");
-    }
-
-    let branch = branch.unwrap();
     let mut result = Vec::new();
+    let base_urls: Vec<String> =
+        context.get(CONFIG_BASE_URLS).context("get config CONFIG_BASE_URLS")?;
     for base_url in base_urls {
         let (bucket, _) = split_gs_url(&base_url).context("Splitting gs URL.")?;
-        let prefix = format!(
-            "development/{}",
-            BRANCH_TO_PREFIX_MAPPING.get(branch.as_str()).expect("Branch value is not supported!")
-        );
         let version = get_latest_version(bucket, &prefix, auth, ui, &client).await?;
         result.push(format!("{}/{}", base_url, version));
     }
@@ -183,17 +186,32 @@ pub async fn pb_list_impl<I>(
     version: Option<String>,
     branch: Option<String>,
     ui: &I,
+    context: &EnvironmentContext,
 ) -> Result<Vec<ProductBundle>>
 where
     I: structured_ui::Interface,
 {
+    let mut products = Vec::new();
+    // If the product.index is specified, we will use local product_bundles.json
+    let index: String = context.get(PRODUCT_BUNDLE_INDEX_KEY)?;
+    if Path::new(&index).is_file() {
+        let pm = std::fs::read_to_string(index)?;
+        let prods = serde_json::from_str::<ProductManifest>(&pm)
+            .map_err(|e| bug!("Parsing json {:?}: {e}", pm))?;
+        products.extend(prods);
+
+        // If version is not explicitly passed in, directly return
+        if version.is_none() && branch.is_none() {
+            return Ok(products);
+        }
+    }
+
     let client = Client::initial()?;
 
-    let mut products = Vec::new();
     let base_urls = if let Some(base_url) = override_base_url {
         vec![base_url]
     } else {
-        resolve_branch_to_base_urls(version, branch, auth, ui, &client).await?
+        resolve_branch_to_base_urls(version, branch, auth, ui, &client, &context).await?
     };
 
     for base_url in &base_urls {
@@ -205,6 +223,9 @@ where
         });
         products.extend(prods);
     }
+    products.dedup_by_key(|i| i.name.clone());
+    products.sort_by_key(|i| i.product_version.clone());
+    products.reverse();
     Ok(products)
 }
 
@@ -251,14 +272,29 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_config::{ConfigLevel, TestEnv};
     use fho::{Format, TestBuffers};
-    use temp_test_env::TempTestEnv;
+    use std::fs::File;
+    use std::path::Path;
+
+    async fn setup_test_env(path: &Path) -> TestEnv {
+        let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query(PRODUCT_BUNDLE_INDEX_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(path.to_str().unwrap().into())
+            .await
+            .unwrap();
+
+        env
+    }
 
     #[fuchsia::test]
     async fn test_pb_list_impl() {
-        let test_env = TempTestEnv::new().expect("test_env");
-        let mut f =
-            std::fs::File::create(test_env.home.join(PB_MANIFEST_NAME)).expect("file create");
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(PB_MANIFEST_NAME);
+        let env = setup_test_env(&path).await;
+        let mut f = File::create(&path).expect("file create");
         f.write_all(
             r#"[{
             "name": "fake_name",
@@ -272,10 +308,11 @@ mod test {
         let ui = structured_ui::MockUi::new();
         let pbs = pb_list_impl(
             &AuthFlowChoice::Default,
-            Some(format!("file:{}", test_env.home.display())),
-            Some(String::from("fake_version")),
+            Some(format!("file:{}", tmp.path().display())),
+            None,
             None,
             &ui,
+            &env.context,
         )
         .await
         .expect("testing list");
@@ -291,9 +328,10 @@ mod test {
 
     #[fuchsia::test]
     async fn test_pb_list_impl_machine_code() {
-        let test_env = TempTestEnv::new().expect("test_env");
-        let mut f =
-            std::fs::File::create(test_env.home.join(PB_MANIFEST_NAME)).expect("file create");
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(PB_MANIFEST_NAME);
+        let env = setup_test_env(&path).await;
+        let mut f = File::create(&path).expect("file create");
         f.write_all(
             r#"[{
             "name": "fake_name",
@@ -309,10 +347,53 @@ mod test {
         let tool = ProductListTool {
             cmd: ListCommand {
                 auth: AuthFlowChoice::Default,
-                base_url: Some(format!("file:{}", test_env.home.display())),
+                base_url: Some(format!("file:{}", tmp.path().display())),
+                version: None,
+                branch: None,
+            },
+            context: env.context.clone(),
+        };
+
+        tool.main(writer).await.expect("testing list");
+
+        let pbs: Vec<ProductBundle> = serde_json::from_str(&buffers.into_stdout_str()).unwrap();
+        assert_eq!(
+            vec![ProductBundle {
+                name: String::from("fake_name"),
+                product_version: String::from("fake_version"),
+                transfer_manifest_url: String::from("fake_url")
+            }],
+            pbs
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_pb_list_impl_machine_code_ignore_unknown_fields() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(PB_MANIFEST_NAME);
+        let env = setup_test_env(&path).await;
+        let mut f = File::create(&path).expect("file create");
+        f.write_all(
+            r#"[{
+            "name": "fake_name",
+            "product_version": "fake_version",
+            "transfer_manifest_url": "fake_url",
+            "transfer_manifest_path": "not_used_path"
+            }]"#
+            .as_bytes(),
+        )
+        .expect("write_all");
+
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::new_test(Some(Format::Json), &buffers);
+        let tool = ProductListTool {
+            cmd: ListCommand {
+                auth: AuthFlowChoice::Default,
+                base_url: Some(format!("file:{}", tmp.path().display())),
                 version: Some("fake_version".into()),
                 branch: None,
             },
+            context: env.context.clone(),
         };
 
         tool.main(writer).await.expect("testing list");

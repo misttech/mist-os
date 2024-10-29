@@ -12,7 +12,7 @@ use assert_matches::assert_matches;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_settings::{KeyboardMarker, KeyboardProxy};
 use settings_storage::device_storage::DeviceStorage;
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::Status;
 
 const ENV_NAME: &str = "settings_service_keyboard_test_environment";
@@ -21,7 +21,7 @@ const ENV_NAME: &str = "settings_service_keyboard_test_environment";
 async fn create_keyboard_test_env_with_failures() -> KeyboardProxy {
     let storage_factory = InMemoryStorageFactory::new();
     create_test_env_with_failures(
-        Arc::new(storage_factory),
+        Rc::new(storage_factory),
         ENV_NAME,
         Interface::Keyboard,
         SettingType::Keyboard,
@@ -33,9 +33,9 @@ async fn create_keyboard_test_env_with_failures() -> KeyboardProxy {
 
 /// Creates an environment for keyboard.
 async fn create_test_keyboard_env(
-    storage_factory: Arc<InMemoryStorageFactory>,
-) -> (KeyboardProxy, Arc<DeviceStorage>) {
-    let env = EnvironmentBuilder::new(Arc::clone(&storage_factory))
+    storage_factory: Rc<InMemoryStorageFactory>,
+) -> (KeyboardProxy, Rc<DeviceStorage>) {
+    let env = EnvironmentBuilder::new(Rc::clone(&storage_factory))
         .fidl_interfaces(&[Interface::Keyboard])
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
@@ -56,7 +56,7 @@ async fn test_keyboard_storage() {
     let factory = InMemoryStorageFactory::new();
 
     // Create and fetch a store from device storage so we can read stored value for testing.
-    let (keyboard_service, store) = create_test_keyboard_env(Arc::new(factory)).await;
+    let (keyboard_service, store) = create_test_keyboard_env(Rc::new(factory)).await;
 
     // Set a new value.
     let keyboard_settings = fidl_fuchsia_settings::KeyboardSettings {

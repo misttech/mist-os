@@ -667,10 +667,9 @@ zx_status_t brcmf_cfg80211_add_iface(brcmf_pub* drvr, const char* name, struct v
         err = brcmf_bus_get_bootloader_macaddr(drvr->bus_if, client_mac_addr.byte);
         if (err != ZX_OK || client_mac_addr.IsZero() || client_mac_addr.IsBcast()) {
           if (err != ZX_OK) {
-            BRCMF_ERR("Failed to get valid mac address from bootloader: %s",
-                      zx_status_get_string(err));
+            BRCMF_WARN("Failed to get mac address from bootloader: %s", zx_status_get_string(err));
           } else {
-            BRCMF_ERR("Failed to get valid mac address from bootloader.");
+            BRCMF_WARN("Failed to get valid mac address from bootloader.");
 #if !defined(NDEBUG)
             BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(client_mac_addr.byte));
 #endif /* !defined(NDEBUG) */
@@ -680,7 +679,7 @@ zx_status_t brcmf_cfg80211_add_iface(brcmf_pub* drvr, const char* name, struct v
             BRCMF_ERR("Failed to generate random MAC address.");
             return err;
           }
-          BRCMF_ERR("Falling back to random mac address");
+          BRCMF_INFO("Falling back to random mac address");
 #if !defined(NDEBUG)
           BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC, FMT_MAC_ARGS(client_mac_addr.byte));
 #endif /* !defined(NDEBUG) */

@@ -7,8 +7,8 @@
 
 #include <utility>
 
-#include "src/storage/f2fs/bcache.h"
-#include "src/storage/f2fs/f2fs_layout.h"
+#include "src/storage/f2fs/common.h"
+#include "src/storage/f2fs/layout.h"
 
 namespace f2fs {
 
@@ -26,6 +26,8 @@ struct MkfsOptions {
   uint32_t secs_per_zone = 1;
   std::vector<std::string> extension_list;
 };
+
+class BcacheMapper;
 
 class MkfsWorker {
  public:

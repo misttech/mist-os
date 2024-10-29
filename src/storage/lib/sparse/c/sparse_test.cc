@@ -4,13 +4,13 @@
 
 #include "src/storage/lib/sparse/c/sparse.h"
 
-#include <lib/stdcompat/span.h>
 #include <sparse_format.h>
 
 #include <algorithm>
 #include <array>
 #include <numeric>
 #include <optional>
+#include <span>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -68,7 +68,7 @@ void AddBytes(std::vector<uint8_t> &vec, const T &data) {
 }
 
 template <size_t FileHeaderSize, size_t ChunkHeaderSize>
-std::vector<uint8_t> MakeSparseImage(cpp20::span<const SparseDataDescriptor> descriptors) {
+std::vector<uint8_t> MakeSparseImage(std::span<const SparseDataDescriptor> descriptors) {
   static_assert(FileHeaderSize >= sizeof(sparse_header_t));
   static_assert(ChunkHeaderSize >= sizeof(chunk_header_t));
 
@@ -123,7 +123,7 @@ std::vector<uint8_t> MakeSparseImage(cpp20::span<const SparseDataDescriptor> des
   return data;
 }
 
-std::vector<uint8_t> GenerateExpectedData(cpp20::span<const SparseDataDescriptor> descriptors,
+std::vector<uint8_t> GenerateExpectedData(std::span<const SparseDataDescriptor> descriptors,
                                           uint32_t base_fill) {
   std::vector<uint8_t> data;
   for (const auto &chunk : descriptors) {

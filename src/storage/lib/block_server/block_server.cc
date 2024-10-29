@@ -28,7 +28,7 @@ BlockServer::BlockServer(const PartitionInfo& info, Interface* interface)
                      uintptr_t request_count) {
                     reinterpret_cast<BlockServer*>(context)->interface_->OnRequests(
                         reinterpret_cast<Session&>(session),
-                        cpp20::span<const Request>(requests, request_count));
+                        std::span<const Request>(requests, request_count));
                   },
           })) {}
 

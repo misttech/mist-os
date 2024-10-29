@@ -297,37 +297,6 @@
         "name": "fuchsia.wlan.common/RateSelectionOffloadExtension"
     },
     {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/RequestStatus.ACKNOWLEDGED",
-        "value": "0"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/RequestStatus.REJECTED_ALREADY_IN_USE",
-        "value": "3"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/RequestStatus.REJECTED_DUPLICATE_REQUEST",
-        "value": "4"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/RequestStatus.REJECTED_INCOMPATIBLE_MODE",
-        "value": "2"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.wlan.common/RequestStatus.REJECTED_NOT_SUPPORTED",
-        "value": "1"
-    },
-    {
-        "kind": "enum",
-        "name": "fuchsia.wlan.common/RequestStatus",
-        "strictness": "strict",
-        "type": "uint32"
-    },
-    {
         "kind": "struct/member",
         "name": "fuchsia.wlan.common/SaeFeature.driver_handler_supported",
         "ordinal": "1",

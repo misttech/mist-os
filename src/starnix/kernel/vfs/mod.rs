@@ -75,7 +75,7 @@ pub use xattr::*;
 use crate::device::binder::BinderDriver;
 use crate::task::CurrentTask;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
-use starnix_uapi::ownership::{Releasable, ReleaseGuard};
+use starnix_types::ownership::{Releasable, ReleaseGuard};
 use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::sync::Arc;

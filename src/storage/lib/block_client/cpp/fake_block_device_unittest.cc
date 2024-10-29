@@ -573,9 +573,9 @@ TEST(FakeFVMBlockDeviceTest, QuerySlices) {
 
 void CheckAllocatedSlices(BlockDevice* device, const uint64_t* starts, const uint64_t* lengths,
                           size_t slices_count) {
-  fuchsia_hardware_block_volume::wire::VsliceRange ranges[slices_count];
+  auto ranges = std::make_unique<fuchsia_hardware_block_volume::wire::VsliceRange[]>(slices_count);
   size_t actual_ranges = 0;
-  ASSERT_EQ(ZX_OK, device->VolumeQuerySlices(starts, slices_count, ranges, &actual_ranges));
+  ASSERT_EQ(ZX_OK, device->VolumeQuerySlices(starts, slices_count, ranges.get(), &actual_ranges));
   ASSERT_EQ(slices_count, actual_ranges);
   for (size_t i = 0; i < slices_count; i++) {
     EXPECT_TRUE(ranges[i].allocated);

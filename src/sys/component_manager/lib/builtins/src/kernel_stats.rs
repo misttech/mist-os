@@ -38,6 +38,18 @@ impl KernelStats {
                         mmu_overhead_bytes: Some(mem_stats.mmu_overhead_bytes),
                         ipc_bytes: Some(mem_stats.ipc_bytes),
                         other_bytes: Some(mem_stats.other_bytes),
+                        free_loaned_bytes: Some(mem_stats.free_loaned_bytes),
+                        cache_bytes: Some(mem_stats.cache_bytes),
+                        slab_bytes: Some(mem_stats.slab_bytes),
+                        zram_bytes: Some(mem_stats.zram_bytes),
+                        vmo_reclaim_total_bytes: Some(mem_stats.vmo_reclaim_total_bytes),
+                        vmo_reclaim_newest_bytes: Some(mem_stats.vmo_reclaim_newest_bytes),
+                        vmo_reclaim_oldest_bytes: Some(mem_stats.vmo_reclaim_oldest_bytes),
+                        vmo_reclaim_disabled_bytes: Some(mem_stats.vmo_reclaim_disabled_bytes),
+                        vmo_discardable_locked_bytes: Some(mem_stats.vmo_discardable_locked_bytes),
+                        vmo_discardable_unlocked_bytes: Some(
+                            mem_stats.vmo_discardable_unlocked_bytes,
+                        ),
                         ..Default::default()
                     };
                     responder.send(&stats)?;
@@ -227,7 +239,7 @@ mod tests {
 
         assert!(mem_stats.total_bytes.unwrap() > 0);
         assert!(mem_stats.total_heap_bytes.unwrap() > 0);
-
+        assert!(mem_stats.slab_bytes.unwrap() > 0);
         Ok(())
     }
 

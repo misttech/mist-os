@@ -217,6 +217,10 @@
                     // dash shells. It uses PackageResolver to add tool package directories
                     // into the dash environment.
                     "/core/debug-dash-launcher",
+
+                    // process is used in engineering builds to launch
+                    // shell binaries. It uses PackageResolver to resolve tools from packages.
+                    "/core/process_resolver",
                 ],
             },
             {

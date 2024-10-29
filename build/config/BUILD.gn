@@ -944,6 +944,7 @@ config("Wno-vla-cxx-extension") {
     "//tools/fidl/fidlc:*",
     "//vendor/arm/camera/driver/fuchsia/wrappers:*",
     "//vendor/google/starnix/android:*",
+    "//vendor/google/starnix/tests/*",
     "//zircon/system/ulib/runtests-utils:*",
     "//zircon/system/ulib/test-utils:*",
     "//zircon/system/ulib/zxtest:*",

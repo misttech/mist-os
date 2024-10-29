@@ -413,7 +413,7 @@ impl FileGenerator {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 pub(crate) trait Migration {
     fn id(&self) -> u64;
     async fn migrate(&self, file_generator: FileGenerator) -> Result<(), MigrationError>;
@@ -429,16 +429,16 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl_fuchsia_io::DirectoryMarker;
-    use futures::future::BoxFuture;
+    use futures::future::LocalBoxFuture;
     use futures::FutureExt;
+    use std::rc::Rc;
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Arc;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl<T> Migration for (u64, T)
     where
-        T: Fn(FileGenerator) -> BoxFuture<'static, Result<(), MigrationError>> + Send + Sync,
+        T: Fn(FileGenerator) -> LocalBoxFuture<'static, Result<(), MigrationError>>,
     {
         fn id(&self) -> u64 {
             self.0
@@ -457,10 +457,10 @@ mod tests {
     fn cannot_register_same_id_twice() {
         let mut builder = MigrationManagerBuilder::new();
         builder
-            .register((ID, Box::new(|_| async move { Ok(()) }.boxed())))
+            .register((ID, Box::new(|_| async move { Ok(()) }.boxed_local())))
             .expect("should register once");
         let result = builder
-            .register((ID, Box::new(|_| async move { Ok(()) }.boxed())))
+            .register((ID, Box::new(|_| async move { Ok(()) }.boxed_local())))
             .map_err(|e| format!("{e:}"));
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "migration with id 20220130120000 already registered");
@@ -496,20 +496,20 @@ mod tests {
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
-        let migration_ran = Arc::new(AtomicBool::new(false));
+        let migration_ran = Rc::new(AtomicBool::new(false));
 
         builder
             .register((
                 ID,
                 Box::new({
-                    let migration_ran = Arc::clone(&migration_ran);
+                    let migration_ran = Rc::clone(&migration_ran);
                     move |_| {
-                        let migration_ran = Arc::clone(&migration_ran);
+                        let migration_ran = Rc::clone(&migration_ran);
                         async move {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -542,20 +542,20 @@ mod tests {
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
-        let migration_ran = Arc::new(AtomicBool::new(false));
+        let migration_ran = Rc::new(AtomicBool::new(false));
 
         builder
             .register((
                 ID,
                 Box::new({
-                    let migration_ran = Arc::clone(&migration_ran);
+                    let migration_ran = Rc::clone(&migration_ran);
                     move |_| {
-                        let migration_ran = Arc::clone(&migration_ran);
+                        let migration_ran = Rc::clone(&migration_ran);
                         async move {
                             migration_ran.store(true, Ordering::SeqCst);
                             Err(MigrationError::NoData)
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -609,21 +609,21 @@ mod tests {
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
-        let migration_1_ran = Arc::new(AtomicBool::new(false));
-        let migration_2_ran = Arc::new(AtomicBool::new(false));
+        let migration_1_ran = Rc::new(AtomicBool::new(false));
+        let migration_2_ran = Rc::new(AtomicBool::new(false));
 
         builder
             .register((
                 ID,
                 Box::new({
-                    let migration_ran = Arc::clone(&migration_1_ran);
+                    let migration_ran = Rc::clone(&migration_1_ran);
                     move |_| {
-                        let migration_ran = Arc::clone(&migration_ran);
+                        let migration_ran = Rc::clone(&migration_ran);
                         async move {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -633,14 +633,14 @@ mod tests {
             .register((
                 ID2,
                 Box::new({
-                    let migration_ran = Arc::clone(&migration_2_ran);
+                    let migration_ran = Rc::clone(&migration_2_ran);
                     move |_| {
-                        let migration_ran = Arc::clone(&migration_ran);
+                        let migration_ran = Rc::clone(&migration_ran);
                         async move {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -665,20 +665,20 @@ mod tests {
         std::fs::write(tempdir.path().join(DATA_FILE_NAME), "").expect("failed to write data file");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
-        let migration_ran = Arc::new(AtomicBool::new(false));
+        let migration_ran = Rc::new(AtomicBool::new(false));
 
         builder
             .register((
                 ID,
                 Box::new({
-                    let migration_ran = Arc::clone(&migration_ran);
+                    let migration_ran = Rc::clone(&migration_ran);
                     move |_| {
-                        let migration_ran = Arc::clone(&migration_ran);
+                        let migration_ran = Rc::clone(&migration_ran);
                         async move {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -701,38 +701,38 @@ mod tests {
             .expect("failed to write migration file");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
-        let initial_migration_ran = Arc::new(AtomicBool::new(false));
+        let initial_migration_ran = Rc::new(AtomicBool::new(false));
 
         builder
             .register((
                 ID,
                 Box::new({
-                    let initial_migration_ran = Arc::clone(&initial_migration_ran);
+                    let initial_migration_ran = Rc::clone(&initial_migration_ran);
                     move |_| {
-                        let initial_migration_ran = Arc::clone(&initial_migration_ran);
+                        let initial_migration_ran = Rc::clone(&initial_migration_ran);
                         async move {
                             initial_migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
             .expect("can register");
 
-        let second_migration_ran = Arc::new(AtomicBool::new(false));
+        let second_migration_ran = Rc::new(AtomicBool::new(false));
         builder
             .register((
                 ID2,
                 Box::new({
-                    let second_migration_ran = Arc::clone(&second_migration_ran);
+                    let second_migration_ran = Rc::clone(&second_migration_ran);
                     move |_| {
-                        let second_migration_ran = Arc::clone(&second_migration_ran);
+                        let second_migration_ran = Rc::clone(&second_migration_ran);
                         async move {
                             second_migration_ran.store(true, Ordering::SeqCst);
                             Err(MigrationError::NoData)
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -759,20 +759,20 @@ mod tests {
         std::fs::write(tempdir.path().join(DATA_FILE_NAME), "").expect("failed to write data file");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
-        let migration_ran = Arc::new(AtomicBool::new(false));
+        let migration_ran = Rc::new(AtomicBool::new(false));
 
         builder
             .register((
                 ID,
                 Box::new({
-                    let migration_ran = Arc::clone(&migration_ran);
+                    let migration_ran = Rc::clone(&migration_ran);
                     move |_| {
-                        let migration_ran = Arc::clone(&migration_ran);
+                        let migration_ran = Rc::clone(&migration_ran);
                         async move {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -783,9 +783,9 @@ mod tests {
             .register((
                 ID2,
                 Box::new({
-                    let migration_ran = Arc::clone(&migration_ran);
+                    let migration_ran = Rc::clone(&migration_ran);
                     move |file_generator: FileGenerator| {
-                        let migration_ran = Arc::clone(&migration_ran);
+                        let migration_ran = Rc::clone(&migration_ran);
                         async move {
                             migration_ran.store(true, Ordering::SeqCst);
                             let file = file_generator.new_file("test").await.expect("can get file");
@@ -794,7 +794,7 @@ mod tests {
                                 .expect("can wite file");
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))
@@ -843,20 +843,20 @@ mod tests {
         std::fs::write(tempdir.path().join(DATA_FILE_NAME), "").expect("failed to write data file");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
-        let migration_ran = Arc::new(AtomicBool::new(false));
+        let migration_ran = Rc::new(AtomicBool::new(false));
 
         builder
             .register((
                 ID,
                 Box::new({
-                    let migration_ran = Arc::clone(&migration_ran);
+                    let migration_ran = Rc::clone(&migration_ran);
                     move |_| {
-                        let migration_ran = Arc::clone(&migration_ran);
+                        let migration_ran = Rc::clone(&migration_ran);
                         async move {
                             migration_ran.store(true, Ordering::SeqCst);
                             Ok(())
                         }
-                        .boxed()
+                        .boxed_local()
                     }
                 }),
             ))

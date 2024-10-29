@@ -82,8 +82,6 @@ static_library("minfs") {
     "//zircon/third_party/ulib/safemath",
   ]
 
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
   if (is_fuchsia) {
     sources += [
       "allocator/allocator.cc",

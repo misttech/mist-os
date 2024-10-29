@@ -5,7 +5,6 @@
 #include <assert.h>
 #include <getopt.h>
 #include <inttypes.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -13,6 +12,7 @@
 #include <unistd.h>
 #include <zircon/errors.h>
 
+#include <span>
 #include <string>
 #include <vector>
 
@@ -62,7 +62,7 @@ bool FakeFtl::OnVolumeAdded(uint32_t unused_page_size, uint32_t num_pages) {
 
 enum BlockStatus { kOk, kBadBlock, kReadFailure };
 
-BlockStatus block_status(cpp20::span<uint8_t> data) {
+BlockStatus block_status(std::span<uint8_t> data) {
   if (!memcmp(data.data(), "BADBLOCK", 8)) {
     return BlockStatus::kBadBlock;
   }
@@ -110,7 +110,7 @@ zx::result<std::unique_ptr<NdmRamDriver>> LoadData(const ftl::VolumeOptions& opt
       spare_offset += options.eb_size / 2;
     }
 
-    auto status = block_status(cpp20::span(data_buf.get(), 8));
+    auto status = block_status(std::span(data_buf.get(), 8));
     switch (status) {
       case BlockStatus::kOk: {
         ndm->NandWrite(page_count, 1, data_buf.get(), spare_buf.get());

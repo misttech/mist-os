@@ -325,10 +325,10 @@ impl Registry {
         let component = component_decls_guard
             .get(&parsed_url)
             .ok_or(fresolution::ResolverError::ManifestNotFound)?;
-        let manifest_file = fuchsia_fs::directory::open_file_no_describe_deprecated(
+        let manifest_file = fuchsia_fs::directory::open_file_async(
             &component.package_dir,
             &fragment,
-            fio::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
         let component_decl: fcdecl::Component =

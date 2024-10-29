@@ -73,13 +73,18 @@ std::unique_ptr<Screenshot> LoadPngScreenshot() {
 
 void DataProvider::GetAnnotations(fuchsia::feedback::GetAnnotationsParameters params,
                                   GetAnnotationsCallback callback) {
-  callback(std::move(Annotations().set_annotations(CreateAnnotations())));
+  // TODO(https://fxbug.dev/374183399): Remove call to set_annotations.
+  callback(std::move(
+      Annotations().set_annotations(CreateAnnotations()).set_annotations2(CreateAnnotations())));
 }
 
 void DataProvider::GetSnapshot(fuchsia::feedback::GetSnapshotParameters parms,
                                GetSnapshotCallback callback) {
-  callback(
-      std::move(Snapshot().set_annotations(CreateAnnotations()).set_archive(CreateSnapshot())));
+  // TODO(https://fxbug.dev/374183399): Remove call to set_annotations.
+  callback(std::move(Snapshot()
+                         .set_annotations(CreateAnnotations())
+                         .set_annotations2(CreateAnnotations())
+                         .set_archive(CreateSnapshot())));
 }
 
 void DataProvider::GetScreenshot(ImageEncoding encoding, GetScreenshotCallback callback) {

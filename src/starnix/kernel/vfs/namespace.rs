@@ -22,6 +22,7 @@ use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex,
     RwLock, Unlocked,
 };
+use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
 use starnix_uapi::auth::UserAndOrGroupId;
 use starnix_uapi::device_type::DeviceType;
@@ -30,7 +31,6 @@ use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::vfs::{FdEvents, ResolveFlags};
 use starnix_uapi::{errno, error, NAME_MAX};
@@ -1035,6 +1035,7 @@ impl NamespaceNode {
         L: LockBefore<DeviceOpen>,
     {
         FileObject::new(
+            current_task,
             self.entry.node.open(locked, current_task, &self.mount, flags, access_check)?,
             self.clone(),
             flags,

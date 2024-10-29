@@ -10,7 +10,13 @@
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #include <lib/zx/socket.h>
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD) && __cplusplus >= 202002L
+#include <format>
+#include <source_location>
+#endif
 #include <span>
+
+#include "lib/syslog/structured_backend/fuchsia_syslog.h"
 
 #define FDF_LOGL(severity, logger, msg...) \
   (logger).logf((FUCHSIA_LOG_##severity), nullptr, __FILE__, __LINE__, msg)
@@ -18,6 +24,15 @@
 #define FDF_LOG(severity, msg...) FDF_LOGL(severity, *fdf::Logger::GlobalInstance(), msg)
 
 namespace fdf {
+
+enum LogSeverity : uint8_t {
+  TRACE = FUCHSIA_LOG_TRACE,
+  DEBUG = FUCHSIA_LOG_DEBUG,
+  INFO = FUCHSIA_LOG_INFO,
+  WARN = FUCHSIA_LOG_WARNING,
+  ERROR = FUCHSIA_LOG_ERROR,
+  FATAL = FUCHSIA_LOG_FATAL,
+};
 
 // Provides a driver's logger.
 class Logger final {
@@ -72,6 +87,38 @@ class Logger final {
   void logvf(FuchsiaLogSeverity severity, cpp20::span<std::string> tags, const char* file, int line,
              const char* msg, va_list args);
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD) && __cplusplus >= 202002L
+  struct SeverityAndSourceLocation {
+    FuchsiaLogSeverity severity;
+    std::source_location loc;
+
+    consteval SeverityAndSourceLocation(
+        LogSeverity severity, const std::source_location& loc = std::source_location::current())
+        : severity(severity), loc(loc) {}
+  };
+
+  template <typename... Args>
+  void log(SeverityAndSourceLocation sasl, std::format_string<Args...> fmt, Args&&... args) {
+    log(nullptr, sasl.severity, sasl.loc.file_name(), sasl.loc.line(), fmt,
+        std::forward<Args>(args)...);
+  }
+
+  template <typename... Args>
+  void log(FuchsiaLogSeverity severity, const std::source_location& loc,
+           std::format_string<Args...> fmt, Args&&... args) {
+    log(nullptr, severity, loc.file_name(), loc.line(), fmt, std::forward<Args>(args)...);
+  }
+
+  template <typename... Args>
+  void log(const char* tag, FuchsiaLogSeverity severity, const char* file, int line,
+           std::format_string<Args...> fmt, Args&&... args) {
+    vlog(severity, tag, file, line, fmt.get(), std::make_format_args(args...));
+  }
+
+  void vlog(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
+            std::string_view fmt, std::format_args args);
+#endif
+
   // Begins a structured logging record. You probably don't want to call
   // this directly.
   void BeginRecord(fuchsia_syslog::LogBuffer& buffer, FuchsiaLogSeverity severity,
@@ -113,6 +160,75 @@ class Logger final {
   // Used to learn about changes in severity.
   fidl::WireClient<fuchsia_logger::LogSink> log_sink_;
 };
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD) && __cplusplus >= 202002L
+// Use template type deduction to allow us to get source location while using variadic templates.
+template <typename... Args>
+struct trace {
+  trace(std::format_string<Args...> fmt, Args&&... args,
+        const std::source_location& loc = std::source_location::current()) {
+    fdf::Logger::GlobalInstance()->log(FUCHSIA_LOG_TRACE, loc, fmt, std::forward<Args>(args)...);
+  }
+};
+
+template <typename... Args>
+trace(std::format_string<Args...>, Args&&...) -> trace<Args...>;
+
+template <typename... Args>
+struct debug {
+  debug(std::format_string<Args...> fmt, Args&&... args,
+        const std::source_location& loc = std::source_location::current()) {
+    fdf::Logger::GlobalInstance()->log(FUCHSIA_LOG_DEBUG, loc, fmt, std::forward<Args>(args)...);
+  }
+};
+
+template <typename... Args>
+debug(std::format_string<Args...>, Args&&...) -> debug<Args...>;
+
+template <typename... Args>
+struct info {
+  info(std::format_string<Args...> fmt, Args&&... args,
+       const std::source_location& loc = std::source_location::current()) {
+    fdf::Logger::GlobalInstance()->log(FUCHSIA_LOG_INFO, loc, fmt, std::forward<Args>(args)...);
+  }
+};
+
+template <typename... Args>
+info(std::format_string<Args...>, Args&&...) -> info<Args...>;
+
+template <typename... Args>
+struct warn {
+  warn(std::format_string<Args...> fmt, Args&&... args,
+       const std::source_location& loc = std::source_location::current()) {
+    fdf::Logger::GlobalInstance()->log(FUCHSIA_LOG_WARNING, loc, fmt, std::forward<Args>(args)...);
+  }
+};
+
+template <typename... Args>
+warn(std::format_string<Args...>, Args&&...) -> warn<Args...>;
+
+template <typename... Args>
+struct error {
+  error(std::format_string<Args...> fmt, Args&&... args,
+        const std::source_location& loc = std::source_location::current()) {
+    fdf::Logger::GlobalInstance()->log(FUCHSIA_LOG_ERROR, loc, fmt, std::forward<Args>(args)...);
+  }
+};
+
+template <typename... Args>
+error(std::format_string<Args...>, Args&&...) -> error<Args...>;
+
+template <typename... Args>
+struct fatal {
+  fatal(std::format_string<Args...> fmt, Args&&... args,
+        const std::source_location& loc = std::source_location::current()) {
+    fdf::Logger::GlobalInstance()->log(FUCHSIA_LOG_ERROR, loc, fmt, std::forward<Args>(args)...);
+  }
+};
+
+template <typename... Args>
+fatal(std::format_string<Args...>, Args&&...) -> fatal<Args...>;
+#endif
 
 }  // namespace fdf
 

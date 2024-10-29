@@ -6,6 +6,8 @@
 
 #include <lib/sysconfig/sync-client.h>
 
+#include <span>
+
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/partition-client.h"
@@ -41,7 +43,7 @@ class AstroPartitioner : public DevicePartitioner {
   zx::result<> WipePartitionTables() const override;
 
   zx::result<> ValidatePayload(const PartitionSpec& spec,
-                               cpp20::span<const uint8_t> data) const override;
+                               std::span<const uint8_t> data) const override;
 
   zx::result<> Flush() const override;
 

@@ -52,6 +52,11 @@ closed protocol ClientController {
     /// The returned status represents acknowledgement of the request.  The
     /// ClientListener protocol should be monitored to learn when client functionality
     /// has been enabled.
+    @available(added=NEXT)
+    strict StartClientConnections() -> (struct {
+        status RequestStatus;
+    });
+    @available(replaced=NEXT)
     strict StartClientConnections() -> (struct {
         status fuchsia.wlan.common.RequestStatus;
     });
@@ -61,6 +66,11 @@ closed protocol ClientController {
     /// The returned status represents acknowledgements of the request.  The
     /// ClientListener protocol should be monitored to learn when client functionality
     /// has been disabled.
+    @available(added=NEXT)
+    strict StopClientConnections() -> (struct {
+        status RequestStatus;
+    });
+    @available(replaced=NEXT)
     strict StopClientConnections() -> (struct {
         status fuchsia.wlan.common.RequestStatus;
     });
@@ -104,6 +114,13 @@ closed protocol ClientController {
     /// to the connection status are disseminated via the ClientStateUpdates protocol.
     /// If the connect attempt fails, the service will fall back to default behavior
     /// with scanning and connecting via network selection.
+    @available(added=NEXT)
+    strict Connect(struct {
+        id NetworkIdentifier;
+    }) -> (struct {
+        status RequestStatus;
+    });
+    @available(replaced=NEXT)
     strict Connect(struct {
         id NetworkIdentifier;
     }) -> (struct {

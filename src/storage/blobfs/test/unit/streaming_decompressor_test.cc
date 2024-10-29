@@ -4,6 +4,8 @@
 
 #include <lib/fzl/owned-vmo-mapper.h>
 
+#include <span>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -62,11 +64,11 @@ class StreamingDecompressorTest : public ::testing::Test {
 
   const chunked_compression::SeekTable& seek_table() { return seek_table_; }
 
-  cpp20::span<const uint8_t> original_data() const {
+  std::span<const uint8_t> original_data() const {
     return {original_data_.get(), original_data_size_};
   }
 
-  cpp20::span<const uint8_t> compressed_data() const {
+  std::span<const uint8_t> compressed_data() const {
     ZX_ASSERT(seek_table_.SerializedHeaderSize() <= compressed_data_.size());
     return {compressed_data_.data(), seek_table_.CompressedSize()};
   }
@@ -88,7 +90,7 @@ TEST_F(StreamingDecompressorTest, WholeFile) {
   std::vector<uint8_t> decompressed_data(kTestDataSize);
   size_t decompressed_data_offset = 0;
 
-  auto callback = [&](cpp20::span<const uint8_t> data) -> zx::result<> {
+  auto callback = [&](std::span<const uint8_t> data) -> zx::result<> {
     ZX_ASSERT(decompressed_data_offset + data.size() <= decompressed_data.size());
     std::copy(data.begin(), data.end(), decompressed_data.data() + decompressed_data_offset);
     decompressed_data_offset += data.size();
@@ -112,7 +114,7 @@ TEST_F(StreamingDecompressorTest, Chunked) {
   std::vector<uint8_t> decompressed_data(kTestDataSize);
   size_t decompressed_data_offset = 0;
 
-  auto callback = [&](cpp20::span<const uint8_t> data) -> zx::result<> {
+  auto callback = [&](std::span<const uint8_t> data) -> zx::result<> {
     ZX_ASSERT(decompressed_data_offset + data.size() <= decompressed_data.size());
     std::copy(data.begin(), data.end(), decompressed_data.data() + decompressed_data_offset);
     decompressed_data_offset += data.size();
@@ -139,7 +141,7 @@ TEST_F(StreamingDecompressorTest, Chunked) {
 
 // Test that we get a failure if we try to add more data to the decompressor past the end.
 TEST_F(StreamingDecompressorTest, ExtraDataFails) {
-  auto callback = [&](cpp20::span<const uint8_t>) -> zx::result<> { return zx::ok(); };
+  auto callback = [&](std::span<const uint8_t>) -> zx::result<> { return zx::ok(); };
   zx::result streaming_decompressor = StreamingChunkedDecompressor::Create(
       DecompressorConnector(), seek_table(), std::move(callback));
   ASSERT_TRUE(streaming_decompressor.is_ok()) << streaming_decompressor.status_string();
@@ -157,7 +159,7 @@ TEST_F(StreamingDecompressorTest, ExtraDataFails) {
 
 // Test that we can't create a streaming decompressor with an invalid seek table.
 TEST_F(StreamingDecompressorTest, InvalidSeekTable) {
-  auto callback = [&](cpp20::span<const uint8_t>) -> zx::result<> { return zx::ok(); };
+  auto callback = [&](std::span<const uint8_t>) -> zx::result<> { return zx::ok(); };
   chunked_compression::SeekTable empty_seek_table{};
   zx::result streaming_decompressor = StreamingChunkedDecompressor::Create(
       DecompressorConnector(), empty_seek_table, std::move(callback));
@@ -168,7 +170,7 @@ TEST_F(StreamingDecompressorTest, InvalidSeekTable) {
 // Test that errors in the stream callback are propagated.
 TEST_F(StreamingDecompressorTest, StreamCallbackError) {
   constexpr zx_status_t kTestErrorCode = ZX_ERR_INTERNAL;
-  auto callback = [&](cpp20::span<const uint8_t>) -> zx::result<> {
+  auto callback = [&](std::span<const uint8_t>) -> zx::result<> {
     return zx::error(kTestErrorCode);
   };
   zx::result streaming_decompressor = StreamingChunkedDecompressor::Create(

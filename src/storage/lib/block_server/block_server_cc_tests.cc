@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 
+#include <span>
 #include <unordered_set>
 
 #include <gtest/gtest.h>
@@ -50,7 +51,7 @@ class TestInterface : public Interface {
     }).detach();
   }
 
-  void OnRequests(Session& session, cpp20::span<const Request> requests) override {
+  void OnRequests(Session& session, std::span<const Request> requests) override {
     for (const Request& request : requests) {
       switch (request.operation.tag) {
         case Operation::Tag::Read:
@@ -89,6 +90,7 @@ TEST(BlockServer, Basic) {
   TestInterface test_interface;
   BlockServer block_server(
       PartitionInfo{
+          .start_block = 0,
           .block_count = kBlocks,
           .block_size = kBlockSize,
           .type_guid = {1, 2, 3, 4},
@@ -144,6 +146,7 @@ TEST(BlockServer, Termination) {
   {
     BlockServer block_server(
         PartitionInfo{
+            .start_block = 0,
             .block_count = kBlocks,
             .block_size = kBlockSize,
             .type_guid = {1, 2, 3, 4},
@@ -173,6 +176,7 @@ TEST(BlockServer, AsyncTermination) {
 
   BlockServer block_server(
       PartitionInfo{
+          .start_block = 0,
           .block_count = kBlocks,
           .block_size = kBlockSize,
           .type_guid = {1, 2, 3, 4},
@@ -204,6 +208,7 @@ TEST(BlockServer, FullFifo) {
   TestInterface test_interface;
   BlockServer block_server(
       PartitionInfo{
+          .start_block = 0,
           .block_count = kBlocks,
           .block_size = kBlockSize,
           .type_guid = {1, 2, 3, 4},
@@ -271,6 +276,7 @@ TEST(BlockServer, Group) {
   TestInterface test_interface;
   BlockServer block_server(
       PartitionInfo{
+          .start_block = 0,
           .block_count = kBlocks,
           .block_size = kBlockSize,
           .type_guid = {1, 2, 3, 4},

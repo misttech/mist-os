@@ -52,8 +52,6 @@ if (current_toolchain == unknown_wasm32_toolchain) {
     configs += [ ":env" ]
 
     sources = lib_sources
-
-    configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   }
 }
 
@@ -63,7 +61,6 @@ rustc_test("example_lib_tests") {
   sources = lib_sources
 
   deps = [ "//src/lib/fuchsia" ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("wasm-example-unittests") {

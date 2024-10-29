@@ -21,13 +21,11 @@
 
 #include <concepts>
 #include <cstdint>
-#include <limits>
 #include <utility>
 
 #include <zxtest/zxtest.h>
 
 #include "../needs-next.h"
-#include "zxtest/base/test.h"
 
 NEEDS_NEXT_SYSCALL(zx_system_set_processor_power_domain);
 NEEDS_NEXT_SYSCALL(zx_system_set_processor_power_state);
@@ -254,7 +252,7 @@ TEST(SetPowerDomainTest, RegisterDomainWithNonEmptyMaskWithInvalidLevels) {
                 ZX_ERR_INVALID_ARGS);
 }
 
-TEST(SetPowerDomainTest, RegisterDomainWithNonEmptyMaskWithInvalidTransitions) {
+TEST(SetPowerDomainTest, RegisterDomainWithNonEmptyMaskWithEmptyTransitions) {
   NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
   zx::port p;
   ASSERT_OK(zx::port::create(0, &p));
@@ -262,9 +260,8 @@ TEST(SetPowerDomainTest, RegisterDomainWithNonEmptyMaskWithInvalidTransitions) {
   ASSERT_TRUE(rsrc->is_valid());
   auto [levels, transitions] = GetModel();
   auto domain = GetDomainWithDefaultCpus(123);
-  ASSERT_STATUS(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain, p.get(),
-                                                     levels.data(), levels.size(), nullptr, 0),
-                ZX_ERR_INVALID_ARGS);
+  ASSERT_OK(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain, p.get(), levels.data(),
+                                                 levels.size(), nullptr, 0));
 }
 
 TEST(SetPowerDomainTest, RegisterDomainWithNonEmptyMaskWithTooManyTransitions) {

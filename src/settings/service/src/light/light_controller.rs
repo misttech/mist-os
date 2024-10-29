@@ -22,7 +22,7 @@ use settings_storage::fidl_storage::{FidlStorage, FidlStorageConvertible};
 use settings_storage::storage_factory::{NoneT, StorageAccess};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Used as the argument field in a ControllerError::InvalidArgument to signal the FIDL handler to
 /// signal that a LightError::INVALID_NAME should be returned to the client.
@@ -79,7 +79,7 @@ pub struct LightController {
     /// Cache of data that includes hardware values. The data stored on disk does not persist the
     /// hardware values, so restoring does not bring the values back into memory. The data needs to
     /// be cached at this layer so we don't lose track of them.
-    data_cache: Arc<Mutex<Option<LightInfo>>>,
+    data_cache: Rc<Mutex<Option<LightInfo>>>,
 }
 
 impl StorageAccess for LightController {
@@ -88,10 +88,11 @@ impl StorageAccess for LightController {
     const STORAGE_KEY: &'static str = LightInfo::KEY;
 }
 
+#[async_trait(?Send)]
 impl data_controller::CreateWithAsync for LightController {
-    type Data = Arc<std::sync::Mutex<DefaultSetting<LightHardwareConfiguration, &'static str>>>;
+    type Data = Rc<Mutex<DefaultSetting<LightHardwareConfiguration, &'static str>>>;
     async fn create_with(client: ClientProxy, data: Self::Data) -> Result<Self, ControllerError> {
-        let light_hardware_config = data.lock().unwrap().load_default_value().map_err(|_| {
+        let light_hardware_config = data.lock().await.load_default_value().map_err(|_| {
             ControllerError::InitFailure("Invalid default light hardware config".into())
         })?;
 
@@ -99,7 +100,7 @@ impl data_controller::CreateWithAsync for LightController {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for LightController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {
@@ -154,7 +155,7 @@ impl LightController {
             client,
             light_proxy,
             light_hardware_config,
-            data_cache: Arc::new(Mutex::new(None)),
+            data_cache: Rc::new(Mutex::new(None)),
         })
     }
 
@@ -490,7 +491,7 @@ mod tests {
     use crate::{service, Address, LightController, ServiceContext, SettingType};
     use futures::lock::Mutex;
     use settings_storage::UpdateState;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     // Verify that a set call without a restore call succeeds. This can happen when the controller
     // is shutdown after inactivity and is brought up again to handle the set call.
@@ -507,7 +508,7 @@ mod tests {
         // Create a fake hardware light service that responds to FIDL calls and add it to the
         // service registry so that FIDL calls are routed to this fake service.
         let service_registry = ServiceRegistry::create();
-        let light_service_handle = Arc::new(Mutex::new(HardwareLightService::new()));
+        let light_service_handle = Rc::new(Mutex::new(HardwareLightService::new()));
         service_registry.lock().await.register_service(light_service_handle.clone());
 
         let service_context =
@@ -528,7 +529,7 @@ mod tests {
             Default::default(),
             controller_messenger,
             signature,
-            Arc::new(service_context),
+            Rc::new(service_context),
             SettingType::Light,
         );
 
@@ -539,7 +540,7 @@ mod tests {
             .expect("Unable to create agent messenger");
 
         // Spawn a task that mimics the storage agent by responding to read/write calls.
-        fuchsia_async::Task::spawn(async move {
+        fuchsia_async::Task::local(async move {
             loop {
                 if let Ok((payload, message_client)) = storage_receptor.next_payload().await {
                     if let Ok(StoragePayload::Request(storage_request)) =
@@ -569,7 +570,7 @@ mod tests {
         })
         .detach();
 
-        let client_proxy = ClientProxy::new(Arc::new(base_proxy), SettingType::Light).await;
+        let client_proxy = ClientProxy::new(Rc::new(base_proxy), SettingType::Light).await;
 
         // Create the light controller.
         let light_controller = LightController::create_with_config(client_proxy, None)
@@ -602,7 +603,7 @@ mod tests {
         // Create a fake hardware light service that responds to FIDL calls and add it to the
         // service registry so that FIDL calls are routed to this fake service.
         let service_registry = ServiceRegistry::create();
-        let light_service_handle = Arc::new(Mutex::new(HardwareLightService::new()));
+        let light_service_handle = Rc::new(Mutex::new(HardwareLightService::new()));
         service_registry.lock().await.register_service(light_service_handle.clone());
 
         let service_context =
@@ -623,7 +624,7 @@ mod tests {
             Default::default(),
             controller_messenger,
             signature,
-            Arc::new(service_context),
+            Rc::new(service_context),
             SettingType::Light,
         );
 
@@ -634,7 +635,7 @@ mod tests {
             .expect("Unable to create agent messenger");
 
         // Spawn a task that mimics the storage agent by responding to read/write calls.
-        fuchsia_async::Task::spawn(async move {
+        fuchsia_async::Task::local(async move {
             loop {
                 if let Ok((payload, message_client)) = storage_receptor.next_payload().await {
                     if let Ok(StoragePayload::Request(storage_request)) =
@@ -664,7 +665,7 @@ mod tests {
         })
         .detach();
 
-        let client_proxy = ClientProxy::new(Arc::new(base_proxy), SettingType::Light).await;
+        let client_proxy = ClientProxy::new(Rc::new(base_proxy), SettingType::Light).await;
 
         // Create the light controller.
         let light_controller = LightController::create_with_config(client_proxy, None)

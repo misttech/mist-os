@@ -33,9 +33,8 @@ declare_args() {
 # //build/bazel:legacy_ninja_build_outputs target.
 #
 # The bazel-generated files will be copied (possibly hard-linked) into the
-# `target_out_dir` matching the GN action for this template call (since
-# GN requires that an action's output file be in either target_out_dir
-# or target_out_dir).
+# `ninja_base_dir` (which is `target_out_dir` by default) matching the GN
+# action for this template call.
 #
 # This also takes a list of Bazel target patterns, since Bazel does not
 # support building specific files, only targets. For now it is up to the
@@ -71,6 +70,11 @@ declare_args() {
 #
 #     Type: list of Bazel target patterns.
 #
+#   ninja_base_dir: (optional)
+#     A GN path for the base directory used for `ninja` paths in the
+#     scope items of `copy_outputs`, `directory_outputs`, etc..
+#     Default value is `target_out_dir`.
+#
 #   copy_outputs: (optional)
 #     A list of scopes, where each item describes a Bazel output and a
 #     corresponding Ninja output location (where the Bazel build artifact
@@ -104,7 +108,7 @@ declare_args() {
 #          as `copy_outputs` items.
 #
 #       ninja_dir  (required)
-#          A path string, relative to $target_out_dir, where the
+#          A path string, relative to `ninja_base_dir`, where the
 #          directory will be recursively copied to. Previous instances are
 #          replaced, instead of being overwritten, to avoid keeping stale
 #          files from previous builds.
@@ -138,15 +142,32 @@ declare_args() {
 #             listed in the top-level bazel_targets argument.
 #
 #          archive: (required)
-#             output path for the package's archive, relative to $target_out_dir.
+#             output path for the package's archive, relative to `ninja_base_dir`.
 #
 #          manifest: (optional)
-#             output path for the package's manifest file, relative to $target_out_dir.
+#             output path for the package's manifest file, relative to `ninja_base_dir`.
 #
 #          copy_debug_symbols: (optional)
 #             A boolean flag, set it to true to copy all debug symbols from
 #             the package's ELF binaries to the top-level ${root_build_dir}/.build-id/
 #             directory.
+#
+#   final_symlink_outputs: (optional)
+#     A list of scopes describing symlink locations, relative to the Ninja build
+#     directory, pointing to Bazel artifacts directly. This is similar
+#     to copy_outputs, except that the `ninja` path points to a symlink location
+#     in the Ninja build directory.
+#
+#     IMPORTANT: This should only be used for "final" targets of the Ninja build
+#     graph, i.e. ones that are never used as input for other Ninja commands, since
+#     the timestamp in the Bazel output base, which the symlink point to, are never
+#     guaranteed to be consistent.
+#
+#     This is useful to use the symlinks after the build complete. For an
+#     example, see //build/bazel:generate_final_fuchsia_in_tree_idk
+#
+#     NOTE: This feature is a special case and is not available to wrappers
+#     like `bazel_build_action()` intentionally, in order to limit its usage.
 #
 #   extra_bazel_args: (optional)
 #     A list extra command line arguments to pass to Bazel.
@@ -217,8 +238,7 @@ declare_args() {
 #
 #   Where <bazel_path> is a Bazel output path, relative to the Bazel workspace
 #   that looks like "bazel-bin/<bazel_target_package>/<output_file>", and
-#   where <ninja_path> is an output path relative to the `target_out_dir`
-#   of the current target.
+#   where <ninja_path> is an output path relative to the `ninja_base_dir` directory.
 #
 #   Moreover, the <bazel_path> value supports these special substitution
 #   expressions:
@@ -256,13 +276,25 @@ template("bazel_action") {
     _package_outputs = invoker.package_outputs
   }
 
+  _final_symlink_outputs = []
+  if (defined(invoker.final_symlink_outputs)) {
+    _final_symlink_outputs = invoker.final_symlink_outputs
+  }
+
   assert(
-      _copy_outputs != [] || _directory_outputs != [] || _package_outputs != [],
+      _copy_outputs != [] || _directory_outputs != [] ||
+          _package_outputs != [] || _final_symlink_outputs != [],
       "At least one of `copy_outputs`, `directory_outputs` or `package_outputs` must be a non-empty list!")
 
   _has_file_outputs = false
   _has_directory_outputs = false
   _has_package_outputs = false
+  _has_final_symlink_outputs = false
+
+  _ninja_base_dir = target_out_dir
+  if (defined(invoker.ninja_base_dir)) {
+    _ninja_base_dir = invoker.ninja_base_dir
+  }
 
   _bazel_targets = invoker.bazel_targets
 
@@ -321,7 +353,7 @@ template("bazel_action") {
         type = "file"
         bazel_target = get_label_info(_bazel_target, "label_no_toolchain")
         bazel_file = _bazel_file
-        ninja_file = "$target_out_dir/${entry.ninja}"
+        ninja_file = "${_ninja_base_dir}/${entry.ninja}"
       },
     ]
     _has_file_outputs = true
@@ -379,7 +411,7 @@ template("bazel_action") {
         type = "directory"
         bazel_target = get_label_info(_bazel_target, "label_no_toolchain")
         bazel_dir = _bazel_dir
-        ninja_dir = "$target_out_dir/${entry.ninja_dir}"
+        ninja_dir = "${_ninja_base_dir}/${entry.ninja_dir}"
         copy_debug_symbols =
             defined(entry.copy_debug_symbols) && entry.copy_debug_symbols
         tracked_files = entry.tracked_files
@@ -396,11 +428,11 @@ template("bazel_action") {
            "`package_outputs` scope requires package_label key: $entry")
     _archive = ""
     if (defined(entry.archive)) {
-      _archive = "$target_out_dir/${entry.archive}"
+      _archive = "${_ninja_base_dir}/${entry.archive}"
     }
     _manifest = ""
     if (defined(entry.manifest)) {
-      _manifest = "$target_out_dir/${entry.archive}"
+      _manifest = "${_ninja_base_dir}/${entry.archive}"
     }
     _all_outputs += [
       {
@@ -414,6 +446,63 @@ template("bazel_action") {
     ]
 
     _has_package_outputs = true
+  }
+
+  foreach(entry, _final_symlink_outputs) {
+    assert(
+        "$entry" != entry,
+        "`final_symlink_outputs` items must be scopes, string found: \"$entry\"")
+    assert(defined(entry.bazel),
+           "`final_symlink_outputs` scope requires bazel key: $entry")
+    assert(defined(entry.ninja),
+           "`final_symlink_outputs` scope requires ninja key: $entry")
+
+    _bazel_target = _bazel_targets[0]
+    if (defined(entry.bazel_target)) {
+      _bazel_target = entry.bazel_target
+    }
+
+    foreach(path, [ entry.bazel ]) {
+      assert(rebase_path(path, "//") != path,
+             "bazel output path must be relative: $path")
+      assert(string_replace("XX$path", "XX-", "") == "XX$path",
+             "bazel output path cannot begin with dash: $path")
+      if (string_replace(path, "{{BAZEL_TARGET_", "") != path) {
+        _bazel_target_name = get_label_info(_bazel_target, "name")
+        _bazel_target_package =
+            rebase_path(get_label_info(_bazel_target, "dir"), "//")
+        _bazel_target_out_dir = "bazel-bin/" + _bazel_target_package
+
+        path = string_replace(path, "{{BAZEL_TARGET_NAME}}", _bazel_target_name)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_PACKAGE}}",
+                              _bazel_target_package)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_OUT_DIR}}",
+                              _bazel_target_out_dir)
+        path = string_replace(path,
+                              "{{BAZEL_TARGET_OUT_PATH}}",
+                              "${_bazel_target_out_dir}/${_bazel_target_name}")
+      }
+
+      # In case of typo with a substitution (e.g. writing {{BAZEL_TARGET_O_DIR}})
+      # GN will complain with an error but will not display the problematic
+      # so use an assert to provide a user-friendly message.
+      assert(string_replace(path, "{{", "") == path,
+             "Unsupported substitution in Bazel output path: $path")
+
+      _bazel_file = path
+    }
+
+    _all_outputs += [
+      {
+        type = "final_symlink"
+        bazel_target = get_label_info(_bazel_target, "label_no_toolchain")
+        bazel_file = _bazel_file
+        ninja_file = "${_ninja_base_dir}/${entry.ninja}"
+      },
+    ]
+    _has_final_symlink_outputs = true
   }
 
   # Write the log of build events to a target-specific file.
@@ -636,6 +725,19 @@ template("bazel_action") {
             _manifest_arg,
             "${output.copy_debug_symbols}",
           ]
+        }
+      }
+    }
+
+    if (_has_final_symlink_outputs) {
+      args += [ "--final-symlink-outputs" ]
+      foreach(output, _all_outputs) {
+        if (output.type == "final_symlink") {
+          args += [
+            output.bazel_file,
+            rebase_path(output.ninja_file, root_build_dir),
+          ]
+          outputs += [ output.ninja_file ]
         }
       }
     }

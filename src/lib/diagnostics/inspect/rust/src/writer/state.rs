@@ -37,7 +37,7 @@ impl SafeOp for u64 {
 
 impl SafeOp for i64 {
     fn safe_sub(&self, other: i64) -> i64 {
-        self.checked_sub(other).unwrap_or(std::i64::MIN)
+        self.checked_sub(other).unwrap_or(i64::MIN)
     }
     fn safe_add(&self, other: i64) -> i64 {
         self.checked_add(other).unwrap_or(i64::MAX)
@@ -287,7 +287,7 @@ impl State {
 
     pub(crate) fn get_block<F>(&self, index: BlockIndex, callback: F)
     where
-        F: FnOnce(&Block<&Container>) -> (),
+        F: FnOnce(&Block<&Container>),
     {
         let state_lock = self.try_lock().unwrap();
         callback(&state_lock.get_block(index))
@@ -295,7 +295,7 @@ impl State {
 
     pub(crate) fn get_block_mut<F>(&self, index: BlockIndex, callback: F)
     where
-        F: FnOnce(&mut Block<&mut Container>) -> (),
+        F: FnOnce(&mut Block<&mut Container>),
     {
         let mut state_lock = self.try_lock().unwrap();
         callback(&mut state_lock.get_block_mut(index))
@@ -522,7 +522,7 @@ impl<'a> LockedStateGuard<'a> {
         disposition: LinkNodeDisposition,
         parent_index: BlockIndex,
     ) -> Result<BlockIndex, Error> {
-        self.inner_lock.allocate_link(name, content.into(), disposition, parent_index)
+        self.inner_lock.allocate_link(name, content, disposition, parent_index)
     }
 
     pub(crate) fn get_block(&self, index: BlockIndex) -> Block<&Container> {
@@ -570,7 +570,7 @@ impl InnerState {
             .create_child(
                 zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::NO_WRITE,
                 0,
-                self.storage.get_size().map_err(|status| Error::VmoSize(status))?,
+                self.storage.get_size().map_err(Error::VmoSize)?,
             )
             .ok();
         header.thaw_header(old)?;
@@ -722,7 +722,7 @@ impl InnerState {
             parent_index,
             format,
         )?;
-        if let Err(err) = self.inner_set_property_value(block_index, &value) {
+        if let Err(err) = self.inner_set_property_value(block_index, value) {
             self.heap.free_block(block_index)?;
             self.release_string_reference(name_block_index)?;
             return Err(err);
@@ -830,12 +830,12 @@ impl InnerState {
         let mut next = block.next_extent()?;
         while next != BlockIndex::EMPTY {
             let next_block = self.heap.container.block_at(next);
-            content.extend_from_slice(&next_block.extent_contents()?);
+            content.extend_from_slice(next_block.extent_contents()?);
             next = next_block.next_extent()?;
         }
 
         content.truncate(block.total_length()?);
-        Ok(String::from_utf8(content).ok().ok_or(Error::NameNotUtf8)?)
+        String::from_utf8(content).ok().ok_or(Error::NameNotUtf8)
     }
 
     /// Free a PROPERTY block.
@@ -935,7 +935,7 @@ impl InnerState {
         parent_index: BlockIndex,
     ) -> Result<BlockIndex, Error> {
         // Safety: array_element_size will never fail for BlockType::StringReference.
-        let block_size = slots as usize * BlockType::StringReference.array_element_size().unwrap()
+        let block_size = slots * BlockType::StringReference.array_element_size().unwrap()
             + constants::MIN_ORDER_SIZE;
         if block_size > constants::MAX_ORDER_SIZE {
             return Err(Error::BlockSizeTooBig(block_size));
@@ -954,7 +954,7 @@ impl InnerState {
 
     fn get_array_size(&self, block_index: BlockIndex) -> Result<usize, Error> {
         let block = self.heap.container.block_at(block_index);
-        block.array_slots().map_err(|e| Error::VmoFormat(e))
+        block.array_slots().map_err(Error::VmoFormat)
     }
 
     fn set_array_string_slot(
@@ -968,7 +968,7 @@ impl InnerState {
         }
 
         let reference_index = if !value.is_empty() {
-            let reference_index = self.get_or_create_string_reference(value.into())?;
+            let reference_index = self.get_or_create_string_reference(value)?;
             self.heap.container.block_at_mut(reference_index).increment_string_reference_count()?;
             reference_index
         } else {
@@ -1072,7 +1072,6 @@ impl InnerState {
             let mut parent = self.heap.container.block_at_mut(parent_index);
             let child_count = parent.child_count()? - 1;
             if parent.block_type() == BlockType::Tombstone && child_count == 0 {
-                drop(parent); // drop exclusive reference.
                 self.heap.free_block(parent_index).expect("Failed to free block");
             } else {
                 parent.set_child_count(child_count)?;
@@ -1093,7 +1092,6 @@ impl InnerState {
         if block.block_type() == BlockType::NodeValue && block.child_count()? != 0 {
             block.become_tombstone()?;
         } else {
-            drop(block); // drop exclusive &mut self reference only.
             self.heap.free_block(block_index)?;
         }
         Ok(())
@@ -1126,7 +1124,7 @@ impl InnerState {
     }
 
     fn write_extents(&mut self, value: &[u8]) -> Result<(BlockIndex, u32), Error> {
-        if value.len() == 0 {
+        if value.is_empty() {
             // Invalid index
             return Ok((BlockIndex::ROOT, 0));
         }
@@ -1381,7 +1379,7 @@ mod tests {
             assert_eq!(state.get_block(block_index).int_value().unwrap(), -6);
 
             assert!(state.subtract_int_metric(block_index, i64::MAX).is_ok());
-            assert_eq!(state.get_block(block_index).int_value().unwrap(), std::i64::MIN);
+            assert_eq!(state.get_block(block_index).int_value().unwrap(), i64::MIN);
             assert!(state.set_int_metric(block_index, i64::MAX).is_ok());
 
             assert!(state.add_int_metric(block_index, 2).is_ok());
@@ -1543,7 +1541,7 @@ mod tests {
                 collected.push(state.create_node(sf.into(), 0.into()).unwrap());
             }
 
-            assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_some());
+            assert!(state.inner_lock.string_reference_block_indexes.contains_key(sf));
 
             assert_eq!(state.stats().allocated_blocks, 102);
             let block = state.get_block(collected[0]);
@@ -1551,16 +1549,16 @@ mod tests {
             assert_eq!(sf_block.string_reference_count().unwrap(), 100);
 
             collected.into_iter().for_each(|b| {
-                assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_some());
+                assert!(state.inner_lock.string_reference_block_indexes.contains_key(sf));
                 assert!(state.free_value(b).is_ok())
             });
 
-            assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_none());
+            assert!(!state.inner_lock.string_reference_block_indexes.contains_key(sf));
 
             let node_index = state.create_node(sf.into(), 0.into()).unwrap();
-            assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_some());
+            assert!(state.inner_lock.string_reference_block_indexes.contains_key(sf));
             assert!(state.free_value(node_index).is_ok());
-            assert!(state.inner_lock.string_reference_block_indexes.get(sf).is_none());
+            assert!(!state.inner_lock.string_reference_block_indexes.contains_key(sf));
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
@@ -1895,7 +1893,7 @@ mod tests {
             let block = state.get_block(block_index);
             assert_eq!(block.block_type(), BlockType::BoolValue);
             assert_eq!(*block.index(), 2);
-            assert_eq!(block.bool_value().unwrap(), true);
+            assert!(block.bool_value().unwrap());
             assert_eq!(*block.name_index().unwrap(), 3);
             assert_eq!(*block.parent_index().unwrap(), 0);
 
@@ -1988,7 +1986,6 @@ mod tests {
             .write_extents(&[4u8; TRIED_TO_WRITE])
             .unwrap();
         assert_eq!(written as usize, EXPECTED_WRITTEN);
-        assert!(EXPECTED_WRITTEN < TRIED_TO_WRITE);
     }
 
     #[fuchsia::test]
@@ -2272,7 +2269,7 @@ mod tests {
                         a: 1u64,
                     });
                 }
-                Err(_) => assert!(false),
+                Err(_) => unreachable!("we never return errors in the callback"),
             }
 
             // Verify link block.
@@ -2467,7 +2464,7 @@ mod tests {
             }
 
             // Set the value of the string to something very large that causes an overflow.
-            let values = ['a' as u8; 8096];
+            let values = [b'a'; 8096];
             assert!(state.set_property(block_index, &values).is_err());
 
             // We now expect the length of the payload, as well as the property extent index to be

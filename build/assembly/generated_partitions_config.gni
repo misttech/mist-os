@@ -254,10 +254,7 @@ template("generated_partitions_config") {
     depfile_path = "$target_out_dir/$target_name.depfile"
     depfile = depfile_path
 
-    outputs = [
-      output_path,
-      "$output_path/partitions_config.json",
-    ]
+    outputs = [ "$output_path/partitions_config.json" ]
     inputs = [ cwd_relative_partitions_config ]
 
     metadata = {
@@ -274,7 +271,7 @@ template("generated_partitions_config") {
       "--partitions-config",
       rebase_path(inputs[0], root_build_dir),
       "--output",
-      rebase_path(outputs[0], root_build_dir),
+      rebase_path(output_path, root_build_dir),
       "--depfile",
       rebase_path(depfile_path, root_build_dir),
     ]

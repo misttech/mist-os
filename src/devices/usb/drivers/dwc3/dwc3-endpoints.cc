@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/logging/cpp/logger.h>
+
 #include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/dwc3/dwc3-regs.h"
@@ -37,9 +39,7 @@ zx_status_t Dwc3::Fifo::Init(zx::bti& bti) {
   return ZX_OK;
 }
 
-void Dwc3::Fifo::Release() {
-  first = next = current = last = nullptr;
-}
+void Dwc3::Fifo::Release() { first = next = current = last = nullptr; }
 
 void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
   fbl::AutoLock lock(&lock_);
@@ -53,7 +53,7 @@ void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
 }
 
 void Dwc3::EpSetConfig(Endpoint& ep, bool enable) {
-  zxlogf(DEBUG, "Dwc3::EpSetConfig %u", ep.ep_num);
+  FDF_LOG(DEBUG, "Dwc3::EpSetConfig %u", ep.ep_num);
 
   if (enable) {
     CmdEpSetConfig(ep, false);
@@ -82,7 +82,7 @@ zx_status_t Dwc3::EpSetStall(Endpoint& ep, bool stall) {
 
 void Dwc3::EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t buffer,
                            size_t length, bool send_zlp) {
-  zxlogf(SERIAL, "Dwc3::EpStartTransfer ep %u type %u length %zu", ep.ep_num, type, length);
+  FDF_LOG(DEBUG, "Dwc3::EpStartTransfer ep %u type %u length %zu", ep.ep_num, type, length);
 
   dwc3_trb_t* trb = fifo.next++;
   if (fifo.next == fifo.last) {
@@ -140,7 +140,7 @@ void Dwc3::EpReadTrb(Endpoint& ep, Fifo& fifo, const dwc3_trb_t* src, dwc3_trb_t
     CacheFlushInvalidate(fifo.buffer.get(), (src - fifo.first) * sizeof(*src), sizeof(*src));
     memcpy(dst, src, sizeof(*dst));
   } else {
-    zxlogf(ERROR, "bad trb");
+    FDF_LOG(ERROR, "bad trb");
   }
 }
 
@@ -162,7 +162,7 @@ void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
 
     zx::result result{info->uep->server->get_iter(info->req, zx_system_get_page_size())};
     if (result.is_error()) {
-      zxlogf(ERROR, "[BUG] server->phys_iter(): %s", result.status_string());
+      FDF_LOG(ERROR, "[BUG] server->phys_iter(): %s", result.status_string());
     }
     ZX_ASSERT(result.is_ok());
 
@@ -232,7 +232,7 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
       uep->fifo.current = nullptr;
 
       if (trb.control & TRB_HWO) {
-        zxlogf(ERROR, "TRB_HWO still set in dwc3_ep_xfer_complete");
+        FDF_LOG(ERROR, "TRB_HWO still set in dwc3_ep_xfer_complete");
       }
 
       auto& freq{std::get<usb::FidlRequest>(opt_info->req)};
@@ -244,7 +244,7 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
   if (opt_info.has_value()) {
     pending_completions_.push(std::move(*opt_info));
   } else {
-    zxlogf(ERROR, "no usb request found to complete!");
+    FDF_LOG(ERROR, "no usb request found to complete!");
   }
 }
 

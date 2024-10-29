@@ -16,7 +16,11 @@ type RealmOptions = resource table {
     /// capability to true. If true, SAG will wait to receive a token through
     /// [`fuchsia.power.system/CpuElementManager.AddExectuionStateDependency`].
     /// If false, SAG will skip adding external Execution State dependencies.
+    /// Defaults to false.
     2: wait_for_suspending_token bool;
+
+    /// Specifies whether SAG will use a suspender or not. Defaults to true.
+    3: use_suspender bool;
 };
 
 @discoverable

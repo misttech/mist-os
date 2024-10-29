@@ -15,7 +15,7 @@
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
-namespace fdf_fake_platform_device {
+namespace fdf_fake {
 
 using Mmio = std::variant<fdf::PDev::MmioInfo, fdf::MmioBuffer>;
 
@@ -123,7 +123,7 @@ class FakePDev : public fidl::WireServer<fuchsia_hardware_platform_device::Devic
   MetadataMap metadata_;
 };
 
-}  // namespace fdf_fake_platform_device
+}  // namespace fdf_fake
 
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 

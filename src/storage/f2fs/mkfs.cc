@@ -8,9 +8,11 @@
 
 #include <iostream>
 
+#include <fbl/unique_fd.h>
 #include <safemath/checked_math.h>
 
 #include "src/lib/uuid/uuid.h"
+#include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/segment.h"
 
 namespace f2fs {

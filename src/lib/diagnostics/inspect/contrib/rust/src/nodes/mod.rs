@@ -2,72 +2,118 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/357825314): NodeExt and TimeProperty would benefit from being generic over
-// the timeline, so that callers can choose whether to use Monotonic, Boot or something else.
-
 //! Utilities and wrappers providing higher level functionality for Inspect Nodes and properties.
+
+use std::{fmt, marker};
 
 mod list;
 mod lru_cache;
 
 pub use list::BoundedListNode;
 pub use lru_cache::LruCacheNode;
+pub use zx::{BootTimeline, MonotonicTimeline};
 
 use fuchsia_inspect::{InspectType, IntProperty, Node, Property, StringReference};
 
-/// Extension trait that allows to manage timestamp properties.
-pub trait NodeExt {
-    /// Creates a new property holding the current monotonic timestamp.
-    fn create_time(&self, name: impl Into<StringReference>) -> TimeProperty;
-
-    /// Creates a new property holding the given timestamp.
-    fn create_time_at<'b>(
-        &self,
-        name: impl Into<StringReference>,
-        timestamp: zx::MonotonicInstant,
-    ) -> TimeProperty;
-
-    /// Records a new property holding the current monotonic timestamp.
-    fn record_time(&self, name: impl Into<StringReference>);
+/// Implemented by timelines for which we can get the current time.
+pub trait GetCurrentTime: zx::Timeline + Sized {
+    fn get_current_time() -> zx::Instant<Self>;
 }
 
-impl NodeExt for Node {
-    fn create_time(&self, name: impl Into<StringReference>) -> TimeProperty {
-        self.create_time_at(name, zx::MonotonicInstant::get())
+impl GetCurrentTime for zx::MonotonicTimeline {
+    fn get_current_time() -> zx::MonotonicInstant {
+        zx::MonotonicInstant::get()
     }
+}
 
-    fn create_time_at<'b>(
+impl GetCurrentTime for zx::BootTimeline {
+    fn get_current_time() -> zx::BootInstant {
+        zx::BootInstant::get()
+    }
+}
+
+/// Returned by functions which take the current time and write it to a property.
+pub struct CreateTimeResult<T> {
+    /// The time written to the property.
+    pub timestamp: zx::Instant<T>,
+    /// A property to which the timestamp was written.
+    pub property: TimeProperty<T>,
+}
+
+/// Extension trait that allows to manage timestamp properties.
+pub trait NodeTimeExt<T: zx::Timeline> {
+    /// Creates a new property holding the current timestamp on the given timeline. Returns the
+    /// current timestamp that was used for the returned property too.
+    fn create_time(&self, name: impl Into<StringReference>) -> CreateTimeResult<T>;
+
+    /// Creates a new property holding the given timestamp.
+    fn create_time_at(
         &self,
         name: impl Into<StringReference>,
-        timestamp: zx::MonotonicInstant,
-    ) -> TimeProperty {
-        TimeProperty { inner: self.create_int(name, timestamp.into_nanos()) }
+        timestamp: zx::Instant<T>,
+    ) -> TimeProperty<T>;
+
+    /// Records a new property holding the current timestamp and returns the instant that was
+    /// recorded.
+    fn record_time(&self, name: impl Into<StringReference>) -> zx::Instant<T>;
+}
+
+impl<T> NodeTimeExt<T> for Node
+where
+    T: zx::Timeline + GetCurrentTime,
+{
+    fn create_time(&self, name: impl Into<StringReference>) -> CreateTimeResult<T> {
+        let timestamp = T::get_current_time();
+        CreateTimeResult { timestamp, property: self.create_time_at(name, timestamp) }
     }
 
-    fn record_time(&self, name: impl Into<StringReference>) {
-        self.record_int(name, zx::MonotonicInstant::get().into_nanos());
+    fn create_time_at(
+        &self,
+        name: impl Into<StringReference>,
+        timestamp: zx::Instant<T>,
+    ) -> TimeProperty<T> {
+        TimeProperty {
+            inner: self.create_int(name, timestamp.into_nanos()),
+            _phantom: marker::PhantomData,
+        }
+    }
+
+    fn record_time(&self, name: impl Into<StringReference>) -> zx::Instant<T> {
+        let instant = T::get_current_time();
+        self.record_int(name, instant.into_nanos());
+        instant
     }
 }
 
 /// Wrapper around an int property that stores a monotonic timestamp.
 #[derive(Debug)]
-pub struct TimeProperty {
+pub struct TimeProperty<T> {
     pub(crate) inner: IntProperty,
+    _phantom: marker::PhantomData<T>,
 }
 
-impl TimeProperty {
+impl<T> TimeProperty<T>
+where
+    T: zx::Timeline + GetCurrentTime,
+{
     /// Updates the underlying property with the current monotonic timestamp.
     pub fn update(&self) {
-        self.set_at(zx::MonotonicInstant::get());
+        self.set_at(T::get_current_time());
     }
 
     /// Updates the underlying property with the given timestamp.
-    pub fn set_at(&self, timestamp: zx::MonotonicInstant) {
+    pub fn set_at(&self, timestamp: zx::Instant<T>) {
         Property::set(&self.inner, timestamp.into_nanos());
     }
 }
 
-impl InspectType for TimeProperty {}
+/// An Inspect Time Property on the boot timeline.
+pub type BootTimeProperty = TimeProperty<zx::BootTimeline>;
+
+/// An Inspect Time Property on the monotonictimeline.
+pub type MonotonicTimeProperty = TimeProperty<zx::MonotonicTimeline>;
+
+impl<T: fmt::Debug + Send + Sync> InspectType for TimeProperty<T> {}
 
 #[cfg(test)]
 mod tests {
@@ -98,8 +144,11 @@ mod tests {
     #[fuchsia::test]
     fn test_create_time_and_update() {
         let inspector = Inspector::default();
-        let time_property = inspector.root().create_time("time");
+        let CreateTimeResult { timestamp: recorded_t1, property: time_property }: CreateTimeResult<
+            zx::MonotonicTimeline,
+        > = inspector.root().create_time("time");
         let t1 = validate_inspector_get_time(&inspector, AnyProperty);
+        assert_eq!(recorded_t1.into_nanos(), t1);
 
         time_property.update();
         let t2 = validate_inspector_get_time(&inspector, AnyProperty);
@@ -115,7 +164,7 @@ mod tests {
     fn test_record_time() {
         let before_time = zx::MonotonicInstant::get().into_nanos();
         let inspector = Inspector::default();
-        inspector.root().record_time("time");
+        NodeTimeExt::<zx::MonotonicTimeline>::record_time(inspector.root(), "time");
         let after_time = validate_inspector_get_time(&inspector, AnyProperty);
         assert_lt!(before_time, after_time);
     }
@@ -123,13 +172,13 @@ mod tests {
     #[fuchsia::test]
     fn test_create_time_no_executor() {
         let inspector = Inspector::default();
-        inspector.root().create_time("time");
+        let _: CreateTimeResult<zx::MonotonicTimeline> = inspector.root().create_time("time");
     }
 
     #[fuchsia::test]
     fn test_record_time_no_executor() {
         let inspector = Inspector::default();
-        inspector.root().record_time("time");
+        NodeTimeExt::<zx::MonotonicTimeline>::record_time(inspector.root(), "time");
     }
 
     fn validate_inspector_get_time<T>(inspector: &Inspector, expected: T) -> i64

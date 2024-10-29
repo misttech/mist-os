@@ -33,7 +33,7 @@ pub fn validate(parse_result: &ParseResult) -> Result<(), Error> {
     let mut failed = false;
     for (namespace, trial_map) in tests {
         for (trial_name, trial) in trial_map {
-            if trial.yes == None && trial.no == None {
+            if trial.yes.is_none() && trial.no.is_none() {
                 bail!("Trial {} in {} needs a yes: or no: entry", trial_name, namespace);
             }
             let klog_fetcher;
@@ -46,15 +46,15 @@ pub fn validate(parse_result: &ParseResult) -> Result<(), Error> {
             };
             if let Fetcher::TrialData(fetcher) = &mut fetcher {
                 if let Some(klog) = &trial.klog {
-                    klog_fetcher = TextFetcher::try_from(&**klog)?;
+                    klog_fetcher = TextFetcher::from(&**klog);
                     fetcher.set_klog(&klog_fetcher);
                 }
                 if let Some(syslog) = &trial.syslog {
-                    syslog_fetcher = TextFetcher::try_from(&**syslog)?;
+                    syslog_fetcher = TextFetcher::from(&**syslog);
                     fetcher.set_syslog(&syslog_fetcher);
                 }
                 if let Some(bootlog) = &trial.bootlog {
-                    bootlog_fetcher = TextFetcher::try_from(&**bootlog)?;
+                    bootlog_fetcher = TextFetcher::from(&**bootlog);
                     fetcher.set_bootlog(&bootlog_fetcher);
                 }
                 if let Some(annotations) = &trial.annotations {
@@ -62,10 +62,10 @@ pub fn validate(parse_result: &ParseResult) -> Result<(), Error> {
                     fetcher.set_annotations(&annotations_fetcher);
                 }
             }
-            let now = if trial.now == None {
+            let now = if trial.now.is_none() {
                 None
             } else {
-                match MetricState::evaluate_math(&trial.now.as_ref().unwrap()) {
+                match MetricState::evaluate_math(trial.now.as_ref().unwrap()) {
                     MetricValue::Int(time) => Some(time),
                     oops => bail!(
                         "Trial {} in {}: 'now: {}' was not integer, it was {:?}",
@@ -109,7 +109,7 @@ pub fn validate(parse_result: &ParseResult) -> Result<(), Error> {
         }
     }
     if failed {
-        return Err(format_err!("Config validation test failed"));
+        Err(format_err!("Config validation test failed"))
     } else {
         Ok(())
     }
@@ -127,12 +127,12 @@ fn check_failure(
     match actions.get(namespace) {
         None => {
             println!("Namespace {} not found in trial {}", action_name, trial_name);
-            return true;
+            true
         }
         Some(action_map) => match action_map.get(action_name) {
             None => {
                 println!("Action {} not found in trial {}", action_name, trial_name);
-                return true;
+                true
             }
             Some(action) => {
                 let trigger = match action {
@@ -143,14 +143,14 @@ fn check_failure(
                         return true;
                     }
                 };
-                match metric_state.eval_action_metric(namespace, &trigger) {
-                    MetricValue::Bool(actual) if actual == expected => return false,
+                match metric_state.eval_action_metric(namespace, trigger) {
+                    MetricValue::Bool(actual) if actual == expected => false,
                     other => {
                         println!(
                             "Test {} failed: trigger '{}' of action {} returned {:?}, expected {}",
                             trial_name, trigger, action_name, other, expected
                         );
-                        return true;
+                        true
                     }
                 }
             }

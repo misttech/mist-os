@@ -40,6 +40,8 @@ class ServiceInstanceResolver : public MdnsAgent {
 
   void Quit() override;
 
+  fuchsia::net::mdns::ServiceInstance GetInstance();
+
  private:
   std::string service_;
   std::string instance_name_;

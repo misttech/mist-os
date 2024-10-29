@@ -9,7 +9,7 @@
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
-namespace fdf_fake_platform_device {
+namespace fdf_fake {
 
 void FakePDev::GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) {
   auto mmio = config_.mmios.find(request->index);
@@ -70,11 +70,12 @@ void FakePDev::GetBtiById(GetBtiByIdRequestView request, GetBtiByIdCompleter::Sy
       completer.ReplyError(ZX_ERR_NOT_FOUND);
       return;
     }
-    zx_status_t status = fake_bti_create(bti.reset_and_get_address());
-    if (status != ZX_OK) {
-      completer.ReplyError(status);
+    zx::result result = fake_bti::CreateFakeBti();
+    if (result.is_error()) {
+      completer.ReplyError(result.status_value());
       return;
     }
+    bti = std::move(result.value());
   } else {
     itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti);
   }
@@ -179,7 +180,7 @@ void FakePDev::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {}
 
-}  // namespace fdf_fake_platform_device
+}  // namespace fdf_fake
 
 zx::result<fdf::MmioBuffer> fdf::internal::PDevMakeMmioBufferWeak(fdf::PDev::MmioInfo& pdev_mmio,
                                                                   uint32_t cache_policy) {

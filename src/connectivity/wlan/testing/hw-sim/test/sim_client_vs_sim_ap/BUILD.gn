@@ -8,7 +8,6 @@ import(
 rust_wlan_integration_test("sim_client_vs_sim_ap") {
   edition = "2021"
   binary_deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
     "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_rust",
     "//sdk/rust/zx",

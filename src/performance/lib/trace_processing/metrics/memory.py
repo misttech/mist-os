@@ -53,7 +53,7 @@ class MemoryMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_freeform_metrics(
         self, model: trace_model.Model
-    ) -> trace_metrics.JsonType:
+    ) -> trace_metrics.JsonType | tuple[str, trace_metrics.JsonType]:
         series_by_name = collections.defaultdict(list)
         for event in trace_utils.filter_events(
             model.all_events(),

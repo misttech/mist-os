@@ -61,7 +61,7 @@ pub struct Tag(String);
 pub struct ServiceName(String);
 
 /// A regular expression corresponding to a valid tag or service name.
-const NAME_PATTERN: &'static str = r"^[a-z][a-z-]*$";
+const NAME_PATTERN: &str = r"^[a-z][a-z-]*$";
 
 static NAME_VALIDATOR: LazyLock<Regex> = LazyLock::new(|| Regex::new(NAME_PATTERN).unwrap());
 
@@ -110,7 +110,7 @@ impl Deref for ServiceName {
 /// Allow treating `Tag` as a `&str` for, e.g., HashMap indexing operations.
 impl Borrow<str> for Tag {
     fn borrow(&self) -> &str {
-        &*self
+        self
     }
 }
 
@@ -118,7 +118,7 @@ impl Borrow<str> for Tag {
 /// operations.
 impl Borrow<str> for ServiceName {
     fn borrow(&self) -> &str {
-        &*self
+        self
     }
 }
 
@@ -153,7 +153,7 @@ fn try_insert_items(config: &mut Config, config_text: &str) -> Result<(), Error>
         let name = ServiceName::new(service_name)?;
         if let Some(existing) = config
             .entry(name.clone())
-            .or_insert_with(|| HashMap::new())
+            .or_default()
             .insert(tag, TagConfig { selectors, max_bytes, min_seconds_between_fetch })
         {
             bail!("Duplicate TagConfig found: {:?}", existing);

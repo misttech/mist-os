@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("test.example") {
-  sdk_category = "internal"
   sources = [ "realm_factory.test.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.component.sandbox",

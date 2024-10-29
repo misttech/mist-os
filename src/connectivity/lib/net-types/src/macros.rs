@@ -6,11 +6,12 @@ use assert_matches::assert_matches;
 use proc_macro::TokenStream;
 use proc_macro2::{TokenStream as TokenStream2, TokenTree};
 use quote::{quote, ToTokens as _};
+use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
     parse_quote, AngleBracketedGenericArguments, GenericArgument, GenericParam, Generics, Ident,
-    Type, TypeParam, TypeParamBound, TypePath,
+    Token, Type, TypeParam, TypeParamBound, TypePath,
 };
 
 /// Implements a derive macro for [`net_types::ip::GenericOverIp`].
@@ -159,13 +160,44 @@ enum IpGenericParamType {
     GenericOverIp,
 }
 
+impl Parse for IpGenericParamType {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        let bound: Ident = input.parse()?;
+        let bound_error_message = "the bound passed to generic_over_ip \
+                                   must be Ip, IpAddress, or GenericOverIp";
+
+        Ok(match bound.to_string().as_str() {
+            "Ip" => IpGenericParamType::IpVersion,
+            "IpAddress" => IpGenericParamType::IpAddress,
+            "GenericOverIp" => IpGenericParamType::GenericOverIp,
+            _ => return Err(syn::Error::new(bound.span(), bound_error_message)),
+        })
+    }
+}
+
+struct GenericOverIpArgs {
+    ident: Ident,
+    _comma_token: Token![,],
+    bound: IpGenericParamType,
+}
+
+impl Parse for GenericOverIpArgs {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(GenericOverIpArgs {
+            ident: input.parse()?,
+            _comma_token: input.parse()?,
+            bound: input.parse()?,
+        })
+    }
+}
+
 fn find_generic_over_ip_attr(
     ast: &syn::DeriveInput,
 ) -> Result<Option<(Ident, IpGenericParamType)>, syn::Error> {
     let mut attrs = ast
         .attrs
         .iter()
-        .filter(|attr| attr.path.get_ident().map(|i| i == "generic_over_ip").unwrap_or(false));
+        .filter(|attr| attr.path().get_ident().map(|i| i == "generic_over_ip").unwrap_or(false));
     let attr = attrs.next().ok_or_else(|| {
         syn::Error::new(
             ast.ident.span(),
@@ -182,81 +214,33 @@ fn find_generic_over_ip_attr(
         }
     }
 
-    let meta = attr.parse_meta().map_err(|e| {
-        syn::Error::new(attr.span(), format!("generic_over_ip attr did not parse as Meta: {e:?}"))
-    })?;
-
-    let list = match meta {
+    let list = match &attr.meta {
         syn::Meta::Path(_) | syn::Meta::NameValue(_) => {
             return Err(syn::Error::new(
-                meta.span(),
+                attr.meta.span(),
                 "generic_over_ip must be passed at most one\
-                type parameter identifier",
+                    type parameter identifier",
             ));
         }
         syn::Meta::List(list) => list,
     };
 
-    if list.nested.is_empty() {
+    if list.tokens.is_empty() {
         return Ok(None);
-    } else if list.nested.len() != 2 {
-        return Err(syn::Error::new(
-            list.span(),
-            "generic_over_ip must be either be passed no \
-                         arguments, or one type parameter identifier and its \
-                         trait bound (Ip, IpAddress, or GenericOverIp)",
-        ));
     }
 
-    let mut iter = list.nested.into_iter();
-    let (ident, bound) = (iter.next().unwrap(), iter.next().unwrap());
+    let args: GenericOverIpArgs = syn::parse(list.tokens.clone().into()).map_err(|e| {
+        syn::Error::new(
+            list.tokens.span(),
+            format!(
+                "generic_over_ip must be either be passed no \
+                        arguments, or one type parameter identifier and its \
+                        trait bound (Ip, IpAddress, or GenericOverIp),: {e:?}"
+            ),
+        )
+    })?;
 
-    let ident = match ident {
-        syn::NestedMeta::Meta(meta) => match meta {
-            syn::Meta::Path(path) => match path.get_ident() {
-                None => Err(syn::Error::new(
-                    path.span(),
-                    "generic_over_ip must be passed a parameter identifier",
-                )),
-                Some(ident) => Ok(ident.clone()),
-            },
-            syn::Meta::List(_) | syn::Meta::NameValue(_) => Err(syn::Error::new(
-                meta.span(),
-                "generic_over_ip must be passed at most one \
-                             type parameter identifier, not a list or name-value pair",
-            )),
-        },
-        syn::NestedMeta::Lit(lit) => Err(syn::Error::new(
-            lit.span(),
-            "generic_over_ip must be passed at most one \
-                        type parameter identifier, not a literal",
-        )),
-    }?;
-
-    let bound_error_message = "the bound passed to generic_over_ip \
-                                             must be Ip, IpAddress, or GenericOverIp";
-
-    let bound = match bound {
-        syn::NestedMeta::Meta(meta) => match meta {
-            syn::Meta::Path(path) => match path.get_ident() {
-                None => Err(syn::Error::new(path.span(), bound_error_message)),
-                Some(ident) => Ok(ident.clone()),
-            },
-            syn::Meta::List(_) | syn::Meta::NameValue(_) => {
-                Err(syn::Error::new(meta.span(), bound_error_message))
-            }
-        },
-        syn::NestedMeta::Lit(lit) => Err(syn::Error::new(lit.span(), bound_error_message)),
-    }?;
-
-    let bound = match bound.to_string().as_str() {
-        "Ip" => IpGenericParamType::IpVersion,
-        "IpAddress" => IpGenericParamType::IpAddress,
-        "GenericOverIp" => IpGenericParamType::GenericOverIp,
-        _ => return Err(syn::Error::new(bound.span(), bound_error_message)),
-    };
-
-    Ok(Some((ident, bound)))
+    Ok(Some((args.ident, args.bound)))
 }
 
 fn collect_bounds<'a>(

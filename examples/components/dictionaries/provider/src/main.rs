@@ -11,7 +11,7 @@ use tracing::*;
 use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 enum IncomingRequest {
-    Router(fsandbox::RouterRequestStream),
+    Router(fsandbox::DictionaryRouterRequestStream),
 }
 
 #[fuchsia::main]
@@ -63,15 +63,22 @@ async fn main() {
                     while let Ok(Some(request)) = stream.try_next().await {
                         match request {
                             // [START request]
-                            fsandbox::RouterRequest::Route { payload: _, responder } => {
+                            fsandbox::DictionaryRouterRequest::Route { payload: _, responder } => {
                                 let dup_dict_id = id_gen.next();
                                 store.duplicate(dict_id, dup_dict_id).await.unwrap().unwrap();
                                 let capability = store.export(dup_dict_id).await.unwrap().unwrap();
-                                let _ = responder.send(Ok(capability));
+                                let fsandbox::Capability::Dictionary(dict) = capability else {
+                                    panic!("capability was not a dictionary? {capability:?}");
+                                };
+                                let _ = responder.send(Ok(
+                                    fsandbox::DictionaryRouterRouteResponse::Dictionary(dict),
+                                ));
                             }
                             // [END request]
-                            fsandbox::RouterRequest::_UnknownMethod { ordinal, .. } => {
-                                warn!(%ordinal, "Unknown Router request");
+                            fsandbox::DictionaryRouterRequest::_UnknownMethod {
+                                ordinal, ..
+                            } => {
+                                warn!(%ordinal, "Unknown DictionaryRouter request");
                             }
                         }
                     }

@@ -6,9 +6,11 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
+import("//src/power/cpu-manager/node_config/node_config.gni")
 
 cpu_manager_deps = [
   ":cpu-manager-config-lib",
+  "energy_model_config/parser",
   "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_rust",
   "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
   "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_rust",
@@ -48,6 +50,7 @@ cpu_manager_sources = [
   "src/main.rs",
   "src/message.rs",
   "src/node.rs",
+  "src/rppm_handler.rs",
   "src/syscall_handler.rs",
   "src/test/mock_node.rs",
   "src/test/mod.rs",
@@ -136,15 +139,18 @@ group("tests") {
 fuchsia_unittest_package("cpu-manager-tests") {
   manifest = "meta/cpu_manager_bin_test.cml"
   deps = [
+    ":astro",
     ":bin_test",
-    "node_config:test_config_data",
+    ":sherlock",
   ]
 }
 
-group("astro_config") {
-  deps = [ "node_config:astro" ]
+node_config("astro") {
+  source = "node_config/astro_node_config.json5"
+  output = "astro_node_config.json5"
 }
 
-group("sherlock_config") {
-  deps = [ "node_config:sherlock" ]
+node_config("sherlock") {
+  source = "node_config/sherlock_node_config.json5"
+  output = "sherlock_node_config.json5"
 }

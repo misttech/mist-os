@@ -180,6 +180,7 @@ pub mod executor {
     use super::LOCAL_EXECUTOR;
 
     use crate::runtime::WakeupTime;
+    use crate::Timer;
     use std::future::Future;
     use std::ops::{Deref, DerefMut};
     use std::rc::Rc;
@@ -190,8 +191,8 @@ pub mod executor {
     use tokio::task::LocalSet;
 
     impl WakeupTime for MonotonicInstant {
-        fn into_time(self) -> MonotonicInstant {
-            self
+        fn into_timer(self) -> Timer {
+            Timer(async_io::Timer::at(self))
         }
     }
 
@@ -301,7 +302,7 @@ pub mod executor {
 }
 
 pub mod timer {
-    use crate::runtime::WakeupTime;
+    use crate::WakeupTime;
     use futures::prelude::*;
     use std::pin::Pin;
     use std::task::{Context, Poll};
@@ -309,15 +310,12 @@ pub mod timer {
     /// An asynchronous timer.
     #[derive(Debug)]
     #[must_use = "futures do nothing unless polled"]
-    pub struct Timer(async_io::Timer);
+    pub struct Timer(pub async_io::Timer);
 
     impl Timer {
         /// Create a new timer scheduled to fire at `time`.
-        pub fn new<WT>(time: WT) -> Self
-        where
-            WT: WakeupTime,
-        {
-            Timer(async_io::Timer::at(time.into_time()))
+        pub fn new(time: impl WakeupTime) -> Self {
+            time.into_timer()
         }
     }
 

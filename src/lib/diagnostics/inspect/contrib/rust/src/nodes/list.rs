@@ -36,6 +36,11 @@ impl BoundedListNode {
         self.items.len()
     }
 
+    /// Returns whether or not the bounded list has no elements inside.
+    pub fn is_empty(&self) -> bool {
+        self.items.len() == 0
+    }
+
     /// Returns the capacity of the `BoundedListNode`, the maximum number of child nodes.
     pub fn capacity(&self) -> usize {
         self.capacity
@@ -163,14 +168,14 @@ mod tests {
             list_node.add_entry(|node| {
                 node.record_string("key1", "value1");
                 sender.send(()).unwrap();
-                let _ = receiver2.recv().unwrap();
+                receiver2.recv().unwrap();
                 node.record_string("key2", "value2");
             });
             list_node
         });
 
         // Make sure we already called `add_entry`.
-        let _ = receiver.recv().unwrap();
+        receiver.recv().unwrap();
 
         // We can't read until the atomic transaction is completed.
         assert_matches!(reader::read(&inspector).await, Err(ReaderError::InconsistentSnapshot));

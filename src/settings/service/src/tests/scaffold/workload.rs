@@ -7,8 +7,8 @@ use crate::service::message::{Audience, Messenger, Signature};
 use crate::service::test::Payload;
 use async_trait::async_trait;
 use fuchsia_trace as ftrace;
-use futures::future::BoxFuture;
-use std::sync::Arc;
+use futures::future::LocalBoxFuture;
+use std::rc::Rc;
 
 pub(crate) mod channel {
     use crate::job;
@@ -32,7 +32,7 @@ pub(crate) mod channel {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl job::work::Independent for Workload {
         async fn execute(self: Box<Self>, _messenger: Messenger, _id: ftrace::Id) {
             self.state_sender.unbounded_send(State::Execute).expect("should succeed");
@@ -49,12 +49,12 @@ impl StubWorkload {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl job::work::Independent for StubWorkload {
     async fn execute(self: Box<Self>, _messenger: Messenger, _id: ftrace::Id) {}
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl job::work::Sequential for StubWorkload {
     async fn execute(
         self: Box<Self>,
@@ -81,14 +81,14 @@ impl Workload {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl job::work::Independent for Workload {
     async fn execute(self: Box<Self>, messenger: Messenger, _id: ftrace::Id) {
         let _ = messenger.message(self.payload.into(), Audience::Messenger(self.target));
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl job::work::Sequential for Workload {
     async fn execute(
         self: Box<Self>,
@@ -103,22 +103,20 @@ impl job::work::Sequential for Workload {
 
 /// [Workload] provides a simple implementation of [Workload](job::Workload) for sending a test
 /// Payload to a given target.
-pub(crate) struct Sequential<
-    T: Fn(Messenger, data::StoreHandle) -> BoxFuture<'static, ()> + Send + Sync,
-> {
+pub(crate) struct Sequential<T: Fn(Messenger, data::StoreHandle) -> LocalBoxFuture<'static, ()>> {
     /// The payload to be delivered.
-    callback: Arc<T>,
+    callback: Rc<T>,
 }
 
-impl<T: Fn(Messenger, data::StoreHandle) -> BoxFuture<'static, ()> + Send + Sync> Sequential<T> {
+impl<T: Fn(Messenger, data::StoreHandle) -> LocalBoxFuture<'static, ()>> Sequential<T> {
     pub(crate) fn boxed(callback: T) -> Box<Self> {
-        Box::new(Self { callback: Arc::new(callback) })
+        Box::new(Self { callback: Rc::new(callback) })
     }
 }
 
-#[async_trait]
-impl<T: Fn(Messenger, data::StoreHandle) -> BoxFuture<'static, ()> + Send + Sync>
-    job::work::Sequential for Sequential<T>
+#[async_trait(?Send)]
+impl<T: Fn(Messenger, data::StoreHandle) -> LocalBoxFuture<'static, ()>> job::work::Sequential
+    for Sequential<T>
 {
     async fn execute(
         self: Box<Self>,

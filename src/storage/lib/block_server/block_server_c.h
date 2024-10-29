@@ -49,6 +49,7 @@ constexpr static const uintptr_t MAX_REQUESTS = 64;
 struct Session;
 
 struct PartitionInfo {
+  uint64_t start_block;
   uint64_t block_count;
   uint32_t block_size;
   uint8_t type_guid[16];

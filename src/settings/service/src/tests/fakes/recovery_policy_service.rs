@@ -9,16 +9,16 @@ use fidl::prelude::*;
 use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::TryStreamExt;
-use std::sync::Arc;
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub(crate) struct RecoveryPolicy {
-    is_local_reset_allowed: Arc<Mutex<Option<bool>>>,
+    is_local_reset_allowed: Rc<Mutex<Option<bool>>>,
 }
 
 impl RecoveryPolicy {
     pub(crate) fn create() -> Self {
-        Self { is_local_reset_allowed: Arc::new(Mutex::new(None)) }
+        Self { is_local_reset_allowed: Rc::new(Mutex::new(None)) }
     }
 }
 
@@ -37,7 +37,7 @@ impl Service for RecoveryPolicy {
 
         let local_reset_allowed_handle = self.is_local_reset_allowed.clone();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(req) = manager_stream.try_next().await.unwrap() {
                 // Support future expansion of FIDL.
                 #[allow(unreachable_patterns)]

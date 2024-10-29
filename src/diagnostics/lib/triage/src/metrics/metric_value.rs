@@ -79,7 +79,7 @@ impl Eq for MetricValue {}
 
 impl std::fmt::Display for MetricValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &*self {
+        match self {
             MetricValue::Int(n) => write!(f, "Int({})", n),
             MetricValue::Float(n) => write!(f, "Float({})", n),
             MetricValue::Bool(n) => write!(f, "Bool({})", n),
@@ -92,15 +92,15 @@ impl std::fmt::Display for MetricValue {
     }
 }
 
-impl Into<MetricValue> for f64 {
-    fn into(self) -> MetricValue {
-        MetricValue::Float(self)
+impl From<f64> for MetricValue {
+    fn from(val: f64) -> MetricValue {
+        MetricValue::Float(val)
     }
 }
 
-impl Into<MetricValue> for i64 {
-    fn into(self) -> MetricValue {
-        MetricValue::Int(self)
+impl From<i64> for MetricValue {
+    fn from(val: i64) -> MetricValue {
+        MetricValue::Int(val)
     }
 }
 
@@ -144,9 +144,7 @@ impl From<JsonValue> for MetricValue {
             JsonValue::String(value) => Self::String(value),
             JsonValue::Bool(value) => Self::Bool(value),
             JsonValue::Number(_) => Self::from(&value),
-            JsonValue::Array(values) => {
-                Self::Vector(values.into_iter().map(|v| Self::from(v)).collect())
-            }
+            JsonValue::Array(values) => Self::Vector(values.into_iter().map(Self::from).collect()),
             _ => unhandled_type("Unsupported JSON type"),
         }
     }
@@ -168,9 +166,7 @@ impl From<&JsonValue> for MetricValue {
                     unhandled_type("Unable to convert JSON number")
                 }
             }
-            JsonValue::Array(values) => {
-                Self::Vector(values.iter().map(|v| Self::from(v)).collect())
-            }
+            JsonValue::Array(values) => Self::Vector(values.iter().map(Self::from).collect()),
             _ => unhandled_type("Unsupported JSON type"),
         }
     }
@@ -178,7 +174,7 @@ impl From<&JsonValue> for MetricValue {
 
 impl std::fmt::Debug for Problem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &*self {
+        match self {
             Problem::Missing(s) => write!(f, "Missing: {}", s),
             Problem::Ignore(problems) => {
                 if problems.len() == 1 {
@@ -390,11 +386,11 @@ pub(crate) mod test {
         test_from!(JsonValue::String, MetricValue::String, "Hi World".to_string());
         test_from_int!(JsonValue::Number, MetricValue::Int, 3);
         test_from_int!(JsonValue::Number, MetricValue::Int, i64::MAX);
-        test_from_int!(JsonValue::Number, MetricValue::Int, std::i64::MIN);
+        test_from_int!(JsonValue::Number, MetricValue::Int, i64::MIN);
         test_from_to!(JsonValue::Number, MetricValue::Int, JsonNumber::from(u64::MAX), -1);
         test_from_float!(JsonValue::Number, MetricValue::Float, std::f64::consts::PI);
-        test_from_float!(JsonValue::Number, MetricValue::Float, std::f64::MAX);
-        test_from_float!(JsonValue::Number, MetricValue::Float, std::f64::MIN);
+        test_from_float!(JsonValue::Number, MetricValue::Float, f64::MAX);
+        test_from_float!(JsonValue::Number, MetricValue::Float, f64::MIN);
         test_from!(JsonValue::Bool, MetricValue::Bool, true);
         test_from!(JsonValue::Bool, MetricValue::Bool, false);
         let json_vec = vec![json!(1), json!(2), json!(3)];
@@ -443,12 +439,12 @@ pub(crate) mod test {
         test_from!(DiagnosticProperty::Bytes, MetricValue::Bytes, vec![1, 2, 3]);
         test_from!(DiagnosticProperty::Int, MetricValue::Int, 3);
         test_from!(DiagnosticProperty::Int, MetricValue::Int, i64::MAX);
-        test_from!(DiagnosticProperty::Int, MetricValue::Int, std::i64::MIN);
+        test_from!(DiagnosticProperty::Int, MetricValue::Int, i64::MIN);
         test_from!(DiagnosticProperty::Uint, MetricValue::Int, 3);
         test_from_to!(DiagnosticProperty::Uint, MetricValue::Int, u64::MAX, -1);
         test_from!(DiagnosticProperty::Double, MetricValue::Float, std::f64::consts::PI);
-        test_from!(DiagnosticProperty::Double, MetricValue::Float, std::f64::MAX);
-        test_from!(DiagnosticProperty::Double, MetricValue::Float, std::f64::MIN);
+        test_from!(DiagnosticProperty::Double, MetricValue::Float, f64::MAX);
+        test_from!(DiagnosticProperty::Double, MetricValue::Float, f64::MIN);
         test_from!(DiagnosticProperty::Bool, MetricValue::Bool, true);
         test_from!(DiagnosticProperty::Bool, MetricValue::Bool, false);
         let diagnostic_array = ArrayContent::Values(vec![1.5, 2.5, 3.5]);

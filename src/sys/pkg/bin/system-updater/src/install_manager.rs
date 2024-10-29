@@ -9,7 +9,7 @@ use fidl_fuchsia_update_installer::{
     CancelError, ResumeError, SuspendError, UpdateNotStartedReason,
 };
 use fidl_fuchsia_update_installer_ext::State;
-use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt as _};
+use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeTimeExt};
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use futures::select;
@@ -424,7 +424,7 @@ where
 
 impl<N: Notify> ControlRequest<N> {
     fn write_to_inspect(&self, node: &inspect::Node) {
-        node.record_time("time");
+        NodeTimeExt::<zx::MonotonicTimeline>::record_time(node, "time");
 
         match self {
             Self::Start(data) => {

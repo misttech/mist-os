@@ -56,10 +56,18 @@ async fn create_test_env() -> TestEnv {
 
     // Expose config capabilities to system-activity-governor.
     builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.power.UseSuspender".parse().unwrap(),
+            value: false.into(),
+        }))
+        .await
+        .unwrap();
+
+    builder
         .add_route(
             Route::new()
                 .capability(Capability::configuration("fuchsia.power.UseSuspender"))
-                .from(Ref::void())
+                .from(Ref::self_())
                 .to(&component_ref),
         )
         .await

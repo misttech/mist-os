@@ -17,7 +17,16 @@
       "name": "test.dependent",
       "declarations": {
         "test.dependent/MyEnum": {
-          "kind": "enum"
+          "kind": "enum",
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         }
       }
     }

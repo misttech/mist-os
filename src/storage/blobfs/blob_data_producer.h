@@ -5,13 +5,13 @@
 #ifndef SRC_STORAGE_BLOBFS_BLOB_DATA_PRODUCER_H_
 #define SRC_STORAGE_BLOBFS_BLOB_DATA_PRODUCER_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 
 namespace blobfs {
 
@@ -28,7 +28,7 @@ class BlobDataProducer {
   // Producers must be able to accommodate zero padding up to kBlobfsBlockSize if it would be
   // required i.e. if the last span returned is not a whole block size, it must point to a buffer
   // that can be extended with zero padding (which will be done by the caller).
-  virtual zx::result<cpp20::span<const uint8_t>> Consume(uint64_t max) = 0;
+  virtual zx::result<std::span<const uint8_t>> Consume(uint64_t max) = 0;
 
   // Subclasses should return true if the next call to Consume would invalidate data returned by
   // previous calls to Consume.
@@ -38,14 +38,14 @@ class BlobDataProducer {
 // A simple producer that just vends data from a supplied span.
 class SimpleBlobDataProducer : public BlobDataProducer {
  public:
-  explicit SimpleBlobDataProducer(cpp20::span<const uint8_t> data) : data_(data) {}
+  explicit SimpleBlobDataProducer(std::span<const uint8_t> data) : data_(data) {}
 
   // BlobDataProducer implementation:
   uint64_t GetRemainingBytes() const override;
-  zx::result<cpp20::span<const uint8_t>> Consume(uint64_t max) override;
+  zx::result<std::span<const uint8_t>> Consume(uint64_t max) override;
 
  private:
-  cpp20::span<const uint8_t> data_;
+  std::span<const uint8_t> data_;
 };
 
 // Merges two producers together with optional padding between them. If there is padding, we
@@ -59,7 +59,7 @@ class MergeBlobDataProducer : public BlobDataProducer {
 
   // BlobDataProducer implementation:
   uint64_t GetRemainingBytes() const override;
-  zx::result<cpp20::span<const uint8_t>> Consume(uint64_t max) override;
+  zx::result<std::span<const uint8_t>> Consume(uint64_t max) override;
   bool NeedsFlush() const override;
 
  private:
@@ -77,7 +77,7 @@ class DecompressBlobDataProducer : public BlobDataProducer {
 
   // BlobDataProducer implementation:
   uint64_t GetRemainingBytes() const override;
-  zx::result<cpp20::span<const uint8_t>> Consume(uint64_t max) override;
+  zx::result<std::span<const uint8_t>> Consume(uint64_t max) override;
   bool NeedsFlush() const override;
 
  private:

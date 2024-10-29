@@ -12,7 +12,7 @@ use fuchsia_async::{self as fasync, DurationExt};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::{AbortHandle, Abortable, TryFutureExt};
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::MonotonicDuration;
 
 /// Helper for creating a beacon. The builder allows chaining additional fuses
@@ -60,7 +60,7 @@ pub struct Beacon {
     /// Receptor.
     event_sender: UnboundedSender<MessageEvent>,
     /// Sentinel for secondary ActionFuses
-    sentinel: Arc<Mutex<Sentinel>>,
+    sentinel: Rc<Mutex<Sentinel>>,
     /// Timeout for firing if a response payload is not delivered in time.
     timeout_abort_client: AbortHandle,
 }
@@ -73,7 +73,7 @@ impl Beacon {
         fuses: Option<ActionFuseHandle>,
         timeout: Option<MonotonicDuration>,
     ) -> (Beacon, Receptor) {
-        let sentinel = Arc::new(Mutex::new(Sentinel::new()));
+        let sentinel = Rc::new(Mutex::new(Sentinel::new()));
         let (event_tx, event_rx) = futures::channel::mpsc::unbounded::<MessageEvent>();
         let (timeout_abort_client, timeout_abort_server) = AbortHandle::new_pair();
         let signature = messenger.get_signature();
@@ -90,7 +90,7 @@ impl Beacon {
             event_rx,
             ActionFuse::create(Box::new(move || {
                 let sentinel = sentinel.clone();
-                fasync::Task::spawn(async move {
+                fasync::Task::local(async move {
                     timeout_abort_client.abort();
                     sentinel.lock().await.trigger().await;
                 })
@@ -111,7 +111,7 @@ impl Beacon {
                 timeout_abort_server,
             );
 
-            fasync::Task::spawn(abortable_timeout.unwrap_or_else(|_| ())).detach();
+            fasync::Task::local(abortable_timeout.unwrap_or_else(|_| ())).detach();
         }
         (beacon, receptor)
     }

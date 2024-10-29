@@ -15,7 +15,8 @@ use pbms::AuthFlowChoice;
     example = "\
     Sample invocations:
 
-    // List all product names of current ffx version.
+    // List all product names based on current ffx version. Note it will list
+    // the latest version of the date section.
     ffx product list
 
     // List all product names with version 19.20240302.2.1

@@ -1168,7 +1168,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             transaction.add(store_id, m);
         }
         for (r, c) in checksums {
-            transaction.add_checksum(r, c);
+            transaction.add_checksum(r, c, true);
         }
         self.update_allocated_size(transaction, allocated, deallocated).await
     }
@@ -1281,24 +1281,67 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         let write_end = min(range.end, target_range.end);
                         let write_length = write_end - target_range.start;
                         let (current_buf, remaining_buf) = buf.split_at_mut(write_length as usize);
-                        writes.push(async move {
-                            let maybe_checksums = self
-                                .write_aligned(current_buf.as_ref(), write_device_offset)
-                                .await?;
-                            Ok::<_, Error>(maybe_checksums.into_option().map(|checksums| {
-                                (
-                                    write_device_offset..(write_device_offset + write_length),
-                                    checksums,
-                                )
-                            }))
-                        });
-                        if let Some((_, write_bitmap)) = &mut bitmap {
+                        let checksum_ranges = if let Some((bitmap, write_bitmap)) = &mut bitmap {
+                            let mut checksum_range_start = 0;
+                            let mut checksum_range_type =
+                                !bitmap.get(block_offset_within_extent as usize).unwrap();
+                            let mut checksum_ranges = Vec::new();
+                            let mut write_device_offset_start = write_device_offset;
                             for i in block_offset_within_extent
                                 ..block_offset_within_extent + write_length / block_size
                             {
                                 write_bitmap.set(i as usize, true);
+                                if checksum_range_type == bitmap.get(i as usize).unwrap() {
+                                    checksum_ranges.push((
+                                        checksum_range_start as usize
+                                            ..(i - block_offset_within_extent) as usize,
+                                        write_device_offset_start
+                                            ..write_device_offset + i * block_size,
+                                        checksum_range_type,
+                                    ));
+                                    checksum_range_start = i - block_offset_within_extent;
+                                    checksum_range_type = !checksum_range_type;
+                                    write_device_offset_start =
+                                        write_device_offset + i * block_size;
+                                }
                             }
-                        }
+                            checksum_ranges
+                        } else {
+                            // If there is no bitmap, then the overwrite range is fully written to.
+                            // However, we could still be within the journal flush window where one
+                            // of the blocks was written to for the first time to put it in this
+                            // state, so we still need to emit the checksums in case replay needs
+                            // them.
+                            vec![(
+                                0..(write_length / block_size) as usize,
+                                write_device_offset..(write_device_offset + write_length),
+                                false,
+                            )]
+                        };
+                        writes.push(async move {
+                            let maybe_checksums = self
+                                .write_aligned(current_buf.as_ref(), write_device_offset)
+                                .await?;
+                            Ok::<Vec<_>, Error>(
+                                maybe_checksums
+                                    .into_option()
+                                    .into_iter()
+                                    .flat_map(|checksums| {
+                                        let mut out_checksums = Vec::new();
+                                        for (checksum_range, write_range, first_write) in
+                                            &checksum_ranges
+                                        {
+                                            out_checksums.push((
+                                                write_range.clone(),
+                                                checksums[checksum_range.clone()].to_vec(),
+                                                *first_write,
+                                            ))
+                                        }
+                                        out_checksums
+                                    })
+                                    .collect(),
+                            )
+                        });
                         buf = remaining_buf;
                         target_range.start += write_length;
                         if target_range.start == target_range.end {
@@ -1338,12 +1381,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             }
         }
 
-        let checksums = writes
-            .try_filter_map(|x| futures::future::ok(x))
-            .try_collect::<Vec<(Range<u64>, Vec<Checksum>)>>()
-            .await?;
-        for (r, c) in checksums {
-            transaction.add_checksum(r, c);
+        let checksums = writes.try_collect::<Vec<_>>().await?;
+        for (r, c, first_write) in checksums.into_iter().flatten() {
+            transaction.add_checksum(r, c, first_write);
         }
 
         for m in mutations {

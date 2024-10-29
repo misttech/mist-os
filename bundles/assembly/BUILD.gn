@@ -4040,6 +4040,7 @@ assembly_input_bundle("power_framework_sag") {
 #
 assembly_input_bundle("power_framework_testing_sag") {
   bootfs_packages = [
+    "//src/power/system-activity-governor:config-use-suspender",
     "//src/power/system-activity-governor/fake:package",
     "//src/power/testing/fake-suspend:fake-suspend-pkg",
   ]
@@ -4512,6 +4513,34 @@ assembly_input_bundle("recovery_fdr") {
           source = "$root_build_dir/gen/src/sys/pkg/bin/system-update-committer/system_update_committer_config_disable.json"
           destination = "config.json"
           label = "//src/sys/pkg/bin/system-update-committer:disable"
+        },
+      ]
+    },
+  ]
+}
+
+assembly_input_bundle("session_manager_enable_pkg_cache") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/session/bin/session_manager/meta/session_manager_enable_pkg_cache.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+assembly_input_bundle("session_manager_disable_pkg_cache") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/session/bin/session_manager/meta/session_manager_disable_pkg_cache.core_shard.cml" ]
         },
       ]
     },

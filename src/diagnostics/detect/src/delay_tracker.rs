@@ -65,6 +65,7 @@ impl DelayTracker {
 mod test {
     use super::*;
     use injectable_time::FakeTime;
+    use static_assertions::const_assert;
 
     #[fuchsia::test]
     fn verify_test_mode() {
@@ -79,18 +80,18 @@ mod test {
         let ok_slow_2 = tracker.ok_to_send(&trigger_slow);
         let ok_fast_2 = tracker.ok_to_send(&trigger_fast);
         // This one should obviously succeed.
-        assert_eq!(ok_slow_1, true);
+        assert!(ok_slow_1);
         // It should allow a different snapshot signature too.
-        assert_eq!(ok_fast_1, true);
+        assert!(ok_fast_1);
         // It should reject the first (slow) signature the second time.
-        assert_eq!(ok_slow_2, false);
+        assert!(!ok_slow_2);
         // The second (fast) signature should be accepted repeatedly.
-        assert_eq!(ok_fast_2, true);
+        assert!(ok_fast_2);
     }
 
     #[fuchsia::test]
     fn verify_appropriate_report_interval() {
-        assert!(MINIMUM_SIGNATURE_INTERVAL_NANOS > 1);
+        const_assert!(MINIMUM_SIGNATURE_INTERVAL_NANOS > 1);
         let time = Arc::new(FakeTime::new());
         let test_tracker = DelayTracker::new(time.clone(), Mode::IntegrationTest);
         let production_tracker = DelayTracker::new(time, Mode::Production);

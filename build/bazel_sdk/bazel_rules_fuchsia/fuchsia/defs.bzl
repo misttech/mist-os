@@ -12,6 +12,10 @@ See also:
 """
 
 load(
+    "//fuchsia/constraints:target_compatibility.bzl",
+    _COMPATIBILITY = "COMPATIBILITY",
+)
+load(
     "//fuchsia/constraints/platforms:supported_platforms.bzl",
     _fuchsia_platforms = "fuchsia_platforms",
 )
@@ -47,6 +51,10 @@ load(
 load(
     "//fuchsia/private:fuchsia_cc_driver.bzl",
     _fuchsia_cc_driver = "fuchsia_cc_driver",
+)
+load(
+    "//fuchsia/private:fuchsia_cc_library.bzl",
+    _fuchsia_cc_library = "fuchsia_cc_library",
 )
 load(
     "//fuchsia/private:fuchsia_component.bzl",
@@ -167,6 +175,7 @@ fuchsia_bind_cc_library = _fuchsia_bind_cc_library
 fuchsia_bind_library = _fuchsia_bind_library
 fuchsia_cc_binary = _fuchsia_cc_binary
 fuchsia_cc_driver = _fuchsia_cc_driver
+fuchsia_cc_library = _fuchsia_cc_library
 fuchsia_cc_test = _fuchsia_cc_test
 fuchsia_component = _fuchsia_component
 fuchsia_component_manifest = _fuchsia_component_manifest
@@ -217,4 +226,5 @@ get_fuchsia_api_levels = _get_fuchsia_api_levels
 fuchsia_platforms = _fuchsia_platforms
 
 # Constants
+COMPATIBILITY = _COMPATIBILITY
 FUCHSIA_API_LEVEL_STATUS_SUPPORTED = _FUCHSIA_API_LEVEL_STATUS_SUPPORTED

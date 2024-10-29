@@ -86,8 +86,8 @@ go_library("go_empty_gidl_tests_library") {
 go_test("go_empty_gidl_test_bin") {
   library = ":go_empty_gidl_tests_library"
   non_go_deps = [ ":go_empty_gidl" ]
-  use_prebuilt_go = false
 }
+assert(is_fuchsia, "gidl test is fuchsia-only (${current_toolchain})")
 
 fuchsia_unittest_package("go_empty_gidl_tests") {
   deps = [ ":go_empty_gidl_test_bin" ]

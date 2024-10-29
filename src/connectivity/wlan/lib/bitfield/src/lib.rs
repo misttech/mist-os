@@ -548,7 +548,7 @@ fn get_data_format_from_struct_def(struct_def: &DeriveInput) -> Result<DataForma
         Data::Struct(DataStruct { fields: Fields::Unnamed(fields), .. }) => {
             if fields.unnamed.len() != 1 {
                 return Err(Error::new(
-                    fields.paren_token.span,
+                    fields.paren_token.span.join(),
                     "expected a tuple struct with a single field",
                 ));
             }

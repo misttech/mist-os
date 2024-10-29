@@ -6,6 +6,7 @@
 #define ZIRCON_KERNEL_LIB_EFI_TESTING_INCLUDE_LIB_EFI_TESTING_FAKE_NETWORK_PROTOCOL_H_
 
 #include <vector>
+#include <type_traits>
 
 #include <efi/protocol/managed-network.h>
 

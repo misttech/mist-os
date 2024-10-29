@@ -982,6 +982,56 @@ func Main() {
 	addMulticastIpv4RoutingTableControllerService(componentCtx, ns.stack)
 	addMulticastIpv6RoutingTableControllerService(componentCtx, ns.stack)
 
+	{
+		componentCtx.OutgoingService.AddService(
+			routesAdmin.RouteTableProviderV4Name,
+			func(ctx context.Context, c zx.Channel) error {
+				_ = syslog.ErrorTf(routesAdmin.RouteTableProviderV4Name,
+					"netstack2 does not support %s",
+					routesAdmin.RouteTableProviderV4Name,
+				)
+				component.CloseWithEpitaph(c, zx.ErrNotSupported)
+				return nil
+			},
+		)
+
+		componentCtx.OutgoingService.AddService(
+			routesAdmin.RouteTableProviderV6Name,
+			func(ctx context.Context, c zx.Channel) error {
+				_ = syslog.ErrorTf(routesAdmin.RouteTableProviderV6Name,
+					"netstack2 does not support %s",
+					routesAdmin.RouteTableProviderV6Name,
+				)
+				component.CloseWithEpitaph(c, zx.ErrNotSupported)
+				return nil
+			},
+		)
+
+		componentCtx.OutgoingService.AddService(
+			routesAdmin.RuleTableV4Name,
+			func(ctx context.Context, c zx.Channel) error {
+				_ = syslog.ErrorTf(routesAdmin.RuleTableV4Name,
+					"netstack2 does not support %s",
+					routesAdmin.RuleTableV4Name,
+				)
+				component.CloseWithEpitaph(c, zx.ErrNotSupported)
+				return nil
+			},
+		)
+
+		componentCtx.OutgoingService.AddService(
+			routesAdmin.RuleTableV6Name,
+			func(ctx context.Context, c zx.Channel) error {
+				_ = syslog.ErrorTf(routesAdmin.RuleTableV6Name,
+					"netstack2 does not support %s",
+					routesAdmin.RuleTableV6Name,
+				)
+				component.CloseWithEpitaph(c, zx.ErrNotSupported)
+				return nil
+			},
+		)
+	}
+
 	componentCtx.BindStartupHandle(context.Background())
 }
 

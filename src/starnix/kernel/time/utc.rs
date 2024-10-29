@@ -5,15 +5,26 @@
 
 #[cfg(not(feature = "starnix_lite"))]
 use crate::vdso::vdso_loader::MemoryMappedVvar;
-use fuchsia_runtime::{
-    duplicate_utc_clock_handle, UtcClock as UtcClockHandle, UtcClockTransform, UtcInstant,
-};
+use fuchsia_runtime::{zx_utc_reference_get, UtcTimeline};
 use once_cell::sync::Lazy;
 use starnix_logging::log_warn;
 use starnix_sync::Mutex;
-use zx::{
-    AsHandleRef, ClockTransformation, {self as zx},
-};
+use zx::{self as zx, AsHandleRef, Unowned};
+
+// TODO(https://fxbug.dev/356911500): Use types below from fuchsia_runtime
+type UtcInstant = zx::Instant<UtcTimeline>;
+type UtcClockHandle = zx::Clock<zx::BootTimeline, UtcTimeline>;
+type UtcClockTransform = zx::ClockTransformation<zx::BootTimeline, UtcTimeline>;
+fn utc_clock() -> Unowned<'static, UtcClockHandle> {
+    // SAFETY: basic FFI call which returns either a valid handle or ZX_HANDLE_INVALID.
+    unsafe {
+        let handle = zx_utc_reference_get();
+        Unowned::from_raw_handle(handle)
+    }
+}
+fn duplicate_utc_clock_handle(rights: zx::Rights) -> Result<UtcClockHandle, zx::Status> {
+    utc_clock().duplicate(rights)
+}
 
 // Many Linux APIs need a running UTC clock to function. Since there can be a delay until the
 // UTC clock in Zircon starts up (https://fxbug.dev/42081426), Starnix provides a synthetic utc clock initially,
@@ -30,17 +41,14 @@ struct UtcClock {
 impl UtcClock {
     pub fn new(real_utc_clock: UtcClockHandle) -> Self {
         let offset = real_utc_clock.get_details().unwrap().backstop.into_nanos()
-            - zx::MonotonicInstant::get().into_nanos();
-        let current_transform = ClockTransformation {
-            reference_offset: zx::MonotonicInstant::default(),
+            - zx::BootInstant::get().into_nanos();
+        let current_transform = zx::ClockTransformation {
+            reference_offset: zx::BootInstant::default(),
             synthetic_offset: UtcInstant::from_nanos(offset),
             rate: zx::sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
         };
-        let mut utc_clock = Self {
-            real_utc_clock: real_utc_clock,
-            current_transform: current_transform,
-            real_utc_clock_started: false,
-        };
+        let mut utc_clock =
+            Self { real_utc_clock, current_transform, real_utc_clock_started: false };
         utc_clock.poll_transform();
         if !utc_clock.real_utc_clock_started {
             log_warn!(
@@ -66,14 +74,14 @@ impl UtcClock {
     }
 
     pub fn now(&self) -> UtcInstant {
-        let monotonic_time = zx::MonotonicInstant::get();
+        let boot_time = zx::BootInstant::get();
         // Utc time is calculated using the same transform as the one stored in vvar. This is
         // to ensure that utc calculations are the same whether using a syscall or the vdso
         // function.
-        self.current_transform.apply(monotonic_time)
+        self.current_transform.apply(boot_time)
     }
 
-    pub fn estimate_monotonic_deadline(&self, utc: UtcInstant) -> zx::MonotonicInstant {
+    pub fn estimate_boot_deadline(&self, utc: UtcInstant) -> zx::BootInstant {
         self.current_transform.apply_inverse(utc)
     }
 
@@ -97,7 +105,15 @@ impl UtcClock {
     #[cfg(not(feature = "starnix_lite"))]
     pub fn update_utc_clock(&mut self, dest: &MemoryMappedVvar) {
         self.poll_transform();
-        dest.update_utc_data_transform(&self.current_transform);
+        // TODO(https://fxbug.dev/356911500): Remove the parsing
+        let mono_transform = zx::ClockTransformation {
+            reference_offset: zx::MonotonicInstant::from_nanos(
+                self.current_transform.reference_offset.into_nanos(),
+            ),
+            synthetic_offset: self.current_transform.synthetic_offset,
+            rate: self.current_transform.rate.clone(),
+        };
+        dest.update_utc_data_transform(&mono_transform);
     }
 }
 
@@ -122,7 +138,7 @@ pub fn utc_now() -> UtcInstant {
     (*UTC_CLOCK).lock().now()
 }
 
-pub fn estimate_monotonic_deadline_from_utc(utc: UtcInstant) -> zx::MonotonicInstant {
+pub fn estimate_boot_deadline_from_utc(utc: UtcInstant) -> zx::BootInstant {
     #[cfg(test)]
     {
         if let Some(test_time) = UTC_CLOCK_OVERRIDE_FOR_TESTING.with(|cell| {
@@ -133,7 +149,7 @@ pub fn estimate_monotonic_deadline_from_utc(utc: UtcInstant) -> zx::MonotonicIns
             return test_time;
         }
     }
-    (*UTC_CLOCK).lock().estimate_monotonic_deadline(utc)
+    (*UTC_CLOCK).lock().estimate_boot_deadline(utc)
 }
 
 #[cfg(test)]

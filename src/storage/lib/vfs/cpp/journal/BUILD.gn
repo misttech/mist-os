@@ -126,9 +126,6 @@ test("journal-unit") {
     "//zircon/third_party/ulib/cksum",
     "//zircon/third_party/ulib/safemath",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 source_set("fuzz-utils") {

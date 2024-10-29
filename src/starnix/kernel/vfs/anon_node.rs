@@ -8,10 +8,10 @@ use crate::vfs::{
     FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
 };
 use starnix_sync::{FileOpsCore, Locked};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{error, ino_t, statfs, ANON_INODE_FS_MAGIC};
 use std::sync::Arc;
 
@@ -39,7 +39,12 @@ impl Anon {
         info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
-        FileObject::new_anonymous(ops, fs.create_node(current_task, Anon, info), flags)
+        FileObject::new_anonymous(
+            current_task,
+            ops,
+            fs.create_node(current_task, Anon, info),
+            flags,
+        )
     }
 
     pub fn new_file(

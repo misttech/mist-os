@@ -65,7 +65,7 @@ impl StorageAccess for IntlController {
     const STORAGE_KEY: &'static str = <IntlInfo as DeviceStorageCompatible>::KEY;
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl data_controller::Create for IntlController {
     async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
         let time_zone_ids = IntlController::load_time_zones();
@@ -73,7 +73,7 @@ impl data_controller::Create for IntlController {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for IntlController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {

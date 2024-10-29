@@ -325,11 +325,9 @@ async fn run(
     inspect: inspect::Node,
 ) -> Result<(), Error> {
     let mut id_gen = IdGenerator::new();
-    let directory = fuchsia_fs::directory::open_in_namespace_deprecated(
-        HCI_DEVICE_CLASS_PATH,
-        fio::OpenFlags::empty(),
-    )
-    .expect("Failed to open hci dev directory");
+    let directory =
+        fuchsia_fs::directory::open_in_namespace(HCI_DEVICE_CLASS_PATH, fio::Flags::empty())
+            .expect("Failed to open hci dev directory");
     let mut hci_device_events =
         Watcher::new(&directory).await.context("Cannot create device watcher")?;
     let mut client_requests = ConcurrentClientRequestFutures::new();

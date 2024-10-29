@@ -118,6 +118,9 @@ python_c_extension("fuchsia_controller_internal") {
     "cpp/raii/py_wrapper.h",
   ]
 
+  stubs_root = "cpp/stubs"
+  stubs = [ "__init__.pyi" ]
+
   deps = [
     ":lib",
     "//zircon/system/public",
@@ -134,8 +137,6 @@ python_c_extension("fuchsia_controller_internal") {
 }
 
 python_library("fuchsia_controller_py") {
-  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
-  enable_mypy = false
   library_name = "fuchsia_controller_py"
   source_root = "python/fuchsia_controller_py"
   library_deps = [
@@ -170,7 +171,6 @@ python_library("fidl_bindings") {
 }
 
 python_binary("example") {
-  enable_mypy = true
   main_source = "python/example.py"
   deps = [
     ":fidl_bindings",

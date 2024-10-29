@@ -59,9 +59,9 @@ pub trait WriteInspect {
 #[macro_export]
 macro_rules! inspect_log {
     ($bounded_list_node:expr, $($args:tt)+) => {{
-        use $crate::{inspect_insert, nodes::NodeExt};
+        use $crate::{inspect_insert, nodes::{NodeTimeExt, BootTimeline}};
         $bounded_list_node.add_entry(|node| {
-            node.record_time("@time");
+            NodeTimeExt::<BootTimeline>::record_time(node, "@time");
             inspect_insert!(@internal_inspect_log node, $($args)+);
         });
     }};

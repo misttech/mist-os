@@ -5,13 +5,15 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_H_
 #define SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
-#include <fidl/fuchsia.io/cpp/fidl.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/device-protocol/pdev-fidl.h>
 #include <lib/dma-buffer/buffer.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -21,7 +23,6 @@
 #include <deque>
 #include <memory>
 
-#include <ddktl/device.h>
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
@@ -40,21 +41,13 @@ zx_status_t CacheFlush(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, si
 zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset,
                                  size_t length);
 
-class Dwc3;
-using Dwc3Type = ddk::Device<Dwc3, ddk::Initializable, ddk::Unbindable>;
-
-class Dwc3 : public Dwc3Type,
-             public fidl::Server<fuchsia_hardware_usb_dci::UsbDci> {
+class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dci::UsbDci> {
  public:
-  explicit Dwc3(zx_device_t* parent, async_dispatcher_t* dispatcher)
-      : Dwc3Type(parent), dispatcher_{dispatcher} {}
+  Dwc3(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase{"dwc3", std::move(start_args), std::move(dispatcher)} {}
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-
-  // Device protocol implementation.
-  void DdkInit(ddk::InitTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
+  zx::result<> Start() override;
+  void Stop() override;
 
   // fuchsia_hardware_usb_dci::UsbDci protocol implementation.
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
@@ -80,12 +73,12 @@ class Dwc3 : public Dwc3Type,
                              fidl::UnknownMethodCompleter::Sync& completer) override { /* no-op */ }
 
  private:
-  zx_status_t CommonCancelAll(uint8_t ep_addr);
+  zx::result<> CommonCancelAll(uint8_t ep_addr);
   void DciIntfSetSpeed(fuchsia_hardware_usb_descriptor::wire::UsbSpeed speed) TA_REQ(dci_lock_);
   void DciIntfSetConnected(bool connected) TA_REQ(dci_lock_);
-  zx_status_t DciIntfControl(const fuchsia_hardware_usb_descriptor::wire::UsbSetup* setup,
-                             const uint8_t* write_buffer, size_t write_size, uint8_t* read_buffer,
-                             size_t read_size, size_t* read_actual) TA_REQ(dci_lock_);
+  zx::result<size_t> DciIntfControl(const fuchsia_hardware_usb_descriptor::wire::UsbSetup* setup,
+                                    const uint8_t* write_buffer, size_t write_size,
+                                    uint8_t* read_buffer, size_t read_size) TA_REQ(dci_lock_);
 
   static inline const uint32_t kEventBufferSize = zx_system_get_page_size();
   static inline const uint32_t kEp0BufferSize = UINT16_MAX + 1;
@@ -137,7 +130,7 @@ class Dwc3 : public Dwc3Type,
       fbl::AutoLock lock{&lock_};
 
       if (info.uep == nullptr) {
-        zxlogf(ERROR, "[BUG] Enqueuing usb::FidlRequest with no corresponding uep");
+        FDF_LOG(ERROR, "[BUG] Enqueuing usb::FidlRequest with no corresponding uep");
       }
       ZX_ASSERT(info.uep != nullptr);  // Halt and catch fire.
 
@@ -214,7 +207,7 @@ class Dwc3 : public Dwc3Type,
       auto result =
           fdf::SynchronizedDispatcher::Create({}, "ep-dispatcher", [&](fdf_dispatcher_t*) {});
       if (result.is_error()) {
-        zxlogf(ERROR, "Could not initialize dispatcher: %s", result.status_string());
+        FDF_LOG(ERROR, "Could not initialize dispatcher: %s", result.status_string());
         return;
       }
       dispatcher_ = std::move(result.value());
@@ -377,7 +370,6 @@ class Dwc3 : public Dwc3Type,
   zx_status_t AcquirePDevResources();
   zx_status_t Init();
   libsync::Completion init_done_;  // Signaled at the end of Init().
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ServeProtocol();  // Invoked before DdkAdd()
   void ReleaseResources();
 
   // The IRQ thread and its two top level event decoders.
@@ -469,7 +461,7 @@ class Dwc3 : public Dwc3Type,
   fbl::Mutex lock_;
   fbl::Mutex dci_lock_;
 
-  ddk::PDevFidl pdev_;
+  fdf::PDev pdev_;
 
   fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface> dci_intf_ TA_GUARDED(dci_lock_);
 
@@ -496,9 +488,10 @@ class Dwc3 : public Dwc3Type,
   // endpoints_[0].lock(), but how do we express this?
   bool configured_ = false;
 
-  async_dispatcher_t* dispatcher_;
-  component::OutgoingDirectory outgoing_{dispatcher_};
   fidl::ServerBindingGroup<fuchsia_hardware_usb_dci::UsbDci> bindings_;
+  fidl::SyncClient<fuchsia_driver_framework::NodeController> child_;
+
+  compat::SyncInitializedDeviceServer compat_;
 };
 
 }  // namespace dwc3

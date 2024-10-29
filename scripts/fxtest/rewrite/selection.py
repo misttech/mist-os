@@ -20,6 +20,7 @@ import shutil
 import tempfile
 import typing
 
+import environment
 import event
 import execution
 import selection_types
@@ -50,10 +51,12 @@ PERFECT_MATCH_DISTANCE: int = 0
 async def select_tests(
     entries: list[Test],
     selection: list[str],
+    exec_env: environment.ExecutionEnvironment,
     mode: SelectionMode = SelectionMode.ANY,
     fuzzy_distance_threshold: int = DEFAULT_FUZZY_DISTANCE_THRESHOLD,
     recorder: event.EventRecorder | None = None,
     exact_match: bool = False,
+    override_matcher_path: list[str] | None = None,
 ) -> selection_types.TestSelections:
     """Perform selection on the incoming list of tests.
 
@@ -65,6 +68,7 @@ async def select_tests(
     Args:
         entries (list[Test]): Tests to select from.
         selection (list[str]): Selection command line.
+        exec_env (ExecutionEnvironment): The environment used to construct paths to tools.
         mode (SelectionMode, optional): Selection mode. Defaults to ANY.
         fuzzy_distance_threshold (int, optional): Distance threshold for including tests in selection.
         recorder (EventRecorder, optional): If set, record match duration events.
@@ -167,12 +171,24 @@ async def select_tests(
                     f"Matching {group}", hide_children=True
                 )
 
-            label = _TestDistanceMeasurer(entries, extract_label)
-            name = _TestDistanceMeasurer(entries, extract_name)
-            component = _TestDistanceMeasurer(entries, extract_component)
-            package = _TestDistanceMeasurer(entries, extract_package)
+            matcher_prefix = exec_env.fx_cmd_line("dldist")
+
+            label = _TestDistanceMeasurer(
+                entries, extract_label, matcher_script_prefix=matcher_prefix
+            )
+            name = _TestDistanceMeasurer(
+                entries, extract_name, matcher_script_prefix=matcher_prefix
+            )
+            component = _TestDistanceMeasurer(
+                entries, extract_component, matcher_script_prefix=matcher_prefix
+            )
+            package = _TestDistanceMeasurer(
+                entries, extract_package, matcher_script_prefix=matcher_prefix
+            )
             trailing_path = _TestDistanceMeasurer(
-                entries, extract_trailing_path
+                entries,
+                extract_trailing_path,
+                matcher_script_prefix=matcher_prefix,
             )
 
             async def closest_name_match() -> list[_TestDistance]:
@@ -283,7 +299,20 @@ async def select_tests(
 
         match_tasks.append(asyncio.create_task(task_handler(group)))
 
-    await asyncio.wait(match_tasks, return_when=asyncio.FIRST_EXCEPTION)
+    done, pending = await asyncio.wait(
+        match_tasks, return_when=asyncio.FIRST_EXCEPTION
+    )
+
+    # Stop any pending tasks after exception.
+    if pending:
+        t: asyncio.Task[None]
+        for t in pending:
+            t.cancel()
+
+    # Find the exception and raise it.
+    d: asyncio.Task[None]
+    for d in done:
+        d.result()
 
     omitted_fuzzy_matches: list[Test] = []
     if PERFECT_MATCH_DISTANCE in best_matches.values():
@@ -322,10 +351,12 @@ class _TestDistanceMeasurer:
         self,
         tests: list[Test],
         extractor: typing.Callable[[Test], str | None],
+        matcher_script_prefix: list[str],
     ) -> None:
         self._test_and_key = [
             (test, y) for test in tests if (y := extractor(test)) is not None
         ]
+        self._matcher_script_prefix = matcher_script_prefix
 
     async def distances(
         self,
@@ -355,28 +386,17 @@ class _TestDistanceMeasurer:
                 f.write("\n".join([v[1] for v in self._test_and_key]))
                 f.flush()
 
-            program_prefix = ["fx", "dldist"]
-            if shutil.which("fx") is None:
-                # Try to use dldist from the FUCHSIA_DIR, for test scenarios.
-                expected_path = os.path.join(
-                    os.getenv("FUCHSIA_DIR") or "", "bin", "dldist"
-                )
-                if os.path.exists(expected_path):
-                    program_prefix = [expected_path]
-                else:
-                    # Find the directory containing this script, correcting for cases
-                    # where it is run as a .pyz archive. Try to find dldist in the
-                    # bin directory under that directory.
-                    cur_path = os.path.dirname(__file__)
-                    while not os.path.isdir(cur_path):
-                        cur_path = os.path.split(cur_path)[0]
-                    expected_path = os.path.join(cur_path, "bin", "dldist")
-                    if os.path.exists(expected_path):
-                        program_prefix = [expected_path]
-                    else:
-                        raise RuntimeError(
-                            "Could not find matcher script dldist"
-                        )
+            program_prefix = self._matcher_script_prefix
+
+            if program_prefix and program_prefix[0] == "fx":
+                if not shutil.which("fx"):
+                    # There is no fx available, which means we may be in a test scenario.
+                    # Try to construct a path to the dldist data dependency.
+                    cur_dir = os.path.dirname(os.path.dirname(__file__))
+                    dldist_path = os.path.join(cur_dir, "bin", "dldist")
+                    if os.path.exists(dldist_path):
+                        # Only override if we are actually in a test scenario.
+                        program_prefix = [dldist_path]
 
             arg_suffix = [
                 "-v",
@@ -393,16 +413,17 @@ class _TestDistanceMeasurer:
                 parent=parent_id,
             )
 
-            if output is not None and output.return_code == 0:
-                vals = [
-                    int(line) for line in output.stdout.strip().splitlines()
-                ]
-                return [
-                    _TestDistance(t[0], v)
-                    for t, v in zip(self._test_and_key, vals)
-                ]
+            if output is None:
+                raise RuntimeError(
+                    f"Failed to execute matcher script at {program_prefix}."
+                )
+            elif output.return_code != 0:
+                raise RuntimeError(f"Matching program failed:\n{output.stderr}")
 
-            return []
+            vals = [int(line) for line in output.stdout.strip().splitlines()]
+            return [
+                _TestDistance(t[0], v) for t, v in zip(self._test_and_key, vals)
+            ]
 
 
 def _parse_selection_command_line(

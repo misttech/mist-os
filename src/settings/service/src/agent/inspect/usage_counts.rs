@@ -21,7 +21,7 @@ use futures::StreamExt;
 use inspect::NumericProperty;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Information about a setting type usage count to be written to inspect.
 struct SettingTypeUsageInspectInfo {
@@ -70,7 +70,7 @@ impl SettingTypeUsageInspectAgent {
     async fn create_with_node(context: Context, node: inspect::Node) {
         let (_, message_rx) = context
             .delegate
-            .create(MessengerType::Broker(Arc::new(move |message| {
+            .create(MessengerType::Broker(Rc::new(move |message| {
                 // Only catch setting handler requests.
                 matches!(message.payload(), service::Payload::Setting(HandlerPayload::Request(_)))
             })))
@@ -80,7 +80,7 @@ impl SettingTypeUsageInspectAgent {
         let mut agent =
             SettingTypeUsageInspectAgent { inspect_node: node, api_call_counts: HashMap::new() };
 
-        fasync::Task::spawn({
+        fasync::Task::local({
             async move {
             let _ = &context;
             let id = fuchsia_trace::Id::new();

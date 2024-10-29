@@ -79,25 +79,22 @@ impl fmt::Display for BlockType {
 impl BlockType {
     /// Returns whether the type is for a `*_VALUE` block or not.
     pub fn is_any_value(&self) -> bool {
-        match *self {
+        matches!(
+            *self,
             BlockType::NodeValue
-            | BlockType::IntValue
-            | BlockType::UintValue
-            | BlockType::DoubleValue
-            | BlockType::BufferValue
-            | BlockType::ArrayValue
-            | BlockType::LinkValue
-            | BlockType::BoolValue => true,
-            _ => false,
-        }
+                | BlockType::IntValue
+                | BlockType::UintValue
+                | BlockType::DoubleValue
+                | BlockType::BufferValue
+                | BlockType::ArrayValue
+                | BlockType::LinkValue
+                | BlockType::BoolValue
+        )
     }
 
     /// Returns whether the type is of a numeric `*_VALUE` block or not.
     pub fn is_numeric_value(&self) -> bool {
-        match *self {
-            BlockType::IntValue | BlockType::UintValue | BlockType::DoubleValue => true,
-            _ => false,
-        }
+        matches!(*self, BlockType::IntValue | BlockType::UintValue | BlockType::DoubleValue)
     }
 
     pub fn is_valid_for_array(&self) -> bool {

@@ -128,7 +128,7 @@ void RestrictedState::ArchRedirectRestrictedExceptionToNormal(
   regs.pc = vector_table;
   regs.a0 = context;
   regs.a1 = ZX_RESTRICTED_REASON_EXCEPTION;
-  [[maybe_unused]] zx_status_t status = arch_set_general_regs(Thread::Current().Get(), &regs);
+  [[maybe_unused]] zx_status_t status = arch_set_general_regs(Thread::Current::Get(), &regs);
   // This will only fail if register state has not been saved, but this will always
   // have happened by this stage of exception handling.
   DEBUG_ASSERT(status == ZX_OK);
@@ -136,7 +136,7 @@ void RestrictedState::ArchRedirectRestrictedExceptionToNormal(
 
 void RestrictedState::ArchSaveRestrictedExceptionState(zx_restricted_state_t& state) {
   zx_thread_state_general_regs_t regs = {};
-  [[maybe_unused]] zx_status_t status = arch_get_general_regs(Thread::Current().Get(), &regs);
+  [[maybe_unused]] zx_status_t status = arch_get_general_regs(Thread::Current::Get(), &regs);
   // This will only fail if register state has not been saved, but this will always
   // have happened by this stage of exception handling.
   DEBUG_ASSERT(status == ZX_OK);

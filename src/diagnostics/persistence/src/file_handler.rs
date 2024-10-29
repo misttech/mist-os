@@ -63,7 +63,7 @@ impl Serialize for PersistSchema {
             PersistPayload::Error(error) => {
                 let mut s = serializer.serialize_map(Some(2))?;
                 s.serialize_entry(TIMESTAMPS_KEY, &self.timestamps)?;
-                s.serialize_entry(ERROR_KEY, &ErrorHelper(&error))?;
+                s.serialize_entry(ERROR_KEY, &ErrorHelper(error))?;
                 s.end()
             }
         }
@@ -120,9 +120,19 @@ pub(crate) fn write(service_name: &ServiceName, tag: &Tag, data: &PersistSchema)
         .ok();
 }
 
+pub(crate) struct ServiceEntry {
+    pub name: String,
+    pub data: Vec<TagEntry>,
+}
+
+pub(crate) struct TagEntry {
+    pub name: String,
+    pub data: String,
+}
+
 // All the names in the previous-boot directory.
 // TODO(https://fxbug.dev/42150693): If this gets big, use Lazy Inspect.
-pub(crate) fn remembered_data() -> Result<Vec<(String, Vec<(String, String)>)>, Error> {
+pub(crate) fn remembered_data() -> Result<Vec<ServiceEntry>, Error> {
     // Counter for number of tags successfully retrieved. If no persisted tags were
     // retrieved, this method returns an error.
     let mut tags_retrieved = 0;
@@ -167,8 +177,10 @@ pub(crate) fn remembered_data() -> Result<Vec<(String, Vec<(String, String)>)>, 
                                                 Ok(contents) => {
                                                     tags_retrieved += 1;
 
-                                                    tag_entries
-                                                        .push((tag_name, contents.to_owned()));
+                                                    tag_entries.push(TagEntry {
+                                                        name: tag_name,
+                                                        data: contents.to_owned(),
+                                                    });
                                                 }
                                                 Err(e) => {
                                                     warn!(
@@ -197,7 +209,7 @@ pub(crate) fn remembered_data() -> Result<Vec<(String, Vec<(String, String)>)>, 
                             }
                         }
                     }
-                    service_entries.push((service_name, tag_entries));
+                    service_entries.push(ServiceEntry { name: service_name, data: tag_entries });
                 }
             }
         };

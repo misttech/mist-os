@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/defer.h>
 
 #include "src/devices/usb/drivers/dwc3/dwc3-regs.h"
@@ -17,30 +18,30 @@ void Dwc3::HandleEpEvent(uint32_t event) {
 
   switch (type) {
     case DEPEVT_XFER_COMPLETE:
-      zxlogf(SERIAL, "ep[%u] DEPEVT_XFER_COMPLETE", ep_num);
+      FDF_LOG(DEBUG, "ep[%u] DEPEVT_XFER_COMPLETE", ep_num);
       HandleEpTransferCompleteEvent(ep_num);
       break;
     case DEPEVT_XFER_IN_PROGRESS:
-      zxlogf(SERIAL, "ep[%u] DEPEVT_XFER_IN_PROGRESS: status %u", ep_num, status);
+      FDF_LOG(DEBUG, "ep[%u] DEPEVT_XFER_IN_PROGRESS: status %u", ep_num, status);
       break;
     case DEPEVT_XFER_NOT_READY:
-      zxlogf(SERIAL, "ep[%u] DEPEVT_XFER_NOT_READY", ep_num);
+      FDF_LOG(DEBUG, "ep[%u] DEPEVT_XFER_NOT_READY", ep_num);
       HandleEpTransferNotReadyEvent(ep_num, DEPEVT_XFER_NOT_READY_STAGE(event));
       break;
     case DEPEVT_STREAM_EVT:
-      zxlogf(SERIAL, "ep[%u] DEPEVT_STREAM_EVT ep_num: status %u", ep_num, status);
+      FDF_LOG(DEBUG, "ep[%u] DEPEVT_STREAM_EVT ep_num: status %u", ep_num, status);
       break;
     case DEPEVT_CMD_CMPLT: {
       uint32_t cmd_type = DEPEVT_CMD_CMPLT_CMD_TYPE(event);
       uint32_t rsrc_id = DEPEVT_CMD_CMPLT_RSRC_ID(event);
-      zxlogf(SERIAL, "ep[%u] DEPEVT_CMD_COMPLETE: type %u rsrc_id %u", ep_num, cmd_type, rsrc_id);
+      FDF_LOG(DEBUG, "ep[%u] DEPEVT_CMD_COMPLETE: type %u rsrc_id %u", ep_num, cmd_type, rsrc_id);
       if (cmd_type == DEPCMD::DEPSTRTXFER) {
         HandleEpTransferStartedEvent(ep_num, rsrc_id);
       }
       break;
     }
     default:
-      zxlogf(ERROR, "dwc3_handle_ep_event: unknown event type %u", type);
+      FDF_LOG(ERROR, "dwc3_handle_ep_event: unknown event type %u", type);
       break;
   }
 }
@@ -56,121 +57,121 @@ void Dwc3::HandleEvent(uint32_t event) {
 
   switch (type) {
     case DEVT_DISCONNECT:
-      zxlogf(SERIAL, "DEVT_DISCONNECT");
+      FDF_LOG(DEBUG, "DEVT_DISCONNECT");
       break;
     case DEVT_USB_RESET:
-      zxlogf(SERIAL, "DEVT_USB_RESET");
+      FDF_LOG(DEBUG, "DEVT_USB_RESET");
       HandleResetEvent();
       break;
     case DEVT_CONNECTION_DONE:
-      zxlogf(SERIAL, "DEVT_CONNECTION_DONE");
+      FDF_LOG(DEBUG, "DEVT_CONNECTION_DONE");
       HandleConnectionDoneEvent();
       break;
     case DEVT_LINK_STATE_CHANGE:
-      zxlogf(SERIAL, "DEVT_LINK_STATE_CHANGE: ");
+      FDF_LOG(DEBUG, "DEVT_LINK_STATE_CHANGE: ");
       switch (info) {
         case DSTS::USBLNKST_U0 | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS::USBLNKST_U0");
+          FDF_LOG(DEBUG, "DSTS::USBLNKST_U0");
           break;
         case DSTS::USBLNKST_U1 | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_U1");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_U1");
           break;
         case DSTS::USBLNKST_U2 | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_U2");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_U2");
           break;
         case DSTS::USBLNKST_U3 | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_U3");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_U3");
           break;
         case DSTS::USBLNKST_ESS_DIS | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_ESS_DIS");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_ESS_DIS");
           break;
         case DSTS::USBLNKST_RX_DET | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_RX_DET");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_RX_DET");
           break;
         case DSTS::USBLNKST_ESS_INACT | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_ESS_INACT");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_ESS_INACT");
           break;
         case DSTS::USBLNKST_POLL | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_POLL");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_POLL");
           break;
         case DSTS::USBLNKST_RECOV | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_RECOV");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_RECOV");
           break;
         case DSTS::USBLNKST_HRESET | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_HRESET");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_HRESET");
           break;
         case DSTS::USBLNKST_CMPLY | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_CMPLY");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_CMPLY");
           break;
         case DSTS::USBLNKST_LPBK | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_LPBK");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_LPBK");
           break;
         case DSTS::USBLNKST_RESUME_RESET | DEVT_LINK_STATE_CHANGE_SS:
-          zxlogf(SERIAL, "DSTS_USBLNKST_RESUME_RESET");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_RESUME_RESET");
           break;
         case DSTS::USBLNKST_ON:
-          zxlogf(SERIAL, "DSTS_USBLNKST_ON");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_ON");
           break;
         case DSTS::USBLNKST_SLEEP:
-          zxlogf(SERIAL, "DSTS_USBLNKST_SLEEP");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_SLEEP");
           break;
         case DSTS::USBLNKST_SUSPEND:
-          zxlogf(SERIAL, "DSTS_USBLNKST_SUSPEND");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_SUSPEND");
           break;
         case DSTS::USBLNKST_DISCONNECTED:
-          zxlogf(SERIAL, "DSTS_USBLNKST_DISCONNECTED");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_DISCONNECTED");
           break;
         case DSTS::USBLNKST_EARLY_SUSPEND:
-          zxlogf(SERIAL, "DSTS_USBLNKST_EARLY_SUSPEND");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_EARLY_SUSPEND");
           break;
         case DSTS::USBLNKST_RESET:
-          zxlogf(SERIAL, "DSTS_USBLNKST_RESET");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_RESET");
           break;
         case DSTS::USBLNKST_RESUME:
-          zxlogf(SERIAL, "DSTS_USBLNKST_RESUME");
+          FDF_LOG(DEBUG, "DSTS_USBLNKST_RESUME");
           break;
         default:
-          zxlogf(ERROR, "unknown state %d", info);
+          FDF_LOG(ERROR, "unknown state %d", info);
           break;
       }
       break;
     case DEVT_REMOTE_WAKEUP:
-      zxlogf(SERIAL, "DEVT_REMOTE_WAKEUP");
+      FDF_LOG(DEBUG, "DEVT_REMOTE_WAKEUP");
       break;
     case DEVT_HIBERNATE_REQUEST:
-      zxlogf(SERIAL, "DEVT_HIBERNATE_REQUEST");
+      FDF_LOG(DEBUG, "DEVT_HIBERNATE_REQUEST");
       break;
     case DEVT_SUSPEND_ENTRY:
-      zxlogf(SERIAL, "DEVT_SUSPEND_ENTRY");
+      FDF_LOG(DEBUG, "DEVT_SUSPEND_ENTRY");
       // TODO(voydanoff) is this the best way to detect disconnect?
       HandleDisconnectedEvent();
       break;
     case DEVT_SOF:
-      zxlogf(SERIAL, "DEVT_SOF");
+      FDF_LOG(DEBUG, "DEVT_SOF");
       break;
     case DEVT_ERRATIC_ERROR:
-      zxlogf(SERIAL, "DEVT_ERRATIC_ERROR");
+      FDF_LOG(DEBUG, "DEVT_ERRATIC_ERROR");
       break;
     case DEVT_COMMAND_COMPLETE:
-      zxlogf(SERIAL, "DEVT_COMMAND_COMPLETE");
+      FDF_LOG(DEBUG, "DEVT_COMMAND_COMPLETE");
       break;
     case DEVT_EVENT_BUF_OVERFLOW:
-      zxlogf(SERIAL, "DEVT_EVENT_BUF_OVERFLOW");
+      FDF_LOG(DEBUG, "DEVT_EVENT_BUF_OVERFLOW");
       break;
     case DEVT_VENDOR_TEST_LMP:
-      zxlogf(SERIAL, "DEVT_VENDOR_TEST_LMP");
+      FDF_LOG(DEBUG, "DEVT_VENDOR_TEST_LMP");
       break;
     case DEVT_STOPPED_DISCONNECT:
-      zxlogf(SERIAL, "DEVT_STOPPED_DISCONNECT");
+      FDF_LOG(DEBUG, "DEVT_STOPPED_DISCONNECT");
       break;
     case DEVT_L1_RESUME_DETECT:
-      zxlogf(SERIAL, "DEVT_L1_RESUME_DETECT");
+      FDF_LOG(DEBUG, "DEVT_L1_RESUME_DETECT");
       break;
     case DEVT_LDM_RESPONSE:
-      zxlogf(SERIAL, "DEVT_LDM_RESPONSE");
+      FDF_LOG(DEBUG, "DEVT_LDM_RESPONSE");
       break;
     default:
-      zxlogf(ERROR, "dwc3_handle_event: unknown event type %u", type);
+      FDF_LOG(ERROR, "dwc3_handle_event: unknown event type %u", type);
       break;
   }
 }
@@ -192,7 +193,7 @@ int Dwc3::IrqThread() {
     // Wait for a new interrupt.
     zx_port_packet_t wakeup_pkt;
     if (zx_status_t status = irq_port_.wait(zx::time::infinite(), &wakeup_pkt); status != ZX_OK) {
-      zxlogf(ERROR, "Dwc3::IrqThread: zx_port_wait returned %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "Dwc3::IrqThread: zx_port_wait returned %s", zx_status_get_string(status));
       shutdown_now = true;
       continue;
     }
@@ -235,19 +236,19 @@ int Dwc3::IrqThread() {
           // completion queue.
           break;
         case IrqSignal::Exit:
-          zxlogf(INFO, "Dwc3::IrqThread: shutting down");
+          FDF_LOG(INFO, "Dwc3::IrqThread: shutting down");
           shutdown_now = true;
           break;
         default:
-          zxlogf(ERROR, "Dwc3::IrqThread: got invalid signal value %u",
-                 static_cast<std::underlying_type_t<decltype(signal)>>(signal));
+          FDF_LOG(ERROR, "Dwc3::IrqThread: got invalid signal value %u",
+                  static_cast<std::underlying_type_t<decltype(signal)>>(signal));
           shutdown_now = true;
           break;
       }
       shutdown_now = true;
       continue;
     } else {
-      zxlogf(ERROR, "Dwc3::IrqThread: unrecognized packet type %u", wakeup_pkt.type);
+      FDF_LOG(ERROR, "Dwc3::IrqThread: unrecognized packet type %u", wakeup_pkt.type);
       shutdown_now = true;
       continue;
     }

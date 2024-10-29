@@ -9,6 +9,7 @@
 #include <zircon/types.h>
 
 #include <optional>
+#include <span>
 
 #include <fbl/vector.h>
 #include <storage/operation/operation.h>
@@ -44,7 +45,7 @@ std::optional<const JournalEntryView> ParseEntry(storage::VmoBuffer* journal_buf
   // To know how much of the journal we need to parse, first observe only one block.
   storage::BlockBufferView small_view(journal_buffer, start, 1);
   const auto header = JournalHeaderView::Create(
-      cpp20::span<uint8_t>(static_cast<uint8_t*>(small_view.Data(0)), small_view.BlockSize()),
+      std::span<uint8_t>(static_cast<uint8_t*>(small_view.Data(0)), small_view.BlockSize()),
       sequence_number);
 
   // This is not a header block.
@@ -125,8 +126,8 @@ zx_status_t ParseJournalEntries(const JournalSuperblock* info, storage::VmoBuffe
       break;
 
     if (entry->header().ObjectType() == JournalObjectType::kRevocation) {
-      // TODO(https://fxbug.dev/42109842): Revocation records advise us to avoid replaying the provided
-      // operations.
+      // TODO(https://fxbug.dev/42109842): Revocation records advise us to avoid replaying the
+      // provided operations.
       //
       // We should implement this by:
       // 1) Parsing all blocks into a non-|operations| vector

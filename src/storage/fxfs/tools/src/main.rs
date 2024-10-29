@@ -21,7 +21,6 @@ const DEFAULT_VOLUME: &str = "default";
 #[cfg(target_os = "linux")]
 use {
     fuse3::{raw::prelude::Session, MountOptions},
-    tokio::runtime::Runtime,
     tools::fuse_fs::FuseFs,
 };
 
@@ -305,85 +304,76 @@ async fn main() -> Result<(), Error> {
         SubCommand::CreateGolden(_) => tools::golden::create_image().await,
         SubCommand::CheckGolden(args) => tools::golden::check_images(args.images_dir).await,
         #[cfg(target_os = "linux")]
-        SubCommand::RunInMemoryFuse(args) => run_in_memory_fuse(args.path),
+        SubCommand::RunInMemoryFuse(args) => run_in_memory_fuse(args.path).await,
         #[cfg(target_os = "linux")]
-        SubCommand::CreateFileFuse(args) => run_file_fuse_create(args.mount_path, args.device_path),
+        SubCommand::CreateFileFuse(args) => {
+            run_file_fuse_create(args.mount_path, args.device_path).await
+        }
         #[cfg(target_os = "linux")]
-        SubCommand::OpenFileFuse(args) => run_file_fuse_open(args.mount_path, args.device_path),
+        SubCommand::OpenFileFuse(args) => {
+            run_file_fuse_open(args.mount_path, args.device_path).await
+        }
     }
 }
 
 /// Run FUSE-Fxfs with a fake in-memory device.
 /// This is used for running unit tests for FUSE-Fxfs.
 #[cfg(target_os = "linux")]
-fn run_in_memory_fuse(path: String) -> Result<(), Error> {
-    let rt = Runtime::new()?;
+async fn run_in_memory_fuse(path: String) -> Result<(), Error> {
+    let uid = unsafe { libc::getuid() };
+    let gid = unsafe { libc::getgid() };
 
-    rt.block_on(async {
-        let uid = unsafe { libc::getuid() };
-        let gid = unsafe { libc::getgid() };
+    let mut mount_options = MountOptions::default();
+    mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
 
-        let mut mount_options = MountOptions::default();
-        mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
+    let fs = FuseFs::new_in_memory(path.clone()).await;
 
-        let fs = FuseFs::new_in_memory(path.clone()).await;
-
-        Session::new(mount_options).mount_with_unprivileged(fs, path).await.unwrap().await.unwrap();
-    });
+    Session::new(mount_options).mount_with_unprivileged(fs, path).await.unwrap().await.unwrap();
 
     Ok(())
 }
 
 /// Run FUSE-Fxfs by creating a new file-backed device.
 #[cfg(target_os = "linux")]
-fn run_file_fuse_create(mount_path: String, device_path: String) -> Result<(), Error> {
-    let rt = Runtime::new()?;
+async fn run_file_fuse_create(mount_path: String, device_path: String) -> Result<(), Error> {
+    let uid = unsafe { libc::getuid() };
+    let gid = unsafe { libc::getgid() };
 
-    rt.block_on(async {
-        let uid = unsafe { libc::getuid() };
-        let gid = unsafe { libc::getgid() };
+    let mut mount_options = MountOptions::default();
+    mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
 
-        let mut mount_options = MountOptions::default();
-        mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
+    let fs = FuseFs::new_file_backed(device_path.as_str(), mount_path.clone()).await;
+    let handle = fs.notify_destroy();
+    handle.await;
 
-        let fs = FuseFs::new_file_backed(device_path.as_str(), mount_path.clone()).await;
-        let handle = fs.notify_destroy();
-        handle.await;
-
-        Session::new(mount_options)
-            .mount_with_unprivileged(fs, mount_path)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-    });
-
+    Session::new(mount_options)
+        .mount_with_unprivileged(fs, mount_path)
+        .await
+        .unwrap()
+        .await
+        .unwrap();
     Ok(())
 }
 
 /// Run FUSE-Fxfs by opening an existing file-backed device.
 #[cfg(target_os = "linux")]
-fn run_file_fuse_open(mount_path: String, device_path: String) -> Result<(), Error> {
-    let rt = Runtime::new()?;
+async fn run_file_fuse_open(mount_path: String, device_path: String) -> Result<(), Error> {
+    let uid = unsafe { libc::getuid() };
+    let gid = unsafe { libc::getgid() };
 
-    rt.block_on(async {
-        let uid = unsafe { libc::getuid() };
-        let gid = unsafe { libc::getgid() };
+    let mut mount_options = MountOptions::default();
+    mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
 
-        let mut mount_options = MountOptions::default();
-        mount_options.fs_name("fxfs").nonempty(true).write_back(true).uid(uid).gid(gid);
+    let fs = FuseFs::open_file_backed(device_path.as_str(), mount_path.clone()).await;
+    let handle = fs.notify_destroy();
+    handle.await;
 
-        let fs = FuseFs::open_file_backed(device_path.as_str(), mount_path.clone()).await;
-        let handle = fs.notify_destroy();
-        handle.await;
-
-        Session::new(mount_options)
-            .mount_with_unprivileged(fs, mount_path)
-            .await
-            .unwrap()
-            .await
-            .unwrap();
-    });
+    Session::new(mount_options)
+        .mount_with_unprivileged(fs, mount_path)
+        .await
+        .unwrap()
+        .await
+        .unwrap();
 
     Ok(())
 }

@@ -22,7 +22,7 @@ use futures::channel::mpsc::UnboundedSender;
 use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
 use std::collections::VecDeque;
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::MonotonicDuration;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
@@ -65,14 +65,14 @@ impl RequestInfo {
     /// Adds a closure that will be triggered when the recipient for a response
     /// to the request goes out of scope. This allows for the message handler to
     /// know when the recipient is no longer valid.
-    async fn bind_to_scope(&mut self, trigger_fn: Box<dyn FnOnce() + Sync + Send>) {
+    async fn bind_to_scope(&mut self, trigger_fn: Box<dyn FnOnce()>) {
         self.client.bind_to_recipient(ActionFuse::create(trigger_fn)).await;
     }
 }
 
 #[derive(Clone, Debug)]
 struct ActiveRequest {
-    request: Arc<RequestInfo>,
+    request: Rc<RequestInfo>,
     // The number of attempts that have been made on this request.
     attempts: u64,
     last_result: Option<SettingHandlerResult>,
@@ -83,7 +83,7 @@ impl ActiveRequest {
         self.request.setting_request.clone()
     }
 
-    pub(crate) fn get_info(&mut self) -> &mut Arc<RequestInfo> {
+    pub(crate) fn get_info(&mut self) -> &mut Rc<RequestInfo> {
         &mut self.request
     }
 }
@@ -123,11 +123,11 @@ pub(crate) struct SettingProxy {
     client_signature: Option<service::message::Signature>,
     active_request: Option<ActiveRequest>,
     pending_requests: VecDeque<Box<RequestInfo>>,
-    listen_requests: Vec<Arc<RequestInfo>>,
+    listen_requests: Vec<Rc<RequestInfo>>,
     next_request_id: usize,
 
     /// Factory for generating a new controller to service requests.
-    handler_factory: Arc<Mutex<dyn SettingHandlerFactory + Send + Sync>>,
+    handler_factory: Rc<Mutex<dyn SettingHandlerFactory>>,
     /// Messenger factory for communication with service components.
     delegate: service::message::Delegate,
     /// Messenger to send messages to controllers.
@@ -150,7 +150,7 @@ pub(crate) struct SettingProxy {
     error_count: usize,
 
     /// Inspect logger for active listener counts.
-    listener_logger: Arc<Mutex<ListenerInspectLogger>>,
+    listener_logger: Rc<Mutex<ListenerInspectLogger>>,
 }
 
 struct NodeError {
@@ -172,14 +172,14 @@ impl SettingProxy {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn create(
         setting_type: SettingType,
-        handler_factory: Arc<Mutex<dyn SettingHandlerFactory + Send + Sync>>,
+        handler_factory: Rc<Mutex<dyn SettingHandlerFactory>>,
         delegate: service::message::Delegate,
         max_attempts: u64,
         teardown_timeout: MonotonicDuration,
         request_timeout: Option<MonotonicDuration>,
         retry_on_timeout: bool,
         node: fuchsia_inspect::Node,
-        listener_logger: Arc<Mutex<ListenerInspectLogger>>,
+        listener_logger: Rc<Mutex<ListenerInspectLogger>>,
     ) -> Result<service::message::Signature, Error> {
         let (messenger, receptor) = delegate
             .create(MessengerType::Addressable(service::Address::Handler(setting_type)))
@@ -228,7 +228,7 @@ impl SettingProxy {
         };
 
         // Main task loop for receiving and processing incoming messages.
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let id = ftrace::Id::new();
             trace!(
                 id,
@@ -618,7 +618,7 @@ impl SettingProxy {
 
             // Add the request to the queue of requests to process.
             self.active_request =
-                Some(ActiveRequest { request: Arc::from(pending), attempts: 0, last_result: None });
+                Some(ActiveRequest { request: Rc::from(pending), attempts: 0, last_result: None });
         }
 
         // Recreating signature is always honored, even if the request is not.
@@ -691,7 +691,7 @@ impl SettingProxy {
 
         let proxy_request_sender_clone = self.proxy_request_sender.clone();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             trace!(id, c"response");
             while let Some(message_event) = receptor.next().await {
                 let handler_result = match message_event {
@@ -765,7 +765,7 @@ impl SettingProxy {
         self.teardown_cancellation = Some(cancellation_tx);
         let sender = self.proxy_request_sender.clone();
         let teardown_timeout = self.teardown_timeout;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let timeout = fuchsia_async::Timer::new(crate::clock::now() + teardown_timeout).fuse();
             futures::pin_mut!(cancellation_rx, timeout);
             futures::select! {

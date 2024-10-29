@@ -260,7 +260,7 @@ TEST_F(StorageTest, LargeIOs) {
     pages.push_back(page.release());
   }
   sync_completion_t completion;
-  writer_->ScheduleWriteBlocks(&completion, std::move(pages));
+  writer_->ScheduleWriteBlocks(&completion, std::move(pages), true);
   ASSERT_TRUE(sync_completion_wait(&completion, zx::sec(kWriteTimeOut).get()) == ZX_OK);
 
   // Reset Pages

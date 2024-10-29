@@ -32,7 +32,6 @@ if (is_host) {
       "job_test.cc",
       "object_test.cc",
       "pager_test.cc",
-      "pc_test.cc",
       "pci_test.cc",
       "pmt_test.cc",
       "port_test.cc",

@@ -11,11 +11,11 @@ enum PromotedOperands {
 
 // TODO(https://fxbug.dev/42134879): More informative error messages as part of structured errors.
 
-pub fn calculate(function: &MathFunction, operands: &Vec<MetricValue>) -> MetricValue {
+pub fn calculate(function: &MathFunction, operands: &[MetricValue]) -> MetricValue {
     // Arity check. + and * are well-defined for 1..N arguments, but the parser will only
     // give us 2 arguments. This check avoids panics from internal bugs.
     match function {
-        MathFunction::Min | MathFunction::Max if operands.len() > 0 => {}
+        MathFunction::Min | MathFunction::Max if !operands.is_empty() => {}
         MathFunction::Min | MathFunction::Max => {
             return super::syntax_error("No operands in math expression");
         }
@@ -94,7 +94,7 @@ fn fold<T: num_traits::Num + Copy>(operands: Vec<T>, function: &dyn (Fn(T, T) ->
     }
 }
 
-fn promote_type(operands: &Vec<MetricValue>) -> Result<PromotedOperands, MetricValue> {
+fn promote_type(operands: &[MetricValue]) -> Result<PromotedOperands, MetricValue> {
     let mut int_vec = Vec::with_capacity(operands.len());
     let mut float_vec = Vec::with_capacity(operands.len());
     let mut error_vec = Vec::with_capacity(operands.len());
@@ -122,10 +122,10 @@ fn promote_type(operands: &Vec<MetricValue>) -> Result<PromotedOperands, MetricV
     if float_vec.len() == operands.len() {
         return Ok(PromotedOperands::Float(float_vec));
     }
-    if non_numeric_error.is_some() {
-        error_vec.push(&non_numeric_error.as_ref().unwrap());
+    if let Some(ref err) = non_numeric_error {
+        error_vec.push(err);
     }
-    return Err(MetricValue::Problem(super::MetricState::important_problem(error_vec)));
+    Err(MetricValue::Problem(super::MetricState::important_problem(error_vec)))
 }
 
 // Correct operation of this file is tested in parse.rs.

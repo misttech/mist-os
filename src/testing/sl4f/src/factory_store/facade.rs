@@ -73,13 +73,7 @@ impl FactoryStoreFacade {
     pub async fn read_file(&self, args: Value) -> Result<Value, Error> {
         let req: ReadFileRequest = from_value(args)?;
         let dir_proxy = self.get_directory_for_provider(req.provider)?;
-
-        let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
-            &dir_proxy,
-            &req.filename,
-            fio::OpenFlags::RIGHT_READABLE,
-        )?;
-        let contents = fuchsia_fs::file::read(&file).await?;
+        let contents = fuchsia_fs::directory::read_file(&dir_proxy, &req.filename).await?;
         Ok(to_value(BASE64_STANDARD.encode(&contents))?)
     }
 

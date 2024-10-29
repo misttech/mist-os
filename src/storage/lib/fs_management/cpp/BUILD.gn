@@ -63,9 +63,6 @@ if (is_fuchsia) {
       "//zircon/system/ulib/zx",
       "//zircon/system/ulib/zx",
     ]
-
-    # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-    configs += [ "//build/config:Wno-vla-cxx-extension" ]
   }
 } else {
   source_set("fs-management") {

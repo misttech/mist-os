@@ -6,19 +6,25 @@ use crate::subsystems::prelude::*;
 use anyhow::{ensure, Context};
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
+use assembly_config_schema::platform_config::swd_config::SwdConfig;
 use assembly_config_schema::product_config::ProductSessionConfig;
 use fuchsia_url::AbsoluteComponentUrl;
 
 pub(crate) struct SessionConfig;
-impl DefineSubsystemConfiguration<(&PlatformSessionConfig, &Option<ProductSessionConfig>, &String)>
-    for SessionConfig
+impl
+    DefineSubsystemConfiguration<(
+        &PlatformSessionConfig,
+        &Option<ProductSessionConfig>,
+        &String,
+        &SwdConfig,
+    )> for SessionConfig
 {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        config: &(&PlatformSessionConfig, &Option<ProductSessionConfig>, &String),
+        config: &(&PlatformSessionConfig, &Option<ProductSessionConfig>, &String, &SwdConfig),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let (platform_config, product_config, session_url) = *config;
+        let (platform_config, product_config, session_url, swd_config) = *config;
 
         if platform_config.enabled {
             ensure!(
@@ -26,6 +32,16 @@ impl DefineSubsystemConfiguration<(&PlatformSessionConfig, &Option<ProductSessio
                 "The platform session manager is only supported in the default feature set level"
             );
             builder.platform_bundle("session_manager");
+            if swd_config.enable_upgradable_packages {
+                context.ensure_build_type_and_feature_set_level(
+                    &[BuildType::Eng, BuildType::UserDebug],
+                    &[FeatureSupportLevel::Standard],
+                    "Upgradable packages",
+                )?;
+                builder.platform_bundle("session_manager_enable_pkg_cache");
+            } else {
+                builder.platform_bundle("session_manager_disable_pkg_cache");
+            }
         }
 
         let (url, collection, element_url, view_id_annotation) = match (

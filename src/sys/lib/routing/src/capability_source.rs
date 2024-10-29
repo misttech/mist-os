@@ -354,7 +354,18 @@ impl TryFrom<Capability> for CapabilitySource {
     type Error = fidl::Error;
 
     fn try_from(capability: Capability) -> Result<Self, Self::Error> {
-        let Capability::Data(Data::Bytes(bytes)) = capability else {
+        let Capability::Data(data) = capability else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        Self::try_from(data)
+    }
+}
+
+impl TryFrom<Data> for CapabilitySource {
+    type Error = fidl::Error;
+
+    fn try_from(data: Data) -> Result<Self, Self::Error> {
+        let Data::Bytes(bytes) = data else {
             return Err(fidl::Error::InvalidEnumValue);
         };
         Ok(unpersist::<finternal::CapabilitySource>(&bytes)?.fidl_into_native())

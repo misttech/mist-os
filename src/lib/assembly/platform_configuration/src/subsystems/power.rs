@@ -71,6 +71,14 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                     ),
                 )?;
 
+                builder.set_config_capability(
+                    "fuchsia.power.UseSuspender",
+                    Config::new(
+                        ConfigValueType::Bool,
+                        context.board_info.provides_feature("fuchsia::suspender").into(),
+                    ),
+                )?;
+
                 match context.feature_set_level {
                     FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => {}
                     FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {

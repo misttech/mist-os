@@ -3,6 +3,7 @@ ffx daemon stop
 ffx emu show
 ffx emu start
 ffx emu stop
+ffx package file-hash
 ffx product download
 ffx product get-artifacts
 ffx product get-image-path

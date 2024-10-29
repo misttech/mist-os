@@ -258,8 +258,7 @@ impl<D: Directory + AsRefDirectory + Clone + Send + Sync> ProgramContext<D> {
         // We should block on fuchsia.sys.SystemController forever on this task, if
         // it returns something has gone wrong.
         eprintln!("[shutdown-shim]: we shouldn't still be running, crashing the system");
-        Self::abort(self.abort_tx.clone()).await;
-        unreachable!();
+        Self::abort(self.abort_tx.clone()).await
     }
 
     async fn send_command(

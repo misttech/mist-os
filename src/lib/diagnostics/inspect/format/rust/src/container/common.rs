@@ -8,6 +8,11 @@ pub trait BlockContainer {
 
     /// Returns the size of the container.
     fn len(&self) -> usize;
+
+    /// Returns whether the container is empty or not.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// Trait implemented by an Inspect container that can be read from.
@@ -138,16 +143,14 @@ impl BlockContainer for [u8] {
 
     #[inline]
     fn len(&self) -> usize {
-        <[u8]>::len(&self)
+        <[u8]>::len(self)
     }
 }
 
 impl ReadBytes for [u8] {
     #[inline]
     fn get_slice_at(&self, offset: usize, size: usize) -> Option<&[u8]> {
-        let Some(upper_bound) = offset.checked_add(size) else {
-            return None;
-        };
+        let upper_bound = offset.checked_add(size)?;
         if offset >= self.len() || upper_bound > self.len() {
             return None;
         }
@@ -180,9 +183,7 @@ impl<const N: usize> WriteBytes for [u8; N] {
         if offset >= self.len() {
             return None;
         }
-        let Some(upper_bound) = offset.checked_add(size) else {
-            return None;
-        };
+        let upper_bound = offset.checked_add(size)?;
         if upper_bound > self.len() {
             return None;
         }

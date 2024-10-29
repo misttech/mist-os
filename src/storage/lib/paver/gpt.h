@@ -130,9 +130,6 @@ class GptDevicePartitioner {
   fuchsia_hardware_block::wire::BlockInfo block_info_;
 };
 
-zx::result<uuid::Uuid> GptPartitionType(Partition type,
-                                        PartitionScheme scheme = PartitionScheme::kLegacy);
-
 // TODO(69527): Remove this and migrate usages to |utf16_to_utf8|
 inline void utf16_to_cstring(char* dst, const uint8_t* src, size_t charcount) {
   while (charcount > 0) {

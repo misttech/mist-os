@@ -10,17 +10,17 @@ use std::collections::BTreeMap;
 use std::ops::Range;
 use storage_device::Device;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum ChecksumState {
-    Unverified(Checksum),
+    Unverified(Vec<Checksum>),
     Valid,
     Invalid,
 }
 
 impl ChecksumState {
-    fn checksum(&self) -> Option<Checksum> {
+    fn checksum(&mut self) -> Option<&mut Vec<Checksum>> {
         if let ChecksumState::Unverified(c) = self {
-            Some(*c)
+            Some(c)
         } else {
             None
         }
@@ -68,6 +68,7 @@ impl ChecksumList {
         journal_offset: u64,
         mut device_range: Range<u64>,
         mut checksums: &[u64],
+        first_write: bool,
     ) -> Result<(), Error> {
         if journal_offset < self.flushed_offset {
             // Ignore anything that was prior to being flushed.
@@ -78,12 +79,18 @@ impl ChecksumList {
             self.max_chunk_size = chunk_size;
         }
 
-        // At time of writing Fxfs, doesn't support cloning, but when it does, it's possible for
-        // there to be multiple references to the same device range.  Obviously, each of those
-        // references must have the same checksum value, so we check that here.  We must also deal
-        // with the case where the reference doesn't perfectly match a previous reference;
-        // `device_range` can partially overlap some of the existing entries.  Where there's a
-        // duplicate, we leave it untouched with the original journal offset.
+        // Copy on write extents will always write to new device ranges. However, overwrite extents
+        // will continue to write to the same device range repeatedly. On every write, a new
+        // checksum is emitted for each block in the range.
+        //
+        // When replaying the journal, it's valid for any of the possible checksums to match,
+        // because any or all of the future writes to the range may have gone through. The only
+        // time that matters is when the first write to that block has happened during this replay,
+        // since that's the only thing we can actually roll back. On the first write, we create the
+        // checksum entry, and if any further checksums come in, we add them to the existing list.
+        //
+        // Fxfs currently doesn't support cloning, but if and when it does, this code may need to
+        // be revisited.
         let mut gap_entries = Vec::new();
         let mut r = self.device_offset_to_checksum_entry.range(device_range.start + 1..);
         while let Some((_, index)) = r.next() {
@@ -112,28 +119,27 @@ impl ChecksumList {
 
             let overlap = std::cmp::max(device_range.start, entry.device_range.start)
                 ..std::cmp::min(device_range.end, entry.device_range.end);
-            let entry_checksums = &entry.checksums[((overlap.start - entry.device_range.start)
+            let entry_checksums = &mut entry.checksums[((overlap.start - entry.device_range.start)
                 / chunk_size) as usize
                 ..((overlap.end - entry.device_range.start) / chunk_size) as usize];
 
             let (head, tail) = checksums.split_at(entry_checksums.len());
             checksums = tail;
-            ensure!(
-                entry_checksums.iter().map(|c| c.0.checksum().unwrap()).eq(head.iter().cloned()),
-                FxfsError::Inconsistent
-            );
+            for ((checksum_state, _), new_checksum) in entry_checksums.iter_mut().zip(head.iter()) {
+                checksum_state.checksum().unwrap().push(*new_checksum);
+            }
             device_range.start = overlap.end;
 
             // Now that we no longer need entry, we can insert the gap into checksum_entries, but we
             // can't touch device_offset_to_checksum_entry until after the loop.
-            if !gap.is_empty() {
+            if !gap.is_empty() && first_write {
                 gap_entries.push((gap.end, self.checksum_entries.len()));
                 self.checksum_entries.push(ChecksumEntry {
                     start_journal_offset: journal_offset,
                     device_range: gap,
                     checksums: gap_checksums
                         .into_iter()
-                        .map(|c| (ChecksumState::Unverified(*c), u64::MAX))
+                        .map(|c| (ChecksumState::Unverified(vec![*c]), u64::MAX))
                         .collect(),
                 });
             }
@@ -147,7 +153,7 @@ impl ChecksumList {
         self.device_offset_to_checksum_entry.extend(gap_entries);
 
         // Add any remainder.
-        if !device_range.is_empty() {
+        if !device_range.is_empty() && first_write {
             self.device_offset_to_checksum_entry
                 .insert(device_range.end, self.checksum_entries.len());
             self.checksum_entries.push(ChecksumEntry {
@@ -155,7 +161,7 @@ impl ChecksumList {
                 device_range,
                 checksums: checksums
                     .iter()
-                    .map(|c| (ChecksumState::Unverified(*c), u64::MAX))
+                    .map(|c| (ChecksumState::Unverified(vec![*c]), u64::MAX))
                     .collect(),
             });
         }
@@ -221,12 +227,17 @@ impl ChecksumList {
                     // be replayed and we can skip verifications that we know were done on the
                     // previous iteration of the loop.
                     if *dependency >= journal_offset {
-                        if let ChecksumState::Unverified(checksum) = *checksum_state {
+                        if let Some(checksums) = checksum_state.checksum() {
                             device.read(offset, buf.subslice_mut(0..chunk_size)).await?;
-                            if fletcher64(&buf.as_slice()[0..chunk_size], 0) != checksum {
-                                *checksum_state = ChecksumState::Invalid;
-                            } else {
+                            let found_checksum = fletcher64(&buf.as_slice()[0..chunk_size], 0);
+                            if checksums
+                                .iter()
+                                .find(|&&checksum| checksum == found_checksum)
+                                .is_some()
+                            {
                                 *checksum_state = ChecksumState::Valid;
+                            } else {
+                                *checksum_state = ChecksumState::Invalid;
                             }
                         }
                         if *checksum_state == ChecksumState::Invalid {
@@ -266,6 +277,7 @@ mod tests {
             1,
             512..2048,
             &[fletcher64(&[1; 512], 0), fletcher64(&[2; 512], 0), fletcher64(&[3; 512], 0)],
+            true,
         )
         .unwrap();
 
@@ -284,7 +296,7 @@ mod tests {
         assert_eq!(list.clone().verify(&device, 10).await.expect("verify failed"), 10);
 
         // Add another entry followed by a deallocation.
-        list.push(3, 2048..2560, &[fletcher64(&[4; 512], 0)]).unwrap();
+        list.push(3, 2048..2560, &[fletcher64(&[4; 512], 0)], true).unwrap();
         list.mark_deallocated(4, 1536..2048);
 
         // All entries should validate.
@@ -318,9 +330,9 @@ mod tests {
 
         // This entry has the wrong checksum will fail, but it should be ignored anyway because it
         // is prior to the flushed offset.
-        list.push(1, 512..1024, &[fletcher64(&[2; 512], 0)]).unwrap();
+        list.push(1, 512..1024, &[fletcher64(&[2; 512], 0)], true).unwrap();
 
-        list.push(2, 1024..1536, &[fletcher64(&[2; 512], 0)]).unwrap();
+        list.push(2, 1024..1536, &[fletcher64(&[2; 512], 0)], true).unwrap();
 
         assert_eq!(list.verify(&device, 10).await.expect("verify failed"), 10);
     }
@@ -334,16 +346,16 @@ mod tests {
         buffer.as_mut_slice().copy_from_slice(&[2; 512]);
         device.write(2560, buffer.as_ref()).await.expect("write failed");
 
-        list.push(2, 512..1024, &[fletcher64(&[1; 512], 0)]).unwrap();
+        list.push(2, 512..1024, &[fletcher64(&[1; 512], 0)], true).unwrap();
         list.mark_deallocated(3, 0..1024);
-        list.push(4, 2048..3072, &[fletcher64(&[2; 512], 0); 2]).unwrap();
+        list.push(4, 2048..3072, &[fletcher64(&[2; 512], 0); 2], true).unwrap();
         list.mark_deallocated(5, 1536..2560);
 
         assert_eq!(list.verify(&device, 10).await.expect("verify failed"), 10);
     }
 
     #[fuchsia::test]
-    async fn test_duplicate_entries() {
+    async fn test_different_chunk_size() {
         let device = FakeDevice::new(2048, 512);
         let mut buffer = device.allocate_buffer(1024).await;
         let mut list = ChecksumList::new(1);
@@ -352,25 +364,52 @@ mod tests {
         device.write(1024, buffer.as_ref()).await.expect("write failed");
 
         let c0 = fletcher64(&[0; 512], 0);
+        let c2 = fletcher64(&[2; 512], 0);
+
+        list.push(1, 1024..2048, &[c2, c2], true).unwrap();
+
+        list.push(2, 1024..2048, &[c0], false)
+            .expect_err("Expected failure due to different chunk size");
+        assert_eq!(list.verify(&device, 2).await.expect("verify failed"), 2);
+    }
+
+    #[fuchsia::test]
+    async fn test_drop_unneeded_checksums_after_first_write() {
+        let device = FakeDevice::new(2048, 512);
+        let mut buffer = device.allocate_buffer(1024).await;
+        let mut list = ChecksumList::new(1);
+
+        buffer.as_mut_slice().copy_from_slice(&[2; 1024]);
+        device.write(1024, buffer.as_ref()).await.expect("write failed");
+
         let c1 = fletcher64(&[1; 512], 0);
         let c2 = fletcher64(&[2; 512], 0);
 
-        list.push(1, 1024..2048, &[c2, c2]).unwrap();
+        list.push(1, 1024..2048, &[c2, c2], true).unwrap();
+        list.push(2, 0..1024, &[c2, c1], false).unwrap();
+        assert_eq!(list.verify(&device, 2).await.expect("verify failed"), 2);
+    }
 
-        // Different checksum.
-        list.push(2, 1536..2048, &[c1]).expect_err("Expected failure due to checksum mismatch");
+    #[fuchsia::test]
+    async fn test_overlapping_checksums() {
+        let device = FakeDevice::new(2048, 512);
+        let mut buffer = device.allocate_buffer(1024).await;
+        let mut list = ChecksumList::new(1);
 
-        // Overlapping head.
-        list.push(3, 512..1536, &[c0, c2]).expect("push failed");
-        list.push(4, 512..1024, &[c1]).expect_err("Expected failure due to checksum mismatch");
+        buffer.as_mut_slice().copy_from_slice(&[2; 1024]);
+        device.write(1024, buffer.as_ref()).await.expect("write failed");
 
-        // Overlapping tail.
-        list.push(5, 1536..2560, &[c2, c0]).expect("push failed");
-        list.push(6, 2048..2560, &[c1]).expect_err("Expected failure due to checksum mismatch");
+        let c1 = fletcher64(&[1; 512], 0);
+        let c2 = fletcher64(&[2; 512], 0);
 
-        // Different chunk size.
-        list.push(7, 0..1024, &[c0]).expect_err("Expected failure due to different chunk size");
+        list.push(1, 1024..2048, &[c2, c2], true).unwrap();
 
-        assert_eq!(list.verify(&device, 6).await.expect("verify failed"), 6);
+        list.push(2, 512..2560, &[c1, c1, c1, c1], false).unwrap();
+        assert_eq!(list.verify(&device, 2).await.expect("verify failed"), 2);
+
+        // Changing the data to ones should be fine now because the other checksums will match.
+        buffer.as_mut_slice().copy_from_slice(&[1; 1024]);
+        device.write(1024, buffer.as_ref()).await.expect("write failed");
+        assert_eq!(list.verify(&device, 4).await.expect("verify failed"), 4);
     }
 }

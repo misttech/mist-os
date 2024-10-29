@@ -7,8 +7,6 @@
 
 #include <zircon/types.h>
 
-#include "src/storage/f2fs/common.h"
-
 namespace f2fs {
 
 enum class UpdateMode {

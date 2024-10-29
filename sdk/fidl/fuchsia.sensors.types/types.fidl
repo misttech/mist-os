@@ -61,8 +61,8 @@ type SensorType = flexible enum : uint32 {
     DEVICE_PRIVATE_BASE = 0x10000;
 };
 
-/// Unit type for each measurement.
-type SensorMeasurementUnit = flexible enum : uint32 {
+/// Unit type for measurements and configuration settings.
+type Unit = flexible enum : uint32 {
     /// Unitless
     NONE = 0;
 
@@ -92,8 +92,8 @@ type SensorMeasurementUnit = flexible enum : uint32 {
     COULOMBS = 25;
 };
 
-/// Exponential scaling value for measurement, derived from SI units.
-type SensorMeasurementScale = flexible enum : int16 {
+/// Exponential scaling value for SI units.
+type Scale = flexible enum : int16 {
     NANO = -9;
     MICRO = -6;
     MILLI = -3;
@@ -185,11 +185,11 @@ type SensorInfo = table {
     7: reporting_mode SensorReportingMode;
 
     /// The unit type of returned measurements.
-    8: measurement_unit SensorMeasurementUnit;
+    8: measurement_unit Unit;
 
     /// The magnitude of returned measurements as an exponent.
     /// Measurement = |value| * 10^|measurement_scale| units.
-    9: measurement_scale SensorMeasurementScale;
+    9: measurement_scale Scale;
 };
 
 /// Uncalibrated samples from 3 axis sensors (eg. accelerometer, gyroscope,

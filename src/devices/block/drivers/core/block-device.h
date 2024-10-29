@@ -89,7 +89,7 @@ class BlockDevice : public BlockDeviceType,
   void GetTypeGuid(GetTypeGuidCompleter::Sync& completer) override;
   void GetInstanceGuid(GetInstanceGuidCompleter::Sync& completer) override;
   void GetName(GetNameCompleter::Sync& completer) override;
-  void GetFlags(GetFlagsCompleter::Sync& completer) override;
+  void GetMetadata(GetMetadataCompleter::Sync& completer) override;
 
   void QuerySlices(QuerySlicesRequestView request, QuerySlicesCompleter::Sync& completer) override;
   void GetVolumeInfo(GetVolumeInfoCompleter::Sync& completer) override;

@@ -23,6 +23,11 @@ fuchsia_product_configuration(
                 "suspend_enabled": True,
                 "testing_sag_enabled": True,
             },
+            "storage": {
+                "filesystems": {
+                    "image_mode": "no_image",
+                },
+            },
         },
     },
 )

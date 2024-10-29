@@ -1,10 +1,12 @@
 // Transition from one idle power level to another idle power level is invalid
 [
     {
-        cpu_set: [
-            0,
-        ],
-        power_domain_id: 0,
+        power_domain: {
+            cpu_set: [
+                0,
+            ],
+            domain_id: 0,
+        },
         power_levels: [
             {
                 processing_rate: 0,

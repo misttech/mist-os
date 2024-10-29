@@ -226,6 +226,13 @@
             to: "#testing",
         },
 
+        // Needed for RemoteControlService tests.
+        {
+            protocol: [ "fuchsia.developer.remotecontrol.connector.Connector" ],
+            from: "#remote-control",
+            to: "#testing",
+        },
+
         // Needed for driver tests.
         {
             directory: [

@@ -224,12 +224,11 @@ template("assemble_security_pkg_test_system") {
     platform = {
       build_type = "eng"
 
-      # We use a bootstrap assembly, because this is a test
-      # Even though we are building a fvm/fxfs, a bootstrap assembly cannot load
-      # blobs. The blobs are necessary for the test to exercise blob resolution.
-      # The test never tries to boot using this assembly, and uses the resolution
-      # code from the "main" assembly.
-      feature_set_level = "bootstrap"
+      # We use a utility assembly, because this needs a filesystem for the test,
+      # and bootstrap assemblies cannot produce a filesystem. A standard
+      # assembly would insert packages into the filesystem that collide with the
+      # packages provided by the test. Utility is the only option.
+      feature_set_level = "utility"
       storage = {
         filesystems = {
           image_name = labels.assembly
@@ -254,12 +253,11 @@ template("assemble_security_pkg_test_system") {
     platform = {
       build_type = "eng"
 
-      # We use a bootstrap assembly, because this is a test
-      # Even though we are building a fvm/fxfs, a bootstrap assembly cannot load
-      # blobs. The blobs are necessary for the test to exercise blob resolution.
-      # The test never tries to boot using this assembly, and uses the resolution
-      # code from the "main" assembly.
-      feature_set_level = "bootstrap"
+      # We use a utility assembly, because this needs a filesystem for the test,
+      # and bootstrap assemblies cannot produce a filesystem. A standard
+      # assembly would insert packages into the filesystem that collide with the
+      # packages provided by the test. Utility is the only option.
+      feature_set_level = "utility"
       storage = {
         filesystems = {
           image_name = labels.assembly
@@ -316,7 +314,6 @@ template("assemble_security_pkg_test_system") {
     }
 
     board_config_label = ":${labels.board_config}"
-    use_bringup_platform_bundles_only = true
     base_packages = packages_for_assembly
   }
 

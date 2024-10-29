@@ -219,7 +219,7 @@ mod test_util {
             ) {
                 scope.spawn(async move {
                     self.0.send((relative_path, server_end.into_channel())).await.unwrap();
-                })
+                });
             }
 
             fn lazy(&self, path: &Path) -> bool {

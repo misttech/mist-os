@@ -379,6 +379,25 @@ zx_status_t SdioControllerDevice::SdioDisableFn(uint8_t fn_idx) {
   return st;
 }
 
+zx_status_t SdioControllerDevice::SdioIoReady(uint8_t fn_idx, bool* out_ready) {
+  if (!SdioFnIdxValid(fn_idx) || fn_idx == 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  std::lock_guard<std::mutex> lock(lock_);
+
+  uint8_t io_ready_reg = 0;
+
+  zx_status_t st = SdioDoRwByteLocked(false, 0, SDIO_CIA_CCCR_IORx_FUNC_RDY_ADDR, 0, &io_ready_reg);
+  if (st != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Error reading I/O Ready: %d status: %d", fn_idx, st);
+    return st;
+  }
+
+  *out_ready = io_ready_reg & (1 << fn_idx);
+  return ZX_OK;
+}
+
 zx_status_t SdioControllerDevice::SdioEnableFnIntr(uint8_t fn_idx) {
   zx_status_t st = ZX_OK;
 

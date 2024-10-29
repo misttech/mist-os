@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::SpecificRouter;
+use crate::Router;
 use from_enum::FromEnum;
 use router_error::Explain;
 use std::fmt::Debug;
@@ -85,11 +85,10 @@ pub enum Capability {
     Data(crate::Data),
     Directory(crate::Directory),
     Handle(crate::Handle),
-    Router(crate::Router),
-    ConnectorRouter(crate::SpecificRouter<crate::Connector>),
-    DictionaryRouter(crate::SpecificRouter<crate::Dict>),
-    DirEntryRouter(crate::SpecificRouter<crate::DirEntry>),
-    DataRouter(crate::SpecificRouter<crate::Data>),
+    ConnectorRouter(crate::Router<crate::Connector>),
+    DictionaryRouter(crate::Router<crate::Dict>),
+    DirEntryRouter(crate::Router<crate::DirEntry>),
+    DataRouter(crate::Router<crate::Data>),
     Instance(crate::WeakInstanceToken),
     DirEntry(crate::DirEntry),
 }
@@ -105,7 +104,6 @@ impl Capability {
     pub fn try_clone(&self) -> Result<Self, ()> {
         let out = match self {
             Self::Connector(s) => Self::Connector(s.clone()),
-            Self::Router(s) => Self::Router(s.clone()),
             Self::ConnectorRouter(s) => Self::ConnectorRouter(s.clone()),
             Self::DictionaryRouter(s) => Self::DictionaryRouter(s.clone()),
             Self::DirEntryRouter(s) => Self::DirEntryRouter(s.clone()),
@@ -123,19 +121,18 @@ impl Capability {
 
     pub fn debug_typename(&self) -> &'static str {
         match self {
-            Self::Connector(_) => "Connector",
-            Self::Router(_) => "Router",
-            Self::ConnectorRouter(_) => "ConnectorRouter",
-            Self::DictionaryRouter(_) => "DictionaryRouter",
-            Self::DirEntryRouter(_) => "DirEntryRouter",
-            Self::DataRouter(_) => "DataRouter",
-            Self::Dictionary(_) => "Dictionary",
-            Self::Data(_) => "Data",
-            Self::Unit(_) => "Unit",
-            Self::Directory(_) => "Directory",
-            Self::Handle(_) => "Handle",
+            Self::Connector(_) => crate::Connector::debug_typename(),
+            Self::ConnectorRouter(_) => crate::Router::<crate::Connector>::debug_typename(),
+            Self::DictionaryRouter(_) => crate::Router::<crate::Dict>::debug_typename(),
+            Self::DirEntryRouter(_) => crate::Router::<crate::DirEntry>::debug_typename(),
+            Self::DataRouter(_) => crate::Router::<crate::Data>::debug_typename(),
+            Self::Dictionary(_) => crate::Dict::debug_typename(),
+            Self::Data(_) => crate::Data::debug_typename(),
+            Self::Unit(_) => crate::Unit::debug_typename(),
+            Self::Directory(_) => crate::Directory::debug_typename(),
+            Self::Handle(_) => crate::Handle::debug_typename(),
             Self::Instance(_) => "Instance",
-            Self::DirEntry(_) => "DirEntry",
+            Self::DirEntry(_) => crate::DirEntry::debug_typename(),
         }
     }
 }
@@ -217,18 +214,7 @@ impl TryFrom<Capability> for crate::Unit {
     }
 }
 
-impl TryFrom<Capability> for crate::Router {
-    type Error = ();
-
-    fn try_from(c: Capability) -> Result<Self, Self::Error> {
-        match c {
-            Capability::Router(r) => Ok(r),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<Capability> for SpecificRouter<crate::Dict> {
+impl TryFrom<Capability> for Router<crate::Dict> {
     type Error = ();
 
     fn try_from(c: Capability) -> Result<Self, Self::Error> {
@@ -239,7 +225,7 @@ impl TryFrom<Capability> for SpecificRouter<crate::Dict> {
     }
 }
 
-impl TryFrom<Capability> for SpecificRouter<crate::DirEntry> {
+impl TryFrom<Capability> for Router<crate::DirEntry> {
     type Error = ();
 
     fn try_from(c: Capability) -> Result<Self, Self::Error> {
@@ -250,7 +236,7 @@ impl TryFrom<Capability> for SpecificRouter<crate::DirEntry> {
     }
 }
 
-impl TryFrom<Capability> for SpecificRouter<crate::Connector> {
+impl TryFrom<Capability> for Router<crate::Connector> {
     type Error = ();
 
     fn try_from(c: Capability) -> Result<Self, Self::Error> {
@@ -261,7 +247,7 @@ impl TryFrom<Capability> for SpecificRouter<crate::Connector> {
     }
 }
 
-impl TryFrom<Capability> for SpecificRouter<crate::Data> {
+impl TryFrom<Capability> for Router<crate::Data> {
     type Error = ();
 
     fn try_from(c: Capability) -> Result<Self, Self::Error> {
@@ -274,4 +260,6 @@ impl TryFrom<Capability> for SpecificRouter<crate::Data> {
 
 /// Parent trait implemented by all capability types. Useful for defining interfaces that
 /// generic over a capability type.
-pub trait CapabilityBound: Into<Capability> + TryFrom<Capability> + Send + Sync + 'static {}
+pub trait CapabilityBound: Into<Capability> + TryFrom<Capability> + Send + Sync + 'static {
+    fn debug_typename() -> &'static str;
+}

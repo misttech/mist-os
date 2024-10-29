@@ -42,7 +42,7 @@ const LAST_VALUE_KEY: &str = "LAST_VALUE";
 pub(crate) struct ChangeFunction {
     /// The function that will be used to evaluate whether or not a setting has changed.
     #[allow(clippy::type_complexity)]
-    function: Box<dyn Fn(&SettingInfo, &SettingInfo) -> bool + Send + Sync + 'static>,
+    function: Box<dyn Fn(&SettingInfo, &SettingInfo) -> bool>,
 
     /// An identifier for the change function that is used to group hanging gets. This identifier
     /// should be the same for all change functions in a given sequence. For example, when a client
@@ -55,7 +55,7 @@ impl ChangeFunction {
     #[allow(clippy::type_complexity)]
     pub fn new(
         id: u64,
-        function: Box<dyn Fn(&SettingInfo, &SettingInfo) -> bool + Send + Sync + 'static>,
+        function: Box<dyn Fn(&SettingInfo, &SettingInfo) -> bool>,
     ) -> ChangeFunction {
         ChangeFunction { function, id }
     }
@@ -64,19 +64,11 @@ impl ChangeFunction {
 /// [Responder] is a trait for handing back results of a watch request. It is unique from other
 /// work responders, since [Work] consumers expect a value to be present on success. The Responder
 /// specifies the conversions for [Response](crate::handler::base::Response).
-pub trait Responder<
-    R: From<SettingInfo> + Send + Sync + 'static,
-    E: From<Error> + Send + Sync + 'static,
->
-{
+pub trait Responder<R: From<SettingInfo>, E: From<Error>> {
     fn respond(self, response: Result<R, E>);
 }
 
-pub struct Work<
-    R: From<SettingInfo> + Send + Sync + 'static,
-    E: From<Error> + Send + Sync + 'static,
-    T: Responder<R, E> + Send + Sync + 'static,
-> {
+pub struct Work<R: From<SettingInfo>, E: From<Error>, T: Responder<R, E>> {
     setting_type: SettingType,
     signature: Signature,
     responder: T,
@@ -86,11 +78,8 @@ pub struct Work<
     _error_type: PhantomData<E>,
 }
 
-impl<
-        R: From<SettingInfo> + Send + Sync + 'static,
-        E: From<Error> + Send + Sync + 'static,
-        T: Responder<R, E> + Send + Sync + 'static,
-    > Work<R, E, T>
+impl<R: From<SettingInfo> + 'static, E: From<Error> + 'static, T: Responder<R, E> + 'static>
+    Work<R, E, T>
 {
     fn new(setting_type: SettingType, responder: T, cancelation_rx: oneshot::Receiver<()>) -> Self
     where
@@ -208,12 +197,9 @@ impl<
     }
 }
 
-#[async_trait]
-impl<
-        R: From<SettingInfo> + Send + Sync + 'static,
-        E: From<Error> + Send + Sync + 'static,
-        T: Responder<R, E> + Send + Sync + 'static,
-    > Sequential for Work<R, E, T>
+#[async_trait(?Send)]
+impl<R: From<SettingInfo> + 'static, E: From<Error> + 'static, T: Responder<R, E> + 'static>
+    Sequential for Work<R, E, T>
 {
     async fn execute(
         mut self: Box<Self>,
@@ -265,11 +251,8 @@ impl<
     }
 }
 
-impl<
-        R: From<SettingInfo> + Send + Sync + 'static,
-        E: From<Error> + Send + Sync + 'static,
-        T: Responder<R, E> + Send + Sync + 'static,
-    > From<(Work<R, E, T>, oneshot::Sender<()>)> for Job
+impl<R: From<SettingInfo> + 'static, E: From<Error> + 'static, T: Responder<R, E> + 'static>
+    From<(Work<R, E, T>, oneshot::Sender<()>)> for Job
 {
     fn from((work, cancelation_tx): (Work<R, E, T>, oneshot::Sender<()>)) -> Job {
         let signature = work.signature;
@@ -287,7 +270,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::channel::oneshot::Sender;
     use futures::lock::Mutex;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     struct TestResponder {
         sender: Sender<Result<SettingInfo, Error>>,
@@ -308,7 +291,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_watch_basic_functionality() {
         // Create store for job.
-        let store_handle = Arc::new(Mutex::new(HashMap::new()));
+        let store_handle = Rc::new(Mutex::new(HashMap::new()));
 
         let get_info = SettingInfo::Unknown(UnknownInfo(true));
         let listen_info = SettingInfo::Unknown(UnknownInfo(false));
@@ -377,7 +360,7 @@ mod tests {
             .0;
 
         let work_messenger_signature = work_messenger.get_signature();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let _ = work.execute(work_messenger, store_handle, 0.into()).await;
         })
         .detach();
@@ -411,7 +394,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_custom_change_function() {
         // Create store for job.
-        let store_handle = Arc::new(Mutex::new(HashMap::new()));
+        let store_handle = Rc::new(Mutex::new(HashMap::new()));
 
         // Pre-fill the storage with the value so that the initial get will not trigger a response.
         let unchanged_info = SettingInfo::Unknown(UnknownInfo(true));
@@ -458,9 +441,9 @@ mod tests {
             .0;
 
         // Execute work on async task.
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let _ =
-                work.execute(work_messenger, Arc::new(Mutex::new(HashMap::new())), 0.into()).await;
+                work.execute(work_messenger, Rc::new(Mutex::new(HashMap::new())), 0.into()).await;
         })
         .detach();
 

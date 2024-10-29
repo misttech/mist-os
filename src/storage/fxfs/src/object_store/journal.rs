@@ -112,11 +112,11 @@ pub struct JournalCheckpointV32 {
     pub version: Version,
 }
 
-pub type JournalRecord = JournalRecordV41;
+pub type JournalRecord = JournalRecordV42;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum JournalRecordV41 {
+pub enum JournalRecordV42 {
     // Indicates no more records in this block.
     EndBlock,
     // Mutation for a particular object.  object_id here is for the collection i.e. the store or
@@ -138,7 +138,41 @@ pub enum JournalRecordV41 {
     DidFlushDevice(u64),
     // Checksums for a data range written by this transaction. A transaction is only valid if these
     // checksums are right. The range is the device offset the checksums are for.
+    //
+    // A boolean indicates whether this range is being written to for the first time. For overwrite
+    // extents, we only check the checksums for a block if it has been written to for the first
+    // time since the last flush, because otherwise we can't roll it back anyway so it doesn't
+    // matter. For copy-on-write extents, the bool is always true.
+    DataChecksums(Range<u64>, ChecksumsV38, bool),
+}
+
+#[derive(Serialize, Deserialize, TypeFingerprint, Versioned)]
+pub enum JournalRecordV41 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: MutationV41 },
+    Commit,
+    Discard(u64),
+    DidFlushDevice(u64),
     DataChecksums(Range<u64>, ChecksumsV38),
+}
+
+impl From<JournalRecordV41> for JournalRecordV42 {
+    fn from(record: JournalRecordV41) -> Self {
+        match record {
+            JournalRecordV41::EndBlock => Self::EndBlock,
+            JournalRecordV41::Mutation { object_id, mutation } => {
+                Self::Mutation { object_id, mutation: mutation.into() }
+            }
+            JournalRecordV41::Commit => Self::Commit,
+            JournalRecordV41::Discard(offset) => Self::Discard(offset),
+            JournalRecordV41::DidFlushDevice(offset) => Self::DidFlushDevice(offset),
+            JournalRecordV41::DataChecksums(range, sums) => {
+                // At the time of writing the only extents written by real systems are CoW extents
+                // so the new bool is always true.
+                Self::DataChecksums(range, sums, true)
+            }
+        }
+    }
 }
 
 #[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
@@ -405,6 +439,7 @@ const STORE_DELETED: u64 = u64::MAX;
 pub struct JournaledChecksums {
     pub device_range: Range<u64>,
     pub checksums: Checksums,
+    pub first_write: bool,
 }
 
 /// Handles for journal-like objects have some additional functionality to manage their extents,
@@ -589,7 +624,9 @@ impl Journal {
                 checksum_list.push(
                     journal_offset,
                     *device_offset..*device_offset + range.length().unwrap(),
-                    checksums.maybe_as_ref().context("Malformed checksums")?,
+                    checksums.maybe_as_ref().context("Malformed snooped checksums")?,
+                    // Cow mode extents are always writing for the first time
+                    true,
                 )?;
             }
             Mutation::ObjectStore(_) => {}
@@ -715,11 +752,12 @@ impl Journal {
             ..
         } in &transactions
         {
-            for JournaledChecksums { device_range, checksums } in checksums {
+            for JournaledChecksums { device_range, checksums, first_write } in checksums {
                 checksum_list.push(
                     checkpoint.file_offset,
                     device_range.clone(),
                     checksums.maybe_as_ref().context("Malformed checksums")?,
+                    *first_write,
                 )?;
             }
             for mutation in root_parent_mutations
@@ -1010,7 +1048,7 @@ impl Journal {
                                 }
                             }
                         }
-                        JournalRecord::DataChecksums(device_range, checksums) => {
+                        JournalRecord::DataChecksums(device_range, checksums, first_write) => {
                             let current_transaction = match current_transaction.as_mut() {
                                 None => {
                                     transactions.push(JournaledTransaction::new(checkpoint));
@@ -1019,9 +1057,11 @@ impl Journal {
                                 }
                                 Some(transaction) => transaction,
                             };
-                            current_transaction
-                                .checksums
-                                .push(JournaledChecksums { device_range, checksums });
+                            current_transaction.checksums.push(JournaledChecksums {
+                                device_range,
+                                checksums,
+                                first_write,
+                            });
                         }
                         JournalRecord::Commit => {
                             if let Some(JournaledTransaction {
@@ -1623,12 +1663,15 @@ impl Journal {
                         .write_record(&JournalRecord::Mutation { object_id: 0, mutation })
                         .unwrap();
                 }
-                for (device_range, checksums) in transaction.take_checksums().into_iter() {
+                for (device_range, checksums, first_write) in
+                    transaction.take_checksums().into_iter()
+                {
                     inner
                         .writer
                         .write_record(&JournalRecord::DataChecksums(
                             device_range,
                             Checksums::fletcher(checksums),
+                            first_write,
                         ))
                         .unwrap();
                 }

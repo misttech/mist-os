@@ -367,10 +367,13 @@ struct ChannelProxy {
 ///
 /// When the proxy exits, `proxy.resume_event` will be removed from `resume_events`.
 fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>>, name: String) {
+    let mut thread_name = format!("proxy:{:?}", name);
+    thread_name.truncate(32);
+
     // TODO: We will likely have to handle a larger number of wake sources in the future,
     // at which point we may want to consider a Port-based approach, and reduce the number
     // of threads.
-    let _ = std::thread::Builder::new().name(format!("proxy_thread_{:?}", name)).spawn(move || {
+    let _ = std::thread::Builder::new().name(thread_name).spawn(move || {
         let mut bounce_bytes = [MaybeUninit::uninit(); zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize];
         let mut bounce_handles =
             [const { MaybeUninit::uninit() }; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];

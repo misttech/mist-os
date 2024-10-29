@@ -8,6 +8,7 @@
 #include <lib/zx/result.h>
 
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -36,7 +37,7 @@ zx_status_t BlobfsCompress(const uint8_t* src, size_t src_sz, uint8_t* dest_writ
                            chunked_compression::CompressionParams params,
                            const CompressionCliOptionStruct& cli_options);
 
-zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlob(cpp20::span<const uint8_t> data,
+zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlob(std::span<const uint8_t> data,
                                                      blobfs::DeliveryBlobType type);
 
 }  // namespace blobfs_compress

@@ -14,21 +14,47 @@ import (
 //go:embed *.tmpl
 var templates embed.FS
 
-type Generator struct{ *fidlgen.Generator }
+type Generator struct {
+	fdomain bool
+	*fidlgen.Generator
+}
 
-func NewGenerator(rustfmtPath, rustfmtConfigPath string) *Generator {
+func NewGenerator(rustfmtPath, rustfmtConfigPath string, fdomain bool) *Generator {
 	var args []string
 	if rustfmtConfigPath != "" {
 		args = append(args, "--config-path", rustfmtConfigPath)
 	}
 	formatter := fidlgen.NewFormatter(rustfmtPath, args...)
 
-	return &Generator{fidlgen.NewGenerator("RustTemplates", templates, formatter, template.FuncMap{
-		"ResourceDialect": func() string { return "fidl::encoding::DefaultFuchsiaResourceDialect" },
-	})}
+	return &Generator{
+		fdomain: fdomain,
+		Generator: fidlgen.NewGenerator("RustTemplates", templates, formatter, template.FuncMap{
+			"ResourceDialect": func() string {
+				if fdomain {
+					return "fdomain_client::fidl::FDomainResourceDialect"
+				} else {
+					return "fidl::encoding::DefaultFuchsiaResourceDialect"
+				}
+			},
+			"FDomain": func() bool { return fdomain },
+			"MarkerNamespace": func() string {
+				if fdomain {
+					return "fdomain_client::fidl"
+				} else {
+					return "fidl::endpoints"
+				}
+			},
+			"ChannelType": func() string {
+				if fdomain {
+					return "fdomain_client::Channel"
+				} else {
+					return "::fidl::AsyncChannel"
+				}
+			},
+		})}
 }
 
 func (gen *Generator) GenerateFidl(ir fidlgen.Root, outputFilename string, includeDrivers bool) error {
-	tree := Compile(ir, includeDrivers)
+	tree := Compile(ir, includeDrivers, gen.fdomain)
 	return gen.GenerateFile(outputFilename, "GenerateSourceFile", tree)
 }

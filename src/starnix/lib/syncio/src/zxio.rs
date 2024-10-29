@@ -552,6 +552,7 @@ pub struct zxio_verification_options {
     pub __bindgen_padding_0: [u8; 7usize],
 }
 pub type zxio_verification_options_t = zxio_verification_options;
+pub type zxio_selinux_context_state_t = u8;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct zxio_node_attr {
@@ -565,10 +566,13 @@ pub struct zxio_node_attr {
     pub modification_time: u64,
     pub change_time: u64,
     pub access_time: u64,
+    pub selinux_context: *mut u8,
+    pub selinux_context_length: u16,
+    pub selinux_context_state: zxio_selinux_context_state_t,
+    pub __bindgen_padding_0: u8,
     pub mode: u32,
     pub uid: u32,
     pub gid: u32,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub rdev: u64,
     pub fsverity_options: zxio_verification_options_t,
     pub fsverity_root_hash: *mut u8,
@@ -578,7 +582,7 @@ pub struct zxio_node_attr {
     pub object_type: zxio_object_type_t,
     pub wrapping_key_id: [u8; 16usize],
     pub has: zxio_node_attr_zxio_node_attr_has_t,
-    pub __bindgen_padding_2: [u8; 4usize],
+    pub __bindgen_padding_2: [u8; 3usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -603,6 +607,7 @@ pub struct zxio_node_attr_zxio_node_attr_has_t {
     pub object_type: bool,
     pub casefold: bool,
     pub wrapping_key_id: bool,
+    pub selinux_context: bool,
 }
 impl Default for zxio_node_attr {
     fn default() -> Self {
@@ -1400,6 +1405,8 @@ pub const ZXIO_OBJECT_TYPE_RAW_SOCKET: zxio_object_type_t = 11;
 pub const ZXIO_OBJECT_TYPE_PACKET_SOCKET: zxio_object_type_t = 12;
 pub const ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET: zxio_object_type_t = 13;
 pub const ZXIO_OBJECT_TYPE_SYMLINK: zxio_object_type_t = 14;
+pub const ZXIO_SELINUX_CONTEXT_STATE_DATA: zxio_selinux_context_state_t = 0;
+pub const ZXIO_SELINUX_CONTEXT_STATE_USE_XATTRS: zxio_selinux_context_state_t = 1;
 pub type __builtin_va_list = [__va_list_tag; 1usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

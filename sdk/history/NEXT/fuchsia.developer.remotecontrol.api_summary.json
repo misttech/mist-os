@@ -171,6 +171,16 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability",
+        "strictness": "flexible",
+        "ordinal": "4244545653215915243",
+        "direction": "two_way",
+        "request": "fuchsia.developer.remotecontrol/RemoteControlConnectCapabilityRequest",
+        "response": "fuchsia.developer.remotecontrol/RemoteControl_ConnectCapability_Response",
+        "error": "fuchsia.developer.remotecontrol/ConnectCapabilityError"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.developer.remotecontrol/RemoteControl.EchoString",
         "strictness": "strict",
         "ordinal": "3152176461926033451",
@@ -218,6 +228,35 @@
         "name": "fuchsia.developer.remotecontrol/RemoteControl",
         "openness": "open",
         "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.developer.remotecontrol/RemoteControlConnectCapabilityRequest.capability_name",
+        "ordinal": "3",
+        "type": "string:255"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.developer.remotecontrol/RemoteControlConnectCapabilityRequest.capability_set",
+        "ordinal": "2",
+        "type": "fuchsia.sys2/OpenDirType"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.developer.remotecontrol/RemoteControlConnectCapabilityRequest.moniker",
+        "ordinal": "1",
+        "type": "string:4096"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.developer.remotecontrol/RemoteControlConnectCapabilityRequest.server_channel",
+        "ordinal": "4",
+        "type": "zx/Handle:CHANNEL"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.developer.remotecontrol/RemoteControlConnectCapabilityRequest",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

@@ -16,11 +16,11 @@ async fn unlink_file_with_sufficient_rights() {
 
     for dir_flags in harness
         .dir_rights
-        .valid_combos_with(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE)
+        .combinations_containing_deprecated(fio::Rights::READ_BYTES | fio::Rights::WRITE_BYTES)
     {
         let root =
             root_directory(vec![directory("src", vec![file("file.txt", contents.to_vec())])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         let src_dir = open_dir_with_flags(&test_dir, dir_flags, "src").await;
 
         let file = open_node::<fio::FileMarker>(
@@ -59,10 +59,10 @@ async fn unlink_file_with_insufficient_rights() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in harness.dir_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in harness.dir_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
         let root =
             root_directory(vec![directory("src", vec![file("file.txt", contents.to_vec())])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         let src_dir = open_dir_with_flags(&test_dir, dir_flags, "src").await;
 
         assert_eq!(
@@ -86,9 +86,10 @@ async fn unlink_directory_with_sufficient_rights() {
         return;
     }
 
-    for dir_flags in harness.dir_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in harness.dir_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
+    {
         let root = root_directory(vec![directory("src", vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         // Re-open dir with flags being tested.
         let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
 
@@ -106,9 +107,9 @@ async fn unlink_directory_with_insufficient_rights() {
         return;
     }
 
-    for dir_flags in harness.dir_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in harness.dir_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
         let root = root_directory(vec![directory("src", vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         // Re-open dir with flags being tested.
         let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
 
@@ -131,7 +132,7 @@ async fn unlink_must_be_directory() {
     }
 
     let root = root_directory(vec![directory("dir", vec![]), file("file", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     let must_be_directory = fio::UnlinkOptions {
         flags: Some(fio::UnlinkFlags::MUST_BE_DIRECTORY),

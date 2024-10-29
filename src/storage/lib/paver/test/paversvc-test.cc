@@ -1919,7 +1919,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteBootloaderNotAligned) {
   ValidateUnwrittenPages(8 * kPagesPerBlock - 1, 1);
 }
 
-TEST_F(PaverServiceSkipBlockTest, WriteVolumes) {
+TEST_F(PaverServiceSkipBlockTest, DISABLED_WriteVolumes) {
   // TODO(https://fxbug.dev/42109028): Figure out a way to test this.
 }
 
@@ -2494,9 +2494,8 @@ TEST_F(PaverServiceLuisTest, WriteSparseVolume) {
   ASSERT_OK(block_client->Read(block_read_vmo, image.image_length, kFvmBlockStart, 0));
 
   // Verify the written data against the unsparsed payload
-  cpp20::span<const uint8_t> raw_as_bytes = {
-      reinterpret_cast<const uint8_t*>(image.raw_data.data()),
-      image.raw_data.size() * sizeof(uint32_t)};
+  std::span<const uint8_t> raw_as_bytes = {reinterpret_cast<const uint8_t*>(image.raw_data.data()),
+                                           image.raw_data.size() * sizeof(uint32_t)};
   ASSERT_BYTES_EQ(block_read_vmo_mapper.start(), raw_as_bytes.data(), raw_as_bytes.size());
 }
 

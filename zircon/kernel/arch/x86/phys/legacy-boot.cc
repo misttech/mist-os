@@ -12,12 +12,11 @@
 #include <lib/memalloc/range.h>
 #include <zircon/assert.h>
 
-#include <array>
-
 #include <ktl/array.h>
 #include <ktl/iterator.h>
 #include <ktl/limits.h>
 #include <ktl/span.h>
+#include <ktl/string_view.h>
 #include <phys/acpi.h>
 #include <phys/address-space.h>
 #include <phys/allocation.h>
@@ -38,6 +37,11 @@ extern "C" {
 }  // extern "C"
 
 namespace {
+
+constexpr uintptr_t kSmbiosSearchBase = 0xf0000;
+constexpr size_t kSmbiosSearchSize = 0x10000;
+constexpr size_t kSmbiosAlign = 16;
+constexpr ktl::array kSmbiosSignatures{"_SM_"sv, "_SM3_"sv};
 
 template <typename T>
 ktl::span<const ktl::byte> AsBytes(const T& obj) {
@@ -62,6 +66,22 @@ void InitAcpi(LegacyBoot& boot_info) {
   }
 }
 
+void InitSmbios(LegacyBoot& boot_info) {
+  ktl::string_view scan{
+      reinterpret_cast<const char*>(kSmbiosSearchBase),
+      kSmbiosSearchSize,
+  };
+  while (scan.size() >= kSmbiosAlign) {
+    for (ktl::string_view sig : kSmbiosSignatures) {
+      if (scan.starts_with(sig)) {
+        boot_info.smbios = reinterpret_cast<uintptr_t>(scan.data());
+        return;
+      }
+    }
+    scan.remove_prefix(kSmbiosAlign);
+  }
+}
+
 }  // namespace
 
 // A default, weak definition that may be overrode to perform other relevant
@@ -69,7 +89,11 @@ void InitAcpi(LegacyBoot& boot_info) {
 [[gnu::weak]] void LegacyBootSetUartConsole(const uart::all::Driver& uart) { SetUartConsole(uart); }
 
 void LegacyBootInitMemory(AddressSpace* aspace) {
+  // Note that these are done before paging is enabled (at all for 32-bit) with
+  // new identity-mapping page tables, because the fixed-address regions they
+  // scan won't be among the known RAM ranges that get identity-mapped.
   InitAcpi(gLegacyBoot);
+  InitSmbios(gLegacyBoot);
 
   constexpr auto as_memrange =
       [](auto obj, memalloc::Type type = memalloc::Type::kLegacyBootData) -> memalloc::Range {

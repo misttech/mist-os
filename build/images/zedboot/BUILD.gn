@@ -63,6 +63,7 @@ assembled_system("zedboot_assembly") {
   # zbi arguments
   if (custom_signing_script != "") {
     inputs = custom_signing_script_inputs
+    deps = [ "//build/images/custom_signing:deps" ]
     generate_signed_zbi = true
   } else if (use_vboot) {
     inputs = vboot_action.inputs

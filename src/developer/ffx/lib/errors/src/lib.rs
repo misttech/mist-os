@@ -67,6 +67,7 @@ pub enum FfxError {
     #[error("{}", match .err {
         TargetConnectionError::PermissionDenied => format!("Could not establish SSH connection to the target {}: Permission denied.", target_string(.target)),
         TargetConnectionError::ConnectionRefused => format!("Could not establish SSH connection to the target {}: Connection refused.", target_string(.target)),
+        TargetConnectionError::ConnectionClosedByRemoteHost => format!("Could not establish SSH connection to the target {}: Connection closed by remote host.", target_string(.target)),
         TargetConnectionError::UnknownNameOrService => format!("Could not establish SSH connection to the target {}: Unknown name or service.", target_string(.target)),
         TargetConnectionError::Timeout => format!("Could not establish SSH connection to the target {}: Timed out awaiting connection.", target_string(.target)),
         TargetConnectionError::KeyVerificationFailure => format!("Could not establish SSH connection to the target {}: Key verification failed.", target_string(.target)),
@@ -263,6 +264,7 @@ impl IntoExitCode for TargetConnectionError {
             TargetConnectionError::RcsConnectionError => 51,
             TargetConnectionError::FailedToKnockService => 52,
             TargetConnectionError::TargetIncompatible => 53,
+            TargetConnectionError::ConnectionClosedByRemoteHost => 54,
         }
     }
 }

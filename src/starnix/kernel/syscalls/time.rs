@@ -10,12 +10,12 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_runtime::UtcInstant;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{InterruptibleEvent, Locked, Unlocked, WakeReason};
-use starnix_uapi::auth::CAP_WAKE_ALARM;
-use starnix_uapi::errors::{Errno, EINTR};
-use starnix_uapi::time::{
+use starnix_types::time::{
     duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
     timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
 };
+use starnix_uapi::auth::CAP_WAKE_ALARM;
+use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::user_address::UserRef;
 use starnix_uapi::{
     errno, error, from_status_like_fdio, itimerspec, itimerval, pid_t, sigevent, timespec, timeval,
@@ -77,9 +77,13 @@ pub fn sys_clock_gettime(
                 profile_duration!("GetUtcInstant");
                 utc_now().into_nanos()
             }
-            CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW | CLOCK_BOOTTIME => {
+            CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW => {
                 profile_duration!("GetMonotonic");
                 zx::MonotonicInstant::get().into_nanos()
+            }
+            CLOCK_BOOTTIME => {
+                profile_duration!("GetBootTime");
+                zx::BootInstant::get().into_nanos()
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 profile_duration!("GetThreadCpuTime");
@@ -145,17 +149,9 @@ pub fn sys_clock_nanosleep(
     // At some point we'll need to monitor changes to the realtime clock proactively and adjust
     // timers accordingly.
     match which_clock {
-        CLOCK_REALTIME | CLOCK_MONOTONIC => {}
+        CLOCK_REALTIME | CLOCK_MONOTONIC | CLOCK_BOOTTIME => {}
         CLOCK_TAI => {
             track_stub!(TODO("https://fxbug.dev/322875165"), "clock_nanosleep, CLOCK_TAI", flags);
-            return error!(EINVAL);
-        }
-        CLOCK_BOOTTIME => {
-            track_stub!(
-                TODO("https://fxbug.dev/322874654"),
-                "clock_nanosleep, CLOCK_BOOTTIME",
-                flags
-            );
             return error!(EINVAL);
         }
         CLOCK_PROCESS_CPUTIME_ID => {
@@ -166,7 +162,7 @@ pub fn sys_clock_nanosleep(
             );
             return error!(EINVAL);
         }
-        _ => return error!(EOPNOTSUPP),
+        _ => return error!(ENOTSUP),
     }
 
     let request = current_task.read_object(user_request)?;
@@ -180,23 +176,24 @@ pub fn sys_clock_nanosleep(
         return clock_nanosleep_relative_to_utc(current_task, request, is_absolute, user_remaining);
     }
 
-    let monotonic_deadline = if is_absolute {
+    // TODO(https://fxbug.dev/361583830): Support futex wait on different timeline deadlines.
+    let boot_deadline = if is_absolute {
         time_from_timespec(request)?
     } else {
-        zx::MonotonicInstant::after(duration_from_timespec(request)?)
+        zx::BootInstant::after(duration_from_timespec(request)?)
     };
 
-    clock_nanosleep_monotonic_with_deadline(
+    clock_nanosleep_boot_with_deadline(
         current_task,
         is_absolute,
-        monotonic_deadline,
+        boot_deadline,
         None,
         user_remaining,
     )
 }
 
-// Sleep until we've satisfied |request| relative to the UTC clock which may advance at a different rate from the
-// monotonic clock by repeatdly computing a monotonic target and sleeping.
+/// Sleep until we've satisfied |request| relative to the UTC clock which may advance at
+/// a different rate from the boot clock by repeatdly computing a boot target and sleeping.
 fn clock_nanosleep_relative_to_utc(
     current_task: &mut CurrentTask,
     request: timespec,
@@ -209,15 +206,15 @@ fn clock_nanosleep_relative_to_utc(
         utc_now() + duration_from_timespec(request)?
     };
     loop {
-        // Compute monotonic deadline that corresponds to the UTC clocks's current transformation to
-        // monotonic. This may have changed while we were sleeping so check again on every
+        // Compute boot deadline that corresponds to the UTC clocks's current transformation to
+        // boot. This may have changed while we were sleeping so check again on every
         // iteration.
-        let monotonic_deadline =
-            crate::time::utc::estimate_monotonic_deadline_from_utc(clock_deadline_absolute);
-        clock_nanosleep_monotonic_with_deadline(
+        let boot_deadline =
+            crate::time::utc::estimate_boot_deadline_from_utc(clock_deadline_absolute);
+        clock_nanosleep_boot_with_deadline(
             current_task,
             is_absolute,
-            monotonic_deadline,
+            boot_deadline,
             Some(clock_deadline_absolute),
             user_remaining,
         )?;
@@ -233,17 +230,18 @@ fn clock_nanosleep_relative_to_utc(
     }
 }
 
-fn clock_nanosleep_monotonic_with_deadline(
+fn clock_nanosleep_boot_with_deadline(
     current_task: &mut CurrentTask,
     is_absolute: bool,
-    deadline: zx::MonotonicInstant,
+    deadline: zx::BootInstant,
     original_utc_deadline: Option<UtcInstant>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
     let event = InterruptibleEvent::new();
     let guard = event.begin_wait();
     match current_task.run_in_state(RunState::Event(event.clone()), || {
-        match guard.block_until(deadline) {
+        // TODO(https://fxbug.dev/361583830): Remove the parsing from boot time to mono time
+        match guard.block_until(zx::MonotonicInstant::from_nanos(deadline.into_nanos())) {
             Err(WakeReason::Interrupted) => error!(EINTR),
             _ => Ok(()),
         }
@@ -255,7 +253,7 @@ fn clock_nanosleep_monotonic_with_deadline(
                     Some(original_utc_deadline) => {
                         GenericDuration::from(original_utc_deadline - utc_now())
                     }
-                    None => GenericDuration::from(deadline - zx::MonotonicInstant::get()),
+                    None => GenericDuration::from(deadline - zx::BootInstant::get()),
                 };
                 let remaining = timespec_from_duration(*std::cmp::max(
                     GenericDuration::from_nanos(0),
@@ -264,7 +262,7 @@ fn clock_nanosleep_monotonic_with_deadline(
                 current_task.write_object(user_remaining, &remaining)?;
             }
             current_task.set_syscall_restart_func(move |current_task| {
-                clock_nanosleep_monotonic_with_deadline(
+                clock_nanosleep_boot_with_deadline(
                     current_task,
                     is_absolute,
                     deadline,
@@ -546,12 +544,16 @@ mod test {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use crate::time::utc::UtcClockOverrideGuard;
-    use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcDuration};
-    use starnix_uapi::ownership::OwnedRef;
+    use fuchsia_runtime::{UtcDuration, UtcTimeline};
+    use starnix_types::ownership::OwnedRef;
     use starnix_uapi::signals;
     use starnix_uapi::user_address::UserAddress;
     use test_util::{assert_geq, assert_leq};
-    use zx::HandleBased;
+    use zx::{BootTimeline, Clock, ClockUpdate, HandleBased};
+
+    // TODO(https://fxbug.dev/356911500): Use types below from fuchsia_runtime
+    type UtcClock = Clock<BootTimeline, UtcTimeline>;
+    type UtcClockUpdate = ClockUpdate<BootTimeline, UtcTimeline>;
 
     #[::fuchsia::test]
     async fn test_nanosleep_without_remainder() {

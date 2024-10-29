@@ -56,7 +56,7 @@ impl PartialOrd for ListResultItem {
 impl Serialize for ListResultItem {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Self::Moniker(string) => serializer.serialize_str(&string),
+            Self::Moniker(string) => serializer.serialize_str(string),
             Self::MonikerWithUrl(data) => data.serialize(serializer),
         }
     }

@@ -10,6 +10,7 @@
 #include <lib/fit/result.h>
 #include <lib/zx/socket.h>
 #include <lib/zxio/cpp/transitional.h>
+#include <lib/zxio/cpp/udp_socket_private.h>
 #include <lib/zxio/fault_catcher.h>
 #include <lib/zxio/null.h>
 #include <netinet/icmp6.h>
@@ -2012,7 +2013,7 @@ ParseControlMessages<fuchsia_posix_socket_packet::wire::SendControlData>(fidl::A
 template <typename R, typename = int>
 struct FitResultHasValue : std::false_type {};
 template <typename R>
-struct FitResultHasValue<R, decltype(&R::value, 0)> : std::true_type{};
+struct FitResultHasValue<R, decltype(&R::value, 0)> : std::true_type {};
 template <typename T, typename R>
 typename std::enable_if<FitResultHasValue<R>::value>::type HandleSendMsgResponse(const R& result,
                                                                                  size_t total) {
@@ -2528,9 +2529,9 @@ struct datagram_socket
     // Use stack allocated memory whenever the client-versioned `kRxUdpPreludeSize` is
     // at least as large as the server's.
     std::unique_ptr<uint8_t[]> heap_allocated_buf;
-    uint8_t stack_allocated_buf[kRxUdpPreludeSize];
+    uint8_t stack_allocated_buf[zxio::kRxUdpPreludeSize];
     uint8_t* buf = stack_allocated_buf;
-    if (datagram_socket_.prelude_size.rx > kRxUdpPreludeSize) {
+    if (datagram_socket_.prelude_size.rx > zxio::kRxUdpPreludeSize) {
       heap_allocated_buf = std::make_unique<uint8_t[]>(datagram_socket_.prelude_size.rx);
       buf = heap_allocated_buf.get();
     }
@@ -2703,9 +2704,9 @@ struct datagram_socket
     // Use stack allocated memory whenever the client-versioned `kTxUdpPreludeSize` is
     // at least as large as the server's.
     std::unique_ptr<uint8_t[]> heap_allocated_buf;
-    uint8_t stack_allocated_buf[kTxUdpPreludeSize];
+    uint8_t stack_allocated_buf[zxio::kTxUdpPreludeSize];
     uint8_t* buf = stack_allocated_buf;
-    if (datagram_socket_.prelude_size.tx > kTxUdpPreludeSize) {
+    if (datagram_socket_.prelude_size.tx > zxio::kTxUdpPreludeSize) {
       heap_allocated_buf = std::make_unique<uint8_t[]>(datagram_socket_.prelude_size.tx);
       buf = heap_allocated_buf.get();
     }

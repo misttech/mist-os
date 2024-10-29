@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <span>
 #include <sstream>
 #include <string_view>
 #include <vector>
@@ -22,7 +23,7 @@
 namespace storage::volume_image {
 
 fpromise::result<VolumeDescriptor, std::string> VolumeDescriptor::Deserialize(
-    cpp20::span<const uint8_t> serialized) {
+    std::span<const uint8_t> serialized) {
   rapidjson::Document document;
   rapidjson::ParseResult result =
       document.Parse(reinterpret_cast<const char*>(serialized.data()), serialized.size());

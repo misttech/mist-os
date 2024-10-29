@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
-use fidl::encoding::ProxyChannelBox;
+use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -117,7 +117,6 @@ pub struct AllowedMarker;
 impl fidl::endpoints::ProtocolMarker for AllowedMarker {
     type Proxy = AllowedProxy;
     type RequestStream = AllowedRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = AllowedSynchronousProxy;
 
@@ -125,7 +124,6 @@ impl fidl::endpoints::ProtocolMarker for AllowedMarker {
 }
 
 pub trait AllowedProxyInterface: Send + Sync {}
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct AllowedSynchronousProxy {
@@ -173,13 +171,13 @@ impl AllowedSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct AllowedProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for AllowedProxy {
     type Protocol = AllowedMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -194,7 +192,7 @@ impl fidl::endpoints::Proxy for AllowedProxy {
 
 impl AllowedProxy {
     /// Create a new Proxy for test.bindingsdenylist/Allowed.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <AllowedMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -212,7 +210,7 @@ impl AllowedProxy {
 impl AllowedProxyInterface for AllowedProxy {}
 
 pub struct AllowedEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for AllowedEventStream {}
@@ -245,7 +243,9 @@ pub enum AllowedEvent {}
 
 impl AllowedEvent {
     /// Decodes a message buffer as a [`AllowedEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<AllowedEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<AllowedEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -260,7 +260,7 @@ impl AllowedEvent {
 
 /// A Stream of incoming requests for test.bindingsdenylist/Allowed.
 pub struct AllowedRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -276,7 +276,7 @@ impl fidl::endpoints::RequestStream for AllowedRequestStream {
     type Protocol = AllowedMarker;
     type ControlHandle = AllowedControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -284,11 +284,17 @@ impl fidl::endpoints::RequestStream for AllowedRequestStream {
         AllowedControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -351,14 +357,13 @@ impl AllowedRequest {
 
 #[derive(Debug, Clone)]
 pub struct AllowedControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for AllowedControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -366,7 +371,6 @@ impl fidl::endpoints::ControlHandle for AllowedControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -390,7 +394,6 @@ pub struct DenyEachBindingMarker;
 impl fidl::endpoints::ProtocolMarker for DenyEachBindingMarker {
     type Proxy = DenyEachBindingProxy;
     type RequestStream = DenyEachBindingRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = DenyEachBindingSynchronousProxy;
 
@@ -419,7 +422,6 @@ pub trait DenyEachBindingProxyInterface: Send + Sync {
         + Send;
     fn r#only_deny_syzkaller(&self, a: bool) -> Self::OnlyDenySyzkallerResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct DenyEachBindingSynchronousProxy {
@@ -552,13 +554,13 @@ impl DenyEachBindingSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct DenyEachBindingProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for DenyEachBindingProxy {
     type Protocol = DenyEachBindingMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -573,7 +575,7 @@ impl fidl::endpoints::Proxy for DenyEachBindingProxy {
 
 impl DenyEachBindingProxy {
     /// Create a new Proxy for test.bindingsdenylist/DenyEachBinding.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <DenyEachBindingMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -590,44 +592,62 @@ impl DenyEachBindingProxy {
     pub fn r#only_deny_cpp(
         &self,
         mut a: bool,
-    ) -> fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyCppResult> {
+    ) -> fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenyCppResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         DenyEachBindingProxyInterface::r#only_deny_cpp(self, a)
     }
 
     pub fn r#only_deny_dart(
         &self,
         mut a: bool,
-    ) -> fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyDartResult> {
+    ) -> fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenyDartResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         DenyEachBindingProxyInterface::r#only_deny_dart(self, a)
     }
 
     pub fn r#only_deny_go(
         &self,
         mut a: bool,
-    ) -> fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyGoResult> {
+    ) -> fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenyGoResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         DenyEachBindingProxyInterface::r#only_deny_go(self, a)
     }
 
     pub fn r#only_deny_libfuzzer(
         &self,
         mut a: bool,
-    ) -> fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyLibfuzzerResult> {
+    ) -> fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenyLibfuzzerResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         DenyEachBindingProxyInterface::r#only_deny_libfuzzer(self, a)
     }
 
     pub fn r#only_deny_syzkaller(
         &self,
         mut a: bool,
-    ) -> fidl::client::QueryResponseFut<DenyEachBindingOnlyDenySyzkallerResult> {
+    ) -> fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenySyzkallerResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         DenyEachBindingProxyInterface::r#only_deny_syzkaller(self, a)
     }
 }
 
 impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
-    type OnlyDenyCppResponseFut = fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyCppResult>;
+    type OnlyDenyCppResponseFut = fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenyCppResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#only_deny_cpp(&self, mut a: bool) -> Self::OnlyDenyCppResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<DenyEachBindingOnlyDenyCppResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>,
@@ -647,11 +667,13 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         )
     }
 
-    type OnlyDenyDartResponseFut =
-        fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyDartResult>;
+    type OnlyDenyDartResponseFut = fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenyDartResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#only_deny_dart(&self, mut a: bool) -> Self::OnlyDenyDartResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<DenyEachBindingOnlyDenyDartResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyDartResponse, u32>,
@@ -671,10 +693,13 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         )
     }
 
-    type OnlyDenyGoResponseFut = fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyGoResult>;
+    type OnlyDenyGoResponseFut = fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenyGoResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#only_deny_go(&self, mut a: bool) -> Self::OnlyDenyGoResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<DenyEachBindingOnlyDenyGoResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>,
@@ -694,11 +719,13 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         )
     }
 
-    type OnlyDenyLibfuzzerResponseFut =
-        fidl::client::QueryResponseFut<DenyEachBindingOnlyDenyLibfuzzerResult>;
+    type OnlyDenyLibfuzzerResponseFut = fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenyLibfuzzerResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#only_deny_libfuzzer(&self, mut a: bool) -> Self::OnlyDenyLibfuzzerResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<DenyEachBindingOnlyDenyLibfuzzerResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyLibfuzzerResponse, u32>,
@@ -718,11 +745,13 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         )
     }
 
-    type OnlyDenySyzkallerResponseFut =
-        fidl::client::QueryResponseFut<DenyEachBindingOnlyDenySyzkallerResult>;
+    type OnlyDenySyzkallerResponseFut = fidl::client::QueryResponseFut<
+        DenyEachBindingOnlyDenySyzkallerResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#only_deny_syzkaller(&self, mut a: bool) -> Self::OnlyDenySyzkallerResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<DenyEachBindingOnlyDenySyzkallerResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenySyzkallerResponse, u32>,
@@ -744,7 +773,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
 }
 
 pub struct DenyEachBindingEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for DenyEachBindingEventStream {}
@@ -777,7 +806,9 @@ pub enum DenyEachBindingEvent {}
 
 impl DenyEachBindingEvent {
     /// Decodes a message buffer as a [`DenyEachBindingEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<DenyEachBindingEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<DenyEachBindingEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -793,7 +824,7 @@ impl DenyEachBindingEvent {
 
 /// A Stream of incoming requests for test.bindingsdenylist/DenyEachBinding.
 pub struct DenyEachBindingRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -809,7 +840,7 @@ impl fidl::endpoints::RequestStream for DenyEachBindingRequestStream {
     type Protocol = DenyEachBindingMarker;
     type ControlHandle = DenyEachBindingControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -817,11 +848,17 @@ impl fidl::endpoints::RequestStream for DenyEachBindingRequestStream {
         DenyEachBindingControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -1035,14 +1072,13 @@ impl DenyEachBindingRequest {
 
 #[derive(Debug, Clone)]
 pub struct DenyEachBindingControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for DenyEachBindingControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -1050,7 +1086,6 @@ impl fidl::endpoints::ControlHandle for DenyEachBindingControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -1402,7 +1437,6 @@ pub struct ImportsSameNameContextMarker;
 impl fidl::endpoints::ProtocolMarker for ImportsSameNameContextMarker {
     type Proxy = ImportsSameNameContextProxy;
     type RequestStream = ImportsSameNameContextRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = ImportsSameNameContextSynchronousProxy;
 
@@ -1413,7 +1447,6 @@ pub trait ImportsSameNameContextProxyInterface: Send + Sync {
     fn r#unattributed(&self) -> Result<(), fidl::Error>;
     fn r#always_appears_in_importing_library(&self) -> Result<(), fidl::Error>;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct ImportsSameNameContextSynchronousProxy {
@@ -1478,13 +1511,13 @@ impl ImportsSameNameContextSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct ImportsSameNameContextProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for ImportsSameNameContextProxy {
     type Protocol = ImportsSameNameContextMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -1499,7 +1532,7 @@ impl fidl::endpoints::Proxy for ImportsSameNameContextProxy {
 
 impl ImportsSameNameContextProxy {
     /// Create a new Proxy for test.bindingsdenylist/ImportsSameNameContext.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name =
             <ImportsSameNameContextMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
@@ -1542,7 +1575,7 @@ impl ImportsSameNameContextProxyInterface for ImportsSameNameContextProxy {
 }
 
 pub struct ImportsSameNameContextEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for ImportsSameNameContextEventStream {}
@@ -1575,7 +1608,9 @@ pub enum ImportsSameNameContextEvent {}
 
 impl ImportsSameNameContextEvent {
     /// Decodes a message buffer as a [`ImportsSameNameContextEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<ImportsSameNameContextEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<ImportsSameNameContextEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -1591,7 +1626,7 @@ impl ImportsSameNameContextEvent {
 
 /// A Stream of incoming requests for test.bindingsdenylist/ImportsSameNameContext.
 pub struct ImportsSameNameContextRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -1607,7 +1642,7 @@ impl fidl::endpoints::RequestStream for ImportsSameNameContextRequestStream {
     type Protocol = ImportsSameNameContextMarker;
     type ControlHandle = ImportsSameNameContextControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -1615,11 +1650,17 @@ impl fidl::endpoints::RequestStream for ImportsSameNameContextRequestStream {
         ImportsSameNameContextControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -1733,14 +1774,13 @@ impl ImportsSameNameContextRequest {
 
 #[derive(Debug, Clone)]
 pub struct ImportsSameNameContextControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for ImportsSameNameContextControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -1748,7 +1788,6 @@ impl fidl::endpoints::ControlHandle for ImportsSameNameContextControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }

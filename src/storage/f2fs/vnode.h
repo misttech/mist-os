@@ -5,28 +5,35 @@
 #ifndef SRC_STORAGE_F2FS_VNODE_H_
 #define SRC_STORAGE_F2FS_VNODE_H_
 
+#include <span>
+
 #include "src/storage/f2fs/bitmap.h"
+#include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/dir_entry_cache.h"
+#include "src/storage/f2fs/extent_cache.h"
 #include "src/storage/f2fs/file_cache.h"
 #include "src/storage/f2fs/timestamp.h"
-#include "src/storage/f2fs/vmo_manager.h"
 #include "src/storage/f2fs/xattr.h"
+#include "src/storage/lib/vfs/cpp/paged_vnode.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
+#include "src/storage/lib/vfs/cpp/watcher.h"
 
 namespace f2fs {
 constexpr uint32_t kNullIno = std::numeric_limits<uint32_t>::max();
+// The maximum number of blocks that an append can make dirty.
+// (inode + double indirect + indirect + dnode + data)
+constexpr uint32_t kMaxNeededBlocksForUpdate = 5;
 
+struct NodePath;
 class F2fs;
+class NodePage;
+class SuperblockInfo;
+class VmoManager;
+class DirEntryCache;
 
 // i_advise uses Fadvise:xxx bit. We can add additional hints later.
 enum class FAdvise {
   kCold = 1,
-};
-
-// Used to track orphans and modified dirs
-enum class VnodeSet {
-  kOrphan = 0,
-  kModifiedDir,
-  kMax,
 };
 
 // InodeInfo->flags keeping only in memory
@@ -49,8 +56,6 @@ enum class InodeInfoFlag {
   kFlagSize,
 };
 
-constexpr uint32_t kMaxNeededBlocksForUpdate = 5;
-
 inline bool IsValidNameLength(std::string_view name) { return name.length() <= kMaxNameLen; }
 
 class VnodeF2fs : public fs::PagedVnode,
@@ -59,7 +64,7 @@ class VnodeF2fs : public fs::PagedVnode,
                   public fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>> {
  public:
   explicit VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode);
-  ~VnodeF2fs() { ReleasePagedVmo(); }
+  ~VnodeF2fs();
 
   uint32_t InlineDataOffset() const {
     return kPageSize - sizeof(NodeFooter) -
@@ -148,6 +153,9 @@ class VnodeF2fs : public fs::PagedVnode,
   zx::result<std::vector<block_t>> GetDataBlockAddresses(pgoff_t index, size_t count,
                                                          bool read_only = false);
 
+  // The maximum depth is four.
+  // Offset[0] indicates inode offset.
+  zx::result<NodePath> GetNodePath(pgoff_t block);
   virtual block_t GetBlockAddr(LockedPage &page);
   zx::result<std::vector<LockedPage>> WriteBegin(const size_t offset, const size_t len)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
@@ -325,9 +333,9 @@ class VnodeF2fs : public fs::PagedVnode,
   void CleanupCache();
 
   zx_status_t SetExtendedAttribute(XattrIndex index, std::string_view name,
-                                   cpp20::span<const uint8_t> value, XattrOption option);
+                                   std::span<const uint8_t> value, XattrOption option);
   zx::result<size_t> GetExtendedAttribute(XattrIndex index, std::string_view name,
-                                          cpp20::span<uint8_t> out);
+                                          std::span<uint8_t> out);
 
   nid_t XattrNid() const { return xattr_nid_; }
 

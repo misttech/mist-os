@@ -151,9 +151,10 @@ type BufferCollectionConstraints = table {
     ///
     /// A participant can specify `pixel_format`
     /// [`fuchsia.images2/PixelFormat.DO_NOT_CARE`] and/or
-    /// `pixel_format_modifier` [`fuchsia.images2/FORMAT_MODIFIER_DO_NOT_CARE`]
-    /// to permit any value to be selected, but at least one participant must
-    /// specify a specific format for overall allocation to succeed.
+    /// `pixel_format_modifier`
+    /// [`fuchsia.images2/PixelFormatModifier.DO_NOT_CARE`] to permit any value
+    /// to be selected, but at least one participant must specify a specific
+    /// format for overall allocation to succeed.
     ///
     /// In a SetConstraints message, un-set or zero length means no image format
     /// constraints; a raw buffer can be allocated if no other participants
@@ -325,13 +326,10 @@ type PixelFormatAndModifier = struct {
     /// if the participant needs to specify `ImageFormatConstraints` without
     /// constraining the `pixel_format`.
     pixel_format fuchsia.images2.PixelFormat;
-    /// Specific modifier (not just flags), or `FORMAT_MODIFIER_DO_NOT_CARE`,
-    /// from set of values defined in `fuchsia.images2` format_modifier.fidl.
-    //
-    // Re. changing the type, in this particular case we'll change any impacted
-    // client code that needs to compile with < 19 and >= 19 SDK to make sure it
-    // compiles either way. The old/new types are wire compatible and there's no
-    // change to any defined/permitted values.
+    /// The participant can specify
+    /// [`fuchsia.images2/PixelFormatModifier.DO_NOT_CARE`] if the participant
+    /// needs to specify `ImageFormatConstraints` without constraining the
+    /// `pixel_format_modifier`.
     pixel_format_modifier fuchsia.images2.PixelFormatModifier;
 };
 
@@ -391,29 +389,22 @@ type ImageFormatConstraints = table {
     /// treated by the server as one additional `pixel_format_and_modifiers`
     /// entry.
     ///
-    /// This is a value from `fuchsia.images2` format_modifier.fidl that's
-    /// acceptable to the participant in combination with the `pixel_format`.
+    /// This is a [`fuchsia.images2/PixelFormatModifier`] that's acceptable to
+    /// the participant in combination with the `pixel_format`.
     ///
     /// See also `pixel_format_and_modifiers`.
     ///
     /// If `pixel_format` is set but `pixel_format_modifier` is un-set, the
     /// default depends on other fields:
     ///
-    /// * If `pixel_format` is `DO_NOT_CARE`, the pixel format modifier is
-    ///   implicitly `FORMAT_MODIFIER_DO_NOT_CARE`.
+    /// * If `pixel_format` is [`fuchsia.images2/PixelFormat.DO_NOT_CARE`], the
+    ///   pixel format modifier is implicitly
+    ///   [`fuchsia.images2/PixelFormatModifier.DO_NOT_CARE`].
     /// * else if `BufferCollectionConstraints.usage` isn't `NONE`, the pixel
-    ///   format modifier is implicitly `FORMAT_MODIFIER_LINEAR`.
+    ///   format modifier is implicitly
+    ///   [`fuchsia.images2/PixelFormatModifier.LINEAR`].
     /// * else the pixel format modifier is implicitly
-    ///   `FORMAT_MODIFIER_DO_NOT_CARE`.
-    ///
-    /// When set, this value is a specific modifier (not just flags), or
-    /// `FORMAT_MODIFIER_DO_NOT_CARE`, from set of values defined in
-    /// `fuchsia.images2` format_modifier.fidl.
-    //
-    // Re. changing the type, in this particular case we'll change any impacted
-    // client code that needs to compile with < 19 and >= 19 SDK to make sure it
-    // compiles either way. The old/new types are wire compatible and there's no
-    // change to any defined/permitted values.
+    ///   [`fuchsia.images2/PixelFormatModifier.DO_NOT_CARE`].
     2: pixel_format_modifier fuchsia.images2.PixelFormatModifier;
 
     /// The (additional) [`fuchsia.sysmem2/PixelFormatAndModifier`]s for which
@@ -454,29 +445,32 @@ type ImageFormatConstraints = table {
     ///
     /// All the `PixelFormatAndModifiers` in a `SetConstraints` message from a
     /// participant must be unique across all the entries under
-    /// `image_format_constraints`. If `fuchsia.images2.PixelFormat.DO_NOT_CARE`
-    /// is used in an entry, there must not be any other entry (considering all
-    /// the entries under `image_format_constraints`) with matching
-    /// `pixel_format_modifier`. If `FORMAT_MODIFIER_DO_NOT_CARE` is used, there
+    /// `image_format_constraints`. If
+    /// [`fuchsia.images2/PixelFormat.DO_NOT_CARE`] is used in an entry, there
     /// must not be any other entry (considering all the entries under
+    /// `image_format_constraints`) with matching `pixel_format_modifier`. If
+    /// [`fuchsia.images2/PixelFormatModifier.DO_NOT_CARE`] is used, there must
+    /// not be any other entry (considering all the entries under
     /// `image_format_constraints`) with matching `pixel_format`.
     ///
-    /// A `PixelFormatAndModifier` value with either `DO_NOT_CARE` or
-    /// `FORMAT_MODIFIER_DO_NOT_CARE` (but not both, for purposes of this
-    /// example) can be combined with a `PixelFormatAndModifier` from a separate
-    /// participant with the other field indicating "do not care", resulting in
-    /// a complete `PixelFormatAndModifier` that can succeed allocation.
-    /// However, at least for now, it's not permitted for a single participant
-    /// to specify two separate `PixelFormatAndModifier` values which have "do
-    /// not care" in different fields. This does not prohibit a single
-    /// `PixelFormatAndModifier` with both DO_NOT_CARE and
-    /// PIXEL_FORMAT_DO_NOT_CARE (which is only a single
+    /// A `PixelFormatAndModifier` value with either
+    /// [`fuchsia.images2/PixelFormat.DO_NOT_CARE`] or
+    /// [`fuchsia.images2/PixelFormatModifier.DO_NOT_CARE`] (but not both, for
+    /// purposes of this example) can be combined with a
+    /// `PixelFormatAndModifier` from a separate participant with the other
+    /// field indicating "do not care", resulting in a complete
+    /// `PixelFormatAndModifier` that can succeed allocation. However, at least
+    /// for now, it's not permitted for a single participant to specify two
+    /// separate `PixelFormatAndModifier` values which have "do not care" in
+    /// different fields. This does not prohibit a single
+    /// `PixelFormatAndModifier` with both `PixelFormat.DO_NOT_CARE` and
+    /// `PixelFormatModifier.DO_NOT_CARE` (which is only a single
     /// `PixelFormatAndModifier` value). If a client really needs to specify
     /// some constraints relevant to `pixel_format`(s) with
-    /// `pixel_format_modifier` FORMAT_MODIFIER_DO_NOT_CARE, and other
-    /// constraints relevant to `pixel_format_modifier`(s) with `pixel_format`
-    /// DO_NOT_CARE, the client can do so by duplicating the token and
-    /// using/driving two separate participants.
+    /// `pixel_format_modifier` `DO_NOT_CARE`, and other constraints relevant to
+    /// `pixel_format_modifier`(s) with `pixel_format` `DO_NOT_CARE`, the client
+    /// can do so by duplicating the token and using/driving two separate
+    /// participants.
     ///
     /// See also `pixel_format` for more comments relevant to multiple
     /// `PixelFormatAndModifier`s in a single `ImageFormatConstraints`.
@@ -487,7 +481,7 @@ type ImageFormatConstraints = table {
     /// not an error.
     ///
     /// The client can specify a single entry
-    /// [fuchsia.sysmem2/ColorSpace.DO_NOT_CARE`] if the client doesn't want to
+    /// [`fuchsia.sysmem2/ColorSpace.DO_NOT_CARE`] if the client doesn't want to
     /// constrain which `ColorSpace` is chosen. At least one participant must
     /// specify at least one `ColorSpace` value other than
     /// `ColorSpace.DO_NOT_CARE`, or allocation will fail.

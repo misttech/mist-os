@@ -8,7 +8,6 @@ import(
 rust_wlan_integration_test("autoconnect_idle_iface") {
   edition = "2021"
   binary_deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_rust",
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
     "//sdk/rust/zx",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",

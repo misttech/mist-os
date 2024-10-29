@@ -35,9 +35,9 @@ enum IncomingService {
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new_local();
-    fs.dir("svc").add_unified_service(IncomingService::Default);
-    fs.dir("svc").add_unified_service_instance("hello", IncomingService::Hello);
-    fs.dir("svc").add_unified_service_instance("goodbye", IncomingService::Goodbye);
+    fs.dir("svc").add_fidl_service_instance("default", IncomingService::Default);
+    fs.dir("svc").add_fidl_service_instance("hello", IncomingService::Hello);
+    fs.dir("svc").add_fidl_service_instance("goodbye", IncomingService::Goodbye);
     fs.take_and_serve_directory_handle()?;
 
     fs.for_each_concurrent(None, |request| {

@@ -4,10 +4,9 @@
 
 #include "src/storage/volume_image/ftl/ftl_image_internal.h"
 
-#include <lib/stdcompat/span.h>
-
 #include <iostream>
 #include <limits>
+#include <span>
 #include <vector>
 
 #include <fbl/algorithm.h>
@@ -20,7 +19,7 @@ namespace storage::volume_image::ftl_image_internal {
 namespace {
 // Writes |value| into |sink|, in little endian, as expected by the FTL.
 template <typename T, typename std::enable_if<std::is_integral<T>::value, bool>::type = true>
-void WriteValue(const T value, cpp20::span<uint8_t> sink) {
+void WriteValue(const T value, std::span<uint8_t> sink) {
   for (size_t i = 0; i < sink.size(); ++i) {
     uint8_t byte = (value >> (i * 8)) & 0xFF;
     sink[i] = byte;
@@ -28,7 +27,7 @@ void WriteValue(const T value, cpp20::span<uint8_t> sink) {
 }
 // Fills |oob_bytes| with the expected FTL data.
 void FillOutOfBandBytes(uint32_t logical_page_number, uint32_t generation_number,
-                        cpp20::span<uint8_t> oob_bytes) {
+                        std::span<uint8_t> oob_bytes) {
   // Reset the contents of |oob| to unprogrammed state.
   std::fill(oob_bytes.begin(), oob_bytes.end(), 0xFF);
 
@@ -54,14 +53,14 @@ void FillOutOfBandBytes(uint32_t logical_page_number, uint32_t generation_number
 
 template <>
 void WriteOutOfBandBytes<PageType::kVolumePage>(uint32_t logical_page_number,
-                                                cpp20::span<uint8_t> oob_bytes) {
+                                                std::span<uint8_t> oob_bytes) {
   // Volume pages have the generation number ''unprogrammed'' where all bits are set.
   FillOutOfBandBytes(logical_page_number, std::numeric_limits<uint32_t>::max(), oob_bytes);
 }
 
 template <>
 void WriteOutOfBandBytes<PageType::kMapPage>(uint32_t logical_page_number,
-                                             cpp20::span<uint8_t> oob_bytes) {
+                                             std::span<uint8_t> oob_bytes) {
   // Generated images have the first version of the map pages, with generation number 0.
   FillOutOfBandBytes(logical_page_number, 0, oob_bytes);
 }
@@ -99,7 +98,7 @@ fpromise::result<void, std::string> WriteMapBlock(
       size_t mapping_page_offset = logical_page - lower_bound;
       size_t map_page_offset = (mapping_page_offset % mappings_per_page) * sizeof(uint32_t);
       WriteValue(physical_page,
-                 cpp20::span<uint8_t>(page_buffer.data() + map_page_offset, sizeof(uint32_t)));
+                 std::span<uint8_t>(page_buffer.data() + map_page_offset, sizeof(uint32_t)));
     }
 
     // Only write map pages that have mappings.

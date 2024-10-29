@@ -62,6 +62,7 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   }
 
  protected:
+  // FIDL natural C++ methods for fuchsia.hardware.hrtimer.
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
   void Stop(StopRequest& request, StopCompleter::Sync& completer) override;
   void GetTicksLeft(GetTicksLeftRequest& request, GetTicksLeftCompleter::Sync& completer) override;
@@ -74,12 +75,24 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
-  inspect::UintProperty& IrqEntries() { return irq_entries_; }
-  inspect::UintProperty& IrqExits() { return irq_exits_; }
-
+  static constexpr size_t kMaxInspectEvents = 256;  // Arbitrary.
   enum class MaxTicks : uint8_t {
     k16Bit,
     k64Bit,
+  };
+  enum class EventType : uint8_t {
+    None,
+    Start,
+    StartAndWait,
+    StartAndWait2,
+    StartHardware,
+    RetriggerIrq,
+    TriggerIrqWait,
+    TriggerIrqWait2,
+    TriggerIrq,
+    Stop,
+    StopWait,
+    StopWait2,
   };
 
   struct TimersProperties {
@@ -114,9 +127,14 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
 
   static size_t TimerIndexFromId(uint64_t id) { return id; }
 
+  inspect::UintProperty& IrqEntries() { return irq_entries_; }
+  inspect::UintProperty& IrqExits() { return irq_exits_; }
+
+  bool IsTimerStarted(size_t id);
   fit::result<const fuchsia_hardware_hrtimer::DriverError> StartHardware(size_t timer_index);
   zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> LeaseWakeHandling();
   void WatchRequiredLevel();
+  void RecordEvent(int64_t now, uint64_t id, EventType type, uint64_t data);
 
   TimersProperties timers_properties_[kNumberOfTimers] = {
       // clang-format off
@@ -152,7 +170,6 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
       Timer(*this, timers_properties_[6]), Timer(*this, timers_properties_[7]),
       Timer(*this, timers_properties_[8])};
   std::optional<fdf::MmioBuffer> mmio_;
-  zx::interrupt irq_;
   // Need to keep the ElementControl channel end (returned from adding the power element
   // aml-timer-wake) so the power element stays in the topology.
   std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_;
@@ -166,9 +183,16 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag_;
   async_dispatcher_t* dispatcher_;
 
+  inspect::Node inspect_node_;
+  struct Event {
+    int64_t timestamp;
+    uint64_t id;
+    uint64_t data;
+    EventType type;
+  } events_[kMaxInspectEvents] = {};
+  size_t event_index_ = 0;
   // TODO(b/369886005): These inspect properties exist to help diagnose b/369886005
   // and can probably be safely removed once that bug is resolved.
-  inspect::Node inspect_node_;
   inspect::UintProperty lease_requests_;
   inspect::UintProperty lease_replies_;
   inspect::UintProperty update_requests_;

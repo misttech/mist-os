@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
 use tracing::info;
 use wlan_common::assert_variant;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 /// Tests that an idle interface is automatically connected to a saved network, if present and
 /// available, when client connections are enabled.
@@ -46,7 +46,7 @@ async fn autoconnect_idle_iface() {
 
     assert_variant!(
         client_controller.start_client_connections().await,
-        Ok(fidl_common::RequestStatus::Acknowledged)
+        Ok(fidl_policy::RequestStatus::Acknowledged)
     );
 
     // Drop client provider controller to allow another to be created in the test setup.

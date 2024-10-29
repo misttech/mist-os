@@ -158,12 +158,20 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
             let v6_routes_state =
                 connect_to_protocol::<<Ipv6 as fnet_routes_ext::FidlRouteIpExt>::StateMarker>()
                     .expect("connect to fuchsia.net.routes");
-            let v4_routes_set_provider = connect_to_protocol::<
+            let v4_main_route_table = connect_to_protocol::<
                 <Ipv4 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableMarker,
             >()
             .expect("connect to fuchsia.net.routes.admin");
-            let v6_routes_set_provider = connect_to_protocol::<
+            let v6_main_route_table = connect_to_protocol::<
                 <Ipv6 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableMarker,
+            >()
+            .expect("connect to fuchsia.net.routes.admin");
+            let v4_route_table_provider = connect_to_protocol::<
+                <Ipv4 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableProviderMarker,
+            >()
+            .expect("connect to fuchsia.net.routes.admin");
+            let v6_route_table_provider = connect_to_protocol::<
+                <Ipv6 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableProviderMarker,
             >()
             .expect("connect to fuchsia.net.routes.admin");
 
@@ -172,8 +180,10 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
                 interfaces_state_proxy,
                 v4_routes_state,
                 v6_routes_state,
-                v4_routes_set_provider,
-                v6_routes_set_provider,
+                v4_main_route_table,
+                v6_main_route_table,
+                v4_route_table_provider,
+                v6_route_table_provider,
                 route_clients,
                 unified_request_stream,
                 interfaces_handler,

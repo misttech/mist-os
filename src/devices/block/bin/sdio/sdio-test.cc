@@ -4,6 +4,7 @@
 
 #include "sdio.h"
 
+#include <fidl/fuchsia.hardware.sdio/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdf/arena.h>
@@ -16,7 +17,8 @@ namespace sdio {
 
 namespace {
 
-class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_sdio::Device> {
+class SdioTest : public zxtest::Test,
+                 public fidl::testing::WireTestBase<fuchsia_hardware_sdio::Device> {
  public:
   SdioTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread), arena_(fdf::Arena('S')) {
     auto endpoints = fidl::Endpoints<Device>::Create();
@@ -108,6 +110,10 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
   }
   void PerformTuning(PerformTuningCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    FAIL();
   }
 
  protected:

@@ -3,18 +3,22 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::Context;
+use anyhow::{Context, Result};
 use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
+use assembly_config_schema::platform_config::health_check_config::HealthCheckConfig;
 use assembly_config_schema::platform_config::starnix_config::PlatformStarnixConfig;
 use assembly_config_schema::product_config::ComponentPolicyConfig;
 use assembly_util::{BootfsDestination, FileEntry};
+use camino::Utf8PathBuf;
 use component_manager_config::{compile, Args};
+use std::fs::File;
 use std::path::PathBuf;
 
 pub(crate) struct ComponentConfig<'a> {
     pub policy: &'a ComponentPolicyConfig,
     pub development_support: &'a DevelopmentSupportConfig,
     pub starnix: &'a PlatformStarnixConfig,
+    pub health_check: &'a HealthCheckConfig,
 }
 
 pub(crate) struct ComponentSubsystem;
@@ -38,6 +42,33 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
             input.push(context.get_resource("component_manager_policy_starnix.json5"));
         }
 
+        let monikers: Vec<&str> = config
+            .health_check
+            .verify_components
+            .iter()
+            .map(|verify_component| verify_component.source_moniker())
+            .collect();
+
+        let write_config = |name: &str, value: serde_json::Value| -> Result<Utf8PathBuf> {
+            let path = gendir.join(name);
+            let file = File::create(&path).with_context(|| format!("Creating config: {}", name))?;
+            serde_json::to_writer_pretty(file, &value)
+                .with_context(|| format!("Writing config: {}", name))?;
+            Ok(path)
+        };
+        let health_checks_source = write_config(
+            "ota_health_check_config.json",
+            serde_json::json!(
+            {
+                "health_check" : {
+                    "monikers": monikers,
+                },
+            }
+            ),
+        )?;
+
+        input.push(health_checks_source);
+
         // Collect the platform policies based on build-type.
         match (context.build_type, config.development_support.include_sl4f) {
             // The eng policies are given to Eng and UserDebug builds that also include sl4f.
@@ -52,6 +83,7 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
                 input.push(context.get_resource("component_manager_policy_user.json5"));
             }
         }
+
         let input = input.into_iter().map(PathBuf::from).collect();
 
         // Collect the product policies.

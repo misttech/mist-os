@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fidl::specific_router;
-use crate::{DirEntry, SpecificRouter, SpecificRouterResponse};
+use crate::fidl::router;
+use crate::{DirEntry, Router, RouterResponse};
 use fidl::handle::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::TryStreamExt;
 
-impl crate::RemotableCapability for SpecificRouter<DirEntry> {}
+impl crate::RemotableCapability for Router<DirEntry> {}
 
-impl From<SpecificRouter<DirEntry>> for fsandbox::Capability {
-    fn from(router: SpecificRouter<DirEntry>) -> Self {
+impl From<Router<DirEntry>> for fsandbox::Capability {
+    fn from(router: Router<DirEntry>) -> Self {
         let (client_end, sender_stream) =
             fidl::endpoints::create_request_stream::<fsandbox::DirEntryRouterMarker>().unwrap();
         router.serve_and_register(sender_stream, client_end.get_koid().unwrap());
@@ -19,25 +19,23 @@ impl From<SpecificRouter<DirEntry>> for fsandbox::Capability {
     }
 }
 
-impl TryFrom<SpecificRouterResponse<DirEntry>> for fsandbox::DirEntryRouterRouteResponse {
+impl TryFrom<RouterResponse<DirEntry>> for fsandbox::DirEntryRouterRouteResponse {
     type Error = fsandbox::RouterError;
 
-    fn try_from(resp: SpecificRouterResponse<DirEntry>) -> Result<Self, Self::Error> {
+    fn try_from(resp: RouterResponse<DirEntry>) -> Result<Self, Self::Error> {
         match resp {
-            SpecificRouterResponse::<DirEntry>::Capability(c) => {
+            RouterResponse::<DirEntry>::Capability(c) => {
                 Ok(fsandbox::DirEntryRouterRouteResponse::DirEntry(c.into()))
             }
-            SpecificRouterResponse::<DirEntry>::Unavailable => {
+            RouterResponse::<DirEntry>::Unavailable => {
                 Ok(fsandbox::DirEntryRouterRouteResponse::Unavailable(fsandbox::Unit {}))
             }
-            SpecificRouterResponse::<DirEntry>::Debug(_) => {
-                Err(fsandbox::RouterError::NotSupported)
-            }
+            RouterResponse::<DirEntry>::Debug(_) => Err(fsandbox::RouterError::NotSupported),
         }
     }
 }
 
-impl SpecificRouter<DirEntry> {
+impl Router<DirEntry> {
     async fn serve_router(
         self,
         mut stream: fsandbox::DirEntryRouterRequestStream,
@@ -45,7 +43,7 @@ impl SpecificRouter<DirEntry> {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fsandbox::DirEntryRouterRequest::Route { payload, responder } => {
-                    responder.send(specific_router::route_from_fidl(&self, payload).await)?;
+                    responder.send(router::route_from_fidl(&self, payload).await)?;
                 }
                 fsandbox::DirEntryRouterRequest::_UnknownMethod { ordinal, .. } => {
                     tracing::warn!(

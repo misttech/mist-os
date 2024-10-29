@@ -124,7 +124,7 @@ where
         let normalized_meta = event.normalized_metadata();
         let meta = normalized_meta.as_ref().unwrap_or_else(|| event.metadata());
 
-        SystemTime::default().format_time(&mut writer)?;
+        SystemTime.format_time(&mut writer)?;
         write!(writer, " {} ", meta.level())?;
 
         let mut seen = false;

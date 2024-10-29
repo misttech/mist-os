@@ -37,6 +37,12 @@ using Vector = elfldltl::AllocCheckerContainer<fbl::Vector>::Container<T>;
 // A list of valid non-owning references to RuntimeModules.
 using ModuleRefList = Vector<const RuntimeModule*>;
 
+// These are helpers to allow specific ways to access an element.
+constexpr auto DerefElement = [](auto&& ptr) -> decltype(auto) { return *ptr; };
+constexpr auto AsConstElement = [](const auto& elt) -> decltype(auto) { return elt; };
+constexpr auto DerefElementsView = std::views::transform(DerefElement);
+constexpr auto AsConstElementsView = std::views::transform(AsConstElement);
+
 // TODO(https://fxbug.dev/324136831): comment on how RuntimeModule relates to
 // startup modules when the latter is supported.
 // TODO(https://fxbug.dev/328135195): comment on the reference counting when
@@ -107,11 +113,18 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
 
   constexpr size_t static_tls_bias() const { return static_tls_bias_; }
 
-  // This is a list of module references to this module's DT_NEEDEDs, i.e. the
+  // Return a view of `list` with all of its elements dereferenced and made
+  // constant (i.e. Vector<const RuntimeModule*> -> View<const RuntimeModule&>).
+  static constexpr auto const_derefed_element_view(const ModuleRefList& list) {
+    return std::views::transform(std::views::transform(list, DerefElement), AsConstElement);
+  }
+
+  // This is a list of module pointers to this module's DT_NEEDEDs, i.e. the
   // first level of dependencies in this module's module tree. If this list is
   // empty, the module does not have any dependencies.
-  constexpr const ModuleRefList& direct_deps() const { return direct_deps_; }
   constexpr ModuleRefList& direct_deps() { return direct_deps_; }
+  // Return a view of const references to each direct_deps module.
+  constexpr auto GetDirectDeps() const { return const_derefed_element_view(direct_deps_); }
 
   // This is the breadth-first ordered list of module references, representing
   // this module's tree of modules. A reference to this module (the root) is
@@ -120,11 +133,11 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // module; global modules that may have been used for relocations, but are not
   // a DT_NEEDED of any dependency, are not included in this list.
   // This list is set when dlopen() is called on this module.
-  constexpr const ModuleRefList& module_tree() const {
+  constexpr auto module_tree() const {
     // RuntimeModule::ReifyModuleTree should have ben called before any callers
     // call this accessor.
     assert(!module_tree_.is_empty());
-    return module_tree_;
+    return const_derefed_element_view(module_tree_);
   }
 
   // Constructs this module's `module_tree` if it has not been set yet.

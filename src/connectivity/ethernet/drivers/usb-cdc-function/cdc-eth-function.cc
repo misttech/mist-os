@@ -501,6 +501,127 @@ zx_status_t UsbCdc::UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t 
   return status;
 }
 
+void UsbCdc::DdkInit(ddk::InitTxn txn) {
+  list_initialize(&tx_pending_infos_);
+  mtx_init(&ethernet_mutex_, mtx_plain);
+
+  auto status = function_.AllocInterface(&descriptors_.comm_intf.b_interface_number);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: AllocInterface failed", __func__);
+    txn.Reply(status);
+    return;
+  }
+  status = function_.AllocInterface(&descriptors_.cdc_intf_0.b_interface_number);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: AllocInterface failed", __func__);
+    txn.Reply(status);
+    return;
+  }
+  descriptors_.cdc_intf_1.b_interface_number = descriptors_.cdc_intf_0.b_interface_number;
+  descriptors_.cdc_union.bControlInterface = descriptors_.comm_intf.b_interface_number;
+  descriptors_.cdc_union.bSubordinateInterface = descriptors_.cdc_intf_0.b_interface_number;
+
+  status = function_.AllocEp(USB_DIR_OUT, &bulk_out_addr_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: AllocEp failed", __func__);
+    txn.Reply(status);
+    return;
+  }
+  status = function_.AllocEp(USB_DIR_IN, &bulk_in_addr_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: AllocEp failed", __func__);
+    txn.Reply(status);
+    return;
+  }
+  status = function_.AllocEp(USB_DIR_IN, &intr_addr_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: AllocEp failed", __func__);
+    txn.Reply(status);
+    return;
+  }
+
+  descriptors_.bulk_out_ep.b_endpoint_address = bulk_out_addr_;
+  descriptors_.bulk_in_ep.b_endpoint_address = bulk_in_addr_;
+  descriptors_.intr_ep.b_endpoint_address = intr_addr_;
+
+  status = cdc_generate_mac_address();
+  if (status != ZX_OK) {
+    txn.Reply(status);
+    return;
+  }
+
+  auto dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "cdc-ep-dispatcher", [](fdf_dispatcher_t*) {});
+  if (dispatcher.is_error()) {
+    zxlogf(ERROR, "fdf::SynchronizedDispatcher::Create(): %s", dispatcher.status_string());
+    txn.Reply(dispatcher.error_value());
+    return;
+  }
+  dispatcher_ = std::move(dispatcher.value());
+
+  auto result = DdkConnectFidlProtocol<ffunction::UsbFunctionService::Device>(parent());
+  if (result.is_error()) {
+    zxlogf(ERROR, "DdkConnectFidlProtocol(): %s\n", result.status_string());
+    txn.Reply(result.error_value());
+    return;
+  }
+
+  // allocate bulk out usb requests
+  status = bulk_out_ep_.Init(bulk_out_addr_, result.value(), dispatcher_.async_dispatcher());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "bulk_out_ep_.Init(): %s", zx_status_get_string(status));
+    txn.Reply(status);
+    return;
+  }
+
+  size_t actual =
+      bulk_out_ep_.AddRequests(BULK_RX_COUNT, BULK_REQ_SIZE, frequest::Buffer::Tag::kVmoId);
+  if (actual != BULK_RX_COUNT) {
+    zxlogf(ERROR, "bulk_out_ep_.AddRequests() returned %ld reqs", actual);
+    txn.Reply(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  // allocate bulk in usb requests
+  status = bulk_in_ep_.Init(bulk_in_addr_, result.value(), dispatcher_.async_dispatcher());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "bulk_in_ep_.Init(): %s", zx_status_get_string(status));
+    txn.Reply(status);
+    return;
+  }
+
+  actual = bulk_in_ep_.AddRequests(BULK_TX_COUNT, BULK_REQ_SIZE, frequest::Buffer::Tag::kVmoId);
+  if (actual != BULK_TX_COUNT) {
+    zxlogf(ERROR, "bulk_in_ep_.AddRequests() returned %ld reqs", actual);
+    txn.Reply(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  // allocate interrupt requests
+  status = intr_ep_.Init(intr_addr_, result.value(), dispatcher_.async_dispatcher());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "intr_ep_.Init(): %s", zx_status_get_string(status));
+    txn.Reply(status);
+    return;
+  }
+
+  actual = intr_ep_.AddRequests(INTR_COUNT, BULK_REQ_SIZE, frequest::Buffer::Tag::kVmoId);
+  if (actual != INTR_COUNT) {
+    zxlogf(ERROR, "intr_ep_.AddRequests() returned %ld reqs", actual);
+    txn.Reply(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  status = function_.SetInterface(this, &usb_function_interface_protocol_ops_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "function_.SetInterface(): %s", zx_status_get_string(status));
+    txn.Reply(status);
+    return;
+  }
+
+  txn.Reply(ZX_OK);
+}
+
 void UsbCdc::DdkUnbind(ddk::UnbindTxn txn) {
   zxlogf(DEBUG, "%s", __func__);
   unbound_ = true;
@@ -512,9 +633,6 @@ void UsbCdc::DdkUnbind(ddk::UnbindTxn txn) {
     }
   }
 
-  dispatcher_.ShutdownAsync();
-  dispatcher_.release();
-
   txn.Reply();
 }
 
@@ -524,6 +642,10 @@ void UsbCdc::DdkRelease() {
   if (suspend_thread_.has_value()) {
     suspend_thread_->join();
   }
+
+  dispatcher_.ShutdownAsync();
+  dispatcher_.release();
+
   delete this;
 }
 
@@ -566,130 +688,19 @@ zx_status_t UsbCdc::Bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  list_initialize(&cdc->tx_pending_infos_);
-  mtx_init(&cdc->ethernet_mutex_, mtx_plain);
+  zx_status_t status = cdc->DdkAdd("cdc-eth-function");
 
-  auto status = cdc->function_.AllocInterface(&cdc->descriptors_.comm_intf.b_interface_number);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: AllocInterface failed", __func__);
-    cdc->DdkRelease();
-    return status;
-  }
-  status = cdc->function_.AllocInterface(&cdc->descriptors_.cdc_intf_0.b_interface_number);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: AllocInterface failed", __func__);
-    cdc->DdkRelease();
-    return status;
-  }
-  cdc->descriptors_.cdc_intf_1.b_interface_number = cdc->descriptors_.cdc_intf_0.b_interface_number;
-  cdc->descriptors_.cdc_union.bControlInterface = cdc->descriptors_.comm_intf.b_interface_number;
-  cdc->descriptors_.cdc_union.bSubordinateInterface =
-      cdc->descriptors_.cdc_intf_0.b_interface_number;
+  // Either the DDK now owns this reference, or (in the case of failure) it will be freed in the
+  // block below. In either case, we want to avoid the unique_ptr destructing the allocated
+  // UsbCdc instance.
+  [[maybe_unused]] auto released = cdc.release();
 
-  status = cdc->function_.AllocEp(USB_DIR_OUT, &cdc->bulk_out_addr_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: AllocEp failed", __func__);
-    cdc->DdkRelease();
-    return status;
-  }
-  status = cdc->function_.AllocEp(USB_DIR_IN, &cdc->bulk_in_addr_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: AllocEp failed", __func__);
-    cdc->DdkRelease();
-    return status;
-  }
-  status = cdc->function_.AllocEp(USB_DIR_IN, &cdc->intr_addr_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: AllocEp failed", __func__);
-    cdc->DdkRelease();
-    return status;
-  }
-
-  cdc->descriptors_.bulk_out_ep.b_endpoint_address = cdc->bulk_out_addr_;
-  cdc->descriptors_.bulk_in_ep.b_endpoint_address = cdc->bulk_in_addr_;
-  cdc->descriptors_.intr_ep.b_endpoint_address = cdc->intr_addr_;
-
-  status = cdc->cdc_generate_mac_address();
-  if (status != ZX_OK) {
-    cdc->DdkRelease();
-    return status;
-  }
-
-  auto dispatcher =
-      fdf::SynchronizedDispatcher::Create({}, "cdc-ep-dispatcher", [](fdf_dispatcher_t*) {});
-  if (dispatcher.is_error()) {
-    zxlogf(ERROR, "fdf::SynchronizedDispatcher::Create(): %s", dispatcher.status_string());
-    return dispatcher.error_value();
-  }
-  cdc->dispatcher_ = std::move(dispatcher.value());
-
-  auto result = DdkConnectFidlProtocol<ffunction::UsbFunctionService::Device>(parent);
-  if (result.is_error()) {
-    zxlogf(ERROR, "DdkConnectFidlProtocol(): %s\n", result.status_string());
-    cdc->DdkRelease();
-    return result.error_value();
-  }
-
-  // allocate bulk out usb requests
-  status = cdc->bulk_out_ep_.Init(cdc->bulk_out_addr_, result.value(),
-                                  cdc->dispatcher_.async_dispatcher());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "bulk_out_ep_.Init(): %s", zx_status_get_string(status));
-    cdc->DdkRelease();
-    return status;
-  }
-
-  size_t actual =
-      cdc->bulk_out_ep_.AddRequests(BULK_RX_COUNT, BULK_REQ_SIZE, frequest::Buffer::Tag::kVmoId);
-  if (actual != BULK_RX_COUNT) {
-    zxlogf(ERROR, "bulk_out_ep_.AddRequests() returned %ld reqs", actual);
-    cdc->DdkRelease();
-    return ZX_ERR_INTERNAL;
-  }
-
-  // allocate bulk in usb requests
-  status = cdc->bulk_in_ep_.Init(cdc->bulk_in_addr_, result.value(),
-                                 cdc->dispatcher_.async_dispatcher());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "bulk_in_ep_.Init(): %s", zx_status_get_string(status));
-    cdc->DdkRelease();
-    return status;
-  }
-
-  actual =
-      cdc->bulk_in_ep_.AddRequests(BULK_TX_COUNT, BULK_REQ_SIZE, frequest::Buffer::Tag::kVmoId);
-  if (actual != BULK_TX_COUNT) {
-    zxlogf(ERROR, "bulk_in_ep_.AddRequests() returned %ld reqs", actual);
-    cdc->DdkRelease();
-    return ZX_ERR_INTERNAL;
-  }
-
-  // allocate interrupt requests
-  status = cdc->intr_ep_.Init(cdc->intr_addr_, result.value(), cdc->dispatcher_.async_dispatcher());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "intr_ep_.Init(): %s", zx_status_get_string(status));
-    cdc->DdkRelease();
-    return status;
-  }
-
-  actual = cdc->intr_ep_.AddRequests(INTR_COUNT, BULK_REQ_SIZE, frequest::Buffer::Tag::kVmoId);
-  if (actual != INTR_COUNT) {
-    zxlogf(ERROR, "intr_ep_.AddRequests() returned %ld reqs", actual);
-    cdc->DdkRelease();
-    return ZX_ERR_INTERNAL;
-  }
-
-  status = cdc->DdkAdd("cdc-eth-function");
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not add UsbCdc %s.", zx_status_get_string(status));
     cdc->DdkRelease();
     return status;
   }
-  cdc->function_.SetInterface(cdc.get(), &cdc->usb_function_interface_protocol_ops_);
-  {
-    // The DDK now owns this reference.
-    [[maybe_unused]] auto released = cdc.release();
-  }
+
   return ZX_OK;
 }
 

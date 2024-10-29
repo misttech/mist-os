@@ -96,19 +96,18 @@ void main() {
         '{"version":"1","content":[{"host_match":"package-manager-test","host_replacement":"%%NAME%%","path_prefix_match":"/","path_prefix_replacement":"/"}]}';
 
     setUp(() async {
-      repoServer =
-          await PackageManagerRepo.initRepo(sl4fDriver, runtimeDepsPath, log);
+      repoServer = await PackageManagerRepo.initRepo(runtimeDepsPath, log);
 
       // Gather the original package management settings before test begins.
-      originalRepos = await getCurrentRepos(sl4fDriver);
+      originalRepos = await repoServer.getCurrentRepos();
       originalRewriteRuleJson = (await repoServer.pkgctlRuleDumpdynamic(
               'Save original rewrite rules from `pkgctl rule dump-dynamic`', 0))
           .stdout
           .toString();
     });
     tearDown(() async {
-      if (!await resetPkgctl(
-          sl4fDriver, originalRepos, originalRewriteRuleJson)) {
+      if (!await repoServer.resetPkgctl(
+          originalRepos, originalRewriteRuleJson)) {
         log.severe('Failed to reset pkgctl to default state');
       }
       if (repoServer != null) {
@@ -126,8 +125,7 @@ void main() {
       // pkgctl repo add url <repo URL> -f 1
       // pkgctl repo rm fuchsia-pkg://<repo URL>
       // pkgctl repo
-      // ffx repository add-from-pm <repo path> --repository <repo name>
-      // ffx repository server start --address [::]:<port>
+      // ffx repository server start --address [::]:<port> --repository <repo name>
       await repoServer.setupServe(
           '$testPackageName-0.far', manifestPath, repoName);
       final optionalPort = repoServer.getServePort();
@@ -149,7 +147,7 @@ void main() {
       var gethashOutput = (await repoServer.pkgctlGethash(
               'Should error when checking for the package',
               '$repoUrl/$testPackageName',
-              1))
+              0))
           .stdout
           .toString();
 
@@ -160,7 +158,7 @@ void main() {
           .stdout
           .toString();
 
-      await repoServer.ffxTargetRepositoryRegister();
+      await repoServer.ffxTargetRepositoryRegister(repoName);
 
       // Check that our new repo source is listed.
       var listSrcsOutput = (await repoServer.pkgctlRepo(
@@ -231,7 +229,7 @@ void main() {
       final curlOutput = curlResponse.stdout.toString();
       expect(curlOutput.contains('$testPackageName/0'), isTrue);
 
-      await repoServer.ffxTargetRepositoryRegister();
+      await repoServer.ffxTargetRepositoryRegister(repoName);
     });
     test('Test `ffx repository server` chooses its own port number.', () async {
       // Covers these commands (success cases only):
@@ -282,7 +280,7 @@ void main() {
       expect(optionalPort.isPresent, isTrue);
       final port = optionalPort.value;
 
-      await repoServer.ffxTargetRepositoryRegister();
+      await repoServer.ffxTargetRepositoryRegister(repoNameFixed);
 
       var localRewriteRule = testRepoRewriteRule;
       localRewriteRule =
@@ -330,7 +328,7 @@ void main() {
       expect(optionalPort.isPresent, isTrue);
       final port = optionalPort.value;
 
-      await repoServer.ffxTargetRepositoryRegister();
+      await repoServer.ffxTargetRepositoryRegister(repoNameFixed);
 
       var localRewriteRule = testRepoRewriteRule;
       localRewriteRule =
@@ -376,7 +374,7 @@ void main() {
       expect(optionalPort.isPresent, isTrue);
       final port = optionalPort.value;
 
-      await repoServer.ffxTargetRepositoryRegister();
+      await repoServer.ffxTargetRepositoryRegister(repoNameFixed);
 
       var localRewriteRule = testRepoRewriteRule;
       localRewriteRule = localRewriteRule.replaceAll('%%NAME%%', repoNameFixed);
@@ -414,7 +412,7 @@ void main() {
 
       String repoUrl = 'fuchsia-pkg://$repoName';
 
-      await repoServer.ffxTargetRepositoryRegister();
+      await repoServer.ffxTargetRepositoryRegister(repoName);
 
       var localRewriteRule = testRepoRewriteRule;
       localRewriteRule = localRewriteRule.replaceAll('%%NAME%%', '$repoName');

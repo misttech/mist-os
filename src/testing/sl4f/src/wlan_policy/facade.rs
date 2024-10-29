@@ -6,6 +6,7 @@ use crate::common_utils::common::macros::with_line;
 use crate::wlan_policy::types::{ClientStateSummary, NetworkConfig};
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_wlan_policy as fidl_policy;
 use fuchsia_async::{self as fasync, DurationExt as _};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::RwLock;
@@ -14,7 +15,6 @@ use std::cell::Cell;
 use std::collections::HashSet;
 use std::fmt::{self, Debug};
 use tracing::*;
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 pub struct WlanPolicyFacade {
     controller: RwLock<InnerController>,
@@ -181,13 +181,13 @@ impl WlanPolicyFacade {
         Ok(Self::request_status_as_string(response))
     }
 
-    fn request_status_as_string(response: fidl_common::RequestStatus) -> String {
+    fn request_status_as_string(response: fidl_policy::RequestStatus) -> String {
         match response {
-            fidl_common::RequestStatus::Acknowledged => "Acknowledged",
-            fidl_common::RequestStatus::RejectedNotSupported => "RejectedNotSupported",
-            fidl_common::RequestStatus::RejectedIncompatibleMode => "RejectedIncompatibleMode",
-            fidl_common::RequestStatus::RejectedAlreadyInUse => "RejectedAlreadyInUse",
-            fidl_common::RequestStatus::RejectedDuplicateRequest => "RejectedDuplicateRequest",
+            fidl_policy::RequestStatus::Acknowledged => "Acknowledged",
+            fidl_policy::RequestStatus::RejectedNotSupported => "RejectedNotSupported",
+            fidl_policy::RequestStatus::RejectedIncompatibleMode => "RejectedIncompatibleMode",
+            fidl_policy::RequestStatus::RejectedAlreadyInUse => "RejectedAlreadyInUse",
+            fidl_policy::RequestStatus::RejectedDuplicateRequest => "RejectedDuplicateRequest",
         }
         .to_string()
     }
@@ -258,7 +258,7 @@ impl WlanPolicyFacade {
             .ok_or(format_err!("client controller has not been initialized"))?;
 
         let req_status = controller.start_client_connections().await?;
-        if fidl_common::RequestStatus::Acknowledged == req_status {
+        if fidl_policy::RequestStatus::Acknowledged == req_status {
             Ok(())
         } else {
             bail!("{:?}", req_status);
@@ -309,7 +309,7 @@ impl WlanPolicyFacade {
             .ok_or(format_err!("client controller has not been initialized"))?;
 
         let req_status = controller.stop_client_connections().await?;
-        if fidl_common::RequestStatus::Acknowledged == req_status {
+        if fidl_policy::RequestStatus::Acknowledged == req_status {
             Ok(())
         } else {
             bail!("{:?}", req_status);

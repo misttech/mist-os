@@ -742,9 +742,9 @@ mod tests {
             let mut ns = Vec::<fcrunner::ComponentNamespaceEntry>::new();
             if include_pkg {
                 let pkg_path = "/pkg".to_string();
-                let pkg_chan = fuchsia_fs::directory::open_in_namespace_deprecated(
+                let pkg_chan = fuchsia_fs::directory::open_in_namespace(
                     "/pkg",
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+                    fio::PERM_READABLE | fio::PERM_EXECUTABLE,
                 )
                 .unwrap()
                 .into_channel()

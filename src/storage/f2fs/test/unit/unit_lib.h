@@ -5,11 +5,29 @@
 #ifndef SRC_STORAGE_F2FS_TEST_UNIT_UNIT_LIB_H_
 #define SRC_STORAGE_F2FS_TEST_UNIT_UNIT_LIB_H_
 
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+
 #include <unordered_set>
 
 #include <gtest/gtest.h>
 
+#include "src/storage/f2fs/common.h"
+#include "src/storage/f2fs/component_runner.h"
+#include "src/storage/f2fs/dir.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/file.h"
+#include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/fsck.h"
+#include "src/storage/f2fs/inspect.h"
+#include "src/storage/f2fs/mkfs.h"
+#include "src/storage/f2fs/mount.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/reader.h"
+#include "src/storage/f2fs/storage_buffer.h"
+#include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/f2fs/vnode_cache.h"
+#include "src/storage/f2fs/writeback.h"
 
 namespace f2fs {
 
@@ -112,9 +130,9 @@ class FileTester {
                           std::string_view oldname, std::string_view newname);
   static void CreateChildren(F2fs *fs, std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes,
                              std::vector<uint32_t> &inos, fbl::RefPtr<Dir> &parent,
-                             std::string name, uint32_t inode_cnt);
+                             std::string name, size_t inode_cnt);
   static void DeleteChildren(std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes, fbl::RefPtr<Dir> &parent,
-                             uint32_t inode_cnt);
+                             size_t inode_cnt);
 
   static void VnodeWithoutParent(F2fs *fs, umode_t mode, fbl::RefPtr<VnodeF2fs> &vnode);
 

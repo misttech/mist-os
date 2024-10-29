@@ -6,7 +6,7 @@ use crate::device::DeviceMode;
 use crate::mm::PAGE_SIZE;
 use crate::security;
 use crate::signals::{send_standard_signal, SignalInfo};
-use crate::task::{CurrentTask, Kernel, WaitQueue, Waiter};
+use crate::task::{CurrentTask, EncryptionKeyId, Kernel, WaitQueue, Waiter};
 use crate::time::utc;
 use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::pipe::{Pipe, PipeHandle};
@@ -29,6 +29,8 @@ use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore,
     Locked, Mutex, RwLock, RwLockReadGuard,
 };
+use starnix_types::ownership::Releasable;
+use starnix_types::time::{timespec_from_time, NANOS_PER_SECOND};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{
     Credentials, FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
@@ -39,21 +41,18 @@ use starnix_uapi::errors::{Errno, EACCES};
 use starnix_uapi::file_mode::{mode, Access, AccessCheck, FileMode};
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::Releasable;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::SIGXFSZ;
-use starnix_uapi::time::{timespec_from_time, NANOS_PER_SECOND};
 use starnix_uapi::{
     errno, error, fsverity_descriptor, gid_t, ino_t, statx, statx_timestamp, timespec, uapi, uid_t,
     FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE, FALLOC_FL_PUNCH_HOLE,
     FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE, LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, STATX_ATIME,
     STATX_ATTR_VERITY, STATX_BASIC_STATS, STATX_BLOCKS, STATX_CTIME, STATX_GID, STATX_INO,
-    STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID, STATX__RESERVED, XATTR_TRUSTED_PREFIX,
-    XATTR_USER_PREFIX,
+    STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID, STATX__RESERVED, XATTR_USER_PREFIX,
 };
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
-use syncio::zxio_node_attr_has_t;
+use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FsNodeLinkBehavior {
@@ -202,6 +201,9 @@ pub struct FsNodeInfo {
     pub time_modify: UtcInstant,
     pub security_state: security::FsNodeState,
     pub casefold: bool,
+    // If this node is fscrypt encrypted, stores the id of the user wrapping key used to encrypt
+    // it.
+    pub wrapping_key_id: Option<[u8; 16]>,
 }
 
 impl FsNodeInfo {
@@ -783,6 +785,11 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         Ok(())
     }
 
+    /// Get node attributes
+    fn get_attr(&self, _has: zxio_node_attr_has_t) -> Result<zxio_node_attributes_t, Errno> {
+        error!(ENOTSUP)
+    }
+
     /// Get an extended attribute on the node.
     ///
     /// An implementation can systematically return a value. Otherwise, if `max_size` is 0, it can
@@ -1249,6 +1256,19 @@ impl FsNode {
         self.ops.as_ref()
     }
 
+    /// Returns an error if this node is encrypted and locked.
+    pub fn fail_if_locked(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        let node_info = self.fetch_and_refresh_info(current_task)?;
+        if let Some(wrapping_key_id) = node_info.wrapping_key_id {
+            let encryption_keys = current_task.kernel().encryption_keys.read();
+            // Fail if the user tries to create a child in a locked encrypted directory.
+            if !encryption_keys.contains_key(&EncryptionKeyId::from(wrapping_key_id)) {
+                return error!(ENOKEY);
+            }
+        }
+        Ok(())
+    }
+
     /// Returns the `FsNode`'s `FsNodeOps` as a `&T`, or `None` if the downcast fails.
     pub fn downcast_ops<T>(&self) -> Option<&T>
     where
@@ -1578,6 +1598,8 @@ impl FsNode {
             };
         }
 
+        security::check_fs_node_link_access(current_task, self, child)?;
+
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().link(&mut locked, self, current_task, name, child)?;
         Ok(child.clone())
@@ -1602,6 +1624,11 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_sticky_bit(current_task, child)?;
+        if child.is_dir() {
+            security::check_fs_node_rmdir_access(current_task, self, child)?;
+        } else {
+            security::check_fs_node_unlink_access(current_task, self, child)?;
+        }
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().unlink(&mut locked, self, current_task, name, child)?;
         self.update_ctime_mtime();
@@ -2145,24 +2172,25 @@ impl FsNode {
     }
 
     /// Check that `current_task` can access the extended attributed `name`. Will return the result
-    /// of `error` in case the attributed is trusted and the task has not the CAP_SYS_ADMIN
-    /// capability.
+    /// of `error` in case the attribute is not in the 'user' namespace and the task has not the
+    /// CAP_SYS_ADMIN capability.
     fn check_trusted_attribute_access(
         &self,
         current_task: &CurrentTask,
         name: &FsStr,
         error: impl FnOnce() -> Errno,
     ) -> Result<(), Errno> {
-        if name.starts_with(XATTR_TRUSTED_PREFIX.to_bytes())
-            && !current_task.creds().has_capability(CAP_SYS_ADMIN)
-        {
-            return Err(error());
-        }
+        // Some irregular file types, most notably symlinks, tend to have very permissive write
+        // settings since the type precludes normal data storage anyways. So only allow privileged
+        // namespaces to be used on them.
         if name.starts_with(XATTR_USER_PREFIX.to_bytes()) {
             let info = self.info();
             if !info.mode.is_reg() && !info.mode.is_dir() {
                 return Err(error());
             }
+        } else if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+            // Non-privileged callers only have access to the user namespace.
+            return Err(error());
         }
         Ok(())
     }
@@ -2179,6 +2207,7 @@ impl FsNode {
         if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
             return security::fs_node_getsecurity(current_task, self, name, max_size);
         }
+        security::check_fs_node_getxattr_access(current_task, self, name)?;
         self.check_access(
             current_task,
             mount,
@@ -2198,11 +2227,12 @@ impl FsNode {
         op: XattrOp,
     ) -> Result<(), Errno> {
         // Based on the man page for xattr(7), write access permissions to security attributes
-        // depend on the security module. If there isn't any, write access is liminuted to
+        // depend on the security module. If there isn't any, write access is limited to
         // processed with the CAP_SYS_ADMIN capability.
         if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
             return security::fs_node_setsecurity(current_task, self, name, value, op);
         }
+        security::check_fs_node_setxattr_access(current_task, self, name, value, op)?;
         self.check_access(
             current_task,
             mount,
@@ -2219,6 +2249,8 @@ impl FsNode {
         mount: &MountInfo,
         name: &FsStr,
     ) -> Result<(), Errno> {
+        // TODO: Is removing security.* xattrs allowed at all?
+        security::check_fs_node_removexattr_access(current_task, self, name)?;
         self.check_access(
             current_task,
             mount,
@@ -2234,6 +2266,7 @@ impl FsNode {
         current_task: &CurrentTask,
         max_size: usize,
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        security::check_fs_node_listxattr_access(current_task, self)?;
         Ok(self.ops().list_xattrs(self, current_task, max_size)?.map(|mut v| {
             v.retain(|name| {
                 self.check_trusted_attribute_access(current_task, name.as_ref(), || errno!(EPERM))
@@ -2614,6 +2647,45 @@ mod tests {
                 &MountInfo::detached(),
                 "security.name".into(),
                 "security_label".into(),
+                XattrOp::Create,
+            ),
+            error!(EPERM)
+        );
+    }
+
+    #[::fuchsia::test]
+    async fn set_non_user_xattr_fails_without_security_module_or_root() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let mut creds = Credentials::with_ids(1, 2);
+        creds.groups = vec![3, 4];
+        current_task.set_creds(creds);
+
+        // Create a node.
+        let node = &current_task
+            .fs()
+            .root()
+            .create_node(
+                &mut locked,
+                &current_task,
+                "foo".into(),
+                FileMode::IFREG,
+                DeviceType::NONE,
+            )
+            .expect("create_node")
+            .entry
+            .node;
+
+        // Give read-write-execute access.
+        node.update_info(|info| info.mode = mode!(IFREG, 0o777));
+
+        // Without a security module, and without CAP_SYS_ADMIN capabilities, setting the xattr
+        // should fail.
+        assert_eq!(
+            node.set_xattr(
+                &current_task,
+                &MountInfo::detached(),
+                "trusted.name".into(),
+                "some data".into(),
                 XattrOp::Create,
             ),
             error!(EPERM)

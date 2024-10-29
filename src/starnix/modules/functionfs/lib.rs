@@ -20,10 +20,11 @@ use starnix_logging::{
     log_error, log_warn, trace_instant, track_stub, TraceScope, CATEGORY_STARNIX,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::vfs::{default_statfs, FdEvents};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     errno, error, gid_t, ino_t, statfs, uid_t, usb_functionfs_event,
     usb_functionfs_event_type_FUNCTIONFS_BIND, usb_functionfs_event_type_FUNCTIONFS_ENABLE,

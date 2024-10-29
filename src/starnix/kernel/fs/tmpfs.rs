@@ -12,13 +12,13 @@ use crate::vfs::{
 };
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard, Unlocked};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::seal_flags::SealFlags;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{error, gid_t, statfs, uid_t, TMPFS_MAGIC};
 use std::sync::Arc;
 

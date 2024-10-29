@@ -21,7 +21,7 @@ use futures::StreamExt;
 use itertools::Itertools as _;
 use net_declare::{fidl_ip_v4, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix};
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6, Subnet};
-use netstack_testing_common::realms::{Netstack, Netstack3, TestSandboxExt};
+use netstack_testing_common::realms::{Netstack, Netstack2, Netstack3, TestSandboxExt};
 use netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
 use routes_common::{test_route, TestSetup};
@@ -1504,6 +1504,28 @@ async fn main_table_authorization<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Ne
         .await
         .expect("fidl should succeed");
     assert_eq!(table_id.get(), authorized_table_id);
+}
+
+// Netstack2 does not support fuchsia.net.routes.admin.RouteTableProviderV{4, 6}, so it closes the
+// channel as soon as a request comes in.
+#[netstack_test]
+#[variant(I, Ip)]
+async fn route_table_provider_netstack2_closes_channel<I: FidlRouteAdminIpExt + FidlRouteIpExt>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<Netstack2, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to route table provider");
+    let _table = fnet_routes_ext::admin::new_route_table::<I>(&route_table_provider, None)
+        .expect("create new route table");
+
+    let signals =
+        route_table_provider.on_closed().await.expect("should await closure successfully");
+    assert!(signals.contains(zx::Signals::CHANNEL_PEER_CLOSED));
 }
 
 #[netstack_test]

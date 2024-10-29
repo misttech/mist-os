@@ -22,9 +22,9 @@ use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_settings::{DisplayMarker, DisplayProxy, IntlMarker};
 use fuchsia_async::{Task, TestExecutor};
 use fuchsia_inspect::component;
-use futures::future::{self, BoxFuture};
+use futures::future::{self, LocalBoxFuture};
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::{self as zx, Status};
 
 const ENV_NAME: &str = "settings_service_display_test_environment";
@@ -32,13 +32,13 @@ const AUTO_BRIGHTNESS_LEVEL: f32 = 0.9;
 
 fn default_settings() -> DefaultSetting<DisplayConfiguration, &'static str> {
     let config_logger =
-        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+        Rc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
     build_display_default_settings(config_logger)
 }
 
 // Creates an environment that will fail on a get request.
 async fn create_display_test_env_with_failures(
-    storage_factory: Arc<InMemoryStorageFactory>,
+    storage_factory: Rc<InMemoryStorageFactory>,
 ) -> DisplayProxy {
     create_test_env_with_failures_and_config(
         storage_factory,
@@ -97,7 +97,7 @@ async fn validate_restore_with_storage_controller(
     };
     let storage_factory = InMemoryStorageFactory::with_initial_data(&info);
 
-    let env = EnvironmentBuilder::new(Arc::new(storage_factory))
+    let env = EnvironmentBuilder::new(Rc::new(storage_factory))
         .service(Box::new(ServiceRegistry::serve(service_registry)))
         .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE)])
@@ -166,7 +166,7 @@ fn validate_restore_with_brightness_controller(
         service_registry
             .lock()
             .await
-            .register_service(Arc::new(Mutex::new(brightness_service_handle_clone)));
+            .register_service(Rc::new(Mutex::new(brightness_service_handle_clone)));
         let info = DisplayInfo {
             manual_brightness_value: manual_brightness,
             auto_brightness_value,
@@ -177,7 +177,7 @@ fn validate_restore_with_brightness_controller(
         };
         let storage_factory = InMemoryStorageFactory::with_initial_data(&info);
 
-        assert!(EnvironmentBuilder::new(Arc::new(storage_factory))
+        assert!(EnvironmentBuilder::new(Rc::new(storage_factory))
             .service(Box::new(ServiceRegistry::serve(service_registry)))
             .agents(vec![AgentType::Restore.into()])
             .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE)])
@@ -207,7 +207,7 @@ fn validate_restore_with_brightness_controller(
 #[fuchsia::test(allow_stalls = false)]
 async fn test_display_failure() {
     let service_gen =
-        |service_name: &str, channel: zx::Channel| -> BoxFuture<'static, Result<()>> {
+        |service_name: &str, channel: zx::Channel| -> LocalBoxFuture<'static, Result<()>> {
             match service_name {
                 fidl_fuchsia_ui_brightness::ControlMarker::PROTOCOL_NAME => {
                     // This stream is closed immediately
@@ -226,7 +226,7 @@ async fn test_display_failure() {
             }
         };
 
-    let env = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+    let env = EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
         .service(Box::new(service_gen))
         .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE), Interface::Intl])
         .display_configuration(default_settings())
@@ -245,7 +245,7 @@ async fn test_display_failure() {
 #[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let display_proxy =
-        create_display_test_env_with_failures(Arc::new(InMemoryStorageFactory::new())).await;
+        create_display_test_env_with_failures(Rc::new(InMemoryStorageFactory::new())).await;
     let result = display_proxy.watch().await;
     assert_matches!(result, Err(ClientChannelClosed { status: Status::UNAVAILABLE, .. }));
 }

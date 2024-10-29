@@ -107,10 +107,10 @@ class ConsistencyCheckerFixtureVerbose : public testing::Test {
     zx::result child = root->Create(name, fs::CreationType::kFile);
     EXPECT_TRUE(child.is_ok()) << child.status_string();
     if (data_size != 0) {
-      char data[data_size];
-      memset(data, 0, data_size);
+      auto data = std::make_unique<char[]>(data_size);
+      memset(data.get(), 0, data_size);
       size_t size_written;
-      EXPECT_EQ(child->Write(data, data_size, offset, &size_written), ZX_OK);
+      EXPECT_EQ(child->Write(data.get(), data_size, offset, &size_written), ZX_OK);
       EXPECT_EQ(size_written, data_size);
     }
     if (truncate_size > 0) {

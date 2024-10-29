@@ -82,7 +82,7 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
         return open_status;
       }
     }
-    // On failure, |Vfs::Serve()| will close the channel with an epitaph.
+    // On failure, |Vfs::ServeDeprecated()| will close the channel with an epitaph.
     vfs->ServeDeprecated(vn, server_end.TakeChannel(), *clone_options);
     return ZX_OK;
   }();
@@ -95,6 +95,22 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
     }
     server_end.Close(status);
   }
+}
+
+void Connection::NodeClone2(fio::Flags flags, zx::channel object) const {
+  FS_PRETTY_TRACE_DEBUG("[NodeClone2] reopening with flags: ", flags);
+  auto vfs = this->vfs();
+  if (!vfs) {
+    fidl::ServerEnd<fio::Node>{std::move(object)}.Close(ZX_ERR_CANCELED);
+    return;
+  }
+  // On failure, |Vfs::Serve()| will close the channel with an epitaph.
+  [[maybe_unused]] zx_status_t status = vfs->Serve(vnode(), std::move(object), flags);
+#if FS_TRACE_DEBUG_ENABLED
+  if (status != ZX_OK) {
+    FS_PRETTY_TRACE_DEBUG("[NodeClone2] serve failed: ", zx_status_get_string(status));
+  }
+#endif  // FS_TRACE_DEBUG_ENABLED
 }
 
 zx::result<> Connection::NodeUpdateAttributes(const VnodeAttributesUpdate& update) {

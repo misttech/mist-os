@@ -7,7 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "src/storage/f2fs/common.h"
-#include "src/storage/f2fs/f2fs_layout.h"
+#include "src/storage/f2fs/layout.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "unit_lib.h"
 

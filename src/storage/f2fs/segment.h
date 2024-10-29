@@ -5,15 +5,16 @@
 #ifndef SRC_STORAGE_F2FS_SEGMENT_H_
 #define SRC_STORAGE_F2FS_SEGMENT_H_
 
-#include <lib/zircon-internal/thread_annotations.h>
-
 #include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/common.h"
-#include "src/storage/f2fs/f2fs_internal.h"
-#include "src/storage/f2fs/f2fs_layout.h"
-#include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/layout.h"
+#include "src/storage/f2fs/superblock_info.h"
 
 namespace f2fs {
+
+class F2fs;
+class LockedPage;
+class SuperblockInfo;
 
 // constant macro
 constexpr uint32_t kNullSegNo = std::numeric_limits<uint32_t>::max();
@@ -62,7 +63,7 @@ struct SegmentEntry {
   uint64_t mtime = 0;              // modification time of the segment
   uint16_t valid_blocks = 0;       // # of valid blocks
   uint16_t ckpt_valid_blocks = 0;  // # of valid blocks in the last CP
-  uint8_t type = 0;                // segment type like CURSEG_XXX_TYPE
+  uint8_t type = 0;                // segment type like CursegType::XXX
 };
 
 struct SectionEntry {
@@ -93,7 +94,7 @@ struct FreeSegmapInfo {
   uint32_t free_sections = 0;  // # of free sections
 };
 
-// Notice: The order of dirty type is same with CURSEG_XXX in f2fs.h
+// Notice: The order of dirty type is same with CursegType::XXX
 enum class DirtyType {
   kDirtyHotData = 0,  // dirty segments assigned as hot data logs
   kDirtyWarmData,     // dirty segments assigned as warm data logs

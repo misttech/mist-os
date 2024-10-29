@@ -79,7 +79,7 @@ impl ReadableTree for fidl_fuchsia_inspect::TreeProxy {
             if subset_names.is_empty() {
                 return Ok(names);
             }
-            names.extend(subset_names.into_iter());
+            names.extend(subset_names);
         }
     }
 

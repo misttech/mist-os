@@ -9,7 +9,6 @@
 #include <gtest/gtest.h>
 
 #include "lib/fpromise/result.h"
-#include "lib/stdcompat/span.h"
 #include "src/storage/fvm/format.h"
 #include "src/storage/fvm/metadata.h"
 #include "src/storage/volume_image/fvm/fvm_descriptor.h"
@@ -31,8 +30,7 @@ class RamReaderWriter : public Reader, public Writer {
 
   // Reader interface
   uint64_t length() const final { return length_; }
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     if (offset + buffer.size() > length_) {
       return fpromise::error("Read exceeds size of buffer");
     }
@@ -55,7 +53,7 @@ class RamReaderWriter : public Reader, public Writer {
 
   // Writer interface
   fpromise::result<void, std::string> Write(uint64_t offset,
-                                            cpp20::span<const uint8_t> buffer) final {
+                                            std::span<const uint8_t> buffer) final {
     uint64_t progress = 0;
     uint64_t page_number = offset / kPageSize;
     while (buffer.size() - progress > 0) {
@@ -93,16 +91,16 @@ fvm::VPartitionEntry MakePartitionEntry(const std::string& name, uint32_t slice_
 
 // Set the first byte and last byte of a slice to some value.
 void SetSlice(const fvm::Metadata& metadata, uint64_t pslice, Writer* writer, uint8_t value) {
-  writer->Write(metadata.GetHeader().GetSliceDataOffset(pslice), cpp20::span(&value, 1));
-  writer->Write(metadata.GetHeader().GetSliceDataOffset(pslice + 1) - 1, cpp20::span(&value, 1));
+  writer->Write(metadata.GetHeader().GetSliceDataOffset(pslice), std::span(&value, 1));
+  writer->Write(metadata.GetHeader().GetSliceDataOffset(pslice + 1) - 1, std::span(&value, 1));
 }
 
 // Get the first and last bytes of a slice from an outputted block file. Ensure they are equal.
 uint8_t GetBlockSlice(uint64_t slice_size, uint64_t pslice, Reader* reader) {
   uint8_t value = 0;
-  EXPECT_TRUE(reader->Read(pslice * slice_size, cpp20::span(&value, 1)).is_ok());
+  EXPECT_TRUE(reader->Read(pslice * slice_size, std::span(&value, 1)).is_ok());
   uint8_t value2 = 0;
-  EXPECT_TRUE(reader->Read((pslice + 1) * slice_size - 1, cpp20::span(&value2, 1)).is_ok());
+  EXPECT_TRUE(reader->Read((pslice + 1) * slice_size - 1, std::span(&value2, 1)).is_ok());
   EXPECT_EQ(value, value2);
   return value;
 }
@@ -125,8 +123,8 @@ TEST(FvmUnpackTest, BasicSuccess) {
   ASSERT_TRUE(metadata_or.is_ok());
   fvm::Metadata metadata(std::move(metadata_or.value()));
   RamReaderWriter block;
-  block.Write(0, cpp20::span<const uint8_t>(static_cast<uint8_t*>(metadata.Get()->data()),
-                                            metadata.Get()->size()));
+  block.Write(0, std::span<const uint8_t>(static_cast<uint8_t*>(metadata.Get()->data()),
+                                          metadata.Get()->size()));
   for (uint64_t i = 0; i < slices.size(); ++i) {
     // These are 1 indexed inside of FVM.
     SetSlice(metadata, i + 1, &block, static_cast<uint8_t>(i));
@@ -163,8 +161,8 @@ TEST(FvmUnpackTest, SkipUnlistedPartition) {
   ASSERT_TRUE(metadata_or.is_ok());
   fvm::Metadata metadata(std::move(metadata_or.value()));
   RamReaderWriter block;
-  block.Write(0, cpp20::span<const uint8_t>(static_cast<uint8_t*>(metadata.Get()->data()),
-                                            metadata.Get()->size()));
+  block.Write(0, std::span<const uint8_t>(static_cast<uint8_t*>(metadata.Get()->data()),
+                                          metadata.Get()->size()));
   for (uint64_t i = 0; i < slices.size(); ++i) {
     // These are 1 indexed inside of FVM.
     SetSlice(metadata, i + 1, &block, static_cast<uint8_t>(i));

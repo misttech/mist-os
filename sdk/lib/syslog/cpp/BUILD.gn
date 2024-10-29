@@ -102,23 +102,6 @@ sdk_shared_library("backend_fuchsia_globals") {
   deps = [ "//src/zircon/lib/zircon" ]
 }
 
-# TODO(b/300157652): Transitional no-op target. This will be removed when
-# all targets have migrated to the newer build rules.
-# This is needed for now to bring the implicit offer
-# CML rules in client_includes, and to serve as a backend
-# target for other repositories until the transition is finished
-# (so they can be soft-transitioned).
-sdk_source_set("backend_fuchsia_lib") {
-  category = "internal"
-
-  sdk_name = "syslog_cpp_backend_fuchsia_lib"
-
-  include_base = "//sdk"
-
-  data_deps = [ "//sdk/lib/syslog:client_includes" ]
-  deps = [ ":cpp" ]
-}
-
 test("logging_cpp_unittests") {
   sources = [
     "host/encoder.h",

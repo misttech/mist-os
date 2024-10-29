@@ -15,7 +15,9 @@ struct LocalFDomain(FDomainCodec);
 
 impl LocalFDomain {
     fn new_client() -> Arc<Client> {
-        Client::new(LocalFDomain(FDomainCodec::new(FDomain::new_empty())))
+        let (client, fut) = Client::new(LocalFDomain(FDomainCodec::new(FDomain::new_empty())));
+        fuchsia_async::Task::spawn(fut).detach();
+        client
     }
 }
 
@@ -56,8 +58,6 @@ async fn socket() {
 }
 
 #[fuchsia::test]
-// TODO: https://fxbug.dev/372974069 - Fix leak and re-enable
-#[cfg_attr(feature = "variant_asan", ignore)]
 async fn channel() {
     let client = LocalFDomain::new_client();
 

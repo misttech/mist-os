@@ -8,8 +8,9 @@ use crate::capability_source::{
     CapabilitySource, CapabilityToCapabilitySource, ComponentCapability, ComponentSource,
 };
 use crate::component_instance::ComponentInstanceInterface;
-use crate::{RouteRequest, RoutingError};
+use crate::{RouteRequest, RouterResponse, RoutingError};
 use cm_rust::FidlIntoNative;
+use sandbox::Data;
 use std::sync::Arc;
 
 /// Get a specific configuration use declaration from the structured
@@ -71,7 +72,7 @@ where
                 .into());
             }
         };
-    let sandbox::Capability::Router(router) = capability else {
+    let sandbox::Capability::DataRouter(router) = capability else {
         return Err(RoutingError::BedrockWrongCapabilityType {
             actual: format!("{:?}", capability),
             expected: "Router".to_string(),
@@ -84,12 +85,11 @@ where
         metadata: request_metadata::config_metadata(use_config.availability),
     };
     let data = match router.route(Some(request), false).await? {
-        sandbox::Capability::Data(d) => d,
-        sandbox::Capability::Unit(_) => return Ok(use_config.default.clone()),
-        other => {
-            return Err(RoutingError::BedrockWrongCapabilityType {
-                actual: format!("{:?}", other),
-                expected: "Data or Unit".to_string(),
+        RouterResponse::<Data>::Capability(d) => d,
+        RouterResponse::<Data>::Unavailable => return Ok(use_config.default.clone()),
+        RouterResponse::<Data>::Debug(_) => {
+            return Err(RoutingError::RouteUnexpectedDebug {
+                type_name: cm_rust::CapabilityTypeName::Config,
                 moniker: component.moniker().clone().into(),
             }
             .into());

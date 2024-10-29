@@ -27,15 +27,15 @@ fn contains_unescaped_wildcard(s: &str) -> bool {
     false
 }
 
-impl<'a> Into<Segment<'a>> for &'a str {
-    fn into(self) -> Segment<'a> {
-        if contains_unescaped_wildcard(self) {
-            return Segment::Pattern(self);
+impl<'a> From<&'a str> for Segment<'a> {
+    fn from(s: &'a str) -> Segment<'a> {
+        if contains_unescaped_wildcard(s) {
+            return Segment::Pattern(s);
         }
-        if !self.contains('\\') {
-            return Segment::ExactMatch(Cow::from(self));
+        if !s.contains('\\') {
+            return Segment::ExactMatch(Cow::from(s));
         }
-        Segment::ExactMatch(Cow::Owned(unescape(self)))
+        Segment::ExactMatch(Cow::Owned(unescape(s)))
     }
 }
 
@@ -45,10 +45,10 @@ pub enum TreeNames<'a> {
     All,
 }
 
-impl<'a> Into<TreeNames<'a>> for Vec<&'a str> {
-    fn into(self) -> TreeNames<'a> {
+impl<'a> From<Vec<&'a str>> for TreeNames<'a> {
+    fn from(vec: Vec<&'a str>) -> TreeNames<'a> {
         let mut payload = vec![];
-        for name in self {
+        for name in vec {
             if name.contains('\\') {
                 payload.push(Cow::Owned(unescape(name)));
             } else {
@@ -96,33 +96,33 @@ pub struct Selector<'a> {
     pub tree: TreeSelector<'a>,
 }
 
-impl Into<fdiagnostics::Selector> for Selector<'_> {
-    fn into(mut self) -> fdiagnostics::Selector {
-        let tree_names = self.tree.tree_names.take();
+impl From<Selector<'_>> for fdiagnostics::Selector {
+    fn from(mut selector: Selector<'_>) -> fdiagnostics::Selector {
+        let tree_names = selector.tree.tree_names.take();
         fdiagnostics::Selector {
-            component_selector: Some(self.component.into()),
-            tree_selector: Some(self.tree.into()),
+            component_selector: Some(selector.component.into()),
+            tree_selector: Some(selector.tree.into()),
             tree_names: tree_names.map(|names| names.into()),
             ..Default::default()
         }
     }
 }
 
-impl Into<fdiagnostics::ComponentSelector> for ComponentSelector<'_> {
-    fn into(self) -> fdiagnostics::ComponentSelector {
+impl From<ComponentSelector<'_>> for fdiagnostics::ComponentSelector {
+    fn from(component_selector: ComponentSelector<'_>) -> fdiagnostics::ComponentSelector {
         fdiagnostics::ComponentSelector {
             moniker_segments: Some(
-                self.segments.into_iter().map(|segment| segment.into()).collect(),
+                component_selector.segments.into_iter().map(|segment| segment.into()).collect(),
             ),
             ..Default::default()
         }
     }
 }
 
-impl Into<fdiagnostics::TreeSelector> for TreeSelector<'_> {
-    fn into(self) -> fdiagnostics::TreeSelector {
-        let node_path = self.node.into_iter().map(|s| s.into()).collect();
-        match self.property {
+impl From<TreeSelector<'_>> for fdiagnostics::TreeSelector {
+    fn from(tree_selector: TreeSelector<'_>) -> fdiagnostics::TreeSelector {
+        let node_path = tree_selector.node.into_iter().map(|s| s.into()).collect();
+        match tree_selector.property {
             None => fdiagnostics::TreeSelector::SubtreeSelector(fdiagnostics::SubtreeSelector {
                 node_path,
             }),
@@ -136,20 +136,20 @@ impl Into<fdiagnostics::TreeSelector> for TreeSelector<'_> {
     }
 }
 
-impl Into<fdiagnostics::TreeNames> for TreeNames<'_> {
-    fn into(self) -> fdiagnostics::TreeNames {
-        match self {
-            Self::All => fdiagnostics::TreeNames::All(fdiagnostics::All {}),
-            Self::Some(names) => {
+impl From<TreeNames<'_>> for fdiagnostics::TreeNames {
+    fn from(tree_names: TreeNames<'_>) -> fdiagnostics::TreeNames {
+        match tree_names {
+            TreeNames::All => fdiagnostics::TreeNames::All(fdiagnostics::All {}),
+            TreeNames::Some(names) => {
                 fdiagnostics::TreeNames::Some(names.iter().map(|n| n.to_string()).collect())
             }
         }
     }
 }
 
-impl Into<fdiagnostics::StringSelector> for Segment<'_> {
-    fn into(self) -> fdiagnostics::StringSelector {
-        match self {
+impl From<Segment<'_>> for fdiagnostics::StringSelector {
+    fn from(segment: Segment<'_>) -> fdiagnostics::StringSelector {
+        match segment {
             Segment::ExactMatch(s) => fdiagnostics::StringSelector::ExactMatch(s.into_owned()),
             Segment::Pattern(s) => fdiagnostics::StringSelector::StringPattern(s.to_owned()),
         }

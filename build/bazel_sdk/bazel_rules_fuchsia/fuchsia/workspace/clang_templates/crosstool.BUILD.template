@@ -6,6 +6,7 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@fuchsia_sdk//:generated_constants.bzl", sdk_constants = "constants")
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
+    "COMPATIBILITY",
     "fuchsia_cpu_filter_dict",
     "fuchsia_cpu_select",
     "fuchsia_debug_symbols",
@@ -403,6 +404,7 @@ fuchsia_package_resource_group(
         },
         sdk_constants.target_cpus,
     ),
+    target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
     visibility = ["//visibility:public"],
 )
 
@@ -457,6 +459,7 @@ fuchsia_package_resource_group(
         },
         sdk_constants.target_cpus,
     ),
+    target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
     visibility = ["//visibility:public"],
 )
 

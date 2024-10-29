@@ -11,6 +11,7 @@ use crate::execution_scope::{yield_to_executor, ExecutionScope};
 use crate::node::OpenNode;
 use crate::object_request::Representation;
 use crate::path::Path;
+use crate::protocols::ToFlags as _;
 
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
@@ -86,15 +87,9 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 trace::duration!(c"storage", c"Directory::Clone");
                 self.handle_clone(flags, object);
             }
-            fio::DirectoryRequest::Reopen {
-                rights_request: _,
-                object_request,
-                control_handle: _,
-            } => {
-                trace::duration!(c"storage", c"Directory::Reopen");
-                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
-                // Suppress any errors in the event a bad `object_request` channel was provided.
-                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
+            fio::DirectoryRequest::Clone2 { request, control_handle: _ } => {
+                trace::duration!(c"storage", c"Directory::Clone2");
+                self.handle_clone2(request.into_channel());
             }
             fio::DirectoryRequest::Close { responder } => {
                 trace::duration!(c"storage", c"Directory::Close");
@@ -136,7 +131,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
                 trace::duration!(c"storage", c"Directory::UpdateAttributes");
-                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
+                // TODO(https://fxbug.dev/324112547): Handle unimplemented io2 method.
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::ListExtendedAttributes { iterator, .. } => {
@@ -289,6 +284,13 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         };
 
         self.directory.clone().open(self.scope.clone(), flags, Path::dot(), server_end);
+    }
+
+    fn handle_clone2(&mut self, object: fidl::Channel) {
+        let flags = self.options.rights.to_flags() | fio::Flags::PROTOCOL_DIRECTORY;
+        ObjectRequest::new3(flags, &Default::default(), object).handle(|req| {
+            self.directory.clone().open3(self.scope.clone(), Path::dot(), flags, req)
+        });
     }
 
     fn handle_open(

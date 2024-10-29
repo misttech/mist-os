@@ -7,7 +7,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -24,6 +23,7 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <span>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -178,10 +178,10 @@ TEST_F(DecompressorSandboxTest, ChunkedPartialDecompression) {
   CompressData(std::move(compressor), input_data_, &compressed_size);
 
   std::unique_ptr<SeekableDecompressor> local_decompressor;
-  ASSERT_EQ(ZX_OK, SeekableChunkedDecompressor::CreateDecompressor(
-                       cpp20::span(static_cast<const uint8_t*>(compressed_mapper_.start()),
-                                   compressed_size),
-                       compressed_size, &local_decompressor));
+  ASSERT_EQ(ZX_OK,
+            SeekableChunkedDecompressor::CreateDecompressor(
+                std::span(static_cast<const uint8_t*>(compressed_mapper_.start()), compressed_size),
+                compressed_size, &local_decompressor));
 
   size_t total_size = 0;
   size_t iterations = 0;

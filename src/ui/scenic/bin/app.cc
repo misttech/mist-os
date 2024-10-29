@@ -145,6 +145,7 @@ scenic_structured_config::Config GetConfig() {
                        .value();
   FX_LOGS(INFO) << "Scenic i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0);
   FX_LOGS(INFO) << "Scenic display_rotation: " << GetDisplayRotation(values);
+  FX_LOGS(INFO) << "visual_debugging_level: " << static_cast<int>(values.visual_debugging_level());
 
   return values;
 }
@@ -421,7 +422,8 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     flatland_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         async_get_default_dispatcher(), display_manager_->default_display_coordinator(),
         flatland_renderer, utils::CreateSysmemAllocatorSyncPtr("flatland::DisplayCompositor"),
-        config_values_.display_composition(), /*max_display_layers=*/1);
+        config_values_.display_composition(), /*max_display_layers=*/1,
+        config_values_.visual_debugging_level());
   }
 
   // Flatland manager depends on compositor, and is required by engine.

@@ -124,7 +124,7 @@ zx_status_t Astro::GpioInit() {
               reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins)),
       }},
       {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_INIT),
+          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
           .data = encoded_metadata.value(),
       }},
   };

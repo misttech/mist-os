@@ -440,13 +440,13 @@ mod tests {
     use std::fmt::Debug;
     use std::io::Cursor;
 
-    fn parse_argument<'a>(bytes: &'a [u8]) -> (&'a [u8], Argument<'static>) {
+    fn parse_argument(bytes: &[u8]) -> (&[u8], Argument<'static>) {
         let (remaining, decoded_from_full) =
             nom::error::dbg_dmp(&crate::parse::parse_argument, "roundtrip")(bytes).unwrap();
         (remaining, decoded_from_full.into_owned())
     }
 
-    fn parse_record<'a>(bytes: &'a [u8]) -> (&'a [u8], Record<'static>) {
+    fn parse_record(bytes: &[u8]) -> (&[u8], Record<'static>) {
         let (remaining, decoded_from_full) =
             nom::error::dbg_dmp(&crate::parse::try_parse_record, "roundtrip")(bytes).unwrap();
         (remaining, decoded_from_full.into_owned())

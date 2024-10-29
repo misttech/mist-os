@@ -15,6 +15,10 @@ from honeydew.typing import custom_types
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
+_CUSTOM_FUCHSIA_DEVICE_CLASS: (
+    type[fuchsia_device_interface.FuchsiaDevice] | None
+) = None
+
 
 # List all the public methods
 def create_device(
@@ -84,7 +88,12 @@ def create_device(
                 device_info.ip_port,
             )
 
-        return fuchsia_device.FuchsiaDevice(
+        device_class: type[
+            fuchsia_device_interface.FuchsiaDevice
+        ] | None = get_custom_fuchsia_device()
+        if device_class is None:
+            device_class = fuchsia_device.FuchsiaDevice
+        return device_class(  # type: ignore[call-arg]
             device_info,
             ffx_config,
             config,
@@ -93,3 +102,30 @@ def create_device(
         raise errors.FuchsiaDeviceError(
             f"Failed to create device for '{device_info.name}': {err}"
         ) from err
+
+
+def register_custom_fuchsia_device(
+    fuchsia_device_class: type[fuchsia_device_interface.FuchsiaDevice],
+) -> None:
+    """Registers a custom fuchsia device class implementation.
+
+    Args:
+        fuchsia_device_class: custom fuchsia device class implementation.
+    """
+    _LOGGER.info(
+        "Registering custom FuchsiaDevice class '%s' with Honeydew",
+        fuchsia_device_class,
+    )
+    global _CUSTOM_FUCHSIA_DEVICE_CLASS
+    _CUSTOM_FUCHSIA_DEVICE_CLASS = fuchsia_device_class
+
+
+def get_custom_fuchsia_device() -> (
+    type[fuchsia_device_interface.FuchsiaDevice] | None
+):
+    """Returns if any custom fuchsia device class implementation is available. Otherwise, None.
+
+    Returns:
+        Custom fuchsia device class
+    """
+    return _CUSTOM_FUCHSIA_DEVICE_CLASS

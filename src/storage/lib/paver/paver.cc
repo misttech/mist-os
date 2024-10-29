@@ -14,7 +14,6 @@
 #include <lib/fidl/epitaph.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -218,9 +217,9 @@ zx::result<fuchsia_mem::wire::Buffer> PartitionRead(const DevicePartitioner& par
   // Try to find ZBI size if asset is a ZBI. This won't work on signed ZBI, nor vbmeta assets.
   fzl::VmoMapper mapper;
   if (zx::make_result(mapper.Map(vmo, 0, partition_size, ZX_VM_PERM_READ)).is_ok()) {
-    auto data = cpp20::span(static_cast<uint8_t*>(mapper.start()), mapper.size());
+    auto data = std::span(static_cast<uint8_t*>(mapper.start()), mapper.size());
     const zbi_header_t* container_header;
-    cpp20::span<const uint8_t> container_data;
+    std::span<const uint8_t> container_data;
     if (ExtractZbiPayload(data, &container_header, &container_data)) {
       asset_size = sizeof(*container_header) + container_data.size();
     }
@@ -247,8 +246,8 @@ zx::result<> ValidatePartitionPayload(const DevicePartitioner& partitioner,
   // Pass an empty payload for the sparse image; if any of the validators need to look at contents,
   // they will simply fail.
   // At this time none of them do so in a context where the sparse format is used.
-  auto payload = sparse ? cpp20::span<const uint8_t>()
-                        : cpp20::span<const uint8_t>(
+  auto payload = sparse ? std::span<const uint8_t>()
+                        : std::span<const uint8_t>(
                               static_cast<const uint8_t*>(payload_mapper.start()), payload_size);
   return partitioner.ValidatePayload(spec, payload);
 }

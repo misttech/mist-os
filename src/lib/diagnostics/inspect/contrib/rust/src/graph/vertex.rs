@@ -84,7 +84,7 @@ where
     }
 
     pub(crate) fn id(&self) -> &I {
-        &self.metadata.id()
+        self.metadata.id()
     }
 }
 
@@ -95,7 +95,7 @@ where
     fn drop(&mut self) {
         self.outgoing_edges.iter().for_each(|(_, n)| n.mark_as_gone());
         self.incoming_edges.iter().for_each(|(_, n)| n.mark_as_gone());
-        if let Some(ref events_tracker) = self.metadata.events_tracker() {
+        if let Some(events_tracker) = self.metadata.events_tracker() {
             events_tracker.record_removed(self.id().get_id().as_ref())
         }
     }

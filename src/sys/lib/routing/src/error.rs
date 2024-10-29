@@ -334,6 +334,9 @@ pub enum RoutingError {
 
     #[error("{type_name} router unexpectedly returned unavailable for target {moniker}")]
     RouteUnexpectedUnavailable { type_name: CapabilityTypeName, moniker: ExtendedMoniker },
+
+    #[error("{name} at {moniker} is missing porcelain type metadata.")]
+    MissingPorcelainType { name: Name, moniker: Moniker },
 }
 
 impl Explain for RoutingError {
@@ -388,7 +391,8 @@ impl Explain for RoutingError {
             RoutingError::PolicyError(err) => err.as_zx_status(),
             RoutingError::SourceCapabilityIsVoid { .. } => zx::Status::NOT_FOUND,
             RoutingError::RouteUnexpectedDebug { .. }
-            | RoutingError::RouteUnexpectedUnavailable { .. } => zx::Status::INTERNAL,
+            | RoutingError::RouteUnexpectedUnavailable { .. }
+            | RoutingError::MissingPorcelainType { .. } => zx::Status::INTERNAL,
         }
     }
 }
@@ -424,7 +428,8 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::UseFromParentNotFound { moniker, .. }
             | RoutingError::UseFromRootEnvironmentNotAllowed { moniker, .. }
             | RoutingError::RouteSourceShutdown { moniker }
-            | RoutingError::UseFromSelfNotFound { moniker, .. } => moniker.into(),
+            | RoutingError::UseFromSelfNotFound { moniker, .. }
+            | RoutingError::MissingPorcelainType { moniker, .. } => moniker.into(),
 
             RoutingError::BedrockMemberAccessUnsupported { moniker }
             | RoutingError::BedrockNotPresentInDictionary { moniker, .. }
@@ -437,7 +442,6 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::RouteUnexpectedUnavailable { moniker, .. }
             | RoutingError::UnsupportedCapabilityType { moniker, .. }
             | RoutingError::UnsupportedRouteSource { moniker, .. } => moniker,
-
             RoutingError::AvailabilityRoutingError(err) => err.into(),
             RoutingError::ComponentInstanceError(err) => err.into(),
             RoutingError::EventsRoutingError(err) => err.into(),

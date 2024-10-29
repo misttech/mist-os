@@ -34,8 +34,8 @@ TEST(PowerStateTest, Ctor) {
     ASSERT_FALSE(state.desired_active_power_level());
     ASSERT_FALSE(state.idle_power_level());
     ASSERT_FALSE(state.power_level());
-    ASSERT_FALSE(state.IsActive());
-    ASSERT_FALSE(state.IsIdle());
+    ASSERT_FALSE(state.is_active());
+    ASSERT_FALSE(state.is_idle());
   }
 
   {
@@ -47,8 +47,8 @@ TEST(PowerStateTest, Ctor) {
     ASSERT_EQ(state.power_level(), 2);
     ASSERT_EQ(state.desired_active_power_level(), 4);
     ASSERT_FALSE(state.idle_power_level());
-    ASSERT_TRUE(state.IsActive());
-    ASSERT_FALSE(state.IsIdle());
+    ASSERT_TRUE(state.is_active());
+    ASSERT_FALSE(state.is_idle());
   }
 
   {
@@ -60,8 +60,8 @@ TEST(PowerStateTest, Ctor) {
     ASSERT_EQ(state.idle_power_level(), 5);
     ASSERT_EQ(state.power_level(), 5);
     ASSERT_EQ(state.desired_active_power_level(), 4);
-    ASSERT_FALSE(state.IsActive());
-    ASSERT_TRUE(state.IsIdle());
+    ASSERT_FALSE(state.is_active());
+    ASSERT_TRUE(state.is_idle());
   }
 
   // Many states impacting a single omain.
@@ -181,7 +181,7 @@ TEST(PowerStateTest, UpdatePowerLevelToIdle) {
   auto domain = MakePowerDomainHelper(kModelId, energy_model, 1, 2, 3, 4, 5, 6);
   PowerState state(domain, std::nullopt, 2, 2);
 
-  ASSERT_TRUE(state.IsActive());
+  ASSERT_TRUE(state.is_active());
   size_t i = 0;
   auto& level = domain->model().levels()[i];
   ASSERT_TRUE(level.type() == power_management::PowerLevel::kIdle);
@@ -190,8 +190,8 @@ TEST(PowerStateTest, UpdatePowerLevelToIdle) {
   EXPECT_EQ(state.power_level(), i);
   EXPECT_EQ(state.idle_power_level(), i);
   EXPECT_EQ(state.desired_active_power_level(), 2);
-  EXPECT_TRUE(state.IsIdle());
-  EXPECT_FALSE(state.IsActive());
+  EXPECT_TRUE(state.is_idle());
+  EXPECT_FALSE(state.is_active());
 }
 
 TEST(PowerStateTest, UpdatePowerLevelToActive) {
@@ -199,7 +199,7 @@ TEST(PowerStateTest, UpdatePowerLevelToActive) {
   auto domain = MakePowerDomainHelper(kModelId, energy_model, 1, 2, 3, 4, 5, 6);
   PowerState state(domain, 0, 2, kTotalPowerLevels - 1);
 
-  ASSERT_TRUE(state.IsIdle());
+  ASSERT_TRUE(state.is_idle());
 
   size_t i = kTotalPowerLevels - 1;
   auto& level = domain->model().levels()[i];
@@ -212,8 +212,8 @@ TEST(PowerStateTest, UpdatePowerLevelToActive) {
   EXPECT_TRUE(state.idle_power_level());
   EXPECT_EQ(state.active_power_level(), i);
   EXPECT_EQ(state.desired_active_power_level(), kTotalPowerLevels - 1);
-  EXPECT_TRUE(state.IsIdle());
-  EXPECT_FALSE(state.IsActive());
+  EXPECT_TRUE(state.is_idle());
+  EXPECT_FALSE(state.is_active());
 
   // The CPU wakes up and transitions from idle.
   state.TransitionFromIdle();
@@ -223,8 +223,8 @@ TEST(PowerStateTest, UpdatePowerLevelToActive) {
   EXPECT_FALSE(state.idle_power_level());
   EXPECT_EQ(state.active_power_level(), i);
   EXPECT_EQ(state.desired_active_power_level(), i);
-  EXPECT_FALSE(state.IsIdle());
-  EXPECT_TRUE(state.IsActive());
+  EXPECT_FALSE(state.is_idle());
+  EXPECT_TRUE(state.is_active());
 }
 
 TEST(PowerStateTest, UpdateUtilizationReflectsOnDomain) {

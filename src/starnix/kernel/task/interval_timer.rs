@@ -7,14 +7,16 @@ use crate::task::{
     CurrentTask, GenericDuration, HrTimer, HrTimerHandle, TargetTime, ThreadGroup, Timeline,
     TimerId, TimerWakeup,
 };
+use crate::time::utc::estimate_boot_deadline_from_utc;
 use crate::vfs::timer::TimerOps;
-use fuchsia_async::MonotonicDuration;
+use assert_matches::assert_matches;
+
 use futures::stream::AbortHandle;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;
+use starnix_types::ownership::{TempRef, WeakRef};
+use starnix_types::time::{duration_from_timespec, timespec_from_duration};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::ownership::{TempRef, WeakRef};
-use starnix_uapi::time::{duration_from_timespec, timespec_from_duration};
 use starnix_uapi::{itimerspec, SI_TIMER};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -22,9 +24,9 @@ use std::sync::Arc;
 #[derive(Default)]
 pub struct TimerRemaining {
     /// Remaining time until the next expiration.
-    pub remainder: zx::MonotonicDuration,
+    pub remainder: zx::SyntheticDuration,
     /// Interval for periodic timer.
-    pub interval: zx::MonotonicDuration,
+    pub interval: zx::SyntheticDuration,
 }
 
 impl From<TimerRemaining> for itimerspec {
@@ -60,7 +62,7 @@ struct IntervalTimerMutableState {
     /// Time of the next expiration on the requested timeline.
     target_time: TargetTime,
     /// Interval for periodic timer.
-    interval: zx::MonotonicDuration,
+    interval: zx::SyntheticDuration,
     /// Number of timer expirations that have occurred since the last time a signal was sent.
     ///
     /// Timer expiration is not counted as overrun under `SignalEventNotify::None`.
@@ -128,17 +130,30 @@ impl IntervalTimer {
                 // relative to the monotonic clock is off. Drop the guard before blocking so
                 // that the target time can be updated.
                 let target_time = { self.state.lock().target_time };
-                let target_monotonic = target_time.estimate_monotonic();
-                let now = zx::MonotonicInstant::get();
-                if now >= target_monotonic {
-                    break now - target_monotonic;
+                let now = self.timeline.now();
+                if now >= target_time {
+                    break now
+                        .delta(&target_time)
+                        .expect("timer timeline and target time are comparable");
                 }
                 if let Some(hr_timer) = &self.hr_timer {
+                    assert_matches!(
+                        target_time,
+                        TargetTime::BootInstant(_) | TargetTime::RealTime(_),
+                        "monotonic times can't be alarm deadlines",
+                    );
                     if let Err(e) = hr_timer.start(system_task, None, target_time) {
                         log_error!("Failed to start the HrTimer to trigger wakeup: {e}");
                     }
                 }
-                fuchsia_async::Timer::new(target_monotonic).await;
+
+                match target_time {
+                    TargetTime::Monotonic(t) => fuchsia_async::Timer::new(t).await,
+                    TargetTime::BootInstant(t) => fuchsia_async::Timer::new(t).await,
+                    TargetTime::RealTime(t) => {
+                        fuchsia_async::Timer::new(estimate_boot_deadline_from_utc(t)).await
+                    }
+                }
             };
             if !self.state.lock().armed {
                 return;
@@ -149,7 +164,7 @@ impl IntervalTimer {
                 let mut guard = self.state.lock();
                 // If the `interval` is zero, the timer expires just once, at the time
                 // specified by `target_time`.
-                if guard.interval == zx::MonotonicDuration::ZERO {
+                if guard.interval == zx::SyntheticDuration::ZERO {
                     guard.overrun_cur = 1;
                 } else {
                     let exp =
@@ -199,7 +214,7 @@ impl IntervalTimer {
             // If the `interval` is zero, the timer expires just once, at the time
             // specified by `target_time`.
             let mut guard = self.state.lock();
-            if guard.interval != zx::MonotonicDuration::default() {
+            if guard.interval != zx::SyntheticDuration::default() {
                 guard.target_time = self.timeline.now() + GenericDuration::from(guard.interval);
             } else {
                 guard.disarm();
@@ -233,7 +248,7 @@ impl IntervalTimer {
         let interval = duration_from_timespec(new_value.it_interval)?;
 
         if let Some(hr_timer) = &self.hr_timer {
-            *hr_timer.is_interval.lock() = guard.interval != zx::MonotonicDuration::default();
+            *hr_timer.is_interval.lock() = guard.interval != zx::SyntheticDuration::default();
         }
 
         // Stop the current running task;
@@ -292,12 +307,8 @@ impl IntervalTimer {
 
         TimerRemaining {
             remainder: std::cmp::max(
-                MonotonicDuration::ZERO,
-                guard
-                    .target_time
-                    .delta(&self.timeline.now())
-                    .expect("timelines must match")
-                    .into_mono(),
+                zx::SyntheticDuration::ZERO,
+                *guard.target_time.delta(&self.timeline.now()).expect("timelines must match"),
             ),
             interval: guard.interval,
         }

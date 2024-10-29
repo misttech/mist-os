@@ -500,6 +500,38 @@ var handleSubtypes = map[fidlgen.HandleSubtype]string{
 	fidlgen.HandleSubtypeVmo:          "fidl::Vmo",
 }
 
+var handleSubtypesFdomain = map[fidlgen.HandleSubtype]string{
+	fidlgen.HandleSubtypeBti:          "fdomain_client::Bti",
+	fidlgen.HandleSubtypeChannel:      "fdomain_client::Channel",
+	fidlgen.HandleSubtypeClock:        "fdomain_client::Clock",
+	fidlgen.HandleSubtypeDebugLog:     "fdomain_client::DebugLog",
+	fidlgen.HandleSubtypeEvent:        "fdomain_client::Event",
+	fidlgen.HandleSubtypeEventpair:    "fdomain_client::EventPair",
+	fidlgen.HandleSubtypeException:    "fdomain_client::Exception",
+	fidlgen.HandleSubtypeFifo:         "fdomain_client::Fifo",
+	fidlgen.HandleSubtypeGuest:        "fdomain_client::Guest",
+	fidlgen.HandleSubtypeInterrupt:    "fdomain_client::Interrupt",
+	fidlgen.HandleSubtypeIommu:        "fdomain_client::Iommu",
+	fidlgen.HandleSubtypeJob:          "fdomain_client::Job",
+	fidlgen.HandleSubtypeMsi:          "fdomain_client::Msi",
+	fidlgen.HandleSubtypeNone:         "fdomain_client::Handle",
+	fidlgen.HandleSubtypePager:        "fdomain_client::Pager",
+	fidlgen.HandleSubtypePciDevice:    "fdomain_client::PciDevice",
+	fidlgen.HandleSubtypePmt:          "fdomain_client::Pmt",
+	fidlgen.HandleSubtypePort:         "fdomain_client::Port",
+	fidlgen.HandleSubtypeProcess:      "fdomain_client::Process",
+	fidlgen.HandleSubtypeProfile:      "fdomain_client::Profile",
+	fidlgen.HandleSubtypeResource:     "fdomain_client::Resource",
+	fidlgen.HandleSubtypeSocket:       "fdomain_client::Socket",
+	fidlgen.HandleSubtypeStream:       "fdomain_client::Stream",
+	fidlgen.HandleSubtypeSuspendToken: "fdomain_client::SuspendToken",
+	fidlgen.HandleSubtypeThread:       "fdomain_client::Thread",
+	fidlgen.HandleSubtypeTimer:        "fdomain_client::Timer",
+	fidlgen.HandleSubtypeVcpu:         "fdomain_client::Vcpu",
+	fidlgen.HandleSubtypeVmar:         "fdomain_client::Vmar",
+	fidlgen.HandleSubtypeVmo:          "fdomain_client::Vmo",
+}
+
 var objectTypeConsts = map[fidlgen.HandleSubtype]string{
 	fidlgen.HandleSubtypeBti:          "fidl::ObjectType::BTI",
 	fidlgen.HandleSubtypeChannel:      "fidl::ObjectType::CHANNEL",
@@ -533,10 +565,14 @@ var objectTypeConsts = map[fidlgen.HandleSubtype]string{
 }
 
 type compiler struct {
-	decls        fidlgen.DeclInfoMap
-	experiments  fidlgen.Experiments
-	library      fidlgen.LibraryIdentifier
-	externCrates map[string]struct{}
+	decls             fidlgen.DeclInfoMap
+	experiments       fidlgen.Experiments
+	library           fidlgen.LibraryIdentifier
+	externCrates      map[string]struct{}
+	cratePrefix       string
+	endpointNamespace string
+	handleSubtypes    *map[fidlgen.HandleSubtype]string
+	dialect           string
 	// Raw structs (including ExternalStructs), needed for
 	// flattening parameters and in computeUseFidlStructCopy.
 	structs map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
@@ -553,8 +589,9 @@ func (c *compiler) lookupDeclInfo(val fidlgen.EncodedCompoundIdentifier) fidlgen
 	panic(fmt.Sprintf("identifier not in decl map: %s", val))
 }
 
-func compileLibraryName(library fidlgen.LibraryIdentifier) string {
-	parts := []string{"fidl"}
+func (c *compiler) compileLibraryName(library fidlgen.LibraryIdentifier) string {
+	parts := []string{c.cratePrefix}
+
 	for _, part := range library {
 		parts = append(parts, string(part))
 	}
@@ -623,7 +660,7 @@ func (c *compiler) compileDeclIdentifier(val fidlgen.EncodedCompoundIdentifier) 
 	// compileCamelIdentifier already did. We should only call it once.
 	name = changeIfReserved(fidlgen.Identifier(name))
 	if c.inExternalLibrary(val) {
-		crate := compileLibraryName(ci.Library)
+		crate := c.compileLibraryName(ci.Library)
 		c.externCrates[crate] = struct{}{}
 		return fmt.Sprintf("%s::%s", crate, name)
 	}
@@ -768,8 +805,8 @@ func compilePrimitiveSubtype(val fidlgen.PrimitiveSubtype) string {
 	panic(fmt.Sprintf("unknown primitive type: %v", val))
 }
 
-func compileHandleSubtype(val fidlgen.HandleSubtype) string {
-	if t, ok := handleSubtypes[val]; ok {
+func (c *compiler) compileHandleSubtype(val fidlgen.HandleSubtype) string {
+	if t, ok := (*c.handleSubtypes)[val]; ok {
 		return t
 	}
 	panic(fmt.Sprintf("unknown handle type: %v", val))
@@ -856,7 +893,7 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 			t.Param = fmt.Sprintf("Option<%s>", t.Param)
 		}
 	case fidlgen.HandleType:
-		s := compileHandleSubtype(val.HandleSubtype)
+		s := c.compileHandleSubtype(val.HandleSubtype)
 		objType := compileObjectTypeConst(val.HandleSubtype)
 		t.FidlTemplate = fmt.Sprintf("fidl::encoding::HandleType<%s, { %s.into_raw() }, %d>", s, objType, val.HandleRights)
 		t.Owned = s
@@ -878,7 +915,7 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 		}
 		s := ""
 		if val.ProtocolTransport != "Driver" {
-			s = fmt.Sprintf("fidl::endpoints::%s<%sMarker>", role_type, c.compileDeclIdentifier(val.Protocol))
+			s = fmt.Sprintf("%s::%s<%sMarker>", c.endpointNamespace, role_type, c.compileDeclIdentifier(val.Protocol))
 			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
 		} else {
 			s = fmt.Sprintf("fidl_driver::endpoints::Driver%s<%sMarker>", role_type, c.compileDeclIdentifier(val.Protocol))
@@ -923,6 +960,22 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 				} else {
 					t.Param = fmt.Sprintf("Option<&%s>", name)
 				}
+			}
+		case fidlgen.ProtocolDeclType:
+			s := ""
+			if val.ProtocolTransport != "Driver" {
+				s = fmt.Sprintf("%s::ClientEnd<%sMarker>", c.endpointNamespace, name)
+				t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
+			} else {
+				s = fmt.Sprintf("fidl_driver::endpoints::DriverClientEnd<%sMarker>", name)
+				t.FidlTemplate = fmt.Sprintf("fidl_driver::encoding::DriverEndpoint<%sMarker>", name)
+			}
+			t.Owned = s
+			t.Param = s
+			if val.Nullable {
+				t.FidlTemplate = fmt.Sprintf("fidl::encoding::Optional<%s>", t.FidlTemplate)
+				t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
+				t.Param = fmt.Sprintf("Option<%s>", t.Param)
 			}
 		default:
 			panic(fmt.Sprintf("unexpected type: %v", declInfo.Type))
@@ -987,7 +1040,7 @@ func convertParamToEncodeExpr(v string, t Type) string {
 // from Result<(p.Params[0].Type, p.Params[1].Type, ...), _> to Result<T, _>
 // where p is payloadForType(t) and T implements fidl::encoding::Encode<p.FidlType>.
 // If len(p.Params) == 1 then the source type is Result<p.Params[0].Type, _>.
-func convertResultToEncodeExpr(v string, t Type, p Payload) string {
+func convertResultToEncodeExpr(v string, t Type, p Payload, dialect string) string {
 	switch t.DeclType {
 	case fidlgen.StructDeclType:
 		var names []string
@@ -1000,7 +1053,7 @@ func convertResultToEncodeExpr(v string, t Type, p Payload) string {
 				transform = true
 			}
 			if t.IsResourceType() {
-				expr = convertMutRefParamToEncodeExpr(param.Name, t)
+				expr = convertMutRefParamToEncodeExpr(param.Name, t, dialect)
 			} else {
 				expr = "*" + expr
 			}
@@ -1029,7 +1082,7 @@ func convertResultToEncodeExpr(v string, t Type, p Payload) string {
 //
 // TODO(https://fxbug.dev/42073194): Remove this once the transition to the new types is
 // complete. This is only needed for convertResultToEncodeExpr.
-func convertMutRefParamToEncodeExpr(v string, t Type) string {
+func convertMutRefParamToEncodeExpr(v string, t Type, dialect string) string {
 	switch t.Kind {
 	case fidlgen.IdentifierType:
 		switch t.DeclType {
@@ -1042,7 +1095,7 @@ func convertMutRefParamToEncodeExpr(v string, t Type) string {
 			}
 		}
 	}
-	return convertMutRefOwnedToEncodeExpr(v, t)
+	return convertMutRefOwnedToEncodeExpr(v, t, dialect)
 }
 
 // convertMutRefOwnedToEncodeExpr returns an expression that converts a variable
@@ -1050,15 +1103,15 @@ func convertMutRefParamToEncodeExpr(v string, t Type) string {
 //
 // TODO(https://fxbug.dev/42073194): Remove this once the transition to the new types is
 // complete. This is only needed for convertMutRefResultToEncodeExpr.
-func convertMutRefOwnedToEncodeExpr(v string, t Type) string {
+func convertMutRefOwnedToEncodeExpr(v string, t Type, dialect string) string {
 	switch t.Kind {
 	case fidlgen.PrimitiveType:
 		return "*" + v
 	case fidlgen.HandleType, fidlgen.EndpointType:
 		if t.Nullable {
-			return fmt.Sprintf("%s.as_mut().map(|x| std::mem::replace(x, fidl::Handle::invalid().into()))", v)
+			return fmt.Sprintf("%s.as_mut().map(|x| std::mem::replace(x, <<%s as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<%s>>::invalid().into()))", v, dialect, dialect)
 		}
-		return fmt.Sprintf("std::mem::replace(%s, fidl::Handle::invalid().into())", v)
+		return fmt.Sprintf("std::mem::replace(%s, <<%s as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<%s>>::invalid().into())", v, dialect, dialect)
 	case fidlgen.StringType:
 		if t.Nullable {
 			return v + ".as_deref()"
@@ -1346,7 +1399,7 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 			Type:      fmt.Sprintf("Result<%s, %s>", okParamType, errType.Param),
 			OwnedType: p.TupleType,
 		}}
-		p.EncodeExpr = convertResultToEncodeExpr(paramName, innerType, inner)
+		p.EncodeExpr = convertResultToEncodeExpr(paramName, innerType, inner, c.dialect)
 		p.ConvertToTuple = func(owned string) string {
 			return fmt.Sprintf("%s.map(|x| %s)", owned, inner.ConvertToTuple("x"))
 		}
@@ -1853,7 +1906,7 @@ func (dc *derivesCompiler) derivesForType(t Type) derives {
 	}
 }
 
-func Compile(r fidlgen.Root, includeDrivers bool) Root {
+func Compile(r fidlgen.Root, includeDrivers bool, fdomain bool) Root {
 	r = r.ForBindings("rust")
 	transports := []string{"Channel"}
 	if includeDrivers {
@@ -1861,16 +1914,32 @@ func Compile(r fidlgen.Root, includeDrivers bool) Root {
 	}
 	r = r.ForTransports(transports)
 
+	cratePrefix := "fidl"
+	endpointNamespace := "fidl::endpoints"
+	handleSubtypes := &handleSubtypes
+	dialect := "fidl::encoding::DefaultFuchsiaResourceDialect"
+
+	if fdomain {
+		cratePrefix = "fdomain"
+		endpointNamespace = "fdomain_client::fidl"
+		handleSubtypes = &handleSubtypesFdomain
+		dialect = "fdomain_client::fidl::FDomainResourceDialect"
+	}
+
 	root := Root{
 		Experiments: r.Experiments,
 	}
 	thisLibParsed := r.Name.Parse()
 	c := compiler{
-		decls:        r.DeclInfo(),
-		experiments:  r.Experiments,
-		library:      thisLibParsed,
-		externCrates: map[string]struct{}{},
-		structs:      map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
+		decls:             r.DeclInfo(),
+		experiments:       r.Experiments,
+		library:           thisLibParsed,
+		cratePrefix:       cratePrefix,
+		endpointNamespace: endpointNamespace,
+		dialect:           dialect,
+		handleSubtypes:    handleSubtypes,
+		externCrates:      map[string]struct{}{},
+		structs:           map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
 	}
 	for _, s := range r.Structs {
 		c.structs[s.Name] = s
@@ -1924,7 +1993,7 @@ func Compile(r fidlgen.Root, includeDrivers bool) Root {
 
 	c.fillDerives(&root)
 
-	thisLibCompiled := compileLibraryName(thisLibParsed)
+	thisLibCompiled := c.compileLibraryName(thisLibParsed)
 
 	// Sort the extern crates to make sure the generated file is
 	// consistent across builds.

@@ -215,7 +215,7 @@ fn sanitize_histogram_parameters<Key>(
     // empty Vec<usize> for indexes, and we will have verified that counts is empty too.
     let counts_len = match counts {
         FieldValue::Array(counts) => counts.len(),
-        FieldValue::StringList(counts) if counts.len() == 0 => 0,
+        FieldValue::StringList(counts) if counts.is_empty() => 0,
         _ => return Err(()),
     };
     if size < 3 {
@@ -231,7 +231,7 @@ fn sanitize_histogram_parameters<Key>(
             }
             Ok((None, size))
         }
-        Some(FieldValue::StringList(indexes)) if indexes.len() == 0 => {
+        Some(FieldValue::StringList(indexes)) if indexes.is_empty() => {
             if counts_len != 0 || dict_len != n_parameters {
                 return Err(());
             }
@@ -292,8 +292,8 @@ fn match_linear_histogram<Key>(
                 (counts_i64, value_as_i64(floor), value_as_i64(step))
             {
                 return Some(FieldValue::LinearIntHistogram(LinearHistogram {
-                    floor: floor,
-                    step: step,
+                    floor,
+                    step,
                     counts,
                     indexes,
                     size,
@@ -393,13 +393,10 @@ where
 {
     // Quick checks for efficiency - most maps won't be histograms.
     let dict_len = dict.len();
-    if dict_len < 4 || dict_len > 6 {
+    if !(4..=6).contains(&dict_len) {
         return None;
     }
-    let floor = dict.get(&Key::from_str("floor").ok().unwrap());
-    if floor.is_none() {
-        return None;
-    }
+    let floor = dict.get(&Key::from_str("floor").ok().unwrap())?;
     let step = dict.get(&Key::from_str("step").ok().unwrap());
     let initial_step = dict.get(&Key::from_str("initial_step").ok().unwrap());
     let step_multiplier = dict.get(&Key::from_str("step_multiplier").ok().unwrap());
@@ -407,27 +404,21 @@ where
     let indexes = dict.get(&Key::from_str("indexes").ok().unwrap());
     let size = dict.get(&Key::from_str("size").ok().unwrap());
     // Indexes may be None if the histogram isn't condensed.
-    match (floor, step, initial_step, step_multiplier, counts, indexes, size) {
-        (Some(floor), Some(step), None, None, Some(counts), indexes, Some(size)) => {
+    match (step, initial_step, step_multiplier, counts, indexes, size) {
+        (Some(step), None, None, Some(counts), indexes, Some(size)) => {
             match_linear_histogram(floor, step, counts, indexes, size, dict_len)
         }
-        (
-            Some(floor),
-            None,
-            Some(initial_step),
-            Some(step_multiplier),
-            Some(counts),
-            indexes,
-            Some(size),
-        ) => match_exponential_histogram(
-            floor,
-            initial_step,
-            step_multiplier,
-            counts,
-            indexes,
-            size,
-            dict_len,
-        ),
+        (None, Some(initial_step), Some(step_multiplier), Some(counts), indexes, Some(size)) => {
+            match_exponential_histogram(
+                floor,
+                initial_step,
+                step_multiplier,
+                counts,
+                indexes,
+                size,
+                dict_len,
+            )
+        }
         _ => None,
     }
 }
@@ -543,7 +534,7 @@ impl NumericValue {
     #[inline]
     fn as_i64(&self) -> Option<i64> {
         match self {
-            Self::Positive(x) if *x <= i64::max_value() as u64 => Some(*x as i64),
+            Self::Positive(x) if *x <= i64::MAX as u64 => Some(*x as i64),
             Self::Negative(x) => Some(*x),
             _ => None,
         }
@@ -594,7 +585,7 @@ macro_rules! parse_numeric_vec_impls {
     ($($type:ty),*) => {
         $(
             paste::paste! {
-                fn [<parse_ $type _vec>](vec: &Vec<NumericValue>) -> Option<Vec<$type>> {
+                fn [<parse_ $type _vec>](vec: &[NumericValue]) -> Option<Vec<$type>> {
                     vec.iter().map(|value| value.[<as_ $type>]()).collect::<Option<Vec<_>>>()
                 }
 

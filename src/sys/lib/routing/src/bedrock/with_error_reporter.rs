@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use router_error::RouterError;
-use sandbox::{Capability, Request, Routable, Router};
+use sandbox::{CapabilityBound, Request, Routable, Router, RouterResponse};
 
 use crate::error::{ErrorReporter, RouteRequestErrorInfo};
 
@@ -17,35 +17,35 @@ pub trait WithErrorReporter {
     ) -> Self;
 }
 
-impl WithErrorReporter for Router {
+struct RouterWithErrorReporter<T: CapabilityBound, R: ErrorReporter> {
+    router: Router<T>,
+    route_request: RouteRequestErrorInfo,
+    error_reporter: R,
+}
+
+#[async_trait]
+impl<T: CapabilityBound, R: ErrorReporter> Routable<T> for RouterWithErrorReporter<T, R> {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<RouterResponse<T>, RouterError> {
+        match self.router.route(request, debug).await {
+            Ok(res) => Ok(res),
+            Err(err) => {
+                self.error_reporter.report(&self.route_request, &err).await;
+                Err(err)
+            }
+        }
+    }
+}
+
+impl<T: CapabilityBound> WithErrorReporter for Router<T> {
     fn with_error_reporter(
         self,
         route_request: RouteRequestErrorInfo,
         error_reporter: impl ErrorReporter,
     ) -> Self {
-        struct RouterWithErrorReporter<R> {
-            router: Router,
-            route_request: RouteRequestErrorInfo,
-            error_reporter: R,
-        }
-
-        #[async_trait]
-        impl<R: ErrorReporter> Routable for RouterWithErrorReporter<R> {
-            async fn route(
-                &self,
-                request: Option<Request>,
-                debug: bool,
-            ) -> Result<Capability, RouterError> {
-                match self.router.route(request, debug).await {
-                    Ok(res) => Ok(res),
-                    Err(err) => {
-                        self.error_reporter.report(&self.route_request, &err).await;
-                        Err(err)
-                    }
-                }
-            }
-        }
-
         Self::new(RouterWithErrorReporter { router: self, route_request, error_reporter })
     }
 }

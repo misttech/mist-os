@@ -41,6 +41,7 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   //
 
   void Clone(CloneRequestView request, CloneCompleter::Sync& completer) final;
+  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) final;
   void Close(CloseCompleter::Sync& completer) final;
   void Query(QueryCompleter::Sync& completer) final;
   void GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) final;
@@ -54,10 +55,6 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
                      GetAttributesCompleter::Sync& completer) final;
   void UpdateAttributes(fuchsia_io::wire::MutableNodeAttributes* request,
                         UpdateAttributesCompleter::Sync& completer) final;
-  void Reopen(fuchsia_io::wire::NodeReopenRequest* request,
-              ReopenCompleter::Sync& completer) final {
-    request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
-  }
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
   void ListExtendedAttributes(ListExtendedAttributesRequestView request,
                               ListExtendedAttributesCompleter::Sync& completer) final {

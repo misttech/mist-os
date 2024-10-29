@@ -5,7 +5,6 @@
 use anyhow::{bail, format_err, Context as _, Error};
 use async_trait::async_trait;
 use fidl::endpoints::{create_proxy, create_request_stream};
-use fidl_fuchsia_wlan_common as wlan_common;
 use fidl_fuchsia_wlan_policy::{self as wlan_policy, NetworkConfig, SecurityType};
 use fuchsia_async::{MonotonicInstant, TimeoutExt as _};
 use fuchsia_component::client::connect_to_protocol;
@@ -139,7 +138,7 @@ impl WifiConnect for WifiConnectImpl {
         match client_controller.save_network(&network_config).await? {
             Ok(()) => {
                 let result = client_controller.connect(&network_id).await?;
-                if result == wlan_common::RequestStatus::Acknowledged {
+                if result == wlan_policy::RequestStatus::Acknowledged {
                     Ok(())
                 } else {
                     Err(format_err!("Unexpected return from connect: {:?}", result))
@@ -244,7 +243,7 @@ mod tests {
                     }
                     Connect { id, responder } => {
                         assert_eq!(id, network_id());
-                        responder.send(wlan_common::RequestStatus::Acknowledged).unwrap();
+                        responder.send(wlan_policy::RequestStatus::Acknowledged).unwrap();
 
                         proxy
                             .on_client_state_update(&wlan_policy::ClientStateSummary {
@@ -313,7 +312,7 @@ mod tests {
                     }
                     Connect { id, responder } => {
                         assert_eq!(id, network_id());
-                        responder.send(wlan_common::RequestStatus::Acknowledged).unwrap();
+                        responder.send(wlan_policy::RequestStatus::Acknowledged).unwrap();
 
                         proxy
                             .on_client_state_update(&wlan_policy::ClientStateSummary {

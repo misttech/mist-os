@@ -413,7 +413,7 @@ where
                 );
             }
             match first_match {
-                Some(child) => assertion.run(&child)?,
+                Some(child) => assertion.run(child)?,
                 None => bail!("node `{}` - no child named `{}`", self.path, assertion.name),
             }
         }
@@ -795,7 +795,7 @@ impl<T: MulAssign + AddAssign + PartialOrd + Add<Output = T> + Copy + Default + 
                 current_floor += step_size;
                 index += 1;
             }
-            index as usize
+            index
         };
         self.values[value_index] += T::one();
     }
@@ -813,7 +813,7 @@ impl<T: MulAssign + AddAssign + PartialOrd + Add<Output = T> + Copy + Default + 
                 offset *= step_multiplier;
                 index += 1;
             }
-            index as usize
+            index
         };
         self.values[value_index] += T::one();
     }

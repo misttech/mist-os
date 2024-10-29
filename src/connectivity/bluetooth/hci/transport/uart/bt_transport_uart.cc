@@ -1107,26 +1107,28 @@ void BtTransportUart::QueueUartRead() {
 zx_status_t BtTransportUart::ServeProtocols() {
   // Add HCI services to the outgoing directory.
   auto hci_protocol = [this](fidl::ServerEnd<fhbt::Hci> server_end) mutable {
+    hci_binding_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
     if (hci_transport_binding_) {
       FDF_LOG(ERROR,
               "Hci protocol connect when we have already started HciTransport. "
               "Only one type of transport should be used");
+      return;
     }
-    hci_binding_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
     queue_read_task_.Post(dispatcher_);
   };
   auto hci_transport_protocol = [this](fidl::ServerEnd<fhbt::HciTransport> server_end) mutable {
-    if (hci_binding_.size() != 0) {
-      FDF_LOG(ERROR,
-              "HciTransport protocol connect with Hci transport active. "
-              "Only one type of transport should be used.");
-    }
     hci_transport_binding_.emplace(dispatcher_, std::move(server_end), this,
                                    [this](fidl::UnbindInfo) {
                                      hci_transport_binding_.reset();
                                      FDF_LOG(INFO, "HciTransport server binding unbound.");
                                    });
     FDF_LOG(INFO, "HciTransport server binding emplaced.");
+    if (hci_binding_.size() != 0) {
+      FDF_LOG(ERROR,
+              "HciTransport protocol connect with Hci transport active. "
+              "Only one type of transport should be used.");
+      return;
+    }
     queue_read_task_.Post(dispatcher_);
   };
   auto snoop_protocol = [this](fidl::ServerEnd<fhbt::Snoop> server_end) mutable {

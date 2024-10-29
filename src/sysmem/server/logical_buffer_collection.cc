@@ -2760,8 +2760,9 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
           // needed; prefer to just remove the more-picky entry if that'll work fine for the
           // client).
           //
-          // This check also ensures that a (DO_NOT_CARE, FORMAT_MODIFIER_DO_NOT_CARE) is the only
-          // entry, since that's combine-able with any other format (including itself).
+          // This check also ensures that a (PixelFormat.DO_NOT_CARE,
+          // PixelFormatModifier.DO_NOT_CARE) is the only entry, since that's combine-able with any
+          // other format (including itself).
           //
           // This can also happen in case of (foo, do not care) and (do not care, bar), which is
           // fine to combine from separate participants (despite no single participant having nailed

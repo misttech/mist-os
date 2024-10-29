@@ -116,7 +116,7 @@ pub fn emit_struct<W: Write>(
                 slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
             ) -> Result<(), ::fidl_next::EncodeError> {{
                 if let Some(inner) = this {{
-                    ::fidl_next::EncoderExt::encode(encoder, inner)?;
+                    ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
                     ::fidl_next::WireBox::encode_present(slot);
                 }} else {{
                     ::fidl_next::WireBox::encode_absent(slot);

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.net/cpp/wire.h>
 #include <fidl/fuchsia.posix.socket/cpp/wire.h>
+#include <lib/zxio/cpp/udp_socket_private.h>
 #include <netinet/in.h>
 
 #include <span>
@@ -151,6 +152,10 @@ const uint32_t kTxUdpPreludeSize =
 const uint32_t kRxUdpPreludeSize =
     fidl::MaxSizeInChannel<fsocket::wire::RecvMsgMeta, fidl::MessageDirection::kSending>() +
     kMetadataSizeSegmentSize;
+
+// These constants need to be kept in sync with the client library in zxio.
+static_assert(kTxUdpPreludeSize == zxio::kTxUdpPreludeSize);
+static_assert(kRxUdpPreludeSize == zxio::kRxUdpPreludeSize);
 
 DeserializeSendMsgMetaResult deserialize_send_msg_meta(Buffer buf) {
   DeserializeSendMsgMetaResult res = {};

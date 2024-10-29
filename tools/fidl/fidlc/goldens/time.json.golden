@@ -17,7 +17,16 @@
       "name": "zx",
       "declarations": {
         "zx/Rights": {
-          "kind": "bits"
+          "kind": "bits",
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "zx/CHANNEL_MAX_MSG_BYTES": {
           "kind": "const"
@@ -53,7 +62,16 @@
           "kind": "const"
         },
         "zx/ObjType": {
-          "kind": "enum"
+          "kind": "enum",
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "zx/Handle": {
           "kind": "experimental_resource"

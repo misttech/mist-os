@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 mod attributes;
-mod clone_reopen;
+mod clone;
 mod describe;
 mod directory;
 mod file;

@@ -15,11 +15,11 @@ use crate::{clock, event, service};
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
 use futures::StreamExt;
-use std::sync::Arc;
+use std::rc::Rc;
 
 fn default_audio_info() -> AudioInfo {
     let config_logger =
-        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+        Rc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
     let mut audio_configuration = build_audio_default_settings(config_logger);
     audio_configuration
         .load_default_value()
@@ -28,7 +28,7 @@ fn default_audio_info() -> AudioInfo {
 }
 
 // Returns a registry populated with the AudioCore service.
-async fn create_service() -> Arc<Mutex<ServiceRegistry>> {
+async fn create_service() -> Rc<Mutex<ServiceRegistry>> {
     let service_registry = ServiceRegistry::create();
     let audio_core_service_handle = audio_core_service::Builder::new(default_audio_info())
         .set_suppress_client_errors(true)
@@ -107,7 +107,7 @@ async fn test_detect_early_exit() {
         0.into(),
         &audio_proxy,
         create_default_audio_stream(AudioStreamType::Media),
-        Some(Arc::new(move || {
+        Some(Rc::new(move || {
             tx.unbounded_send(()).unwrap();
         })),
         None,

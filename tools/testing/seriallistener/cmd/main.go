@@ -127,7 +127,7 @@ func main() {
 		}
 	}
 	deviceType := os.Getenv(constants.DeviceTypeEnvKey)
-	if deviceType != "QEMU" && deviceType != "AEMU" {
+	if deviceType != "QEMU" && deviceType != "AEMU" && deviceType != "crosvm" {
 		stdout = os.Stdout
 	}
 

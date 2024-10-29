@@ -137,30 +137,41 @@ def main():
                 Source(os.path.join(name, source), p, args.output)
             )
         if not name.endswith("/..."):
-            go_sources = {f for f in args.sources if f.endswith(".go")}
+            # Get the common subdirectory of all sources, which is necessary to
+            # determine the Go package name for these sources.
+            dirs = set(
+                os.path.dirname(src)
+                for src in args.sources
+                if src.endswith(".go")
+            )
+            if len(dirs) > 1:
+                raise ValueError(
+                    f"Sources are from multiple directories {dirs}, "
+                    f"this is not supported by go_library"
+                )
+            subdir = list(dirs)[0]
+            name = os.path.join(name, subdir)
+            source_dir = os.path.join(args.source_dir, subdir)
 
-            # Go sources are constrained to live top-level under `source_dir`;
-            # others (e.g., template files) are free to live further down.
-            for s in go_sources:
-                if os.path.dirname(s):
-                    raise ValueError(
-                        f'Source "{s}" for "{name}" comes from a subdirectory.'
-                        f" Specify source_dir instead."
-                    )
+            go_sources = {
+                os.path.basename(f) for f in args.sources if f.endswith(".go")
+            }
 
             # Require all non-generated Go files to be listed as sources.
-            if not os.path.abspath(args.source_dir).startswith(build_dir):
-                # TODO: Use `glob.glob("*.go", root_dir=args.source_dir)`
+            if not os.path.abspath(source_dir).startswith(build_dir):
+                # TODO: Use `glob.glob("*.go", root_dir=source_dir)`
                 # instead of os.listdir after upgrading to Python 3.10.
                 go_files = {
-                    f for f in os.listdir(args.source_dir) if f.endswith(".go")
+                    f
+                    for f in os.listdir(source_dir)
+                    if f.endswith(".go") and not f.endswith("_test.go")
                 }
                 missing = go_files - go_sources
                 if missing:
                     raise ValueError(
-                        f"go_library requires that all Go files in source_dir"
-                        f" be listed as sources, but the following files are"
-                        f" missing from sources for target {name}:"
+                        f"go_library requires that all non-test Go files in "
+                        f"source_dir be listed as sources, but the following "
+                        f"files are missing from sources for target {name}:"
                         f' {", ".join(sorted(missing))}'
                     )
     elif args.allow_globbing:

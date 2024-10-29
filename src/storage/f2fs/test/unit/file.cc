@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <span>
 #include <unordered_set>
 
 #include <gtest/gtest.h>
@@ -14,13 +15,7 @@
 namespace f2fs {
 namespace {
 
-class FileTest : public F2fsFakeDevTestFixture {
- public:
-  FileTest()
-      : F2fsFakeDevTestFixture(TestOptions{
-            .block_count = uint64_t{8} * 1024 * 1024 * 1024 / kDefaultSectorSize,
-        }) {}
-};
+using FileTest = F2fsFakeDevTestFixture;
 
 TEST_F(FileTest, BlkAddrLevel) {
   srand(testing::UnitTest::GetInstance()->random_seed());
@@ -488,43 +483,75 @@ TEST_F(FileTest, MixedSizeWriteUnaligned) {
   test_file_vn = nullptr;
 }
 
-TEST(FileTest2, FailedNidReuse) {
-  std::unique_ptr<BcacheMapper> bc;
-  constexpr uint64_t kBlockCount = 409600;
-  FileTester::MkfsOnFakeDevWithOptions(&bc, MkfsOptions(), kBlockCount);
-
-  std::unique_ptr<F2fs> fs;
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  FileTester::MountWithOptions(loop.dispatcher(), MountOptions{}, &bc, &fs);
-
-  fbl::RefPtr<VnodeF2fs> root;
-  FileTester::CreateRoot(fs.get(), &root);
-  fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
-
-  uint32_t iter = 0;
+TEST_F(FileTest, OutOfSpace) {
+  std::vector<fbl::RefPtr<VnodeF2fs>> vnodes;
+  SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
+  zx::result vnode_or = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(vnode_or.is_ok());
+  fbl::RefPtr<File> file = fbl::RefPtr<File>::Downcast(*std::move(vnode_or));
+  size_t num_blocks = 0;
+  uint8_t buf[Page::Size()] = {1};
+  size_t out;
+  // Fill data until it meets ZX_ERR_NO_SPACE
   while (true) {
-    zx::result tmp_child = root_dir->Create(std::to_string(++iter), fs::CreationType::kFile);
-    if (tmp_child.is_error()) {
-      ASSERT_EQ(tmp_child.error_value(), ZX_ERR_NO_SPACE) << tmp_child.status_string();
-      break;
+    size_t before = file->GetBlocks();
+    zx_status_t ret =
+        FileTester::Write(file.get(), buf, sizeof(buf), num_blocks * sizeof(buf), &out);
+    size_t after = file->GetBlocks();
+    if (ret == ZX_OK) {
+      ASSERT_GT(after, before);
+      ++num_blocks;
+      continue;
     }
-    ASSERT_EQ(tmp_child->Close(), ZX_OK);
+    ASSERT_EQ(before, after);
+    ASSERT_EQ(ret, ZX_ERR_NO_SPACE);
+    break;
   }
-
-  const size_t kIteration = fs->GetNodeManager().GetFreeNidCount() + 1;
-  for (size_t i = 0; i < kIteration; ++i) {
-    zx::result tmp_child = root_dir->Create(std::to_string(++iter), fs::CreationType::kFile);
-    ASSERT_EQ(tmp_child.status_value(), ZX_ERR_NO_SPACE) << tmp_child.status_string();
+  {
+    // The last page we tried shuold be truncated
+    fbl::RefPtr<Page> page;
+    ASSERT_EQ(file->FindPage(num_blocks, &page), ZX_ERR_NOT_FOUND);
+    zx::result addr_or = file->GetDataBlockAddresses(num_blocks, 1, true);
+    ASSERT_TRUE(addr_or.is_ok());
+    ASSERT_EQ(addr_or->front(), kNullAddr);
   }
+  size_t size = file->GetSize();
+  ASSERT_TRUE(size / kBlockSize > kDefaultBlocksPerSegment);
+  vnodes.push_back(file);
+  // Secure free blocks as many as a segment
+  file->Truncate(size - kDefaultBlocksPerSegment * kBlockSize);
+  // Create new files to consume blocks until it meets ZX_ERR_NO_SPACE
+  while (true) {
+    size_t inodes_before = superblock_info.GetValidInodeCount();
+    size_t nodes_before = superblock_info.GetValidNodeCount();
+    size_t nids_before = fs_->GetNodeManager().GetFreeNidCount();
+    zx::result child_or = root_dir_->Create(std::to_string(--num_blocks), fs::CreationType::kFile);
+    size_t inodes_after = superblock_info.GetValidInodeCount();
+    size_t nodes_after = superblock_info.GetValidNodeCount();
+    size_t nids_after = fs_->GetNodeManager().GetFreeNidCount();
+    if (child_or.is_ok()) {
+      ASSERT_GT(inodes_after, inodes_before);
+      ASSERT_GT(nodes_after, nodes_before);
+      ASSERT_GT(nids_before, nids_after);
+      child_or->Close();
+      vnodes.push_back(fbl::RefPtr<VnodeF2fs>::Downcast(*child_or));
+      continue;
+    }
+    ASSERT_EQ(inodes_before, inodes_after);
+    ASSERT_EQ(nodes_before, nodes_after);
+    ASSERT_EQ(nids_before, nids_after);
+    ASSERT_EQ(child_or.error_value(), ZX_ERR_NO_SPACE);
 
-  for (size_t i = 0; i < kIteration; ++i) {
-    zx::result tmp_child = root_dir->Create(std::to_string(++iter), fs::CreationType::kDirectory);
-    ASSERT_EQ(tmp_child.status_value(), ZX_ERR_NO_SPACE) << tmp_child.status_string();
+    zx::result dir_or =
+        root_dir_->Create(std::to_string(--num_blocks), fs::CreationType::kDirectory);
+    inodes_after = superblock_info.GetValidInodeCount();
+    nodes_after = superblock_info.GetValidNodeCount();
+    nids_after = fs_->GetNodeManager().GetFreeNidCount();
+    ASSERT_EQ(dir_or.status_value(), ZX_ERR_NO_SPACE);
+    break;
   }
-
-  root_dir->Close();
-  root_dir = nullptr;
-  FileTester::Unmount(std::move(fs), &bc);
+  file->Close();
+  FileTester::DeleteChildren(vnodes, root_dir_, vnodes.size());
 }
 
 TEST_F(FileTest, BasicXattrSetGet) {
@@ -591,8 +618,8 @@ TEST_F(FileTest, BasicXattrSetGet) {
   ASSERT_EQ(std::memcmp(buf.data(), value.data(), value.size()), 0);
 
   // Remove xattr, then get xattr is failed
-  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name,
-                                                cpp20::span<const uint8_t>(), XattrOption::kNone),
+  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, std::span<const uint8_t>(),
+                                                XattrOption::kNone),
             ZX_OK);
   result = test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, name, buf);
   ASSERT_TRUE(result.is_error());
@@ -651,7 +678,7 @@ TEST_F(FileTest, XattrFill) {
   // Remove half of xattrs
   for (uint32_t i = 0; i < xattrs.size(); i += 2) {
     ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, xattrs[i].first,
-                                                  cpp20::span<const uint8_t>(), XattrOption::kNone),
+                                                  std::span<const uint8_t>(), XattrOption::kNone),
               ZX_OK);
   }
 

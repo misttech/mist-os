@@ -14,6 +14,13 @@ pub struct Owned<'buf, T: ?Sized> {
     _phantom: PhantomData<&'buf mut [u8]>,
 }
 
+// SAFETY: `Owned` doesn't add any restrictions on sending across thread boundaries, and so is
+// `Send` if `T` is `Send`.
+unsafe impl<T: Send + ?Sized> Send for Owned<'_, T> {}
+
+// SAFETY: `Owned` doesn't add any interior mutability, so it is `Sync` if `T` is `Sync`.
+unsafe impl<T: Sync + ?Sized> Sync for Owned<'_, T> {}
+
 impl<T: ?Sized> Drop for Owned<'_, T> {
     fn drop(&mut self) {
         unsafe {

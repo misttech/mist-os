@@ -161,7 +161,7 @@ impl AccessPoint {
                         Ok(config) => config,
                         Err(e) => {
                             info!("StartAccessPoint could not derive AP config: {}", e);
-                            responder.send(fidl_common::RequestStatus::RejectedNotSupported)?;
+                            responder.send(fidl_policy::RequestStatus::RejectedNotSupported)?;
                             continue;
                         }
                     };
@@ -171,7 +171,7 @@ impl AccessPoint {
                         Ok(receiver) => receiver,
                         Err(e) => {
                             info!("failed to start AP: {}", e);
-                            responder.send(fidl_common::RequestStatus::RejectedIncompatibleMode)?;
+                            responder.send(fidl_policy::RequestStatus::RejectedIncompatibleMode)?;
                             continue;
                         }
                     };
@@ -186,7 +186,7 @@ impl AccessPoint {
                     if let Err(e) = internal_msg_sink.send(fut.boxed()).await {
                         error!("Failed to send internal message: {:?}", e)
                     }
-                    responder.send(fidl_common::RequestStatus::Acknowledged)?;
+                    responder.send(fidl_policy::RequestStatus::Acknowledged)?;
                 }
                 fidl_policy::AccessPointControllerRequest::StopAccessPoint {
                     config,
@@ -196,7 +196,7 @@ impl AccessPoint {
                         Some(id) => types::Ssid::from_bytes_unchecked(id.ssid),
                         None => {
                             warn!("received disconnect request with no SSID specified");
-                            responder.send(fidl_common::RequestStatus::RejectedNotSupported)?;
+                            responder.send(fidl_policy::RequestStatus::RejectedNotSupported)?;
                             continue;
                         }
                     };
@@ -208,7 +208,7 @@ impl AccessPoint {
                         Some(_) => vec![],
                         None => {
                             warn!("received disconnect request with no credential specified");
-                            responder.send(fidl_common::RequestStatus::RejectedNotSupported)?;
+                            responder.send(fidl_policy::RequestStatus::RejectedNotSupported)?;
                             continue;
                         }
                     };
@@ -216,11 +216,11 @@ impl AccessPoint {
                     let mut iface_manager = self.iface_manager.lock().await;
                     match iface_manager.stop_ap(ssid, credential).await {
                         Ok(()) => {
-                            responder.send(fidl_common::RequestStatus::Acknowledged)?;
+                            responder.send(fidl_policy::RequestStatus::Acknowledged)?;
                         }
                         Err(e) => {
                             error!("failed to stop AP: {}", e);
-                            responder.send(fidl_common::RequestStatus::RejectedIncompatibleMode)?;
+                            responder.send(fidl_policy::RequestStatus::RejectedIncompatibleMode)?;
                         }
                     }
                 }
@@ -534,7 +534,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut start_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -585,7 +585,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut start_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -630,7 +630,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut start_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::RejectedNotSupported))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::RejectedNotSupported))
         );
     }
 
@@ -668,7 +668,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut stop_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 
@@ -717,7 +717,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut stop_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::RejectedIncompatibleMode))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::RejectedIncompatibleMode))
         );
     }
 
@@ -878,7 +878,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut second_serve_fut), Poll::Pending);
         assert_variant!(
             exec.run_until_stalled(&mut start_fut),
-            Poll::Ready(Ok(fidl_common::RequestStatus::Acknowledged))
+            Poll::Ready(Ok(fidl_policy::RequestStatus::Acknowledged))
         );
     }
 }

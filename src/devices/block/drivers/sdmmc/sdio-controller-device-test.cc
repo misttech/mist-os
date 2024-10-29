@@ -1920,6 +1920,65 @@ TEST_F(SdioControllerDeviceTest, PerformTuning) {
   driver_test().runtime().RunUntilIdle();
 }
 
+TEST_F(SdioControllerDeviceTest, IoReady) {
+  sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
+    out_response[0] = OpCondFunctions(5) | SDIO_SEND_OP_COND_RESP_S18A;
+  });
+  sdmmc_.set_host_info({
+      .caps = SDMMC_HOST_CAP_VOLTAGE_330,
+      .max_transfer_size = 0x1000,
+  });
+
+  ASSERT_OK(StartDriver());
+
+  fidl::WireClient function1 = ConnectDeviceClient(1);
+  ASSERT_TRUE(function1.is_valid());
+
+  fidl::WireClient function2 = ConnectDeviceClient(2);
+  ASSERT_TRUE(function2.is_valid());
+
+  fidl::WireClient function5 = ConnectDeviceClient(5);
+  ASSERT_TRUE(function5.is_valid());
+
+  sdmmc_.Write(0x0003, std::vector<uint8_t>{0b0010'0100}, 0);
+
+  function2->IoReady().ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_TRUE(result->value()->ready);
+  });
+
+  function5->IoReady().ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_TRUE(result->value()->ready);
+  });
+
+  function1->IoReady().ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_FALSE(result->value()->ready);
+  });
+
+  driver_test().runtime().RunUntilIdle();
+
+  sdmmc_.Write(0x0003, std::vector<uint8_t>{0b0000'0010}, 0);
+
+  function5->IoReady().ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_FALSE(result->value()->ready);
+  });
+
+  function1->IoReady().ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_TRUE(result->value()->ready);
+  });
+
+  driver_test().runtime().RunUntilIdle();
+}
+
 }  // namespace sdmmc
 
 FUCHSIA_DRIVER_EXPORT(sdmmc::TestSdmmcRootDevice);

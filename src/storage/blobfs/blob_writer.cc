@@ -6,7 +6,6 @@
 
 #include <lib/fit/defer.h>
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
@@ -25,6 +24,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <span>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -482,7 +482,7 @@ zx::result<> Blob::Writer::Commit(Blob& blob) {
   if (compress) {
     // The data comes from the compressor's buffer.
     data_ptr = &data.emplace<SimpleBlobDataProducer>(
-        cpp20::span(static_cast<const uint8_t*>(compressor_->Data()), compressor_->Size()));
+        std::span(static_cast<const uint8_t*>(compressor_->Data()), compressor_->Size()));
   } else if (compressor_) {
     // Compression didn't save space, so the data must be decompressed from the compressor's buffer.
     zx::result producer_or =
@@ -494,14 +494,14 @@ zx::result<> Blob::Writer::Commit(Blob& blob) {
   } else if (!decompressed_data_.empty()) {
     // We decompressed the data in the write buffer as it would not save any on-disk storage space.
     data_ptr = &data.emplace<SimpleBlobDataProducer>(
-        cpp20::span(decompressed_data_.data(), decompressed_data_.size()));
+        std::span(decompressed_data_.data(), decompressed_data_.size()));
   } else {
     // The data comes from the write buffer.
     data_ptr = &data.emplace<SimpleBlobDataProducer>(
-        cpp20::span(payload() + payload_persisted_, payload_length() - payload_persisted_));
+        std::span(payload() + payload_persisted_, payload_length() - payload_persisted_));
   }
 
-  SimpleBlobDataProducer merkle(cpp20::span(merkle_tree(), merkle_size));
+  SimpleBlobDataProducer merkle(std::span(merkle_tree(), merkle_size));
 
   MergeBlobDataProducer producer = [&, &blob_layout = *blob_layout_]() {
     switch (blob_layout.Format()) {
@@ -841,7 +841,7 @@ zx::result<> Blob::Writer::InitializeDecompressor() {
   zx::result streaming_decompressor = StreamingChunkedDecompressor::Create(
       connector, seek_table_,
       [this, write_uncompressed,
-       last_offset = size_t{0}](cpp20::span<const uint8_t> data) mutable -> zx::result<> {
+       last_offset = size_t{0}](std::span<const uint8_t> data) mutable -> zx::result<> {
         if (zx_status_t status = merkle_tree_creator_.Append(data.data(), data.size());
             status != ZX_OK) {
           FX_LOGS(ERROR) << "MerkleTreeCreator::Append failed: " << zx_status_get_string(status);
@@ -863,7 +863,7 @@ zx::result<> Blob::Writer::InitializeDecompressor() {
 }
 
 zx::result<> Blob::Writer::ParseDeliveryBlob() {
-  cpp20::span<const uint8_t> data = {static_cast<const uint8_t*>(buffer_.start()), total_written_};
+  std::span<const uint8_t> data = {static_cast<const uint8_t*>(buffer_.start()), total_written_};
   // Try to decode the header.
   zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(data);
   if (header.is_error()) {

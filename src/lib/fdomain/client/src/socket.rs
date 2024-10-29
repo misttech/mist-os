@@ -39,8 +39,8 @@ impl Socket {
     pub fn read(&self, max_bytes: usize) -> impl Future<Output = Result<Vec<u8>, Error>> {
         let client = self.0.client();
         let handle = self.0.proto();
-        async move {
-            client?
+        let result = client.map(|client| {
+            client
                 .transaction(
                     ordinals::READ_SOCKET,
                     proto::SocketReadSocketRequest {
@@ -50,8 +50,8 @@ impl Socket {
                     Responder::ReadSocket,
                 )
                 .map(|f| f.map(|x| x.data))
-                .await
-        }
+        });
+        async move { result?.await }
     }
 
     /// Write all of the given data to the socket.
@@ -61,16 +61,16 @@ impl Socket {
         let hid = self.0.proto();
 
         let client = self.0.client();
-        async move {
-            client?
+        let result = client.map(|client| {
+            client
                 .transaction(
                     ordinals::WRITE_SOCKET,
                     proto::SocketWriteSocketRequest { handle: hid, data },
                     move |x| Responder::WriteSocket(x, hid),
                 )
                 .map(move |x| x.map(|y| assert!(y.wrote as usize == len)))
-                .await
-        }
+        });
+        async move { result?.await }
     }
 
     /// Set the disposition of this socket and/or its peer.
@@ -86,19 +86,14 @@ impl Socket {
             .unwrap_or(proto::SocketDisposition::NoChange);
         let client = self.0.client();
         let handle = self.0.proto();
-        async move {
-            client?
-                .transaction(
-                    ordinals::SET_SOCKET_DISPOSITION,
-                    proto::SocketSetSocketDispositionRequest {
-                        handle,
-                        disposition,
-                        disposition_peer,
-                    },
-                    Responder::SetSocketDisposition,
-                )
-                .await
-        }
+        let result = client.map(|client| {
+            client.transaction(
+                ordinals::SET_SOCKET_DISPOSITION,
+                proto::SocketSetSocketDispositionRequest { handle, disposition, disposition_peer },
+                Responder::SetSocketDisposition,
+            )
+        });
+        async move { result?.await }
     }
 
     /// Split this socket into a streaming reader and a writer. This is more

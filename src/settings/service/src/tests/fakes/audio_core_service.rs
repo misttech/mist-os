@@ -14,7 +14,7 @@ use futures::channel::oneshot;
 use futures::lock::Mutex;
 use futures::{FutureExt, TryStreamExt};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub(crate) struct Builder {
     suppress_client_errors: bool,
@@ -34,8 +34,8 @@ impl Builder {
         self
     }
 
-    pub(crate) fn build(self) -> Arc<Mutex<AudioCoreService>> {
-        Arc::new(Mutex::new(AudioCoreService::new(
+    pub(crate) fn build(self) -> Rc<Mutex<AudioCoreService>> {
+        Rc::new(Mutex::new(AudioCoreService::new(
             self.suppress_client_errors,
             self.default_settings,
         )))
@@ -45,7 +45,7 @@ impl Builder {
 /// usages.
 pub(crate) struct AudioCoreService {
     suppress_client_errors: bool,
-    audio_streams: Arc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
+    audio_streams: Rc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
     exit_tx: Option<oneshot::Sender<()>>,
 }
 
@@ -58,11 +58,7 @@ impl AudioCoreService {
                 (stream.user_volume_level, stream.user_volume_muted),
             );
         }
-        Self {
-            audio_streams: Arc::new(RwLock::new(streams)),
-            suppress_client_errors,
-            exit_tx: None,
-        }
+        Self { audio_streams: Rc::new(RwLock::new(streams)), suppress_client_errors, exit_tx: None }
     }
 
     pub(crate) fn get_level_and_mute(&self, usage: AudioRenderUsage) -> Option<(f32, bool)> {
@@ -96,7 +92,7 @@ impl Service for AudioCoreService {
 
         let streams_clone = self.audio_streams.clone();
         let suppress_client_errors = self.suppress_client_errors;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let fused_exit = rx.fuse();
             futures::pin_mut!(fused_exit);
 
@@ -146,11 +142,11 @@ fn get_level_and_mute(
 fn process_volume_control_stream(
     volume_control: ServerEnd<fidl_fuchsia_media_audio::VolumeControlMarker>,
     render_usage: AudioRenderUsage,
-    streams: Arc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
+    streams: Rc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
     suppress_client_errors: bool,
 ) {
     let mut stream = volume_control.into_stream().expect("volume control stream error");
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         while let Some(req) = stream.try_next().await.unwrap() {
             #[allow(unreachable_patterns)]
             match req {

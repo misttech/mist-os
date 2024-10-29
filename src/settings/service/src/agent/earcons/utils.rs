@@ -10,7 +10,7 @@ use fidl_fuchsia_media::AudioRenderUsage;
 use fidl_fuchsia_media_sounds::{PlayerMarker, PlayerProxy};
 use futures::lock::Mutex;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::rc::Rc;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Creates a file-based sound from a resource file.
@@ -28,8 +28,8 @@ fn resource_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarke
 /// Will not do anything if the sound player connection is already established.
 pub(super) async fn connect_to_sound_player(
     publisher: Publisher,
-    service_context_handle: Arc<ServiceContext>,
-    sound_player_connection: Arc<Mutex<Option<ExternalServiceProxy<PlayerProxy>>>>,
+    service_context_handle: Rc<ServiceContext>,
+    sound_player_connection: Rc<Mutex<Option<ExternalServiceProxy<PlayerProxy>>>>,
 ) {
     let mut sound_player_connection_lock = sound_player_connection.lock().await;
     if sound_player_connection_lock.is_none() {
@@ -50,7 +50,7 @@ pub(super) async fn play_sound<'a>(
     sound_player_proxy: &ExternalServiceProxy<PlayerProxy>,
     file_name: &'a str,
     id: u32,
-    added_files: Arc<Mutex<HashSet<&'a str>>>,
+    added_files: Rc<Mutex<HashSet<&'a str>>>,
 ) -> Result<(), Error> {
     // New sound, add it to the sound player set.
     if added_files.lock().await.insert(file_name) {
@@ -71,7 +71,7 @@ pub(super) async fn play_sound<'a>(
     let sound_player_proxy = sound_player_proxy.clone();
     // This fasync thread is needed so that the earcons sounds can play rapidly and not wait
     // for the previous sound to finish to send another request.
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         if let Err(e) =
             call_async!(sound_player_proxy => play_sound(id, AudioRenderUsage::Background)).await
         {

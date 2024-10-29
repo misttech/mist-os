@@ -125,10 +125,10 @@ fn verify_output(output: Output, status_code: i32, expected_text: StringMatch) {
     let stdout = std::str::from_utf8(&output.stdout).expect("Non-UTF8 return from command");
     match expected_text {
         StringMatch::Contains(s) => {
-            assert_eq!(stdout.contains(s), true, "{} does not contain: {}", stdout, s)
+            assert!(stdout.contains(s), "{} does not contain: {}", stdout, s)
         }
         StringMatch::DoesNotContain(s) => {
-            assert_eq!(stdout.contains(s), false, "{} should not contain: {}", stdout, s)
+            assert!(!stdout.contains(s), "{} should not contain: {}", stdout, s)
         }
     };
 }

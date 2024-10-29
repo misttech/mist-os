@@ -9,6 +9,7 @@ fidl("fuchsia.archivist.test") {
   sources = [
     "puppet.test.fidl",
     "realm_factory.test.fidl",
+    "stop_watcher.test.fidl",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.component",

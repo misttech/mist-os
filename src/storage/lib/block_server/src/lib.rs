@@ -8,6 +8,7 @@ use futures::{Future, FutureExt as _, TryStreamExt as _};
 use std::borrow::Cow;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::ops::Range;
 use std::sync::{Arc, Mutex};
 use zx::HandleBased;
 use {
@@ -21,10 +22,10 @@ pub mod c_interface;
 /// Information associated with the block device.
 #[derive(Clone)]
 pub struct PartitionInfo {
-    /// If `block_count` is zero, the server will use the `get_volume_info` method to get the count
-    /// of assigned slices and use that (along with the slice and block sizes) to determine the
-    /// block count.
-    pub block_count: u64,
+    /// If `block_range` is None, the partition is a volume and may not be contiguous.
+    /// In this case, the server will use the `get_volume_info` method to get the count of assigned
+    /// slices and use that (along with the slice and block sizes) to determine the block count.
+    pub block_range: Option<Range<u64>>,
     pub type_guid: [u8; 16],
     pub instance_guid: [u8; 16],
     pub name: Option<String>,
@@ -183,12 +184,12 @@ impl<SM: SessionManager> BlockServer<SM> {
         match request {
             fvolume::VolumeRequest::GetInfo { responder } => match self.partition_info().await {
                 Ok(info) => {
-                    let block_count = if info.block_count == 0 {
+                    let block_count = if let Some(range) = info.block_range.as_ref() {
+                        range.end - range.start
+                    } else {
                         let volume_info = self.session_manager.get_volume_info().await?;
                         volume_info.0.slice_size * volume_info.1.partition_slice_count
                             / self.block_size as u64
-                    } else {
-                        info.block_count
                     };
                     responder.send(Ok(&fblock::BlockInfo {
                         block_count,
@@ -249,10 +250,31 @@ impl<SM: SessionManager> BlockServer<SM> {
                     responder.send(status.into_raw(), None)?;
                 }
             },
-            fvolume::VolumeRequest::GetFlags { responder } => match self.partition_info().await {
-                Ok(info) => responder.send(Ok(info.flags))?,
-                Err(status) => responder.send(Err(status.into_raw()))?,
-            },
+            fvolume::VolumeRequest::GetMetadata { responder } => {
+                match self.partition_info().await {
+                    Ok(info) => {
+                        let mut type_guid =
+                            fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
+                        type_guid.value.copy_from_slice(&info.type_guid);
+                        let mut instance_guid =
+                            fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
+                        instance_guid.value.copy_from_slice(&info.instance_guid);
+                        responder.send(Ok(&fpartition::PartitionGetMetadataResponse {
+                            name: info.name.clone(),
+                            type_guid: Some(type_guid),
+                            instance_guid: Some(instance_guid),
+                            start_block_offset: info.block_range.as_ref().map(|range| range.start),
+                            num_blocks: info
+                                .block_range
+                                .as_ref()
+                                .map(|range| range.end - range.start),
+                            flags: Some(info.flags),
+                            ..Default::default()
+                        }))?;
+                    }
+                    Err(status) => responder.send(Err(status.into_raw()))?,
+                }
+            }
             fvolume::VolumeRequest::QuerySlices { responder, start_slices } => {
                 match self.session_manager.query_slices(&start_slices).await {
                     Ok(mut results) => {
@@ -653,7 +675,7 @@ mod tests {
 
     fn test_partition_info() -> PartitionInfo {
         PartitionInfo {
-            block_count: 1234,
+            block_range: Some(12..34),
             type_guid: [1; 16],
             instance_guid: [2; 16],
             name: Some("foo".to_string()),
@@ -675,24 +697,36 @@ mod tests {
                 let partition_info = test_partition_info();
 
                 let block_info = proxy.get_info().await.unwrap().unwrap();
-                assert_eq!(block_info.block_count, partition_info.block_count);
+                assert_eq!(
+                    block_info.block_count,
+                    partition_info.block_range.as_ref().unwrap().end
+                        - partition_info.block_range.as_ref().unwrap().start
+                );
 
                 // TODO(https://fxbug.dev/348077960): Check max_transfer_size
 
                 let (status, type_guid) = proxy.get_type_guid().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
-                assert_eq!(&type_guid.unwrap().value, &partition_info.type_guid);
+                assert_eq!(&type_guid.as_ref().unwrap().value, &partition_info.type_guid);
 
                 let (status, instance_guid) = proxy.get_instance_guid().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
-                assert_eq!(&instance_guid.unwrap().value, &partition_info.instance_guid);
+                assert_eq!(&instance_guid.as_ref().unwrap().value, &partition_info.instance_guid);
 
                 let (status, name) = proxy.get_name().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
                 assert_eq!(&name, &partition_info.name);
 
-                let flags = proxy.get_flags().await.unwrap().expect("get_flags failed");
-                assert_eq!(flags, partition_info.flags);
+                let metadata = proxy.get_metadata().await.unwrap().expect("get_flags failed");
+                assert_eq!(metadata.name, name);
+                assert_eq!(metadata.type_guid.as_ref(), type_guid.as_deref());
+                assert_eq!(metadata.instance_guid.as_ref(), instance_guid.as_deref());
+                assert_eq!(
+                    metadata.start_block_offset,
+                    Some(partition_info.block_range.as_ref().unwrap().start)
+                );
+                assert_eq!(metadata.num_blocks, Some(block_info.block_count));
+                assert_eq!(metadata.flags, Some(partition_info.flags));
 
                 std::mem::drop(proxy);
             }

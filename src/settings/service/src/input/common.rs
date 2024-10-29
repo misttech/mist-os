@@ -17,7 +17,7 @@ use fidl_fuchsia_ui_policy::{
 use fuchsia_async::{self as fasync, DurationExt};
 use futures::future::Fuse;
 use futures::{FutureExt, StreamExt};
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::MonotonicDuration;
 
 /// The amount of time in milliseconds to wait for a camera device to be detected.
@@ -107,7 +107,7 @@ impl From<MediaButtons> for Request {
 /// Method for listening to media button changes. Changes will be reported back
 /// on the supplied sender.
 pub(crate) async fn monitor_media_buttons(
-    service_context_handle: Arc<ServiceContext>,
+    service_context_handle: Rc<ServiceContext>,
     sender: futures::channel::mpsc::UnboundedSender<MediaButtonsEvent>,
 ) -> Result<(), Error> {
     let presenter_service =
@@ -118,7 +118,7 @@ pub(crate) async fn monitor_media_buttons(
     // TODO(https://fxbug.dev/42058092) This independent spawn is necessary! For some reason removing this or
     // merging it with the spawn below causes devices to lock up on input button events. Figure out
     // whether this can be removed or left as-is as part of the linked bug.
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         if let Err(error) = call_async!(presenter_service => register_listener(client_end)).await {
             tracing::error!(
                 "Registering media button listener with presenter service failed {:?}",
@@ -128,7 +128,7 @@ pub(crate) async fn monitor_media_buttons(
     })
     .detach();
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         while let Some(Ok(media_request)) = stream.next().await {
             // Support future expansion of FIDL
             #[allow(clippy::single_match)]
@@ -154,7 +154,7 @@ pub(crate) async fn monitor_media_buttons(
 
 /// Connects to the fuchsia.camera3.DeviceWatcher api.
 async fn connect_to_camera_watcher(
-    service_context_handle: Arc<ServiceContext>,
+    service_context_handle: Rc<ServiceContext>,
 ) -> Result<ExternalServiceProxy<Camera3DeviceWatcherProxy>, Error> {
     service_context_handle.connect::<DeviceWatcherMarker>().await
 }
@@ -215,7 +215,7 @@ fn extract_cam_id(ids: Vec<WatchDevicesEvent>) -> Result<u64, Error> {
 /// Establishes a connection to the fuchsia.camera3.Device api by watching
 /// the camera id and using it to connect to the device.
 pub(crate) async fn connect_to_camera(
-    service_context_handle: Arc<ServiceContext>,
+    service_context_handle: Rc<ServiceContext>,
 ) -> Result<Camera3DeviceProxy, Error> {
     // Connect to the camera device watcher to get camera ids. This will
     // be used to connect to the camera.

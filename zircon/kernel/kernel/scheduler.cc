@@ -25,6 +25,7 @@
 
 #include <new>
 
+#include <arch/interrupt.h>
 #include <arch/ops.h>
 #include <arch/thread.h>
 #include <ffl/string.h>
@@ -1551,6 +1552,9 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     performance_scale_reciprocal_ = 1 / performance_scale_;
   }
 
+  // Flush any pending power level request.
+  power_level_control_.SendPendingPowerLevelRequest();
+
   SetIdle(next_thread->IsIdle());
 
   if (current_thread->IsIdle()) {
@@ -2926,3 +2930,50 @@ cpu_mask_t Scheduler::SetCpuAffinity(Thread& thread, cpu_mask_t affinity) {
 
 template cpu_mask_t Scheduler::SetCpuAffinity<Affinity::Hard>(Thread& thread, cpu_mask_t affinity);
 template cpu_mask_t Scheduler::SetCpuAffinity<Affinity::Soft>(Thread& thread, cpu_mask_t affinity);
+
+void Scheduler::RequestPowerLevelForTesting(uint8_t power_level) {
+  InterruptDisableGuard interrupts_disabled;
+  bool need_reschedule;
+  {
+    Guard<MonitoredSpinLock, NoIrqSave> guard{&queue_lock_, SOURCE_TAG};
+    need_reschedule = power_level_control_.RequestPowerLevel(power_level);
+  }
+  if (need_reschedule) {
+    RescheduleMask(cpu_num_to_mask(this_cpu()));
+  }
+}
+
+bool Scheduler::PowerLevelControl::RequestPowerLevel(uint8_t power_level) {
+  // If there is already a pending request, it can be updated without issuing a reschedule,
+  // since this update raced with dispatch of the previous request and won.
+  const bool had_pending_request = pending_update_request_.has_value();
+  pending_update_request_ = power_state_.RequestTransition(cpu(), power_level);
+  return !had_pending_request && pending_update_request_.has_value();
+}
+
+void Scheduler::PowerLevelControl::TimerHandler(Timer* timer, zx_time_t now, void* arg) {
+  // Only queue the DPC if the timer handler is running on the expected CPU. If the timer handler
+  // is running on a different CPU, the CPU it services went offline while the timer was pending
+  // and its power level requests are no longer relevant.
+  PowerLevelControl* power_level_control = static_cast<PowerLevelControl*>(arg);
+  if (power_level_control->cpu() == arch_curr_cpu_num()) {
+    power_level_control->request_dpc_.Queue();
+  }
+}
+
+void Scheduler::PowerLevelControl::DpcHandler(Dpc* dpc) {
+  Scheduler* scheduler = dpc->arg<Scheduler>();
+  fbl::RefPtr<power_management::PowerDomain> domain;
+  ktl::optional<power_management::PowerLevelUpdateRequest> request;
+
+  {
+    Guard<MonitoredSpinLock, IrqSave> guard{&scheduler->queue_lock_, SOURCE_TAG};
+    domain = scheduler->power_level_control_.power_state_.domain();
+    request.swap(scheduler->power_level_control_.pending_update_request_);
+  }
+
+  if (domain && domain->controller()->is_serving() && request.has_value()) {
+    const zx::result result = domain->controller()->Post(*request);
+    ASSERT(result.status_value() != ZX_ERR_SHOULD_WAIT);
+  }
+}

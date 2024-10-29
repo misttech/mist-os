@@ -123,6 +123,7 @@ impl CoreRealm {
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<LogSinkMarker>())
+                    .capability(Capability::dictionary("diagnostics"))
                     .from(Ref::parent())
                     .to(&bt_init)
                     .to(&secure_stash),

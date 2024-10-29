@@ -47,6 +47,7 @@ syscall_tests = [
   "procfs_test",
   "ptrace_test",
   "read_write_test",
+  "reboot_test",
   "restart_read_test",
   "rlimit_test",
   "seccomp_test",

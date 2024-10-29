@@ -9,6 +9,7 @@
 #include <lib/zx/result.h>
 
 #include <memory>
+#include <span>
 
 #include "src/storage/lib/block_server/block_server_c.h"
 
@@ -19,6 +20,7 @@ using Operation = internal::Operation;
 using Request = internal::Request;
 
 struct PartitionInfo {
+  uint64_t start_block;
   uint64_t block_count;
   uint32_t block_size;
   uint8_t type_guid[16];
@@ -87,7 +89,7 @@ class Interface {
 
   // Called when new requests arrive.  It is OK for this method to block so as to cause push back on
   // the fifo (which is recommended for effective flow control).
-  virtual void OnRequests(Session&, cpp20::span<const Request>) = 0;
+  virtual void OnRequests(Session&, std::span<const Request>) = 0;
 };
 
 class BlockServer {

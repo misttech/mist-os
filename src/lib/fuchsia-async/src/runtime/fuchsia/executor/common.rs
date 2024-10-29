@@ -5,7 +5,7 @@
 use super::super::timer::Timers;
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
 use super::scope::ScopeRef;
-use super::time::MonotonicInstant;
+use super::time::{BootInstant, MonotonicInstant};
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
@@ -61,6 +61,7 @@ static ACTIVE_EXECUTORS: AtomicUsize = AtomicUsize::new(0);
 pub(crate) struct Executor {
     pub(super) port: zx::Port,
     monotonic_timers: Arc<Timers<MonotonicInstant>>,
+    boot_timers: Arc<Timers<BootInstant>>,
     pub(super) done: AtomicBool,
     is_local: bool,
     receivers: Mutex<PacketReceiverMap<Arc<dyn PacketReceiver>>>,
@@ -84,13 +85,21 @@ impl Executor {
 
         let mut receivers: PacketReceiverMap<Arc<dyn PacketReceiver>> = PacketReceiverMap::new();
         let monotonic_timers = receivers.insert(|key| {
-            let timers = Arc::new(Timers::new(key, matches!(time, ExecutorTime::FakeTime(_))));
+            let timers = Arc::new(Timers::<MonotonicInstant>::new(
+                key,
+                matches!(time, ExecutorTime::FakeTime(_)),
+            ));
+            (timers.clone(), timers)
+        });
+        let boot_timers = receivers.insert(|key| {
+            let timers = Arc::new(Timers::<BootInstant>::new(key, false));
             (timers.clone(), timers)
         });
 
         Executor {
             port: zx::Port::create(),
             monotonic_timers,
+            boot_timers,
             done: AtomicBool::new(false),
             is_local,
             receivers: Mutex::new(receivers),
@@ -362,8 +371,9 @@ impl Executor {
         // Drop all of the uncompleted tasks
         while let Some(_) = self.ready_tasks.pop() {}
 
-        // Unregister the timer receiver so that we can perform the check below.
+        // Unregister the timer receivers so that we can perform the check below.
         self.receivers.lock().remove(self.monotonic_timers.port_key());
+        self.receivers.lock().remove(self.boot_timers.port_key());
 
         // Do not allow any receivers to outlive the executor. That's very likely a bug waiting to
         // happen. See discussion above.
@@ -630,8 +640,12 @@ impl EHandle {
         self.inner().spawn_local(self.root_scope(), future, true);
     }
 
-    pub(crate) fn timers(&self) -> &Arc<Timers<MonotonicInstant>> {
+    pub(crate) fn mono_timers(&self) -> &Arc<Timers<MonotonicInstant>> {
         &self.inner().monotonic_timers
+    }
+
+    pub(crate) fn boot_timers(&self) -> &Arc<Timers<BootInstant>> {
+        &self.inner().boot_timers
     }
 }
 

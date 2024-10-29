@@ -118,7 +118,7 @@ impl Parse for AliasSpec {
             AliasSpec::Union {
                 _union_keyword: input.parse()?,
                 _brace: braced!(brace_contents in input),
-                aliases: brace_contents.parse_terminated(Alias::parse)?,
+                aliases: brace_contents.parse_terminated(Alias::parse, Token![,])?,
             }
         } else {
             AliasSpec::SingleName(input.parse()?)
@@ -143,6 +143,6 @@ pub struct FieldList {
 
 impl Parse for FieldList {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        Ok(FieldList { fields: input.parse_terminated(FieldDef::parse)? })
+        Ok(FieldList { fields: input.parse_terminated(FieldDef::parse, Token![,])? })
     }
 }

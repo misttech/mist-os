@@ -417,6 +417,7 @@ impl CallbackState {
                                     "rs".to_string(),
                                     "res".to_string(),
                                     "rro".to_string(),
+                                    "sched".to_string(),
                                     "sm".to_string(),
                                     "ss".to_string(),
                                     "vibrator".to_string(),

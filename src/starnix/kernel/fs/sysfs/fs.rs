@@ -4,21 +4,21 @@
 
 use crate::bpf::program::BPF_PROG_TYPE_FUSE;
 use crate::device::kobject::KObjectHandle;
-use crate::fs::sysfs::cgroup::CgroupDirectoryNode;
 use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
 };
 use crate::task::{CurrentTask, NetstackDevicesDirectory};
 use crate::vfs::{
-    BytesFile, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-    FsNodeInfo, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
+    BytesFile, CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsNodeInfo, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile,
+    SymlinkNode,
 };
 use starnix_logging::bug_ref;
 use starnix_sync::{Locked, Unlocked};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
-use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{ino_t, statfs, SYSFS_MAGIC};
 
 pub const SYSFS_DEVICES: &str = "devices";
@@ -40,25 +40,14 @@ impl FileSystemOps for SysFs {
 impl SysFs {
     pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
         let kernel = current_task.kernel();
-        // TODO(https://fxbug.dev/322596990): cgroup lifetimes need to be implemented; until then,
-        // we set CacheMode::Permanent here to hopefully avoid immediate issues. For now, every
-        // created cgroup will continue to exist, which doesn't match cgroup lifetime semantics, so
-        // we may still see some issues from this until cgroup lifetimes are implemented.
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, SysFs, options)
+        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options)
             .expect("sysfs constructed with valid options");
         let mut dir = StaticDirectoryBuilder::new(&fs);
         let dir_mode = mode!(IFDIR, 0o755);
         dir.subdir(current_task, "fs", 0o755, |dir| {
             dir.subdir(current_task, "selinux", 0o755, |_| ());
             dir.subdir(current_task, "bpf", 0o755, |_| ());
-            dir.node(
-                "cgroup",
-                fs.create_node(
-                    current_task,
-                    CgroupDirectoryNode::new(),
-                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
-                ),
-            );
+            dir.subdir(current_task, "cgroup", 0o755, |_| ());
             dir.subdir(current_task, "fuse", 0o755, |dir| {
                 dir.subdir(current_task, "connections", 0o755, |_| ());
                 dir.subdir(current_task, "features", 0o755, |dir| {

@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error, Result};
-use component_events::events::*;
-use component_events::matcher::*;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_diagnostics::{self as fdiagnostics, ArchiveAccessorMarker, Interest, Severity};
 use realm_proxy_client::RealmProxyClient;
@@ -25,34 +23,6 @@ pub(crate) async fn snapshot_and_stream_logs(
         .with_archive(accessor)
         .snapshot_then_subscribe::<Logs>()
         .expect("subscribe to logs")
-}
-
-pub struct StopChecker {
-    event_stream: EventStream,
-}
-
-impl StopChecker {
-    pub async fn new() -> Self {
-        Self { event_stream: EventStream::open().await.unwrap() }
-    }
-
-    pub async fn wait_for_component_to_stop(&mut self, moniker: &str) {
-        EventMatcher::ok()
-            .stop(Some(ExitStatusMatcher::Clean))
-            .moniker(moniker)
-            .wait::<Stopped>(&mut self.event_stream)
-            .await
-            .unwrap();
-    }
-
-    pub async fn wait_for_component_to_crash(&mut self, moniker: &str) {
-        EventMatcher::ok()
-            .stop(Some(ExitStatusMatcher::AnyCrash))
-            .moniker(moniker)
-            .wait::<Stopped>(&mut self.event_stream)
-            .await
-            .unwrap();
-    }
 }
 
 /// Extension methods on LogSettingsProxy.

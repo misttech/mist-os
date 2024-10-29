@@ -28,6 +28,7 @@
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/minfs.h"
 #include "src/storage/minfs/minfs_private.h"
+#include "src/storage/minfs/mount.h"
 #include "src/storage/minfs/runner.h"
 #include "src/storage/minfs/vnode.h"
 
@@ -36,7 +37,7 @@ namespace fio_test = fuchsia_io_test;
 
 namespace minfs {
 
-constexpr uint64_t kBlockCount = 1 << 11;
+constexpr uint64_t kBlockCount = 1 << 13;
 
 class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
  public:
@@ -47,7 +48,9 @@ class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
 
     auto bcache = Bcache::Create(std::move(device), kBlockCount);
     ZX_ASSERT(bcache.is_ok());
-    ZX_ASSERT(Mkfs(bcache.value().get()).is_ok());
+    // TODO(https://fxbug.dev/375550868): should not be overriding inode count
+    auto mount_options = MountOptions{.inode_count = 8192};
+    ZX_ASSERT(Mkfs(mount_options, bcache.value().get()).is_ok());
 
     auto runner = Runner::Create(vfs_loop_.dispatcher(), *std::move(bcache), {});
     ZX_ASSERT(runner.is_ok());

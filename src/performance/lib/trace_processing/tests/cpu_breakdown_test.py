@@ -8,7 +8,7 @@ import unittest
 from typing import cast
 
 from trace_processing import trace_model, trace_time
-from trace_processing.metrics import cpu_breakdown
+from trace_processing.metrics import cpu
 
 
 class CpuBreakdownTest(unittest.TestCase):
@@ -260,8 +260,9 @@ class CpuBreakdownTest(unittest.TestCase):
         self.assertEqual(model.processes[1].name, "small_process")
         self.assertEqual(len(model.processes[1].threads), 1)
 
-        processor = cpu_breakdown.CpuBreakdownMetricsProcessor()
+        processor = cpu.CpuMetricsProcessor()
         breakdown = processor.process_freeform_metrics(model)
+        assert isinstance(breakdown, list)
 
         self.assertEqual(len(breakdown), 5)
 
@@ -322,9 +323,10 @@ class CpuBreakdownTest(unittest.TestCase):
     def test_group_by_process_name(self) -> None:
         model = self.construct_trace_model()
 
-        processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
-        breakdown = processor.process_metrics()
-        consolidated_breakdown = processor.group_by_process_name(breakdown)
+        processor = cpu.CpuMetricsProcessor()
+        breakdown = processor.process_freeform_metrics(model)
+        assert isinstance(breakdown, list)
+        consolidated_breakdown = cpu.group_by_process_name(breakdown)
         self.assertEqual(len(consolidated_breakdown), 4)
 
         # Make it easier to compare breakdown results.
@@ -370,11 +372,9 @@ class CpuBreakdownTest(unittest.TestCase):
         self.assertEqual(len(model.processes[0].threads), 3)
 
         # Keep logs for skipped records logging.
-        with self.assertLogs(
-            "CpuBreakdownMetricsProcessor", level="WARNING"
-        ) as context_manager:
-            processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
-            breakdown = processor.process_metrics()
+        with self.assertLogs(cpu._LOGGER, level="WARNING") as context_manager:
+            processor = cpu.CpuMetricsProcessor()
+            breakdown = processor.process_freeform_metrics(model)
 
         self.assertEqual(len(breakdown), 2)
 
@@ -402,10 +402,8 @@ class CpuBreakdownTest(unittest.TestCase):
         )
 
         # Skipped records are logged.
-        self.assertEqual(
-            context_manager.output,
-            [
-                "WARNING:CpuBreakdownMetricsProcessor:Possibly missing ContextSwitch "
-                "record(s) in trace for these CPUs and durations: {2: 2500.0}"
-            ],
+        self.assertRegex(
+            context_manager.output[0],
+            r"Possibly missing ContextSwitch "
+            r"record\(s\) in trace for these CPUs and durations: {2: 2500.0}",
         )

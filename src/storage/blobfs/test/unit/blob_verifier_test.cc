@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <random>
+#include <span>
 
 #include <gtest/gtest.h>
 
@@ -23,8 +24,8 @@ struct BlockMerkleTreeInfo {
   uint8_t* merkle_data = nullptr;
   Digest root;
 
-  cpp20::span<const uint8_t> GetMerkleDataBlocks() const {
-    return cpp20::span(static_cast<const uint8_t*>(blocks.start()), blocks.size());
+  std::span<const uint8_t> GetMerkleDataBlocks() const {
+    return std::span(static_cast<const uint8_t*>(blocks.start()), blocks.size());
   }
 };
 

@@ -112,7 +112,7 @@ async fn provide_snapshot(
     let attribution_state = attribution_client.get_attributions();
     let kernel_resources =
         resources::KernelResources::get_resources(&root_job, &attribution_state)?;
-    let memory_stats = kernel_stats.get_memory_stats_extended().await?;
+    let memory_stats = kernel_stats.get_memory_stats().await?;
     let compression_stats = kernel_stats.get_memory_stats_compression().await?;
 
     let attribution_snapshot = AttributionSnapshot::new(

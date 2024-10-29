@@ -241,7 +241,7 @@ std::unique_ptr<VPartitionAdapter> VPartitionAdapter::Create(const fbl::unique_f
   }
   std::string relative_path = std::string(topo_path.value()->path.get());
   constexpr std::string_view kDevPrefix = "/dev/";
-  if (!cpp20::starts_with(std::string_view(relative_path), kDevPrefix)) {
+  if (!std::string_view(relative_path).starts_with(kDevPrefix)) {
     ADD_FAILURE("Bad topo path, doesn't start with /dev/: %s", relative_path.c_str());
     return nullptr;
   }

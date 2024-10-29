@@ -25,10 +25,13 @@ extern const char* kLegacyShimName;
 
 class BootZbi;
 
+using SmbiosItem = boot_shim::SingleOptionalItem<uint64_t, ZBI_TYPE_SMBIOS>;
+
 using LegacyBootShimBase = boot_shim::BootShim<  //
     boot_shim::PoolMemConfigItem,                //
     boot_shim::UartItem<>,                       //
     boot_shim::AcpiRsdpItem,                     //
+    SmbiosItem,                                  //
     boot_shim::TestSerialNumberItem>;
 
 class LegacyBootShim : public LegacyBootShimBase {
@@ -39,7 +42,18 @@ class LegacyBootShim : public LegacyBootShimBase {
     set_cmdline(info.cmdline);
     Log(input_zbi_.storage());
     Check("Error scanning ZBI", Get<SerialNumber>().Init(input_zbi_));
-    Get<boot_shim::AcpiRsdpItem>().set_payload(info.acpi_rsdp);
+    if (info.acpi_rsdp != 0) {
+      fprintf(log, "%s:   ACPI RSDP @ %#" PRIx64 "\n", name, info.acpi_rsdp);
+      Get<boot_shim::AcpiRsdpItem>().set_payload(info.acpi_rsdp);
+    } else {
+      fprintf(log, "%s:   ACPI RSDP not found\n", name);
+    }
+    if (info.smbios != 0) {
+      fprintf(log, "%s:   SMBIOS @ %#" PRIx64 "\n", name, info.smbios);
+      Get<SmbiosItem>().set_payload(info.smbios);
+    } else {
+      fprintf(log, "%s:   SMBIOS not found\n", name);
+    }
     Get<boot_shim::UartItem<>>().Init(info.uart);
   }
 

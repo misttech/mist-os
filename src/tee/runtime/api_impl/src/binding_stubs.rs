@@ -10,7 +10,8 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
 
-use crate::{mem, storage};
+use crate::props::is_propset_pseudo_handle;
+use crate::{mem, props, storage};
 use num_traits::FromPrimitive;
 use std::unimplemented;
 use tee_internal::binding::{
@@ -20,8 +21,8 @@ use tee_internal::binding::{
     TEE_Time, TEE_Whence, TEE_OBJECT_ID_MAX_LEN, TEE_SUCCESS, TEE_UUID,
 };
 use tee_internal::{
-    to_tee_result, Attribute, AttributeId, HandleFlags, ObjectEnumHandle, ObjectHandle,
-    Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
+    to_tee_result, Attribute, AttributeId, Error, HandleFlags, ObjectEnumHandle, ObjectHandle,
+    PropSetHandle, Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
 };
 
 // This function returns a list of the C entry point that we want to expose from
@@ -245,14 +246,33 @@ pub fn exposed_c_entry_points() -> &'static [*const extern "C" fn()] {
     ]
 }
 
-fn slice_from_raw_parts_mut<'a>(data: *mut std::os::raw::c_void, size: usize) -> &'a mut [u8] {
+fn slice_from_raw_parts_mut<'a, Input, Output>(data: *mut Input, size: usize) -> &'a mut [Output] {
+    debug_assert_eq!(align_of::<Input>(), align_of::<Output>());
+    debug_assert_eq!(size_of::<Input>(), size_of::<Output>());
     if data.is_null() {
         assert_eq!(size, 0);
         &mut []
     } else {
         // SAFETY: `data` is non-null in this branch, and the library must
         // assume that it points to valid memory.
-        unsafe { std::slice::from_raw_parts_mut(data as *mut u8, size) }
+
+        assert!(data.is_aligned());
+        assert!(
+            size * size_of::<Input>() < isize::MAX.try_into().unwrap(),
+            "Size of buf slice is too large and will cause undefined behavior"
+        );
+        // SAFETY: According to the safety concerns for `std::slice::from_raw_parts_mut`:
+        // [1] data must be [valid] for both reads and writes for len * mem::size_of::<T>() many bytes, and it must be properly aligned.
+        // [2] The entire memory range of this slice must be contained within a single allocated object
+        // [3] data must be non-null and aligned even for zero-length slices
+        // [4] data must point to len consecutive properly initialized values of type T.
+        // [5] The memory referenced by the returned slice must not be accessed through any other pointer
+        // [6] The total size len * mem::size_of::<T>() of the slice must be no larger than isize::MAX,
+        //      and adding that size to data must not "wrap around" the address space.
+        //
+        // Nullity, alignment, and size are checked above, satisfying [3] and parts of [1] and [6].
+        // [1] (validity), [2], [4], [5], and [6] (wrap-around) are the responsibility of the caller to uphold.
+        unsafe { std::slice::from_raw_parts_mut(data as *mut Output, size) }
     }
 }
 
@@ -263,12 +283,41 @@ fn slice_from_raw_parts<'a, Input, Output>(data: *const Input, size: usize) -> &
         assert_eq!(size, 0);
         &mut []
     } else {
-        // SAFETY: `data` is non-null in this branch, Input and Output are
-        // understood locally to be layout-compatible (where any instance of
-        // Input is a bitwise valid instance of Output), and the library must
-        // assume that `data` points to valid memory.
+        assert!(data.is_aligned());
+        assert!(
+            size * size_of::<Input>() < isize::MAX.try_into().unwrap(),
+            "Size of buf slice is too large and will cause undefined behavior"
+        );
+        // SAFETY: According to the safety concerns for `std::slice::from_raw_parts_mut`:
+        // [1] data must be [valid] for reads for len * mem::size_of::<T>() many bytes, and it must be properly aligned.
+        // [2] The entire memory range of this slice must be contained within a single allocated object
+        // [3] data must be non-null and aligned even for zero-length slices
+        // [4] data must point to len consecutive properly initialized values of type T.
+        // [5] The memory referenced by the returned slice  not be mutated for the duration of lifetime 'a, except inside an UnsafeCell.
+        // [6] The total size len * mem::size_of::<T>() of the slice must be no larger than isize::MAX,
+        //      and adding that size to data must not "wrap around" the address space.
+        //
+        // Nullity, alignment, and size are checked above, satisfying [3] and parts of [1] and [6].
+        // [1] (validity), [2], [4], [5], and [6] (wrap-around) are the responsibility of the caller to uphold.
         unsafe { std::slice::from_raw_parts(data as *const Output, size) }
     }
+}
+
+// Returns None if a Utf8Error is encountered.
+fn c_str_to_str<'a>(name: *const ::std::os::raw::c_char) -> Option<&'a str> {
+    assert!(!name.is_null());
+    // SAFETY: According to the safety concerns for `CStr::from_ptr`:
+    // [1] The memory pointed to by ptr must contain a valid nul terminator at the end of the string.
+    // [2] ptr must be [valid] for reads of bytes up to and including the nul terminator. This means in particular:
+    //     [2a] The entire memory range of this CStr must be contained within a single allocated object!
+    //     [2b] ptr must be non-null even for a zero-length cstr.
+    // [3] The memory referenced by the returned CStr must not be mutated for the duration of lifetime 'a.
+    // [4] The nul terminator must be within isize::MAX from ptr
+    //
+    // [1], [2a], and [4] are assumed to be upheld by the caller, and not checked here.
+    // [2b] is checked above for nullity, and we do not mutate the memory here, satisfying [3].
+    let name_cstr = unsafe { std::ffi::CStr::from_ptr(name) };
+    name_cstr.to_str().ok()
 }
 
 #[no_mangle]
@@ -278,7 +327,48 @@ extern "C" fn TEE_GetPropertyAsString(
     valueBuffer: *mut ::std::os::raw::c_char,
     valueBufferLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!valueBuffer.is_null());
+    assert!(valueBuffer.is_aligned());
+    assert!(!valueBufferLen.is_null());
+    assert!(valueBufferLen.is_aligned());
+    to_tee_result((|| -> TeeResult {
+        let handle = *PropSetHandle::from_binding(&propsetOrEnumerator);
+        let name = if is_propset_pseudo_handle(handle) {
+            c_str_to_str(name).ok_or(Error::ItemNotFound)?
+        } else {
+            ""
+        };
+
+        // SAFETY: Nullity and alignment are checked above, but full validity of the memory read
+        // is the responsibility of the caller (e.g. out-of-bounds or freed memory pointers).
+        let initial_buf_len = unsafe { *valueBufferLen };
+        let mut buf = slice_from_raw_parts_mut(valueBuffer, initial_buf_len);
+
+        let (len, result) = match props::get_property_as_string(handle, name, &mut buf) {
+            Ok(written) => {
+                // written.len() does not include the NUL terminator byte, so cases where we
+                // write the exact buffer length are captured by `<` rather than `<=`.
+                debug_assert!(written.len() < initial_buf_len);
+                (written.len(), Ok(()))
+            }
+            Err(err) => {
+                if err.error == Error::ShortBuffer {
+                    (err.actual_length, Err(err.error))
+                } else {
+                    (err.written.len(), Err(err.error))
+                }
+            }
+        };
+
+        // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
+        // other validity concerns for `ptr::write()`.
+        unsafe {
+            // Add 1 for NUL terminator.
+            *valueBufferLen = len + 1;
+        }
+
+        result
+    })())
 }
 
 #[no_mangle]
@@ -287,7 +377,24 @@ extern "C" fn TEE_GetPropertyAsBool(
     name: *mut ::std::os::raw::c_char,
     value: *mut bool,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!value.is_null());
+    assert!(value.is_aligned());
+
+    to_tee_result((|| -> TeeResult {
+        let handle = *PropSetHandle::from_binding(&propsetOrEnumerator);
+        let name = if is_propset_pseudo_handle(handle) {
+            c_str_to_str(name).ok_or(Error::ItemNotFound)?
+        } else {
+            ""
+        };
+        let val = props::get_property_as_bool(handle, name)?;
+        // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
+        // other validity concerns for `ptr::write()`.
+        unsafe {
+            *value = val;
+        }
+        Ok(())
+    })())
 }
 
 #[no_mangle]
@@ -296,7 +403,24 @@ extern "C" fn TEE_GetPropertyAsU32(
     name: *mut ::std::os::raw::c_char,
     value: *mut u32,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!value.is_null());
+    assert!(value.is_aligned());
+
+    to_tee_result((|| -> TeeResult {
+        let handle = *PropSetHandle::from_binding(&propsetOrEnumerator);
+        let name = if is_propset_pseudo_handle(handle) {
+            c_str_to_str(name).ok_or(Error::ItemNotFound)?
+        } else {
+            ""
+        };
+        let val = props::get_property_as_u32(handle, name)?;
+        // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
+        // other validity concerns for `ptr::write()`.
+        unsafe {
+            *value = val;
+        }
+        Ok(())
+    })())
 }
 
 #[no_mangle]
@@ -305,7 +429,24 @@ extern "C" fn TEE_GetPropertyAsU64(
     name: *mut ::std::os::raw::c_char,
     value: *mut u64,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!value.is_null());
+    assert!(value.is_aligned());
+
+    to_tee_result((|| -> TeeResult {
+        let handle = *PropSetHandle::from_binding(&propsetOrEnumerator);
+        let name = if is_propset_pseudo_handle(handle) {
+            c_str_to_str(name).ok_or(Error::ItemNotFound)?
+        } else {
+            ""
+        };
+        let val = props::get_property_as_u64(handle, name)?;
+        // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
+        // other validity concerns for `ptr::write()`.
+        unsafe {
+            *value = val;
+        }
+        Ok(())
+    })())
 }
 
 #[no_mangle]
@@ -315,7 +456,44 @@ extern "C" fn TEE_GetPropertyAsBinaryBlock(
     valueBuffer: *mut ::std::os::raw::c_void,
     valueBufferLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!valueBufferLen.is_null());
+    assert!(valueBufferLen.is_aligned());
+
+    to_tee_result((|| -> TeeResult {
+        let handle = *PropSetHandle::from_binding(&propsetOrEnumerator);
+        let name = if is_propset_pseudo_handle(handle) {
+            c_str_to_str(name).ok_or(Error::ItemNotFound)?
+        } else {
+            ""
+        };
+        // SAFETY: Nullity and alignment are checked above, but full validity of the memory read
+        // is the responsibility of the caller (e.g. out-of-bounds or freed memory pointers).
+        let initial_buf_len = unsafe { *valueBufferLen };
+        let mut buf = slice_from_raw_parts_mut(valueBuffer as *mut u8, initial_buf_len);
+
+        let (len, result) = match props::get_property_as_binary_block(handle, name, &mut buf) {
+            Ok(bytes_written) => {
+                debug_assert!(bytes_written.len() <= initial_buf_len);
+                (bytes_written.len(), Ok(()))
+            }
+            Err(err) => {
+                let len = match err.error {
+                    Error::ShortBuffer => err.actual_length,
+                    Error::BadFormat => 0,
+                    _ => err.written.len(),
+                };
+                (len, Err(err.error))
+            }
+        };
+
+        // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
+        // other validity concerns for `ptr::write()`.
+        unsafe {
+            *valueBufferLen = len;
+        };
+
+        result
+    })())
 }
 
 #[no_mangle]
@@ -324,7 +502,24 @@ extern "C" fn TEE_GetPropertyAsUUID(
     name: *mut ::std::os::raw::c_char,
     value: *mut TEE_UUID,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!value.is_null());
+    assert!(value.is_aligned());
+
+    to_tee_result((|| -> TeeResult {
+        let handle = *PropSetHandle::from_binding(&propsetOrEnumerator);
+        let name = if is_propset_pseudo_handle(handle) {
+            c_str_to_str(name).ok_or(Error::ItemNotFound)?
+        } else {
+            ""
+        };
+        let uuid = props::get_property_as_uuid(handle, name)?;
+        // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
+        // other validity concerns for `ptr::write()`.
+        unsafe {
+            *value = *uuid.to_binding();
+        }
+        Ok(())
+    })())
 }
 
 #[no_mangle]
@@ -333,17 +528,42 @@ extern "C" fn TEE_GetPropertyAsIdentity(
     name: *mut ::std::os::raw::c_char,
     value: *mut TEE_Identity,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!value.is_null());
+    assert!(value.is_aligned());
+
+    to_tee_result((|| -> TeeResult {
+        let handle = *PropSetHandle::from_binding(&propsetOrEnumerator);
+        let name = if is_propset_pseudo_handle(handle) {
+            c_str_to_str(name).ok_or(Error::ItemNotFound)?
+        } else {
+            ""
+        };
+        let identity = props::get_property_as_identity(handle, name)?;
+        // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
+        // other validity concerns for `ptr::write()`.
+        unsafe {
+            *value = *identity.to_binding();
+        }
+        Ok(())
+    })())
 }
 
 #[no_mangle]
 extern "C" fn TEE_AllocatePropertyEnumerator(enumerator: *mut TEE_PropSetHandle) -> TEE_Result {
-    unimplemented!()
+    assert!(!enumerator.is_null());
+    assert!(enumerator.is_aligned());
+    let handle = props::allocate_property_enumerator();
+    // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
+    // other validity concerns for `ptr::write()`.
+    unsafe {
+        *enumerator = handle.to_binding().clone();
+    }
+    TEE_SUCCESS
 }
 
 #[no_mangle]
 extern "C" fn TEE_FreePropertyEnumerator(enumerator: TEE_PropSetHandle) {
-    unimplemented!()
+    props::free_property_enumerator(*PropSetHandle::from_binding(&enumerator));
 }
 
 #[no_mangle]
@@ -351,12 +571,15 @@ extern "C" fn TEE_StartPropertyEnumerator(
     enumerator: TEE_PropSetHandle,
     propSet: TEE_PropSetHandle,
 ) {
-    unimplemented!()
+    props::start_property_enumerator(
+        *PropSetHandle::from_binding(&enumerator),
+        *PropSetHandle::from_binding(&propSet),
+    );
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetPropertyEnumerator(enumerator: TEE_PropSetHandle) {
-    unimplemented!()
+    props::reset_property_enumerator(*PropSetHandle::from_binding(&enumerator));
 }
 
 #[no_mangle]
@@ -365,12 +588,51 @@ extern "C" fn TEE_GetPropertyName(
     nameBuffer: *mut ::std::os::raw::c_void,
     nameBufferLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!nameBuffer.is_null());
+    assert!(nameBuffer.is_aligned());
+    assert!(!nameBufferLen.is_null());
+    assert!(nameBufferLen.is_aligned());
+
+    to_tee_result((|| -> TeeResult {
+        let handle = *PropSetHandle::from_binding(&enumerator);
+
+        // SAFETY: Nullity and alignment are checked above, but full validity of the memory read
+        // is the responsibility of the caller (e.g. out-of-bounds or freed memory pointers).
+        let initial_buf_len = unsafe { *nameBufferLen };
+        let mut buf = slice_from_raw_parts_mut(nameBuffer, initial_buf_len);
+
+        let (len, result) = match props::get_property_name(handle, &mut buf) {
+            Ok(written) => {
+                // written.len() does not include the NUL terminator byte, so cases where we
+                // write the exact buffer length are captured by `<` rather than `<=`.
+                debug_assert!(written.len() < initial_buf_len);
+                (written.len(), Ok(()))
+            }
+            Err(err) => {
+                if err.error == Error::ShortBuffer {
+                    (err.actual_length, Err(err.error))
+                } else {
+                    (err.written.len(), Err(err.error))
+                }
+            }
+        };
+
+        // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
+        // other validity concerns for `ptr::write()`.
+        unsafe {
+            // Add 1 for NUL terminator.
+            *nameBufferLen = len + 1;
+        }
+
+        result
+    })())
 }
 
 #[no_mangle]
 extern "C" fn TEE_GetNextProperty(enumerator: TEE_PropSetHandle) -> TEE_Result {
-    unimplemented!()
+    to_tee_result((|| -> TeeResult {
+        props::get_next_property(*PropSetHandle::from_binding(&enumerator))
+    })())
 }
 
 #[no_mangle]
@@ -626,7 +888,7 @@ extern "C" fn TEE_InitRefAttribute(
 ) {
     assert!(!attr.is_null());
     let id = AttributeId::from_u32(attributeID).unwrap();
-    let buffer = slice_from_raw_parts(buffer, length);
+    let buffer = slice_from_raw_parts_mut(buffer, length);
     let attribute = storage::init_ref_attribute(id, buffer);
     // SAFETY: `attr` nullity checked above.
     unsafe { *attr = *attribute.to_binding() };

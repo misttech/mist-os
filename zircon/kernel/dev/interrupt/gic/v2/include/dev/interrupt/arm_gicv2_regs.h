@@ -85,7 +85,7 @@ inline void arm_gicv2_write32(uint64_t reg, uint32_t value) {
 #define GICD_PIDR2 (GICD_OFFSET + 0xfe8)
 #define GICD_PIDR3 (GICD_OFFSET + 0xfec)
 
-// we might need to check that we're not a gic v3, in which case look for the v3 PIDR2 reg
+// We might need to check that we're not a gic v3, in which case look for the v3 PIDR2 reg.
 #define GICD_V3_PIDR2 (GICD_OFFSET + 0xffe8)
 
 // Virtual interface control registers.
@@ -93,7 +93,5 @@ inline void arm_gicv2_write32(uint64_t reg, uint32_t value) {
 
 // Virtual CPU interface registers.
 #define GICV_ADDRESS (GICV_OFFSET + arm_gicv2_gic_base)
-
-#define MAX_INT 1024
 
 #endif  // ZIRCON_KERNEL_DEV_INTERRUPT_GIC_V2_INCLUDE_DEV_INTERRUPT_ARM_GICV2_REGS_H_

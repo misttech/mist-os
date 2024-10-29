@@ -7,8 +7,8 @@
 
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
+#include <span>
 #include <string>
 
 namespace storage::volume_image {
@@ -34,7 +34,7 @@ class Compressor {
   // for processing. Anytime a compressor emits symbols, it will call the provided |Handler|.
   //
   // The compressed data is only guaranteed to be valid within a single call to the handler.
-  using Handler = fit::function<fpromise::result<void, std::string>(cpp20::span<const uint8_t>)>;
+  using Handler = fit::function<fpromise::result<void, std::string>(std::span<const uint8_t>)>;
 
   virtual ~Compressor() = default;
 
@@ -48,7 +48,7 @@ class Compressor {
   //
   // On failure, returns a string decribing the error condition.
   virtual fpromise::result<void, std::string> Compress(
-      cpp20::span<const uint8_t> uncompressed_data) = 0;
+      std::span<const uint8_t> uncompressed_data) = 0;
 
   // Returns |fpromise::ok| on success. At this point all remaining symbols for the compressed
   // representation will be emitted.

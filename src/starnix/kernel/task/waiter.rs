@@ -12,9 +12,9 @@ use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
 use starnix_sync::{
     EventWaitGuard, InterruptibleEvent, Mutex, NotifyKind, PortEvent, PortWaitResult,
 };
+use starnix_types::ownership::debug_assert_no_local_temp_ref;
 use starnix_uapi::error;
 use starnix_uapi::errors::{Errno, EINTR};
-use starnix_uapi::ownership::debug_assert_no_local_temp_ref;
 use starnix_uapi::vfs::FdEvents;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
@@ -189,8 +189,13 @@ struct WaitCancelerEventPair {
     inner: HandleWaitCanceler,
 }
 
-struct WaitCancelerTimer {
-    timer: Weak<zx::Timer>,
+struct WaitCancelerBootTimer {
+    timer: Weak<zx::BootTimer>,
+    inner: HandleWaitCanceler,
+}
+
+struct WaitCancelerMonoTimer {
+    timer: Weak<zx::MonotonicTimer>,
     inner: HandleWaitCanceler,
 }
 
@@ -204,7 +209,8 @@ enum WaitCancelerInner {
     Queue(WaitCancelerQueue),
     Event(WaitCancelerEvent),
     EventPair(WaitCancelerEventPair),
-    Timer(WaitCancelerTimer),
+    BootTimer(WaitCancelerBootTimer),
+    MonoTimer(WaitCancelerMonoTimer),
     Vmo(WaitCancelerVmo),
 }
 
@@ -241,8 +247,12 @@ impl WaitCanceler {
         Self::new_inner(WaitCancelerInner::EventPair(WaitCancelerEventPair { event_pair, inner }))
     }
 
-    pub fn new_timer(timer: Weak<zx::Timer>, inner: HandleWaitCanceler) -> Self {
-        Self::new_inner(WaitCancelerInner::Timer(WaitCancelerTimer { timer, inner }))
+    pub fn new_mono_timer(timer: Weak<zx::MonotonicTimer>, inner: HandleWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::MonoTimer(WaitCancelerMonoTimer { timer, inner }))
+    }
+
+    pub fn new_boot_timer(timer: Weak<zx::BootTimer>, inner: HandleWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::BootTimer(WaitCancelerBootTimer { timer, inner }))
     }
 
     pub fn new_vmo(vmo: Weak<zx::Vmo>, inner: HandleWaitCanceler) -> Self {
@@ -319,7 +329,11 @@ impl WaitCanceler {
                     let Some(event_pair) = event_pair.upgrade() else { return };
                     inner.cancel(event_pair.as_handle_ref());
                 }
-                WaitCancelerInner::Timer(WaitCancelerTimer { timer, inner }) => {
+                WaitCancelerInner::BootTimer(WaitCancelerBootTimer { timer, inner }) => {
+                    let Some(timer) = timer.upgrade() else { return };
+                    inner.cancel(timer.as_handle_ref());
+                }
+                WaitCancelerInner::MonoTimer(WaitCancelerMonoTimer { timer, inner }) => {
                     let Some(timer) = timer.upgrade() else { return };
                     inner.cancel(timer.as_handle_ref());
                 }

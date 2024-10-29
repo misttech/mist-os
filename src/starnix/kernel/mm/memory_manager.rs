@@ -26,23 +26,24 @@ use starnix_logging::{
     impossible_error, log_warn, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
+use starnix_types::futex_address::FutexAddress;
+use starnix_types::math::round_up_to_system_page_size;
+use starnix_types::ownership::WeakRef;
+use starnix_types::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::futex_address::FutexAddress;
-use starnix_uapi::math::round_up_to_system_page_size;
-use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::range_ext::RangeExt;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::restricted_aspace::{
-    RESTRICTED_ASPACE_BASE, RESTRICTED_ASPACE_HIGHEST_ADDRESS, RESTRICTED_ASPACE_SIZE,
+    RESTRICTED_ASPACE_BASE, RESTRICTED_ASPACE_HIGHEST_ADDRESS, RESTRICTED_ASPACE_RANGE,
+    RESTRICTED_ASPACE_SIZE,
 };
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
-use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE,
     MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE,
-    PROT_EXEC, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
+    PROT_EXEC, PROT_GROWSDOWN, PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
 };
 use static_assertions::const_assert_eq;
 use std::collections::HashMap;
@@ -73,6 +74,8 @@ pub fn init_usercopy() {
     let _ = usercopy();
 }
 
+const GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS: usize = 256;
+
 #[cfg(target_arch = "x86_64")]
 const ASLR_RANDOM_BITS: usize = 27;
 
@@ -92,10 +95,7 @@ fn usercopy() -> Option<&'static usercopy::Usercopy> {
         if UNIFIED_ASPACES_ENABLED {
             // ASUMPTION: All Starnix managed Linux processes have the same
             // restricted mode address range.
-            Some(
-                usercopy::Usercopy::new(RESTRICTED_ASPACE_BASE..RESTRICTED_ASPACE_HIGHEST_ADDRESS)
-                    .unwrap(),
-            )
+            Some(usercopy::Usercopy::new(RESTRICTED_ASPACE_RANGE).unwrap())
         } else {
             None
         }
@@ -154,10 +154,14 @@ bitflags! {
       const READ = PROT_READ;
       const WRITE = PROT_WRITE;
       const EXEC = PROT_EXEC;
+      const GROWSDOWN = PROT_GROWSDOWN;
     }
 }
 
 impl ProtectionFlags {
+    pub const ACCESS_FLAGS: Self =
+        Self::from_bits_truncate(Self::READ.bits() | Self::WRITE.bits() | Self::EXEC.bits());
+
     pub fn to_vmar_flags(self) -> zx::VmarFlags {
         let mut vmar_flags = zx::VmarFlags::empty();
         if self.contains(ProtectionFlags::READ) {
@@ -184,6 +188,22 @@ impl ProtectionFlags {
             prot_flags |= ProtectionFlags::EXEC;
         }
         prot_flags
+    }
+
+    pub fn from_access_bits(prot: u32) -> Option<Self> {
+        if let Some(flags) = ProtectionFlags::from_bits(prot) {
+            if flags.contains(Self::ACCESS_FLAGS.complement()) {
+                None
+            } else {
+                Some(flags)
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn access_flags(&self) -> Self {
+        *self & Self::ACCESS_FLAGS
     }
 }
 
@@ -223,8 +243,14 @@ const_assert_eq!(MappingFlags::DONT_SPLIT.bits(), MappingOptions::DONT_SPLIT.bit
 const_assert_eq!(MappingFlags::DONT_EXPAND.bits(), MappingOptions::DONT_EXPAND.bits() << 3);
 
 impl MappingFlags {
-    fn prot_flags(&self) -> ProtectionFlags {
-        ProtectionFlags::from_bits_truncate(self.bits())
+    fn access_flags(&self) -> ProtectionFlags {
+        ProtectionFlags::from_bits_truncate(self.bits() & ProtectionFlags::ACCESS_FLAGS.bits())
+    }
+
+    fn with_access_flags(&self, prot_flags: ProtectionFlags) -> Self {
+        let mapping_flags =
+            *self & (MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXEC).complement();
+        mapping_flags | Self::from_bits_truncate(prot_flags.access_flags().bits())
     }
 
     #[cfg(feature = "alternate_anon_allocs")]
@@ -232,8 +258,9 @@ impl MappingFlags {
         MappingOptions::from_bits_truncate(self.bits() << 3)
     }
 
-    fn from_prot_flags_and_options(prot_flags: ProtectionFlags, options: MappingOptions) -> Self {
-        Self::from_bits_truncate(prot_flags.bits()) | Self::from_bits_truncate(options.bits() << 3)
+    fn from_access_flags_and_options(prot_flags: ProtectionFlags, options: MappingOptions) -> Self {
+        Self::from_bits_truncate(prot_flags.access_flags().bits())
+            | Self::from_bits_truncate(options.bits() << 3)
     }
 }
 
@@ -398,6 +425,17 @@ impl Mapping {
             name,
             file_write_guard: FileWriteGuardRef(None),
         }
+    }
+
+    fn inflate_to_include_guard_pages(&self, range: &Range<UserAddress>) -> Range<UserAddress> {
+        let start = if self.flags.contains(MappingFlags::GROWSDOWN) {
+            range
+                .start
+                .saturating_sub(*PAGE_SIZE as usize * GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS)
+        } else {
+            range.start
+        };
+        start..range.end
     }
 
     /// Converts a `UserAddress` to an offset in this mapping's memory object.
@@ -655,7 +693,7 @@ fn map_in_vmar(
     } else {
         zx::VmarFlags::empty()
     };
-    let vmar_flags = flags.prot_flags().to_vmar_flags()
+    let vmar_flags = flags.access_flags().to_vmar_flags()
         | zx::VmarFlags::ALLOW_FAULTS
         | vmar_extra_flags
         | vmar_maybe_map_range;
@@ -668,18 +706,42 @@ fn map_in_vmar(
 }
 
 impl MemoryManagerState {
+    /// Returns occupied address ranges that intersect with the given range.
+    ///
+    /// An address range is "occupied" if (a) there is already a mapping in that range or (b) there
+    /// is a GROWSDOWN mapping <= 256 pages above that range. The 256 pages below a GROWSDOWN
+    /// mapping is the "guard region." The memory manager avoids mapping memory in the guard region
+    /// in some circumstances to preserve space for the GROWSDOWN mapping to grow down.
+    fn get_occupied_address_ranges<'a>(
+        &'a self,
+        subrange: &'a Range<UserAddress>,
+    ) -> impl Iterator<Item = Range<UserAddress>> + 'a {
+        let query_range = subrange.start
+            ..(subrange
+                .end
+                .saturating_add(*PAGE_SIZE as usize * GUARD_PAGE_COUNT_FOR_GROWSDOWN_MAPPINGS));
+        self.mappings.intersection(query_range).filter_map(|(range, mapping)| {
+            let occupied_range = mapping.inflate_to_include_guard_pages(range);
+            if occupied_range.start < subrange.end && subrange.start < occupied_range.end {
+                Some(occupied_range)
+            } else {
+                None
+            }
+        })
+    }
+
     fn count_possible_placements(
         &self,
         length: usize,
         subrange: &Range<UserAddress>,
     ) -> Option<usize> {
-        let mut mappings_in_range = self.mappings.intersection(subrange);
+        let mut occupied_ranges = self.get_occupied_address_ranges(subrange);
         let mut possible_placements = 0;
         // If the allocation is placed at the first available address, every page that is left
         // before the next mapping or the end of subrange is +1 potential placement.
         let mut first_fill_end = subrange.start.checked_add(length)?;
         while first_fill_end <= subrange.end {
-            let Some((mapping, _)) = mappings_in_range.next() else {
+            let Some(mapping) = occupied_ranges.next() else {
                 possible_placements += (subrange.end - first_fill_end) / (*PAGE_SIZE as usize) + 1;
                 break;
             };
@@ -699,9 +761,9 @@ impl MemoryManagerState {
     ) -> Option<UserAddress> {
         let mut candidate =
             Range { start: subrange.start, end: subrange.start.checked_add(length)? };
-        let mut mappings_in_range = self.mappings.intersection(subrange);
+        let mut occupied_ranges = self.get_occupied_address_ranges(subrange);
         loop {
-            let Some((mapping, _)) = mappings_in_range.next() else {
+            let Some(mapping) = occupied_ranges.next() else {
                 // No more mappings: treat the rest of the index as an offset.
                 let res =
                     candidate.start.checked_add(chosen_placement_idx * *PAGE_SIZE as usize)?;
@@ -751,16 +813,20 @@ impl MemoryManagerState {
 
         loop {
             // Is there a next mapping? If not, the candidate is already good.
-            let Some((mapping, _)) = map_iter.next_back() else {
+            let Some((occupied_range, mapping)) = map_iter.next_back() else {
                 return Some(candidate.start);
             };
+            let occupied_range = mapping.inflate_to_include_guard_pages(occupied_range);
             // If it doesn't overlap, the gap is big enough to fit.
-            if mapping.end <= candidate.start {
+            if occupied_range.end <= candidate.start {
                 return Some(candidate.start);
             }
             // If there was a mapping in the way, the next range to consider will be `length` bytes
             // below.
-            candidate = Range { start: mapping.start.checked_sub(length)?, end: mapping.start };
+            candidate = Range {
+                start: occupied_range.start.checked_sub(length)?,
+                end: occupied_range.start,
+            };
         }
     }
 
@@ -769,7 +835,7 @@ impl MemoryManagerState {
         let Some(hint_end) = hint_addr.checked_add(length) else {
             return false;
         };
-        self.mappings.intersection(&(hint_addr..hint_end)).next().is_none()
+        self.get_occupied_address_ranges(&(hint_addr..hint_end)).next().is_none()
     }
 
     // Map the memory without updating `self.mappings`.
@@ -875,10 +941,6 @@ impl MemoryManagerState {
         mapping.name = name;
         self.mappings.insert(mapped_addr..end, mapping);
 
-        if flags.contains(MappingFlags::GROWSDOWN) {
-            track_stub!(TODO("https://fxbug.dev/297373369"), "GROWSDOWN guard region");
-        }
-
         Ok(mapped_addr)
     }
 
@@ -925,10 +987,6 @@ impl MemoryManagerState {
         let mapping = Mapping::new_private_anonymous(flags, name);
         self.mappings.insert(mapped_addr..end, mapping);
 
-        if flags.contains(MappingFlags::GROWSDOWN) {
-            track_stub!(TODO("https://fxbug.dev/297373369"), "GROWSDOWN guard region");
-        }
-
         Ok(mapped_addr)
     }
 
@@ -955,7 +1013,7 @@ impl MemoryManagerState {
             );
         }
         let memory = create_anonymous_mapping_memory(length as u64)?;
-        let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
+        let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
         self.map_memory(
             mm,
             addr,
@@ -1520,14 +1578,49 @@ impl MemoryManagerState {
         prot_flags: ProtectionFlags,
     ) -> Result<(), Errno> {
         profile_duration!("Protect");
-        // TODO(https://fxbug.dev/42179751): If the mprotect flags include PROT_GROWSDOWN then the specified protection may
-        // extend below the provided address if the lowest mapping is a MAP_GROWSDOWN mapping. This function has to
-        // compute the potentially extended range before modifying the Zircon protections or metadata.
         let vmar_flags = prot_flags.to_vmar_flags();
+        let page_size = *PAGE_SIZE;
+        let end = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?.round_up(page_size)?;
 
         if self.check_has_unauthorized_splits(addr, length) {
             return error!(EINVAL);
         }
+
+        let prot_range = if prot_flags.contains(ProtectionFlags::GROWSDOWN) {
+            let mut start = addr;
+            let Some((range, mapping)) = self.mappings.get(&start) else {
+                return error!(EINVAL);
+            };
+            // Ensure that the mapping has GROWSDOWN if PROT_GROWSDOWN was specified.
+            if !mapping.flags.contains(MappingFlags::GROWSDOWN) {
+                return error!(EINVAL);
+            }
+            let access_flags = mapping.flags.access_flags();
+            // From <https://man7.org/linux/man-pages/man2/mprotect.2.html>:
+            //
+            //   PROT_GROWSDOWN
+            //     Apply the protection mode down to the beginning of a
+            //     mapping that grows downward (which should be a stack
+            //     segment or a segment mapped with the MAP_GROWSDOWN flag
+            //     set).
+            start = range.start;
+            while let Some((range, mapping)) =
+                self.mappings.get(&start.saturating_sub(page_size as usize))
+            {
+                if !mapping.flags.contains(MappingFlags::GROWSDOWN)
+                    || mapping.flags.access_flags() != access_flags
+                {
+                    break;
+                }
+                start = range.start;
+            }
+            start..end
+        } else {
+            addr..end
+        };
+
+        let addr = prot_range.start;
+        let length = prot_range.end - prot_range.start;
 
         // Make one call to mprotect to update all the zircon protections.
         // SAFETY: This is safe because the vmar belongs to a different process.
@@ -1545,16 +1638,11 @@ impl MemoryManagerState {
         })?;
 
         // Update the flags on each mapping in the range.
-        let end = (addr + length).round_up(*PAGE_SIZE)?;
-        let prot_range = addr..end;
         let mut updates = vec![];
-        for (range, mapping) in self.mappings.intersection(addr..end) {
+        for (range, mapping) in self.mappings.intersection(prot_range.clone()) {
             let range = range.intersect(&prot_range);
             let mut mapping = mapping.clone();
-            let new_flags = mapping.flags
-                & (MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXEC).complement()
-                | MappingFlags::from_bits_truncate(prot_flags.bits());
-            mapping.flags = new_flags;
+            mapping.flags = mapping.flags.with_access_flags(prot_flags);
             updates.push((range, mapping));
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
@@ -1783,6 +1871,27 @@ impl MemoryManagerState {
         Ok(result)
     }
 
+    /// Finds the next mapping at or above the given address if that mapping has the
+    /// MappingFlags::GROWSDOWN flag.
+    ///
+    /// If such a mapping exists, this function returns the address at which that mapping starts
+    /// and the mapping itself.
+    fn next_mapping_if_growsdown(&self, addr: UserAddress) -> Option<(UserAddress, &Mapping)> {
+        match self.mappings.iter_starting_at(&addr).next() {
+            Some((range, mapping)) => {
+                if range.contains(&addr) {
+                    // |addr| is already contained within a mapping, nothing to grow.
+                    None
+                } else if !mapping.flags.contains(MappingFlags::GROWSDOWN) {
+                    None
+                } else {
+                    Some((range.start, mapping))
+                }
+            }
+            None => None,
+        }
+    }
+
     /// Determines if an access at a given address could be covered by extending a growsdown mapping and
     /// extends it if possible. Returns true if the given address is covered by a mapping.
     pub fn extend_growsdown_mapping_to_address(
@@ -1791,35 +1900,19 @@ impl MemoryManagerState {
         is_write: bool,
     ) -> Result<bool, Error> {
         profile_duration!("ExtendGrowsDown");
-        let (mapping_to_grow, mapping_low_addr) = match self.mappings.iter_starting_at(&addr).next()
-        {
-            Some((range, mapping)) => {
-                if range.contains(&addr) {
-                    // |addr| is already contained within a mapping, nothing to grow.
-                    return Ok(false);
-                }
-                if !mapping.flags.contains(MappingFlags::GROWSDOWN) {
-                    return Ok(false);
-                }
-                (mapping, range.start)
-            }
-            None => return Ok(false),
+        let Some((mapping_low_addr, mapping_to_grow)) = self.next_mapping_if_growsdown(addr) else {
+            return Ok(false);
         };
         if is_write && !mapping_to_grow.can_write() {
             // Don't grow a read-only GROWSDOWN mapping for a write fault, it won't work.
             return Ok(false);
         }
-        // TODO(https://fxbug.dev/42179751): Once we add a guard region below a growsdown mapping we will need to move that
-        // before attempting to map the grown area.
         let low_addr = addr - (addr.ptr() as u64 % *PAGE_SIZE);
         let high_addr = mapping_low_addr;
         let length = high_addr
             .ptr()
             .checked_sub(low_addr.ptr())
             .ok_or_else(|| anyhow!("Invalid growth range"))?;
-        // TODO(https://fxbug.dev/42179751): - Instead of making a new memory object, perhaps a
-        // growsdown mapping should be oversized to start with the end mapped. Then on extension
-        // we could map further down in the memory object for as long as we had space.
         let memory =
             Arc::new(MemoryObject::from(zx::Vmo::create(length as u64).map_err(|s| match s {
                 zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => {
@@ -1828,7 +1921,7 @@ impl MemoryManagerState {
                 _ => anyhow!("Unexpected error creating VMO: {s}"),
             })?));
         let vmar_flags =
-            mapping_to_grow.flags.prot_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
+            mapping_to_grow.flags.access_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
         let mapping = Mapping::new(
             low_addr,
             memory.clone(),
@@ -3370,7 +3463,7 @@ impl MemoryManager {
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
     ) -> Result<UserAddress, Errno> {
-        let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
+        let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
 
         // Unmapped mappings must be released after the state is unlocked.
         let mut released_mappings = vec![];
@@ -3733,7 +3826,7 @@ impl MemoryManager {
     ) -> Result<(Arc<MemoryObject>, u64), Errno> {
         let state = self.state.read();
         let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
-        if !mapping.flags.prot_flags().contains(perms) {
+        if !mapping.flags.access_flags().contains(perms) {
             return error!(EACCES);
         }
         match &mapping.backing {
@@ -4851,6 +4944,30 @@ mod tests {
                 addr.unwrap()
             );
         }
+        assert_eq!(mm.state.read().find_random_unused_range(page_size, &subrange_ten), None);
+    }
+
+    #[::fuchsia::test]
+    async fn test_grows_down_near_aspace_base() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let mm = current_task.mm();
+
+        let page_count = 10;
+
+        let page_size = *PAGE_SIZE as usize;
+        let addr = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE) + page_count * page_size;
+        assert_eq!(
+            map_memory_with_flags(
+                &mut locked,
+                &current_task,
+                addr,
+                page_size as u64,
+                MAP_ANONYMOUS | MAP_PRIVATE | MAP_GROWSDOWN
+            ),
+            addr
+        );
+
+        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)..addr;
         assert_eq!(mm.state.read().find_random_unused_range(page_size, &subrange_ten), None);
     }
 

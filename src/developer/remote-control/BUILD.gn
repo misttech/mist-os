@@ -24,6 +24,7 @@ group("tests") {
   deps = [
     ":remote-control-lib-tests",
     "//src/developer/remote-control/runner:tests",
+    "//src/developer/remote-control/test:fdomain-connection-test",
   ]
 }
 
@@ -91,6 +92,7 @@ rustc_binary("bin") {
     "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
     "//src/lib/diagnostics/log/rust",
+    "//src/lib/fdomain/container",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
@@ -101,6 +103,7 @@ rustc_binary("bin") {
   ]
 
   sources = [
+    "src/fdomain.rs",
     "src/main.rs",
     "src/usb.rs",
   ]

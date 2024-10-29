@@ -121,7 +121,7 @@ impl<E: Encoder + ?Sized, T: Encode<E>> encode::EncodeOption<E> for Vec<T> {
         slot: Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), encode::EncodeError> {
         if let Some(vec) = this {
-            encoder.encode_slice(vec.as_mut_slice())?;
+            encoder.encode_next_slice(vec.as_mut_slice())?;
             WireOptionalVector::encode_present(slot, vec.len() as u64);
         } else {
             WireOptionalVector::encode_absent(slot);

@@ -60,7 +60,7 @@ async fn suite_connection_handler(mut stream: ftest::SuiteRequestStream) {
 
     let (mut task_tx, task_rx) = mpsc::unbounded::<fasync::Task<()>>();
     let _task_handler = fasync::Task::spawn(async move {
-        task_rx.for_each_concurrent(None, |task| async move { task.await }).await;
+        task_rx.for_each_concurrent(None, |task| task).await;
     });
 
     while let Some(Ok(val)) = stream.next().await {
@@ -195,17 +195,17 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
 
     // Metrics to collect:
     // - Total time to get snapshot
-    const TOTAL_TIME: &'static str = "Total - Time";
+    const TOTAL_TIME: &str = "Total - Time";
     // - Total size of data in snapshot
-    const TOTAL_SIZE: &'static str = "Total - Size";
+    const TOTAL_SIZE: &str = "Total - Size";
     // - Number of batches returned
-    const BATCH_COUNT: &'static str = "Batch - Count";
+    const BATCH_COUNT: &str = "Batch - Count";
     // - Time to get each batch
-    const BATCH_TIME: &'static str = "Batch - Time";
+    const BATCH_TIME: &str = "Batch - Time";
     // - Number of entries in each batch
-    const BATCH_ENTRIES: &'static str = "Batch - Entries";
+    const BATCH_ENTRIES: &str = "Batch - Entries";
     // - Size of each entry
-    const ENTRY_SIZE: &'static str = "Entry - Size";
+    const ENTRY_SIZE: &str = "Entry - Size";
 
     stdout.write_all(format!("Got {} selectors\n", selectors.len()).as_bytes()).await.ok();
 
@@ -248,7 +248,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
             let time_batch_start = Instant::now();
             match iterator.get_next().await? {
                 Ok(contents) => {
-                    if contents.len() == 0 {
+                    if contents.is_empty() {
                         break;
                     }
                     batch_count += 1;
@@ -291,7 +291,7 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
 
     let formatted_moniker = moniker.replace("/", "::");
 
-    let directory = PathBuf::new().join("/custom_artifacts").join(&formatted_moniker);
+    let directory = PathBuf::from("custom_artifacts").join(&formatted_moniker);
     std::fs::create_dir_all(&directory)?;
     let mut file = File::create(directory.join("readall.fuchsiaperf.fyi.json"))?;
     metrics.write_fuchsiaperf(&formatted_moniker, &file)?;

@@ -25,7 +25,6 @@
 #include <lib/fdio/fd.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/stdcompat/span.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/sys/cpp/testing/service_directory_provider.h>
 #include <lib/zbi-format/zbi.h>
@@ -37,6 +36,7 @@
 
 #include <array>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -182,7 +182,7 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> ControllerFromBlock(Bloc
 
 // Ensure that the partitions on the device matches the given list.
 void EnsurePartitionsMatch(const gpt::GptDevice* gpt,
-                           cpp20::span<const PartitionDescription> expected) {
+                           std::span<const PartitionDescription> expected) {
   for (auto& part : expected) {
     const gpt_partition_t* gpt_part = FindPartitionWithLabel(gpt, part.name);
     ASSERT_TRUE(gpt_part != nullptr, "Partition \"%s\" not found", part.name);
@@ -191,8 +191,6 @@ void EnsurePartitionsMatch(const gpt::GptDevice* gpt,
     EXPECT_EQ(part.start + part.length - 1, gpt_part->last);
   }
 }
-
-constexpr paver::Partition kUnknownPartition = static_cast<paver::Partition>(1000);
 
 TEST(PartitionName, Bootloader) {
   EXPECT_STREQ(PartitionName(paver::Partition::kBootloaderA, paver::PartitionScheme::kNew),
@@ -216,13 +214,6 @@ TEST(PartitionName, AbrMetadata) {
                GUID_ABR_META_NAME);
 }
 
-TEST(PartitionName, UnknownPartition) {
-  // We don't define what is returned in this case, but it shouldn't crash and
-  // it should be non-empty.
-  EXPECT_STRNE(PartitionName(kUnknownPartition, paver::PartitionScheme::kNew), "");
-  EXPECT_STRNE(PartitionName(kUnknownPartition, paver::PartitionScheme::kLegacy), "");
-}
-
 TEST(PartitionSpec, ToStringDefaultContentType) {
   // This is a bit of a change-detector test since we don't actually care about
   // the string value, but it's the cleanest way to check that the string is
@@ -234,11 +225,6 @@ TEST(PartitionSpec, ToStringDefaultContentType) {
 TEST(PartitionSpec, ToStringWithContentType) {
   EXPECT_EQ(PartitionSpec(paver::Partition::kZirconA, "foo").ToString(), "Zircon A (foo)");
   EXPECT_EQ(PartitionSpec(paver::Partition::kVbMetaB, "a b c").ToString(), "VBMeta B (a b c)");
-}
-
-TEST(PartitionSpec, ToStringUnknownPartition) {
-  EXPECT_NE(PartitionSpec(kUnknownPartition).ToString(), "");
-  EXPECT_NE(PartitionSpec(kUnknownPartition, "foo").ToString(), "");
 }
 
 class GptDevicePartitionerTests : public zxtest::Test {
@@ -774,15 +760,15 @@ TEST_F(EfiDevicePartitionerTests, ValidatePayload) {
 
   // Test invalid partitions.
   ASSERT_NOT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kZirconA),
-                                             cpp20::span<uint8_t>()));
+                                             std::span<uint8_t>()));
   ASSERT_NOT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kZirconB),
-                                             cpp20::span<uint8_t>()));
+                                             std::span<uint8_t>()));
   ASSERT_NOT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kZirconR),
-                                             cpp20::span<uint8_t>()));
+                                             std::span<uint8_t>()));
 
   // Non-kernel partitions are not validated.
   ASSERT_OK(partitioner->ValidatePayload(PartitionSpec(paver::Partition::kAbrMeta),
-                                         cpp20::span<uint8_t>()));
+                                         std::span<uint8_t>()));
 }
 
 TEST_F(EfiDevicePartitionerTests, OnStopRebootBootloader) {
@@ -1714,18 +1700,18 @@ TEST_F(NelsonPartitionerTests, ValidatePayload) {
   std::vector<uint8_t> payload_bl2_size(paver::kNelsonBL2Size);
   ASSERT_NOT_OK(
       partitioner->ValidatePayload(PartitionSpec(paver::Partition::kBootloaderA, "bootloader"),
-                                   cpp20::span<uint8_t>(payload_bl2_size)));
+                                   std::span<uint8_t>(payload_bl2_size)));
   ASSERT_NOT_OK(
       partitioner->ValidatePayload(PartitionSpec(paver::Partition::kBootloaderB, "bootloader"),
-                                   cpp20::span<uint8_t>(payload_bl2_size)));
+                                   std::span<uint8_t>(payload_bl2_size)));
 
   std::vector<uint8_t> payload_bl2_tpl_size(static_cast<size_t>(2) * 1024 * 1024);
   ASSERT_OK(
       partitioner->ValidatePayload(PartitionSpec(paver::Partition::kBootloaderA, "bootloader"),
-                                   cpp20::span<uint8_t>(payload_bl2_tpl_size)));
+                                   std::span<uint8_t>(payload_bl2_tpl_size)));
   ASSERT_OK(
       partitioner->ValidatePayload(PartitionSpec(paver::Partition::kBootloaderB, "bootloader"),
-                                   cpp20::span<uint8_t>(payload_bl2_tpl_size)));
+                                   std::span<uint8_t>(payload_bl2_tpl_size)));
 }
 
 TEST_F(NelsonPartitionerTests, WriteBootloaderA) {

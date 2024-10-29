@@ -199,6 +199,35 @@ impl std::fmt::Debug for GptManager {
     }
 }
 
+#[derive(Eq, thiserror::Error, Clone, Debug, PartialEq)]
+pub enum TransactionCommitError {
+    #[error("I/O error")]
+    Io,
+    #[error("Invalid arguments")]
+    InvalidArguments,
+    #[error("No space")]
+    NoSpace,
+}
+
+impl From<format::FormatError> for TransactionCommitError {
+    fn from(error: format::FormatError) -> Self {
+        match error {
+            format::FormatError::InvalidArguments => Self::InvalidArguments,
+            format::FormatError::NoSpace => Self::NoSpace,
+        }
+    }
+}
+
+impl From<TransactionCommitError> for zx::Status {
+    fn from(error: TransactionCommitError) -> zx::Status {
+        match error {
+            TransactionCommitError::Io => zx::Status::IO,
+            TransactionCommitError::InvalidArguments => zx::Status::INVALID_ARGS,
+            TransactionCommitError::NoSpace => zx::Status::NO_SPACE,
+        }
+    }
+}
+
 impl GptManager {
     /// Loads and validates a GPT-formatted block device.
     pub async fn open(client: RemoteBlockClient) -> Result<Self, Error> {
@@ -257,21 +286,6 @@ impl GptManager {
         &self.partitions
     }
 
-    /// Computes the number of blocks required to store a single copy of metadata for a given
-    /// partition table size.  In other words, what the minimal value of the `first_usable` in a
-    /// header would be for the given size.
-    pub fn metadata_blocks_for_partition_table_size(
-        &self,
-        partition_table_size: usize,
-    ) -> Result<u64, Error> {
-        let bs = self.client.block_size() as usize;
-        partition_table_size
-            .checked_mul(self.header.part_size as usize)
-            .and_then(|s| s.checked_next_multiple_of(bs))
-            .map(|size| 2 + (size / bs) as u64)
-            .ok_or(anyhow!("Partition table overflow"))
-    }
-
     // We only store valid partitions in memory.  This function allows us to flatten this back out
     // to a non-sparse array for serialization.
     fn flattened_partitions(&self) -> Vec<PartitionInfo> {
@@ -299,7 +313,10 @@ impl GptManager {
         })
     }
 
-    pub async fn commit_transaction(&mut self, mut transaction: Transaction) -> Result<(), Error> {
+    pub async fn commit_transaction(
+        &mut self,
+        mut transaction: Transaction,
+    ) -> Result<(), TransactionCommitError> {
         let mut new_header = self.header.clone();
         let entries =
             transaction.partitions.iter().map(|entry| entry.as_entry()).collect::<Vec<_>>();
@@ -318,8 +335,14 @@ impl GptManager {
 
         // Per section 5.3.2 of the UEFI spec, the backup metadata must be written first.  The spec
         // permits the partition table entries and header to be written in either order.
-        self.write_metadata(&backup_header, &partition_table_raw[..]).await?;
-        self.write_metadata(&new_header, &partition_table_raw[..]).await?;
+        self.write_metadata(&backup_header, &partition_table_raw[..]).await.map_err(|err| {
+            tracing::error!(?err, "Failed to write metadata");
+            TransactionCommitError::Io
+        })?;
+        self.write_metadata(&new_header, &partition_table_raw[..]).await.map_err(|err| {
+            tracing::error!(?err, "Failed to write metadata");
+            TransactionCommitError::Io
+        })?;
 
         self.header = new_header;
         self.partitions = BTreeMap::new();

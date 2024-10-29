@@ -55,7 +55,7 @@ class MountOptions {
   // "disable_ext_identify", 0
   // "inline_xattr", 0
   // "inline_dentry", 1
-  // "mode", ModeType::kModeAdaptive (0)
+  // "mode", Lfs (1), Adaptive (0)
   // "readonly", 0
   // "read_extent_cache", 1
   // "active_logs", 6

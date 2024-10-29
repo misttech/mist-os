@@ -28,25 +28,19 @@
             to: [ "#realm_factory" ],
         },
         {
-            protocol: [ "fuchsia.logger.Log" ],
-            from: "parent",
-            to: [ "#test_cases" ],
-        },
-        {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
             to: [ "#realm_factory" ],
             availability: "optional",
         },
         {
-            event_stream: [ "stopped" ],
-            from: "parent",
-            to: [ "#test_cases" ],
-        },
-        {
-            event_stream: [ "capability_requested" ],
+            event_stream: [
+                "capability_requested",
+                "stopped",
+            ],
             from: "parent",
             to: [ "#realm_factory" ],
+            scope: "#realm_factory",
         },
     ],
     expose: [

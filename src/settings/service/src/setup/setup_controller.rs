@@ -68,14 +68,14 @@ impl StorageAccess for SetupController {
     const STORAGE_KEY: &'static str = SetupInfo::KEY;
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl data_controller::Create for SetupController {
     async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
         Ok(Self { client })
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for SetupController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {

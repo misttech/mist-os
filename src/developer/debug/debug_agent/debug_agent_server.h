@@ -54,11 +54,12 @@ class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent>,
       debug::Result<debug_ipc::UpdateFilterReply, fuchsia_debugger::FilterError>;
 
   // Convert |fidl_filter| to a debug_ipc equivalent, then add that to DebugAgent's set of filters.
-  AddFilterResult AddFilter(const fuchsia_debugger::Filter& fidl_filter) const;
+  AddFilterResult AddFilter(const fuchsia_debugger::Filter& fidl_filter);
 
-  // Attempt to attach to all given koids, some may fail, which is not reported as an error. The
-  // number of successful attaches is returned.
-  uint32_t AttachToKoids(const std::vector<zx_koid_t>& koids) const;
+  // Attempt to attach to all given FilterMatches, some may fail, which is not reported as an error.
+  // If any of the FilterMatch identifiers does not correspond to one of our filters, take no
+  // action. The number of successful attaches is returned.
+  uint32_t AttachToFilterMatches(const std::vector<debug_ipc::FilterMatch>& filter_matches) const;
 
   using GetMatchingProcessesResult =
       debug::Result<std::vector<DebuggedProcess*>, fuchsia_debugger::FilterError>;
@@ -68,6 +69,9 @@ class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent>,
   // returns all currently attached processes.
   GetMatchingProcessesResult GetMatchingProcesses(
       std::optional<fuchsia_debugger::Filter> filter) const;
+
+  uint32_t next_filter_id_ = 1;
+  std::map<uint32_t, debug_ipc::Filter> filters_;
 
   std::optional<fidl::ServerBindingRef<fuchsia_debugger::DebugAgent>> binding_ref_;
 

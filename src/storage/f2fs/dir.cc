@@ -2,12 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/dir.h"
+
 #include <dirent.h>
 #include <sys/stat.h>
 
 #include <safemath/checked_math.h>
 
+#include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/node.h"
+#include "src/storage/f2fs/superblock_info.h"
 
 namespace f2fs {
 

@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/vmo_manager.h"
+
+#include <storage/buffer/vmo_buffer.h>
+#include <storage/buffer/vmoid_registry.h>
 
 namespace f2fs {
 namespace {

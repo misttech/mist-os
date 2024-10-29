@@ -39,14 +39,14 @@ fn store_data(inspect_node: &fuchsia_inspect::Node, name: &str, data: &JsonValue
 
 pub fn serve_persisted_data(persist_root: &fuchsia_inspect::Node) -> Result<(), Error> {
     let remembered_data = file_handler::remembered_data()?;
-    for (service_name, service_data) in remembered_data.iter() {
-        persist_root.record_child(service_name, |service_node| {
-            for (tag_name, tag_data) in service_data.iter() {
-                let json_data = serde_json::from_str(tag_data).unwrap_or_else(|err| {
+    for service in remembered_data {
+        persist_root.record_child(service.name, |service_node| {
+            for tag in service.data {
+                let json_data = serde_json::from_str(&tag.data).unwrap_or_else(|err| {
                     error!("Error {:?} parsing stored data", err);
                     json!("<<Error parsing saved data>>")
                 });
-                store_data(service_node, tag_name, &json_data, 0);
+                store_data(service_node, &tag.name, &json_data, 0);
             }
         });
     }

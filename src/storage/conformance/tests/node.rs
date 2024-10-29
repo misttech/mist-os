@@ -11,7 +11,7 @@ use io_conformance_util::*;
 async fn test_open_node_on_directory() {
     let harness = TestHarness::new().await;
     let root = root_directory(vec![]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     let (_proxy, on_representation) = test_dir
         .open3_node_repr::<fio::NodeMarker>(
@@ -40,7 +40,7 @@ async fn test_open_node_on_file() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![file("file", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     let (_proxy, representation) = test_dir
         .open3_node_repr::<fio::NodeMarker>(
@@ -78,7 +78,7 @@ async fn test_open_node_on_file() {
 async fn test_set_attr_and_set_flags_on_node() {
     let harness = TestHarness::new().await;
     let root = root_directory(vec![file("file", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     let proxy = test_dir
         .open3_node::<fio::NodeMarker>("file", fio::Flags::PROTOCOL_NODE, None)
@@ -115,7 +115,7 @@ async fn test_set_attr_and_set_flags_on_node() {
 async fn test_node_clone() {
     let harness = TestHarness::new().await;
     let root = root_directory(vec![file("file", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     let proxy = test_dir
         .open3_node::<fio::NodeMarker>(
@@ -139,7 +139,7 @@ async fn test_node_clone() {
 async fn test_open_node_with_attributes() {
     let harness = TestHarness::new().await;
     let root = root_directory(vec![]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     let (_proxy, representation) = test_dir
         .open3_node_repr::<fio::NodeMarker>(
@@ -169,5 +169,3 @@ async fn test_open_node_with_attributes() {
                 }
     );
 }
-
-// TODO(https://fxbug.dev/293947862): Add tests for fuchsia.io/Node.Reopen.

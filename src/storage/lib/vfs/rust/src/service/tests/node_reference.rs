@@ -16,11 +16,9 @@ use crate::execution_scope::ExecutionScope;
 use crate::file::test_utils::{run_client, run_server_client};
 use crate::{service, ToObjectRequest};
 
-use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TestExecutor;
-use futures::StreamExt;
 use zx_status::Status;
 
 // Redefine these constants as a u32 as in macos they are u16
@@ -227,25 +225,6 @@ fn update_attributes_not_supported() {
             let response =
                 node_proxy.update_attributes(&fio::MutableNodeAttributes::default()).await.unwrap();
             assert_eq!(response, Err(Status::BAD_HANDLE.into_raw()));
-        },
-    );
-}
-
-#[test]
-fn reopen_not_supported() {
-    run_server_client(
-        fio::OpenFlags::NODE_REFERENCE,
-        endpoint(|_scope, _channel| ()),
-        |node_proxy| async move {
-            let (client_end, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
-
-            node_proxy.reopen(&fio::RightsRequest::default(), server_end).unwrap();
-
-            let mut event_stream = client_end.take_event_stream();
-            assert_matches!(
-                event_stream.next().await,
-                Some(Err(fidl::Error::ClientChannelClosed { status: Status::NOT_SUPPORTED, .. }))
-            );
         },
     );
 }

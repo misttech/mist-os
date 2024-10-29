@@ -26,7 +26,7 @@ mod host_identifier;
 pub struct RemoteControlService {
     ids: RefCell<Vec<Weak<RefCell<Vec<u64>>>>>,
     id_allocator: Box<dyn Fn() -> Result<Box<dyn Identifier + 'static>>>,
-    connector: Box<dyn Fn(fidl::Socket)>,
+    connector: Box<dyn Fn(ConnectionRequest, Weak<RemoteControlService>)>,
 }
 
 struct Client {
@@ -39,18 +39,27 @@ struct Client {
     allocated_ids: Rc<RefCell<Vec<u64>>>,
 }
 
+/// Indicates a connection request to be handled by the `connector` argument of
+/// `RemoteControlService::new`
+pub enum ConnectionRequest {
+    Overnet(fidl::Socket),
+    FDomain(fidl::Socket),
+}
+
 impl RemoteControlService {
-    pub async fn new(connector: impl Fn(fidl::Socket) + 'static) -> Self {
+    pub async fn new(connector: impl Fn(ConnectionRequest, Weak<Self>) + 'static) -> Self {
         let boot_id = zx::MonotonicInstant::get().into_nanos() as u64;
         Self::new_with_allocator(connector, move || Ok(Box::new(HostIdentifier::new(boot_id)?)))
     }
 
-    pub async fn new_with_default_allocator(connector: impl Fn(fidl::Socket) + 'static) -> Self {
+    pub async fn new_with_default_allocator(
+        connector: impl Fn(ConnectionRequest, Weak<Self>) + 'static,
+    ) -> Self {
         Self::new_with_allocator(connector, || Ok(Box::new(DefaultIdentifier::new())))
     }
 
     pub(crate) fn new_with_allocator(
-        connector: impl Fn(fidl::Socket) + 'static,
+        connector: impl Fn(ConnectionRequest, Weak<Self>) + 'static,
         id_allocator: impl Fn() -> Result<Box<dyn Identifier + 'static>> + 'static,
     ) -> Self {
         Self {
@@ -71,11 +80,19 @@ impl RemoteControlService {
         client: &Client,
         request: connector::ConnectorRequest,
     ) -> Result<()> {
-        let connector::ConnectorRequest::EstablishCircuit { id, socket, responder } = request;
-        (self.connector)(socket);
-        client.allocated_ids.borrow_mut().push(id);
-        responder.send()?;
-        Ok(())
+        match request {
+            connector::ConnectorRequest::EstablishCircuit { id, socket, responder } => {
+                (self.connector)(ConnectionRequest::Overnet(socket), Rc::downgrade(self));
+                client.allocated_ids.borrow_mut().push(id);
+                responder.send()?;
+                Ok(())
+            }
+            connector::ConnectorRequest::FdomainToolboxSocket { socket, responder } => {
+                (self.connector)(ConnectionRequest::FDomain(socket), Rc::downgrade(self));
+                responder.send()?;
+                Ok(())
+            }
+        }
     }
 
     async fn handle(self: &Rc<Self>, request: rcs::RemoteControlRequest) -> Result<()> {
@@ -102,23 +119,36 @@ impl RemoteControlService {
                 self.clone().identify_host(responder).await?;
                 Ok(())
             }
+            #[cfg(any(
+                fuchsia_api_level_less_than = "NEXT",
+                fuchsia_api_level_at_least = "PLATFORM"
+            ))]
             rcs::RemoteControlRequest::OpenCapability {
                 moniker,
                 capability_set,
                 capability_name,
                 server_channel,
-                flags,
+                flags: _,
                 responder,
             } => {
                 responder.send(
                     self.clone()
-                        .open_capability(
-                            moniker,
-                            capability_set,
-                            capability_name,
-                            flags,
-                            server_channel,
-                        )
+                        .open_capability(moniker, capability_set, capability_name, server_channel)
+                        .await,
+                )?;
+                Ok(())
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            rcs::RemoteControlRequest::ConnectCapability {
+                moniker,
+                capability_set,
+                capability_name,
+                server_channel,
+                responder,
+            } => {
+                responder.send(
+                    self.clone()
+                        .open_capability(moniker, capability_set, capability_name, server_channel)
                         .await,
                 )?;
                 Ok(())
@@ -218,7 +248,6 @@ impl RemoteControlService {
         moniker: String,
         capability_set: fsys::OpenDirType,
         capability_name: String,
-        flags: io::OpenFlags,
         server_end: zx::Channel,
     ) -> Result<(), rcs::ConnectCapabilityError> {
         // Connect to the root LifecycleController protocol
@@ -246,11 +275,71 @@ impl RemoteControlService {
             capability_set,
             capability_name,
             server_end,
-            flags,
             lifecycle,
             query,
         )
         .await
+    }
+
+    pub async fn open_toolboox(
+        self: &Rc<Self>,
+        server_end: zx::Channel,
+    ) -> Result<(), rcs::ConnectCapabilityError> {
+        // Connect to the root LifecycleController protocol
+        let controller = connect_to_protocol_at_path::<fsys::LifecycleControllerMarker>(
+            "/svc/fuchsia.sys2.LifecycleController.root",
+        )
+        .map_err(|err| {
+            error!(%err, "could not connect to lifecycle controller");
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
+        })?;
+
+        // Connect to the root RealmQuery protocol
+        let query = connect_to_protocol_at_path::<fsys::RealmQueryMarker>(
+            "/svc/fuchsia.sys2.RealmQuery.root",
+        )
+        .map_err(|err| {
+            error!(%err, "could not connect to realm query");
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
+        })?;
+
+        // Attempt to resolve both the modern and legacy locations concurrently and use the one that
+        // resolves successfully
+        let moniker =
+            moniker::Moniker::try_from("toolbox").expect("Moniker 'toolbox' did not parse!");
+        let legacy_moniker = moniker::Moniker::try_from("core/toolbox")
+            .expect("Moniker 'core/toolbox' did not parse!");
+        let (modern, legacy) = futures::join!(
+            resolve_instance(&controller, &moniker),
+            resolve_instance(&controller, &legacy_moniker)
+        );
+
+        let moniker = if modern.is_ok() {
+            moniker
+        } else if legacy.is_ok() {
+            legacy_moniker
+        } else {
+            error!("Unable to resolve toolbox component in either toolbox or core/toolbox");
+            return Err(rcs::ConnectCapabilityError::NoMatchingComponent);
+        };
+
+        let dir = component_debug::dirs::open_instance_dir_root_readable(
+            &moniker,
+            fsys::OpenDirType::NamespaceDir.into(),
+            &query,
+        )
+        .map_err(|err| {
+            error!(?err, "error opening exposed dir");
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
+        })
+        .await?;
+
+        dir.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "svc", server_end.into())
+            .map_err(|err| {
+                error!(?err, "error opening svc dir in toolbox");
+                rcs::ConnectCapabilityError::CapabilityConnectFailed
+            })?;
+        Ok(())
     }
 }
 
@@ -261,7 +350,6 @@ async fn connect_to_capability_at_moniker(
     capability_set: fsys::OpenDirType,
     capability_name: String,
     server_end: zx::Channel,
-    flags: io::OpenFlags,
     lifecycle: fsys::LifecycleControllerProxy,
     query: fsys::RealmQueryProxy,
 ) -> Result<(), rcs::ConnectCapabilityError> {
@@ -285,7 +373,7 @@ async fn connect_to_capability_at_moniker(
         })
         .await?;
 
-    connect_to_capability_in_dir(&dir, &capability_name, server_end, flags).await?;
+    connect_to_capability_in_dir(&dir, &capability_name, server_end).await?;
     Ok(())
 }
 
@@ -293,17 +381,20 @@ async fn connect_to_capability_in_dir(
     dir: &io::DirectoryProxy,
     capability_name: &str,
     server_end: zx::Channel,
-    flags: io::OpenFlags,
 ) -> Result<(), rcs::ConnectCapabilityError> {
     check_entry_exists(dir, capability_name).await?;
 
     // Connect to the capability
-    dir.open(flags, io::ModeType::empty(), capability_name, ServerEnd::new(server_end)).map_err(
-        |err| {
-            error!(%err, "error opening capability from exposed dir");
-            rcs::ConnectCapabilityError::CapabilityConnectFailed
-        },
+    dir.open(
+        io::OpenFlags::empty(),
+        io::ModeType::empty(),
+        capability_name,
+        ServerEnd::new(server_end),
     )
+    .map_err(|err| {
+        error!(%err, "error opening capability from exposed dir");
+        rcs::ConnectCapabilityError::CapabilityConnectFailed
+    })
 }
 
 // Checks that the given directory contains an entry with the given name.
@@ -533,12 +624,12 @@ mod tests {
         let RcsEnv { system_info_proxy, use_default_identifier } = env;
         if use_default_identifier {
             Rc::new(RemoteControlService::new_with_allocator(
-                |_| (),
+                |_, _| (),
                 move || Ok(Box::new(DefaultIdentifier { boot_timestamp_nanos: BOOT_TIME })),
             ))
         } else {
             Rc::new(RemoteControlService::new_with_allocator(
-                |_| (),
+                |_, _| (),
                 move || {
                     Ok(Box::new(HostIdentifier {
                         interface_state_proxy: setup_fake_interface_state_service(),
@@ -658,7 +749,6 @@ mod tests {
                 dir_type,
                 "fuchsia.hwinfo.Board".to_string(),
                 server,
-                io::OpenFlags::RIGHT_READABLE,
                 lifecycle,
                 query,
             )
@@ -683,7 +773,6 @@ mod tests {
                 dir_type,
                 "svc/fuchsia.hwinfo.Board".to_string(),
                 server,
-                io::OpenFlags::RIGHT_READABLE,
                 lifecycle,
                 query,
             )
@@ -708,7 +797,6 @@ mod tests {
                 dir_type,
                 "fuchsia.not.exposed".to_string(),
                 server,
-                io::OpenFlags::RIGHT_READABLE,
                 lifecycle,
                 query,
             )
@@ -734,7 +822,6 @@ mod tests {
                 dir_type,
                 "svc/fuchsia.not.exposed".to_string(),
                 server,
-                io::OpenFlags::RIGHT_READABLE,
                 lifecycle,
                 query,
             )

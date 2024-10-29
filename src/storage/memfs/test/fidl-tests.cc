@@ -23,6 +23,7 @@
 #include <zircon/syscalls.h>
 
 #include <future>
+#include <span>
 #include <utility>
 
 #include <fbl/unique_fd.h>
@@ -59,7 +60,7 @@ TEST(FidlTests, TestFidlBasic) {
     const fidl::WireResult result = fidl::WireCall(endpoints.client)->Query();
     ASSERT_OK(result.status());
     const fidl::WireResponse response = result.value();
-    const cpp20::span data = response.protocol.get();
+    const std::span data = response.protocol.get();
     const std::string_view protocol{reinterpret_cast<const char*>(data.data()), data.size_bytes()};
     ASSERT_EQ(protocol, fio::wire::kFileProtocolName);
   }

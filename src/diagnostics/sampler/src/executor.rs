@@ -9,6 +9,7 @@
 //! [`MetricConfig`] - defined in src/diagnostics/lib/sampler-config/src/lib.rs
 //! This is deserialized from Sampler config files or created by FIRE by interpolating
 //! component information into FIRE config files. It contains
+//!
 //!  - selectors: SelectorList
 //!  - metric_id
 //!  - metric_type: DataType
@@ -21,6 +22,7 @@
 //!
 //! [`ProjectConfig`] - defined in src/diagnostics/lib/sampler-config/src/lib.rs
 //! This encodes the contents of a single config file:
+//!
 //!  - project_id
 //!  - customer_id (defaults to 1)
 //!  - poll_rate_sec
@@ -28,11 +30,13 @@
 //!
 //! [`SamplerConfig`] - defined in src/diagnostics/lib/sampler-config/src/lib.rs
 //! The entire config for Sampler. Contains
+//!
 //!  - list of ProjectConfig
 //!  - minimum sample rate
 //!
 //! [`ProjectSampler`] - defined in src/diagnostics/sampler/src/executor.rs
 //! This contains
+//!
 //!  - several MetricConfig's
 //!  - an ArchiveReader configured with all active selectors
 //!  - a cache of previous Diagnostic values, indexed by selector strings
@@ -42,6 +46,7 @@
 //!  - Inspect stats (struct ProjectSamplerStats)
 //!
 //! [`ProjectSampler`] is stored in:
+//!
 //!  - [`TaskCancellation`]:     execution_context: fasync::Task<Vec<ProjectSampler>>,
 //!  - [`RebootSnapshotProcessor`]:    project_samplers: Vec<ProjectSampler>,
 //!  - [`SamplerExecutor`]:     project_samplers: Vec<ProjectSampler>,
@@ -49,8 +54,10 @@
 //!
 //! [`SamplerExecutor`] (defined in executor.rs) is built from a single [`SamplerConfig`].
 //! [`SamplerExecutor`] contains
+//!
 //!  - a list of ProjectSamplers
 //!  - an Inspect stats structure
+//!
 //! [`SamplerExecutor`] only has one member function execute() which calls spawn() on each
 //! project sampler, passing it a receiver-oneshot to cancel it. The collection of
 //! oneshot-senders and spawned-tasks builds the returned TaskCancellation.
@@ -102,6 +109,7 @@ use moniker::ExtendedMoniker;
 use sampler_config::{DataType, MetricConfig, ProjectConfig, SamplerConfig, SelectorList};
 use selectors::SelectorExt;
 use std::cell::{Ref, RefCell, RefMut};
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -141,10 +149,8 @@ impl TaskCancellation {
 
         for project_sampler in &project_samplers {
             for metric in &project_sampler.metrics {
-                for selector_opt in metric.borrow().selectors.iter() {
-                    if let Some(selector) = selector_opt {
-                        reader.add_selector(selector.selector_string.as_str());
-                    }
+                for selector in metric.borrow().selectors.iter().flatten() {
+                    reader.add_selector(selector.selector_string.as_str());
                 }
             }
         }
@@ -439,9 +445,11 @@ impl ProjectSampler {
         if project_id != 0 {
             let (metric_logger_proxy, metrics_server_end) =
                 fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
-            let mut project_spec = ProjectSpec::default();
-            project_spec.customer_id = Some(customer_id);
-            project_spec.project_id = Some(project_id);
+            let project_spec = ProjectSpec {
+                customer_id: Some(customer_id),
+                project_id: Some(project_id),
+                ..ProjectSpec::default()
+            };
             metric_logger_factory
                 .create_metric_event_logger(&project_spec, metrics_server_end)
                 .await?
@@ -450,12 +458,14 @@ impl ProjectSampler {
         }
         for metric in &config.metrics {
             if let Some(metric_project_id) = metric.project_id {
-                if metric_loggers.get(&metric_project_id).is_none() {
+                if let Entry::Vacant(entry) = metric_loggers.entry(metric_project_id) {
                     let (metric_logger_proxy, metrics_server_end) =
                         fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
-                    let mut project_spec = ProjectSpec::default();
-                    project_spec.customer_id = Some(customer_id);
-                    project_spec.project_id = Some(metric_project_id);
+                    let project_spec = ProjectSpec {
+                        customer_id: Some(customer_id),
+                        project_id: Some(metric_project_id),
+                        ..ProjectSpec::default()
+                    };
                     metric_logger_factory
                         .create_metric_event_logger(&project_spec, metrics_server_end)
                         .await?
@@ -466,7 +476,7 @@ impl ProjectSampler {
                                 metric_project_id,
                                 e
                             ))?;
-                    metric_loggers.insert(metric_project_id, metric_logger_proxy);
+                    entry.insert(metric_logger_proxy);
                 }
             }
         }
@@ -655,7 +665,7 @@ impl ProjectSampler {
                     continue;
                 };
                 let found_properties = diagnostics_hierarchy::select_from_hierarchy(
-                    &payload,
+                    payload,
                     &parsed_selector.selector,
                 )?;
                 match found_properties.len() {
@@ -671,7 +681,7 @@ impl ProjectSampler {
                             metric.borrow(),
                             self.metric_cache.borrow_mut(),
                             metric_cache_key,
-                            &found_properties[0],
+                            found_properties[0],
                         )? {
                             parsed_selector.increment_upload_count();
                             events_to_log.push((project_id, event));
@@ -694,8 +704,8 @@ impl ProjectSampler {
         Ok((snapshot_outcome, events_to_log))
     }
 
-    fn update_selectors_for_metric<'a>(
-        mut metric: RefMut<'a, MetricConfig>,
+    fn update_selectors_for_metric(
+        mut metric: RefMut<'_, MetricConfig>,
         selector_idx: usize,
     ) -> bool {
         if let Some(true) = metric.upload_once {
@@ -706,12 +716,12 @@ impl ProjectSampler {
         }
         let mut deleted = false;
         for (index, selector) in metric.selectors.iter_mut().enumerate() {
-            if index != selector_idx && *selector != None {
+            if index != selector_idx && selector.is_some() {
                 *selector = None;
                 deleted = true;
             }
         }
-        return deleted;
+        deleted
     }
 
     fn prepare_sample<'a>(
@@ -758,8 +768,8 @@ impl ProjectSampler {
         Ok(())
     }
 
-    fn maybe_update_cache<'a>(
-        mut cache: RefMut<'a, HashMap<MetricCacheKey, Property>>,
+    fn maybe_update_cache(
+        mut cache: RefMut<'_, HashMap<MetricCacheKey, Property>>,
         new_sample: &Property,
         data_type: &DataType,
         metric_cache_key: MetricCacheKey,
@@ -823,20 +833,18 @@ fn process_sample_for_data_type(
 fn sanitize_unsigned_numerical(diff: u64, data_source: &MetricCacheKey) -> Result<i64, Error> {
     match diff.try_into() {
         Ok(diff) => Ok(diff),
-        Err(e) => {
-            return Err(format_err!(
-                concat!(
-                    "Selector used for EventCount type",
-                    " refered to an unsigned int property,",
-                    " but cobalt requires i64, and casting introduced overflow",
-                    " which produces a negative int: {:?}. This could be due to",
-                    " a single sample being larger than i64, or a diff between",
-                    " samples being larger than i64. Error: {:?}"
-                ),
-                data_source,
-                e
-            ));
-        }
+        Err(e) => Err(format_err!(
+            concat!(
+                "Selector used for EventCount type",
+                " refered to an unsigned int property,",
+                " but cobalt requires i64, and casting introduced overflow",
+                " which produces a negative int: {:?}. This could be due to",
+                " a single sample being larger than i64, or a diff between",
+                " samples being larger than i64. Error: {:?}"
+            ),
+            data_source,
+            e
+        )),
     }
 }
 
@@ -922,7 +930,7 @@ fn build_cobalt_histogram(counts: impl Iterator<Item = u64>) -> Vec<HistogramBuc
         .collect()
 }
 
-fn build_sparse_cobalt_histogram<'a>(
+fn build_sparse_cobalt_histogram(
     counts: impl Iterator<Item = u64>,
     indexes: &[usize],
     size: usize,
@@ -1019,10 +1027,10 @@ fn convert_inspect_histogram_to_cobalt_histogram(
         ) => {
             sanitize_size(*size)?;
             match (indexes, counts) {
-                (None, counts) => build_cobalt_histogram(counts.iter().map(|c| *c)),
+                (None, counts) => build_cobalt_histogram(counts.iter().copied()),
                 (Some(indexes), counts) => {
                     sanitize_indexes(indexes, *size)?;
-                    build_sparse_cobalt_histogram(counts.iter().map(|c| *c), indexes, *size)
+                    build_sparse_cobalt_histogram(counts.iter().copied(), indexes, *size)
                 }
             }
         }
@@ -1050,8 +1058,8 @@ fn process_int(
     data_source: &MetricCacheKey,
 ) -> Result<Option<MetricEventPayload>, Error> {
     let sampled_int = match new_sample {
-        Property::Uint(_, val) => sanitize_unsigned_numerical(val.clone(), data_source)?,
-        Property::Int(_, val) => val.clone(),
+        Property::Uint(_, val) => sanitize_unsigned_numerical(*val, data_source)?,
+        Property::Int(_, val) => *val,
         _ => {
             return Err(format_err!(
                 concat!(
@@ -1125,8 +1133,8 @@ fn compute_initial_event_count(
     data_source: &MetricCacheKey,
 ) -> Result<i64, Error> {
     match new_sample {
-        Property::Uint(_, val) => sanitize_unsigned_numerical(val.clone(), data_source),
-        Property::Int(_, val) => Ok(val.clone()),
+        Property::Uint(_, val) => sanitize_unsigned_numerical(*val, data_source),
+        Property::Int(_, val) => Ok(*val),
         _ => Err(format_err!(
             concat!(
                 "Selector referenced an Inspect property",
@@ -1738,9 +1746,9 @@ mod tests {
         });
 
         process_int_tester(IntTesterParams {
-            new_val: Property::Int("count".to_string(), std::i64::MIN),
+            new_val: Property::Int("count".to_string(), i64::MIN),
             process_ok: true,
-            sample: std::i64::MIN,
+            sample: i64::MIN,
         });
 
         let i64_max_in_u64: u64 = i64::MAX.try_into().unwrap();

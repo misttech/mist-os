@@ -26,7 +26,7 @@ class NodeManagerTest : public F2fsFakeDevTestFixture {
 };
 
 zx_status_t GetLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, LockedPage *out) {
-  auto path_or = GetNodePath(vnode, index);
+  auto path_or = vnode.GetNodePath(index);
   if (path_or.is_error()) {
     return path_or.error_value();
   }
@@ -263,7 +263,7 @@ TEST_F(NodeManagerTest, NodePage) TA_NO_THREAD_SAFETY_ANALYSIS {
   }
 
   {
-    auto path_or = GetNodePath(*vnode, direct_index);
+    auto path_or = vnode->GetNodePath(direct_index);
     ASSERT_TRUE(path_or.is_ok());
     auto dnode_page_or = fs_->GetNodeManager().FindLockedDnodePage(*path_or);
     ASSERT_TRUE(dnode_page_or.is_ok());
@@ -282,7 +282,7 @@ TEST_F(NodeManagerTest, NodePage) TA_NO_THREAD_SAFETY_ANALYSIS {
   }
 
   {
-    auto path_or = GetNodePath(*vnode, indirect_index_lv1);
+    auto path_or = vnode->GetNodePath(indirect_index_lv1);
     ASSERT_TRUE(path_or.is_ok());
     auto dnode_page_or = fs_->GetNodeManager().FindLockedDnodePage(*path_or);
     ASSERT_TRUE(dnode_page_or.is_ok());
@@ -302,7 +302,7 @@ TEST_F(NodeManagerTest, NodePage) TA_NO_THREAD_SAFETY_ANALYSIS {
   }
 
   {
-    auto path_or = GetNodePath(*vnode, indirect_index_lv2);
+    auto path_or = vnode->GetNodePath(indirect_index_lv2);
     ASSERT_TRUE(path_or.is_ok());
     auto dnode_page_or = fs_->GetNodeManager().FindLockedDnodePage(*path_or);
     ASSERT_TRUE(dnode_page_or.is_ok());
@@ -321,7 +321,7 @@ TEST_F(NodeManagerTest, NodePage) TA_NO_THREAD_SAFETY_ANALYSIS {
   }
 
   {
-    auto path_or = GetNodePath(*vnode, indirect_index_lv2 + indirect_blks);
+    auto path_or = vnode->GetNodePath(indirect_index_lv2 + indirect_blks);
     ASSERT_TRUE(path_or.is_ok());
     auto dnode_page_or = fs_->GetNodeManager().FindLockedDnodePage(*path_or);
     ASSERT_TRUE(dnode_page_or.is_ok());
@@ -340,7 +340,7 @@ TEST_F(NodeManagerTest, NodePage) TA_NO_THREAD_SAFETY_ANALYSIS {
   }
 
   {
-    auto path_or = GetNodePath(*vnode, indirect_index_lv3);
+    auto path_or = vnode->GetNodePath(indirect_index_lv3);
     ASSERT_TRUE(path_or.is_ok());
     auto dnode_page_or = fs_->GetNodeManager().FindLockedDnodePage(*path_or);
     ASSERT_TRUE(dnode_page_or.is_ok());
@@ -1178,7 +1178,7 @@ TEST_F(NodeManagerTest, DnodeBidxConsistency) {
   ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
   fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(*std::move(test_file));
 
-  auto path_or = GetNodePath(*vn, kTargetOffset);
+  auto path_or = vn->GetNodePath(kTargetOffset);
   ASSERT_TRUE(path_or.is_ok());
   auto ofs_in_node_or = GetOfsInDnode(*path_or);
 

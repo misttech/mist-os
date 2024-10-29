@@ -23,6 +23,7 @@
 namespace integration_tests {
 
 using component_testing::ChildRef;
+using component_testing::Dictionary;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 
@@ -47,6 +48,10 @@ class CarnelianPixelTest : public ui_testing::PortableUITest {
                           Protocol{fuchsia::vulkan::loader::Loader::Name_}},
          .source = ParentRef(),
          .targets = {ChildRef{kCarnelianClient}}});
+
+    realm_builder().AddRoute({.capabilities = {Dictionary{"diagnostics"}},
+                              .source = ParentRef(),
+                              .targets = {ChildRef{kCarnelianClient}, kTestUIStackRef}});
 
     realm_builder().AddRoute({.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
                                                Protocol{fuchsia::ui::composition::Allocator::Name_},

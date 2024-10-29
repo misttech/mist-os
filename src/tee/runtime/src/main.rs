@@ -18,7 +18,7 @@ use futures::prelude::*;
 fn read_ta_name() -> Result<CString, Error> {
     let mut f = File::open("/pkg/data/ta_name")
         .map_err(|e| anyhow::anyhow!("Could not open ta_name file: {e}"))?;
-    let mut s = String::from("lib");
+    let mut s = String::new();
     let _ = f
         .read_to_string(&mut s)
         .map_err(|e| anyhow::anyhow!("Could not read ta_name file: {e}"))?;

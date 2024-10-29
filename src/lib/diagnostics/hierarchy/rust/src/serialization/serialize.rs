@@ -14,7 +14,7 @@ where
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut s = serializer.serialize_map(Some(1))?;
         let name = self.name.clone();
-        s.serialize_entry(&name, &SerializableHierarchyFields { hierarchy: &self })?;
+        s.serialize_entry(&name, &SerializableHierarchyFields { hierarchy: self })?;
         s.end()
     }
 }
@@ -32,7 +32,7 @@ where
         let mut s = serializer.serialize_map(Some(items))?;
         for property in self.hierarchy.properties.iter() {
             let name = property.name();
-            let _ = match property {
+            match property {
                 Property::String(_, value) => s.serialize_entry(name, &value)?,
                 Property::Int(_, value) => s.serialize_entry(name, &value)?,
                 Property::Uint(_, value) => s.serialize_entry(name, &value)?,
@@ -49,7 +49,7 @@ where
                 }
                 Property::Bool(_, value) => s.serialize_entry(name, &value)?,
                 Property::Bytes(_, array) => {
-                    s.serialize_entry(name, &format!("b64:{}", BASE64_STANDARD.encode(&array)))?
+                    s.serialize_entry(name, &format!("b64:{}", BASE64_STANDARD.encode(array)))?
                 }
                 Property::DoubleArray(_, array) => {
                     s.serialize_entry(name, &array)?;
@@ -63,7 +63,7 @@ where
                 Property::StringList(_, list) => {
                     s.serialize_entry(name, &list)?;
                 }
-            };
+            }
         }
         for child in self.hierarchy.children.iter() {
             s.serialize_entry(&child.name, &SerializableHierarchyFields { hierarchy: child })?;
@@ -83,7 +83,7 @@ pub(crate) fn maybe_condense_histogram<T>(
 where
     T: PartialEq + num_traits::Zero + Copy,
 {
-    if matches!(indexes, Some(_)) {
+    if indexes.is_some() {
         return None;
     }
     let mut condensed_counts = vec![];

@@ -28,9 +28,9 @@ use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_stash::StoreMarker;
 use fuchsia_async as fasync;
 use fuchsia_inspect::component;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::{FutureExt, StreamExt};
-use std::sync::Arc;
+use std::rc::Rc;
 
 const ENV_NAME: &str = "settings_service_environment_test";
 const TEST_PAYLOAD: &str = "test_payload";
@@ -47,7 +47,7 @@ impl TestAgent {
     async fn create(mut context: Context) {
         let mut agent = TestAgent { delegate: context.delegate.clone() };
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let _ = &context;
             while let Ok((AgentPayload::Invocation(invocation), client)) =
                 context.receptor.next_of::<AgentPayload>().await
@@ -67,15 +67,15 @@ impl TestAgent {
 
     async fn handle_service_lifespan(
         &mut self,
-        _service_context: Arc<ServiceContext>,
+        _service_context: Rc<ServiceContext>,
     ) -> InvocationResult {
         let (_, mut receptor) = self.delegate.create_sink().await.expect("Failed to create broker");
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             verify_payload(
                 Payload::Event(EventPayload::Event(Event::Custom(TEST_PAYLOAD))),
                 &mut receptor,
-                Some(Box::new(|client| -> BoxFuture<'_, ()> {
+                Some(Box::new(|client| -> LocalBoxFuture<'_, ()> {
                     Box::pin(async move {
                         let _ = client
                             .reply(Payload::Event(EventPayload::Event(Event::Custom(TEST_REPLY))));
@@ -96,7 +96,7 @@ async fn test_message_hub() {
     let service_registry = ServiceRegistry::create();
 
     let Environment { connector: _, delegate, .. } =
-        EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+        EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
             .service(ServiceRegistry::serve(service_registry))
             .agents(vec![crate::create_agent!(test_agent, TestAgent::create)])
             .spawn_nested(ENV_NAME)
@@ -132,7 +132,7 @@ async fn test_dependency_generation() {
     );
 
     let Environment { entities, .. } =
-        EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+        EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
             .registrants(vec![registrant])
             .spawn_nested(ENV_NAME)
             .await
@@ -163,7 +163,7 @@ async fn test_job_sourcing() {
     );
 
     // Build environment with the registrant.
-    let _ = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+    let _ = EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
         .registrants(vec![registrant])
         .spawn_nested(ENV_NAME)
         .await
@@ -186,13 +186,13 @@ async fn migration_error_does_not_cause_early_exit() {
     .expect("failed to open connection to tempdir");
     let (store_proxy, mut request_stream) =
         create_proxy_and_stream::<StoreMarker>().expect("can create");
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         while let Some(request) = request_stream.next().await {
             match request.unwrap() {
                 fidl_fuchsia_stash::StoreRequest::Identify { .. } => {}
                 fidl_fuchsia_stash::StoreRequest::CreateAccessor { accessor_request, .. } => {
                     let mut stream = accessor_request.into_stream().unwrap();
-                    fasync::Task::spawn(async move {
+                    fasync::Task::local(async move {
                         if let Some(r) = stream.next().await {
                             panic!("unexpected call to store before migration id checked: {r:?}");
                         }
@@ -205,9 +205,9 @@ async fn migration_error_does_not_cause_early_exit() {
     .detach();
 
     let config_logger =
-        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+        Rc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
 
-    let _ = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+    let _ = EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
         .fidl_interfaces(&[fidl::Interface::Light])
         .store_proxy(store_proxy)
         .storage_dir(directory)

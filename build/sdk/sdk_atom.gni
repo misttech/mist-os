@@ -256,6 +256,11 @@ template("sdk_atom") {
     }
   }
 
+  _default_forward_from_invoker = [
+    "assert_no_deps",
+    "testonly",
+  ]
+
   gn_deps = []
   if (defined(invoker.non_sdk_deps)) {
     gn_deps = invoker.non_sdk_deps
@@ -301,7 +306,7 @@ template("sdk_atom") {
   if (defined(meta.value)) {
     meta_generated_file_target = "${target_name}_meta_generated_file"
     generated_file(meta_generated_file_target) {
-      forward_variables_from(invoker, [ "testonly" ])
+      forward_variables_from(invoker, _default_forward_from_invoker)
       outputs = [ meta_file_for_idk ]
       contents = meta.value
       output_conversion = "json"
@@ -315,7 +320,7 @@ template("sdk_atom") {
     # TODO(https://fxbug.dev/42131074): instead, make sure that all atoms generate their metadata
     # file in the right location.
     copy(meta_copy_target_name) {
-      forward_variables_from(invoker, [ "testonly" ])
+      forward_variables_from(invoker, _default_forward_from_invoker)
 
       sources = [ meta.source ]
 
@@ -329,7 +334,7 @@ template("sdk_atom") {
 
   # Verify that the metadata complies with the specified schema.
   validate_json(meta_target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker, _default_forward_from_invoker)
     data = meta_file_for_idk
     schema = "//build/sdk/meta/${meta.schema}.json"
     sources = [
@@ -364,7 +369,7 @@ template("sdk_atom") {
       current_api_file = "$target_gen_dir/$target_name.api"
 
       action(generate_api_target_name) {
-        forward_variables_from(invoker, [ "testonly" ])
+        forward_variables_from(invoker, _default_forward_from_invoker)
 
         script = "//build/sdk/compute_atom_api.py"
 
@@ -393,7 +398,7 @@ template("sdk_atom") {
 
     verify_api_target_name = "${target_name}_verify_api"
     golden_files(verify_api_target_name) {
-      forward_variables_from(invoker, [ "testonly" ])
+      forward_variables_from(invoker, _default_forward_from_invoker)
       comparisons = [
         {
           candidate = current_api_file
@@ -420,10 +425,7 @@ template("sdk_atom") {
   # manifest for this atom in the IDK is `meta_file_for_idk`.
   python_action(target_name) {
     forward_variables_from(invoker,
-                           [
-                             "metadata",
-                             "testonly",
-                           ])
+                           _default_forward_from_invoker + [ "metadata" ])
 
     manifest = "$target_gen_dir/$target_name.sdk"
     areas_file = "//docs/contribute/governance/areas/_areas.yaml"

@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.paver/cpp/wire.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <stdbool.h>
@@ -15,6 +14,7 @@
 
 #include <memory>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -22,6 +22,7 @@
 #include <fbl/string.h>
 #include <fbl/unique_fd.h>
 
+#include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/partition-client.h"
 #include "src/storage/lib/paver/paver-context.h"
@@ -48,6 +49,7 @@ enum class Partition {
 };
 
 const char* PartitionName(Partition partition, PartitionScheme scheme);
+std::optional<uuid::Uuid> PartitionTypeGuid(Partition partition, PartitionScheme scheme);
 
 enum class Arch {
   kX64,
@@ -136,7 +138,7 @@ class DevicePartitioner {
   //
   // This analysis is best-effort only, providing only basic safety checks.
   virtual zx::result<> ValidatePayload(const PartitionSpec& spec,
-                                       cpp20::span<const uint8_t> data) const = 0;
+                                       std::span<const uint8_t> data) const = 0;
 
   // Flush all buffered write to persistant storage.
   virtual zx::result<> Flush() const = 0;
@@ -203,7 +205,7 @@ class FixedDevicePartitioner : public DevicePartitioner {
   zx::result<> WipePartitionTables() const override;
 
   zx::result<> ValidatePayload(const PartitionSpec& spec,
-                               cpp20::span<const uint8_t> data) const override;
+                               std::span<const uint8_t> data) const override;
 
   zx::result<> Flush() const override { return zx::ok(); }
   zx::result<> OnStop() const override { return zx::ok(); }

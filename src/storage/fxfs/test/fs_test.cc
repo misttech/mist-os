@@ -86,9 +86,10 @@ TEST_P(DeviceTest, TestWriteThenRead) {
   const size_t kVmoWriteBlocks = 2;
   const size_t kVmoBlockOffset = 1;
   ASSERT_LE(kVmoBlockOffset + kVmoWriteBlocks, kVmoBlocks);
-  char write_buf[kVmoWriteBlocks * info.block_size];
-  memset(write_buf, 0xa3, sizeof(write_buf));
-  ASSERT_EQ(vmo.write(write_buf, kVmoBlockOffset * info.block_size, sizeof(write_buf)), ZX_OK);
+  const size_t kBufLen = kVmoWriteBlocks * info.block_size;
+  auto write_buf = std::make_unique<char[]>(kBufLen);
+  memset(write_buf.get(), 0xa3, kBufLen);
+  ASSERT_EQ(vmo.write(write_buf.get(), kVmoBlockOffset * info.block_size, kBufLen), ZX_OK);
 
   block_fifo_request_t write_request;
   write_request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
@@ -100,12 +101,13 @@ TEST_P(DeviceTest, TestWriteThenRead) {
 
   // "Clear" vmo, so any data in the vmo after is solely dependent on the following
   // BLOCK_OPCODE_READ
-  char zero_buf[kVmoBlocks * info.block_size];
-  memset(zero_buf, 0, sizeof(zero_buf));
-  ASSERT_EQ(vmo.write(zero_buf, 0, sizeof(zero_buf)), ZX_OK);
+  const size_t kZeroBufLen = kVmoBlocks * info.block_size;
+  auto zero_buf = std::make_unique<char[]>(kZeroBufLen);
+  memset(zero_buf.get(), 0, kZeroBufLen);
+  ASSERT_EQ(vmo.write(zero_buf.get(), 0, kZeroBufLen), ZX_OK);
 
-  char read_buf[kVmoWriteBlocks * info.block_size];
-  memset(read_buf, 0, sizeof(read_buf));
+  auto read_buf = std::make_unique<char[]>(kBufLen);
+  memset(read_buf.get(), 0, kBufLen);
   block_fifo_request_t read_request;
   read_request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   read_request.vmoid = vmoid.get();
@@ -113,8 +115,8 @@ TEST_P(DeviceTest, TestWriteThenRead) {
   read_request.vmo_offset = kVmoBlockOffset;
   read_request.dev_offset = 0;
   ASSERT_EQ(device->FifoTransaction(&read_request, 1), ZX_OK);
-  ASSERT_EQ(vmo.read(read_buf, kVmoBlockOffset * info.block_size, sizeof(read_buf)), ZX_OK);
-  EXPECT_EQ(memcmp(write_buf, read_buf, sizeof(write_buf)), 0);
+  ASSERT_EQ(vmo.read(read_buf.get(), kVmoBlockOffset * info.block_size, kBufLen), ZX_OK);
+  EXPECT_EQ(memcmp(write_buf.get(), read_buf.get(), kBufLen), 0);
 }
 
 // Tests multiple reads and writes in a group
@@ -152,14 +154,15 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
   ASSERT_LE(kOffsetBlocks + 2 * kVmoWriteBlocks, kVmoBlocks);
 
   // Write write_buf1 and write_buf2 to vmo with offset = kOffsetBlocks
-  char write_buf1[kVmoWriteBlocks * info.block_size];
-  memset(write_buf1, 0xa3, sizeof(write_buf1));
-  ASSERT_EQ(vmo.write(write_buf1, kOffsetBlocks * info.block_size, sizeof(write_buf1)), ZX_OK);
+  const size_t kWriteBufLen = kVmoWriteBlocks * info.block_size;
+  auto write_buf1 = std::make_unique<char[]>(kWriteBufLen);
+  memset(write_buf1.get(), 0xa3, kWriteBufLen);
+  ASSERT_EQ(vmo.write(write_buf1.get(), kOffsetBlocks * info.block_size, kWriteBufLen), ZX_OK);
 
-  char write_buf2[kVmoWriteBlocks * info.block_size];
-  memset(write_buf2, 0xf7, sizeof(write_buf2));
-  ASSERT_EQ(vmo.write(write_buf2, (kOffsetBlocks + kVmoWriteBlocks) * info.block_size,
-                      sizeof(write_buf2)),
+  auto write_buf2 = std::make_unique<char[]>(kWriteBufLen);
+  memset(write_buf2.get(), 0xf7, kWriteBufLen);
+  ASSERT_EQ(vmo.write(write_buf2.get(), (kOffsetBlocks + kVmoWriteBlocks) * info.block_size,
+                      kWriteBufLen),
             ZX_OK);
 
   block_fifo_request_t write_requests[2];
@@ -176,9 +179,10 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
   write_requests[1].dev_offset = kVmoWriteBlocks;
   EXPECT_EQ(device->FifoTransaction(write_requests, std::size(write_requests)), ZX_OK);
 
-  char read_buf[kVmoBlocks * info.block_size];
-  memset(read_buf, 0, sizeof(read_buf));
-  ASSERT_EQ(vmo.write(read_buf, 0, sizeof(read_buf)), ZX_OK);
+  const size_t kReadBufLen = kVmoBlocks * info.block_size;
+  auto read_buf = std::make_unique<char[]>(kReadBufLen);
+  memset(read_buf.get(), 0, kReadBufLen);
+  ASSERT_EQ(vmo.write(read_buf.get(), 0, kReadBufLen), ZX_OK);
 
   block_fifo_request_t read_requests[2];
   read_requests[0].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
@@ -193,12 +197,14 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
   read_requests[1].vmo_offset = kOffsetBlocks + kVmoWriteBlocks;
   read_requests[1].dev_offset = kVmoWriteBlocks;
   ASSERT_EQ(device->FifoTransaction(read_requests, std::size(read_requests)), ZX_OK);
-  ASSERT_EQ(vmo.read(read_buf, 0, sizeof(read_buf)), ZX_OK);
-  EXPECT_EQ(memcmp(write_buf1, read_buf + (kOffsetBlocks * info.block_size), sizeof(write_buf1)),
-            0);
-  EXPECT_EQ(memcmp(write_buf2, read_buf + ((kOffsetBlocks + kVmoWriteBlocks) * info.block_size),
-                   sizeof(write_buf2)),
-            0);
+  ASSERT_EQ(vmo.read(read_buf.get(), 0, kReadBufLen), ZX_OK);
+  EXPECT_EQ(
+      memcmp(write_buf1.get(), read_buf.get() + (kOffsetBlocks * info.block_size), kWriteBufLen),
+      0);
+  EXPECT_EQ(
+      memcmp(write_buf2.get(),
+             read_buf.get() + ((kOffsetBlocks + kVmoWriteBlocks) * info.block_size), kWriteBufLen),
+      0);
 }
 
 TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
@@ -227,9 +233,10 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   ASSERT_EQ(zx::vmo::create(kVmoBlocks * info.block_size, 0, &vmo), ZX_OK);
   ASSERT_NO_FATAL_FAILURE(device->BlockAttachVmo(vmo, &vmoid.GetReference(device.get())));
 
-  char write_buf[kVmoBlocks * info.block_size];
-  memset(write_buf, 0xa3, sizeof(write_buf));
-  ASSERT_EQ(vmo.write(write_buf, 0, sizeof(write_buf)), ZX_OK);
+  const size_t kBufLen = kVmoBlocks * info.block_size;
+  auto write_buf = std::make_unique<char[]>(kBufLen);
+  memset(write_buf.get(), 0xa3, kBufLen);
+  ASSERT_EQ(vmo.write(write_buf.get(), 0, kBufLen), ZX_OK);
 
   block_fifo_request_t requests[2];
   requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
@@ -245,9 +252,9 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   requests[1].dev_offset = 0;
   EXPECT_EQ(device->FifoTransaction(requests, std::size(requests)), ZX_OK);
 
-  char read_buf[kVmoBlocks * info.block_size];
-  memset(read_buf, 0, sizeof(read_buf));
-  ASSERT_EQ(vmo.write(read_buf, 0, sizeof(read_buf)), ZX_OK);
+  auto read_buf = std::make_unique<char[]>(kBufLen);
+  memset(read_buf.get(), 0, kBufLen);
+  ASSERT_EQ(vmo.write(read_buf.get(), 0, kBufLen), ZX_OK);
 
   block_fifo_request_t read_request;
   read_request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
@@ -256,8 +263,8 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   read_request.vmo_offset = 0;
   read_request.dev_offset = 0;
   ASSERT_EQ(device->FifoTransaction(&read_request, 1), ZX_OK);
-  ASSERT_EQ(vmo.read(read_buf, 0, sizeof(read_buf)), ZX_OK);
-  EXPECT_EQ(memcmp(write_buf, read_buf, sizeof(write_buf)), 0);
+  ASSERT_EQ(vmo.read(read_buf.get(), 0, kBufLen), ZX_OK);
+  EXPECT_EQ(memcmp(write_buf.get(), read_buf.get(), kBufLen), 0);
 }
 
 TEST_P(DeviceTest, TestInvalidGroupRequests) {

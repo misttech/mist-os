@@ -3,11 +3,6 @@
 // found in the LICENSE file.
 {
     include: [ "syslog/client.shard.cml" ],
-    program: {
-        runner: "elf",
-        binary: "bin/shutdown-shim",
-        lifecycle: { stop_event: "notify" },
-    },
     capabilities: [
         { protocol: "fuchsia.system.state.SystemStateTransition" },
         { protocol: "fuchsia.hardware.power.statecontrol.Admin" },

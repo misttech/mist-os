@@ -12,14 +12,7 @@
     },
     use: [
         {
-            protocol: [
-                "fuchsia.archivist.test.RealmFactory",
-                "fuchsia.logger.Log",
-            ],
-        },
-        {
-            event_stream: "stopped",
-            from: "parent",
+            protocol: [ "fuchsia.archivist.test.RealmFactory" ],
         },
     ],
 }

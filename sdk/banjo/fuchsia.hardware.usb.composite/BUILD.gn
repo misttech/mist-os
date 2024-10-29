@@ -5,10 +5,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.composite") {
-  sdk_category = "internal"
   sources = [ "usb-composite.fidl" ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.usb.descriptor",
+    "//sdk/fidl/fuchsia.hardware.usb.descriptor",
     "//zircon/vdso/zx",
   ]
   enable_banjo = true

@@ -34,7 +34,7 @@ impl MetadataValue<'_> {
             Self::IntVec(value) => {
                 node.atomic_update(|node| {
                     let prop = node.create_int_array(key, value.len());
-                    for (idx, v) in value.into_iter().enumerate() {
+                    for (idx, v) in value.iter().enumerate() {
                         prop.set(idx, *v);
                     }
                     node.record(prop);
@@ -43,7 +43,7 @@ impl MetadataValue<'_> {
             Self::UintVec(value) => {
                 node.atomic_update(|node| {
                     let prop = node.create_uint_array(key, value.len());
-                    for (idx, v) in value.into_iter().enumerate() {
+                    for (idx, v) in value.iter().enumerate() {
                         prop.set(idx, *v);
                     }
                     node.record(prop);
@@ -52,7 +52,7 @@ impl MetadataValue<'_> {
             Self::DoubleVec(value) => {
                 node.atomic_update(|node| {
                     let prop = node.create_double_array(key, value.len());
-                    for (idx, v) in value.into_iter().enumerate() {
+                    for (idx, v) in value.iter().enumerate() {
                         prop.set(idx, *v);
                     }
                     node.record(prop);
@@ -101,7 +101,7 @@ impl<'a> From<&'a str> for MetadataValue<'a> {
     }
 }
 
-impl<'a> From<String> for MetadataValue<'_> {
+impl From<String> for MetadataValue<'_> {
     fn from(value: String) -> MetadataValue<'static> {
         MetadataValue::Str(Cow::Owned(value))
     }
@@ -331,7 +331,7 @@ where
         events_tracker: Option<GraphObjectEventTracker<T>>,
     ) -> (Self, MetaEventNode) {
         let node = parent.create_child("meta");
-        let meta_event_node = MetaEventNode::new(&parent);
+        let meta_event_node = MetaEventNode::new(parent);
 
         let mut map = BTreeMap::default();
         node.atomic_update(|node| {
@@ -339,7 +339,7 @@ where
                 match inner {
                     InnerMetadata::Nested(_) => {
                         Self::insert_nested_to_map(
-                            &node,
+                            node,
                             meta_event_node.deref(),
                             &mut vec![],
                             &mut map,
@@ -351,7 +351,7 @@ where
                         if events_tracker.is_some() && track_events {
                             value.record_inspect(&meta_event_node, &key);
                         }
-                        Self::insert_to_map(&node, &mut map, &[key.into()], value, track_events)
+                        Self::insert_to_map(node, &mut map, &[key.into()], value, track_events)
                     }
                 }
             }
@@ -455,7 +455,7 @@ where
     }
 
     fn remove_and_track(&mut self, key: &str) {
-        if let Some(_) = self.map.remove(key) {
+        if self.map.remove(key).is_some() {
             if let Some(events_tracker) = &self.events_tracker {
                 events_tracker.metadata_dropped(&self.id, key);
             }
@@ -468,10 +468,10 @@ where
         }
     }
 
-    fn insert_to_map<'a>(
+    fn insert_to_map(
         node: &inspect::Node,
         map: &mut BTreeMap<String, (MetadataProperty, bool)>,
-        key_path: &[Cow<'a, str>],
+        key_path: &[Cow<'_, str>],
         value: MetadataValue<'_>,
         track_events: bool,
     ) {
@@ -564,7 +564,7 @@ where
                         value.record_inspect(&event_node, &child_key);
                     }
                     key_path.push(child_key);
-                    Self::insert_to_map(&meta_node, map, &key_path, value, track_events);
+                    Self::insert_to_map(&meta_node, map, key_path, value, track_events);
                     key_path.pop();
                 }
             }

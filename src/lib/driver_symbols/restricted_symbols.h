@@ -6,6 +6,7 @@
 #define SRC_LIB_DRIVER_SYMBOLS_RESTRICTED_SYMBOLS_H_
 
 #include <set>
+#include <string>
 
 namespace driver_symbols {
 
@@ -30,7 +31,6 @@ namespace driver_symbols {
 // this file to remove an element from the list below.
 const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/acpi-arm64.cm",
-    "#meta/ahci.cm",
     "#meta/aml-g12-pdm.cm",
     "#meta/aml-g12-tdm-dai.cm",
     "#meta/aml-g12-tdm.cm",
@@ -143,7 +143,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/rndis-function.cm",
     "#meta/rndis-host.cm",
     "#meta/sdhci.cm",
-    "#meta/sdmmc.cm",
     "#meta/selina_radar.cm",
     "#meta/sherlock-camera-controller_driver_component.cm",
     "#meta/sysmem.cm",
@@ -159,7 +158,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/tpm-driver.cm",
     "#meta/tpm-lpc.cm",
     "#meta/uart16550.cm",
-    "#meta/ufs.cm",
     "#meta/ums-function.cm",
     "#meta/usb-adb-function.cm",
     "#meta/usb-audio.cm",
@@ -170,7 +168,6 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/usb-hci-test-driver.cm",
     "#meta/usb-hid.cm",
     "#meta/usb-hub.cm",
-    "#meta/usb-mass-storage.cm",
     "#meta/usb-peripheral.cm",
     "#meta/usb-two-endpoint-hid-fake-usb.cm",
     "#meta/usb_video.cm",

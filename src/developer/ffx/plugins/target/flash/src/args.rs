@@ -83,6 +83,13 @@ pub struct FlashCommand {
         description = "skip hardware verification. This is dangerous, please be sure the images you are flashing match the device"
     )]
     pub skip_verify: bool,
+
+    #[argh(
+        switch,
+        description = "skip uploading ssh authorized keys. This is dangerous, you will be unable to communicate with the target via ffx.",
+        hidden_help
+    )]
+    pub skip_authorized_keys: bool,
 }
 
 impl Into<ManifestParams> for FlashCommand {
@@ -154,6 +161,7 @@ mod test {
             no_bootloader_reboot: false,
             skip_verify: false,
             oem_stage: vec![test_staged_file],
+            skip_authorized_keys: false,
         };
 
         let params: ManifestParams = cmd.into();

@@ -4,6 +4,8 @@
 
 #include "src/developer/debug/debug_agent/debug_agent_server.h"
 
+#include <algorithm>
+
 #include <gtest/gtest.h>
 
 #include "src/developer/debug/debug_agent/mock_debug_agent_harness.h"
@@ -28,11 +30,7 @@ class DebugAgentServerTest : public debug::TestWithLoop {
   }
 
   uint32_t AttachToMatchingKoids(const debug_ipc::UpdateFilterReply& reply) {
-    std::vector<zx_koid_t> koids;
-    for (const auto& match : reply.matched_processes_for_filter) {
-      koids.insert(koids.end(), match.matched_pids.begin(), match.matched_pids.end());
-    }
-    return server_.AttachToKoids(koids);
+    return server_.AttachToFilterMatches(reply.matched_processes_for_filter);
   }
 
   auto GetMatchingProcesses(std::optional<fuchsia_debugger::Filter> filter) {
@@ -172,6 +170,60 @@ TEST_F(DebugAgentServerTest, AddNewFilter) {
   EXPECT_EQ(status_reply.processes.size(), 2u);
 
   EXPECT_NE(agent->GetDebuggedProcess(kProcess2Koid), nullptr);
+
+  // Now we install a job-only filter that will attach DebugAgent directly to a matching job's
+  // exception channel.
+  fuchsia_debugger::Filter third;
+  third.type(fuchsia_debugger::FilterType::kMonikerPrefix);
+  // Component moniker associated with job5 in mock_system_interface.
+  third.pattern("/some");
+  third.options().job_only(true);
+
+  result = AddFilter(third);
+  EXPECT_TRUE(result.ok());
+
+  reply = result.take_value();
+
+  auto third_filter_match = std::ranges::find_if(reply.matched_processes_for_filter,
+                                                 [](const debug_ipc::FilterMatch& match) {
+                                                   if ((match.id & 0xF) == 3)
+                                                     return true;
+
+                                                   return false;
+                                                 });
+
+  ASSERT_NE(third_filter_match, reply.matched_processes_for_filter.end());
+  EXPECT_EQ(third_filter_match->matched_pids.size(), 2u);
+
+  constexpr zx_koid_t kJob5Koid = 35;
+  constexpr zx_koid_t kJob51Koid = 38;
+
+  // The order of the matches will always be in ascending order.
+  EXPECT_EQ(third_filter_match->matched_pids[0], kJob5Koid);
+  EXPECT_EQ(third_filter_match->matched_pids[1], kJob51Koid);
+
+  // Now we test explicit attach requests. This will be the case if the filter is installed after
+  // the component that matches is already launched and we have been notified of it. See the
+  // job_only tests in debug_agent_unittests to see the case where the filter is matched upon a
+  // notification that a component is starting.
+  debug_ipc::AttachRequest attach_request;
+  attach_request.koid = kJob5Koid;
+  attach_request.config.target = debug_ipc::AttachConfig::Target::kJob;
+  attach_request.config.weak = false;
+
+  debug_ipc::AttachReply attach_reply;
+  agent->OnAttach(attach_request, &attach_reply);
+  ASSERT_TRUE(attach_reply.status.ok()) << attach_reply.status.message();
+
+  attach_request.koid = kJob51Koid;
+
+  agent->OnAttach(attach_request, &attach_reply);
+  ASSERT_TRUE(attach_reply.status.has_error());
+  ASSERT_EQ(attach_reply.status.type(), debug::Status::kAlreadyExists);
+
+  EXPECT_TRUE(agent->GetDebuggedJob(kJob5Koid));
+  // Should not be attached to the child job.
+  EXPECT_FALSE(agent->GetDebuggedJob(kJob51Koid));
 }
 
 TEST_F(DebugAgentServerTest, AddFilterErrors) {
@@ -194,6 +246,14 @@ TEST_F(DebugAgentServerTest, AddFilterErrors) {
   result = AddFilter(f);
   EXPECT_TRUE(result.has_error());
   EXPECT_EQ(result.err(), fuchsia_debugger::FilterError::kUnknownType);
+
+  // recursive and job_only options are mutually exclusive.
+  f.type(fuchsia_debugger::FilterType::kMoniker);
+  f.options().recursive(true);
+  f.options().job_only(true);
+  result = AddFilter(f);
+  EXPECT_TRUE(result.has_error());
+  EXPECT_EQ(result.err(), fuchsia_debugger::FilterError::kInvalidOptions);
 }
 
 TEST_F(DebugAgentServerTest, GetMatchingProcesses) {

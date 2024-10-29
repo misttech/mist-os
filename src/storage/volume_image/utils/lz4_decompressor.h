@@ -6,7 +6,6 @@
 #define SRC_STORAGE_VOLUME_IMAGE_UTILS_LZ4_DECOMPRESSOR_H_
 
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <string>
 #include <vector>
@@ -53,7 +52,7 @@ class Lz4Decompressor final : public Decompressor {
   //
   // On failure, returns a string decribing the error condition.
   fpromise::result<DecompressResult, std::string> Decompress(
-      cpp20::span<const uint8_t> compressed_data) final;
+      std::span<const uint8_t> compressed_data) final;
 
   // Returns |fpromise::ok| on success. At this point all remaining symbols for the decompressed
   // representation will be emitted.

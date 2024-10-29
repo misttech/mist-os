@@ -13,6 +13,7 @@ mod tests {
     };
     use rand::Rng;
     use serial_test::serial;
+    use std::env::VarError;
     use std::ffi::OsString;
     use std::os::fd::AsRawFd;
     use zerocopy::{FromBytes, IntoBytes};
@@ -75,12 +76,21 @@ mod tests {
         ret
     }
 
+    fn get_root_path() -> Option<String> {
+        // TODO(https://fxbug.dev/317285180): Once host syscall tests can be run in CQ with root
+        // access, define MUTABLE_STORAGE for host tests.
+        match std::env::var("MUTABLE_STORAGE") {
+            Ok(root_path) => Some(root_path),
+            Err(e) if e == VarError::NotPresent => None,
+            Err(e) => panic!("fetching env var MUTABLE_STORAGE failed with {:?}", e),
+        }
+    }
+
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn remove_key_that_was_never_added() {
-        let root_dir =
-            std::fs::File::open(&std::env::var("MUTABLE_STORAGE").unwrap()).expect("open failed");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
         let mut random_vector: [u8; 16] = [0; 16];
         for i in 0..16 {
             let rand_u8: u8 = rand::thread_rng().gen();
@@ -95,9 +105,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn remove_key_added_by_different_user_non_root() {
+        let Some(_) = get_root_path() else { return };
         let self_path = std::fs::read_link("/proc/self/exe").unwrap();
         let parent = self_path.parent().expect("no parent");
         let child_binary_path = parent.join("fscrypt_test");
@@ -143,9 +153,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn remove_key_added_by_different_user_root() {
+        let Some(_) = get_root_path() else { return };
         let self_path = std::fs::read_link("/proc/self/exe").unwrap();
         let parent = self_path.parent().expect("no parent");
         let child_binary_path = parent.join("fscrypt_test");
@@ -187,9 +197,10 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn user_reads_directory_unlocked_by_different_user() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
 
         let self_path = std::fs::read_link("/proc/self/exe").unwrap();
@@ -255,10 +266,11 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn readdir_encrypted_directory_name() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
         let (ret, arg_vec) = add_encryption_key(&root_dir);
@@ -313,10 +325,11 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn read_file_contents_from_handle_created_before_remove_encryption_key() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
         let (ret, arg_vec) = add_encryption_key(&root_dir);
@@ -359,10 +372,11 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn readdir_locked_directory() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
         let (ret, arg_vec) = add_encryption_key(&root_dir);
@@ -412,11 +426,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn set_encryption_policy_with_fake_identifier_non_root() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let mut random_vector: [u8; 16] = [0; 16];
         for i in 0..16 {
@@ -448,9 +461,10 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn set_encryption_policy_with_fake_identifier_root() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
         let mut random_vector: [u8; 16] = [0; 16];
@@ -468,12 +482,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn set_encryption_policy_on_directory_encrypted_with_different_policy() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
 
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
@@ -522,12 +535,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn set_encryption_policy_on_file() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let (ret, arg_vec) = add_encryption_key(&root_dir);
         assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
@@ -546,12 +558,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn set_encryption_policy_on_non_empty_directory() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
         let (ret, arg_vec) = add_encryption_key(&root_dir);
@@ -569,11 +580,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn set_encryption_key_on_directory_owned_by_different_user() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
 
         let self_path = std::fs::read_link("/proc/self/exe").unwrap();
@@ -608,11 +618,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn set_encryption_policy_with_encryption_key_added_by_different_user() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
 
         let self_path = std::fs::read_link("/proc/self/exe").unwrap();
@@ -649,10 +658,11 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn stat_locked_file() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
         let (ret, arg_vec) = add_encryption_key(&root_dir);
@@ -686,11 +696,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn one_user_adds_the_same_encryption_key_twice() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
 
         let self_path = std::fs::read_link("/proc/self/exe").unwrap();
@@ -732,9 +741,10 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn different_user_add_the_same_encryption_key() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
 
@@ -827,12 +837,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
     fn root_sets_encryption_policy_on_a_directory_it_does_not_own() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
 
@@ -861,10 +870,11 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn unlink_locked_empty_encrypted_directory() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
 
@@ -914,10 +924,11 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn unlink_locked_encrypted_file() {
-        let root_path = &std::env::var("MUTABLE_STORAGE").expect("failed to get env var");
-        let root_dir = std::fs::File::open(root_path).expect("open failed");
-        let dir_path = std::path::Path::new(root_path).join("my_dir");
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let dir_path = std::path::Path::new(&root_path).join("my_dir");
         std::fs::create_dir_all(dir_path.clone()).unwrap();
         let dir = std::fs::File::open(dir_path.clone()).unwrap();
 

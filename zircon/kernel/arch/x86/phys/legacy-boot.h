@@ -22,8 +22,8 @@ struct LegacyBoot {
   std::string_view cmdline;
   cpp20::span<std::byte> ramdisk;
   cpp20::span<zbi_mem_range_t> mem_config;
-  // Physical address of the ACPI RSDP.
-  uint64_t acpi_rsdp = 0;
+  uint64_t acpi_rsdp = 0;  // Physical address of the ACPI RSDP.
+  uint64_t smbios = 0;     // Physical address of the SMBIOS table.
   uart::all::Driver uart;
 };
 

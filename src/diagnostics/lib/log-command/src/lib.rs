@@ -44,10 +44,9 @@ pub struct WatchCommand {}
 pub struct DumpCommand {}
 
 pub fn parse_time(value: &str) -> Result<DetailedDateTime, String> {
-    let d = parse_date_string(value, Local::now(), Dialect::Us)
+    parse_date_string(value, Local::now(), Dialect::Us)
         .map(|time| DetailedDateTime { time, is_now: value == "now" })
-        .map_err(|e| format!("invalid date string: {}", e));
-    d
+        .map_err(|e| format!("invalid date string: {}", e))
 }
 
 /// Parses a duration from a string. The input is in seconds
@@ -390,7 +389,7 @@ pub trait InstanceGetter {
 #[async_trait::async_trait(?Send)]
 impl InstanceGetter for RealmQueryProxy {
     async fn get_monikers_from_query(&self, query: &str) -> Result<Vec<Moniker>, LogError> {
-        Ok(get_instances_from_query(query, &self)
+        Ok(get_instances_from_query(query, self)
             .await?
             .into_iter()
             .map(|value| value.moniker)
@@ -481,7 +480,7 @@ impl LogCommand {
             .chain(self.set_severity.iter().cloned())
             .collect::<Vec<_>>();
         let mut selectors: Cow<'_, Vec<_>> = Cow::Borrowed(&all_selectors);
-        if !selectors.is_empty() && !(self.force_select || self.force_set_severity) {
+        if !(selectors.is_empty() || self.force_select || self.force_set_severity) {
             let new_selectors = Self::map_interest_selectors(realm_query, selectors.iter()).await?;
             if !new_selectors.is_empty() {
                 selectors = Cow::Owned(
@@ -508,7 +507,7 @@ impl LogCommand {
                         if full_moniker.is_empty() {
                             full_moniker.push_str(segment);
                         } else {
-                            full_moniker.push_str("/");
+                            full_moniker.push('/');
                             full_moniker.push_str(segment);
                         }
                     }
@@ -575,12 +574,13 @@ mod test {
     #[fuchsia::test]
     async fn maybe_set_interest_errors_if_ambiguous_selector() {
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
-        let mut getter = FakeInstanceGetter::default();
-        getter.expected_selector = Some("ambiguous_selector".into());
-        getter.output = vec![
-            Moniker::try_from("core/some/ambiguous_selector:thing/test").unwrap(),
-            Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
-        ];
+        let getter = FakeInstanceGetter {
+            expected_selector: Some("ambiguous_selector".into()),
+            output: vec![
+                Moniker::try_from("core/some/ambiguous_selector:thing/test").unwrap(),
+                Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
+            ],
+        };
         // Main should return an error
 
         let cmd = LogCommand {
@@ -601,7 +601,7 @@ mod test {
             // The channel should be closed without sending any requests.
             assert_matches!(request, None);
         }));
-        while let Some(_) = scheduler.next().await {}
+        while scheduler.next().await.is_some() {}
         drop(scheduler);
 
         let error = format!("{}", set_interest_result.unwrap().unwrap_err());
@@ -630,9 +630,10 @@ ffx log --force-set-severity.
             ..LogCommand::default()
         };
         let mut set_interest_result = None;
-        let mut getter = FakeInstanceGetter::default();
-        getter.expected_selector = Some("ambiguous_selector".into());
-        getter.output = vec![Moniker::try_from("core/some/ambiguous_selector").unwrap()];
+        let getter = FakeInstanceGetter {
+            expected_selector: Some("ambiguous_selector".into()),
+            output: vec![Moniker::try_from("core/some/ambiguous_selector").unwrap()],
+        };
         let mut scheduler = FuturesUnordered::new();
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
         scheduler.push(Either::Left(async {
@@ -653,7 +654,7 @@ ffx log --force-set-severity.
                 vec![parse_log_interest_selector("core/some/ambiguous_selector#INFO").unwrap()]
             );
         }));
-        while let Some(_) = scheduler.next().await {}
+        while scheduler.next().await.is_some() {}
         drop(scheduler);
         assert_matches!(set_interest_result, Some(Ok(())));
     }
@@ -666,12 +667,13 @@ ffx log --force-set-severity.
             force_set_severity: true,
             ..LogCommand::default()
         };
-        let mut getter = FakeInstanceGetter::default();
-        getter.expected_selector = Some("ambiguous_selector".into());
-        getter.output = vec![
-            Moniker::try_from("core/some/ambiguous_selector:thing/test").unwrap(),
-            Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
-        ];
+        let getter = FakeInstanceGetter {
+            expected_selector: Some("ambiguous_selector".into()),
+            output: vec![
+                Moniker::try_from("core/some/ambiguous_selector:thing/test").unwrap(),
+                Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
+            ],
+        };
         let mut set_interest_result = None;
         let mut scheduler = FuturesUnordered::new();
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
@@ -693,7 +695,7 @@ ffx log --force-set-severity.
                 vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()]
             );
         }));
-        while let Some(_) = scheduler.next().await {}
+        while scheduler.next().await.is_some() {}
         drop(scheduler);
         assert_matches!(set_interest_result, Some(Ok(())));
     }
@@ -706,12 +708,13 @@ ffx log --force-set-severity.
             force_set_severity: true,
             ..LogCommand::default()
         };
-        let mut getter = FakeInstanceGetter::default();
-        getter.expected_selector = Some("ambiguous_selector".into());
-        getter.output = vec![
-            Moniker::try_from("core/some/collection:thing/test").unwrap(),
-            Moniker::try_from("core/other/collection:thing/test").unwrap(),
-        ];
+        let getter = FakeInstanceGetter {
+            expected_selector: Some("ambiguous_selector".into()),
+            output: vec![
+                Moniker::try_from("core/some/collection:thing/test").unwrap(),
+                Moniker::try_from("core/other/collection:thing/test").unwrap(),
+            ],
+        };
         let mut set_interest_result = None;
         let mut scheduler = FuturesUnordered::new();
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
@@ -733,7 +736,7 @@ ffx log --force-set-severity.
                 vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()]
             );
         }));
-        while let Some(_) = scheduler.next().await {}
+        while scheduler.next().await.is_some() {}
         drop(scheduler);
         assert_matches!(set_interest_result, Some(Ok(())));
     }
@@ -747,10 +750,10 @@ ffx log --force-set-severity.
 
     #[test]
     fn test_parse_time() {
-        assert_eq!(parse_time("now").unwrap().is_now, true);
+        assert!(parse_time("now").unwrap().is_now);
         let date_string = "04/20/2020";
         let res = parse_time(date_string).unwrap();
-        assert_eq!(res.is_now, false);
+        assert!(!res.is_now);
         assert_eq!(
             res.date_naive(),
             parse_date_string(date_string, Local::now(), Dialect::Us).unwrap().date_naive()

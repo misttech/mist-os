@@ -19,7 +19,7 @@ fn main() -> Result<(), Error> {
 }
 
 fn run_tests(config_files: Vec<String>) -> Result<(), Error> {
-    if config_files.len() == 0 {
+    if config_files.is_empty() {
         bail!("Need at least 1 file to test");
     }
 

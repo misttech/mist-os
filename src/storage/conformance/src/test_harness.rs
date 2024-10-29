@@ -47,8 +47,7 @@ impl TestHarness {
         // Generate set of supported open rights for each object type.
         let dir_rights = Rights::new(get_supported_dir_rights(&config));
         let file_rights = Rights::new(get_supported_file_rights(&config));
-        let executable_file_rights =
-            Rights::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE);
+        let executable_file_rights = Rights::new(fio::Rights::READ_BYTES | fio::Rights::EXECUTE);
 
         TestHarness { proxy, config, dir_rights, file_rights, executable_file_rights }
     }
@@ -105,24 +104,7 @@ impl TestHarness {
     /// that support mutable attributes must support [`fio::NodeAttributesQuery::CREATION_TIME`]
     /// and [`fio::NodeAttributesQuery::MODIFICATION_TIME`].
     pub fn supports_mutable_attrs(&self) -> bool {
-        let all_mutable_attrs: fio::NodeAttributesQuery = fio::NodeAttributesQuery::ACCESS_TIME
-            | fio::NodeAttributesQuery::MODIFICATION_TIME
-            | fio::NodeAttributesQuery::CREATION_TIME
-            | fio::NodeAttributesQuery::MODE
-            | fio::NodeAttributesQuery::GID
-            | fio::NodeAttributesQuery::UID
-            | fio::NodeAttributesQuery::RDEV;
-        if self.config.supported_attributes.intersects(all_mutable_attrs) {
-            assert!(
-                self.config.supported_attributes.contains(
-                    fio::NodeAttributesQuery::CREATION_TIME
-                        | fio::NodeAttributesQuery::MODIFICATION_TIME
-                ),
-                "Harnesses must support at least CREATION_TIME if attributes are mutable."
-            );
-            return true;
-        }
-        false
+        supports_mutable_attrs(&self.config)
     }
 }
 
@@ -152,22 +134,49 @@ async fn connect_to_harness() -> io_test::TestHarnessProxy {
     .expect("Cannot connect to test harness protocol")
 }
 
-/// Returns the aggregate of all io1 rights that are supported for [`io_test::Directory`] objects.
-fn get_supported_dir_rights(config: &io_test::HarnessConfig) -> fio::OpenFlags {
-    fio::OpenFlags::RIGHT_READABLE
-        | fio::OpenFlags::RIGHT_WRITABLE
-        | if config.supports_executable_file {
-            fio::OpenFlags::RIGHT_EXECUTABLE
-        } else {
-            fio::OpenFlags::empty()
-        }
+// Returns the aggregate of all rights that are supported for [`io_test::Directory`] objects.
+// Note that rights are specific to a connection (abilities are properties of the node).
+fn get_supported_dir_rights(config: &io_test::HarnessConfig) -> fio::Rights {
+    fio::R_STAR_DIR
+        | fio::W_STAR_DIR
+        | if config.supports_executable_file { fio::X_STAR_DIR } else { fio::Rights::empty() }
 }
 
-/// Returns the aggregate of all io1 rights that are supported for [`io_test::File`] objects.
-fn get_supported_file_rights(config: &io_test::HarnessConfig) -> fio::OpenFlags {
-    let mut rights = fio::OpenFlags::RIGHT_READABLE;
+// Returns the aggregate of all rights that are supported for [`io_test::File`] objects.
+// Note that rights are specific to a connection (abilities are properties of the node).
+fn get_supported_file_rights(config: &io_test::HarnessConfig) -> fio::Rights {
+    let mut rights = fio::Rights::READ_BYTES | fio::Rights::GET_ATTRIBUTES;
     if config.supports_mutable_file {
-        rights |= fio::OpenFlags::RIGHT_WRITABLE;
+        rights |= fio::Rights::WRITE_BYTES;
+    }
+    if supports_mutable_attrs(&config) {
+        rights |= fio::Rights::WRITE_BYTES;
     }
     rights
+}
+
+// Returns true if the harness supports at least one mutable attribute, false otherwise.
+//
+// *NOTE*: To allow testing both the io1 SetAttrs and io2 UpdateAttributes methods, harnesses
+// that support mutable attributes must support [`fio::NodeAttributesQuery::CREATION_TIME`]
+// and [`fio::NodeAttributesQuery::MODIFICATION_TIME`].
+fn supports_mutable_attrs(config: &io_test::HarnessConfig) -> bool {
+    let all_mutable_attrs: fio::NodeAttributesQuery = fio::NodeAttributesQuery::ACCESS_TIME
+        | fio::NodeAttributesQuery::MODIFICATION_TIME
+        | fio::NodeAttributesQuery::CREATION_TIME
+        | fio::NodeAttributesQuery::MODE
+        | fio::NodeAttributesQuery::GID
+        | fio::NodeAttributesQuery::UID
+        | fio::NodeAttributesQuery::RDEV;
+    if config.supported_attributes.intersects(all_mutable_attrs) {
+        assert!(
+            config.supported_attributes.contains(
+                fio::NodeAttributesQuery::CREATION_TIME
+                    | fio::NodeAttributesQuery::MODIFICATION_TIME
+            ),
+            "Harnesses must support at least CREATION_TIME if attributes are mutable."
+        );
+        return true;
+    }
+    false
 }

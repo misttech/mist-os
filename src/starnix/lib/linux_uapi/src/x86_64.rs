@@ -16,6 +16,7 @@
 //!
 //!    ./src/starnix/lib/linux_uapi/generate.py
 
+use crate::fscrypt_key_specifier;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[repr(transparent)]
@@ -6616,38 +6617,6 @@ impl Default for fscrypt_get_policy_ex_arg {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
-pub struct fscrypt_key_specifier {
-    pub type_: __u32,
-    pub __reserved: __u32,
-    pub u: fscrypt_key_specifier__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
-pub union fscrypt_key_specifier__bindgen_ty_1 {
-    pub __reserved: [__u8; 32usize],
-    pub descriptor: [__u8; 8usize],
-    pub identifier: [__u8; 16usize],
-}
-impl Default for fscrypt_key_specifier__bindgen_ty_1 {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-impl Default for fscrypt_key_specifier {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
 #[derive(Debug, Default)]
 pub struct fscrypt_provisioning_key_payload {
     pub type_: __u32,
@@ -6656,25 +6625,6 @@ pub struct fscrypt_provisioning_key_payload {
 }
 #[repr(C)]
 #[derive(KnownLayout, FromBytes, Immutable)]
-pub struct fscrypt_add_key_arg {
-    pub key_spec: fscrypt_key_specifier,
-    pub raw_size: __u32,
-    pub key_id: __u32,
-    pub __reserved: [__u32; 7usize],
-    pub __flags: __u32,
-    pub raw: __IncompleteArrayField<__u8>,
-}
-impl Default for fscrypt_add_key_arg {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-#[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub struct fscrypt_remove_key_arg {
     pub key_spec: fscrypt_key_specifier,
     pub removal_status_flags: __u32,
@@ -6690,7 +6640,6 @@ impl Default for fscrypt_remove_key_arg {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
 pub struct fscrypt_get_key_status_arg {
     pub key_spec: fscrypt_key_specifier,
     pub __reserved: [__u32; 6usize],

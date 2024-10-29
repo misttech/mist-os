@@ -86,7 +86,6 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     mock_set_buffer_mode_.Call(request->mode);
     completer.ReplySuccess();
   }
-  void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {}
   void GetInterrupt(GetInterruptRequestView request,
                     GetInterruptCompleter::Sync& completer) override {
     if (client_got_interrupt_) {

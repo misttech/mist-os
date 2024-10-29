@@ -9,6 +9,7 @@
 #include <lib/zx/vmo.h>
 
 #include <set>
+#include <string_view>
 #include <vector>
 
 namespace driver_symbols {

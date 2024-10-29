@@ -209,6 +209,10 @@
                 // TODO(https://fxbug.dev/374802310)
                 "inotify03",
                 "inotify12",
+
+                // TODO(https://fxbug.dev/373897750): These tests require cgroups to be unlinkable.
+                "cgroup_core03",
+                "clone303",
             ],
         },
         {

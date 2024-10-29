@@ -348,17 +348,11 @@ pub(crate) struct RuleRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerM
     pub(crate) client: InternalClient<NetlinkRoute, S>,
 }
 
-/// Handler trait for NETLINK_ROUTE requests related to PBR rules.
-pub(crate) trait RuleRequestHandler<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>:
-    Send + 'static
-{
-    fn handle_request(&mut self, req: RuleRequest<S>) -> Result<(), Errno>;
-}
-
-impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> RuleRequestHandler<S>
-    for RuleTable
-{
-    fn handle_request(&mut self, req: RuleRequest<S>) -> Result<(), Errno> {
+impl RuleTable {
+    pub(crate) fn handle_request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
+        &mut self,
+        req: RuleRequest<S>,
+    ) -> Result<(), Errno> {
         let RuleTable { v4_rules, v6_rules } = self;
         let RuleRequest { args, ip_version, sequence_number, mut client } = req;
         let rule_table = match ip_version {

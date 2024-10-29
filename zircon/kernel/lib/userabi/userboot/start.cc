@@ -541,6 +541,18 @@ struct TerminationInfo {
 
     if (!opts.boot.next.empty()) {
       [[maybe_unused]] auto boot_context = launch_process(opts.boot, std::move(userboot_server));
+      // Tests are commonly defined with `userboot.test.next`, but there are some kind of tests,
+      // which require being launched as the boot program. A boot program has a well-defined
+      // protocol for communicating handles, and to properly test the protocol implementation the
+      // program must be launched as `userboot.next` instead. In these cases, two things must
+      // happen:
+      //  + userboot must wait for the program to terminate.
+      //  + test success criteria is applied to `userboot.next` return code, not
+      //  `userboot.test.next`, even if both entries are present.
+      if (opts.next_is_test) {
+        info.test_return_code = WaitForProcessExit(log, opts.boot, boot_context);
+        info.should_shutdown = true;
+      }
     }
   }
   HandleTermination(log, info);

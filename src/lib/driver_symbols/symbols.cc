@@ -9,6 +9,9 @@
 #include <lib/zx/vmar.h>
 #include <zircon/status.h>
 
+#include <string>
+#include <string_view>
+
 #include "restricted_symbols.h"
 
 namespace {

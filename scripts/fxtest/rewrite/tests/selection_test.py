@@ -2,9 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import os
 import unittest
+from unittest import mock
 
 import args
+import environment
 import selection
 import selection_types
 import test_list_file
@@ -201,6 +204,38 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             ),
         )
 
+    def _make_exec_env(self) -> environment.ExecutionEnvironment:
+        """Create an execution environment for test."""
+
+        exec_env = environment.ExecutionEnvironment(
+            fuchsia_dir="",
+            out_dir="",
+            test_json_file="",
+            log_file=None,
+            test_list_file="",
+        )
+
+        # Override the return value when retrieving the command line
+        # for the matching script.  This will be relative to the test
+        # directory which includes dldist as test data under "bin".
+        #
+        # Note we need to go up two levels because the parent of __file__
+        # is the .pyz file path itself.
+
+        cur_path = os.path.dirname(os.path.dirname(__file__))
+        dldist_path = os.path.join(cur_path, "bin", "dldist")
+
+        env_patch = mock.patch.object(
+            exec_env,
+            "fx_cmd_line",
+            mock.Mock(return_value=[dldist_path]),
+        )
+
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
+
+        return exec_env
+
     async def test_select_all(self) -> None:
         """Test that empty selection selects all mode-matching tests with perfect scores"""
         tests = [
@@ -208,7 +243,9 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/tests2", "baz"),
         ]
 
-        selected = await selection.select_tests(tests, [])
+        exec_env = self._make_exec_env()
+
+        selected = await selection.select_tests(tests, [], exec_env)
 
         self.assertEqual(len(selected.selected), 2)
         for score in selected.best_score.values():
@@ -216,7 +253,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(selected.has_device_test())
 
         host_selected = await selection.select_tests(
-            tests, [], selection.SelectionMode.HOST
+            tests, [], exec_env, selection.SelectionMode.HOST
         )
         self.assertEqual(len(host_selected.selected), 1)
         self.assertEqual(
@@ -232,7 +269,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(host_selected.has_device_test())
 
         device_selected = await selection.select_tests(
-            tests, [], selection.SelectionMode.DEVICE
+            tests, [], exec_env, selection.SelectionMode.DEVICE
         )
         self.assertEqual(len(device_selected.selected), 1)
         self.assertEqual(
@@ -254,10 +291,13 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/tests2", "baz"),
         ]
 
+        exec_env = self._make_exec_env()
+
         try:
             selections = await selection.select_tests(
                 tests,
                 [],
+                exec_env,
                 exact_match=True,
             )
             self.assertTrue(False, f"Expected a SelectionError: {selections}")
@@ -271,17 +311,26 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_package_test("src/tests", "foo-pkg", "bar-test"),
             self._make_host_test("src/other-tests", "binary_test"),
         ]
-        select_path = await selection.select_tests(tests, ["//src/tests"])
-        select_name1 = await selection.select_tests(tests, ["foo-pkg"])
-        select_name2 = await selection.select_tests(tests, ["bar-test"])
+
+        exec_env = self._make_exec_env()
+
+        select_path = await selection.select_tests(
+            tests, ["//src/tests"], exec_env
+        )
+        select_name1 = await selection.select_tests(
+            tests, ["foo-pkg"], exec_env
+        )
+        select_name2 = await selection.select_tests(
+            tests, ["bar-test"], exec_env
+        )
         select_pkg = await selection.select_tests(
-            tests, ["--package", "foo-pkg"]
+            tests, ["--package", "foo-pkg"], exec_env
         )
         select_cm = await selection.select_tests(
-            tests, ["--component", "bar-test"]
+            tests, ["--component", "bar-test"], exec_env
         )
         url_prefix = await selection.select_tests(
-            tests, ["fuchsia-pkg://fuchsia.com/foo-pkg"]
+            tests, ["fuchsia-pkg://fuchsia.com/foo-pkg"], exec_env
         )
 
         self.assertEqual(select_path.selected, select_name1.selected)
@@ -293,12 +342,14 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         for g, matches in select_path.group_matches:
             self.assertEqual(len(matches), 1, f"Failed in {g}")
 
-        host_path = await selection.select_tests(tests, ["binary_test"])
+        host_path = await selection.select_tests(
+            tests, ["binary_test"], exec_env
+        )
         self.assertEqual(
             [s.name() for s in host_path.selected], ["host_x64/binary_test"]
         )
 
-        full_path = await selection.select_tests(tests, ["//src"])
+        full_path = await selection.select_tests(tests, ["//src"], exec_env)
         self.assertEqual(
             [s.name() for s in full_path.selected], [t.name() for t in tests]
         )
@@ -310,14 +361,23 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_package_test("src/tests", "foo-pkg", "bar-test"),
             self._make_host_test("src/other-tests", "binary_test"),
         ]
-        select_path = await selection.select_tests(tests, ["rc/te"])
-        select_name1 = await selection.select_tests(tests, ["o-pk"])
-        select_name2 = await selection.select_tests(tests, ["ar-test"])
-        select_pkg = await selection.select_tests(tests, ["--package", "o-pk"])
-        select_cm = await selection.select_tests(
-            tests, ["--component", "ar-test"]
+
+        exec_env = self._make_exec_env()
+
+        select_path = await selection.select_tests(tests, ["rc/te"], exec_env)
+        select_name1 = await selection.select_tests(tests, ["o-pk"], exec_env)
+        select_name2 = await selection.select_tests(
+            tests, ["ar-test"], exec_env
         )
-        url_contains = await selection.select_tests(tests, ["fuchsia.com/foo"])
+        select_pkg = await selection.select_tests(
+            tests, ["--package", "o-pk"], exec_env
+        )
+        select_cm = await selection.select_tests(
+            tests, ["--component", "ar-test"], exec_env
+        )
+        url_contains = await selection.select_tests(
+            tests, ["fuchsia.com/foo"], exec_env
+        )
 
         self.assertEqual(select_path.selected, select_name1.selected)
         self.assertEqual(select_path.selected, select_name2.selected)
@@ -328,12 +388,12 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         for _, matches in select_path.group_matches:
             self.assertEqual(len(matches), 1)
 
-        host_path = await selection.select_tests(tests, ["ary_test"])
+        host_path = await selection.select_tests(tests, ["ary_test"], exec_env)
         self.assertEqual(
             [s.name() for s in host_path.selected], ["host_x64/binary_test"]
         )
 
-        full_path = await selection.select_tests(tests, ["src"])
+        full_path = await selection.select_tests(tests, ["src"], exec_env)
         self.assertEqual(
             [s.name() for s in full_path.selected], [t.name() for t in tests]
         )
@@ -346,7 +406,11 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/other-tests", "binary_test"),
         ]
 
-        host_fuzzy = await selection.select_tests(tests, ["binaryytest"])
+        exec_env = self._make_exec_env()
+
+        host_fuzzy = await selection.select_tests(
+            tests, ["binaryytest"], exec_env
+        )
         self.assertEqual(
             [s.name() for s in host_fuzzy.selected], ["host_x64/binary_test"]
         )
@@ -361,9 +425,12 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/other-tests", "binary_test"),
         ]
 
+        exec_env = self._make_exec_env()
+
         host_exact = await selection.select_tests(
             tests,
             ["binaryytest"],
+            exec_env,
             exact_match=True,
         )
         self.assertEqual(0, len(host_exact.selected))
@@ -383,9 +450,12 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/other-tests", "binary_test"),
         ]
 
+        exec_env = self._make_exec_env()
+
         package_selection = await selection.select_tests(
             tests,
             ["--package", "foo-pkg"],
+            exec_env,
         )
         self.assertEqual(
             list(map(lambda x: x.name(), package_selection.selected)),
@@ -398,6 +468,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         component_selection = await selection.select_tests(
             tests,
             ["--component", "other-baz-test"],
+            exec_env,
         )
         self.assertEqual(
             list(map(lambda x: x.name(), component_selection.selected)),
@@ -411,6 +482,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         both_selection = await selection.select_tests(
             tests,
             ["--package", "foo", "--and", "--component", "other-baz-test"],
+            exec_env,
         )
         self.assertEqual(
             list(map(lambda x: x.name(), both_selection.selected)),
@@ -429,6 +501,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
                 "--component",
                 "other-baz-test",
             ],
+            exec_env,
             exact_match=True,
         )
         self.assertEqual(
@@ -444,10 +517,13 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/other-tests", "binary_test"),
         ]
 
+        exec_env = self._make_exec_env()
+
         # Don't match package or component in exact mode
         device_exact = await selection.select_tests(
             tests,
             ["foo-pkg"],
+            exec_env,
             exact_match=True,
         )
         self.assertEqual(0, len(device_exact.selected))
@@ -460,6 +536,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         device_exact = await selection.select_tests(
             tests,
             ["bar-test"],
+            exec_env,
             exact_match=True,
         )
         self.assertEqual(0, len(device_exact.selected))
@@ -472,7 +549,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
 
         # Package matches in fuzzy mode
         device_fuzzy = await selection.select_tests(
-            tests, ["foo-pkg"], mode=selection.SelectionMode.ANY
+            tests, ["foo-pkg"], exec_env, mode=selection.SelectionMode.ANY
         )
         self.assertEqual(1, len(device_fuzzy.selected))
         self.assertEqual(
@@ -482,7 +559,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             selection.PERFECT_MATCH_DISTANCE,
         )
         device_fuzzy = await selection.select_tests(
-            tests, ["bar-test"], mode=selection.SelectionMode.ANY
+            tests, ["bar-test"], exec_env, mode=selection.SelectionMode.ANY
         )
         self.assertEqual(1, len(device_fuzzy.selected))
         self.assertEqual(
@@ -496,6 +573,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         device_exact = await selection.select_tests(
             tests,
             ["fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"],
+            exec_env,
             exact_match=True,
         )
         self.assertEqual(1, len(device_exact.selected))
@@ -510,6 +588,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         package_exact = await selection.select_tests(
             tests,
             ["--package", "foo-pkg"],
+            exec_env,
             exact_match=True,
         )
         self.assertEqual(1, len(package_exact.selected))
@@ -521,7 +600,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
 
         component_exact = await selection.select_tests(
-            tests, ["--component", "bar-test"], exact_match=True
+            tests, ["--component", "bar-test"], exec_env, exact_match=True
         )
         self.assertEqual(1, len(component_exact.selected))
         self.assertEqual(
@@ -535,6 +614,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         host_exact = await selection.select_tests(
             tests,
             ["host_x64/binary_test"],
+            exec_env,
             exact_match=True,
         )
         self.assertEqual(1, len(host_exact.selected))
@@ -548,6 +628,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         host_exact = await selection.select_tests(
             tests,
             ["binary_test"],
+            exec_env,
             exact_match=True,
         )
         self.assertEqual(1, len(host_exact.selected))
@@ -560,6 +641,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         label_exact = await selection.select_tests(
             tests,
             ["//src/other-tests:binary_test"],
+            exec_env,
             exact_match=True,
         )
         self.assertEqual(1, len(label_exact.selected))
@@ -576,7 +658,11 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/more-tests", "binaryytest"),
         ]
 
-        host_fuzzy = await selection.select_tests(tests, ["binaryytest"])
+        exec_env = self._make_exec_env()
+
+        host_fuzzy = await selection.select_tests(
+            tests, ["binaryytest"], exec_env
+        )
         self.assertEqual(
             [s.name() for s in host_fuzzy.selected], ["host_x64/binaryytest"]
         )
@@ -597,7 +683,11 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/more-tests", "binaryytest"),
         ]
 
-        host_fuzzy = await selection.select_tests(tests, ["binary0test"])
+        exec_env = self._make_exec_env()
+
+        host_fuzzy = await selection.select_tests(
+            tests, ["binary0test"], exec_env
+        )
         self.assertEqual(
             {s.name() for s in host_fuzzy.selected},
             {"host_x64/binary_test", "host_x64/binaryytest"},
@@ -615,8 +705,10 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             self._make_host_test("src/other-tests", "script_test"),
         ]
 
+        exec_env = self._make_exec_env()
+
         # Limit only
-        select_all = await selection.select_tests(tests, [])
+        select_all = await selection.select_tests(tests, [], exec_env)
         select_all.apply_flags(args.parse_args(["--limit=3"]))
         self.assertEqual(len(select_all.selected), 3)
         self.assertEqual(len(select_all.selected_but_not_run), 1)
@@ -630,7 +722,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
 
         # Offset only
-        select_all = await selection.select_tests(tests, [])
+        select_all = await selection.select_tests(tests, [], exec_env)
         select_all.apply_flags(args.parse_args(["--offset=3"]))
         self.assertEqual(len(select_all.selected), 1)
         self.assertEqual(len(select_all.selected_but_not_run), 3)
@@ -642,7 +734,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
 
         # Both
-        select_all = await selection.select_tests(tests, [])
+        select_all = await selection.select_tests(tests, [], exec_env)
         select_all.apply_flags(args.parse_args(["--offset=1", "--limit=2"]))
         self.assertEqual(len(select_all.selected), 2)
         self.assertEqual(len(select_all.selected_but_not_run), 2)

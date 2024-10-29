@@ -27,7 +27,7 @@ use settings_storage::device_storage::DeviceStorageCompatible;
 use settings_storage::storage_factory::FidlStorageFactory;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
 const ENV_NAME: &str = "settings_service_setting_handler_test_environment";
 const CONTEXT_ID: u64 = 0;
@@ -38,7 +38,7 @@ macro_rules! gen_data_controller {
         /// defers to a Control type for how to behave.
         struct $name;
 
-        #[async_trait]
+        #[async_trait(?Send)]
         impl data_controller::Create for $name {
             async fn create(_: DataClientProxy) -> Result<Self, ControllerError> {
                 if $succeed {
@@ -49,7 +49,7 @@ macro_rules! gen_data_controller {
             }
         }
 
-        #[async_trait]
+        #[async_trait(?Send)]
         impl controller::Handle for $name {
             async fn handle(&self, _: Request) -> Option<SettingHandlerResult> {
                 return None;
@@ -67,7 +67,7 @@ gen_data_controller!(FailDataController, false);
 
 macro_rules! verify_handle {
     ($spawn:expr) => {
-        assert!(EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+        assert!(EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
             .handler(SettingType::Unknown, Box::new($spawn))
             .agents(vec![AgentType::Restore.into()])
             .settings(&[SettingType::Unknown])
@@ -97,7 +97,7 @@ async fn test_write_notify() {
         .1
         .get_signature();
 
-    let storage_factory = Arc::new(InMemoryStorageFactory::new());
+    let storage_factory = Rc::new(InMemoryStorageFactory::new());
     storage_factory.initialize_storage::<AccessibilityInfo>().await;
 
     let (invocation_messenger, _) = delegate.create(MessengerType::Unbound).await.unwrap();
@@ -109,8 +109,8 @@ async fn test_write_notify() {
 
     let (directory_proxy, _stream) = create_proxy_and_stream::<DirectoryMarker>().unwrap();
     let blueprint = crate::agent::storage_agent::create_registrar(
-        Arc::clone(&storage_factory),
-        Arc::new(FidlStorageFactory::new(1, directory_proxy)),
+        Rc::clone(&storage_factory),
+        Rc::new(FidlStorageFactory::new(1, directory_proxy)),
     );
 
     blueprint.create(agent_context).await;
@@ -118,7 +118,7 @@ async fn test_write_notify() {
     let mut invocation_receptor = invocation_messenger.message(
         crate::agent::Payload::Invocation(crate::agent::Invocation {
             lifespan: crate::agent::Lifespan::Initialization,
-            service_context: Arc::new(crate::service_context::ServiceContext::new(None, None)),
+            service_context: Rc::new(crate::service_context::ServiceContext::new(None, None)),
         })
         .into(),
         crate::message::base::Audience::Messenger(agent_receptor_signature),
@@ -193,7 +193,7 @@ async fn test_write_notify() {
     .await;
 }
 
-async fn verify_write_behavior<S: DeviceStorageCompatible + Into<SettingInfo> + Send + Sync>(
+async fn verify_write_behavior<S: DeviceStorageCompatible + Into<SettingInfo>>(
     proxy: &mut persist::ClientProxy,
     value: S,
     notified: bool,
@@ -238,7 +238,7 @@ impl StateController {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for StateController {
     async fn handle(&self, _: Request) -> Option<SettingHandlerResult> {
         None
@@ -256,7 +256,7 @@ impl controller::Handle for StateController {
 
 struct BlankController {}
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for BlankController {
     async fn handle(&self, _: Request) -> Option<SettingHandlerResult> {
         return None;
@@ -466,7 +466,7 @@ struct StubController {
     request_mapping: Vec<(Request, SettingHandlerResult)>,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for StubController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         self.request_mapping.iter().find(|(key, _)| *key == request).map(|(_, x)| x.clone())

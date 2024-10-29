@@ -8,12 +8,11 @@ use crate::model::actions::{Action, ActionKey};
 use crate::model::component::instance::{InstanceState, StartedInstanceState};
 use crate::model::component::{ComponentInstance, IncomingCapabilities, StartReason};
 use crate::model::namespace::create_namespace;
-use crate::model::routing::open_capability;
 use crate::runner::RemoteRunner;
 use ::namespace::Entry as NamespaceEntry;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::RoutingError;
-use ::routing::RouteRequest;
+use ::routing::DictExt;
 use async_trait::async_trait;
 use cm_logger::scoped::ScopedLogger;
 use cm_rust::ComponentDecl;
@@ -22,21 +21,23 @@ use cm_util::{AbortError, AbortFutureExt, AbortHandle, AbortableScope};
 use config_encoder::ConfigFields;
 use errors::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError};
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
-use fidl::Vmo;
+use fidl::{endpoints, Vmo};
 use futures::channel::oneshot;
 use hooks::{EventPayload, RuntimeInfo};
 use moniker::Moniker;
 use router_error::RouterError;
 use routing::bedrock::request_metadata::runner_metadata;
-use sandbox::{Capability, Connectable, Dict, Message, Request, Router};
+use sandbox::{Capability, Connector, Dict, Message, Request, Router, RouterResponse};
 use serve_processargs::NamespaceBuilder;
 use std::sync::Arc;
 use tracing::warn;
+use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
+use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_data as fdata, fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
+    fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
 };
 
 /// Starts a component instance.
@@ -159,7 +160,7 @@ async fn do_start(
     let runner = match runner_router {
         Some(runner_router) => open_runner(
             component,
-            runner_router,
+            runner_router.into(),
             runner_name.expect(
                 "runner is set in sandbox but is missing use decl, this should be impossible",
             ),
@@ -220,7 +221,7 @@ async fn do_start(
     // Create a component-scoped logger if the component uses LogSink.
     let decl = &resolved_component.decl;
     let logger = if let Some(logsink_decl) = get_logsink_decl(&decl) {
-        match create_scoped_logger(component, logsink_decl.clone()).await {
+        match create_scoped_logger(logsink_decl.clone(), component, &program_input_dict).await {
             Ok(logger) => Some(logger),
             Err(err) => {
                 warn!(moniker = %component.moniker, %err, "Could not create logger for component. Logs will be attributed to component_manager");
@@ -442,7 +443,7 @@ pub fn should_return_early(
 /// Returns None if the component's decl does not specify a runner.
 async fn open_runner(
     component: &Arc<ComponentInstance>,
-    runner_router: Router,
+    runner_router: Router<Connector>,
     runner_name: Name,
 ) -> Result<Option<RemoteRunner>, StartActionError> {
     // Open up a channel to the runner.
@@ -460,7 +461,7 @@ async fn open_runner(
     match &runner_capability {
         // Built-in runners are hosted by a LaunchTaskOnReceive, which returns a Connector
         // capability for new routes.
-        Capability::Connector(runner_connector) => {
+        RouterResponse::<Connector>::Capability(runner_connector) => {
             let (proxy, server_end) = create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
             runner_connector.send(Message { channel: server_end.into_channel() }).map_err(
                 |_| StartActionError::ResolveRunnerError {
@@ -474,28 +475,12 @@ async fn open_runner(
             )?;
             Ok(Some(RemoteRunner::new(proxy)))
         }
-        // Component provided runners are handled by a program router, which returns a DirEntry
-        // capability for new routes.
-        Capability::DirEntry(runner_dir_entry) => {
-            let (proxy, server_end) = create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
-            runner_dir_entry.send(Message { channel: server_end.into_channel() }).map_err(
-                |_| StartActionError::ResolveRunnerError {
-                    moniker: component.moniker.clone(),
-                    err: Box::new(RouterError::from(RoutingError::BedrockFailedToSend {
-                        moniker: component.moniker.clone().into(),
-                        capability_id: runner_name.to_string(),
-                    })),
-                    runner: runner_name.clone(),
-                },
-            )?;
-            Ok(Some(RemoteRunner::new(proxy)))
-        }
-        cap => Err(StartActionError::ResolveRunnerError {
+        _ => Err(StartActionError::ResolveRunnerError {
             moniker: component.moniker.clone(),
             err: Box::new(
                 RoutingError::BedrockWrongCapabilityType {
-                    actual: cap.debug_typename().to_string(),
-                    expected: "Connector or DirEntry".to_string(),
+                    actual: "Debug".into(),
+                    expected: "Connector".into(),
                     moniker: component.moniker.clone().into(),
                 }
                 .into(),
@@ -626,10 +611,41 @@ fn get_logsink_decl<'a>(decl: &'a cm_rust::ComponentDecl) -> Option<&'a cm_rust:
 /// Returns a ScopedLogger attributed to the component, given its use declaration for the
 /// `fuchsia.logger.LogSink` protocol.
 async fn create_scoped_logger(
-    component: &Arc<ComponentInstance>,
     logsink_decl: cm_rust::UseProtocolDecl,
+    component: &Arc<ComponentInstance>,
+    program_input_dict: &Dict,
 ) -> Result<ScopedLogger, anyhow::Error> {
-    let logsink = open_capability(&RouteRequest::UseProtocol(logsink_decl), component).await?;
+    let router = program_input_dict.get_capability(&logsink_decl.target_path).ok_or_else(|| {
+        anyhow::format_err!(
+            "router for logsink {} is missing from program input dictionary for \
+                 component {}",
+            logsink_decl.target_path,
+            component.moniker
+        )
+    })?;
+    let Capability::ConnectorRouter(router) = router else {
+        anyhow::bail!(
+            "program input dictionary for component {} had an entry with an unexpected \
+                         type: {:?}",
+            component.moniker,
+            router
+        );
+    };
+    let dir_entry = router.into_directory_entry(
+        fio::DirentType::Service,
+        component.execution_scope.clone(),
+        move |_: &RouterError| None,
+    );
+    let (logsink, server) = endpoints::create_proxy::<flogger::LogSinkMarker>().unwrap();
+    let flags = fio::OpenFlags::empty();
+    flags.to_object_request(server.into_channel()).handle(|object_request| {
+        dir_entry.clone().open_entry(OpenRequest::new(
+            component.execution_scope.clone(),
+            flags,
+            vfs::path::Path::dot(),
+            object_request,
+        ))
+    });
     Ok(ScopedLogger::create(logsink)?)
 }
 

@@ -25,12 +25,12 @@ use maplit::btreemap;
 use once_cell::sync::Lazy;
 use starnix_logging::{bug_ref, log_error, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
+use starnix_types::time::duration_to_scheduler_clock;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::time::duration_to_scheduler_clock;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, off_t, pid_t};
@@ -144,10 +144,7 @@ impl ProcDirectory {
             ),
             "filesystems".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node(
-                    "/proc/filesystems",
-                    bug_ref!("https://fxbug.dev/309002087"),
-                ),
+                BytesFile::new_node(b"fxfs".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "misc".into() => fs.create_node(

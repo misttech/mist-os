@@ -8,14 +8,13 @@
 #include <fbl/intrusive_wavl_tree.h>
 
 #include "src/storage/f2fs/common.h"
-#include "src/storage/f2fs/f2fs_layout.h"
+#include "src/storage/f2fs/layout.h"
 
 namespace f2fs {
 
 constexpr uint64_t kMaxVmoSize = std::numeric_limits<uint64_t>::max();
 constexpr size_t kBlocksPerVmoNode = kDefaultBlocksPerSegment;
 constexpr size_t kVmoNodeSize = safemath::CheckMul(kBlocksPerVmoNode, kBlockSize).ValueOrDie();
-constexpr pgoff_t kPgOffMax = std::numeric_limits<pgoff_t>::max() / kBlockSize;
 
 enum class VmoMode {
   kDiscardable = 0,

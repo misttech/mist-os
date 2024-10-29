@@ -23,6 +23,7 @@
 #include <fbl/algorithm.h>
 
 #include "lib/inspect/cpp/vmo/types.h"
+#include "lib/zbi-format/zbi.h"
 #include "nand_driver.h"
 #include "src/devices/block/drivers/ftl/metrics.h"
 #include "src/devices/block/lib/common/include/common-dfv1.h"
@@ -233,8 +234,14 @@ zx_status_t BlockDevice::BlockPartitionGetName(char* out_name, size_t capacity) 
   return ZX_OK;
 }
 
-zx_status_t BlockDevice::BlockPartitionGetFlags(uint64_t* out_flags) {
-  return ZX_ERR_NOT_SUPPORTED;
+zx_status_t BlockDevice::BlockPartitionGetMetadata(partition_metadata_t* out_metadata) {
+  strlcpy(out_metadata->name, kDeviceName, sizeof(out_metadata->name));
+  memcpy(&out_metadata->type_guid, guid_, ZBI_PARTITION_GUID_LEN);
+  memset(&out_metadata->instance_guid, 0, ZBI_PARTITION_GUID_LEN);
+  out_metadata->start_block_offset = 0;
+  out_metadata->num_blocks = params_.num_pages;
+  out_metadata->flags = 0;
+  return ZX_OK;
 }
 
 bool BlockDevice::OnVolumeAdded(uint32_t page_size, uint32_t num_pages) {

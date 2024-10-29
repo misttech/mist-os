@@ -231,7 +231,14 @@ pub enum InternalSubtype {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+pub enum EndpointRole {
+    Client,
+    Server,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind_v2", rename_all = "lowercase")]
 pub enum Type {
     Array {
         element_type: Box<Type>,
@@ -252,8 +259,9 @@ pub enum Type {
         rights: u32,
         nullable: bool,
     },
-    Request {
-        subtype: CompoundIdentifier,
+    Endpoint {
+        role: EndpointRole,
+        protocol: CompoundIdentifier,
         nullable: bool,
     },
     Primitive {

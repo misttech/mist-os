@@ -111,9 +111,9 @@ TEST_P(RwTest, OffsetOperations) {
       ASSERT_EQ(memcmp(buf, expected + read_skip, opt.expected_read_length), 0);
     } else {
       size_t write_skip = opt.write_start - opt.read_start;
-      uint8_t zeroes[write_skip];
-      memset(zeroes, 0, sizeof(zeroes));
-      ASSERT_EQ(memcmp(buf, zeroes, write_skip), 0);
+      auto zeroes = std::make_unique<uint8_t[]>(write_skip);
+      memset(zeroes.get(), 0, write_skip);
+      ASSERT_EQ(memcmp(buf, zeroes.get(), write_skip), 0);
     }
     ASSERT_EQ(lseek(fd.get(), 0, SEEK_CUR), 0);
     struct stat st;

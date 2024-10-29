@@ -5,12 +5,12 @@
 #ifndef SRC_STORAGE_BLOBFS_ALLOCATOR_HOST_ALLOCATOR_H_
 #define SRC_STORAGE_BLOBFS_ALLOCATOR_HOST_ALLOCATOR_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
 #include <cstdint>
 #include <memory>
+#include <span>
 
 #include <id_allocator/id_allocator.h>
 
@@ -26,7 +26,7 @@ class HostAllocator : public BaseAllocator {
  public:
   // Does not take ownership of |block_bitmap|.
   static zx::result<std::unique_ptr<HostAllocator>> Create(RawBitmap block_bitmap,
-                                                           cpp20::span<Inode> node_map);
+                                                           std::span<Inode> node_map);
 
   // blobfs::NodeFinder interface.
   zx::result<InodePtr> GetNode(uint32_t node_index) final;
@@ -39,10 +39,10 @@ class HostAllocator : public BaseAllocator {
   zx::result<> AddNodes() final { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
  private:
-  HostAllocator(RawBitmap block_bitmap, cpp20::span<Inode> node_map,
+  HostAllocator(RawBitmap block_bitmap, std::span<Inode> node_map,
                 std::unique_ptr<id_allocator::IdAllocator> node_bitmap);
 
-  cpp20::span<Inode> node_map_;
+  std::span<Inode> node_map_;
 };
 
 }  // namespace blobfs

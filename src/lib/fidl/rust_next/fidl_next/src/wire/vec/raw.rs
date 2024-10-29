@@ -14,10 +14,19 @@ pub struct RawWireVector<'buf, T> {
     ptr: WirePointer<'buf, T>,
 }
 
+// SAFETY: `RawWireVector` doesn't add any restrictions on sending across thread boundaries, and so
+// is `Send` if `T` is `Send`.
+unsafe impl<T: Send> Send for RawWireVector<'_, T> {}
+
+// SAFETY: `RawWireVector` doesn't add any interior mutability, so it is `Sync` if `T` is `Sync`.
+unsafe impl<T: Sync> Sync for RawWireVector<'_, T> {}
+
 impl<T> Drop for RawWireVector<'_, T> {
     fn drop(&mut self) {
-        unsafe {
-            self.as_slice_ptr().drop_in_place();
+        if !self.ptr.as_ptr().is_null() {
+            unsafe {
+                self.as_slice_ptr().drop_in_place();
+            }
         }
     }
 }

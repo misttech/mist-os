@@ -30,7 +30,7 @@ impl InspectFetcher {
     /// `selectors` should be in Triage format, i.e. INSPECT:moniker:path:leaf.
 
     pub fn create(service_path: &str, selectors: Vec<String>) -> Result<InspectFetcher, Error> {
-        if selectors.len() == 0 {
+        if selectors.is_empty() {
             return Ok(InspectFetcher { reader: None });
         }
         let proxy = match fuchsia_component::client::connect_to_protocol_at_path::<

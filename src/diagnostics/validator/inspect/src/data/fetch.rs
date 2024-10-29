@@ -33,7 +33,7 @@ impl LazyNode {
                 let lazy_node = LazyNode::new(child_channel).await?;
                 children.insert(child_name.to_string(), lazy_node);
             }
-            return Ok(LazyNode { vmo, children: Some(children) });
+            Ok(LazyNode { vmo, children: Some(children) })
         })
     }
 
@@ -63,7 +63,7 @@ impl LazyNodeFetcher {
 
     async fn get_vmo(&self) -> Result<Vmo, Error> {
         let tree_content = self.channel.get_content().await?;
-        return tree_content.buffer.map(|b| b.vmo).ok_or(format_err!("Failed to fetch VMO."));
+        tree_content.buffer.map(|b| b.vmo).ok_or(format_err!("Failed to fetch VMO."))
     }
 
     async fn get_child_names(&self) -> Result<Vec<String>, Error> {
@@ -79,7 +79,7 @@ impl LazyNodeFetcher {
         }
     }
 
-    async fn get_child_tree_channel(&self, name: &String) -> Result<TreeProxy, Error> {
+    async fn get_child_tree_channel(&self, name: &str) -> Result<TreeProxy, Error> {
         let (child_channel, server_end) = create_proxy::<TreeMarker>()?;
         self.channel.open_child(name, server_end)?;
         Ok(child_channel)
@@ -120,12 +120,12 @@ mod tests {
         let grandchild_tree =
             child_tree.children.as_ref().unwrap().get(NAMED_GRANDCHILD_NODE).unwrap();
 
-        assert_has_size(&root_tree.children.as_ref().unwrap(), 1);
-        assert_has_size(&child_tree.children.as_ref().unwrap(), 1);
-        assert_has_size(&grandchild_tree.children.as_ref().unwrap(), 0);
+        assert_has_size(root_tree.children.as_ref().unwrap(), 1);
+        assert_has_size(child_tree.children.as_ref().unwrap(), 1);
+        assert_has_size(grandchild_tree.children.as_ref().unwrap(), 0);
         assert_has_vmo(&vmos, SINGLE_CHILD_ROOT, &root_tree);
-        assert_has_vmo(&vmos, NAMED_CHILD_NODE, &child_tree);
-        assert_has_vmo(&vmos, NAMED_GRANDCHILD_NODE, &grandchild_tree);
+        assert_has_vmo(&vmos, NAMED_CHILD_NODE, child_tree);
+        assert_has_vmo(&vmos, NAMED_GRANDCHILD_NODE, grandchild_tree);
 
         Ok(())
     }
@@ -138,10 +138,10 @@ mod tests {
 
         let children = root_tree.take_children().unwrap();
 
-        assert_eq!(root_tree.children.is_none(), true);
+        assert!(root_tree.children.is_none());
         assert_has_size(&children, child_names(MULTI_CHILD_ROOT).len());
         for name in child_names(MULTI_CHILD_ROOT).iter() {
-            assert_eq!(children.contains_key(name), true);
+            assert!(children.contains_key(name));
         }
 
         Ok(())
@@ -238,13 +238,13 @@ mod tests {
         }
 
         fn get(&self, value: &str) -> zx::Vmo {
-            duplicate_vmo(self.vmos.get(&value.to_string()).unwrap_or(&self.default))
+            duplicate_vmo(self.vmos.get(value).unwrap_or(&self.default))
         }
     }
 
     fn assert_has_vmo(vmos: &TestVmos, name: &str, node: &LazyNode) {
         let actual = get_vmo_as_buf(node.vmo()).unwrap();
-        let expected = get_vmo_as_buf(&vmos.get(&name.to_string())).unwrap();
+        let expected = get_vmo_as_buf(&vmos.get(name)).unwrap();
         assert_eq!(actual, expected);
     }
 

@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
-use fidl::encoding::ProxyChannelBox;
+use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -32,7 +32,6 @@ pub struct ChildMarker;
 impl fidl::endpoints::ProtocolMarker for ChildMarker {
     type Proxy = ChildProxy;
     type RequestStream = ChildRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = ChildSynchronousProxy;
 
@@ -47,7 +46,6 @@ pub trait ChildProxyInterface: Send + Sync {
         request: fidl::endpoints::ServerEnd<ParentMarker>,
     ) -> Result<(), fidl::Error>;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct ChildSynchronousProxy {
@@ -117,13 +115,13 @@ impl ChildSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct ChildProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for ChildProxy {
     type Protocol = ChildMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -138,7 +136,7 @@ impl fidl::endpoints::Proxy for ChildProxy {
 
 impl ChildProxy {
     /// Create a new Proxy for test.inheritancewithrecursivedecl/Child.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <ChildMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -192,7 +190,7 @@ impl ChildProxyInterface for ChildProxy {
 }
 
 pub struct ChildEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for ChildEventStream {}
@@ -225,7 +223,9 @@ pub enum ChildEvent {}
 
 impl ChildEvent {
     /// Decodes a message buffer as a [`ChildEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<ChildEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<ChildEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -240,7 +240,7 @@ impl ChildEvent {
 
 /// A Stream of incoming requests for test.inheritancewithrecursivedecl/Child.
 pub struct ChildRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -256,7 +256,7 @@ impl fidl::endpoints::RequestStream for ChildRequestStream {
     type Protocol = ChildMarker;
     type ControlHandle = ChildControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -264,11 +264,17 @@ impl fidl::endpoints::RequestStream for ChildRequestStream {
         ChildControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -378,14 +384,13 @@ impl ChildRequest {
 
 #[derive(Debug, Clone)]
 pub struct ChildControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for ChildControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -393,7 +398,6 @@ impl fidl::endpoints::ControlHandle for ChildControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -417,7 +421,6 @@ pub struct ParentMarker;
 impl fidl::endpoints::ProtocolMarker for ParentMarker {
     type Proxy = ParentProxy;
     type RequestStream = ParentRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = ParentSynchronousProxy;
 
@@ -428,7 +431,6 @@ pub trait ParentProxyInterface: Send + Sync {
     fn r#first(&self, request: fidl::endpoints::ServerEnd<ParentMarker>)
         -> Result<(), fidl::Error>;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct ParentSynchronousProxy {
@@ -487,13 +489,13 @@ impl ParentSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct ParentProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for ParentProxy {
     type Protocol = ParentMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -508,7 +510,7 @@ impl fidl::endpoints::Proxy for ParentProxy {
 
 impl ParentProxy {
     /// Create a new Proxy for test.inheritancewithrecursivedecl/Parent.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <ParentMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -544,7 +546,7 @@ impl ParentProxyInterface for ParentProxy {
 }
 
 pub struct ParentEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for ParentEventStream {}
@@ -577,7 +579,9 @@ pub enum ParentEvent {}
 
 impl ParentEvent {
     /// Decodes a message buffer as a [`ParentEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<ParentEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<ParentEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -592,7 +596,7 @@ impl ParentEvent {
 
 /// A Stream of incoming requests for test.inheritancewithrecursivedecl/Parent.
 pub struct ParentRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -608,7 +612,7 @@ impl fidl::endpoints::RequestStream for ParentRequestStream {
     type Protocol = ParentMarker;
     type ControlHandle = ParentControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -616,11 +620,17 @@ impl fidl::endpoints::RequestStream for ParentRequestStream {
         ParentControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -708,14 +718,13 @@ impl ParentRequest {
 
 #[derive(Debug, Clone)]
 pub struct ParentControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for ParentControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -723,7 +732,6 @@ impl fidl::endpoints::ControlHandle for ParentControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }

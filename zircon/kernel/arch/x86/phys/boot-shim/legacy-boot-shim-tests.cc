@@ -33,6 +33,8 @@ TEST(X86LegacyBootShimTests, EmptyInfo) {
       "X86LegacyBootShimTests: Missing or empty RAMDISK: No ZBI!",
       "X86LegacyBootShimTests: Error scanning ZBI: container header doesn't fit."
       " Truncated? at offset 0",
+      "X86LegacyBootShimTests:   ACPI RSDP not found",
+      "X86LegacyBootShimTests:   SMBIOS not found",
   });
 }
 
@@ -50,6 +52,8 @@ TEST(X86LegacyBootShimTests, MissingRamdisk) {
       "X86LegacyBootShimTests: Missing or empty RAMDISK: No ZBI!",
       "X86LegacyBootShimTests: Error scanning ZBI: container header doesn't fit."
       " Truncated? at offset 0",
+      "X86LegacyBootShimTests:   ACPI RSDP not found",
+      "X86LegacyBootShimTests:   SMBIOS not found",
   });
 }
 
@@ -136,6 +140,40 @@ TEST(X86LegacyBootShimTests, AcpiAndUartItems) {
 
   ASSERT_EQ(sizeof(kRsdp), rsdp_payload.size());
   EXPECT_BYTES_EQ(rsdp_payload.data(), &kRsdp, sizeof(kRsdp));
+}
+
+TEST(X86LegacyBootShimTests, SmbiosItem) {
+  LegacyBoot info;
+  constexpr uint64_t kSmbios = 0xf5280;
+  info.smbios = kSmbios;
+
+  boot_shim::testing::TestHelper test;
+  LegacyBootShim shim("X86LegacyBootShimTests", info, test.log());
+
+  constexpr size_t kSmbiosItemSize = sizeof(zbi_header_t) + sizeof(kSmbios);
+
+  size_t data_budget = shim.size_bytes();
+  EXPECT_GE(data_budget, kSmbiosItemSize);
+
+  auto [buffer, owner] = test.GetZbiBuffer();
+  LegacyBootShim::DataZbi zbi(buffer);
+  ASSERT_TRUE(zbi.clear().is_ok());
+
+  auto result = shim.AppendItems(zbi);
+  ASSERT_TRUE(result.is_ok());
+
+  zbitl::ByteView smbios_payload;
+  for (auto [header, payload] : zbi) {
+    if (header->type == ZBI_TYPE_SMBIOS) {
+      EXPECT_TRUE(smbios_payload.empty(), "too many SMBIOS items");
+      EXPECT_FALSE(payload.empty());
+      smbios_payload = payload;
+    }
+  }
+  EXPECT_TRUE(zbi.take_error().is_ok());
+
+  ASSERT_EQ(sizeof(kSmbios), smbios_payload.size());
+  EXPECT_BYTES_EQ(smbios_payload.data(), &kSmbios, sizeof(kSmbios));
 }
 
 }  // namespace

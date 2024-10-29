@@ -13,7 +13,6 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/zx/result.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -64,7 +63,7 @@ int Usage() {
 // Returns "true" if the argument matches the prefix.
 // In this case, moves the argument past the prefix.
 bool PrefixMatch(const char** arg, std::string_view prefix) {
-  if (cpp20::starts_with(std::string_view(*arg), prefix)) {
+  if (std::string_view(*arg).starts_with(prefix)) {
     *arg += prefix.length();
     return true;
   }
@@ -172,15 +171,15 @@ int ParseArgs(int argc, const char** argv, DdOptions* options) {
 
 bool IsBlockPath(std::string_view path) {
   // E.g. /dev/class/block/000 or /dev/sys/platform/00:2d/ramctl/ramdisk-0/block
-  return (cpp20::starts_with(path, "/dev") && cpp20::ends_with(path, "/block")) ||
-         cpp20::starts_with(path, "/dev/class/block");
+  return (path.starts_with("/dev") && path.ends_with("/block")) ||
+         path.starts_with("/dev/class/block");
 }
 
 bool IsSkipBlockPath(std::string_view path) {
   // E.g. /dev/class/skip-block/000 or
   // /dev/sys/platform/raw_nand/aml-raw_nand/nand/zircon-a/skip-block
-  return (cpp20::starts_with(path, "/dev") && cpp20::ends_with(path, "/skip-block")) ||
-         cpp20::starts_with(path, "/dev/class/skip-block");
+  return (path.starts_with("/dev") && path.ends_with("/skip-block")) ||
+         path.starts_with("/dev/class/skip-block");
 }
 
 zx::result<fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock>> GetSkipBlockClient(

@@ -107,7 +107,7 @@ fn appropriate_check_interval(
     expression: &str,
     mode: Mode,
 ) -> Result<zx::MonotonicDuration, Error> {
-    let check_every = triage_shim::evaluate_int_math(&expression)
+    let check_every = triage_shim::evaluate_int_math(expression)
         .or_else(|e| bail!("Check_every argument must be Minutes(n), Hours(n), etc. but: {}", e))?;
     if check_every < MINIMUM_CHECK_TIME_NANOS && mode != Mode::IntegrationTest {
         bail!(
@@ -308,37 +308,32 @@ impl RunsDetection for DetectionRunner {
     }
 
     //async fn run_detection(&mut self, opts: DetectionOpts) {
-    fn run_detection(
-        &mut self,
-        opts: DetectionOpts,
-    ) -> impl std::future::Future<Output = ()> + std::marker::Send {
-        async move {
-            if opts.cpu_test {
-                self.stats().scan_test_count.add(1);
-            } else {
-                self.stats().scan_count.add(1);
-            }
-            let diagnostics = self.diagnostic_source.get_diagnostics().await;
-            let diagnostics = match diagnostics {
-                Ok(diagnostics) => diagnostics,
-                Err(e) => {
-                    // This happens when the integration tester runs out of Inspect data.
-                    if self.mode != Mode::IntegrationTest {
-                        error!("Fetching diagnostics failed: {}", e);
-                    }
-                    return;
+    async fn run_detection(&mut self, opts: DetectionOpts) {
+        if opts.cpu_test {
+            self.stats().scan_test_count.add(1);
+        } else {
+            self.stats().scan_count.add(1);
+        }
+        let diagnostics = self.diagnostic_source.get_diagnostics().await;
+        let diagnostics = match diagnostics {
+            Ok(diagnostics) => diagnostics,
+            Err(e) => {
+                // This happens when the integration tester runs out of Inspect data.
+                if self.mode != Mode::IntegrationTest {
+                    error!("Fetching diagnostics failed: {}", e);
                 }
-            };
-
-            let (snapshot_requests, warnings) = self.triage_engine.evaluate(diagnostics);
-
-            if opts.cpu_test {
                 return;
             }
-            self.stats().triage_warnings.add(warnings.len() as u64);
-            for snapshot in snapshot_requests {
-                self.handle_snapshot(snapshot);
-            }
+        };
+
+        let (snapshot_requests, warnings) = self.triage_engine.evaluate(diagnostics);
+
+        if opts.cpu_test {
+            return;
+        }
+        self.stats().triage_warnings.add(warnings.len() as u64);
+        for snapshot in snapshot_requests {
+            self.handle_snapshot(snapshot);
         }
     }
 }

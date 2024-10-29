@@ -12,7 +12,7 @@ use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fidl_fuchsia_bluetooth_gatt::Server_Marker;
 use fidl_fuchsia_bluetooth_gatt2::{LocalServiceRequest, Server_Marker as Server_Marker2};
 use fidl_fuchsia_bluetooth_host::{ReceiverRequest, ReceiverRequestStream};
-use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker};
+use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker, PrivilegedPeripheralMarker};
 use fidl_fuchsia_device::NameProviderMarker;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
@@ -224,6 +224,10 @@ async fn serve_fidl(hd: HostDispatcher, inspect: fuchsia_inspect::Inspector) -> 
         .add_service_at(
             PeripheralMarker::PROTOCOL_NAME,
             host_service_handler(&hd, PeripheralMarker::DEBUG_NAME, LePeripheral),
+        )
+        .add_service_at(
+            PrivilegedPeripheralMarker::PROTOCOL_NAME,
+            host_service_handler(&hd, PeripheralMarker::DEBUG_NAME, LePrivilegedPeripheral),
         )
         .add_service_at(
             Server_Marker::PROTOCOL_NAME,

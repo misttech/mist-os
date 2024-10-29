@@ -77,7 +77,11 @@ zx::result<> PowerState::UpdatePowerLevel(ControlInterface control, uint64_t con
   return zx::error(ZX_ERR_BAD_STATE);
 }
 
-zx::result<> PowerState::UpdatePowerLevel(size_t level) {
+zx::result<> PowerState::UpdatePowerLevel(uint8_t level) {
+  if (!domain_) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
   if (level >= domain_->model().levels().size()) {
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }

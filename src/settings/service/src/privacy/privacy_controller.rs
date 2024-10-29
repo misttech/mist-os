@@ -34,14 +34,14 @@ impl StorageAccess for PrivacyController {
     const STORAGE_KEY: &'static str = PrivacyInfo::KEY;
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl data_controller::Create for PrivacyController {
     async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
         Ok(PrivacyController { client })
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for PrivacyController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {

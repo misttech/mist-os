@@ -24,6 +24,7 @@ common_board_configuration = {
     "fuchsia::pmm_checker",
     "fuchsia::real_time_clock",
     "fuchsia::realtek_8211f",
+    "fuchsia::suspender",
     "fuchsia::suspending_token",
     "fuchsia::usb_peripheral_support",
     "fuchsia::wlan_fullmac",
@@ -86,7 +87,7 @@ common_board_configuration = {
           "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
     }
     zbi = {
-      compression = "zstd.max"
+      compression = "zstd.17"
     }
     fvm = {
       blobfs = {

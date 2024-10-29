@@ -13,9 +13,9 @@ use tempfile::TempDir;
 async fn run_far_tool(args: Vec<&str>, injected_dir: Option<&Path>) -> ProcessOutput {
     const BINARY_PATH: &str = "/pkg/bin/far";
     if let Some(path) = injected_dir {
-        let directory_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let directory_proxy = fuchsia_fs::directory::open_in_namespace(
             path.to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
         )
         .unwrap();
         let proxies = vec![("/injected-dir", &directory_proxy)];

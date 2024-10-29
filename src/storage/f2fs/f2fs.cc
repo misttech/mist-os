@@ -13,7 +13,23 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
+#include <fbl/unique_fd.h>
 #include <safemath/checked_math.h>
+
+#include "src/storage/f2fs/bcache.h"
+#include "src/storage/f2fs/dir.h"
+#include "src/storage/f2fs/file.h"
+#include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/inspect.h"
+#include "src/storage/f2fs/node.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/reader.h"
+#include "src/storage/f2fs/segment.h"
+#include "src/storage/f2fs/storage_buffer.h"
+#include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/f2fs/vnode.h"
+#include "src/storage/f2fs/vnode_cache.h"
+#include "src/storage/f2fs/writeback.h"
 
 namespace f2fs {
 
@@ -58,6 +74,7 @@ F2fs::F2fs(FuchsiaDispatcher dispatcher, std::unique_ptr<f2fs::BcacheMapper> bc,
            const MountOptions& mount_options, PlatformVfs* vfs)
     : dispatcher_(dispatcher), vfs_(vfs), bc_(std::move(bc)), mount_options_(mount_options) {
   inspect_tree_ = std::make_unique<InspectTree>(this);
+  vnode_cache_ = std::make_unique<VnodeCache>();
   zx::event::create(0, &fs_id_);
 }
 
@@ -475,20 +492,26 @@ void F2fs::ClearVnodeSet() {
   vnode_set_.clear();
 }
 
-zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::GetVnode(ino_t ino, LockedPage node_page) {
+zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::GetVnode(ino_t ino, LockedPage* inode_page) {
   if (ino < superblock_info_->GetRootIno() || !node_manager_->CheckNidRange(ino)) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   fbl::RefPtr<VnodeF2fs> vnode;
-  if (vnode_cache_.Lookup(ino, &vnode) == ZX_OK) {
+  if (vnode_cache_->Lookup(ino, &vnode) == ZX_OK) {
     if (unlikely(vnode->TestFlag(InodeInfoFlag::kNewInode))) {
       return zx::error(ZX_ERR_NOT_FOUND);
     }
     return zx::ok(std::move(vnode));
   }
 
+  LockedPage node_page;
+  auto move_page = fit::defer([&node_page, &inode_page] { *inode_page = std::move(node_page); });
+  if (inode_page) {
+    node_page = std::move(*inode_page);
+  }
   if (!node_page) {
+    move_page.cancel();
     if (zx_status_t status = node_manager_->GetNodePage(ino, &node_page); status != ZX_OK) {
       return zx::error(status);
     }
@@ -509,7 +532,7 @@ zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::GetVnode(ino_t ino, LockedPage node_pag
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  if (zx_status_t status = vnode_cache_.Add(vnode.get()); status != ZX_OK) {
+  if (zx_status_t status = vnode_cache_->Add(vnode.get()); status != ZX_OK) {
     return zx::error(status);
   }
 
@@ -560,7 +583,7 @@ zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::CreateNewVnode(umode_t mode, std::optio
   }
   vnode->InitFileCache();
 
-  vnode_cache_.Add(vnode.get());
+  vnode_cache_->Add(vnode.get());
   vnode->SetDirty();
 
   return zx::ok(std::move(vnode));

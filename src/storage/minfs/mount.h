@@ -40,6 +40,10 @@ struct MountOptions {
 
   // If true, don't log messages except for errors.
   bool quiet = false;
+
+  // Should only use for testing to adjust inode counts if we run out of inodes.
+  // TODO(https://fxbug.dev/375550868): should not be overriding inode count.
+  uint32_t inode_count = 0;
 };
 
 #ifdef __Fuchsia__

@@ -83,7 +83,7 @@ unsafe impl<D: ?Sized, T: Decode<D>, const N: usize> Decode<D> for [T; N] {
 mod tests {
     use crate::{f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le};
 
-    use crate::test_util::assert_decoded;
+    use crate::testing::assert_decoded;
     use crate::wire::{WireBox, WireString, WireVector};
     use crate::{WireOptionalString, WireOptionalVector};
 

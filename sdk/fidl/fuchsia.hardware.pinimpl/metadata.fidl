@@ -8,6 +8,13 @@ using fuchsia.hardware.gpio;
 using fuchsia.hardware.pin;
 using zx;
 
+const METADATA_TYPE_NAME string = "fuchsia.hardware.pinimpl.Metadata";
+
+type Pin = table {
+    1: pin uint32;
+    2: name string:fuchsia.hardware.pin.MAX_PIN_NAME_LEN;
+};
+
 /// Arguments to a fuchsia.hardware.pinimpl.PinImpl call to make as part of an `InitStep`.
 type InitCall = flexible union {
     /// If set, the GPIO core driver will call `Configure' with the given config.
@@ -31,14 +38,10 @@ type InitStep = flexible union {
     2: delay zx.Duration;
 };
 
-/// Passed to the GPIO core driver in metadata as DEVICE_METADATA_GPIO_INIT. Steps are processed
-/// sequentially in the order that they appear in the vector. Processing occurs once during the GPIO
-/// core driver's bind hook.
 type Metadata = table {
+    /// Init steps are processed sequentially in the order that they appear in the vector.
+    /// Processing occurs once during the GPIO core driver's start hook.
     1: init_steps vector<InitStep>:MAX;
-};
-
-type ControllerMetadata = struct {
-    /// ID for the controller which is unique among all GPIO controllers.
-    id uint32;
+    2: controller_id uint32;
+    3: pins vector<Pin>:MAX;
 };

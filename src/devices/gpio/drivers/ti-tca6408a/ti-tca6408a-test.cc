@@ -95,8 +95,6 @@ class TiTca6408aTest : public zxtest::Test {
         incoming_(env_dispatcher_->async_dispatcher(), std::in_place) {}
 
   void SetUp() override {
-    constexpr uint32_t kControllerID = 2;
-
     fuchsia_driver_framework::DriverStartArgs start_args;
     fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
     incoming_.SyncCall([&start_args, &outgoing_directory_client](IncomingNamespace* incoming) {
@@ -110,19 +108,6 @@ class TiTca6408aTest : public zxtest::Test {
       ASSERT_TRUE(init_result.is_ok());
 
       incoming->device_server_.Init("pdev", "");
-
-      fuchsia_hardware_pinimpl::ControllerMetadata controller_metadata = {{.id = kControllerID}};
-      const fit::result encoded_controller_metadata = fidl::Persist(controller_metadata);
-      ASSERT_TRUE(encoded_controller_metadata.is_ok());
-
-      // Serve metadata.
-      auto status = incoming->device_server_.AddMetadata(DEVICE_METADATA_GPIO_CONTROLLER,
-                                                         encoded_controller_metadata->data(),
-                                                         encoded_controller_metadata->size());
-      EXPECT_OK(status);
-      status = incoming->device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                              &incoming->env_.incoming_directory());
-      EXPECT_OK(status);
 
       // Serve fake_i2c_.
       auto result = incoming->env_.incoming_directory().AddService<fuchsia_hardware_i2c::Service>(

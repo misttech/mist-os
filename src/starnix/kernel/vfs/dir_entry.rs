@@ -182,6 +182,7 @@ impl DirEntry {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         FileObject::new(
+            current_task,
             self.node.create_file_ops(locked, current_task, flags)?,
             NamespaceNode::new_anonymous(self.clone()),
             flags,
@@ -860,8 +861,6 @@ impl DirEntry {
             }
         };
 
-        security::fs_node_init_with_dentry(current_task, &child)?;
-
         Ok((child, exists))
     }
 
@@ -1076,6 +1075,9 @@ impl<'a> DirEntryLockedChildren<'a> {
                 (child, create_result)
             }
         };
+
+        security::fs_node_init_with_dentry(current_task, &child)?;
+
         child.node.fs().did_create_dir_entry(&child);
         Ok((child, create_result))
     }

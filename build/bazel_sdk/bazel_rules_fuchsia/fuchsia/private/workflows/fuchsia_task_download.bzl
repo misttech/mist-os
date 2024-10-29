@@ -8,7 +8,8 @@ load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 load(":providers.bzl", "FuchsiaProductBundleInfo")
 
-def get_product_bundle_dir(pb):
+def get_product_bundle_dir(ctx):
+    pb = ctx.attr.product_bundle[FuchsiaProductBundleInfo]
     if pb.is_remote:
         return "/tmp/%s-%s" % (pb.product_name, pb.product_version)
     else:
@@ -19,7 +20,7 @@ def _fuchsia_task_download_impl(ctx, make_shell_task):
     if not pb.is_remote:
         fail("fuchsia_task_download can only be used for remote product bundles.")
 
-    output_dir = get_product_bundle_dir(pb)
+    output_dir = get_product_bundle_dir(ctx)
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     return make_shell_task(
         command = [

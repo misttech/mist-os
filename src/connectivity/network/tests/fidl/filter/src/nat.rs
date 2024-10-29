@@ -9,7 +9,9 @@ use std::num::{NonZeroU16, NonZeroU64};
 use std::ops::RangeInclusive;
 
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _};
-use fidl_fuchsia_net_filter_ext::{Action, InterfaceMatcher, Matchers, NatHook, PortRange};
+use fidl_fuchsia_net_filter_ext::{
+    Action, AddressMatcher, AddressMatcherType, InterfaceMatcher, Matchers, NatHook, PortRange,
+};
 use heck::SnakeCase as _;
 use net_types::ip::IpAddress as _;
 use net_types::Witness as _;
@@ -17,8 +19,8 @@ use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
 use crate::ip_hooks::{
-    Addrs, ExpectedConnectivity, OriginalDestination, Ports, Realms, RouterTestIpExt, SockAddrs,
-    SocketType, Sockets, TcpSocket, TestIpExt, TestNet, TestRealm, TestRouterNet, UdpSocket,
+    Addrs, BoundSockets, ExpectedConnectivity, OriginalDestination, Ports, Realms, RouterTestIpExt,
+    SockAddrs, SocketType, TcpSocket, TestIpExt, TestNet, TestRealm, TestRouterNet, UdpSocket,
     LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
 };
 
@@ -424,7 +426,7 @@ async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
     // Bind one socket on the router and one on the server and send some data back
     // and forth, so that the connection is tracked by the router netstack.
     let realms = Realms { client: &net.router, server: &net.server };
-    let (sockets, sock_addrs) = S::bind_sockets(
+    let (BoundSockets { client, mut server }, sock_addrs) = S::bind_sockets(
         realms,
         Addrs {
             client: I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr,
@@ -433,8 +435,17 @@ async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
     )
     .await;
     let client_port = NonZeroU16::new(sock_addrs.client.port()).unwrap();
-    let (server, _client) =
-        S::run_test::<I>(realms, sockets, sock_addrs, ExpectedConnectivity::TwoWay, None).await;
+    let mut router_and_server =
+        S::connect(client, &mut server, sock_addrs, ExpectedConnectivity::TwoWay, None)
+            .await
+            .expect("router can connect to server");
+    let _handles = S::send_and_recv::<I>(
+        realms,
+        router_and_server.as_mut(),
+        sock_addrs,
+        ExpectedConnectivity::TwoWay,
+    )
+    .await;
 
     // Install a rule on the egress hook of the router that masquerades outgoing
     // traffic behind its IP address, and restrict the range of ports within which
@@ -471,7 +482,7 @@ async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
     // If it was restricted to only the port that's already occupied, the traffic
     // from the client will be dropped because there is no viable option to remap
     // its source port while avoiding a conflict.
-    let (Sockets { client: new_client, server: _ }, _sock_addrs) = S::bind_sockets_to_ports(
+    let (BoundSockets { client: new_client, server: _ }, _sock_addrs) = S::bind_sockets_to_ports(
         net.realms(),
         TestRouterNet::<I>::addrs(),
         Ports { src: client_port.get(), dst: 0 /* we're not using the server socket */ },
@@ -480,7 +491,7 @@ async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
     let fnet_ext::IpAddress(router_addr) = I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr.into();
     let _handles = S::run_test::<I>(
         net.realms(),
-        Sockets { client: new_client, server },
+        BoundSockets { client: new_client, server },
         SockAddrs {
             client: std::net::SocketAddr::new(router_addr, masquerade_src_port.get()),
             server: sock_addrs.server,
@@ -491,6 +502,114 @@ async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
             ExpectedConnectivity::TwoWay
         },
         None,
+    )
+    .await;
+}
+
+// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
+// correctly.
+#[netstack_test]
+#[variant(I, Ip)]
+#[test_case(PhantomData::<TcpSocket>; "tcp")]
+#[test_case(PhantomData::<UdpSocket>; "udp")]
+async fn implicit_snat_ports_of_locally_generated_traffic<I: RouterTestIpExt, S: SocketType>(
+    name: &str,
+    _socket_type: PhantomData<S>,
+) {
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+        .expect("initialize logging");
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
+
+    // Set up a network with two hosts (client and server) and a router. The client
+    // and server are both link-layer neighbors with the router but on isolated L2
+    // networks.
+    //
+    // Install a rule on the egress hook of the router that masquerades outgoing
+    // traffic from the client behind its IP address.
+    let mut net =
+        TestRouterNet::<I>::new(&sandbox, &name, None /* ip_hook */, Some(NatHook::Egress)).await;
+    net.install_nat_rule(
+        Matchers {
+            src_addr: Some(AddressMatcher {
+                matcher: AddressMatcherType::Subnet(I::ROUTER_CLIENT_SUBNET.try_into().unwrap()),
+                invert: false,
+            }),
+            out_interface: Some(InterfaceMatcher::Id(
+                NonZeroU64::new(net.router_server_interface.id()).unwrap(),
+            )),
+            ..S::matcher::<I>()
+        },
+        Action::Masquerade { src_port: None },
+    )
+    .await;
+
+    // Send traffic from the client to the server and back. This has the side effect
+    // that the router is tracking this connection.
+    let (BoundSockets { client, mut server }, sock_addrs) =
+        S::bind_sockets(net.realms(), TestRouterNet::<I>::addrs()).await;
+    let client_port = NonZeroU16::new(sock_addrs.client.port()).unwrap();
+    let fnet_ext::IpAddress(router_addr) = I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr.into();
+    let sock_addrs = SockAddrs {
+        client: std::net::SocketAddr::new(router_addr, client_port.get()),
+        server: sock_addrs.server,
+    };
+    let mut client_and_server =
+        S::connect(client, &mut server, sock_addrs, ExpectedConnectivity::TwoWay, None)
+            .await
+            .expect("client can connect to server");
+    S::send_and_recv::<I>(
+        net.realms(),
+        client_and_server.as_mut(),
+        sock_addrs,
+        ExpectedConnectivity::TwoWay,
+    )
+    .await;
+
+    // Bind a socket on the router to the *same* source port that was used by the
+    // client and then allocated by the router for the above NATed connection.
+    let realms = Realms { client: &net.router, server: &net.server };
+    let (BoundSockets { client: new_client, server: _ }, _sock_addrs) = S::bind_sockets_to_ports(
+        realms,
+        Addrs {
+            client: I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr,
+            server: I::SERVER_ADDR_WITH_PREFIX.addr,
+        },
+        Ports { src: client_port.get(), dst: 0 /* we're not using the server socket */ },
+    )
+    .await;
+
+    // Send traffic from this socket on the router to the server and back. The
+    // router should perform source port remapping for the locally-generated traffic
+    // (even though it did not match any NAT rules) to ensure that it does not
+    // conflict with any existing tracked connections.
+    {
+        let sock_addrs = SockAddrs {
+            // Don't assert on the client port, because we expect it to be rewritten.
+            client: std::net::SocketAddr::new(router_addr, 0),
+            server: sock_addrs.server,
+        };
+        let mut router_and_server =
+            S::connect(new_client, &mut server, sock_addrs, ExpectedConnectivity::TwoWay, None)
+                .await
+                .expect("client can connect to server");
+        let _handles = S::send_and_recv::<I>(
+            realms,
+            router_and_server.as_mut(),
+            sock_addrs,
+            ExpectedConnectivity::TwoWay,
+        )
+        .await;
+    }
+
+    // Make sure we can still send traffic from the original client address and port
+    // to the server (and back) through the NAT gateway.
+    S::send_and_recv::<I>(
+        net.realms(),
+        client_and_server.as_mut(),
+        sock_addrs,
+        ExpectedConnectivity::TwoWay,
     )
     .await;
 }

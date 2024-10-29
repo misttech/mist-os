@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::fuchsia::ZxTimer;
+use crate::fs::fuchsia::{BootZxTimer, MonotonicZxTimer};
 use crate::power::OnWakeOps;
 use crate::task::{
     CurrentTask, EventHandler, GenericDuration, HandleWaitCanceler, HrTimer, SignalHandler,
@@ -14,9 +14,9 @@ use crate::vfs::{
 };
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_types::time::{duration_from_timespec, timespec_from_duration, timespec_is_zero};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::time::{duration_from_timespec, timespec_from_duration, timespec_is_zero};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{error, itimerspec, TFD_TIMER_ABSTIME};
 use std::sync::{Arc, Weak};
@@ -76,9 +76,17 @@ impl TimerFile {
         timeline: Timeline,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
-        let timer: Arc<dyn TimerOps> = match wakeup_type {
-            TimerWakeup::Regular => Arc::new(ZxTimer::new()),
-            TimerWakeup::Alarm => Arc::new(HrTimer::new()),
+        let timer: Arc<dyn TimerOps> = match (wakeup_type, timeline) {
+            (TimerWakeup::Regular, Timeline::Monotonic) => Arc::new(MonotonicZxTimer::new()),
+            (TimerWakeup::Regular, Timeline::BootInstant | Timeline::RealTime) => {
+                Arc::new(BootZxTimer::new())
+            }
+            (TimerWakeup::Alarm, Timeline::BootInstant | Timeline::RealTime) => {
+                Arc::new(HrTimer::new())
+            }
+            (TimerWakeup::Alarm, Timeline::Monotonic) => {
+                unreachable!("monotonic times cannot be alarm deadlines")
+            }
         };
 
         Ok(Anon::new_file(

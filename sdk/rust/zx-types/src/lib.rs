@@ -1581,6 +1581,7 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_IOB                        = 34; // zx_info_iob_t[1]
     ZX_INFO_IOB_REGIONS                = 35; // zx_iob_region_info_t[n]
     ZX_INFO_VMAR_MAPS                  = 36; // zx_info_maps_t[n]
+    ZX_INFO_POWER_DOMAINS                  = 37; // zx_info_power_domain_info_t[n]
 ]);
 
 // This macro takes struct-like syntax and creates another macro that can be used to create
@@ -2249,10 +2250,10 @@ pub struct zx_processor_power_level_t {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_processor_power_level_transition_t {
-    pub from: u8,
-    pub to: u8,
     pub latency: zx_duration_t,
     pub energy: u64,
+    pub from: u8,
+    pub to: u8,
     pub padding: [u8; 6],
 }
 
@@ -2282,6 +2283,17 @@ pub struct zx_processor_power_domain_t {
     pub domain_id: u32,
     // Padding.
     pub padding1: [PadByte; 4],
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct zx_power_domain_info_t {
+    pub cpus: zx_cpu_set_t,
+    pub domain_id: u32,
+    pub idle_power_levels: u8,
+    pub active_power_levels: u8,
+    // Padding.
+    pub padding1: [PadByte; 2],
 }
 
 multiconst!(u32, [

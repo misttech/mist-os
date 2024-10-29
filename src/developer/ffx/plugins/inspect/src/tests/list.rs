@@ -13,7 +13,7 @@ use fidl_fuchsia_diagnostics::{
     ClientSelectorConfiguration, DataType, StreamMode, StreamParameters,
 };
 use iquery::commands::ListCommand;
-use std::sync::Arc;
+use std::rc::Rc;
 
 #[fuchsia::test]
 async fn test_list_empty() {
@@ -24,7 +24,7 @@ async fn test_list_empty() {
         client_selector_configuration: Some(ClientSelectorConfiguration::SelectAll(true)),
         ..Default::default()
     };
-    let expected_responses = Arc::new(vec![]);
+    let expected_responses = Rc::new(vec![]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
@@ -55,7 +55,7 @@ async fn test_list_with_data() {
     };
     let lifecycles = make_inspects_for_lifecycle();
     let value = serde_json::to_string(&lifecycles).unwrap();
-    let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
+    let expected_responses = Rc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
@@ -89,7 +89,7 @@ async fn test_list_with_data_with_url() {
     };
     let lifecycles = make_inspects_for_lifecycle();
     let value = serde_json::to_string(&lifecycles).unwrap();
-    let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
+    let expected_responses = Rc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ListCommand { manifest: None, with_url: true, accessor: None };
@@ -131,7 +131,7 @@ async fn test_list_with_data_with_manifest_and_archive() {
     };
     let lifecycles = make_inspects_for_lifecycle();
     let value = serde_json::to_string(&lifecycles).unwrap();
-    let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
+    let expected_responses = Rc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ListCommand {
@@ -152,7 +152,7 @@ async fn test_list_with_data_with_manifest_and_archive() {
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             // We don't expect any responses on the default accessor.
-            Arc::new(vec![]),
+            Rc::new(vec![]),
         )]),
         ListCommand::from(cmd),
         &mut writer,

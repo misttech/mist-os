@@ -5,7 +5,6 @@
 #include "src/storage/blobfs/delivery_blob.h"
 
 #include <lib/cksum.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -56,7 +55,7 @@ constexpr bool IsValidDeliveryType(blobfs::DeliveryBlobType delivery_type) {
   }
 }
 
-zx::result<fbl::Array<uint8_t>> CompressData(cpp20::span<const uint8_t> data,
+zx::result<fbl::Array<uint8_t>> CompressData(std::span<const uint8_t> data,
                                              const chunked_compression::CompressionParams& params) {
   const size_t num_chunks = fbl::round_up(data.size_bytes(), params.chunk_size) / params.chunk_size;
   // If `data` spans multiple chunks, we compress each chunk in parallel.
@@ -106,7 +105,7 @@ bool DeliveryBlobHeader::IsValid() const {
          IsValidDeliveryType(type);
 }
 
-zx::result<DeliveryBlobHeader> DeliveryBlobHeader::FromBuffer(cpp20::span<const uint8_t> buffer) {
+zx::result<DeliveryBlobHeader> DeliveryBlobHeader::FromBuffer(std::span<const uint8_t> buffer) {
   if (buffer.size_bytes() < sizeof(DeliveryBlobHeader)) {
     return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
   }
@@ -158,7 +157,7 @@ MetadataType1 MetadataType1::Create(const DeliveryBlobHeader& header, size_t pay
   return metadata;
 }
 
-zx::result<MetadataType1> MetadataType1::FromBuffer(cpp20::span<const uint8_t> buffer,
+zx::result<MetadataType1> MetadataType1::FromBuffer(std::span<const uint8_t> buffer,
                                                     const blobfs::DeliveryBlobHeader& header) {
   if (buffer.size_bytes() < sizeof(MetadataType1)) {
     return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
@@ -179,7 +178,7 @@ std::string GetDeliveryBlobPath(const std::string_view& path) {
   return fs_path.replace_filename(new_filename);
 }
 
-zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint8_t> data,
+zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(std::span<const uint8_t> data,
                                                           std::optional<bool> compress) {
   constexpr size_t kPayloadOffset = sizeof(DeliveryBlobHeader) + sizeof(MetadataType1);
 
@@ -218,7 +217,7 @@ zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint
   return zx::ok(std::move(delivery_blob));
 }
 
-zx::result<Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t> data) {
+zx::result<Digest> CalculateDeliveryBlobDigest(std::span<const uint8_t> data) {
   zx::result header = DeliveryBlobHeader::FromBuffer(data);
   if (header.is_error()) {
     return header.take_error();
@@ -243,7 +242,7 @@ zx::result<Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t> data) 
     return metadata.take_error();
   }
 
-  cpp20::span<const uint8_t> payload = data.subspan(header->header_length);
+  std::span<const uint8_t> payload = data.subspan(header->header_length);
   if (payload.size() != metadata->payload_length) {
     return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
   }

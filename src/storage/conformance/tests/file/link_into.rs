@@ -23,7 +23,7 @@ impl Fixture {
 
         let root =
             root_directory(vec![file(TEST_FILE, CONTENTS.to_vec()), file("existing", vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
         let file = open_file_with_flags(&test_dir, rights, TEST_FILE).await;
 

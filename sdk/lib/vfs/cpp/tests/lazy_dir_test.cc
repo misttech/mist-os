@@ -27,10 +27,6 @@
 
 namespace {
 
-// vfs::LazyDir is deprecated. See https://fxbug.dev/309685624 for details.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
 // LazyDir that acts like a pseudo-dir for ease of testing.
 class TestLazyDir : public vfs::LazyDir {
  public:
@@ -114,8 +110,6 @@ class LazyDirTest : public ::gtest::RealLoopFixture {
   std::shared_ptr<TestLazyDir> test_dir_;
   zx::channel root_client_;
 };
-
-#pragma clang diagnostic pop
 
 TEST_F(LazyDirTest, ValidateEntries) {
   PerformBlockingWork([this] {

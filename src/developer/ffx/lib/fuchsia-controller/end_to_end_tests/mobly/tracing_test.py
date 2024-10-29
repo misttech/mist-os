@@ -70,8 +70,8 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
             categories=categories,
             buffering_mode=tracing.BufferingMode.ONESHOT,
         )
-        client, server = Socket.create()
-        client = AsyncSocket(client)
+        _client, server = Socket.create()
+        client = AsyncSocket(_client)
 
         controller.initialize_tracing(config=config, output=server.take())
         await controller.start_tracing(

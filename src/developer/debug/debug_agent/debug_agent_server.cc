@@ -61,10 +61,18 @@ class AttachedProcessIterator : public fidl::Server<fuchsia_debugger::AttachedPr
   std::vector<debug_ipc::ProcessRecord>::iterator it_;
 };
 
-// Converts a FIDL filter to a debug_ipc filter or a FilterError if there was an error.
+// Converts a FIDL filter to a debug_ipc filter or a FilterError if there was an error. |id| is
+// optional because sometimes callers want to construct a debug_ipc Filter without the intention of
+// installing it to DebugAgent. If |id| is not given and the filter is installed, it will be
+// impossible to derive the correct attach configuration from the filter.
 debug::Result<debug_ipc::Filter, fuchsia_debugger::FilterError> ToDebugIpcFilter(
-    const fuchsia_debugger::Filter& request) {
+    const fuchsia_debugger::Filter& request, std::optional<uint32_t> id) {
   debug_ipc::Filter filter;
+
+  // Set the highest bit to 1 to differentiate filters set via this interface from filters set in
+  // the frontend. There's no communication between this interface and another debug_ipc client to
+  // this same DebugAgent, so coordination is difficult.
+  constexpr uint32_t kFilterIdBase = 1 << 31;
 
   if (request.pattern().empty()) {
     return fuchsia_debugger::FilterError::kNoPattern;
@@ -88,11 +96,22 @@ debug::Result<debug_ipc::Filter, fuchsia_debugger::FilterError> ToDebugIpcFilter
   }
 
   filter.pattern = request.pattern();
+  if (id) {
+    filter.id = kFilterIdBase | *id;
+  }
 
-  // Filters are always weak when attached via this interface.
-  filter.config.weak = true;
+  if (!request.options().job_only()) {
+    // Non-job-only filters are always weak when attached via this interface.
+    filter.config.weak = true;
+  } else {
+    // Meanwhile, job-only filters are always strong (the default) when attached via this interface.
+    filter.config.job_only = *request.options().job_only();
+  }
 
   if (request.options().recursive()) {
+    if (filter.config.job_only) {
+      return fuchsia_debugger::FilterError::kInvalidOptions;
+    }
     filter.config.recursive = *request.options().recursive();
   }
 
@@ -156,20 +175,12 @@ void DebugAgentServer::AttachTo(AttachToRequest& request, AttachToCompleter::Syn
 
   auto reply = result.take_value();
 
-  // The set removes potential duplicate koids from other filters.
-  std::set<zx_koid_t> koids_to_attach;
-  if (!reply.matched_processes_for_filter.empty()) {
-    for (const auto& f : reply.matched_processes_for_filter) {
-      koids_to_attach.insert(f.matched_pids.begin(), f.matched_pids.end());
-    }
-  }
-
-  completer.Reply(fit::success(AttachToKoids({koids_to_attach.begin(), koids_to_attach.end()})));
+  completer.Reply(fit::success(AttachToFilterMatches(reply.matched_processes_for_filter)));
 }
 
 DebugAgentServer::AddFilterResult DebugAgentServer::AddFilter(
-    const fuchsia_debugger::Filter& fidl_filter) const {
-  auto result = ToDebugIpcFilter(fidl_filter);
+    const fuchsia_debugger::Filter& fidl_filter) {
+  auto result = ToDebugIpcFilter(fidl_filter, next_filter_id_++);
   if (result.has_error()) {
     return result.err();
   }
@@ -187,6 +198,9 @@ DebugAgentServer::AddFilterResult DebugAgentServer::AddFilter(
   // Add in the new filter.
   agent_filters.emplace_back(result.value());
   ipc_request.filters.reserve(agent_filters.size());
+  // Save the filter ourselves as well so that we can use the filter configuration to derive the
+  // attach configuration when there's a match.
+  filters_[agent_filters.back().id] = agent_filters.back();
 
   for (const auto& filter : agent_filters) {
     ipc_request.filters.push_back(filter);
@@ -198,26 +212,33 @@ DebugAgentServer::AddFilterResult DebugAgentServer::AddFilter(
   return reply;
 }
 
-uint32_t DebugAgentServer::AttachToKoids(const std::vector<zx_koid_t>& koids) const {
+uint32_t DebugAgentServer::AttachToFilterMatches(
+    const std::vector<debug_ipc::FilterMatch>& filter_matches) const {
   // This is not a size_t because this count is eventually fed back through a FIDL type, which
   // does not have support for size types.
   uint32_t attaches = 0;
 
-  for (auto koid : koids) {
-    debug_ipc::AttachRequest attach_request;
-    attach_request.koid = koid;
-    attach_request.config.weak = true;
+  std::vector<debug_ipc::Filter> ipc_filters(filters_.size());
+  for (const auto& [_id, filter] : filters_) {
+    ipc_filters.push_back(filter);
+  }
 
-    debug_ipc::AttachReply attach_reply;
-    debug_agent_->OnAttach(attach_request, &attach_reply);
+  auto pids_to_attach = debug_ipc::GetAttachConfigsForFilterMatches(filter_matches, ipc_filters);
 
-    // We may get an error if we're already attached to this process. DebugAgent already prints a
-    // trace log for this, and it's not a problem for clients if we're already attached, so this
-    // case is ignored. Other errors will produce a warning log.
-    if (attach_reply.status.has_error() &&
-        attach_reply.status.type() != debug::Status::Type::kAlreadyExists) {
-      FX_LOGS(WARNING) << " attach to koid " << koid
-                       << " failed: " << attach_reply.status.message();
+  for (const auto& [koid, attach_config] : pids_to_attach) {
+    debug_ipc::AttachRequest request;
+    request.koid = koid;
+    request.config = attach_config;
+
+    debug_ipc::AttachReply reply;
+    debug_agent_->OnAttach(request, &reply);
+
+    // We may get an error if we're already attached to this process, or in the case of job-only,
+    // attached to an ancestor. DebugAgent already prints a trace log for this, and it's not a
+    // problem for clients if we're already attached to what they care about, so this case is
+    // ignored. Other errors will produce a warning log.
+    if (reply.status.has_error() && reply.status.type() != debug::Status::Type::kAlreadyExists) {
+      FX_LOGS(WARNING) << " attach to koid " << koid << " failed: " << reply.status.message();
     } else {
       // Normal case where we attached to something.
       attaches++;
@@ -233,7 +254,8 @@ void DebugAgentServer::OnNotification(const debug_ipc::NotifyProcessStarting& no
     return;
   }
 
-  AttachToKoids({notify.koid});
+  // We only get process starting notifications (as a debug_ipc client) when a filter matches.
+  AttachToFilterMatches({{notify.filter_id, {notify.koid}}});
 }
 
 void DebugAgentServer::OnNotification(const debug_ipc::NotifyException& notify) {
@@ -294,7 +316,8 @@ DebugAgentServer::GetMatchingProcessesResult DebugAgentServer::GetMatchingProces
   const auto& attached_processes = debug_agent_->GetAllProcesses();
 
   if (filter) {
-    auto result = ToDebugIpcFilter(*filter);
+    // We're not installing this filter, so don't need to provide a filter id.
+    auto result = ToDebugIpcFilter(*filter, std::nullopt);
     if (result.has_error()) {
       return result.err();
     }

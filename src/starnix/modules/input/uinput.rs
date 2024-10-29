@@ -552,6 +552,7 @@ mod test {
     ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, Locked<'l, Unlocked>) {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let file_object = FileObject::new(
+            &current_task,
             Box::new(file),
             // The input node doesn't really live at the root of the filesystem.
             // But the test doesn't need to be 100% representative of production.

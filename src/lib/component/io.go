@@ -115,8 +115,8 @@ func (s *Service) Clone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtx
 	return s.addConnectionDeprecated(flags, 0, req)
 }
 
-func (s *Service) Reopen(ctx fidl.Context, rights io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
-	return s.addConnection(io.Flags(0), req.ToChannel())
+func (s *Service) Clone2(ctx fidl.Context, req unknown.CloneableWithCtxInterfaceRequest) error {
+	return s.addConnection(io.Flags(0), req.Channel)
 }
 
 func (*Service) Close(fidl.Context) (unknown.CloseableCloseResult, error) {
@@ -300,8 +300,8 @@ func (dirState *directoryState) Clone(ctx fidl.Context, flags io.OpenFlags, req 
 	return dirState.addConnectionDeprecated(flags, 0, req)
 }
 
-func (dirState *directoryState) Reopen(ctx fidl.Context, rights io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
-	return dirState.addConnection(io.Flags(0), req.ToChannel())
+func (dirState *directoryState) Clone2(ctx fidl.Context, req unknown.CloneableWithCtxInterfaceRequest) error {
+	return dirState.addConnection(io.Flags(0), req.Channel)
 }
 
 func (*directoryState) Close(fidl.Context) (unknown.CloseableCloseResult, error) {
@@ -700,8 +700,8 @@ func (fState *fileState) Clone(ctx fidl.Context, flags io.OpenFlags, req io.Node
 	return fState.addConnectionDeprecated(flags, 0, req)
 }
 
-func (fState *fileState) Reopen(ctx fidl.Context, rights io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
-	return fState.addConnection(io.Flags(0), req.ToChannel())
+func (fState *fileState) Clone2(ctx fidl.Context, req unknown.CloneableWithCtxInterfaceRequest) error {
+	return fState.addConnection(io.Flags(0), req.Channel)
 }
 
 func (fState *fileState) Close(fidl.Context) (unknown.CloseableCloseResult, error) {

@@ -769,7 +769,7 @@ mod tests {
     use test_case::test_case;
 
     use super::*;
-    use crate::conntrack::Tuple;
+    use crate::conntrack::{self, Tuple};
     use crate::context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass};
     use crate::logic::nat::NatConfig;
     use crate::matchers::testutil::{ethernet_interface, wlan_interface, FakeDeviceId};
@@ -1410,6 +1410,40 @@ mod tests {
     #[ip_test(I)]
     fn drop_packet_on_finalize_connection_failure<I: TestIpExt>() {
         let mut bindings_ctx = FakeBindingsCtx::new();
+        let mut ctx = FakeCtx::new(&mut bindings_ctx);
+
+        for i in 0..u16::try_from(conntrack::MAXIMUM_CONNECTIONS).unwrap() {
+            // Create a self-connected flow so it's automatically considered established
+            // after the first packet.
+            let mut packet = FakeIpPacket {
+                src_ip: I::SRC_IP,
+                dst_ip: I::SRC_IP,
+                body: FakeUdpPacket { src_port: i, dst_port: i },
+            };
+            let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
+                &mut bindings_ctx,
+                &mut packet,
+                &ethernet_interface(),
+                &mut NullMetadata {},
+            );
+            assert_eq!(verdict, Verdict::Accept);
+        }
+
+        // Finalizing the connection should fail when the conntrack table is at maximum
+        // capacity and there are no connections to remove, because all existing
+        // connections are considered established.
+        let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value(),
+            &ethernet_interface(),
+            &mut NullMetadata {},
+        );
+        assert_eq!(verdict, Verdict::Drop);
+    }
+
+    #[ip_test(I)]
+    fn implicit_snat_to_prevent_tuple_clash<I: TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
         let mut ctx = FakeCtx::with_nat_routines_and_device_addrs(
             &mut bindings_ctx,
             NatRoutines {
@@ -1450,16 +1484,19 @@ mod tests {
 
         // Now simulate a locally-generated packet that conflicts with this flow; it is
         // from I::SRC_IP to I::DST_IP and has the same source and destination ports.
-        // Finalizing the connection should fail and the packet should be dropped.
-        //
-        // TODO(https://fxbug.dev/372543214): once we remap source ports for locally-
-        // generated traffic, finalizing the connection should succeed.
+        // Finalizing the connection would typically fail, causing the packet to be
+        // dropped, because the reply tuple conflicts with the reply tuple of the
+        // masqueraded flow. So instead this new flow is implicitly SNATed to a free
+        // port and the connection should be successfully finalized.
+        let mut packet = FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value();
+        let src_port = packet.body.src_port;
         let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
             &mut bindings_ctx,
-            &mut FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value(),
+            &mut packet,
             &ethernet_interface(),
             &mut NullMetadata {},
         );
-        assert_eq!(verdict, Verdict::Drop);
+        assert_eq!(verdict, Verdict::Accept);
+        assert_ne!(packet.body.src_port, src_port);
     }
 }

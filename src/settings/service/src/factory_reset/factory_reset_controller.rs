@@ -17,7 +17,7 @@ use fidl_fuchsia_recovery_policy::{DeviceMarker, DeviceProxy};
 use futures::lock::Mutex;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::{NoneT, StorageAccess};
-use std::sync::Arc;
+use std::rc::Rc;
 
 impl DeviceStorageCompatible for FactoryResetInfo {
     type Loader = NoneT;
@@ -36,10 +36,10 @@ impl From<FactoryResetInfo> for SettingInfo {
     }
 }
 
-type FactoryResetHandle = Arc<Mutex<FactoryResetManager>>;
+type FactoryResetHandle = Rc<Mutex<FactoryResetManager>>;
 
 /// Handles the mapping between [`Request`]s/[`State`] changes and the
-/// [`FactoryResetManager`] logic. Wraps an Arc Mutex of the manager so that each field
+/// [`FactoryResetManager`] logic. Wraps an Rc Mutex of the manager so that each field
 /// doesn't need to be individually locked within the manager.
 ///
 /// [`Request`]: crate::handler::base::Request
@@ -69,7 +69,7 @@ impl FactoryResetManager {
             .connect::<DeviceMarker>()
             .await
             .map(|factory_reset_policy_service| {
-                Arc::new(Mutex::new(Self {
+                Rc::new(Mutex::new(Self {
                     client,
                     is_local_reset_allowed: true,
                     factory_reset_policy_service,
@@ -132,14 +132,14 @@ impl FactoryResetManager {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Create for FactoryResetController {
     async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
         Ok(Self { handle: FactoryResetManager::from_client(client).await? })
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl Handle for FactoryResetController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {

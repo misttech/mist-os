@@ -5,6 +5,9 @@
 #ifndef SRC_STORAGE_F2FS_SERVICE_ADMIN_H_
 #define SRC_STORAGE_F2FS_SERVICE_ADMIN_H_
 
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/service.h"
+
 namespace f2fs {
 
 class AdminService final : public fidl::WireServer<fuchsia_fs::Admin>, public fs::Service {

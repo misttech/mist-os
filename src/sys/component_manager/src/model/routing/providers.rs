@@ -16,7 +16,7 @@ use routing::availability::AvailabilityMetadata;
 use routing::bedrock::request_metadata::METADATA_KEY_TYPE;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::error::{ComponentInstanceError, RoutingError};
-use routing::DictExt;
+use routing::{DictExt, GenericRouterResponse};
 use sandbox::{Dict, RemotableCapability, Request};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -62,20 +62,25 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             .map(|e| (e.name().clone(), CapabilityTypeName::from(e)))
             .collect();
         let metadata = Dict::new();
-        if let Some(porcelain_type) = caps_with_metadata.get(&self.name) {
-            metadata
-                .insert(
-                    cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
-                    sandbox::Capability::Data(sandbox::Data::String(porcelain_type.to_string())),
-                )
-                .unwrap();
-        }
+        let Some(porcelain_type) = caps_with_metadata.get(&self.name) else {
+            return Err(RouterError::from(RoutingError::MissingPorcelainType {
+                name: self.name,
+                moniker: source.moniker.clone(),
+            })
+            .into());
+        };
+        metadata
+            .insert(
+                cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
+                sandbox::Capability::Data(sandbox::Data::String(porcelain_type.to_string())),
+            )
+            .unwrap();
         metadata.set_availability(Availability::Transitional);
-        let capability = source
+        let resp = source
             .get_program_output_dict()
             .await?
             .get_with_request(
-                source.moniker.clone(),
+                &source.moniker.clone().into(),
                 &self.name,
                 // Routers in `program_output_dict` do not check availability but we need a
                 // request to run hooks.
@@ -86,8 +91,24 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {
                 moniker: self.target.moniker.clone().into(),
                 name: self.name.to_string(),
-            })
-            .map_err(RouterError::from)?;
+            })?;
+        let capability = match resp {
+            GenericRouterResponse::Capability(c) => c,
+            GenericRouterResponse::Unavailable => {
+                return Err(RoutingError::RouteUnexpectedUnavailable {
+                    type_name: *porcelain_type,
+                    moniker: source.moniker.clone().into(),
+                }
+                .into());
+            }
+            GenericRouterResponse::Debug(_) => {
+                return Err(RoutingError::RouteUnexpectedDebug {
+                    type_name: *porcelain_type,
+                    moniker: source.moniker.clone().into(),
+                }
+                .into())
+            }
+        };
         let entry = capability
             .try_into_directory_entry()
             .map_err(OpenError::DoesNotSupportOpen)

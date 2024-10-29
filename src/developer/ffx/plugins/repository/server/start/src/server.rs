@@ -2,15 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::time::Duration;
+
 use crate::ServerStartTool;
 use ffx_config::EnvironmentContext;
-use ffx_repository_serve::serve_impl;
+use ffx_repository_serve::{get_repo_base_name, serve_impl};
 use ffx_repository_serve_args::ServeCommand;
 use ffx_repository_server_start_args::StartCommand;
-use fho::{Connector, FfxMain, Result};
+use fho::{bug, user_error, Connector, FfxMain, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use pkg::ServerMode;
+use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 
 // map from the start command to the serve command.
 pub(crate) fn to_serve_command(cmd: &StartCommand) -> ServeCommand {
@@ -95,6 +97,29 @@ pub async fn run_foreground_server(
         mode,
     )
     .await
+}
+
+pub(crate) async fn wait_for_start(
+    context: EnvironmentContext,
+    cmd: StartCommand,
+    time_to_wait: Duration,
+) -> Result<()> {
+    let instance_root =
+        context.get("repository.process_dir").map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
+    let mgr = PkgServerInstances::new(instance_root);
+
+    let repo_base_name = get_repo_base_name(&cmd.repository, &context)?;
+    timeout::timeout(time_to_wait, async move {
+        loop {
+            let running_instances = mgr.list_instances()?;
+            if running_instances.iter().any(|instance| instance.name.starts_with(&repo_base_name)) {
+                return Ok(());
+            }
+            fuchsia_async::Timer::new(std::time::Duration::from_secs(1)).await;
+        }
+    })
+    .await
+    .map_err(|e| user_error!(e))?
 }
 
 #[cfg(test)]

@@ -4,8 +4,8 @@
 
 use crate::time::utc;
 use fuchsia_runtime::{UtcDuration, UtcInstant};
+use starnix_types::time::{itimerspec_from_deadline_interval, time_from_timespec};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::time::{itimerspec_from_deadline_interval, time_from_timespec};
 use starnix_uapi::{itimerspec, timespec};
 use std::ops;
 
@@ -22,8 +22,7 @@ impl Timeline {
         match self {
             Self::RealTime => TargetTime::RealTime(utc::utc_now()),
             Self::Monotonic => TargetTime::Monotonic(zx::MonotonicInstant::get()),
-            // TODO(https://fxbug.dev/328306129) handle boot and monotonic time separately
-            Self::BootInstant => TargetTime::BootInstant(zx::MonotonicInstant::get()),
+            Self::BootInstant => TargetTime::BootInstant(zx::BootInstant::get()),
         }
     }
 
@@ -56,8 +55,7 @@ pub enum TimerWakeup {
 pub enum TargetTime {
     Monotonic(zx::MonotonicInstant),
     RealTime(UtcInstant),
-    // TODO(https://fxbug.dev/328306129) handle boot time with its own type
-    BootInstant(zx::MonotonicInstant),
+    BootInstant(zx::BootInstant),
 }
 
 impl TargetTime {
@@ -71,18 +69,18 @@ impl TargetTime {
 
     pub fn itimerspec(&self, interval: zx::MonotonicDuration) -> itimerspec {
         match self {
-            TargetTime::Monotonic(t) | TargetTime::BootInstant(t) => {
-                itimerspec_from_deadline_interval(*t, interval)
-            }
+            TargetTime::Monotonic(t) => itimerspec_from_deadline_interval(*t, interval),
+            TargetTime::BootInstant(t) => itimerspec_from_deadline_interval(*t, interval),
             TargetTime::RealTime(t) => itimerspec_from_deadline_interval(*t, interval),
         }
     }
 
-    // TODO(https://fxbug.dev/328306129) handle boot and monotonic time properly
-    pub fn estimate_monotonic(&self) -> zx::MonotonicInstant {
+    pub fn estimate_boot(&self) -> Option<zx::BootInstant> {
         match self {
-            TargetTime::BootInstant(t) | TargetTime::Monotonic(t) => *t,
-            TargetTime::RealTime(t) => utc::estimate_monotonic_deadline_from_utc(*t),
+            TargetTime::BootInstant(t) => Some(*t),
+            TargetTime::RealTime(t) => Some(utc::estimate_boot_deadline_from_utc(*t)),
+            // It's not possible to estimate how long suspensions will be.
+            TargetTime::Monotonic(_) => None,
         }
     }
 
@@ -110,8 +108,7 @@ impl std::ops::Add<GenericDuration> for TargetTime {
         match self {
             Self::RealTime(t) => Self::RealTime(t + rhs.into_utc()),
             Self::Monotonic(t) => Self::Monotonic(t + rhs.into_mono()),
-            // TODO(https://fxbug.dev/328306129) handle boot and monotonic time properly
-            Self::BootInstant(t) => Self::BootInstant(t + rhs.into_mono()),
+            Self::BootInstant(t) => Self::BootInstant(t + rhs.into_boot()),
         }
     }
 }
@@ -122,8 +119,7 @@ impl std::ops::Sub<GenericDuration> for TargetTime {
         match self {
             TargetTime::Monotonic(t) => Self::Monotonic(t - rhs.into_mono()),
             TargetTime::RealTime(t) => Self::RealTime(t - rhs.into_utc()),
-            // TODO(https://fxbug.dev/328306129) handle boot and monotonic time properly
-            TargetTime::BootInstant(t) => Self::BootInstant(t - rhs.into_mono()),
+            TargetTime::BootInstant(t) => Self::BootInstant(t - rhs.into_boot()),
         }
     }
 }

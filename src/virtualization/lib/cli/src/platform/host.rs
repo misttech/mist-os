@@ -31,12 +31,11 @@ impl PlatformServices for HostPlatformServices {
         // This may fail, but we report the error when we later try to use the GuestManagerProxy.
         let _ = self
             .remote_control
-            .open_capability(
+            .connect_capability(
                 guest_type.moniker(),
                 fsys::OpenDirType::ExposedDir,
                 guest_type.guest_manager_interface(),
                 server_end.into_channel(),
-                OpenFlags::RIGHT_READABLE,
             )
             .await?;
         Ok(guest_manager)
@@ -47,12 +46,11 @@ impl PlatformServices for HostPlatformServices {
         // This may fail, but we report the error when we later try to use the LinuxManagerProxy.
         let _ = self
             .remote_control
-            .open_capability(
+            .connect_capability(
                 GuestType::Termina.moniker(),
                 fsys::OpenDirType::ExposedDir,
                 LinuxManagerMarker::PROTOCOL_NAME,
                 server_end.into_channel(),
-                OpenFlags::RIGHT_READABLE,
             )
             .await?;
         Ok(linux_manager)

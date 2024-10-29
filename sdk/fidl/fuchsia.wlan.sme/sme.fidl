@@ -61,6 +61,10 @@ type DisconnectMlmeEventName = strict enum {
     ROAM_RESULT_INDICATION = 4;
     // SAE handshake failed (or timed out).
     SAE_HANDSHAKE_RESPONSE = 5;
+    // Roam request was malformed or selected BSS was incompatible, so roam could not proceed.
+    ROAM_REQUEST = 6;
+    // Roam confirmation reported failure (or was malformed), causing the disconnect.
+    ROAM_CONFIRMATION = 7;
 };
 
 type DisconnectSource = strict union {
@@ -231,6 +235,10 @@ type ConnectRequest = struct {
     deprecated_scan_type fuchsia.wlan.common.ScanType;
 };
 
+type RoamRequest = struct {
+    bss_description fuchsia.wlan.common.BssDescription;
+};
+
 type ServingApInfo = struct {
     bssid ieee80211.MacAddr;
     ssid ieee80211.Ssid;
@@ -257,6 +265,9 @@ closed protocol ClientSme {
     strict Connect(resource struct {
         req ConnectRequest;
         txn server_end:<ConnectTransaction, optional>;
+    });
+    strict Roam(struct {
+        req RoamRequest;
     });
     strict Disconnect(struct {
         reason UserDisconnectReason;

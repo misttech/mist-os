@@ -401,7 +401,7 @@ capabilities: [
 
 `<outgoing-dir-path>` is a path in the component's
 [outgoing directory][glossary-outgoing-directory] to a
-[`fuchsia.component.sandbox/Router`][fidl-sandbox-router] protocol which is
+[`fuchsia.component.sandbox/DictionaryRouter`][fidl-sandbox-router] protocol which is
 expected to return a [`Dictionary`][fidl-sandbox-dictionary] capability.
 
 To illustrate this feature, let's walk through an example. The example consists
@@ -409,8 +409,8 @@ of two components.
 
 -   `dynamic-dictionary-provider`: Creates a runtime
     [`Dictionary`][fidl-sandbox-dictionary] with three `Echo` protocol
-    instances. It exposes the `Dictionary` via a [`Router`][fidl-sandbox-router]
-    and defines a `dictionary` backed by this `Router`.
+    instances. It exposes the `Dictionary` via a [`DictionaryRouter`][fidl-sandbox-router]
+    and defines a `dictionary` backed by it.
 -   `dynamic-dictionary`: Declares CML to [retrieve](#retrieval) the three
     `Echo` protocols from the `dictionary`, and runs code to use each of these
     protocols.
@@ -418,7 +418,7 @@ of two components.
 ##### Provider
 
 The component manifest of `dynamic-dictionary-provider` is as follows. In it we
-see the `dictionary` definition for `bundle` that names a `Router` in its
+see the `dictionary` definition for `bundle` that names a `DictionaryRouter` in its
 `path`.
 
 ```json5
@@ -445,16 +445,16 @@ component's outgoing directory.
 ```
 
 Finally, we need to expose the dictionary created earlier with a
-[`Router`][fidl-sandbox-router].
+[`DictionaryRouter`][fidl-sandbox-router].
 
 ```json5
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/dictionaries/provider/src/main.rs" region_tag="serve" adjust_indentation="auto" %}
 ```
 
-The [`Router`][fidl-sandbox-router] request handler exports the dictionary and
+The [`DictionaryRouter`][fidl-sandbox-router] request handler exports the dictionary and
 returns it. Note that it makes a
 [`CapabilityStore.Duplicate`][fidl-sandbox-capability-store] of the dictionary
-first because the framework may call `Router.Route` multiple times. This has the
+first because the framework may call `DictionaryRouter.Route` multiple times. This has the
 effect of duplicating the dictionary *handle*, without copying the inner
 contents.
 
@@ -506,7 +506,7 @@ The program just connects to each protocol in turn and tries to use it:
 [fidl-sandbox-capability-store]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#CapabilityStore
 [fidl-sandbox-connector]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Connector
 [fidl-sandbox-dictionary]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#DictionaryRef
-[fidl-sandbox-router]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Router
+[fidl-sandbox-router]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#DictionaryRouter
 [fidl-sandbox-receiver]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Receiver
 [glossary-dictionary]: /docs/glossary/README.md#dictionary
 [glossary-outgoing-directory]: /docs/glossary/README.md#outgoing-directory

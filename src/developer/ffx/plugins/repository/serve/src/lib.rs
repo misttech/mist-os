@@ -169,7 +169,10 @@ $ ffx doctor --restart-daemon"#,
     }
 }
 
-fn get_repo_base_name(cmd_line: &Option<String>, context: &EnvironmentContext) -> Result<String> {
+pub fn get_repo_base_name(
+    cmd_line: &Option<String>,
+    context: &EnvironmentContext,
+) -> Result<String> {
     if let Some(repo_name) = cmd_line.as_ref() {
         return Ok(repo_name.to_string());
     } else {
@@ -188,6 +191,21 @@ pub async fn serve_impl_validate_args(
     rcs_proxy_connector: &Connector<RemoteControlProxy>,
     context: &EnvironmentContext,
 ) -> Result<Option<PkgServerInfo>> {
+    /* This check makes sure there is not a daemon based server running, which causes
+     a lot of confusion.
+    */
+    let bg: bool =
+        context.get(REPO_BACKGROUND_FEATURE_FLAG).context("checking for daemon server flag")?;
+    if bg {
+        return_user_error!(
+            r#"The ffx setting '{}' and the standalone server are mutually incompatible.
+Please disable the daemon based serving by running the following command:
+
+ffx config remove repository.server.enabled && ffx doctor --restart-daemon
+"#,
+            REPO_BACKGROUND_FEATURE_FLAG,
+        );
+    }
     // Check that there is a target device identifed, it is OK if it is not online.
     if !cmd.no_device {
         let res = rcs_proxy_connector

@@ -86,6 +86,7 @@ async fn handle_fidl_request(
         ClientSmeRequest::Connect { req, txn, .. } => Ok(connect(sme, txn, req)
             .await
             .unwrap_or_else(|e| error!("Error handling a connect transaction: {:?}", e))),
+        ClientSmeRequest::Roam { req, .. } => Ok(roam(sme, req)),
         ClientSmeRequest::Disconnect { responder, reason } => {
             disconnect(sme, reason, responder);
             Ok(())
@@ -222,6 +223,10 @@ async fn serve_connect_txn_stream(
         }
     }
     Ok(())
+}
+
+fn roam(sme: &Mutex<Sme>, req: fidl_sme::RoamRequest) {
+    sme.lock().unwrap().on_roam_command(req);
 }
 
 fn disconnect(

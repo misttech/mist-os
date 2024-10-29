@@ -38,14 +38,14 @@ TEST_P(LseekTest, Position) {
   ASSERT_EQ(lseek(fd.get(), -len, SEEK_END), 0);
 
   // Read the entire file.
-  char buf[len + 1];
-  ASSERT_EQ(read(fd.get(), buf, len), static_cast<ssize_t>(len));
-  ASSERT_EQ(memcmp(buf, str, len), 0);
+  auto buf = std::make_unique<char[]>(len + 1);
+  ASSERT_EQ(read(fd.get(), buf.get(), len), static_cast<ssize_t>(len));
+  ASSERT_EQ(memcmp(buf.get(), str, len), 0);
 
   // Seek and read part of the file.
   ASSERT_EQ(lseek(fd.get(), 1, SEEK_SET), 1);
-  ASSERT_EQ(read(fd.get(), buf, len - 1), static_cast<ssize_t>(len - 1));
-  ASSERT_EQ(memcmp(buf, &str[1], len - 1), 0);
+  ASSERT_EQ(read(fd.get(), buf.get(), len - 1), static_cast<ssize_t>(len - 1));
+  ASSERT_EQ(memcmp(buf.get(), &str[1], len - 1), 0);
 
   ASSERT_EQ(unlink(filename.c_str()), 0);
 }
@@ -120,15 +120,15 @@ TEST_P(LseekTest, ZeroFill) {
 
   // Validate the file contents.
   {
-    char expected[len + zeros + 1];
-    memcpy(expected, str, len);
+    auto expected = std::make_unique<char[]>(len + zeros + 1);
+    memcpy(expected.get(), str, len);
     memset(&expected[len], 0, zeros);
     expected[len + zeros] = 'a';
 
-    char buf[len + zeros + 1];
+    auto buf = std::make_unique<char[]>(len + zeros + 1);
     ASSERT_EQ(lseek(fd.get(), 0, SEEK_SET), 0);
-    ASSERT_EQ(read(fd.get(), buf, sizeof(buf)), static_cast<ssize_t>(sizeof(buf)));
-    ASSERT_EQ(memcmp(buf, expected, sizeof(expected)), 0);
+    ASSERT_EQ(read(fd.get(), buf.get(), len + zeros + 1), static_cast<ssize_t>(len + zeros + 1));
+    ASSERT_EQ(memcmp(buf.get(), expected.get(), len + zeros + 1), 0);
   }
 
   // Truncate and observe the (old) sentinel value has been
@@ -141,15 +141,15 @@ TEST_P(LseekTest, ZeroFill) {
   ASSERT_EQ(st.st_size, static_cast<off_t>(len + zeros + 1));
 
   {
-    char expected[len + zeros + 1];
-    memcpy(expected, str, len);
+    auto expected = std::make_unique<char[]>(len + zeros + 1);
+    memcpy(expected.get(), str, len);
     memset(&expected[len], 0, zeros);
     expected[len + zeros] = 'a';
 
-    char buf[len + zeros + 1];
+    auto buf = std::make_unique<char[]>(len + zeros + 1);
     ASSERT_EQ(lseek(fd.get(), 0, SEEK_SET), 0);
-    ASSERT_EQ(read(fd.get(), buf, sizeof(buf)), static_cast<ssize_t>(sizeof(buf)));
-    ASSERT_EQ(memcmp(buf, expected, sizeof(expected)), 0);
+    ASSERT_EQ(read(fd.get(), buf.get(), len + zeros + 1), static_cast<ssize_t>(len + zeros + 1));
+    ASSERT_EQ(memcmp(buf.get(), expected.get(), len + zeros + 1), 0);
   }
 
   ASSERT_EQ(unlink(filename.c_str()), 0);

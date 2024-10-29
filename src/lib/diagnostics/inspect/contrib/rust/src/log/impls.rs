@@ -40,9 +40,12 @@ macro_rules! write_inspect_value {
 // --- Implementations for basic types ---
 
 impl_write_inspect!(Str, self => &self, &str, String);
-impl_write_inspect!(Uint, self => (*self).into(), u8, u16, u32, u64);
-impl_write_inspect!(Int, self => (*self).into(), i8, i16, i32, i64);
-impl_write_inspect!(Double, self => (*self).into(), f32, f64);
+impl_write_inspect!(Uint, self => (*self).into(), u8, u16, u32);
+impl_write_inspect!(Uint, self => *self, u64);
+impl_write_inspect!(Int, self => (*self).into(), i8, i16, i32);
+impl_write_inspect!(Int, self => *self, i64);
+impl_write_inspect!(Double, self => (*self).into(), f32);
+impl_write_inspect!(Double, self => *self, f64);
 impl_write_inspect!(Bool, self => *self, bool);
 
 impl<V: WriteInspect + ?Sized> WriteInspect for &V {

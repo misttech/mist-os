@@ -17,4 +17,11 @@ closed protocol Connector {
         id uint64;
         socket zx.Handle:SOCKET;
     }) -> ();
+
+    // Get a socket connected to an FDomain which has the toolbox as its
+    // namespace. Messages received through the socket will have a little endian
+    // 32-bit length prepended for framing. Messages sent should do the same.
+    strict FdomainToolboxSocket(resource struct {
+        socket zx.Handle:SOCKET;
+    }) -> ();
 };

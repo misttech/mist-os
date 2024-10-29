@@ -33,6 +33,10 @@ struct Options {
   // Optional Program to be executed before the booting program.
   // prefix: `userboot.test`
   ProgramInfo test;
+
+  // When `boot` is set and this flag is set, then `boot`'s result will determine the success
+  // criteria for the test, instead of `test`'s result. Essentially
+  bool next_is_test = false;
 };
 
 // Parses the provided CMDLINE payload for userboot options.

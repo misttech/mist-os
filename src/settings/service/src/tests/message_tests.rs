@@ -7,21 +7,21 @@ use crate::message::base::{Audience, Filter, MessageEvent, MessengerType, Status
 use crate::message::receptor::Receptor;
 use crate::tests::message_utils::verify_payload;
 
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use std::pin::pin;
-use std::sync::Arc;
+use std::rc::Rc;
 use std::task::Poll;
 
 type TestPayload = crate::service::test::Payload;
 pub(crate) mod test_message {
     use super::TestPayload;
-    pub static FOO: crate::Payload = crate::Payload::Test(TestPayload::Integer(0));
-    pub static BAR: crate::Payload = crate::Payload::Test(TestPayload::Integer(1));
-    pub static BAZ: crate::Payload = crate::Payload::Test(TestPayload::Integer(2));
-    pub static QUX: crate::Payload = crate::Payload::Test(TestPayload::Integer(3));
-    pub static THUD: crate::Payload = crate::Payload::Test(TestPayload::Integer(4));
+    pub const FOO: crate::Payload = crate::Payload::Test(TestPayload::Integer(0));
+    pub const BAR: crate::Payload = crate::Payload::Test(TestPayload::Integer(1));
+    pub const BAZ: crate::Payload = crate::Payload::Test(TestPayload::Integer(2));
+    pub const QUX: crate::Payload = crate::Payload::Test(TestPayload::Integer(3));
+    pub const THUD: crate::Payload = crate::Payload::Test(TestPayload::Integer(4));
 }
 
 /// Ensures the delivery result matches expected value.
@@ -37,18 +37,18 @@ async fn verify_result(expected: Status, receptor: &mut Receptor) {
     panic!("Didn't receive result expected");
 }
 
-static ORIGINAL: &crate::Payload = &test_message::FOO;
-static MODIFIED: &crate::Payload = &test_message::QUX;
-static MODIFIED_2: &crate::Payload = &test_message::THUD;
-static BROADCAST: &crate::Payload = &test_message::BAZ;
-static REPLY: &crate::Payload = &test_message::BAR;
+const ORIGINAL: &crate::Payload = &test_message::FOO;
+const MODIFIED: &crate::Payload = &test_message::QUX;
+const MODIFIED_2: &crate::Payload = &test_message::THUD;
+const BROADCAST: &crate::Payload = &test_message::BAZ;
+const REPLY: &crate::Payload = &test_message::BAR;
 
 mod test {
     pub(crate) type MessageHub = crate::message::message_hub::MessageHub;
 }
 
 fn no_filter() -> Filter {
-    Arc::new(|&_| true)
+    Rc::new(|&_| true)
 }
 
 // Tests message client creation results in unique ids.
@@ -162,7 +162,7 @@ async fn test_end_to_end_messaging() {
     verify_payload(
         ORIGINAL.clone(),
         &mut receptor_2,
-        Some(Box::new(|client| -> BoxFuture<'_, ()> {
+        Some(Box::new(|client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let _ = client.reply(REPLY.clone());
             })
@@ -194,7 +194,7 @@ async fn test_implicit_forward() {
     verify_payload(
         ORIGINAL.clone(),
         &mut receiver_3,
-        Some(Box::new(|client| -> BoxFuture<'_, ()> {
+        Some(Box::new(|client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let _ = client.reply(REPLY.clone());
             })
@@ -224,10 +224,10 @@ async fn test_observe_addressable() {
     let mut reply_receptor =
         messenger_client_1.message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(3)));
 
-    let observe_receptor = Arc::new(Mutex::new(None));
+    let observe_receptor = Rc::new(Mutex::new(None));
     verify_payload(ORIGINAL.clone(), &mut receptor_2, {
         let observe_receptor = observe_receptor.clone();
-        Some(Box::new(move |mut client| -> BoxFuture<'_, ()> {
+        Some(Box::new(move |mut client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let mut receptor = observe_receptor.lock().await;
                 *receptor = Some(client.spawn_observer());
@@ -239,7 +239,7 @@ async fn test_observe_addressable() {
     verify_payload(
         ORIGINAL.clone(),
         &mut receptor_3,
-        Some(Box::new(|client| -> BoxFuture<'_, ()> {
+        Some(Box::new(|client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let _ = client.reply(REPLY.clone());
             })
@@ -277,7 +277,7 @@ fn test_timeout() {
         verify_payload(
             ORIGINAL.clone(),
             &mut receptor_2,
-            Some(Box::new(|_| -> BoxFuture<'_, ()> {
+            Some(Box::new(|_| -> LocalBoxFuture<'_, ()> {
                 Box::pin(async move {
                     // Do not respond.
                 })
@@ -437,12 +437,12 @@ async fn verify_messenger_behavior(messenger_type: MessengerType) {
     let mut reply_receptor =
         test_client.message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(1)));
 
-    let captured_signature = Arc::new(Mutex::new(None));
+    let captured_signature = Rc::new(Mutex::new(None));
 
     // Verify target messenger received message and capture Signature.
     verify_payload(ORIGINAL.clone(), &mut target_receptor, {
         let captured_signature = captured_signature.clone();
-        Some(Box::new(move |client| -> BoxFuture<'_, ()> {
+        Some(Box::new(move |client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let mut author = captured_signature.lock().await;
                 *author = Some(client.get_author());
@@ -482,7 +482,7 @@ async fn test_unbound_messenger() {
     verify_payload(
         ORIGINAL.clone(),
         &mut unbound_receptor,
-        Some(Box::new(move |client| -> BoxFuture<'_, ()> {
+        Some(Box::new(move |client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let _ = client.reply(REPLY.clone());
             })
@@ -575,7 +575,7 @@ async fn test_reply_propagation() {
 
     // Create broker to propagate a derived message.
     let (_, mut broker) = delegate
-        .create(MessengerType::Broker(Arc::new(move |message| *message.payload() == *REPLY)))
+        .create(MessengerType::Broker(Rc::new(move |message| *message.payload() == *REPLY)))
         .await
         .expect("broker should be created");
 
@@ -591,7 +591,7 @@ async fn test_reply_propagation() {
     verify_payload(
         ORIGINAL.clone(),
         &mut target_receptor,
-        Some(Box::new(move |client| -> BoxFuture<'_, ()> {
+        Some(Box::new(move |client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let _ = client.reply(REPLY.clone());
             })
@@ -603,7 +603,7 @@ async fn test_reply_propagation() {
     verify_payload(
         REPLY.clone(),
         &mut broker,
-        Some(Box::new(move |client| -> BoxFuture<'_, ()> {
+        Some(Box::new(move |client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let _ = client.propagate(MODIFIED.clone());
             })
@@ -649,7 +649,7 @@ async fn test_propagation() {
     verify_payload(
         ORIGINAL.clone(),
         &mut broker_1,
-        Some(Box::new(move |client| -> BoxFuture<'_, ()> {
+        Some(Box::new(move |client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let _ = client.propagate(MODIFIED.clone());
             })
@@ -662,7 +662,7 @@ async fn test_propagation() {
     verify_payload(
         MODIFIED.clone(),
         &mut broker_2,
-        Some(Box::new(move |client| -> BoxFuture<'_, ()> {
+        Some(Box::new(move |client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 let _ = client.propagate(MODIFIED_2.clone());
             })
@@ -674,7 +674,7 @@ async fn test_propagation() {
     verify_payload(
         MODIFIED_2.clone(),
         &mut target_receptor,
-        Some(Box::new(move |client| -> BoxFuture<'_, ()> {
+        Some(Box::new(move |client| -> LocalBoxFuture<'_, ()> {
             Box::pin(async move {
                 // ensure the original author is attributed to the message.
                 assert_eq!(client.get_author(), sending_signature);
@@ -703,7 +703,7 @@ async fn test_broker_filter_custom() {
         .await
         .expect("broadcast messenger should be created");
     // Filter to target only the ORIGINAL message.
-    let filter: Filter = Arc::new(|message| *message.payload() == *ORIGINAL);
+    let filter: Filter = Rc::new(|message| *message.payload() == *ORIGINAL);
     // Broker that should only target ORIGINAL messages.
     let (_, mut broker_receptor) =
         delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");
@@ -732,7 +732,7 @@ async fn test_broker_filter_caputring_closure() {
         .expect("broadcast messenger should be created");
     // Filter to target only the Foo message.
     let expected_payload = &test_message::FOO;
-    let filter: Filter = Arc::new(move |message| *message.payload() == *expected_payload);
+    let filter: Filter = Rc::new(move |message| *message.payload() == *expected_payload);
     // Broker that should only target Foo messages.
     let (_, mut broker_receptor) =
         delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");

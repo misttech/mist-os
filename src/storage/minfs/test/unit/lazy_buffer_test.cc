@@ -4,7 +4,7 @@
 
 #include "src/storage/minfs/lazy_buffer.h"
 
-#include <lib/stdcompat/span.h>
+#include <span>
 
 #include <gtest/gtest.h>
 #include <storage/buffer/resizeable_vmo_buffer.h>
@@ -59,7 +59,7 @@ class LazyBufferTest : public testing::Test {
   }
 
   // Writes |data| at kIndex.
-  void Write(cpp20::span<const uint32_t> data) {
+  void Write(std::span<const uint32_t> data) {
     SimpleMapper mapper;
     auto flusher = [this, &mapper](BaseBufferView* view) {
       return buffer_->Flush(

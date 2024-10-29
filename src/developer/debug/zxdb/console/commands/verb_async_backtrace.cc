@@ -675,30 +675,43 @@ fxl::RefPtr<AsyncOutputBuffer> FormatScope(const ErrOrValue& scope_state,
             ResolveNonstaticMember(context, tuple, {"__0", "inner", "ptr", "pointer"});
         if (arc_inner_ptr.has_error())
           return cb(FormatError("Invalid children tuple (1)", arc_inner_ptr.err()));
-        ResolvePointer(context, arc_inner_ptr.value(),
-                       [=, cb = std::move(cb)](ErrOrValue arc_inner) mutable {
-                         // TODO: Check strong count.
-                         if (arc_inner.has_error())
-                           return cb(FormatError("Invalid children tuple (2)", arc_inner.err()));
-                         ErrOrValue child_state = ResolveNonstaticMember(
-                             context, arc_inner.value(), {"data", "state", "data", "value"});
-                         if (child_state.has_error())
-                           return cb(FormatError("Invalid children tuple (3)", child_state.err()));
+        ResolvePointer(
+            context, arc_inner_ptr.value(), [=, cb = std::move(cb)](ErrOrValue arc_inner) mutable {
+              // TODO: Check strong count.
+              if (arc_inner.has_error())
+                return cb(FormatError("Invalid children tuple (2)", arc_inner.err()));
+              // ArcInner<ScopeInner> -> ScopeInner -> Condition<ScopeState> -> Arc<Mutex<_>> ->
+              // ArcInner<Mutex<_>>
+              ErrOrValue mutex_ptr = ResolveNonstaticMember(
+                  context, arc_inner.value(), {"data", "state", "__0", "ptr", "pointer"});
+              if (mutex_ptr.has_error())
+                return cb(FormatError("Invalid children tuple (3)", mutex_ptr.err()));
+              ResolvePointer(
+                  context, mutex_ptr.value(), [=, cb = std::move(cb)](ErrOrValue mutex) mutable {
+                    if (mutex.has_error())
+                      return cb(FormatError("Invalid children tuple (4)", mutex.err()));
+                    // ArcInner<Mutex<_>> -> Mutex<_> -> UnsafeCell -> condition::Inner ->
+                    // ScopeState
+                    ErrOrValue child_state = ResolveNonstaticMember(
+                        context, mutex.value(), {"data", "data", "value", "data"});
+                    if (child_state.has_error())
+                      return cb(FormatError("Invalid children tuple (5)", child_state.err()));
 
-                         auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-                         if (indent >= 3) {
-                           out->Append(kAwaiteeMarker);
-                           out->Append(std::string(indent - 3, ' '));
-                         }
-                         out->Append(Syntax::kStringBold, "Scope");
-                         out->Append(Syntax::kNumberDim, "(");
-                         out->Append(Syntax::kNumberDim,
-                                     to_hex_string(arc_inner_ptr.value().GetAs<TargetPointer>()));
-                         out->Append(Syntax::kNumberDim, ")\n");
-                         out->Append(FormatScope(child_state, options, context, 3 + indent));
-                         out->Complete();
-                         cb(out);
-                       });
+                    auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+                    if (indent >= 3) {
+                      out->Append(kAwaiteeMarker);
+                      out->Append(std::string(indent - 3, ' '));
+                    }
+                    out->Append(Syntax::kStringBold, "Scope");
+                    out->Append(Syntax::kNumberDim, "(");
+                    out->Append(Syntax::kNumberDim,
+                                to_hex_string(mutex_ptr.value().GetAs<TargetPointer>()));
+                    out->Append(Syntax::kNumberDim, ")\n");
+                    out->Append(FormatScope(child_state, options, context, 3 + indent));
+                    out->Complete();
+                    cb(out);
+                  });
+            });
       },
       [=](auto values) {
         if (values.has_error()) {
@@ -729,9 +742,9 @@ void OnStackReady(Stack& stack, fxl::RefPtr<CommandContext> cmd_context,
     std::string func_name(StripTemplate(stack[i]->GetLocation().symbol().Get()->GetFullName()));
     std::string expr;
     if (func_name == "fuchsia_async::runtime::fuchsia::executor::local::LocalExecutor::run") {
-      expr = "self.ehandle.root_scope.inner->data.state.data.value";
+      expr = "self.ehandle.root_scope.inner->data.state.__0->data.data.value.data";
     } else if (func_name == "fuchsia_async::runtime::fuchsia::executor::send::SendExecutor::run") {
-      expr = "self.root_scope.inner->data.state.data.value";
+      expr = "self.root_scope.inner->data.state.__0->data.data.value.data";
     } else {
       continue;
     }

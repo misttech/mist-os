@@ -337,7 +337,6 @@ test("blob-creator-test-bin") {
     ":blobfs_integration_fixtures",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/cpp/wire",
-    "//sdk/lib/stdcompat",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//src/storage/blobfs",

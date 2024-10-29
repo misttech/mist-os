@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::pin::pin;
 
 use assert_matches::assert_matches;
-use fidl::endpoints::ProtocolMarker;
+use fidl::endpoints::{ProtocolMarker, Proxy as _};
 use fidl::HandleBased;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::rules::{FidlRuleAdminIpExt, FidlRuleIpExt};
@@ -17,7 +17,7 @@ use net_declare::fidl_subnet;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Subnet};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
-use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
+use netstack_testing_common::realms::{Netstack2, Netstack3, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use routes_common::TestSetup;
 use {
@@ -619,4 +619,26 @@ async fn add_default_route_for_mark<
     .expect("add rule");
 
     route_set
+}
+
+// Netstack2 does not support fuchsia.net.routes.admin.RuleTableV{4, 6}, so it closes the
+// channel as soon as a request comes in.
+#[netstack_test]
+#[variant(I, Ip)]
+async fn rule_table_netstack2_closes_channel<
+    I: FidlRouteAdminIpExt + FidlRouteIpExt + FidlRuleIpExt + FidlRuleAdminIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm::<Netstack2, _>(format!("routes-admin-{name}"))
+        .expect("create realm");
+    let rule_table =
+        realm.connect_to_protocol::<I::RuleTableMarker>().expect("connect to rule table");
+    let _table = fnet_routes_ext::rules::new_rule_set::<I>(&rule_table, 42.into())
+        .expect("create new route table");
+
+    let signals = rule_table.on_closed().await.expect("should await closure successfully");
+    assert!(signals.contains(zx::Signals::CHANNEL_PEER_CLOSED));
 }

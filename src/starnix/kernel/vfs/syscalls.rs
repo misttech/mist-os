@@ -29,6 +29,10 @@ use crate::vfs::{
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::time::{
+    duration_from_poll_timeout, duration_from_timespec, time_from_timespec, timespec_from_duration,
+};
+use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::auth::{
     CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_LEASE, CAP_SYS_ADMIN, CAP_WAKE_ALARM,
     PTRACE_MODE_ATTACH_REALCREDS,
@@ -44,12 +48,8 @@ use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::signals::SigSet;
-use starnix_uapi::time::{
-    duration_from_poll_timeout, duration_from_timespec, time_from_timespec, timespec_from_duration,
-};
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
-use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
@@ -2214,7 +2214,7 @@ pub fn sys_select(
         zx::MonotonicInstant::INFINITE
     } else {
         let timeval = current_task.read_object(timeout_addr)?;
-        start_time + starnix_uapi::time::duration_from_timeval(timeval)?
+        start_time + starnix_types::time::duration_from_timeval(timeval)?
     };
 
     let num_fds = select(
@@ -2234,7 +2234,7 @@ pub fn sys_select(
         let now = zx::MonotonicInstant::get();
         let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
         current_task
-            .write_object(timeout_addr, &starnix_uapi::time::timeval_from_duration(remaining))?;
+            .write_object(timeout_addr, &starnix_types::time::timeval_from_duration(remaining))?;
     }
 
     Ok(num_fds)
@@ -3102,7 +3102,7 @@ pub fn sys_io_uring_register(
 mod tests {
     use super::*;
     use crate::testing::*;
-    use starnix_uapi::vfs::default_statfs;
+    use starnix_types::vfs::default_statfs;
     use starnix_uapi::{O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET};
     use zerocopy::IntoBytes;
 

@@ -70,7 +70,6 @@ pub async fn handle_request_stream(
 /// This version of the function accepts a `TreeRequestStream`, making it suitable for the
 /// recursive calls performed by the `OpenChild` method on `fuchsia.inspect.Tree`.
 /// `spawn_tree_server` is a more ergonomic option for spawning the root tree.
-#[must_use]
 pub fn spawn_tree_server_with_stream(
     inspector: Inspector,
     settings: TreeServerSendPreference,
@@ -85,7 +84,6 @@ pub fn spawn_tree_server_with_stream(
 
 /// Spawns a `fuchsia.inspect.Tree` server and returns the task handling
 /// `fuchsia.inspect.Tree requests and a `ClientEnd` handle to the tree.
-#[must_use]
 pub fn spawn_tree_server(
     inspector: Inspector,
     settings: TreeServerSendPreference,
@@ -147,13 +145,12 @@ mod tests {
 
     /// Spawns a `fuchsia.inspect.Tree` server and returns the task handling
     /// `fuchsia.inspect.Tree` requests and a `TreeProxy` handle to the tree.
-    #[must_use]
     pub fn spawn_server_proxy(
         inspector: Inspector,
         settings: TreeServerSendPreference,
     ) -> Result<(fasync::Task<()>, TreeProxy), Error> {
-        Ok(spawn_tree_server(inspector, settings)
-            .map(|(t, p)| (t, p.into_proxy().expect("ClientEnd is convertible to TreeProxy")))?)
+        spawn_tree_server(inspector, settings)
+            .map(|(t, p)| (t, p.into_proxy().expect("ClientEnd is convertible to TreeProxy")))
     }
 
     #[fuchsia::test]

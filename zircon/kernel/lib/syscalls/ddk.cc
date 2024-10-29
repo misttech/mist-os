@@ -52,12 +52,6 @@
 
 #define LOCAL_TRACE 0
 
-// TODO(https://fxbug.dev/42172752): Remove this when zx_pc_firmware_tables() goes away.
-zx_paddr_t gAcpiRsdp = 0;
-
-// TODO(https://fxbug.dev/42172752): Remove this when zx_pc_firmware_tables() goes away.
-zx_paddr_t gSmbiosPhys = 0;
-
 // zx_status_t zx_vmo_create_contiguous
 zx_status_t sys_vmo_create_contiguous(zx_handle_t bti, size_t size, uint32_t alignment_log2,
                                       zx_handle_t* out) {
@@ -328,25 +322,6 @@ zx_status_t sys_msi_create(zx_handle_t msi_alloc, uint32_t options, uint32_t msi
     return status;
   }
   return up->MakeAndAddHandle(ktl::move(msi_handle), rights, out);
-}
-
-// TODO(https://fxbug.dev/42172752): Remove zx_pc_firmware_tables().
-// zx_status_t zx_pc_firmware_tables
-zx_status_t sys_pc_firmware_tables(zx_handle_t hrsrc, user_out_ptr<zx_paddr_t> acpi_rsdp,
-                                   user_out_ptr<zx_paddr_t> smbios) {
-  zx_status_t status;
-  if ((status = validate_resource(hrsrc, ZX_RSRC_KIND_MMIO)) < 0) {
-    return status;
-  }
-  if ((status = acpi_rsdp.copy_to_user(gAcpiRsdp)) != ZX_OK) {
-    return status;
-  }
-
-  if ((status = smbios.copy_to_user(gSmbiosPhys)) != ZX_OK) {
-    return status;
-  }
-
-  return ZX_OK;
 }
 
 // zx_status_t zx_bti_create

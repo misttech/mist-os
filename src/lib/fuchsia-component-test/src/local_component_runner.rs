@@ -124,12 +124,8 @@ impl LocalComponentHandles {
             .namespace
             .get("/svc")
             .ok_or(format_err!("the component's namespace doesn't have a /svc directory"))?;
-        fuchsia_fs::directory::open_directory_no_describe_deprecated(
-            &svc_dir_proxy,
-            name,
-            fuchsia_fs::OpenFlags::empty(),
-        )
-        .map_err(Into::into)
+        fuchsia_fs::directory::open_directory_async(&svc_dir_proxy, name, fio::Flags::empty())
+            .map_err(Into::into)
     }
 
     /// Connect to the "default" instance of a FIDL service in the `/svc` directory of
@@ -157,10 +153,10 @@ impl LocalComponentHandles {
         instance_name: &str,
     ) -> Result<S::Proxy, Error> {
         let service_dir = self.open_named_service(service_name)?;
-        let directory_proxy = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+        let directory_proxy = fuchsia_fs::directory::open_directory_async(
             &service_dir,
             instance_name,
-            fuchsia_fs::OpenFlags::empty(),
+            fio::Flags::empty(),
         )?;
         Ok(S::Proxy::from_member_opener(Box::new(
             fuchsia_component::client::ServiceInstanceDirectory(directory_proxy),
@@ -177,8 +173,7 @@ impl LocalComponentHandles {
     ///
     /// ```
     /// let data_dir = handles.clone_from_namespace("data")?;
-    /// let assets_dir =
-    ///     fuchsia_fs::directory::open_directory_no_describe_deprecated(&data_dir, "assets", ...)?;
+    /// let assets_dir = fuchsia_fs::directory::open_directory_async(&data_dir, "assets", ...)?;
     /// ```
     pub fn clone_from_namespace(&self, directory_name: &str) -> Result<fio::DirectoryProxy, Error> {
         let dir_proxy = self.namespace.get(&format!("/{}", directory_name)).ok_or(format_err!(

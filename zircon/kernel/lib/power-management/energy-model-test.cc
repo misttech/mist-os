@@ -282,6 +282,101 @@ TEST(PowerModelTest, Create) {
       power_model->FindPowerLevel(static_cast<power_management::ControlInterface>(495), 0));
 }
 
+TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
+  static constexpr auto kPowerLevels = cpp20::to_array<zx_processor_power_level_t>({
+      {
+          .options = 0,
+          .processing_rate = 0,
+          .power_coefficient_nw = 1,
+          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kArmPsci),
+          .control_argument = 1,
+          .diagnostic_name = "0",
+      },
+      {
+          .options = 0,
+          .processing_rate = 4,
+          .power_coefficient_nw = 8,
+          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kCpuDriver),
+          .control_argument = 3,
+          .diagnostic_name = "1",
+      },
+      {
+          .options = 0,
+          .processing_rate = 0,
+          .power_coefficient_nw = 2,
+          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kArmWfi),
+          .control_argument = 0,
+          .diagnostic_name = "2",
+      },
+      {
+          .options = 0,
+          .processing_rate = 4,
+          .power_coefficient_nw = 10,
+          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kCpuDriver),
+          .control_argument = 1,
+          .diagnostic_name = "3",
+      },
+  });
+
+  auto power_model = PowerModel::Create(kPowerLevels, {});
+  ASSERT_TRUE(power_model.is_ok());
+
+  // Proper transformation of the model and the transition table.
+  auto check_level = [](const power_management::PowerLevel& actual,
+                        const power_management::PowerLevel& expected) {
+    EXPECT_EQ(actual.level(), expected.level());
+    EXPECT_EQ(actual.control(), expected.control());
+    EXPECT_EQ(actual.control_argument(), expected.control_argument());
+    EXPECT_EQ(actual.name(), expected.name());
+    EXPECT_EQ(actual.power_coefficient_nw(), expected.power_coefficient_nw());
+    EXPECT_EQ(actual.processing_rate(), expected.processing_rate());
+    EXPECT_EQ(actual.type(), expected.type());
+    EXPECT_EQ(actual.TargetsCpus(), expected.TargetsCpus());
+    EXPECT_EQ(actual.TargetsPowerDomain(), expected.TargetsPowerDomain());
+  };
+
+  ASSERT_EQ(power_model->levels().size(), 4u);
+  auto levels = power_model->levels();
+  for (size_t i = 0; i < levels.size() - 1; ++i) {
+    size_t j = i + 1;
+    EXPECT_LE(levels[i].processing_rate(), levels[i].processing_rate());
+    if (levels[i].processing_rate() == levels[j].processing_rate()) {
+      EXPECT_LE(levels[i].power_coefficient_nw(), levels[j].power_coefficient_nw());
+    }
+    check_level(levels[i],
+                power_management::PowerLevel(levels[i].level(), kPowerLevels[levels[i].level()]));
+    check_level(levels[j],
+                power_management::PowerLevel(levels[j].level(), kPowerLevels[levels[j].level()]));
+  }
+
+  for (size_t row = 0; row < power_model->levels().size(); ++row) {
+    for (size_t column = 0; column < power_model->levels().size(); ++column) {
+      const power_management::PowerLevelTransition& transition =
+          power_model->transitions()[row][column];
+      EXPECT_EQ(transition.energy_cost_nj(),
+                power_management::PowerLevelTransition::Zero().energy_cost_nj());
+      EXPECT_EQ(transition.latency(), power_management::PowerLevelTransition::Zero().latency());
+    }
+  }
+
+  ASSERT_EQ(power_model->idle_levels().size(), 2u);
+  EXPECT_EQ(power_model->idle_levels()[0].level(), 0u);
+  EXPECT_EQ(power_model->idle_levels()[1].level(), 2u);
+
+  ASSERT_EQ(power_model->active_levels().size(), 2u);
+  EXPECT_EQ(power_model->active_levels()[0].level(), 1u);
+  EXPECT_EQ(power_model->active_levels()[1].level(), 3u);
+
+  // Sorter by tuple <Control Interface, Control Argument>
+  for (size_t i = 0; i < levels.size(); ++i) {
+    auto& level = levels[i];
+    EXPECT_EQ(power_model->FindPowerLevel(level.control(), level.control_argument()), i);
+  }
+  EXPECT_FALSE(power_model->FindPowerLevel(power_management::ControlInterface::kArmPsci, 495));
+  EXPECT_FALSE(
+      power_model->FindPowerLevel(static_cast<power_management::ControlInterface>(495), 0));
+}
+
 TEST(PowerDomainRegistryTest, RegisterUniquePowerDomains) {
   PowerDomainRegistry registry;
   std::map<size_t, fbl::RefPtr<PowerDomain>> registed_domains;
@@ -316,7 +411,7 @@ TEST(PowerDomainRegistryTest, RegisterUniquePowerDomains) {
   EXPECT_EQ(cpus, 9);
 }
 
-TEST(PowerDomainRegistryTest, FindDOmain) {
+TEST(PowerDomainRegistryTest, FindDomain) {
   PowerDomainRegistry registry;
   std::map<size_t, fbl::RefPtr<PowerDomain>> registed_domains;
   registed_domains[0] = MakePowerDomainHelper(0, 1, 2, 3);

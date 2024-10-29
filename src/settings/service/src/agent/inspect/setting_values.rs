@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::rc::Rc;
 
 use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, component, Property, StringProperty};
@@ -91,7 +91,7 @@ impl SettingValuesInspectAgent {
 
         let (messenger_client, receptor) = match context
             .delegate
-            .create(MessengerType::Broker(Arc::new(move |message| {
+            .create(MessengerType::Broker(Rc::new(move |message| {
                 // Only catch messages that were originally sent from the interfaces, and
                 // that contain a request for the specific setting type we're interested in.
                 matches!(
@@ -130,7 +130,7 @@ impl SettingValuesInspectAgent {
             _setting_types_inspect_info: setting_types_inspect_info,
         };
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let _ = &context;
             let event = receptor.fuse();
             let agent_event = context.receptor.fuse();
@@ -279,7 +279,7 @@ mod tests {
             .message(
                 Payload::Invocation(Invocation {
                     lifespan: Lifespan::Service,
-                    service_context: Arc::new(ServiceContext::new(None, None)),
+                    service_context: Rc::new(ServiceContext::new(None, None)),
                 })
                 .into(),
                 Audience::Messenger(agent_signature),

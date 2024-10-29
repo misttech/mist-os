@@ -9,7 +9,7 @@ use crate::tests::test_failure_utils::create_test_env_with_failures;
 use assert_matches::assert_matches;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_settings::{PrivacyMarker, PrivacyProxy};
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::Status;
 
 const ENV_NAME: &str = "settings_service_privacy_test_environment";
@@ -18,7 +18,7 @@ const ENV_NAME: &str = "settings_service_privacy_test_environment";
 async fn create_privacy_test_env_with_failures() -> PrivacyProxy {
     let storage_factory = InMemoryStorageFactory::new();
     create_test_env_with_failures(
-        Arc::new(storage_factory),
+        Rc::new(storage_factory),
         ENV_NAME,
         Interface::Privacy,
         SettingType::Privacy,

@@ -115,7 +115,7 @@ impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
         encoder: &mut E,
         slot: Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), encode::EncodeError> {
-        encoder.encode_slice(self.as_mut_slice())?;
+        encoder.encode_next_slice(self.as_mut_slice())?;
         WireVector::encode_present(slot, self.len() as u64);
         Ok(())
     }

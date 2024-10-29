@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
+#include <span>
 #include <vector>
 
 #include "blobfs-compression.h"
@@ -108,7 +109,7 @@ zx_status_t BlobfsCompress(const uint8_t* src, const size_t src_sz, uint8_t* des
   return ZX_OK;
 }
 
-zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlob(cpp20::span<const uint8_t> data,
+zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlob(std::span<const uint8_t> data,
                                                      blobfs::DeliveryBlobType type) {
   switch (type) {
     case blobfs::DeliveryBlobType::kType1:

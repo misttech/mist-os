@@ -29,10 +29,9 @@ impl DriversOnlyTestRealm {
         let (_dev_class, dev_class_server) = create_proxy().expect("Could not create proxy");
 
         let (pkg_client, pkg_server) = create_endpoints();
-        fuchsia_fs::directory::open_channel_in_namespace_deprecated(
+        fuchsia_fs::directory::open_channel_in_namespace(
             "/pkg",
-            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE
-                | fidl_fuchsia_io::OpenFlags::RIGHT_EXECUTABLE,
+            fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::PERM_EXECUTABLE,
             pkg_server,
         )
         .expect("Could not open /pkg");

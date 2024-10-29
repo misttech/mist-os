@@ -211,16 +211,20 @@ pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
         open_interface(|info: &InterfaceInfo| -> bool { info_matches_serial(info, serial) })
             .with_context(|| format!("opening interface with serial number: {}", serial))?;
     match send(Command::GetVar(ClientVariable::Version), &mut interface).await {
-        Ok(Reply::Okay(version)) =>
-        // Only support 0.4 right now.
-        {
-            if version == "0.4".to_string() {
-                Ok(interface)
-            } else {
-                bail!(format!("USB serial {serial}: wrong version ({version})"))
-            }
+        Ok(Reply::Okay(version)) => {
+            tracing::debug!("USB serial {serial}: fastboot version: {version}");
+            Ok(interface)
         }
-        e => bail!(format!("USB serial {serial}: could not get version. Error: {e:#?}")),
+        Ok(Reply::Fail(message)) => {
+            tracing::warn!("Failed to get variable \"version\" with message: \"{message}\". but we communicated over fastboot protocol... continuing");
+            Ok(interface)
+        }
+        Err(e) => bail!(format!(
+            "USB serial {serial}: could not communicate over Fastboot protocol. Error: {e:#?}"
+        )),
+        e => {
+            bail!(format!("USB serial {serial}: got unexpected response getting variable: {e:#?}"))
+        }
     }
 }
 

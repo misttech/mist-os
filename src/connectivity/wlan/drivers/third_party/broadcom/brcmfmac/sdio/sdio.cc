@@ -3210,7 +3210,7 @@ zx_status_t brcmf_sdio_load_files(brcmf_pub* drvr, bool reload) TA_NO_THREAD_SAF
   if ((status =
            wlan::brcmfmac::GetClmBinary(drvr->device, brcmf_bus_type::BRCMF_BUS_TYPE_SDIO,
                                         static_cast<wlan::brcmfmac::CommonCoreId>(bus_if->chip),
-                                        bus_if->chiprev, &clm_binary)) != ZX_OK) {
+                                        bus_if->chiprev, &clm_binary, clm_needed)) != ZX_OK) {
     if (clm_needed) {
       BRCMF_ERR("Load CLM binary failed, error: %s", zx_status_get_string(status));
       if (reload)

@@ -424,7 +424,7 @@ impl Actor {
                 actions,
             }) => {
                 let parent = self.find_parent(parent)?;
-                let lazy_child = Self::create_lazy_node(&parent, name, disposition, actions)?;
+                let lazy_child = Self::create_lazy_node(parent, name, disposition, actions)?;
                 self.lazy_children.insert(id, lazy_child);
             }
             LazyAction::DeleteLazyNode(DeleteLazyNode { id }) => {
@@ -445,7 +445,7 @@ impl Actor {
         }
     }
 
-    fn find_property<'a>(&'a self, id: u32) -> Result<&'a Property, Error> {
+    fn find_property(&self, id: u32) -> Result<&Property, Error> {
         self.properties.get(&id).ok_or_else(|| format_err!("Property {} not found", id))
     }
 

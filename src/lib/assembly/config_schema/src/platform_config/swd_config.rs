@@ -23,6 +23,7 @@ pub struct SwdConfig {
     #[schemars(schema_with = "crate::vec_path_schema")]
     pub tuf_config_paths: Vec<FileRelativePathBuf>,
     pub include_configurator: bool,
+    pub enable_upgradable_packages: bool,
 }
 
 /// The SWD Policies are laid out in

@@ -8,6 +8,7 @@
 #include <lib/fpromise/result.h>
 
 #include <cstdint>
+#include <span>
 
 #include "src/storage/fvm/format.h"
 #include "src/storage/fvm/fvm_sparse.h"
@@ -73,7 +74,7 @@ inline fpromise::result<fvm::Header, std::string> ConvertToFvmHeader(
 }
 
 fpromise::result<fvm::Metadata, std::string> ConvertToFvmMetadata(
-    const fvm::Header& header, cpp20::span<const PartitionEntry> partition_entries);
+    const fvm::Header& header, std::span<const PartitionEntry> partition_entries);
 
 // Returns a |fvm::SparseImage| representation of |descriptor| on success.
 fvm::SparseImage GenerateHeader(const FvmDescriptor& descriptor);

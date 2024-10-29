@@ -1,7 +1,16 @@
 # Archivist test realm factory
 
 The archivist test realm factory is a component that builds a test realm
-with an archivist and one or more [puppet] components inside.
+with an archivist, componnet stop watcher and one or more [puppet] components inside.
+
+## Stop watcher component
+
+This component provides a protocol that enables the test to wait for stop events
+(clean exit, crash, etc) on components they care about within the topology that
+the realm factory creates without depending on topology implementation details.
+
+At typical use case would be to wait for a puppet to exit or crash by passing
+the name that the test itself gives to the puppet.
 
 ## Puppet components
 

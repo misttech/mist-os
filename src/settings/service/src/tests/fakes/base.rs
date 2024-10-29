@@ -5,9 +5,9 @@ use crate::handler::base::{GenerateHandler, Request};
 use crate::handler::setting_handler::{reply, Command, Payload, SettingHandlerResult, State};
 use anyhow::Error;
 use fuchsia_async as fasync;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Trait for providing a service.
 pub(crate) trait Service {
@@ -22,14 +22,12 @@ pub(crate) trait Service {
 
 /// A helper function for creating a simple setting handler.
 pub(crate) fn create_setting_handler(
-    request_handler: Box<
-        dyn Fn(Request) -> BoxFuture<'static, SettingHandlerResult> + Send + Sync + 'static,
-    >,
+    request_handler: Box<dyn Fn(Request) -> LocalBoxFuture<'static, SettingHandlerResult>>,
 ) -> GenerateHandler {
-    let shared_handler = Arc::new(Mutex::new(request_handler));
+    let shared_handler = Rc::new(Mutex::new(request_handler));
     Box::new(move |mut context| {
         let handler = shared_handler.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let _ = &context;
             while let Ok((payload, client)) = context.receptor.next_of::<Payload>().await {
                 // There could be other events such as acks so do not necessarily

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::types::{OperatingPoint, ThermalLoad};
+use energy_model_config::PowerLevelDomain;
 use zx::sys;
 
 /// Defines the message types and arguments to be used for inter-node communication
@@ -24,6 +25,9 @@ pub enum Message {
 
     // Issues the zx_system_set_performance_info syscall.
     SetCpuPerformanceInfo(Vec<sys::zx_cpu_performance_info_t>),
+
+    // Issues the zx_system_set_processor_power_domain syscall.
+    SetCpuProcessorPowerDomain(PowerLevelDomain, sys::zx_handle_t),
 
     /// Get the current operating point
     GetOperatingPoint,
@@ -54,6 +58,9 @@ pub enum MessageReturn {
 
     /// There is no arg in this MessageReturn type. It only serves as an ACK.
     SetCpuPerformanceInfo,
+
+    /// There is no arg in this MessageReturn type. It only serves as an ACK.
+    SetCpuProcessorPowerDomain,
 
     /// Arg: the operating point returned from the node
     GetOperatingPoint(u32),

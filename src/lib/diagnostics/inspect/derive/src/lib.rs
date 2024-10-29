@@ -71,11 +71,11 @@ impl Unit for Vec<u8> {
     type Data = BytesProperty;
 
     fn inspect_create(&self, parent: &Node, name: impl AsRef<str>) -> Self::Data {
-        parent.create_bytes(name.as_ref(), &self)
+        parent.create_bytes(name.as_ref(), self)
     }
 
     fn inspect_update(&self, data: &mut Self::Data) {
-        data.set(&self);
+        data.set(self);
     }
 }
 
@@ -139,7 +139,7 @@ impl<T: Unit> Unit for Option<T> {
         Self::Data {
             name: String::from(name.as_ref()),
             inspect_parent: parent.clone_weak(),
-            inspect_data: self.as_ref().map(|inner| inner.inspect_create(&parent, name.as_ref())),
+            inspect_data: self.as_ref().map(|inner| inner.inspect_create(parent, name.as_ref())),
         }
     }
 
@@ -196,7 +196,7 @@ impl<R: Render> IOwned<R> {
 
     /// Construct the smart pointer and populate the inspect state under parent[name].
     pub fn attached(value: R::Base, parent: &Node, name: impl AsRef<str>) -> Self {
-        let _inspect_data = R::create(&value, &parent, name.as_ref());
+        let _inspect_data = R::create(&value, parent, name.as_ref());
         Self { _base: value, _inspect_data }
     }
 
@@ -219,7 +219,7 @@ impl<R: Render> IOwned<R> {
 
 impl<R: Render> Inspect for &mut IOwned<R> {
     fn iattach(self, parent: &Node, name: impl AsRef<str>) -> Result<(), AttachError> {
-        self._inspect_data = R::create(&self._base, &parent, name.as_ref());
+        self._inspect_data = R::create(&self._base, parent, name.as_ref());
         Ok(())
     }
 }

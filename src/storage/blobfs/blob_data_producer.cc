@@ -4,7 +4,6 @@
 
 #include "src/storage/blobfs/blob_data_producer.h"
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -30,7 +29,7 @@ namespace blobfs {
 
 uint64_t SimpleBlobDataProducer::GetRemainingBytes() const { return data_.size(); }
 
-zx::result<cpp20::span<const uint8_t>> SimpleBlobDataProducer::Consume(uint64_t max) {
+zx::result<std::span<const uint8_t>> SimpleBlobDataProducer::Consume(uint64_t max) {
   auto result = data_.subspan(0, std::min(max, data_.size()));
   data_ = data_.subspan(result.size());
   return zx::ok(result);
@@ -47,7 +46,7 @@ uint64_t MergeBlobDataProducer::GetRemainingBytes() const {
   return first_.GetRemainingBytes() + padding_ + second_.GetRemainingBytes();
 }
 
-zx::result<cpp20::span<const uint8_t>> MergeBlobDataProducer::Consume(uint64_t max) {
+zx::result<std::span<const uint8_t>> MergeBlobDataProducer::Consume(uint64_t max) {
   if (first_.GetRemainingBytes() > 0) {
     auto data = first_.Consume(max);
     if (data.is_error()) {
@@ -62,7 +61,7 @@ zx::result<cpp20::span<const uint8_t>> MergeBlobDataProducer::Consume(uint64_t m
       uint8_t* p = const_cast<uint8_t*>(data->data() + data->size());
       memset(p, 0, to_pad);
       p += to_pad;
-      data.value() = cpp20::span(data->data(), data->size() + to_pad);
+      data.value() = std::span(data->data(), data->size() + to_pad);
       padding_ -= to_pad;
 
       // If we still don't have a full block, fill the block with data from the second producer.
@@ -72,7 +71,7 @@ zx::result<cpp20::span<const uint8_t>> MergeBlobDataProducer::Consume(uint64_t m
         if (data2.is_error())
           return data2;
         memcpy(p, data2->data(), data2->size());
-        data.value() = cpp20::span(data->data(), data->size() + data2->size());
+        data.value() = std::span(data->data(), data->size() + data2->size());
       }
     }
     return data;
@@ -83,7 +82,7 @@ zx::result<cpp20::span<const uint8_t>> MergeBlobDataProducer::Consume(uint64_t m
 
     // If we have some padding, prepend zeroed data.
     if (padding_ > 0) {
-      data.value() = cpp20::span(data->data() - padding_, data->size() + padding_);
+      data.value() = std::span(data->data() - padding_, data->size() + padding_);
       memset(const_cast<uint8_t*>(data->data()), 0, padding_);
       padding_ = 0;
     }
@@ -111,7 +110,7 @@ zx::result<DecompressBlobDataProducer> DecompressBlobDataProducer::Create(
   std::unique_ptr<SeekableDecompressor> decompressor;
   const size_t compressed_size = compressor.Size();
   if (zx_status_t status = SeekableChunkedDecompressor::CreateDecompressor(
-          cpp20::span(static_cast<const uint8_t*>(compressor.Data()), compressed_size),
+          std::span(static_cast<const uint8_t*>(compressor.Data()), compressed_size),
           compressed_size, &decompressor);
       status != ZX_OK) {
     return zx::error(status);
@@ -126,13 +125,13 @@ uint64_t DecompressBlobDataProducer::GetRemainingBytes() const {
   return decompressed_remaining_ + buffer_avail_;
 }
 
-zx::result<cpp20::span<const uint8_t>> DecompressBlobDataProducer::Consume(uint64_t max) {
+zx::result<std::span<const uint8_t>> DecompressBlobDataProducer::Consume(uint64_t max) {
   if (buffer_avail_ == 0) {
     if (zx_status_t status = Decompress(); status != ZX_OK) {
       return zx::error(status);
     }
   }
-  cpp20::span result(buffer_.get() + buffer_offset_, std::min(buffer_avail_, max));
+  std::span result(buffer_.get() + buffer_offset_, std::min(buffer_avail_, max));
   buffer_offset_ += result.size();
   buffer_avail_ -= result.size();
   return zx::ok(result);

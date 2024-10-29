@@ -21,7 +21,7 @@ Device::Device(fdf::DriverStartArgs start_args,
   ltrace_fn(*logger_);
 }
 
-Device::~Device() { ltrace_fn(*logger_); }
+Device::~Device() = default;
 
 zx::result<> Device::Start() {
   zx::result<fidl::ClientEnd<fuchsia_wlan_fullmac::WlanFullmacImpl>> client_end =

@@ -143,40 +143,37 @@ pub fn new_example_double_array(node: &Node) -> DoubleArrayProperty {
 }
 
 pub fn new_example_int_linear_hist(node: &Node) -> IntLinearHistogramProperty {
-    let hist = populated(
+    populated(
         node.create_int_linear_histogram(
             unique_name("histogram"),
             inspect::LinearHistogramParams { floor: -10, step_size: 5, buckets: 3 },
         ),
         PopulateParams { floor: -20, step: 1, count: 40 },
-    );
-    hist
+    )
 }
 
 pub fn new_example_uint_linear_hist(node: &Node) -> UintLinearHistogramProperty {
-    let hist = populated(
+    populated(
         node.create_uint_linear_histogram(
             unique_name("histogram"),
             inspect::LinearHistogramParams { floor: 5, step_size: 5, buckets: 3 },
         ),
         PopulateParams { floor: 0, step: 1, count: 40 },
-    );
-    hist
+    )
 }
 
 pub fn new_example_double_linear_hist(node: &Node) -> DoubleLinearHistogramProperty {
-    let hist = populated(
+    populated(
         node.create_double_linear_histogram(
             unique_name("histogram"),
             inspect::LinearHistogramParams { floor: 0.0, step_size: 0.5, buckets: 3 },
         ),
         PopulateParams { floor: -1.0, step: 0.1, count: 40 },
-    );
-    hist
+    )
 }
 
 pub fn new_example_int_exp_hist(node: &Node) -> IntExponentialHistogramProperty {
-    let hist = populated(
+    populated(
         node.create_int_exponential_histogram(
             unique_name("histogram"),
             inspect::ExponentialHistogramParams {
@@ -187,12 +184,11 @@ pub fn new_example_int_exp_hist(node: &Node) -> IntExponentialHistogramProperty 
             },
         ),
         PopulateParams { floor: -20, step: 1, count: 40 },
-    );
-    hist
+    )
 }
 
 pub fn new_example_uint_exp_hist(node: &Node) -> UintExponentialHistogramProperty {
-    let hist = populated(
+    populated(
         node.create_uint_exponential_histogram(
             unique_name("histogram"),
             inspect::ExponentialHistogramParams {
@@ -203,12 +199,11 @@ pub fn new_example_uint_exp_hist(node: &Node) -> UintExponentialHistogramPropert
             },
         ),
         PopulateParams { floor: 0, step: 1, count: 40 },
-    );
-    hist
+    )
 }
 
 pub fn new_example_double_exp_hist(node: &Node) -> DoubleExponentialHistogramProperty {
-    let hist = populated(
+    populated(
         node.create_double_exponential_histogram(
             unique_name("histogram"),
             inspect::ExponentialHistogramParams {
@@ -219,8 +214,7 @@ pub fn new_example_double_exp_hist(node: &Node) -> DoubleExponentialHistogramPro
             },
         ),
         PopulateParams { floor: -1.0, step: 0.1, count: 40 },
-    );
-    hist
+    )
 }
 
 pub fn new_example_lazy_uint(node: &Node) {

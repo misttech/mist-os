@@ -16,18 +16,28 @@ namespace fasttime::internal {
 #if defined(__aarch64__)
 
 #define TIMER_REG_CNTVCT "cntvct_el0"
+#define TIMER_REG_CNTPCT "cntpct_el0"
 
-inline zx_ticks_t get_raw_ticks_arm_a73() {
+inline zx_ticks_t get_raw_ticks_arm_a73_vct() {
   zx_ticks_t ticks1 = __arm_rsr64(TIMER_REG_CNTVCT);
   zx_ticks_t ticks2 = __arm_rsr64(TIMER_REG_CNTVCT);
   return (((ticks1 ^ ticks2) >> 32) & 1) ? ticks1 : ticks2;
 }
 
+inline zx_ticks_t get_raw_ticks_arm_a73_pct() {
+  zx_ticks_t ticks1 = __arm_rsr64(TIMER_REG_CNTPCT);
+  zx_ticks_t ticks2 = __arm_rsr64(TIMER_REG_CNTPCT);
+  return (((ticks1 ^ ticks2) >> 32) & 1) ? ticks1 : ticks2;
+}
+
 inline zx_ticks_t get_raw_ticks(const TimeValues& tvalues) {
   if (tvalues.use_a73_errata_mitigation) {
-    return get_raw_ticks_arm_a73();
+    return tvalues.use_pct_instead_of_vct ? get_raw_ticks_arm_a73_pct()
+                                          : get_raw_ticks_arm_a73_vct();
+  } else {
+    return tvalues.use_pct_instead_of_vct ? __arm_rsr64(TIMER_REG_CNTPCT)
+                                          : __arm_rsr64(TIMER_REG_CNTVCT);
   }
-  return __arm_rsr64(TIMER_REG_CNTVCT);
 }
 
 #elif defined(__x86_64__)

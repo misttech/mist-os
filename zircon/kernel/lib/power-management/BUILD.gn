@@ -23,7 +23,6 @@ library_headers("headers") {
   if (is_kernel) {
     headers += [
       "lib/power-management/port-power-level-controller.h",
-      "lib/power-management/controller-dpc.h",
       "lib/power-management/kernel-registry.h",
     ]
     public_deps += [ "//zircon/kernel/object" ]
@@ -39,7 +38,6 @@ source_set("power-management") {
   deps = [ "//zircon/system/ulib/fbl" ]
   if (is_kernel) {
     sources += [
-      "controller-dpc.cc",
       "kernel-registry.cc",
       "port-power-level-controller.cc",
     ]

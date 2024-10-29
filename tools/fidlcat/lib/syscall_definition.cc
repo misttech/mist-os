@@ -5710,22 +5710,6 @@ void SyscallDecoderDispatcher::Populate() {
   }
 
   {
-    Syscall* zx_pc_firmware_tables = Add("zx_pc_firmware_tables", SyscallReturnType::kStatus);
-    // Arguments
-    auto handle = zx_pc_firmware_tables->Argument<zx_handle_t>(SyscallType::kHandle);
-    auto acpi_rsdp = zx_pc_firmware_tables->PointerArgument<zx_paddr_t>(SyscallType::kPaddr);
-    auto smbios = zx_pc_firmware_tables->PointerArgument<zx_paddr_t>(SyscallType::kPaddr);
-    // Inputs
-    zx_pc_firmware_tables->Input<zx_handle_t>(
-        "handle", std::make_unique<ArgumentAccess<zx_handle_t>>(handle));
-    // Outputs
-    zx_pc_firmware_tables->Output<zx_paddr_t>(
-        ZX_OK, "acpi_rsdp", std::make_unique<ArgumentAccess<zx_paddr_t>>(acpi_rsdp));
-    zx_pc_firmware_tables->Output<zx_paddr_t>(ZX_OK, "smbios",
-                                              std::make_unique<ArgumentAccess<zx_paddr_t>>(smbios));
-  }
-
-  {
     Syscall* zx_smc_call = Add("zx_smc_call", SyscallReturnType::kStatus);
     // Arguments
     auto handle = zx_smc_call->Argument<zx_handle_t>(SyscallType::kHandle);

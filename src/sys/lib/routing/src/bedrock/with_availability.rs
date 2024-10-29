@@ -9,21 +9,21 @@ use cm_types::Availability;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
-use sandbox::{Capability, Request, Router};
+use sandbox::{CapabilityBound, Request, Routable, Router, RouterResponse};
 
-struct AvailabilityRouter {
-    router: Router,
+struct AvailabilityRouter<T: CapabilityBound> {
+    router: Router<T>,
     availability: Availability,
     moniker: ExtendedMoniker,
 }
 
 #[async_trait]
-impl sandbox::Routable for AvailabilityRouter {
+impl<T: CapabilityBound> Routable<T> for AvailabilityRouter<T> {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<Capability, RouterError> {
+    ) -> Result<RouterResponse<T>, RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let AvailabilityRouter { router, availability, moniker } = self;
         // The availability of the request must be compatible with the
@@ -56,16 +56,16 @@ pub trait WithAvailability {
         self,
         moniker: impl Into<ExtendedMoniker>,
         availability: Availability,
-    ) -> Router;
+    ) -> Self;
 }
 
-impl WithAvailability for Router {
+impl<T: CapabilityBound> WithAvailability for Router<T> {
     fn with_availability(
         self,
         moniker: impl Into<ExtendedMoniker>,
         availability: Availability,
-    ) -> Router {
-        Router::new(AvailabilityRouter { availability, router: self, moniker: moniker.into() })
+    ) -> Self {
+        Router::<T>::new(AvailabilityRouter { availability, router: self, moniker: moniker.into() })
     }
 }
 
@@ -74,7 +74,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use router_error::{DowncastErrorForTest, RouterError};
-    use sandbox::{Capability, Data, Dict, WeakInstanceToken};
+    use sandbox::{Data, Dict, WeakInstanceToken};
     use std::sync::Arc;
 
     #[derive(Debug)]
@@ -94,8 +94,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn availability_good() {
-        let source: Capability = Data::String("hello".to_string()).into();
-        let base = Router::new(source);
+        let source = Data::String("hello".to_string());
+        let base = Router::<Data>::new_ok(source);
         let proxy =
             base.with_availability(ExtendedMoniker::ComponentManager, Availability::Optional);
         let metadata = Dict::new();
@@ -105,7 +105,7 @@ mod tests {
             .await
             .unwrap();
         let capability = match capability {
-            Capability::Data(d) => d,
+            RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
         assert_eq!(capability, Data::String("hello".to_string()));
@@ -113,8 +113,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn availability_bad() {
-        let source: Capability = Data::String("hello".to_string()).into();
-        let base = Router::new(source);
+        let source = Data::String("hello".to_string());
+        let base = Router::<Data>::new_ok(source);
         let proxy =
             base.with_availability(ExtendedMoniker::ComponentManager, Availability::Optional);
         let metadata = Dict::new();

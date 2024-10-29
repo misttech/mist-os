@@ -19,10 +19,10 @@ use smallvec::smallvec;
 use starnix_logging::{log_error, log_trace, track_stub};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
+use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
-use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::{
     bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
     bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5, bpf_attr__bindgen_ty_9,
@@ -80,7 +80,8 @@ fn reopen_bpf_fd(
 ) -> Result<SyscallResult, Errno> {
     let handle: BpfHandle = obj.into();
     // All BPF FDs have the CLOEXEC flag turned on by default.
-    let file = FileObject::new(Box::new(handle), node, open_flags | OpenFlags::CLOEXEC)?;
+    let file =
+        FileObject::new(current_task, Box::new(handle), node, open_flags | OpenFlags::CLOEXEC)?;
     Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
 }
 

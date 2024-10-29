@@ -30,13 +30,12 @@ bool RuntimeModule::ReifyModuleTree(Diagnostics& diag) {
     return enqueue(module);
   };
 
-  // Build the BFS-ordered queue: an indexed-for-loop iterates over the list
-  // since it can be invalidated as modules are enqueued.
+  // Build the BFS-ordered queue: this uses an indexed-for-loop to iterate
+  // over the list since it can't be invalidated as modules are enqueued.
   for (size_t i = 0; i < module_tree_.size(); ++i) {
     const RuntimeModule& module = *module_tree_[i];
     // Enqueue the first-level dependencies of the current module.
-    if (!std::ranges::all_of(module.direct_deps(), enqueue_unique,
-                             [](const RuntimeModule* m) -> const RuntimeModule& { return *m; })) {
+    if (!std::ranges::all_of(module.GetDirectDeps(), enqueue_unique)) {
       return false;
     }
   }

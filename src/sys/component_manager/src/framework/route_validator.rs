@@ -23,7 +23,7 @@ use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::{Explain, RouterError};
-use sandbox::Router;
+use sandbox::{Capability, RouterResponse};
 use std::cmp::Ordering;
 use std::sync::{Arc, Weak};
 use tracing::warn;
@@ -415,7 +415,7 @@ impl RouteRequest {
         (fsys::RouteOutcome, ExtendedMoniker, Option<Vec<fsys::ServiceInstance>>),
         RouterError,
     > {
-        let res: Result<Router, ActionError> = async move {
+        let res: Result<Capability, ActionError> = async move {
             let resolved_state = instance.lock_resolved_state().await.map_err(|err| {
                 ActionError::from(StartActionError::ResolveActionError {
                     moniker: instance.moniker.clone(),
@@ -426,15 +426,57 @@ impl RouteRequest {
         }
         .await;
         let router = res.map_err(|e| RouterError::NotFound(Arc::new(e)))?;
-        router.route(None, true).await.map(|capability| {
-            let capability_source = CapabilitySource::try_from(capability)
-                .expect("failed to convert capability to capability source");
-            let source_moniker = capability_source.source_moniker();
-            let outcome = match capability_source {
+
+        let res = match router {
+            Capability::ConnectorRouter(router) => {
+                router.route(None, true).await.and_then(|resp| match resp {
+                    RouterResponse::Debug(data) => Ok(data),
+                    _ => {
+                        warn!("[route_validator] Route did not return debug info");
+                        Err(RouterError::Internal)
+                    }
+                })
+            }
+            Capability::DictionaryRouter(router) => {
+                router.route(None, true).await.and_then(|resp| match resp {
+                    RouterResponse::Debug(data) => Ok(data),
+                    _ => {
+                        warn!("[route_validator] Route did not return debug info");
+                        Err(RouterError::Internal)
+                    }
+                })
+            }
+            Capability::DirEntryRouter(router) => {
+                router.route(None, true).await.and_then(|resp| match resp {
+                    RouterResponse::Debug(data) => Ok(data),
+                    _ => {
+                        warn!("[route_validator] Route did not return debug info");
+                        Err(RouterError::Internal)
+                    }
+                })
+            }
+            Capability::DataRouter(router) => {
+                router.route(None, true).await.and_then(|resp| match resp {
+                    RouterResponse::Debug(data) => Ok(data),
+                    _ => {
+                        warn!("[route_validator] Route did not return debug info");
+                        Err(RouterError::Internal)
+                    }
+                })
+            }
+            _ => {
+                warn!("[route_validator] Sandbox capability was not a Router type");
+                Err(RouterError::Internal)
+            }
+        };
+        res.map(|data| {
+            let capability_source = CapabilitySource::try_from(data)
+                .expect("failed to convert Data to capability source");
+            let outcome = match &capability_source {
                 CapabilitySource::Void(_) => fsys::RouteOutcome::Void,
                 _ => fsys::RouteOutcome::Success,
             };
-            (outcome, source_moniker, None)
+            (outcome, capability_source.source_moniker(), None)
         })
     }
 

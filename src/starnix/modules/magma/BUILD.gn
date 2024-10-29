@@ -40,6 +40,7 @@ rustc_library("magma") {
     "//src/starnix/lib/starnix-lifecycle",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-syscalls",
+    "//src/starnix/lib/starnix-types",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:vk-sys",

@@ -222,7 +222,14 @@ typedef struct zxio_verification_options {
   zxio_hash_algorithm_t hash_alg;
 } zxio_verification_options_t;
 
-#define ZXIO_WRAPPING_KEY_ID_LENGTH 16
+#define ZXIO_WRAPPING_KEY_ID_LENGTH ((size_t)16u)
+
+#define ZXIO_SELINUX_CONTEXT_MAX_ATTR_LEN ((uint64_t)256u)
+
+typedef uint8_t zxio_selinux_context_state_t;
+
+#define ZXIO_SELINUX_CONTEXT_STATE_DATA ((zxio_selinux_context_state_t)0u)
+#define ZXIO_SELINUX_CONTEXT_STATE_USE_XATTRS ((zxio_selinux_context_state_t)1u)
 
 // Objective information about a node.
 //
@@ -259,6 +266,30 @@ typedef struct zxio_node_attr {
 
   // Time of last access in ns since Unix epoch, UTC.
   uint64_t access_time;
+
+  // Moved selinux parts above the posix attributes to improve byte packing.
+
+  // If |has.selinux_context| is true for zxio_attr_get requests, the caller is required to
+  // initialize |selinux_context| to point at an array of at least |MAX_SELINUX_CONTEXT_ATTR_LEN|,
+  // if |selinux_context| is nullptr, zxio_attr_get fails with ZX_ERR_INVALID_ARGS.
+  // If |has.selinux_context| is true for zxio_attr_set then |selinux_context_state| must be DATA
+  // and |selinux_context| must be a pointer to an array of length |selinux_context_length|. If
+  // |selinux_context| is nullptr when |has.selinux_context| is true then zxio_attr_set fails with
+  // ZX_ERR_INVALID_ARGS.
+  // If |has.selinux_context| is false, |selinux_context| is ignored.
+  uint8_t* selinux_context;
+
+  // For zxio_attr_get this will be set to the length of the value in |selinux_context| when
+  // |selinux_context_state| is DATA. For zxio_attr_set this value should be provided as the length
+  // of the value in |selinux_context|.
+  uint16_t selinux_context_length;
+
+  // For zxio_attr_get when |has.selinux_context| is true this will be set to DATA if the value was
+  // returned to indicate that |selinux_context_length| and |selinux_context| are populated. When it
+  // is USE_EXTENDED_ATTRIBUTES then the value cannot be returned and must be requested via the
+  // extended attributes interface. For zxio_attr_set when |has.selinux_context| is true this should
+  // only be set to DATA.
+  zxio_selinux_context_state_t selinux_context_state;
 
   // POSIX attributes.
   uint32_t mode;
@@ -310,6 +341,7 @@ typedef struct zxio_node_attr {
     bool object_type;
     bool casefold;
     bool wrapping_key_id;
+    bool selinux_context;
   } has;
 } zxio_node_attributes_t;
 

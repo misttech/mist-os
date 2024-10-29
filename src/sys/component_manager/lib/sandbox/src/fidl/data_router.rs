@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fidl::specific_router;
-use crate::{Data, SpecificRouter, SpecificRouterResponse};
+use crate::fidl::router;
+use crate::{Data, Router, RouterResponse};
 use fidl::handle::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::TryStreamExt;
 
-impl crate::RemotableCapability for SpecificRouter<Data> {}
+impl crate::RemotableCapability for Router<Data> {}
 
-impl From<SpecificRouter<Data>> for fsandbox::Capability {
-    fn from(router: SpecificRouter<Data>) -> Self {
+impl From<Router<Data>> for fsandbox::Capability {
+    fn from(router: Router<Data>) -> Self {
         let (client_end, sender_stream) =
             fidl::endpoints::create_request_stream::<fsandbox::DataRouterMarker>().unwrap();
         router.serve_and_register(sender_stream, client_end.get_koid().unwrap());
@@ -19,23 +19,23 @@ impl From<SpecificRouter<Data>> for fsandbox::Capability {
     }
 }
 
-impl TryFrom<SpecificRouterResponse<Data>> for fsandbox::DataRouterRouteResponse {
+impl TryFrom<RouterResponse<Data>> for fsandbox::DataRouterRouteResponse {
     type Error = fsandbox::RouterError;
 
-    fn try_from(resp: SpecificRouterResponse<Data>) -> Result<Self, Self::Error> {
+    fn try_from(resp: RouterResponse<Data>) -> Result<Self, Self::Error> {
         match resp {
-            SpecificRouterResponse::<Data>::Capability(c) => {
+            RouterResponse::<Data>::Capability(c) => {
                 Ok(fsandbox::DataRouterRouteResponse::Data(c.into()))
             }
-            SpecificRouterResponse::<Data>::Unavailable => {
+            RouterResponse::<Data>::Unavailable => {
                 Ok(fsandbox::DataRouterRouteResponse::Unavailable(fsandbox::Unit {}))
             }
-            SpecificRouterResponse::<Data>::Debug(_) => Err(fsandbox::RouterError::NotSupported),
+            RouterResponse::<Data>::Debug(_) => Err(fsandbox::RouterError::NotSupported),
         }
     }
 }
 
-impl SpecificRouter<Data> {
+impl Router<Data> {
     async fn serve_router(
         self,
         mut stream: fsandbox::DataRouterRequestStream,
@@ -43,7 +43,7 @@ impl SpecificRouter<Data> {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fsandbox::DataRouterRequest::Route { payload, responder } => {
-                    responder.send(specific_router::route_from_fidl(&self, payload).await)?;
+                    responder.send(router::route_from_fidl(&self, payload).await)?;
                 }
                 fsandbox::DataRouterRequest::_UnknownMethod { ordinal, .. } => {
                     tracing::warn!(%ordinal, "Received unknown DataRouter request");

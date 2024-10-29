@@ -39,7 +39,7 @@ const CONNECTION_EXPIRY_TIME_UDP: Duration = Duration::from_secs(120);
 const CONNECTION_EXPIRY_OTHER: Duration = Duration::from_secs(30);
 
 /// The maximum number of connections in the conntrack table.
-const MAXIMUM_CONNECTIONS: usize = 50_000;
+pub(crate) const MAXIMUM_CONNECTIONS: usize = 50_000;
 
 /// Implements a connection tracking subsystem.
 ///
@@ -126,7 +126,9 @@ where
     let _ = bindings_ctx.schedule_timer(GC_INTERVAL, timer);
 }
 
-impl<I: IpExt, BC: FilterBindingsContext, E: Default + Send + Sync + 'static> Table<I, BC, E> {
+impl<I: IpExt, BC: FilterBindingsContext, E: Default + Send + Sync + PartialEq + 'static>
+    Table<I, BC, E>
+{
     pub(crate) fn new<CC: CoreTimerContext<FilterTimerId<I>, BC>>(bindings_ctx: &mut BC) -> Self {
         Self {
             inner: Mutex::new(TableInner {
@@ -204,16 +206,35 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default + Send + Sync + 'static> Ta
         // allocations until we're sure that the insertion will succeed. This
         // wastes a little CPU in the common case to avoid pathological behavior
         // in degenerate cases.
-        //
-        // NOTE: It's theoretically possible for the first two packets (or more)
-        // in the same flow to create ExclusiveConnections. In this case,
-        // subsequent packets will be reported as conflicts. However, it should
-        // be the case that packets for the same flow are handled sequentially,
-        // so each subsequent packet should see the connection created by the
-        // first one.
         if guard.table.contains_key(&exclusive.inner.original_tuple)
             || guard.table.contains_key(&exclusive.inner.reply_tuple)
         {
+            // NOTE: It's possible for the first two packets (or more) in the
+            // same flow to create ExclusiveConnections. Typically packets for
+            // the same flow are handled sequentically, so each subsequent
+            // packet should see the connection created by the first one.
+            // However, it is possible (e.g. if these two packets arrive on
+            // different interfaces) for them to race.
+            //
+            // In this case, subsequent packets would be reported as conflicts.
+            // To avoid this race condition, we check whether the conflicting
+            // connection in the table is actually the same as the connection
+            // that we are attempting to finalize; if so, we can simply adopt
+            // the already-finalized connection.
+            let conn = if let Some(conn) = guard.table.get(&exclusive.inner.original_tuple) {
+                conn
+            } else {
+                guard
+                    .table
+                    .get(&exclusive.inner.reply_tuple)
+                    .expect("checked that tuple is in table and table is locked")
+            };
+            // `inner` contains the original and reply tuples along with any NAT
+            // that is configured for the connection.
+            if conn.inner == exclusive.inner {
+                return Ok((false, Some(conn.clone())));
+            }
+
             // TODO(https://fxbug.dev/372549231): add a counter for this error.
             Err(FinalizeConnectionError::Conflict)
         } else {
@@ -662,7 +683,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E> Connection<I, BC, E> {
 
 /// Fields common to both [`ConnectionExclusive`] and [`ConnectionShared`].
 #[derive(Derivative)]
-#[derivative(Debug(bound = "E: Debug"))]
+#[derivative(Debug(bound = "E: Debug"), PartialEq(bound = "E: PartialEq"))]
 pub struct ConnectionCommon<I: IpExt, E> {
     /// The 5-tuple for the connection in the original direction. This is
     /// arbitrary, and is just the direction where a packet was first seen.
@@ -1478,6 +1499,45 @@ mod tests {
             table.finalize_connection(&mut bindings_ctx, conn3),
             Err(FinalizeConnectionError::Conflict)
         );
+    }
+
+    #[ip_test(I)]
+    fn table_conflict_identical_connection<
+        I: IpExt + crate::packets::testutil::internal::TestIpExt,
+    >() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+
+        let original_packet =
+            PacketMetadata::new(&FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value()).unwrap();
+
+        // Simulate a race where two packets in the same flow both end up
+        // creating identical exclusive connections.
+
+        let conn = Connection::Exclusive(
+            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+                &bindings_ctx,
+                &original_packet,
+            )
+            .unwrap(),
+        );
+        let finalized = assert_matches!(
+            table.finalize_connection(&mut bindings_ctx, conn),
+            Ok((true, Some(conn))) => conn
+        );
+
+        let conn = Connection::Exclusive(
+            ConnectionExclusive::<_, _, ()>::from_deconstructed_packet(
+                &bindings_ctx,
+                &original_packet,
+            )
+            .unwrap(),
+        );
+        let conn = assert_matches!(
+            table.finalize_connection(&mut bindings_ctx, conn),
+            Ok((false, Some(conn))) => conn
+        );
+        assert!(Arc::ptr_eq(&finalized, &conn));
     }
 
     #[derive(Copy, Clone)]

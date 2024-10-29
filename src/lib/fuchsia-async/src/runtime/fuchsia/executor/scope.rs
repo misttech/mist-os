@@ -8,18 +8,17 @@
 use super::super::task::JoinHandle;
 use super::common::{Executor, Task};
 use crate::atomic_future::{AtomicFuture, CancelAndDetachResult};
-use crate::waker_list::{WakerEntry, WakerList};
+use crate::condition::{Condition, ConditionGuard, WakerEntry};
 use crate::EHandle;
-use fuchsia_sync::{Mutex, MutexGuard};
 use pin_project_lite::pin_project;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
-use state::{JoinResult, ScopeState};
+use state::{JoinResult, ScopeState, ScopeWaker, Status};
 use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 use std::collections::hash_set;
-use std::future::{poll_fn, Future, IntoFuture};
+use std::future::{Future, IntoFuture};
 use std::mem::{self, ManuallyDrop};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 use std::{fmt, hash};
@@ -55,14 +54,12 @@ impl Scope {
     }
 
     pub fn join(self) -> Join {
-        let waker_entry = self.lock().new_waker_entry();
-        Join { scope: self, waker_entry }
+        Join::new(self)
     }
 
     pub fn cancel(self) -> Join {
         self.inner.cancel_all_tasks();
-        let waker_entry = self.lock().new_waker_entry();
-        Join { scope: self, waker_entry }
+        Join::new(self)
     }
 
     pub fn detach(self) {
@@ -92,13 +89,13 @@ pin_project! {
     pub struct Join {
         scope: Scope,
         #[pin]
-        waker_entry: WakerEntry,
+        waker_entry: WakerEntry<ScopeState>,
     }
 }
 
 impl Join {
-    pub fn detach(self) {
-        self.scope.detach();
+    fn new(scope: Scope) -> Self {
+        Self { scope, waker_entry: WakerEntry::new() }
     }
 }
 
@@ -108,13 +105,13 @@ impl Future for Join {
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         let mut state = this.scope.lock();
-        let result = state.poll_no_tasks();
-        if result.is_ready() {
-            state.close();
+        if state.has_tasks() {
+            state.add_waker(this.waker_entry, cx.waker().clone());
+            Poll::Pending
         } else {
-            this.waker_entry.add(cx.waker().clone());
+            state.close();
+            Poll::Ready(())
         }
-        result
     }
 }
 
@@ -165,8 +162,7 @@ impl ScopeRef {
         ScopeRef {
             inner: Arc::new(ScopeInner {
                 executor,
-                state: Mutex::new(ScopeState::new(None, state::Status::default())),
-                _private: (),
+                state: Condition::new(ScopeState::new(None, Status::default())),
             }),
         }
     }
@@ -177,8 +173,7 @@ impl ScopeRef {
         let child = ScopeRef {
             inner: Arc::new(ScopeInner {
                 executor: self.inner.executor.clone(),
-                state: Mutex::new(ScopeState::new(Some(self.clone()), state.status())),
-                _private: (),
+                state: Condition::new(ScopeState::new(Some(self.clone()), state.status())),
             }),
         };
         let weak = child.downgrade();
@@ -194,17 +189,10 @@ impl ScopeRef {
     /// Waits for there to be no tasks.  This is racy: as soon as this returns it is possible for
     /// another task to have been spawned on this scope.
     pub async fn on_no_tasks(&self) {
-        let mut waker_entry = std::pin::pin!(self.lock().new_waker_entry());
-        poll_fn(|cx| {
-            let mut state = self.lock();
-            let result = state.poll_no_tasks();
-            if result.is_pending() {
-                // NOTE: The lock must be held until after we have added the waker.
-                waker_entry.as_mut().add(cx.waker().clone());
-            }
-            result
-        })
-        .await;
+        self.inner
+            .state
+            .when(|state| if state.has_tasks() { Poll::Pending } else { Poll::Ready(()) })
+            .await;
     }
 
     /// Wakes all the scope's tasks so their futures will be polled again.
@@ -266,8 +254,6 @@ mod state {
         // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
         /// Wakers/results for joining each task.
         pub join_results: HashMap<usize, JoinResult>,
-        /// Waker for joining the scope.
-        waker_list: WakerList,
         /// The number of children that transitively contain tasks, plus one for
         /// this scope if it directly contains tasks.
         subscopes_with_tasks: u32,
@@ -304,7 +290,6 @@ mod state {
                 children: Default::default(),
                 all_tasks: Default::default(),
                 join_results: Default::default(),
-                waker_list: WakerList::new(),
                 subscopes_with_tasks: 0,
                 status,
             }
@@ -326,37 +311,6 @@ mod state {
             let existing = self.all_tasks.insert(id, task);
             assert!(existing.is_none());
             true
-        }
-
-        pub fn take_task(&mut self, id: usize) -> (Option<Arc<Task>>, ScopeWaker) {
-            match self.all_tasks.remove(&id) {
-                Some(task) => (Some(task), self.on_task_removed(0)),
-                None => (None, ScopeWaker::empty()),
-            }
-        }
-
-        pub fn task_did_finish(&mut self, id: usize) -> ScopeWaker {
-            if let Some(task) = self.all_tasks.remove(&id) {
-                let mut wakers = self.on_task_removed(1);
-                if !task.future.is_detached() {
-                    match self.join_results.entry(id) {
-                        Entry::Occupied(mut o) => {
-                            let JoinResult::Waker(waker) =
-                                std::mem::replace(o.get_mut(), JoinResult::Result(task))
-                            else {
-                                unreachable!()
-                            };
-                            wakers.0.push(waker);
-                        }
-                        Entry::Vacant(v) => {
-                            v.insert(JoinResult::Result(task));
-                        }
-                    }
-                }
-                wakers
-            } else {
-                ScopeWaker::empty()
-            }
         }
 
         pub fn children(&self) -> &HashSet<WeakScopeRef> {
@@ -390,38 +344,14 @@ mod state {
             self.status = Status::Cancelled;
         }
 
-        pub fn set_cancelled_and_drain(
-            &mut self,
-        ) -> (
-            HashMap<usize, Arc<Task>>,
-            HashMap<usize, JoinResult>,
-            hash_set::Drain<'_, WeakScopeRef>,
-            ScopeWaker,
-        ) {
-            self.status = Status::Cancelled;
-            let all_tasks = std::mem::take(&mut self.all_tasks);
-            let join_results = std::mem::take(&mut self.join_results);
-            let waker =
-                if all_tasks.is_empty() { ScopeWaker::empty() } else { self.on_task_removed(0) };
-            let children = self.children.drain();
-            (all_tasks, join_results, children, waker)
-        }
-
-        pub fn poll_no_tasks(&mut self) -> Poll<()> {
-            if self.subscopes_with_tasks > 0 {
-                return Poll::Pending;
-            }
-            Poll::Ready(())
+        pub fn has_tasks(&self) -> bool {
+            self.subscopes_with_tasks > 0
         }
 
         pub fn wake_all(&self) {
             for (_, task) in &self.all_tasks {
                 task.wake();
             }
-        }
-
-        pub fn new_waker_entry(&self) -> WakerEntry {
-            self.waker_list.new_entry()
         }
 
         /// Registers our first task with the parent scope.
@@ -447,57 +377,127 @@ mod state {
             can_spawn
         }
 
-        fn on_last_task_removed(&mut self, num_wakers: usize) -> Vec<Waker> {
-            debug_assert!(self.subscopes_with_tasks > 0);
-            self.subscopes_with_tasks -= 1;
-            if self.subscopes_with_tasks > 0 {
-                return Vec::with_capacity(num_wakers);
+        fn on_last_task_removed(
+            this: &mut ConditionGuard<'_, ScopeState>,
+            num_wakers_hint: usize,
+            wakers: &mut Vec<Waker>,
+        ) {
+            debug_assert!(this.subscopes_with_tasks > 0);
+            this.subscopes_with_tasks -= 1;
+            if this.subscopes_with_tasks > 0 {
+                wakers.reserve(num_wakers_hint);
+                return;
             }
 
-            let waker_list = self.waker_list.drain();
-            let mut wakers = match &self.parent {
-                Some(parent) => parent.lock().on_last_task_removed(num_wakers + waker_list.len()),
-                None => Vec::with_capacity(num_wakers),
+            match &this.parent {
+                Some(parent) => {
+                    Self::on_last_task_removed(
+                        &mut parent.lock(),
+                        num_wakers_hint + this.waker_count(),
+                        wakers,
+                    );
+                }
+                None => wakers.reserve(num_wakers_hint),
             };
-            wakers.extend(waker_list);
-            wakers
+            wakers.extend(this.drain_wakers());
         }
+    }
 
-        /// If the scope is finished, returns the join waker for the scope.
-        fn on_task_removed(&mut self, num_wakers_hint: usize) -> ScopeWaker {
-            if self.all_tasks.is_empty() {
-                ScopeWaker(self.on_last_task_removed(num_wakers_hint))
-            } else {
-                ScopeWaker(Vec::with_capacity(num_wakers_hint))
+    #[derive(Default)]
+    struct WakeVec(Vec<Waker>);
+
+    impl Drop for WakeVec {
+        fn drop(&mut self) {
+            for waker in self.0.drain(..) {
+                waker.wake();
             }
         }
     }
 
-    #[must_use]
-    pub struct ScopeWaker(Vec<Waker>);
+    // WakeVec *must* come after the guard because we want the guard to be dropped first.
+    pub struct ScopeWaker<'a>(ConditionGuard<'a, ScopeState>, WakeVec);
 
-    impl ScopeWaker {
-        pub fn empty() -> Self {
-            Self(vec![])
+    impl<'a> From<ConditionGuard<'a, ScopeState>> for ScopeWaker<'a> {
+        fn from(value: ConditionGuard<'a, ScopeState>) -> Self {
+            Self(value, WakeVec::default())
+        }
+    }
+
+    impl ScopeWaker<'_> {
+        pub fn take_task(&mut self, id: usize) -> Option<Arc<Task>> {
+            let task = self.all_tasks.remove(&id);
+            if task.is_some() {
+                self.on_task_removed(0);
+            }
+            task
         }
 
-        /// Wakes the inner waker, if any, after releasing the lock held by `guard`.
-        ///
-        /// Since wake can call arbitrary code, we should not hold the lock when
-        /// calling it. This method enforces the correct behavior.
-        pub fn wake_and_release(self, guard: MutexGuard<'_, ScopeState>) {
-            std::mem::drop(guard);
-            for waker in self.0 {
-                waker.wake();
+        pub fn task_did_finish(&mut self, id: usize) {
+            if let Some(task) = self.all_tasks.remove(&id) {
+                self.on_task_removed(1);
+                if !task.future.is_detached() {
+                    match self.join_results.entry(id) {
+                        Entry::Occupied(mut o) => {
+                            let JoinResult::Waker(waker) =
+                                std::mem::replace(o.get_mut(), JoinResult::Result(task))
+                            else {
+                                // It can't be JoinResult::Result because this function is the only
+                                // function that sets that, and `task_did_finish` won't get called
+                                // twice.
+                                unreachable!()
+                            };
+                            self.1 .0.push(waker);
+                        }
+                        Entry::Vacant(v) => {
+                            v.insert(JoinResult::Result(task));
+                        }
+                    }
+                }
             }
+        }
+
+        pub fn set_cancelled_and_drain(
+            &mut self,
+        ) -> (
+            HashMap<usize, Arc<Task>>,
+            HashMap<usize, JoinResult>,
+            hash_set::Drain<'_, WeakScopeRef>,
+        ) {
+            self.status = Status::Cancelled;
+            let all_tasks = std::mem::take(&mut self.all_tasks);
+            let join_results = std::mem::take(&mut self.join_results);
+            if !all_tasks.is_empty() {
+                self.on_task_removed(0)
+            }
+            let children = self.children.drain();
+            (all_tasks, join_results, children)
+        }
+
+        fn on_task_removed(&mut self, num_wakers_hint: usize) {
+            if self.all_tasks.is_empty() {
+                ScopeState::on_last_task_removed(&mut self.0, num_wakers_hint, &mut self.1 .0)
+            }
+        }
+    }
+
+    impl<'a> Deref for ScopeWaker<'a> {
+        type Target = ConditionGuard<'a, ScopeState>;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl DerefMut for ScopeWaker<'_> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
         }
     }
 }
 
 struct ScopeInner {
     executor: Arc<Executor>,
-    state: Mutex<ScopeState>,
-    _private: (),
+    state: Condition<ScopeState>,
 }
 
 impl Drop for ScopeInner {
@@ -507,7 +507,7 @@ impl Drop for ScopeInner {
         // HashSet::remove because the implementations of Hash and Eq match
         // between PtrKey and WeakScopeRef.
         let key = unsafe { &*(self as *const _ as *const PtrKey) };
-        if let Some(parent) = &self.state.get_mut().parent {
+        if let Some(parent) = &self.state.lock().parent {
             let mut parent_state = parent.lock();
             parent_state.remove_child(key);
         }
@@ -515,7 +515,7 @@ impl Drop for ScopeInner {
 }
 
 impl ScopeRef {
-    fn lock(&self) -> MutexGuard<'_, ScopeState> {
+    fn lock(&self) -> ConditionGuard<'_, ScopeState> {
         self.inner.state.lock()
     }
 
@@ -553,12 +553,12 @@ impl ScopeRef {
 
     /// Cancels and detaches the task.
     pub(crate) fn cancel_and_detach(&self, task_id: usize) {
-        let mut state = self.lock();
+        let mut state = ScopeWaker::from(self.lock());
         state.join_results.remove(&task_id);
         if let Some(task) = state.all_tasks().get(&task_id) {
             match task.future.cancel_and_detach() {
                 CancelAndDetachResult::Done => {
-                    state.take_task(task_id).1.wake_and_release(state);
+                    state.take_task(task_id);
                 }
                 CancelAndDetachResult::AddToRunQueue => {
                     self.inner.executor.ready_tasks.push(task.clone());
@@ -636,17 +636,16 @@ impl ScopeRef {
     /// This is unsafe because of the call to `drop_future_unchecked` which requires that no
     /// thread is currently polling the task.
     pub(super) unsafe fn drop_task_unchecked(&self, task_id: usize) {
-        let mut state = self.lock();
-        let (task, scope_waker) = state.take_task(task_id);
+        let mut state = ScopeWaker::from(self.lock());
+        let task = state.take_task(task_id);
         if let Some(task) = task {
             task.future.drop_future_unchecked();
         }
-        scope_waker.wake_and_release(state);
     }
 
     pub(super) fn task_did_finish(&self, id: usize) {
-        let mut state = self.lock();
-        state.task_did_finish(id).wake_and_release(state);
+        let mut state = ScopeWaker::from(self.lock());
+        state.task_did_finish(id);
     }
 
     /// Cancels tasks in this scope and all child scopes.
@@ -680,15 +679,17 @@ impl ScopeRef {
     pub(super) fn drop_all_tasks(&self) {
         let mut scopes = vec![self.clone()];
         while let Some(scope) = scopes.pop() {
-            let mut state = scope.lock();
-            let (tasks, join_handles, children, scope_waker) = state.set_cancelled_and_drain();
-            scopes.extend(children.filter_map(|child| child.upgrade()));
-            scope_waker.wake_and_release(state);
+            let (tasks, join_results) = {
+                let mut state = ScopeWaker::from(scope.lock());
+                let (tasks, join_results, children) = state.set_cancelled_and_drain();
+                scopes.extend(children.filter_map(|child| child.upgrade()));
+                (tasks, join_results)
+            };
             // Call task destructors once the scope lock is released so we don't risk a deadlock.
             for (_id, task) in tasks {
                 task.future.try_drop().expect("Expected drop to succeed");
             }
-            std::mem::drop(join_handles);
+            std::mem::drop(join_results);
         }
     }
 }
@@ -802,7 +803,7 @@ mod tests {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
         let scope_ref = scope.make_ref();
-        assert_eq!(executor.run_until_stalled(&mut scope.cancel()), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut pin!(scope.cancel())), Poll::Ready(()));
         let mut task = pin!(scope_ref.compute(async { 1 }));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
     }
@@ -856,7 +857,7 @@ mod tests {
     fn join_emtpy_scope() {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
-        assert_eq!(executor.run_until_stalled(&mut scope.join()), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut pin!(scope.join())), Poll::Ready(()));
     }
 
     #[test]
@@ -868,7 +869,7 @@ mod tests {
         let task2 = scope.spawn(pending::<()>());
         // Fuse to stay agnostic as to whether the join completes before or
         // after awaiting the task handle.
-        let mut join = scope.join().fuse();
+        let mut join = pin!(scope.join().fuse());
         let _ = executor.run_until_stalled(&mut join);
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
         let _ = task2.cancel();
@@ -887,7 +888,7 @@ mod tests {
             executor.run_until_stalled(&mut pin!(cancelled_task.cancel())),
             Poll::Ready(None)
         );
-        let mut join = scope.join();
+        let mut join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
         assert_eq!(
             executor.run_until_stalled(&mut pin!(outstanding_task.cancel())),
@@ -902,7 +903,7 @@ mod tests {
         let scope = executor.root_scope().new_child();
         // The default is to detach.
         scope.spawn(pending::<()>());
-        let mut join = scope.join();
+        let mut join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
     }
 
@@ -912,7 +913,7 @@ mod tests {
         let scope = executor.root_scope().new_child();
         let remote = RemoteControlFuture::new();
         let mut task = scope.spawn(remote.as_future());
-        let mut scope_join = scope.join();
+        let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
         remote.resolve();
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
@@ -926,10 +927,10 @@ mod tests {
         let child = scope.new_child();
         let remote = RemoteControlFuture::new();
         child.spawn(remote.as_future());
-        let (mut scope_join, mut child_join) = (scope.join(), child.join());
+        let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
-        assert_eq!(executor.run_until_stalled(&mut child_join), Poll::Pending);
-        child_join.detach();
+        assert_eq!(executor.run_until_stalled(&mut pin!(child.on_no_tasks())), Poll::Pending);
+        child.detach();
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
         remote.resolve();
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
@@ -941,10 +942,10 @@ mod tests {
         let scope = executor.root_scope().new_child();
         let child = scope.new_child();
         child.spawn(pending());
-        let (mut scope_join, mut child_join) = (scope.join(), child.join());
+        let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
-        assert_eq!(executor.run_until_stalled(&mut child_join), Poll::Pending);
-        child_join.detach();
+        assert_eq!(executor.run_until_stalled(&mut pin!(child.on_no_tasks())), Poll::Pending);
+        child.detach();
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
     }
 
@@ -954,10 +955,12 @@ mod tests {
         let scope = executor.root_scope().new_child();
         let child = scope.new_child();
         child.spawn(pending());
-        let (mut scope_join, mut child_join) = (scope.join(), child.join());
-        assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
-        assert_eq!(executor.run_until_stalled(&mut child_join), Poll::Pending);
-        drop(child_join);
+        let mut scope_join = pin!(scope.join());
+        {
+            let mut child_join = pin!(child.join());
+            assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
+            assert_eq!(executor.run_until_stalled(&mut child_join), Poll::Pending);
+        }
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
     }
 
@@ -994,7 +997,7 @@ mod tests {
         let mut executor = TestExecutor::new();
         let scope = executor.root_scope().new_child();
         let scope_ref = scope.make_ref();
-        let mut scope_join = scope.join();
+        let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
         assert_eq!(executor.run_until_stalled(&mut scope_ref.compute(async { 1 })), Poll::Pending);
     }
@@ -1005,7 +1008,7 @@ mod tests {
         let scope = executor.root_scope().new_child();
         let scope_ref = scope.make_ref();
         let _running_task = scope_ref.spawn(pending::<()>());
-        let mut scope_join = scope.join();
+        let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Pending);
         assert_eq!(executor.run_until_stalled(&mut scope_ref.compute(async { 1 })), Poll::Ready(1));
     }
@@ -1020,7 +1023,7 @@ mod tests {
             executor.run_until_stalled(&mut child_before_join.compute(async { 1 })),
             Poll::Ready(1)
         );
-        let mut scope_join = scope.join();
+        let mut scope_join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut scope_join), Poll::Ready(()));
         let child_after_join = scope_ref.new_child();
         let grandchild_after_join = child_before_join.new_child();
@@ -1044,8 +1047,8 @@ mod tests {
         let scope = executor.root_scope().new_child();
         let child = scope.new_child();
         assert_eq!(executor.run_until_stalled(&mut child.compute(async { 1 })), Poll::Ready(1));
-        assert_eq!(executor.run_until_stalled(&mut child.join()), Poll::Ready(()));
-        assert_eq!(executor.run_until_stalled(&mut scope.join()), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut pin!(child.join())), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut pin!(scope.join())), Poll::Ready(()));
     }
 
     #[test]
@@ -1054,8 +1057,8 @@ mod tests {
         let scope = executor.root_scope().new_child();
         let child = scope.new_child();
         assert_eq!(executor.run_until_stalled(&mut child.compute(async { 1 })), Poll::Ready(1));
-        assert_eq!(executor.run_until_stalled(&mut scope.join()), Poll::Ready(()));
-        assert_eq!(executor.run_until_stalled(&mut child.join()), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut pin!(scope.join())), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut pin!(child.join())), Poll::Ready(()));
     }
 
     #[test]
@@ -1066,7 +1069,7 @@ mod tests {
         let remote = RemoteControlFuture::new();
         child.spawn(remote.as_future());
         scope.spawn(async move { child.join().await });
-        let mut join = scope.join();
+        let mut join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
         remote.resolve();
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
@@ -1078,7 +1081,7 @@ mod tests {
         let scope = executor.root_scope().new_child();
         let mut task = scope.compute(async { 1 });
         scope.spawn(async {});
-        let mut join = scope.join();
+        let mut join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
     }
@@ -1117,9 +1120,9 @@ mod tests {
         a.spawn(a_remote.as_future());
         c.spawn(c_remote.as_future());
         d.spawn(d_remote.as_future());
-        let mut a_join = a.join();
-        let mut b_join = b.join();
-        let mut d_join = d.join();
+        let mut a_join = pin!(a.join());
+        let mut b_join = pin!(b.join());
+        let mut d_join = pin!(d.join());
         assert_eq!(executor.run_until_stalled(&mut a_join), Poll::Pending);
         assert_eq!(executor.run_until_stalled(&mut b_join), Poll::Pending);
         assert_eq!(executor.run_until_stalled(&mut d_join), Poll::Pending);
@@ -1132,7 +1135,7 @@ mod tests {
         assert_eq!(executor.run_until_stalled(&mut b_join), Poll::Ready(()));
         a_remote.resolve();
         assert_eq!(executor.run_until_stalled(&mut a_join), Poll::Ready(()));
-        let mut c_join = c.join();
+        let mut c_join = pin!(c.join());
         assert_eq!(executor.run_until_stalled(&mut c_join), Poll::Ready(()));
     }
 

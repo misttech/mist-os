@@ -161,7 +161,7 @@ void FileTester::RenameChild(fbl::RefPtr<Dir> &old_vnode, fbl::RefPtr<Dir> &new_
 
 void FileTester::CreateChildren(F2fs *fs, std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes,
                                 std::vector<uint32_t> &inos, fbl::RefPtr<Dir> &parent,
-                                std::string name, uint32_t inode_cnt) {
+                                std::string name, size_t inode_cnt) {
   for (uint32_t i = 0; i < inode_cnt; ++i) {
     std::string file_name = name + std::to_string(i);
     zx::result test_file = parent->Create(file_name, fs::CreationType::kFile);
@@ -174,7 +174,7 @@ void FileTester::CreateChildren(F2fs *fs, std::vector<fbl::RefPtr<VnodeF2fs>> &v
 }
 
 void FileTester::DeleteChildren(std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes,
-                                fbl::RefPtr<Dir> &parent, uint32_t inode_cnt) {
+                                fbl::RefPtr<Dir> &parent, size_t inode_cnt) {
   uint32_t deleted_file_cnt = 0;
   for (const auto &iter : vnodes) {
     ASSERT_EQ(parent->Unlink(iter->GetNameView(), false), ZX_OK);

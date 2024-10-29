@@ -80,21 +80,18 @@ impl MetricSet {
         };
 
         // Calculate longest key name + unit name in parentheses w/ space
-        let max_len = keys.iter().map(|v| get_key_display_len(**v)).max().unwrap();
+        let max_len = keys.iter().map(|v| get_key_display_len(v)).max().unwrap();
 
         let mut ret = String::new();
         for key in keys.iter() {
-            let pad = " ".repeat(max_len - get_key_display_len(*key));
-            write!(
+            let pad = " ".repeat(max_len - get_key_display_len(key));
+            writeln!(
                 ret,
-                "{}{}{} = {}\n",
+                "{}{}{} = {}",
                 key,
                 self.type_hints.get(*key).map(|v| format!(" ({})", v.unit)).unwrap_or_default(),
                 pad,
-                Self::format_stats_text(
-                    &self.metrics.get(*key).unwrap(),
-                    self.type_hints.get(*key)
-                )
+                Self::format_stats_text(self.metrics.get(*key).unwrap(), self.type_hints.get(*key))
             )
             .ok();
         }

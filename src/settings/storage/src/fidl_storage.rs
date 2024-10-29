@@ -20,7 +20,7 @@ use futures::{FutureExt, StreamExt};
 use std::any::Any;
 use std::collections::HashMap;
 use std::pin::pin;
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::MonotonicDuration;
 
 /// Minimum amount of time between flushing to disk, in milliseconds. The flush call triggers
@@ -45,7 +45,7 @@ pub struct FidlStorage {
     /// Map of [`FidlStorageConvertible`] keys to their typed storage.
     typed_storage_map: HashMap<&'static str, TypedStorage>,
 
-    typed_loader_map: HashMap<&'static str, Box<dyn Any + Send + Sync + 'static>>,
+    typed_loader_map: HashMap<&'static str, Box<dyn Any>>,
 
     /// If true, reads will be returned from the data in memory rather than reading from storage.
     caching_enabled: bool,
@@ -64,7 +64,7 @@ struct TypedStorage {
     flush_sender: UnboundedSender<()>,
 
     /// Cached storage managed through interior mutability.
-    cached_storage: Arc<Mutex<CachedStorage>>,
+    cached_storage: Rc<Mutex<CachedStorage>>,
 }
 
 /// `CachedStorage` abstracts over a cached value that's read from and written
@@ -143,7 +143,7 @@ impl FidlStorage {
         files_generator: G,
     ) -> Result<(Self, Vec<Task<()>>), Error>
     where
-        I: IntoIterator<Item = (&'static str, Option<Box<dyn Any + Send + Sync>>)>,
+        I: IntoIterator<Item = (&'static str, Option<Box<dyn Any>>)>,
         G: Fn(&'static str) -> Result<(String, String), Error>,
     {
         let mut typed_storage_map = HashMap::new();
@@ -157,16 +157,15 @@ impl FidlStorage {
             let (temp_file_path, file_path) =
                 files_generator(key).context("failed to generate file")?;
 
-            let cached_storage = Arc::new(Mutex::new(CachedStorage {
+            let cached_storage = Rc::new(Mutex::new(CachedStorage {
                 current_data: None,
                 temp_file_path,
                 file_path,
             }));
-            let storage =
-                TypedStorage { flush_sender, cached_storage: Arc::clone(&cached_storage) };
+            let storage = TypedStorage { flush_sender, cached_storage: Rc::clone(&cached_storage) };
 
             // Each key has an independent flush queue.
-            let sync_task = Task::spawn(Self::synchronize_task(
+            let sync_task = Task::local(Self::synchronize_task(
                 Clone::clone(&storage_dir),
                 cached_storage,
                 flush_receiver,
@@ -191,7 +190,7 @@ impl FidlStorage {
 
     async fn synchronize_task(
         storage_dir: DirectoryProxy,
-        cached_storage: Arc<Mutex<CachedStorage>>,
+        cached_storage: Rc<Mutex<CachedStorage>>,
         flush_receiver: UnboundedReceiver<()>,
     ) {
         let mut has_pending_flush = false;
@@ -449,6 +448,7 @@ mod tests {
     use fidl::epitaph::ChannelEpitaphExt;
     use fidl_test_storage::{TestStruct, WrongStruct};
     use futures::TryStreamExt;
+    use std::sync::Arc;
     use std::task::Poll;
     use test_case::test_case;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
@@ -1034,7 +1034,7 @@ mod tests {
         let mut sync_receiver = interceptor.install_sync_notifier();
 
         let expected_data = vec![1];
-        let cached_storage = Arc::new(Mutex::new(CachedStorage {
+        let cached_storage = Rc::new(Mutex::new(CachedStorage {
             current_data: Some(expected_data.clone()),
             temp_file_path: "abc_tmp.pfidl".to_owned(),
             file_path: "abc.pfidl".to_owned(),
@@ -1043,9 +1043,9 @@ mod tests {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         // Call spawn in a future since we have to be in an executor context to call spawn.
-        let task = fasync::Task::spawn(FidlStorage::synchronize_task(
+        let task = fasync::Task::local(FidlStorage::synchronize_task(
             Clone::clone(&storage_dir),
-            Arc::clone(&cached_storage),
+            Rc::clone(&cached_storage),
             receiver,
         ));
         futures::pin_mut!(task);

@@ -18,10 +18,10 @@ use futures::lock::Mutex;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::{DefaultLoader, StorageAccess};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
-type VolumeControllerHandle = Arc<Mutex<VolumeController>>;
+type VolumeControllerHandle = Rc<Mutex<VolumeController>>;
 
 pub(crate) struct VolumeController {
     client: ClientProxy,
@@ -41,7 +41,7 @@ impl VolumeController {
         client: ClientProxy,
         audio_info_loader: AudioInfoLoader,
     ) -> VolumeControllerHandle {
-        Arc::new(Mutex::new(Self {
+        Rc::new(Mutex::new(Self {
             client,
             stream_volume_controls: HashMap::new(),
             audio_service_connected: false,
@@ -249,12 +249,12 @@ impl VolumeController {
                     id,
                     &audio_service,
                     *stream,
-                    Some(Arc::new(move || {
+                    Some(Rc::new(move || {
                         // When the StreamVolumeControl exits early, inform the
                         // proxy we have exited. The proxy will then cleanup this
                         // AudioController.
                         let client = client.clone();
-                        fasync::Task::spawn(async move {
+                        fasync::Task::local(async move {
                             trace!(id, c"stream exit");
                             client
                                 .notify(Event::Exited(Err(ControllerError::UnexpectedError(
@@ -297,7 +297,7 @@ impl data_controller::CreateWith for AudioController {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for AudioController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {

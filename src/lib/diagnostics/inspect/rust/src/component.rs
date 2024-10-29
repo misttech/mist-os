@@ -97,7 +97,7 @@ pub fn init_inspector_with_size(max_size: usize) -> &'static Inspector {
 /// it as early as possible, so that it could export a `STARTING_UP` health status while the
 /// component is initializing.
 pub fn health() -> Health {
-    return Health { health_node: HEALTH.clone() };
+    Health { health_node: HEALTH.clone() }
 }
 
 /// Serves statistics about inspect such as size or number of dynamic children in the

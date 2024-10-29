@@ -452,7 +452,7 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
 // Before allowing the system to proceed to the USER init level, wait to be sure
 // that all of the CPUs have started and made it to the check-in point (see
 // above).
-LK_INIT_HOOK(mp_all_cpu_startup_sync, mp_all_cpu_startup_sync_hook, LK_INIT_LEVEL_USER - 1)
+LK_INIT_HOOK(mp_all_cpu_startup_sync, mp_all_cpu_startup_sync_hook, LK_INIT_LEVEL_SMP_WAIT)
 
 static int cmd_mp(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {

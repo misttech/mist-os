@@ -29,8 +29,8 @@ use starnix_logging::{
 use starnix_sync::{LockBefore, Locked, ProcessGroupState, TaskRelease, Unlocked};
 use starnix_syscalls::decls::{Syscall, SyscallDecl};
 use starnix_syscalls::SyscallResult;
+use starnix_types::ownership::{OwnedRef, Releasable, ReleaseGuard, WeakRef};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::ownership::{OwnedRef, Releasable, ReleaseGuard, WeakRef};
 use starnix_uapi::signals::SIGKILL;
 use starnix_uapi::{errno, from_status_like_fdio, pid_t};
 use std::os::unix::thread::JoinHandleExt;

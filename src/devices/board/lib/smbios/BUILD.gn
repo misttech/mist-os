@@ -7,6 +7,7 @@ import("//build/testing/bootfs_test.gni")
 
 source_set("smbios") {
   sources = [ "smbios.cc" ]
+  public = [ "smbios.h" ]
   deps = [
     "//src/lib/ddk",
     "//zircon/system/ulib/fbl",
@@ -14,6 +15,7 @@ source_set("smbios") {
     "//zircon/system/ulib/smbios",
     "//zircon/system/ulib/zx",
   ]
+  public_deps = [ "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp" ]
 }
 
 test("smbios-test") {

@@ -12,24 +12,24 @@ use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::TryStreamExt;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::Channel;
 
 /// An implementation of fuchsia.hardware.light for testing use.
 pub(crate) struct HardwareLightService {
-    pub(crate) light_info: Arc<Mutex<HashMap<u32, Info>>>,
-    pub(crate) simple_values: Arc<Mutex<HashMap<u32, bool>>>,
-    pub(crate) brightness_values: Arc<Mutex<HashMap<u32, f64>>>,
-    pub(crate) rgb_values: Arc<Mutex<HashMap<u32, Rgb>>>,
+    pub(crate) light_info: Rc<Mutex<HashMap<u32, Info>>>,
+    pub(crate) simple_values: Rc<Mutex<HashMap<u32, bool>>>,
+    pub(crate) brightness_values: Rc<Mutex<HashMap<u32, f64>>>,
+    pub(crate) rgb_values: Rc<Mutex<HashMap<u32, Rgb>>>,
 }
 
 impl HardwareLightService {
     pub(crate) fn new() -> Self {
         Self {
-            light_info: Arc::new(Mutex::new(HashMap::new())),
-            simple_values: Arc::new(Mutex::new(HashMap::new())),
-            brightness_values: Arc::new(Mutex::new(HashMap::new())),
-            rgb_values: Arc::new(Mutex::new(HashMap::new())),
+            light_info: Rc::new(Mutex::new(HashMap::new())),
+            simple_values: Rc::new(Mutex::new(HashMap::new())),
+            brightness_values: Rc::new(Mutex::new(HashMap::new())),
+            rgb_values: Rc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -79,7 +79,7 @@ impl Service for HardwareLightService {
         let simple_values = self.simple_values.clone();
         let brightness_values = self.brightness_values.clone();
         let rgb_values = self.rgb_values.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(req) = request_stream.try_next().await.unwrap() {
                 match req {
                     LightRequest::GetNumLights { responder } => responder

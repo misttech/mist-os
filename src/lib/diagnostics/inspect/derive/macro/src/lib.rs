@@ -8,6 +8,7 @@
 
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
+use std::cmp;
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, DeriveInput, Error};
 
@@ -413,18 +414,22 @@ fn derive_inspect_inner(ast: DeriveInput) -> Result<TokenStream, Error> {
         }
     }
     let forward_count = inspect_fields.iter().filter(|f| f.attr_args.forward).count();
-    if forward_count > 1 {
-        return Err(Error::new_spanned(&ast, "only one inspect(forward) is allowed"));
-    } else if forward_count == 1 {
-        // If any other fields have arguments, throw a preventative error.
-        if inspect_fields.iter().filter(|f| f.attr_args.has_explicit()).count() != 1 {
-            return Err(Error::new_spanned(
-                &ast,
-                "if inspect(forward) is used, other fields will not be included",
-            ));
+    match forward_count.cmp(&1) {
+        cmp::Ordering::Greater => {
+            return Err(Error::new_spanned(&ast, "only one inspect(forward) is allowed"))
         }
-        // Remove all other fields except the forwarded one.
-        inspect_fields.retain(|f| f.attr_args.forward);
+        cmp::Ordering::Equal => {
+            // If any other fields have arguments, throw a preventative error.
+            if inspect_fields.iter().filter(|f| f.attr_args.has_explicit()).count() != 1 {
+                return Err(Error::new_spanned(
+                    &ast,
+                    "if inspect(forward) is used, other fields will not be included",
+                ));
+            }
+            // Remove all other fields except the forwarded one.
+            inspect_fields.retain(|f| f.attr_args.forward);
+        }
+        _ => {}
     }
     // Remove all skipped fields.
     inspect_fields.retain(|f| !f.attr_args.skip);

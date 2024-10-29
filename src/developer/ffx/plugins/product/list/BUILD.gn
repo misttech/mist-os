@@ -33,6 +33,6 @@ ffx_plugin("ffx_product_list") {
 
   test_deps = [
     "//src/lib/fuchsia",
-    "//src/lib/testing/temp_test_env",
+    "//third_party/rust_crates:tempfile",
   ]
 }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/extent_cache.h"
 
 namespace f2fs {
 

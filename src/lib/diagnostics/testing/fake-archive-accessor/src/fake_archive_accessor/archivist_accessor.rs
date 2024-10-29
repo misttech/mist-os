@@ -70,7 +70,7 @@ impl ArchiveAccessor {
     /// reader session to diagnostics data.
     pub async fn send(
         result_stream: ServerEnd<diagnostics::BatchIteratorMarker>,
-        inspect_data: &String,
+        inspect_data: &str,
     ) -> Result<(), Error> {
         let (requests, control) = match result_stream.into_stream_and_control_handle() {
             Ok(r) => r,

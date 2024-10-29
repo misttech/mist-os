@@ -58,16 +58,16 @@ pub(crate) fn test() -> TestData {
         .add_triage_config(TRIAGE_CONFIG)
         .events_then_advance(
             vec![
-                TestEvent::OnCrashReportingProductRegistration {
+                TestEvent::CrashReportingProductRegistration {
                     product_name: "FuchsiaDetect".to_string(),
                     program_name: "triage_detect".to_string(),
                 },
-                TestEvent::OnDiagnosticFetch,
-                TestEvent::OnCrashReport {
+                TestEvent::DiagnosticFetch,
+                TestEvent::CrashReport {
                     crash_signature: "fuchsia-detect-frequently".to_string(),
                     crash_program_name: "triage_detect".to_string(),
                 },
-                TestEvent::OnCrashReport {
+                TestEvent::CrashReport {
                     crash_signature: "fuchsia-detect-rarely".to_string(),
                     crash_program_name: "triage_detect".to_string(),
                 },
@@ -76,8 +76,8 @@ pub(crate) fn test() -> TestData {
         )
         .events_then_advance(
             vec![
-                TestEvent::OnDiagnosticFetch,
-                TestEvent::OnCrashReport {
+                TestEvent::DiagnosticFetch,
+                TestEvent::CrashReport {
                     crash_signature: "fuchsia-detect-frequently".to_string(),
                     crash_program_name: "triage_detect".to_string(),
                 },
@@ -86,12 +86,12 @@ pub(crate) fn test() -> TestData {
         )
         .events_then_advance(
             vec![
-                TestEvent::OnDiagnosticFetch,
-                TestEvent::OnCrashReport {
+                TestEvent::DiagnosticFetch,
+                TestEvent::CrashReport {
                     crash_signature: "fuchsia-detect-frequently".to_string(),
                     crash_program_name: "triage_detect".to_string(),
                 },
-                TestEvent::OnCrashReport {
+                TestEvent::CrashReport {
                     crash_signature: "fuchsia-detect-rarely".to_string(),
                     crash_program_name: "triage_detect".to_string(),
                 },
@@ -99,7 +99,7 @@ pub(crate) fn test() -> TestData {
             Duration::from_secs(5),
         )
         .events_then_advance(
-            vec![TestEvent::OnDiagnosticFetch, TestEvent::OnDone],
+            vec![TestEvent::DiagnosticFetch, TestEvent::Done],
             Duration::from_secs(5),
         )
 }

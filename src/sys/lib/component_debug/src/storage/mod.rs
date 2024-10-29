@@ -94,11 +94,9 @@ pub mod test {
                     write(&new_file_path, new_file_contents).unwrap();
                 }
 
-                fuchsia_fs::directory::open_channel_in_namespace_deprecated(
+                fuchsia_fs::directory::open_channel_in_namespace(
                     &tmp_path,
-                    fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::DIRECTORY,
+                    fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
                     ServerEnd::new(object.into_channel()),
                 )
                 .unwrap();

@@ -16,10 +16,11 @@
 
 namespace ufs {
 zx::result<std::unique_ptr<DeviceManager>> DeviceManager::Create(
-    Ufs &controller, TransferRequestProcessor &transfer_request_processor) {
+    Ufs &controller, TransferRequestProcessor &transfer_request_processor,
+    InspectProperties &properties) {
   fbl::AllocChecker ac;
-  auto device_manager =
-      fbl::make_unique_checked<DeviceManager>(&ac, controller, transfer_request_processor);
+  auto device_manager = fbl::make_unique_checked<DeviceManager>(
+      &ac, controller, transfer_request_processor, properties);
   if (!ac.check()) {
     FDF_LOG(ERROR, "Failed to allocate device manager.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -43,22 +44,18 @@ zx::result<> DeviceManager::SendLinkStartUp() {
 
 zx::result<> DeviceManager::DeviceInit() {
   zx::time device_init_start_time = zx::clock::get_monotonic();
-  SetFlagUpiu set_flag_upiu(Flags::fDeviceInit);
-  auto query_response = req_processor_.SendQueryRequestUpiu(set_flag_upiu);
-  if (query_response.is_error()) {
-    return query_response.take_error();
+  if (zx::result<> result = SetFlag(Flags::fDeviceInit); result.is_error()) {
+    return result.take_error();
   }
 
   zx::time device_init_time_out = device_init_start_time + zx::usec(kDeviceInitTimeoutUs);
   while (true) {
-    ReadFlagUpiu read_flag_upiu(Flags::fDeviceInit);
-    auto response = req_processor_.SendQueryRequestUpiu(read_flag_upiu);
-    if (response.is_error()) {
-      return response.take_error();
+    zx::result<uint8_t> flag = ReadFlag(Flags::fDeviceInit);
+    if (flag.is_error()) {
+      return flag.take_error();
     }
-    uint8_t flag = response->GetResponse<FlagResponseUpiu>().GetFlag();
 
-    if (!flag)
+    if (!flag.value())
       break;
 
     if (zx::clock::get_monotonic() > device_init_time_out) {
@@ -71,13 +68,11 @@ zx::result<> DeviceManager::DeviceInit() {
 }
 
 zx::result<> DeviceManager::GetControllerDescriptor() {
-  ReadDescriptorUpiu read_device_desc_upiu(DescriptorType::kDevice);
-  auto response = req_processor_.SendQueryRequestUpiu(read_device_desc_upiu);
-  if (response.is_error()) {
-    return response.take_error();
+  auto device_descriptor = ReadDescriptor<DeviceDescriptor>(DescriptorType::kDevice);
+  if (device_descriptor.is_error()) {
+    return device_descriptor.take_error();
   }
-  device_descriptor_ =
-      response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<DeviceDescriptor>();
+  device_descriptor_ = device_descriptor.value();
 
   // The field definitions for VersionReg and wSpecVersion are the same.
   // wSpecVersion use big-endian byte ordering.
@@ -87,13 +82,11 @@ zx::result<> DeviceManager::GetControllerDescriptor() {
 
   FDF_LOG(INFO, "%u enabled LUNs found", device_descriptor_.bNumberLU);
 
-  ReadDescriptorUpiu read_geometry_desc_upiu(DescriptorType::kGeometry);
-  response = req_processor_.SendQueryRequestUpiu(read_geometry_desc_upiu);
-  if (response.is_error()) {
-    return response.take_error();
+  auto geometry_descriptor = ReadDescriptor<GeometryDescriptor>(DescriptorType::kGeometry);
+  if (geometry_descriptor.is_error()) {
+    return geometry_descriptor.take_error();
   }
-  geometry_descriptor_ =
-      response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<GeometryDescriptor>();
+  geometry_descriptor_ = geometry_descriptor.value();
 
   // TODO(https://fxbug.dev/42075643): We need to functionalize the code to get max_lun_count_.
   if (geometry_descriptor_.bMaxNumberLU == 0) {
@@ -127,6 +120,45 @@ zx::result<uint32_t> DeviceManager::ReadAttribute(Attributes attribute, uint8_t 
 zx::result<> DeviceManager::WriteAttribute(Attributes attribute, uint32_t value, uint8_t index) {
   WriteAttributeUpiu write_attribute_upiu(attribute, value, index);
   auto query_response = req_processor_.SendQueryRequestUpiu(write_attribute_upiu);
+  if (query_response.is_error()) {
+    return query_response.take_error();
+  }
+  return zx::ok();
+}
+
+template <typename DescriptorReturnType>
+zx::result<DescriptorReturnType> DeviceManager::ReadDescriptor(DescriptorType descriptor,
+                                                               uint8_t index) {
+  ReadDescriptorUpiu read_descriptor_upiu(descriptor, index);
+  auto query_response = req_processor_.SendQueryRequestUpiu(read_descriptor_upiu);
+  if (query_response.is_error()) {
+    return query_response.take_error();
+  }
+  return zx::ok(
+      query_response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<DescriptorReturnType>());
+}
+
+zx::result<uint8_t> DeviceManager::ReadFlag(Flags type) {
+  ReadFlagUpiu read_flag_upiu(type);
+  auto query_response = req_processor_.SendQueryRequestUpiu(read_flag_upiu);
+  if (query_response.is_error()) {
+    return query_response.take_error();
+  }
+  return zx::ok(query_response->GetResponse<FlagResponseUpiu>().GetFlag());
+}
+
+zx::result<> DeviceManager::SetFlag(Flags type) {
+  SetFlagUpiu set_flag_upiu(type);
+  auto query_response = req_processor_.SendQueryRequestUpiu(set_flag_upiu);
+  if (query_response.is_error()) {
+    return query_response.take_error();
+  }
+  return zx::ok();
+}
+
+zx::result<> DeviceManager::ClearFlag(Flags type) {
+  ClearFlagUpiu claer_flag_upiu(type);
+  auto query_response = req_processor_.SendQueryRequestUpiu(claer_flag_upiu);
   if (query_response.is_error()) {
     return query_response.take_error();
   }
@@ -176,12 +208,7 @@ zx::result<uint32_t> DeviceManager::GetBootLunEnabled() {
 }
 
 zx::result<UnitDescriptor> DeviceManager::ReadUnitDescriptor(uint8_t lun) {
-  ReadDescriptorUpiu read_unit_desc_upiu(DescriptorType::kUnit, lun);
-  auto response = req_processor_.SendQueryRequestUpiu(read_unit_desc_upiu);
-  if (response.is_error()) {
-    return response.take_error();
-  }
-  return zx::ok(response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>());
+  return ReadDescriptor<UnitDescriptor>(DescriptorType::kUnit, lun);
 }
 
 zx::result<> DeviceManager::ConfigureWriteBooster(inspect::Node &wb_node) {
@@ -211,12 +238,13 @@ zx::result<> DeviceManager::ConfigureWriteBooster(inspect::Node &wb_node) {
   // Get WriteBooster buffer parameters.
   write_booster_buffer_type_ =
       static_cast<WriteBoosterBufferType>(device_descriptor_.bWriteBoosterBufferType);
-  wb_node.RecordUint("write_booster_buffer_type", static_cast<uint8_t>(write_booster_buffer_type_));
+  properties_.write_booster_buffer_type = wb_node.CreateUint(
+      "write_booster_buffer_type", static_cast<uint8_t>(write_booster_buffer_type_));
 
   user_space_configuration_option_ = static_cast<UserSpaceConfigurationOption>(
       device_descriptor_.bWriteBoosterBufferPreserveUserSpaceEn);
-  wb_node.RecordUint("user_space_configuration_option",
-                     static_cast<uint8_t>(user_space_configuration_option_));
+  properties_.user_space_configuration_option = wb_node.CreateUint(
+      "user_space_configuration_option", static_cast<uint8_t>(user_space_configuration_option_));
 
   // Find the size of the write buffer.
   uint32_t alloc_units = 0;
@@ -224,18 +252,16 @@ zx::result<> DeviceManager::ConfigureWriteBooster(inspect::Node &wb_node) {
     alloc_units = betoh32(device_descriptor_.dNumSharedWriteBoosterBufferAllocUnits);
   } else if (write_booster_buffer_type_ == WriteBoosterBufferType::kLuDedicatedBuffer) {
     for (uint8_t lun = 0; lun < max_lun_count_; ++lun) {
-      ReadDescriptorUpiu read_unit_desc_upiu(DescriptorType::kUnit, lun);
-      auto response = req_processor_.SendQueryRequestUpiu(read_unit_desc_upiu);
-      if (response.is_error()) {
+      auto unit_descriptor = ReadDescriptor<UnitDescriptor>(DescriptorType::kUnit, lun);
+      if (unit_descriptor.is_error()) {
         continue;
       }
-      auto unit_desc =
-          response->GetResponse<DescriptorResponseUpiu>().GetDescriptor<UnitDescriptor>();
-      alloc_units = betoh32(unit_desc.dLUNumWriteBoosterBufferAllocUnits);
+      alloc_units = betoh32(unit_descriptor->dLUNumWriteBoosterBufferAllocUnits);
       if (alloc_units > 0) {
         // Found a dedicated buffer from LU.
         write_booster_dedicated_lu_ = lun;
-        wb_node.RecordUint("write_booster_dedicated_lu", write_booster_dedicated_lu_);
+        properties_.write_booster_dedicated_lu =
+            wb_node.CreateUint("write_booster_dedicated_lu", write_booster_dedicated_lu_);
         break;
       }
     }
@@ -254,7 +280,8 @@ zx::result<> DeviceManager::ConfigureWriteBooster(inspect::Node &wb_node) {
   uint32_t write_booster_buffer_size_in_bytes =
       alloc_units * static_cast<uint32_t>(geometry_descriptor_.bAllocationUnitSize) *
       (betoh32(geometry_descriptor_.dSegmentSize)) * kSectorSize;
-  wb_node.RecordUint("write_booster_buffer_size_in_bytes", write_booster_buffer_size_in_bytes);
+  properties_.write_booster_buffer_size_in_bytes =
+      wb_node.CreateUint("write_booster_buffer_size_in_bytes", write_booster_buffer_size_in_bytes);
 
   zx::result<bool> result = IsWriteBoosterBufferLifeTimeLeft();
   if (result.is_error()) {
@@ -293,30 +320,29 @@ zx::result<bool> DeviceManager::IsWriteBoosterBufferLifeTimeLeft() {
 
 zx::result<> DeviceManager::EnableWriteBooster(inspect::Node &wb_node) {
   // Enable WriteBooster.
-  SetFlagUpiu set_wb_upiu(Flags::fWriteBoosterEn);
-  if (auto response = req_processor_.SendQueryRequestUpiu(set_wb_upiu); response.is_error()) {
-    return response.take_error();
+  if (zx::result<> result = SetFlag(Flags::fWriteBoosterEn); result.is_error()) {
+    return result.take_error();
   }
   is_write_booster_enabled_ = true;
-  wb_node.RecordBool("is_write_booster_enabled", is_write_booster_enabled_);
+  properties_.is_write_booster_enabled =
+      wb_node.CreateBool("is_write_booster_enabled", is_write_booster_enabled_);
 
   // Enable WriteBooster buffer flush during hibernate.
-  SetFlagUpiu set_wb_flush_hibern8_upiu(Flags::fWBBufferFlushDuringHibernate);
-  if (auto response = req_processor_.SendQueryRequestUpiu(set_wb_flush_hibern8_upiu);
-      response.is_error()) {
-    return response.take_error();
+  if (zx::result<> result = SetFlag(Flags::fWBBufferFlushDuringHibernate); result.is_error()) {
+    return result.take_error();
   }
-  wb_node.RecordBool("writebooster_buffer_flush_during_hibernate", true);
+  properties_.writebooster_buffer_flush_during_hibernate =
+      wb_node.CreateBool("writebooster_buffer_flush_during_hibernate", true);
 
   // Enable WriteBooster buffer flush.
   // TODO(https://fxbug.dev/42075643): For Samsung Exynos, ignore this flush behaviour due to the
   // quirk of not supporting manual flush.
-  SetFlagUpiu set_wb_flush_upiu(Flags::fWBBufferFlushEn);
-  if (auto response = req_processor_.SendQueryRequestUpiu(set_wb_flush_upiu); response.is_error()) {
-    return response.take_error();
+  if (zx::result<> result = SetFlag(Flags::fWBBufferFlushEn); result.is_error()) {
+    return result.take_error();
   }
   is_write_booster_flush_enabled_ = true;
-  wb_node.RecordBool("writebooster_buffer_flush_enabled", is_write_booster_flush_enabled_);
+  properties_.writebooster_buffer_flush_enabled =
+      wb_node.CreateBool("writebooster_buffer_flush_enabled", is_write_booster_flush_enabled_);
 
   return zx::ok();
 }
@@ -324,33 +350,25 @@ zx::result<> DeviceManager::EnableWriteBooster(inspect::Node &wb_node) {
 zx::result<> DeviceManager::DisableWriteBooster() {
   if (is_write_booster_flush_enabled_) {
     // Disable WriteBooster buffer flush.
-    ClearFlagUpiu clear_wb_flush_upiu(Flags::fWBBufferFlushEn);
-    if (auto response = req_processor_.SendQueryRequestUpiu(clear_wb_flush_upiu);
-        response.is_error()) {
-      return response.take_error();
+    if (zx::result<> result = ClearFlag(Flags::fWBBufferFlushEn); result.is_error()) {
+      return result.take_error();
     }
     is_write_booster_flush_enabled_ = false;
-    // TODO(https://fxbug.dev/42075643): The inspect value of |writebooster_buffer_flush_enabled|
-    // should be set to false.
+    properties_.writebooster_buffer_flush_enabled.Set(is_write_booster_flush_enabled_);
   }
 
   // Disable WriteBooster buffer flush during hibernate.
-  ClearFlagUpiu clear_wb_flush_hibern8_upiu(Flags::fWBBufferFlushDuringHibernate);
-  if (auto response = req_processor_.SendQueryRequestUpiu(clear_wb_flush_hibern8_upiu);
-      response.is_error()) {
-    return response.take_error();
+  if (zx::result<> result = ClearFlag(Flags::fWBBufferFlushDuringHibernate); result.is_error()) {
+    return result.take_error();
   }
-  // TODO(https://fxbug.dev/42075643): The inspect value of
-  // |writebooster_buffer_flush_during_hibernate| should be set to false.
+  properties_.writebooster_buffer_flush_during_hibernate.Set(false);
 
   // Disable WriteBooster.
-  ClearFlagUpiu clear_wb_upiu(Flags::fWriteBoosterEn);
-  if (auto response = req_processor_.SendQueryRequestUpiu(clear_wb_upiu); response.is_error()) {
-    return response.take_error();
+  if (zx::result<> result = ClearFlag(Flags::fWriteBoosterEn); result.is_error()) {
+    return result.take_error();
   }
   is_write_booster_enabled_ = false;
-  // TODO(https://fxbug.dev/42075643): The inspect value of |is_write_booster_enabled| should be set
-  // to false.
+  properties_.is_write_booster_enabled.Set(is_write_booster_enabled_);
 
   return zx::ok();
 }
@@ -428,7 +446,8 @@ zx::result<> DeviceManager::InitReferenceClock(inspect::Node &controller_node) {
     default:
       return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  controller_node.RecordString("reference_clock", reference_clock_string);
+  properties_.reference_clock =
+      controller_node.CreateString("reference_clock", reference_clock_string);
 
   return zx::ok();
 }
@@ -471,12 +490,15 @@ zx::result<> DeviceManager::InitUniproAttributes(inspect::Node &unipro_node) {
     return device_granularity.take_error();
   }
 
-  unipro_node.RecordUint("remote_version", remote_version.value());
-  unipro_node.RecordUint("local_version", local_version.value());
-  unipro_node.RecordUint("host_t_activate", host_t_activate.value());
-  unipro_node.RecordUint("device_t_activate", device_t_activate.value());
-  unipro_node.RecordUint("host_granularity", host_granularity.value());
-  unipro_node.RecordUint("device_granularity", device_granularity.value());
+  properties_.remote_version = unipro_node.CreateUint("remote_version", remote_version.value());
+  properties_.local_version = unipro_node.CreateUint("local_version", local_version.value());
+  properties_.host_t_activate = unipro_node.CreateUint("host_t_activate", host_t_activate.value());
+  properties_.device_t_activate =
+      unipro_node.CreateUint("device_t_activate", device_t_activate.value());
+  properties_.host_granularity =
+      unipro_node.CreateUint("host_granularity", host_granularity.value());
+  properties_.device_granularity =
+      unipro_node.CreateUint("device_granularity", device_granularity.value());
 
   return zx::ok();
 }
@@ -621,15 +643,17 @@ zx::result<> DeviceManager::InitUicPowerMode(inspect::Node &unipro_node) {
     return device_granularity.take_error();
   }
 
-  unipro_node.RecordUint("PA_ActiveTxDataLanes", tx_lanes.value());
-  unipro_node.RecordUint("PA_ActiveRxDataLanes", rx_lanes.value());
-  unipro_node.RecordUint("PA_MaxRxHSGear", max_rx_hs_gear.value());
-  unipro_node.RecordUint("PA_TxGear", max_rx_hs_gear.value());
-  unipro_node.RecordUint("PA_RxGear", max_rx_hs_gear.value());
-  unipro_node.RecordBool("tx_termination", true);
-  unipro_node.RecordBool("rx_termination", true);
-  unipro_node.RecordUint("PA_HSSeries", kHsSeries);
-  unipro_node.RecordUint("power_mode", kPwrMode);
+  properties_.pa_active_tx_data_lanes =
+      unipro_node.CreateUint("PA_ActiveTxDataLanes", tx_lanes.value());
+  properties_.pa_active_rx_data_lanes =
+      unipro_node.CreateUint("PA_ActiveRxDataLanes", rx_lanes.value());
+  properties_.pa_max_rx_hs_gear = unipro_node.CreateUint("PA_MaxRxHSGear", max_rx_hs_gear.value());
+  properties_.pa_tx_gear = unipro_node.CreateUint("PA_TxGear", max_rx_hs_gear.value());
+  properties_.pa_rx_gear = unipro_node.CreateUint("PA_RxGear", max_rx_hs_gear.value());
+  properties_.tx_termination = unipro_node.CreateBool("tx_termination", true);
+  properties_.rx_termination = unipro_node.CreateBool("rx_termination", true);
+  properties_.pa_hs_series = unipro_node.CreateUint("PA_HSSeries", kHsSeries);
+  properties_.power_mode = unipro_node.CreateUint("power_mode", kPwrMode);
 
   return zx::ok();
 }
@@ -712,6 +736,7 @@ zx::result<> DeviceManager::SuspendPower() {
   }
 
   current_power_mode_ = target_power_mode;
+  properties_.power_suspended.Set(true);
   FDF_LOG(INFO, "Power suspended.");
   return zx::ok();
 }
@@ -756,6 +781,7 @@ zx::result<> DeviceManager::ResumePower() {
   }
 
   current_power_mode_ = target_power_mode;
+  properties_.power_suspended.Set(false);
   FDF_LOG(INFO, "Power resumed.");
   return zx::ok();
 }
@@ -789,10 +815,14 @@ zx::result<> DeviceManager::InitUfsPowerMode(inspect::Node &controller_node,
 
   // TODO(https://fxbug.dev/42075643): Enable auto hibernate
 
-  attributes_node.RecordUint("bCurrentPowerMode", static_cast<uint8_t>(current_power_mode_));
-  attributes_node.RecordUint("bActiveICCLevel", kHighestActiveIcclevel);
-  controller_node.RecordUint("PowerCondition", static_cast<uint8_t>(current_power_condition_));
-  controller_node.RecordUint("LinkState", static_cast<uint8_t>(current_link_state_));
+  properties_.b_current_power_mode =
+      attributes_node.CreateUint("bCurrentPowerMode", static_cast<uint8_t>(current_power_mode_));
+  properties_.b_active_icc_level =
+      attributes_node.CreateUint("bActiveICCLevel", kHighestActiveIcclevel);
+  properties_.power_condition =
+      controller_node.CreateUint("PowerCondition", static_cast<uint8_t>(current_power_condition_));
+  properties_.link_state =
+      controller_node.CreateUint("LinkState", static_cast<uint8_t>(current_link_state_));
 
   return zx::ok();
 }

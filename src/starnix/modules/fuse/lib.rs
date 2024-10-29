@@ -28,14 +28,15 @@ use starnix_sync::{
     RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
+use starnix_types::time::{duration_from_timespec, time_from_timespec};
+use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EINTR, EINVAL, ENOENT, ENOSYS};
 use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::time::{duration_from_timespec, time_from_timespec};
-use starnix_uapi::vfs::{default_statfs, FdEvents};
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, errno_from_code, error, mode, off_t, statfs, uapi, FUSE_SUPER_MAGIC};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
@@ -185,7 +186,6 @@ pub fn new_fuse_fs(
     )?;
     let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64, 0);
     fuse_node.state.lock().nlookup += 1;
-    let fuse_node_id = fuse_node.nodeid;
 
     let mut root_node = FsNode::new_root(fuse_node);
     root_node.node_id = FUSE_ROOT_ID_U64;
@@ -195,7 +195,7 @@ pub fn new_fuse_fs(
         state.connect();
         state.execute_operation(
             current_task,
-            fuse_node_id,
+            FuseNode::from_node(&fs.root().node),
             FuseOperation::Init { fs: Arc::downgrade(&fs) },
         )?;
     }
@@ -250,7 +250,7 @@ impl FileSystemOps for FuseFs {
     ) -> Result<(), Errno> {
         self.connection.lock().execute_operation(
             current_task,
-            old_parent.node_id,
+            FuseNode::from_node(&old_parent),
             FuseOperation::Rename {
                 old_name: old_name.to_owned(),
                 new_dir: new_parent.node_id,
@@ -266,11 +266,8 @@ impl FileSystemOps for FuseFs {
 
     fn statfs(&self, fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
         let node = FuseNode::from_node(&fs.root().node);
-        let response = self.connection.lock().execute_operation(
-            current_task,
-            node.nodeid,
-            FuseOperation::Statfs,
-        )?;
+        let response =
+            self.connection.lock().execute_operation(current_task, &node, FuseOperation::Statfs)?;
         let statfs_out = if let FuseResponse::Statfs(statfs_out) = response {
             statfs_out
         } else {
@@ -574,11 +571,8 @@ impl FuseNode {
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        let response = self.connection.lock().execute_operation(
-            current_task,
-            self.nodeid,
-            FuseOperation::GetAttr,
-        )?;
+        let response =
+            self.connection.lock().execute_operation(current_task, self, FuseOperation::GetAttr)?;
         let uapi::fuse_attr_out { attr_valid, attr_valid_nsec, attr, .. } =
             if let FuseResponse::Attr(attr) = response {
                 attr
@@ -691,7 +685,7 @@ impl FileOps for FuseFileObject {
             let mut connection = self.connection.lock();
             if let Err(e) = connection.execute_operation(
                 current_task,
-                node.nodeid,
+                node,
                 if is_dir {
                     FuseOperation::ReleaseDir(self.open_out)
                 } else {
@@ -708,7 +702,7 @@ impl FileOps for FuseFileObject {
         let node = Self::get_fuse_node(file);
         if let Err(e) = self.connection.lock().execute_operation(
             current_task,
-            node.nodeid,
+            node,
             FuseOperation::Flush(self.open_out),
         ) {
             log_error!("Error when flushing fh: {e:?}");
@@ -736,7 +730,7 @@ impl FileOps for FuseFileObject {
         let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
-            node.nodeid,
+            node,
             FuseOperation::Read(uapi::fuse_read_in {
                 fh: self.open_out.fh,
                 offset: offset.try_into().map_err(|_| errno!(EINVAL))?,
@@ -773,7 +767,7 @@ impl FileOps for FuseFileObject {
         let content = data.peek_all()?;
         let response = self.connection.lock().execute_operation(
             current_task,
-            node.nodeid,
+            node,
             FuseOperation::Write {
                 write_in: uapi::fuse_write_in {
                     fh: self.open_out.fh,
@@ -811,7 +805,7 @@ impl FileOps for FuseFileObject {
             let node = Self::get_fuse_node(file);
             let response = self.connection.lock().execute_operation(
                 current_task,
-                node.nodeid,
+                node,
                 FuseOperation::Seek(uapi::fuse_lseek_in {
                     fh: self.open_out.fh,
                     offset: target.offset().try_into().map_err(|_| errno!(EINVAL))?,
@@ -867,7 +861,7 @@ impl FileOps for FuseFileObject {
         let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
-            node.nodeid,
+            node,
             FuseOperation::Poll(uapi::fuse_poll_in {
                 fh: self.open_out.fh,
                 kh: 0,
@@ -918,7 +912,7 @@ impl FileOps for FuseFileObject {
         let node = Self::get_fuse_node(file);
         let response = state.execute_operation(
             current_task,
-            node.nodeid,
+            node,
             FuseOperation::Readdir {
                 read_in: uapi::fuse_read_in {
                     fh: self.open_out.fh,
@@ -1034,7 +1028,7 @@ impl DirEntryOps for FuseDirEntry {
             ..
         } = match parent.connection.lock().execute_operation(
             current_task,
-            parent.nodeid,
+            parent,
             FuseOperation::Lookup { name },
         ) {
             Ok(FuseResponse::Entry(entry)) => entry,
@@ -1106,7 +1100,7 @@ impl FsNodeOps for FuseNode {
                 // fs. Seems like `chroot` also triggers a `FUSE_ACCESS` request on Linux.
                 let response = self.connection.lock().execute_operation(
                     current_task,
-                    self.nodeid,
+                    self,
                     FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() },
                 )?;
 
@@ -1142,7 +1136,7 @@ impl FsNodeOps for FuseNode {
         let mode = node.info().mode;
         let response = self.connection.lock().execute_operation(
             current_task,
-            self.nodeid,
+            self,
             FuseOperation::Open { flags, mode },
         )?;
         let open_out = if let FuseResponse::Open(open_out) = response {
@@ -1176,7 +1170,7 @@ impl FsNodeOps for FuseNode {
     ) -> Result<FsNodeHandle, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self.nodeid,
+            self,
             FuseOperation::Lookup { name: name.to_owned() },
         )?;
         self.fs_node_from_entry(
@@ -1204,7 +1198,7 @@ impl FsNodeOps for FuseNode {
             if dev == DeviceType::NONE && !connection.no_create {
                 match connection.execute_operation(
                     current_task,
-                    self.nodeid,
+                    self,
                     FuseOperation::Create(
                         uapi::fuse_create_in {
                             flags: OpenFlags::CREAT.bits(),
@@ -1220,6 +1214,12 @@ impl FsNodeOps for FuseNode {
                             return error!(EINVAL);
                         };
 
+                        let fuse_node = FuseNode::new(
+                            self.connection.clone(),
+                            response.entry.nodeid,
+                            response.entry.generation,
+                        );
+
                         // It is unfortunate that we have to immediately release the file (only for
                         // it to typically be reopened a short time later), but it will be a little
                         // tricky to fix this properly, and there are Fuse implementations that rely
@@ -1227,7 +1227,7 @@ impl FsNodeOps for FuseNode {
                         // have to tackle this if it shows up as a performance issue.
                         if let Err(e) = connection.execute_operation(
                             current_task,
-                            response.entry.nodeid,
+                            &fuse_node,
                             FuseOperation::Release(response.open),
                         ) {
                             log_error!("Error when releasing fh: {e:?}");
@@ -1246,7 +1246,7 @@ impl FsNodeOps for FuseNode {
             connection
                 .execute_operation(
                     current_task,
-                    self.nodeid,
+                    self,
                     FuseOperation::Mknod {
                         mknod_in: uapi::fuse_mknod_in {
                             mode: mode.bits(),
@@ -1277,7 +1277,7 @@ impl FsNodeOps for FuseNode {
     ) -> Result<FsNodeHandle, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self.nodeid,
+            self,
             FuseOperation::Mkdir {
                 mkdir_in: uapi::fuse_mkdir_in {
                     mode: mode.bits(),
@@ -1305,7 +1305,7 @@ impl FsNodeOps for FuseNode {
     ) -> Result<FsNodeHandle, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self.nodeid,
+            self,
             FuseOperation::Symlink { target: target.to_owned(), name: name.to_owned() },
         )?;
         self.fs_node_from_entry(
@@ -1319,7 +1319,7 @@ impl FsNodeOps for FuseNode {
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self.nodeid,
+            self,
             FuseOperation::Readlink,
         )?;
         let read_out = if let FuseResponse::Read(read_out) = response {
@@ -1343,7 +1343,7 @@ impl FsNodeOps for FuseNode {
             .lock()
             .execute_operation(
                 current_task,
-                self.nodeid,
+                self,
                 FuseOperation::Link {
                     link_in: uapi::fuse_link_in { oldnodeid: child_node.nodeid },
                     name: name.to_owned(),
@@ -1365,7 +1365,7 @@ impl FsNodeOps for FuseNode {
             .lock()
             .execute_operation(
                 current_task,
-                self.nodeid,
+                self,
                 if is_dir {
                     FuseOperation::Rmdir { name: name.to_owned() }
                 } else {
@@ -1393,7 +1393,7 @@ impl FsNodeOps for FuseNode {
 
             let response = self.connection.lock().execute_operation(
                 current_task,
-                self.nodeid,
+                self,
                 FuseOperation::SetAttr(attributes),
             )?;
             let uapi::fuse_attr_out { attr_valid, attr_valid_nsec, attr, .. } =
@@ -1444,7 +1444,7 @@ impl FsNodeOps for FuseNode {
     ) -> Result<ValueOrSize<FsString>, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self.nodeid,
+            self,
             FuseOperation::GetXAttr {
                 getxattr_in: uapi::fuse_getxattr_in {
                     size: max_size.try_into().map_err(|_| errno!(EINVAL))?,
@@ -1472,7 +1472,7 @@ impl FsNodeOps for FuseNode {
         let configuration = state.get_configuration(current_task)?;
         state.execute_operation(
             current_task,
-            self.nodeid,
+            self,
             FuseOperation::SetXAttr {
                 setxattr_in: uapi::fuse_setxattr_in {
                     size: value.len().try_into().map_err(|_| errno!(EINVAL))?,
@@ -1496,7 +1496,7 @@ impl FsNodeOps for FuseNode {
     ) -> Result<(), Errno> {
         self.connection.lock().execute_operation(
             current_task,
-            self.nodeid,
+            self,
             FuseOperation::RemoveXAttr { name: name.to_owned() },
         )?;
         Ok(())
@@ -1510,7 +1510,7 @@ impl FsNodeOps for FuseNode {
     ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
-            self.nodeid,
+            self,
             FuseOperation::ListXAttr(uapi::fuse_getxattr_in {
                 size: max_size.try_into().map_err(|_| errno!(EINVAL))?,
                 padding: 0,
@@ -1538,7 +1538,7 @@ impl FsNodeOps for FuseNode {
         if nlookup > 0 {
             state.execute_operation(
                 current_task,
-                self.nodeid,
+                self,
                 FuseOperation::Forget(uapi::fuse_forget_in { nlookup }),
             )?;
         };
@@ -1695,7 +1695,7 @@ impl<'a> FuseMutableStateGuard<'a> {
     fn execute_operation(
         &mut self,
         current_task: &CurrentTask,
-        nodeid: u64,
+        node: &FuseNode,
         operation: FuseOperation,
     ) -> Result<FuseResponse, Errno> {
         // Block until we have a valid configuration to make sure that the FUSE
@@ -1710,12 +1710,13 @@ impl<'a> FuseMutableStateGuard<'a> {
             return result.clone();
         }
         if !operation.has_response() {
-            self.queue_operation(current_task, nodeid, operation, None)?;
+            self.queue_operation(current_task, node.nodeid, operation, None)?;
             return Ok(FuseResponse::None);
         }
         let waiter = Waiter::new();
         let is_async = operation.is_async();
-        let unique_id = self.queue_operation(current_task, nodeid, operation, Some(&waiter))?;
+        let unique_id =
+            self.queue_operation(current_task, node.nodeid, operation, Some(&waiter))?;
         if is_async {
             return Ok(FuseResponse::None);
         }
@@ -1733,7 +1734,7 @@ impl<'a> FuseMutableStateGuard<'a> {
                     // If interrupted by another process, send an interrupt command to the server
                     // the first time, then wait unconditionally.
                     if first_loop {
-                        self.interrupt(current_task, nodeid, unique_id)?;
+                        self.interrupt(current_task, node.nodeid, unique_id)?;
                         first_loop = false;
                     }
                 }

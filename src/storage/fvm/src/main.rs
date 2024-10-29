@@ -983,7 +983,7 @@ impl Component {
             let partition =
                 &inner.metadata.partitions.get(&partition_index).ok_or(zx::Status::INTERNAL)?;
             PartitionInfo {
-                block_count: 0, // Supplied via `get_volume_info`.
+                block_range: None, // Supplied via `get_volume_info`.
                 type_guid: partition.type_guid,
                 instance_guid: partition.guid,
                 name: Some(partition.name().to_string()),

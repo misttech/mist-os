@@ -4,8 +4,6 @@
 
 #include "src/storage/lib/paver/sherlock.h"
 
-#include <lib/stdcompat/span.h>
-
 #include <algorithm>
 #include <iterator>
 
@@ -195,7 +193,7 @@ zx::result<> SherlockPartitioner::WipePartitionTables() const {
 }
 
 zx::result<> SherlockPartitioner::ValidatePayload(const PartitionSpec& spec,
-                                                  cpp20::span<const uint8_t> data) const {
+                                                  std::span<const uint8_t> data) const {
   if (!SupportsPartition(spec)) {
     ERROR("Unsupported partition %s\n", spec.ToString().c_str());
     return zx::error(ZX_ERR_NOT_SUPPORTED);

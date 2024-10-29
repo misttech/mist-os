@@ -44,7 +44,7 @@ where
     fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
         let child = writer.create_child(key);
         for (i, val) in self.0.iter().enumerate() {
-            val.write_inspect(&child, &i.to_string());
+            val.write_inspect(&child, i.to_string());
         }
 
         writer.record(child);

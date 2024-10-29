@@ -12,6 +12,7 @@ use fidl_fuchsia_component_decl::Component;
 use fidl_fuchsia_data as fdata;
 use fuchsia_url::AbsoluteComponentUrl;
 use maplit::btreeset;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::cmp::{Eq, PartialEq};
 use std::collections::HashMap;
@@ -145,14 +146,25 @@ fn find_meta_far(build_dir: &Utf8Path, manifest_path: String) -> Result<Utf8Path
 
     for blob in package_manifest.blobs() {
         if blob.path.eq(META_FAR_PREFIX) {
-            return Ok(build_dir.join(&blob.source_path));
+            // When blob sources are relative to the manifest file, the parsing
+            // operation rebases the path and changes the blob_sources_relative value
+            // back to "working_dir", which already prefixes it with the build directory.
+            //
+            // This code skips prefixing build directory if it is already present.
+            let source_path = Utf8PathBuf::from(&blob.source_path);
+            return if source_path.starts_with(&build_dir) {
+                Ok(source_path)
+            } else {
+                Ok(build_dir.join(source_path))
+            };
         }
     }
     Err(error::TestListToolError::MissingMetaBlob(manifest_path).into())
 }
 
 fn cm_decl_from_meta_far(meta_far_path: &Utf8PathBuf, cm_path: &str) -> Result<Component, Error> {
-    let mut meta_far = fs::File::open(meta_far_path)?;
+    let mut meta_far = fs::File::open(meta_far_path)
+        .with_context(|| format!("attempted to open {meta_far_path}"))?;
     let mut far_reader = fuchsia_archive::Utf8Reader::new(&mut meta_far)?;
     let cm_contents = far_reader.read_file(cm_path)?;
     let decl: Component = unpersist(&cm_contents)?;
@@ -352,12 +364,14 @@ fn validate_and_get_test_cml(
 fn run_tool() -> Result<(), Error> {
     let opt = opts::Opt::from_args();
     opt.validate()?;
+    if opt.single_threaded {
+        rayon::ThreadPoolBuilder::new().num_threads(1).build_global()?;
+    }
 
     let tests_json = read_tests_json(&opt.input)?;
     let test_components_json = read_test_components_json(&opt.test_components_list)?;
     let test_components_map = TestComponentsJsonEntry::convert_to_map(test_components_json)?;
 
-    use rayon::prelude::*;
     let (successes, errors): (Vec<_>, Vec<_>) = tests_json
         .par_iter()
         .map(|entry| {
@@ -470,13 +484,14 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
-    fn test_find_meta_far() {
+    fn test_find_meta_far_default() {
+        // By default, meta.far paths are relative to working directories.
         let tmp = tempdir().expect("failed to get tempdir");
         let build_dir = Utf8Path::from_path(tmp.path()).unwrap();
         let package_manifest_path = "package_manifest.json";
 
         // Test the working case.
-        let mut contents = r#"
+        let contents = r#"
             {
                 "version": "1",
                 "repository": "fuchsia.com",
@@ -499,9 +514,53 @@ mod tests {
             find_meta_far(&build_dir.to_path_buf(), package_manifest_path.into()).unwrap(),
             build_dir.join("obj/build/components/tests/echo-integration-test/meta.far"),
         );
+    }
+
+    #[test]
+    fn test_find_meta_far_relative_to_file() {
+        // Try to load a meta.far that is relative to the manifest file rather than relative to working directory.
+        let tmp = tempdir().expect("failed to get tempdir");
+        let build_dir = Utf8Path::from_path(tmp.path()).unwrap();
+        let package_manifest_dir = Utf8PathBuf::from("out/package/foo");
+        let package_manifest_path = package_manifest_dir.join("package_manifest.json");
+        std::fs::create_dir_all(build_dir.join(&package_manifest_dir))
+            .expect("create test directory");
+
+        // Test the working case.
+        let contents = r#"
+            {
+                "version": "1",
+                "repository": "fuchsia.com",
+                "package": {
+                    "name": "echo-integration-test",
+                    "version": "0"
+                },
+                "blobs": [
+                    {
+                        "source_path": "blobs/meta.far",
+                        "path": "meta/",
+                        "merkle": "0ec72cdf55fec3e0cc3dd47e86b95ee62c974ebaebea1d05769fea3fc4edca0b",
+                        "size": 36864
+                    }
+                ],
+                "blob_sources_relative": "file"
+            }"#;
+        fs::write(build_dir.join(&package_manifest_path), contents)
+            .expect("failed to write fake package manifest");
+        assert_eq!(
+            find_meta_far(&build_dir.to_path_buf(), package_manifest_path.into()).unwrap(),
+            build_dir.join("out/package/foo/blobs/meta.far"),
+        );
+    }
+
+    #[test]
+    fn test_find_meta_far_error() {
+        let tmp = tempdir().expect("failed to get tempdir");
+        let build_dir = Utf8Path::from_path(tmp.path()).unwrap();
+        let package_manifest_path = "package_manifest.json";
 
         // Test the error case.
-        contents = r#"
+        let contents = r#"
             {
                 "version": "1",
                 "repository": "fuchsia.com",

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
+use super::{selinux_hooks, FileObjectState, FileSystemState, ResolvedElfState, TaskState};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Kernel, Task};
 use crate::vfs::fs_args::MountParams;
@@ -11,13 +11,13 @@ use crate::vfs::{
 };
 use selinux::{SecurityPermission, SecurityServer};
 use starnix_logging::log_debug;
+use starnix_types::ownership::TempRef;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::auth::CAP_SYS_ADMIN;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
-use starnix_uapi::ownership::TempRef;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
@@ -200,6 +200,47 @@ pub fn check_fs_node_mknod_access(
     })
 }
 
+/// Validate that `current_task` has  the permission to create a new hard link to a file.
+/// Corresponds to the `security_inode_link()` hook.
+pub fn check_fs_node_link_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    child: &FsNode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_link_access(security_server, current_task, parent, child)
+    })
+}
+
+/// Validate that `current_task` has the permission to remove a hard link to a file.
+/// Corresponds to the `security_inode_unlink()` hook.
+pub fn check_fs_node_unlink_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    child: &FsNode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_unlink_access(security_server, current_task, parent, child)
+    })
+}
+
+/// Validate that `current_task` has the permission to remove a directory.
+/// Corresponds to the `security_inode_rmdir()` hook.
+pub fn check_fs_node_rmdir_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    child: &FsNode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_rmdir_access(security_server, current_task, parent, child)
+    })
+}
+
+/// Returns the security state for a new file object created by `current_task`.
+pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
+    FileObjectState { _state: selinux_hooks::file_alloc_security(current_task) }
+}
+
 /// Return the default initial `TaskState` for kernel tasks.
 pub fn task_alloc_for_kernel() -> TaskState {
     TaskState { attrs: selinux_hooks::TaskAttrs::for_kernel() }
@@ -237,7 +278,7 @@ pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno
                 Ok(selinux_hooks::TaskAttrs::for_sid(
                     security_server
                         .security_context_to_sid(context.into())
-                        .map_err(|_| errno!(EINVAL))?,
+                        .map_err(|e| errno!(EINVAL, format!("{:?}", e)))?,
                 ))
             },
             || Ok(selinux_hooks::TaskAttrs::for_selinux_disabled()),
@@ -458,6 +499,59 @@ pub fn sb_umount(
 ) -> Result<(), Errno> {
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::sb_umount(&security_server.as_permission_check(), current_task, node, flags)
+    })
+}
+
+pub fn check_fs_node_setxattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    name: &FsStr,
+    value: &FsStr,
+    op: XattrOp,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_setxattr_access(
+            security_server,
+            current_task,
+            fs_node,
+            name,
+            value,
+            op,
+        )
+    })
+}
+
+pub fn check_fs_node_getxattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    name: &FsStr,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_getxattr_access(security_server, current_task, fs_node, name)
+    })
+}
+
+pub fn check_fs_node_listxattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_listxattr_access(security_server, current_task, fs_node)
+    })
+}
+
+pub fn check_fs_node_removexattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    name: &FsStr,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_removexattr_access(
+            security_server,
+            current_task,
+            fs_node,
+            name,
+        )
     })
 }
 
@@ -1047,7 +1141,10 @@ mod tests {
                     XattrOp::Set,
                 )
                 .expect("set_xattr(security.selinux) failed");
-                assert_ne!(None, selinux_hooks::get_cached_sid(node));
+                assert_ne!(
+                    Some(SecurityId::initial(InitialSid::Unlabeled)),
+                    selinux_hooks::get_cached_sid(node)
+                );
 
                 fs_node_setsecurity(
                     current_task,
@@ -1058,7 +1155,10 @@ mod tests {
                 )
                 .expect("set_xattr(security.selinux) failed");
 
-                assert_eq!(None, selinux_hooks::get_cached_sid(node));
+                assert_eq!(
+                    Some(SecurityId::initial(InitialSid::Unlabeled)),
+                    selinux_hooks::get_cached_sid(node)
+                );
             },
         )
     }
@@ -1164,20 +1264,16 @@ mod tests {
             |locked, current_task, _security_server| {
                 let node = &create_test_file(locked, current_task).entry.node;
 
-                // Set an value in `node`'s "security.seliux" attribute.
+                // Set an invalid value in `node`'s "security.seliux" attribute.
                 const TEST_VALUE: &str = "Something Random";
-                node.ops()
-                    .set_xattr(
-                        node,
-                        current_task,
-                        XATTR_NAME_SELINUX.to_bytes().into(),
-                        TEST_VALUE.into(),
-                        XattrOp::Set,
-                    )
-                    .expect("set_xattr(security.selinux) failed");
-
-                // Ensure that there is no SID cached on the node.
-                selinux_hooks::clear_cached_sid(&node);
+                fs_node_setsecurity(
+                    current_task,
+                    node,
+                    XATTR_NAME_SELINUX.to_bytes().into(),
+                    TEST_VALUE.into(),
+                    XattrOp::Set,
+                )
+                .expect("set_xattr(security.selinux) failed");
 
                 // Reading the security attribute should pass-through to read the value from the file system.
                 let result = fs_node_getsecurity(

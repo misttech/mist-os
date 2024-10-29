@@ -89,7 +89,11 @@ def main() -> int:
     # using target name, which should be unique in the same directory, to
     # distinguish between them.
     app_dir = os.path.join(args.gen_dir, args.target_name)
-    os.makedirs(app_dir, exist_ok=True)
+    if os.path.exists(app_dir):
+        # Temporary directory is likely left-over from prior incomplete builds.
+        # Start from clean slate to prevent non-determinism.
+        remove_dir(app_dir)
+    os.makedirs(app_dir)
 
     # Copy over the sources of this binary.
     if (
@@ -124,9 +128,14 @@ def main() -> int:
         f.write(
             f"""
 import sys
+import inspect
 from {main_module} import *
 
-sys.exit({args.main_callable}())
+if inspect.iscoroutinefunction({args.main_callable}):
+    import asyncio
+    asyncio.run({args.main_callable}())
+else:
+    sys.exit({args.main_callable}())
 """
         )
 

@@ -36,10 +36,10 @@ TEST_P(BasicTest, Basic) {
   ASSERT_EQ(write(fd1, input.c_str(), input.length()), static_cast<ssize_t>(input.length()));
   ASSERT_EQ(close(fd1), 0);
 
-  char output[input.length() + 1];
+  auto output = std::make_unique<char[]>(input.length() + 1);
   output[input.length()] = '\0';
-  ASSERT_EQ(pread(fd2, output, input.length(), 0), static_cast<ssize_t>(input.length()));
-  ASSERT_EQ(std::string(output, input.length()), input);
+  ASSERT_EQ(pread(fd2, output.get(), input.length(), 0), static_cast<ssize_t>(input.length()));
+  ASSERT_EQ(std::string(output.get(), input.length()), input);
   ASSERT_EQ(close(fd2), 0);
 
   fd1 = open(GetPath("file.txt").c_str(), O_CREAT | O_RDWR, 0644);

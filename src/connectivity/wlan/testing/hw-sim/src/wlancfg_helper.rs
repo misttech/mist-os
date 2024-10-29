@@ -4,12 +4,12 @@
 
 use crate::test_utils::RetryWithBackoff;
 use fidl::endpoints::{create_endpoints, create_proxy};
+use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_fuchsia_wlan_policy::{Credential, NetworkConfig, NetworkIdentifier, SecurityType};
 use fuchsia_component::client::connect_to_protocol_at;
 use futures::{StreamExt, TryStreamExt};
 use ieee80211::Ssid;
 use tracing::info;
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 fn create_network_config(
     ssid: &Ssid,
@@ -137,7 +137,7 @@ pub async fn start_ap_and_wait_for_confirmation(
             .await
             .expect("starting AP")
         {
-            fidl_common::RequestStatus::Acknowledged => break,
+            fidl_policy::RequestStatus::Acknowledged => break,
             _ => (),
         }
 

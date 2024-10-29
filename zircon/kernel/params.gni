@@ -158,6 +158,7 @@ declare_args() {
 kernel_test_environments = [
   aemu_env,
   astro_env,
+  crosvm_env,
   qemu_env,
   qemu_1cpu_env,
   nuc7_env,

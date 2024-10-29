@@ -59,6 +59,12 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
                         std::move(request->object));
 }
 
+void FileConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+  const fio::Flags flags = fio::Flags::kProtocolFile | fs::internal::RightsToFlags(rights()) |
+                           (append() ? fio::Flags::kFileAppend : fio::Flags());
+  Connection::NodeClone2(flags, request->request.TakeChannel());
+}
+
 void FileConnection::Close(CloseCompleter::Sync& completer) {
   completer.Reply(CloseVnode(koid_));
   Unbind();

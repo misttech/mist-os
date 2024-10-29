@@ -70,7 +70,7 @@ impl VolumeChangeHandler {
                 HashMap::new()
             };
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let mut handler = Self {
                 common_earcons_params: params,
                 last_user_volumes,
@@ -241,7 +241,7 @@ impl VolumeChangeHandler {
         let common_earcons_params = self.common_earcons_params.clone();
 
         let publisher = self.publisher.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             // Connect to the SoundPlayer if not already connected.
             connect_to_sound_player(
                 publisher,
@@ -288,10 +288,9 @@ impl VolumeChangeHandler {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use fuchsia_inspect::component;
     use futures::lock::Mutex;
+    use std::rc::Rc;
 
     use crate::audio::build_audio_default_settings;
     use crate::inspect::config_logger::InspectConfigLogger;
@@ -306,9 +305,8 @@ mod tests {
         ModifiedCounters, // new_counters
         Vec<AudioStream>, // expected_changed_streams
     ) {
-        let config_logger = Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(
-            component::inspector().root(),
-        )));
+        let config_logger =
+            Rc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
         let mut settings = build_audio_default_settings(config_logger);
         let settings = settings
             .load_default_value()
@@ -342,9 +340,9 @@ mod tests {
 
         let mut handler = VolumeChangeHandler {
             common_earcons_params: CommonEarconsParams {
-                service_context: Arc::new(ServiceContext::new(None, None)),
-                sound_player_added_files: Arc::new(Mutex::new(HashSet::new())),
-                sound_player_connection: Arc::new(Mutex::new(None)),
+                service_context: Rc::new(ServiceContext::new(None, None)),
+                sound_player_added_files: Rc::new(Mutex::new(HashSet::new())),
+                sound_player_connection: Rc::new(Mutex::new(None)),
             },
             last_user_volumes,
             modified_counters: old_timestamps,

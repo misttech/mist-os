@@ -8,7 +8,7 @@
 
 ## usage: fx set-build-dir DIR
 ##    or: fx --dir DIR set-build-dir
-##    or: fx set-buil-dir
+##    or: fx set-build-dir
 ##
 ## Switches further `fx` commands to using a different build directory.
 ## This only works if `fx --dir DIR set ...` succeeded previously

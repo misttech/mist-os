@@ -242,7 +242,8 @@ DisplayCompositor::DisplayCompositor(
     async_dispatcher_t* main_dispatcher,
     std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator,
     const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
-    const bool enable_display_composition, uint32_t max_display_layers)
+    const bool enable_display_composition, uint32_t max_display_layers,
+    uint8_t visual_debugging_level)
     : display_coordinator_shared_ptr_(std::move(display_coordinator)),
       display_coordinator_(*display_coordinator_shared_ptr_),
       renderer_(renderer),
@@ -250,7 +251,8 @@ DisplayCompositor::DisplayCompositor(
       sysmem_allocator_(std::move(sysmem_allocator)),
       enable_display_composition_(enable_display_composition),
       max_display_layers_(max_display_layers),
-      main_dispatcher_(main_dispatcher) {
+      main_dispatcher_(main_dispatcher),
+      visual_debugging_level_(visual_debugging_level) {
   FX_CHECK(main_dispatcher_);
   FX_DCHECK(renderer_);
   FX_DCHECK(sysmem_allocator_);
@@ -841,17 +843,16 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     event_data.signal_event.signal(ZX_EVENT_SIGNALED, 0);
 
     // Apply the debugging color to the images.
-#ifdef VISUAL_DEBUGGING_ENABLED
     auto images = render_data.images;
-    for (auto& image : images) {
-      image.multiply_color[0] *= kDebugColor[0];
-      image.multiply_color[1] *= kDebugColor[1];
-      image.multiply_color[2] *= kDebugColor[2];
-      image.multiply_color[3] *= kDebugColor[3];
+    const uint8_t VISUAL_DEBUGGING_LEVEL_INFO_PLATFORM = 2;
+    if (visual_debugging_level_ >= VISUAL_DEBUGGING_LEVEL_INFO_PLATFORM) {
+      for (auto& image : images) {
+        image.multiply_color[0] *= kGpuRenderingDebugColor[0];
+        image.multiply_color[1] *= kGpuRenderingDebugColor[1];
+        image.multiply_color[2] *= kGpuRenderingDebugColor[2];
+        image.multiply_color[3] *= kGpuRenderingDebugColor[3];
+      }
     }
-#else
-    auto& images = render_data.images;
-#endif  // VISUAL_DEBUGGING_ENABLED
 
     const auto apply_cc = (cc_state_machine_.GetDataToApply() != std::nullopt);
     std::vector<zx::event> render_fences;

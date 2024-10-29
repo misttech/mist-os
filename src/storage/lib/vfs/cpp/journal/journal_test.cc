@@ -14,6 +14,7 @@
 #include <iomanip>
 #include <memory>
 #include <optional>
+#include <span>
 #include <thread>
 #include <vector>
 
@@ -1506,7 +1507,7 @@ TEST_F(JournalTest, MetadataOnDiskOrderNotMatchingInMemoryOrder) {
   // Actually write operations[0] before operations[1].
   std::vector<storage::BufferedOperation> buffered_operations0;
   ASSERT_TRUE(reservation0
-                  .CopyRequests(cpp20::span(&operations[0], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(&operations[0], 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations0)
                   .is_ok());
   auto result = writer.WriteMetadata(
@@ -1515,7 +1516,7 @@ TEST_F(JournalTest, MetadataOnDiskOrderNotMatchingInMemoryOrder) {
 
   std::vector<storage::BufferedOperation> buffered_operations1;
   ASSERT_TRUE(reservation1
-                  .CopyRequests(cpp20::span(&operations[1], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(&operations[1], 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations1)
                   .is_ok());
   result = writer.WriteMetadata(
@@ -1635,7 +1636,7 @@ TEST_F(JournalTest, MetadataOnDiskOrderNotMatchingInMemoryOrderWraparound) {
   uint64_t block_count = operations[0].op.length + kEntryMetadataBlocks;
   ASSERT_EQ(journal_buffer->Reserve(block_count, &reservation), ZX_OK);
   ASSERT_TRUE(reservation
-                  .CopyRequests(cpp20::span(&operations[0], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(&operations[0], 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations)
                   .is_ok());
   auto result = writer.WriteMetadata(
@@ -1657,7 +1658,7 @@ TEST_F(JournalTest, MetadataOnDiskOrderNotMatchingInMemoryOrderWraparound) {
   // This means that on-disk, operations[1] wraps around the journal.
   std::vector<storage::BufferedOperation> buffered_operations1;
   ASSERT_TRUE(reservation1
-                  .CopyRequests(cpp20::span(&operations[1], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(&operations[1], 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations1)
                   .is_ok());
   result = writer.WriteMetadata(
@@ -1667,7 +1668,7 @@ TEST_F(JournalTest, MetadataOnDiskOrderNotMatchingInMemoryOrderWraparound) {
 
   std::vector<storage::BufferedOperation> buffered_operations2;
   ASSERT_TRUE(reservation2
-                  .CopyRequests(cpp20::span(&operations[2], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(&operations[2], 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations2)
                   .is_ok());
   result = writer.WriteMetadata(
@@ -1756,7 +1757,7 @@ TEST_F(JournalTest, MetadataOnDiskAndInMemoryWraparoundAtDifferentOffsets) {
   uint64_t block_count = operations[0].op.length + kEntryMetadataBlocks;
   ASSERT_EQ(journal_buffer->Reserve(block_count, &reservation), ZX_OK);
   ASSERT_TRUE(reservation
-                  .CopyRequests(cpp20::span(&operations[0], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(&operations[0], 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations)
                   .is_ok());
   auto result = writer.WriteMetadata(
@@ -1770,7 +1771,7 @@ TEST_F(JournalTest, MetadataOnDiskAndInMemoryWraparoundAtDifferentOffsets) {
   ASSERT_EQ(journal_buffer->Reserve(block_count, &reservation), ZX_OK);
 
   ASSERT_TRUE(reservation
-                  .CopyRequests(cpp20::span(&operations[1], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(&operations[1], 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations)
                   .is_ok());
   result = writer.WriteMetadata(
@@ -2888,7 +2889,7 @@ TEST_F(JournalTest, PayloadBlocksWithJournalMagicAreEscaped) {
         uint64_t offset = (verifier.JournalOffset() + kJournalEntryHeaderBlocks) * kBlockSize;
         uint64_t length = kBlockSize;
         EXPECT_EQ(registry()->journal().read(buffer.data(), offset, length), ZX_OK);
-        EXPECT_THAT(cpp20::span(static_cast<const uint8_t*>(metadata.Data(0)), kBlockSize),
+        EXPECT_THAT(std::span(static_cast<const uint8_t*>(metadata.Data(0)), kBlockSize),
                     ElementsAreArray(buffer.data(), kBlockSize))
             << "Metadata should only be escaped in the journal";
 
@@ -3227,7 +3228,7 @@ TEST(JournalSimpleTest, EmptyOperationWithDataOrTrimReturnsError) {
 
 zx_status_t MakeJournalHelper(uint8_t* dest_buffer, uint64_t blocks, uint64_t block_size) {
   fs::WriteBlocksFn write_blocks_fn = [dest_buffer, blocks, block_size](
-                                          cpp20::span<const uint8_t> buffer, uint64_t block_offset,
+                                          std::span<const uint8_t> buffer, uint64_t block_offset,
                                           uint64_t block_count) {
     EXPECT_GE(buffer.size(), block_count * block_size);
 

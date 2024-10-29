@@ -29,7 +29,7 @@ async fn serve_realm_factory(stream: RealmFactoryRequestStream) {
 
 async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<()> {
     let mut task_group = fasync::TaskGroup::new();
-    let mut factory = ArchivistRealmFactory::default();
+    let mut factory = ArchivistRealmFactory;
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {

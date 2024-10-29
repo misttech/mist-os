@@ -39,7 +39,7 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/outgoing_message.h": "286486ba949ef4f64c985b9a7c921a78",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/server.h": "96ce2132cab8342a0f0c27720b29d648",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/service_handler.h": "1111e49a9e602e3b4c993f57583ba46a",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/status.h": "40fe0fb1df0033a461f085a47da29b44",
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/status.h": "e2049bbf3f489e76322a3268caa79d04",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/string_view.h": "df5f64ddd9b92fd49c4291c8d78c5049",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/sync_call.h": "411153007795dc8052c5336fc50d28f7",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/traits.h": "c3cca16ebfb912748e6acb5773a49c1e",

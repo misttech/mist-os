@@ -12,9 +12,11 @@
 #include <sys/types.h>
 #include <zircon/types.h>
 
-zx_time_t cntpct_to_zx_time(uint64_t cntpct);
-
 // Initializes the driver.
 void ArmGenericTimerInit(const zbi_dcfg_arm_generic_timer_driver_t& config);
+
+// Indicates that we should be using the physical view of the system timer
+// instead of the virtual view.
+bool ArmUsePhysTimerInVdso();
 
 #endif  // ZIRCON_KERNEL_DEV_TIMER_ARM_GENERIC_INCLUDE_DEV_TIMER_ARM_GENERIC_H_

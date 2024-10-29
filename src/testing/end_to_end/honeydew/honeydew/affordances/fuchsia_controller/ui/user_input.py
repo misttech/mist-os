@@ -79,6 +79,9 @@ class TouchDevice(user_input.TouchDevice):
 
             duration_ms: Duration of the event(s) in milliseconds, defaults to
                 300.
+
+        Raises:
+            UserInputError: if failed tap operation.
         """
 
         try:
@@ -91,7 +94,7 @@ class TouchDevice(user_input.TouchDevice):
                 time.sleep(interval / 1000)  # Sleep in seconds
 
         except fcp.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise errors.UserInputError(
                 f"tap operation failed on {self._device_name}"
             ) from status
 
@@ -133,6 +136,7 @@ class UserInput(user_input.UserInput):
 
         Args:
             touch_screen_size: ignore.
+
         Raises:
             UserInputError: if failed to create virtual touch device.
         """

@@ -5,10 +5,11 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_COMMON_INCLUDE_DEV_INTERRUPT_ARM_GIC_HW_INTERFACE_H_
-#define ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_COMMON_INCLUDE_DEV_INTERRUPT_ARM_GIC_HW_INTERFACE_H_
+#ifndef ZIRCON_KERNEL_DEV_INTERRUPT_GIC_COMMON_INCLUDE_DEV_INTERRUPT_ARM_GIC_HW_INTERFACE_H_
+#define ZIRCON_KERNEL_DEV_INTERRUPT_GIC_COMMON_INCLUDE_DEV_INTERRUPT_ARM_GIC_HW_INTERFACE_H_
 
 #include <sys/types.h>
+#include <zircon/types.h>
 
 enum class InterruptState : uint8_t {
   INACTIVE = 0,
@@ -56,6 +57,6 @@ uint8_t gic_get_num_pres();
 uint8_t gic_get_num_lrs();
 
 // Registers the ops of the GIC driver initialized with HW interface layer.
-void arm_gic_hw_interface_register(const struct arm_gic_hw_interface_ops* ops);
+void arm_gic_hw_interface_register(const arm_gic_hw_interface_ops* ops);
 
-#endif  // ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_COMMON_INCLUDE_DEV_INTERRUPT_ARM_GIC_HW_INTERFACE_H_
+#endif  // ZIRCON_KERNEL_DEV_INTERRUPT_GIC_COMMON_INCLUDE_DEV_INTERRUPT_ARM_GIC_HW_INTERFACE_H_

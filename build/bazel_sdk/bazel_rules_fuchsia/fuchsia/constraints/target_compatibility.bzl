@@ -5,6 +5,7 @@
 """Tools to check the comatibility of fuchsia targets"""
 
 load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
 _SUPPORTED_HOST_CPU_PLATFORMS = [
     "@platforms//cpu:x86_64",
@@ -13,11 +14,12 @@ _SUPPORTED_HOST_OS_PLATFORMS = [
     "@platforms//os:linux",
 ]
 
-def _define_host_can_build_fuchsia_flag_impl(_):
+def _define_host_can_build_fuchsia_flag_impl(ctx):
     valid_host_cpu = any([cpu in HOST_CONSTRAINTS for cpu in _SUPPORTED_HOST_CPU_PLATFORMS])
     valid_host_os = any([os in HOST_CONSTRAINTS for os in _SUPPORTED_HOST_OS_PLATFORMS])
+    fuchsia_targets_enabled = ctx.attr._fuchsia_targets_enabled[BuildSettingInfo].value
 
-    if valid_host_cpu and valid_host_os:
+    if valid_host_cpu and valid_host_os and fuchsia_targets_enabled:
         valid_host = "yes"
     else:
         valid_host = "no"
@@ -34,6 +36,11 @@ define_host_can_build_fuchsia_flag = rule(
     due on host machines we do not support due to not having a valid toolchain.
     """,
     implementation = _define_host_can_build_fuchsia_flag_impl,
+    attrs = {
+        "_fuchsia_targets_enabled": attr.label(
+            default = "//fuchsia:fuchsia_targets_enabled",
+        ),
+    },
 )
 
 _HOST_CONDITION = select({

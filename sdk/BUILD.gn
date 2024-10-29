@@ -188,33 +188,14 @@ group("final_fuchsia_idk.validation") {
   testonly = true
 }
 
-foreach(cpu, idk_target_cpus) {
-  # This target runs the test suite against a locally-generated IDK
-  # (which includes support for all target architectures), but only
-  # for target_cpu. E.g. `bazel_sdk_tests_arm64` will run the
-  # test suite with a build configuration that generates Fuchsia/arm64
-  # binaries.
-  run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests_${cpu}") {
-    target_cpu = cpu
-    idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
-    idk_exported_target = "//sdk:final_fuchsia_idk.exported"
-
-    # Use shared output_base and output_user_root between CPU-specific test runs.
-    output_base = "$target_out_dir/output_base"
-    output_user_root = "$target_out_dir/output_user_root"
-  }
-}
-
 # This target runs the test suite against each target architecture
 # supported by the IDK. Currently, this runs multiple instances of
 # the test suite, one per target cpu. This is a dependency of
 # //sdk:final_fuchsia_idk.validation.
-group("final_fuchsia_idk_bazel_sdk_tests") {
-  testonly = true
-  deps = []
-  foreach(cpu, idk_target_cpus) {
-    deps += [ ":final_fuchsia_idk_bazel_sdk_tests_${cpu}" ]
-  }
+run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests") {
+  target_cpus = idk_target_cpus
+  idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
+  idk_exported_target = "//sdk:final_fuchsia_idk.exported"
 }
 
 # This target generate a Fuchsia Bazel SDK directory directly
@@ -227,20 +208,11 @@ generate_fuchsia_bazel_sdk("final_fuchsia_sdk") {
   idk_export_dir = "$root_build_dir/sdk/exported/fuchsia_idk"
 }
 
-foreach(cpu, idk_target_cpus) {
-  run_fuchsia_bazel_sdk_tests("final_fuchsia_sdk_tests_$cpu") {
-    fuchsia_sdk_target = ":final_fuchsia_sdk"
-  }
-}
-
 # Verify the content of the final_fuchsia_sdk target by running
 # the Bazel SDK test suite with it for all supported target cpus.
-group("final_fuchsia_sdk_tests") {
-  testonly = true
-  deps = []
-  foreach(cpu, idk_target_cpus) {
-    deps += [ ":final_fuchsia_sdk_tests_$cpu" ]
-  }
+run_fuchsia_bazel_sdk_tests("final_fuchsia_sdk_tests") {
+  target_cpus = idk_target_cpus
+  fuchsia_sdk_target = ":final_fuchsia_sdk"
 
   # NOTE: For now, nothing should depend on the :final_fuchsia_sdk_test
   # target, except //:root_targets. This ensures the target is always
@@ -278,9 +250,9 @@ if (!is_host) {
   # though the dependencies are very different in each of those cases.
   #
   # Due to limitations of the build system at the GN/Bazel boundary, this cannot
-  # contain testonly atoms. Libraries and packages for use in tests absolutely
-  # belong in the IDK, but unfortunately, before they can be added, the
-  # `testonly` attribute must be removed.
+  # contain testonly atoms. See https://fxbug.dev/42070088.
+  # Libraries and packages for use in tests absolutely belong in the IDK, but
+  # the `testonly` attribute must be removed before they can be added.
   sdk_molecule("fuchsia_idk_atoms") {
     visibility += [ "//vendor/*" ]
 
@@ -365,12 +337,6 @@ if (!is_host) {
       category = "partner"
 
       deps = [
-        # The C++ source libraries must be buildable at each supported API level
-        # but are only built once (per target CPU architecture).
-        # TODO(https://fxbug.dev/42083950): Ensure the libraries build and are
-        # complete at all API levels.
-        ":core_cc_source_libraries",
-
         # TODO(https://fxbug.dev/327223536): `loadable_modules` (a.k.a., the
         # "Vulkan layers") support being built at individual API levels, but
         # each of the subbuilds currently puts the build files at the same path,
@@ -405,6 +371,10 @@ if (!is_host) {
         category = "partner"
 
         deps = [
+          # This target contains atoms that depend on FIDL libraries, but it
+          # does not build the underlying libraries.
+          ":core_cc_source_libraries",
+
           # This target compiles the FIDL files, but the output used in the IDK
           # is not specific to any API level or CPU architecture.
           "//sdk/fidl",
@@ -787,9 +757,14 @@ sdk_molecule("core_cc_prebuilt_libraries") {
   ]
 }
 
-# C/C++ code that is provided as source in the SDK. Must be buildable at each
-# supported API level, though this is not part of the build.
+# C/C++ code that is provided as source in the SDK.
 # Prefer providing source code if all dependencies are available in the SDK.
+# All source files must be buildable at each supported API level.
+# There is currently not mechanism to ensure this, even at "PLATFORM" because
+# it does not cause the source files to be compiled. It only generates the SDK
+# atoms
+# TODO(https://fxbug.dev/42083950): Ensure the libraries build and are
+# complete at all API levels.
 sdk_molecule("core_cc_source_libraries") {
   category = "partner"
   deps = [
@@ -917,21 +892,11 @@ if (current_toolchain == default_toolchain) {
   # as the content of the @fuchsia_sdk repository, populated
   # from the same IDK, is already checked by a different suite
   # of tests defined under //build/bazel/bazel_sdk.
+  run_fuchsia_bazel_sdk_tests("bazel_in_tree_idk_tests") {
+    target_cpus = _bazel_in_tree_idk_cpus
 
-  foreach(cpu, _bazel_in_tree_idk_cpus) {
-    run_fuchsia_bazel_sdk_tests("bazel_in_tree_idk_tests_${cpu}") {
-      target_cpu = cpu
-      idk_exported_target = "//sdk:bazel_in_tree_idk"
-      idk_exported_path = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
-    }
-  }
-
-  group("bazel_in_tree_idk_tests") {
-    testonly = true
-    deps = []
-    foreach(cpu, _bazel_in_tree_idk_cpus) {
-      deps += [ ":bazel_in_tree_idk_tests_${cpu}" ]
-    }
+    idk_exported_target = "//sdk:bazel_in_tree_idk"
+    idk_exported_path = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
 
     # For now, nothing should depend on this except
     # //:root_targets to ensure it can be launched manually

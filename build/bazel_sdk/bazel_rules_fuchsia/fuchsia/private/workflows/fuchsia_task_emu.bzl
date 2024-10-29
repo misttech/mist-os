@@ -11,7 +11,7 @@ load(":providers.bzl", "FuchsiaProductBundleInfo")
 
 def _fuchsia_task_emu_impl(ctx, make_shell_task):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
-    pb_path = get_product_bundle_dir(ctx.attr.product_bundle[FuchsiaProductBundleInfo])
+    pb_path = get_product_bundle_dir(ctx)
     return make_shell_task(
         command = [
             sdk.ffx,

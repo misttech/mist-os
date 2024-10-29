@@ -12,7 +12,7 @@ use fidl_fuchsia_settings::{
     KeyboardRequestStream, LightRequestStream, NightModeRequestStream, PrivacyRequestStream,
     SetupRequestStream,
 };
-use fuchsia_component::server::{ServiceFsDir, ServiceObj};
+use fuchsia_component::server::{ServiceFsDir, ServiceObjLocal};
 use serde::Deserialize;
 
 impl From<Error> for zx::Status {
@@ -114,7 +114,7 @@ pub mod display {
 /// handler is given access to the MessageHub [Delegate] for communication within the service and
 /// [ServiceFsDir] to register as the designated handler for the interface.
 pub(crate) type Register =
-    Box<dyn for<'a> FnOnce(&Seeder, &mut ServiceFsDir<'_, ServiceObj<'a, ()>>) + Send + Sync>;
+    Box<dyn for<'a> FnOnce(&Seeder, &mut ServiceFsDir<'_, ServiceObjLocal<'a, ()>>)>;
 
 impl Interface {
     /// Returns the list of [Dependencies](Dependency) that are necessary to provide this Interface.
@@ -172,85 +172,94 @@ impl Interface {
     /// Converts an [Interface] into the closure to bring up the interface in the service environment
     /// as defined by [Register].
     fn registration_fn(self) -> Register {
-        Box::new(move |seeder: &Seeder, service_dir: &mut ServiceFsDir<'_, ServiceObj<'_, ()>>| {
-            match self {
-                Interface::Audio => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(move |stream: AudioRequestStream| {
-                        seeder.seed(stream);
-                    });
-                }
-                Interface::Accessibility => {
-                    let seeder = seeder.clone();
-                    let _ =
-                        service_dir.add_fidl_service(move |stream: AccessibilityRequestStream| {
+        Box::new(
+            move |seeder: &Seeder, service_dir: &mut ServiceFsDir<'_, ServiceObjLocal<'_, ()>>| {
+                match self {
+                    Interface::Audio => {
+                        let seeder = seeder.clone();
+                        let _ = service_dir.add_fidl_service(move |stream: AudioRequestStream| {
                             seeder.seed(stream);
                         });
-                }
-                Interface::Display(_) => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(move |stream: DisplayRequestStream| {
-                        seeder.seed(stream);
-                    });
-                }
-                Interface::DoNotDisturb => {
-                    let seeder = seeder.clone();
-                    let _ =
-                        service_dir.add_fidl_service(move |stream: DoNotDisturbRequestStream| {
+                    }
+                    Interface::Accessibility => {
+                        let seeder = seeder.clone();
+                        let _ = service_dir.add_fidl_service(
+                            move |stream: AccessibilityRequestStream| {
+                                seeder.seed(stream);
+                            },
+                        );
+                    }
+                    Interface::Display(_) => {
+                        let seeder = seeder.clone();
+                        let _ =
+                            service_dir.add_fidl_service(move |stream: DisplayRequestStream| {
+                                seeder.seed(stream);
+                            });
+                    }
+                    Interface::DoNotDisturb => {
+                        let seeder = seeder.clone();
+                        let _ = service_dir.add_fidl_service(
+                            move |stream: DoNotDisturbRequestStream| {
+                                seeder.seed(stream);
+                            },
+                        );
+                    }
+                    Interface::FactoryReset => {
+                        let seeder = seeder.clone();
+                        let _ = service_dir.add_fidl_service(
+                            move |stream: FactoryResetRequestStream| {
+                                seeder.seed(stream);
+                            },
+                        );
+                    }
+                    Interface::Input => {
+                        let seeder = seeder.clone();
+                        let _ = service_dir.add_fidl_service(move |stream: InputRequestStream| {
                             seeder.seed(stream);
                         });
-                }
-                Interface::FactoryReset => {
-                    let seeder = seeder.clone();
-                    let _ =
-                        service_dir.add_fidl_service(move |stream: FactoryResetRequestStream| {
+                    }
+                    Interface::Intl => {
+                        let seeder = seeder.clone();
+                        let _ = service_dir.add_fidl_service(move |stream: IntlRequestStream| {
                             seeder.seed(stream);
                         });
+                    }
+                    Interface::Keyboard => {
+                        let seeder = seeder.clone();
+                        let _ =
+                            service_dir.add_fidl_service(move |stream: KeyboardRequestStream| {
+                                seeder.seed(stream);
+                            });
+                    }
+                    Interface::Light => {
+                        let seeder = seeder.clone();
+                        let _ = service_dir.add_fidl_service(move |stream: LightRequestStream| {
+                            seeder.seed(stream);
+                        });
+                    }
+                    Interface::NightMode => {
+                        let seeder = seeder.clone();
+                        let _ =
+                            service_dir.add_fidl_service(move |stream: NightModeRequestStream| {
+                                seeder.seed(stream);
+                            });
+                    }
+                    Interface::Privacy => {
+                        let seeder = seeder.clone();
+                        let _ =
+                            service_dir.add_fidl_service(move |stream: PrivacyRequestStream| {
+                                seeder.seed(stream);
+                            });
+                    }
+                    Interface::Setup => {
+                        let seeder = seeder.clone();
+                        let _ = service_dir.add_fidl_service(move |stream: SetupRequestStream| {
+                            seeder.seed(stream);
+                        });
+                    }
                 }
-                Interface::Input => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(move |stream: InputRequestStream| {
-                        seeder.seed(stream);
-                    });
-                }
-                Interface::Intl => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(move |stream: IntlRequestStream| {
-                        seeder.seed(stream);
-                    });
-                }
-                Interface::Keyboard => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(move |stream: KeyboardRequestStream| {
-                        seeder.seed(stream);
-                    });
-                }
-                Interface::Light => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(move |stream: LightRequestStream| {
-                        seeder.seed(stream);
-                    });
-                }
-                Interface::NightMode => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(move |stream: NightModeRequestStream| {
-                        seeder.seed(stream);
-                    });
-                }
-                Interface::Privacy => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(move |stream: PrivacyRequestStream| {
-                        seeder.seed(stream);
-                    });
-                }
-                Interface::Setup => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(move |stream: SetupRequestStream| {
-                        seeder.seed(stream);
-                    });
-                }
-            }
-        })
+            },
+        )
     }
 
     /// Derives a [Registrant] from this [Interface]. This is used convert a list of Interfaces
@@ -286,7 +295,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_fidl_seeder_bringup() {
-        let mut fs = ServiceFs::new();
+        let mut fs = ServiceFs::new_local();
         let delegate = service::MessageHub::create_hub();
         let job_manager_signature = Manager::spawn(&delegate).await;
         let job_seeder = Seeder::new(&delegate, job_manager_signature).await;
@@ -313,12 +322,12 @@ mod tests {
 
         // Spawn nested environment.
         let connector = fs.create_protocol_connector().expect("should create connector");
-        fasync::Task::spawn(fs.collect()).detach();
+        fasync::Task::local(fs.collect()).detach();
 
         // Connect to the Privacy interface and request watching.
         let privacy_proxy =
             connector.connect_to_protocol::<PrivacyMarker>().expect("should connect to protocol");
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             let _ = privacy_proxy.watch().await;
         })
         .detach();

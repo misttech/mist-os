@@ -3,4 +3,9 @@
 // found in the LICENSE file.
 {
     include: [ "//src/power/shutdown-shim/meta/shutdown-shim.base.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/shutdown-shim",
+        lifecycle: { stop_event: "notify" },
+    },
 }

@@ -61,6 +61,7 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   zx_status_t SdioGetDevHwInfo(uint8_t fn_idx, sdio_hw_info_t* out_hw_info) TA_EXCL(lock_);
   zx_status_t SdioEnableFn(uint8_t fn_idx) TA_EXCL(lock_);
   zx_status_t SdioDisableFn(uint8_t fn_idx) TA_EXCL(lock_);
+  zx_status_t SdioIoReady(uint8_t fn_idx, bool* out_ready) TA_EXCL(lock_);
   zx_status_t SdioEnableFnIntr(uint8_t fn_idx) TA_EXCL(lock_);
   zx_status_t SdioDisableFnIntr(uint8_t fn_idx) TA_EXCL(lock_);
   zx_status_t SdioUpdateBlockSize(uint8_t fn_idx, uint16_t blk_sz, bool deflt) TA_EXCL(lock_);

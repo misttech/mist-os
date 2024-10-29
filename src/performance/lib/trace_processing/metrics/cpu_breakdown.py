@@ -3,221 +3,62 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import itertools
-import logging
-import sys
-from typing import Any
-
-from trace_processing import trace_metrics, trace_model, trace_time
-
-_LOGGER: logging.Logger = logging.getLogger("CpuBreakdownMetricsProcessor")
-
-# Default cut-off for the percentage CPU. Any process that has CPU below this
-# won't be listed in the results. User can pass in a cutoff.
-DEFAULT_PERCENT_CUTOFF = 0.0
+from trace_processing import trace_metrics, trace_model
+from trace_processing.metrics import cpu
 
 
-class CpuBreakdownMetricsProcessor:
+# TODO(b/375257864): Delete this file once cross-repo deps are migrated to cpu
+class CpuBreakdownMetricsProcessor(trace_metrics.MetricsProcessor):
     """
     Breaks down CPU metrics into a free-form metrics format.
     """
 
-    # TODO(b/373899149): Remove `model` param after switch to the new MetricsProcessor API.
     def __init__(
         self,
-        model: trace_model.Model | None = None,
-        percent_cutoff: float = DEFAULT_PERCENT_CUTOFF,
+        percent_cutoff: float = cpu._DEFAULT_PERCENT_CUTOFF,
     ) -> None:
-        self._model = model
-        self._percent_cutoff = percent_cutoff
-        # Maps TID to a dict of CPUs to total duration (ms) on that CPU.
-        # E.g. For a TID of 1001 with 3 CPUs, this would be:
-        #   {1001: {0: 1123.123, 1: 123123.123, 3: 1231.23}}
-        self._tid_to_durations: dict[int, dict[int, float]] = {}
-        self._tid_to_thread_name: dict[int, str] = {}
-        self._tid_to_process_name: dict[int, str] = {}
-        # Map of CPU to total duration used (ms).
-        self._cpu_to_total_duration: dict[int, float] = {}
-        self._cpu_to_skipped_duration: dict[int, float] = {}
-        self._min_timestamp: float = sys.float_info.max
-        self._max_timestamp: float = 0
-
-    def _calculate_duration_per_cpu(
-        self,
-        cpu: int,
-        records: list[trace_model.ContextSwitch],
-    ) -> None:
-        """
-        Calculates the total duration for each thread, on a particular CPU.
-
-        Uses a list of sorted ContextSwitch records to sum up the duration for each thread.
-        It's possible that consecutive records do not have matching incoming_tid and outgoing_tid.
-        """
-        smallest_timestamp = self._timestamp_ms(records[0].start)
-        if smallest_timestamp < self._min_timestamp:
-            self._min_timestamp = smallest_timestamp
-        largest_timestamp = self._timestamp_ms(records[-1].start)
-        if largest_timestamp > self._max_timestamp:
-            self._max_timestamp = largest_timestamp
-        total_duration = largest_timestamp - smallest_timestamp
-        skipped_duration = 0.0
-        self._cpu_to_total_duration[cpu] = total_duration
-
-        for prev_record, curr_record in itertools.pairwise(records):
-            # Check that the previous ContextSwitch's incoming_tid ("this thread is starting work
-            # on this CPU") matches the current ContextSwitch's outgoing_tid ("this thread is being
-            # switched away from"). If so, there is a duration to calculate. Otherwise, it means
-            # maybe there is skipped data or something.
-            if prev_record.tid != curr_record.outgoing_tid:
-                start_ts = self._timestamp_ms(prev_record.start)
-                stop_ts = self._timestamp_ms(curr_record.start)
-                skipped_duration += stop_ts - start_ts
-            # Purposely skip saving idle thread durations.
-            elif prev_record.is_idle():
-                continue
-            else:
-                start_ts = self._timestamp_ms(prev_record.start)
-                stop_ts = self._timestamp_ms(curr_record.start)
-                duration = stop_ts - start_ts
-                assert duration >= 0
-                if curr_record.outgoing_tid in self._tid_to_thread_name:
-                    # Add duration to the total duration for that tid and CPU.
-                    self._tid_to_durations.setdefault(
-                        curr_record.outgoing_tid, {}
-                    ).setdefault(cpu, 0)
-                    self._tid_to_durations[curr_record.outgoing_tid][
-                        cpu
-                    ] += duration
-
-        if skipped_duration > 0:
-            self._cpu_to_skipped_duration[cpu] = skipped_duration
-
-    @staticmethod
-    def _timestamp_ms(timestamp: trace_time.TimePoint) -> float:
-        """
-        Return timestamp in ms.
-        """
-        return timestamp.to_epoch_delta().to_milliseconds_f()
-
-    def process_metrics_and_get_total_time(
-        self, model: trace_model.Model
-    ) -> tuple[list[dict[str, trace_metrics.JsonType]], float]:
-        breakdown = self.process_freeform_metrics(model)
-        total_time: float = self._max_timestamp - self._min_timestamp
-        return breakdown, total_time
-
-    def _merge(self, a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "process_name": a["process_name"],
-            "cpu": a["cpu"],
-            "duration": a["duration"] + b["duration"],
-            "percent": a["percent"] + b["percent"],
-        }
-
-    def process_metrics(self) -> list[dict[str, trace_metrics.JsonType]]:
-        """
-        Given TraceModel, iterates through all the SchedulingRecords and calculates the duration
-        for each Process's Threads, and saves them by CPU.
-
-        TODO(b/373899149): Switch to the new MetricsProcessor API.
-        """
-        assert self._model
-        return self.process_freeform_metrics(self._model)
+        self._processor = cpu.CpuMetricsProcessor(percent_cutoff=percent_cutoff)
 
     def process_freeform_metrics(
         self, model: trace_model.Model
     ) -> list[dict[str, trace_metrics.JsonType]]:
         """
-        Given TraceModel, iterates through all the SchedulingRecords and calculates the duration
-        for each Process's Threads, and saves them by CPU.
+        Given trace_model.Model, iterates through all the SchedulingRecords and calculates the
+        duration for each Process's Threads, and saves them by CPU.
 
         Args:
             model: The input trace model.
 
         Returns:
-            list[dict[str, Any]]: Data structure of metrics that can be directly converted to JSON.
+            list[dict[str, trace_metrics.JsonType]]: Data structure of metrics that can be directly
+                                                     converted to JSON.
         """
-        # Map tids to names.
-        for p in model.processes:
-            for t in p.threads:
-                self._tid_to_process_name[t.tid] = p.name
-                self._tid_to_thread_name[t.tid] = t.name
+        (breakdown, _) = self.process_metrics_and_get_total_time(model)
+        return breakdown
 
-        # Calculate durations for each CPU for each tid.
-        for cpu, records in model.scheduling_records.items():
-            self._calculate_duration_per_cpu(
-                cpu,
-                sorted(
-                    (
-                        r
-                        for r in records
-                        if isinstance(r, trace_model.ContextSwitch)
-                    ),
-                    key=lambda record: record.start,
-                ),
-            )
-
-        # Calculate the percent of time the thread spent on this CPU,
-        # compared to the total CPU duration.
-        # If the percent spent is at or above our cutoff, add metric to
-        # breakdown.
-        full_breakdown: list[dict[str, trace_metrics.JsonType]] = []
-        for tid, breakdown in self._tid_to_durations.items():
-            if tid in self._tid_to_thread_name:
-                for cpu, duration in breakdown.items():
-                    percent = duration / self._cpu_to_total_duration[cpu] * 100
-                    if percent >= self._percent_cutoff:
-                        metric: dict[str, trace_metrics.JsonType] = {
-                            "process_name": self._tid_to_process_name[tid],
-                            "thread_name": self._tid_to_thread_name[tid],
-                            "tid": tid,
-                            "cpu": cpu,
-                            "percent": percent,
-                            "duration": duration,
-                        }
-                        full_breakdown.append(metric)
-
-        if self._cpu_to_skipped_duration:
-            _LOGGER.warning(
-                "Possibly missing ContextSwitch record(s) in trace for these CPUs and durations: %s"
-                % self._cpu_to_skipped_duration
-            )
-
-        # Sort metrics by CPU (desc) and percent (desc).
-        full_breakdown.sort(
-            key=lambda m: (m["cpu"], m["percent"]),
-            reverse=True,
-        )
-        return full_breakdown
-
-    def group_by_process_name(
-        self, breakdown: list[dict[str, trace_metrics.JsonType]]
-    ) -> list[dict[str, trace_metrics.JsonType]]:
+    def process_metrics_and_get_total_time(
+        self, model: trace_model.Model
+    ) -> tuple[list[dict[str, trace_metrics.JsonType]], float]:
         """
-        Given a breakdown, group the metrics by process_name only,
-        ignoring thread name.
-        """
-        consolidated_breakdown: list[dict[str, trace_metrics.JsonType]] = []
-        breakdown.sort(key=lambda m: (m["cpu"], m["process_name"]))
-        if not breakdown:
-            return []
-        consolidated_breakdown = [breakdown[0]]
-        for metric in breakdown[1:]:
-            if (
-                metric["cpu"] == consolidated_breakdown[-1]["cpu"]
-                and metric["process_name"]
-                == consolidated_breakdown[-1]["process_name"]
-            ):
-                consolidated_breakdown[-1] = self._merge(
-                    metric, consolidated_breakdown[-1]
-                )
-            else:
-                metric.pop("thread_name", None)
-                metric.pop("tid", None)
-                consolidated_breakdown.append(metric)
+        Given trace_model.Model, iterates through all the SchedulingRecords and calculates the
+        duration for each Process's Threads, and saves them by CPU.
 
-        return sorted(
-            consolidated_breakdown,
-            key=lambda m: (m["cpu"], m["percent"]),
-            reverse=True,
-        )
+        Args:
+            model: The input trace model.
+
+        Returns:
+            list[dict[str, trace_metrics.JsonType]]: Data structure of metrics that can be directly
+                                                     converted to JSON.
+            float: The total duration of the trace.
+        """
+        return self._processor.process_metrics_and_get_total_time(model)
+
+
+def group_by_process_name(
+    breakdown: list[dict[str, trace_metrics.JsonType]]
+) -> list[dict[str, trace_metrics.JsonType]]:
+    """
+    Given a breakdown, group the metrics by process_name only,
+    ignoring thread name.
+    """
+    return cpu.group_by_process_name(breakdown)

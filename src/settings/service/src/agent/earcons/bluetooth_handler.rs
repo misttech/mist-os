@@ -105,7 +105,7 @@ impl BluetoothHandler {
         let common_earcons_params = self.common_earcons_params.clone();
         let messenger = self.messenger.clone();
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             loop {
                 let maybe_req = watcher_requests.try_next().await;
                 match maybe_req {
@@ -131,7 +131,7 @@ impl BluetoothHandler {
                                 let publisher = publisher.clone();
                                 let common_earcons_params = common_earcons_params.clone();
                                 let messenger = messenger.clone();
-                                fasync::Task::spawn(async move {
+                                fasync::Task::local(async move {
                                     play_bluetooth_sound(
                                         common_earcons_params,
                                         publisher,
@@ -162,7 +162,7 @@ impl BluetoothHandler {
                                 let publisher = publisher.clone();
                                 let common_earcons_params = common_earcons_params.clone();
                                 let messenger = messenger.clone();
-                                fasync::Task::spawn(async move {
+                                fasync::Task::local(async move {
                                     play_bluetooth_sound(
                                         common_earcons_params,
                                         publisher,

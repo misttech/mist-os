@@ -23,7 +23,7 @@ use fuchsia_inspect::component;
 use futures::lock::Mutex;
 use settings_storage::device_storage::DeviceStorage;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::Status;
 
 const ENV_NAME: &str = "settings_service_audio_test_environment";
@@ -46,7 +46,7 @@ fn changed_media_stream_settings() -> AudioStreamSettings {
 
 fn default_audio_info() -> DefaultSetting<AudioInfo, &'static str> {
     let config_logger =
-        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+        Rc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
     build_audio_default_settings(config_logger)
 }
 
@@ -58,7 +58,7 @@ fn load_default_audio_info(
 
 /// Creates an environment that will fail on a get request.
 async fn create_audio_test_env_with_failures(
-    storage_factory: Arc<InMemoryStorageFactory>,
+    storage_factory: Rc<InMemoryStorageFactory>,
 ) -> AudioProxy {
     create_test_env_with_failures_and_config(
         storage_factory,
@@ -76,7 +76,7 @@ async fn create_audio_test_env_with_failures(
 // To add a new fake to these tests, add here, in create_services, and then use
 // in your test.
 struct FakeServices {
-    audio_core: Arc<Mutex<AudioCoreService>>,
+    audio_core: Rc<Mutex<AudioCoreService>>,
 }
 
 fn get_default_stream(stream_type: AudioStreamType, info: AudioInfo) -> AudioStream {
@@ -97,7 +97,7 @@ fn verify_audio_stream(settings: &AudioSettings, stream: AudioStreamSettings) {
 // Returns a registry and audio related services it is populated with
 async fn create_services(
     default_settings: AudioInfo,
-) -> (Arc<Mutex<ServiceRegistry>>, FakeServices) {
+) -> (Rc<Mutex<ServiceRegistry>>, FakeServices) {
     let service_registry = ServiceRegistry::create();
     let audio_core_service_handle = audio_core_service::Builder::new(default_settings).build();
     service_registry.lock().await.register_service(audio_core_service_handle.clone());
@@ -106,14 +106,14 @@ async fn create_services(
 }
 
 async fn create_environment(
-    service_registry: Arc<Mutex<ServiceRegistry>>,
+    service_registry: Rc<Mutex<ServiceRegistry>>,
     mut default_settings: DefaultSetting<AudioInfo, &'static str>,
-) -> (ProtocolConnector, Arc<DeviceStorage>) {
-    let storage_factory = Arc::new(InMemoryStorageFactory::with_initial_data(
+) -> (ProtocolConnector, Rc<DeviceStorage>) {
+    let storage_factory = Rc::new(InMemoryStorageFactory::with_initial_data(
         &load_default_audio_info(&mut default_settings),
     ));
 
-    let connector = EnvironmentBuilder::new(Arc::clone(&storage_factory))
+    let connector = EnvironmentBuilder::new(Rc::clone(&storage_factory))
         .service(ServiceRegistry::serve(service_registry))
         .fidl_interfaces(&[Interface::Audio])
         .audio_configuration(default_settings)
@@ -139,7 +139,7 @@ async fn test_volume_restore() {
     }
 
     let storage_factory = InMemoryStorageFactory::with_initial_data(&stored_info);
-    assert!(EnvironmentBuilder::new(Arc::new(storage_factory))
+    assert!(EnvironmentBuilder::new(Rc::new(storage_factory))
         .service(Box::new(ServiceRegistry::serve(service_registry)))
         .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Audio])
@@ -216,7 +216,7 @@ async fn test_persisted_values_applied_at_start() {
 
     let storage_factory = InMemoryStorageFactory::with_initial_data(&test_audio_info);
 
-    let env = EnvironmentBuilder::new(Arc::new(storage_factory))
+    let env = EnvironmentBuilder::new(Rc::new(storage_factory))
         .service(ServiceRegistry::serve(service_registry))
         .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Audio])
@@ -248,7 +248,7 @@ async fn test_persisted_values_applied_at_start() {
 #[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let audio_proxy =
-        create_audio_test_env_with_failures(Arc::new(InMemoryStorageFactory::new())).await;
+        create_audio_test_env_with_failures(Rc::new(InMemoryStorageFactory::new())).await;
     let result = audio_proxy.watch().await;
     assert_matches!(result, Err(ClientChannelClosed { status: Status::UNAVAILABLE, .. }));
 }
@@ -308,7 +308,7 @@ async fn test_invalid_stream_fails() {
 
     // Start the environment with the hand-crafted data.
     let storage_factory = InMemoryStorageFactory::with_initial_data(&test_audio_info);
-    let env = EnvironmentBuilder::new(Arc::new(storage_factory))
+    let env = EnvironmentBuilder::new(Rc::new(storage_factory))
         .service(ServiceRegistry::serve(service_registry))
         .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Audio])

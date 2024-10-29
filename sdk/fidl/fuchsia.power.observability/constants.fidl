@@ -28,10 +28,10 @@ const SUSPEND_STATS_NODE string = "suspend_stats";
 /// Timestamp in nanos at which suspend was attempted.
 const SUSPEND_ATTEMPTED_AT string = "attempted_at_ns";
 
-/// Timestamp in nanos at which a resume happened.
+/// Timestamp in nanos for resume, after a successful suspend.
 const SUSPEND_RESUMED_AT string = "resumed_at_ns";
 
-/// Timestamp in nanos at which suspend failed.
+/// Timestamp in nanos for resume, after an unsuccessful suspend.
 const SUSPEND_FAILED_AT string = "failed_at_ns";
 
 /// The duration of time last spent in suspend.

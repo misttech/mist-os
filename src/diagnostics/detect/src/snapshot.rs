@@ -12,7 +12,8 @@ use tracing::{error, warn};
 use {fidl_fuchsia_feedback as fidl_feedback, fuchsia_async as fasync};
 
 // Name of the crash-report product we're filing against.
-const CRASH_PRODUCT_NAME: &'static str = "FuchsiaDetect";
+const CRASH_PRODUCT_NAME: &str = "FuchsiaDetect";
+
 // CRASH_PROGRAM_NAME serves two purposes:
 // 1) It is sent with the crash report. It may show up on the server as
 //   "process type".
@@ -70,14 +71,14 @@ where
     pub async fn build(self) -> Result<CrashReportHandler, Error> {
         // Proxy is only pre-set for tests. If a proxy was not specified,
         // this is a good time to configure for our crash reporting product.
-        if matches!(self.proxy, None) {
+        if self.proxy.is_none() {
             let config_proxy =
                 connect_to_protocol::<fidl_feedback::CrashReportingProductRegisterMarker>()?;
             let product_config = fidl_feedback::CrashReportingProduct {
                 name: Some(CRASH_PRODUCT_NAME.to_string()),
                 ..Default::default()
             };
-            config_proxy.upsert_with_ack(&CRASH_PROGRAM_NAME.to_string(), &product_config).await?;
+            config_proxy.upsert_with_ack(CRASH_PROGRAM_NAME, &product_config).await?;
         }
         // Connect to the CrashReporter service if a proxy wasn't specified
         let proxy =

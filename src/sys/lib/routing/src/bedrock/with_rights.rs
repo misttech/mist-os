@@ -9,21 +9,21 @@ use async_trait::async_trait;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
-use sandbox::{Capability, Request, Router};
+use sandbox::{CapabilityBound, Request, Routable, Router, RouterResponse};
 
-struct RightsRouter {
-    router: Router,
+struct RightsRouter<T: CapabilityBound> {
+    router: Router<T>,
     rights: Rights,
     moniker: ExtendedMoniker,
 }
 
 #[async_trait]
-impl sandbox::Routable for RightsRouter {
+impl<T: CapabilityBound> Routable<T> for RightsRouter<T> {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<Capability, RouterError> {
+    ) -> Result<RouterResponse<T>, router_error::RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let RightsRouter { router, rights, moniker } = self;
         let request_rights =
@@ -42,12 +42,12 @@ impl sandbox::Routable for RightsRouter {
 pub trait WithRights {
     /// Returns a router that ensures the capability request does not request
     /// greater rights than provided at this stage of the route.
-    fn with_rights(self, moniker: impl Into<ExtendedMoniker>, rights: Rights) -> Router;
+    fn with_rights(self, moniker: impl Into<ExtendedMoniker>, rights: Rights) -> Self;
 }
 
-impl WithRights for Router {
-    fn with_rights(self, moniker: impl Into<ExtendedMoniker>, rights: Rights) -> Router {
-        Router::new(RightsRouter { rights, router: self, moniker: moniker.into() })
+impl<T: CapabilityBound> WithRights for Router<T> {
+    fn with_rights(self, moniker: impl Into<ExtendedMoniker>, rights: Rights) -> Self {
+        Router::<T>::new(RightsRouter { rights, router: self, moniker: moniker.into() })
     }
 }
 
@@ -57,7 +57,7 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
     use router_error::{DowncastErrorForTest, RouterError};
-    use sandbox::{Capability, Data, Dict, WeakInstanceToken};
+    use sandbox::{Data, Dict, WeakInstanceToken};
     use std::sync::Arc;
 
     #[derive(Debug)]
@@ -77,8 +77,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn rights_good() {
-        let source: Capability = Data::String("hello".to_string()).into();
-        let base = Router::new(source);
+        let source = Data::String("hello".to_string());
+        let base = Router::<Data>::new_ok(source);
         let proxy = base.with_rights(ExtendedMoniker::ComponentManager, fio::RW_STAR_DIR.into());
         let metadata = Dict::new();
         metadata.set_rights(fio::R_STAR_DIR.into());
@@ -87,7 +87,7 @@ mod tests {
             .await
             .unwrap();
         let capability = match capability {
-            Capability::Data(d) => d,
+            RouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
         assert_eq!(capability, Data::String("hello".to_string()));
@@ -95,8 +95,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn rights_bad() {
-        let source: Capability = Data::String("hello".to_string()).into();
-        let base = Router::new(source);
+        let source = Data::String("hello".to_string());
+        let base = Router::<Data>::new_ok(source);
         let proxy = base.with_rights(ExtendedMoniker::ComponentManager, fio::R_STAR_DIR.into());
         let metadata = Dict::new();
         metadata.set_rights(fio::RW_STAR_DIR.into());

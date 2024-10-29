@@ -249,8 +249,8 @@ mod tests {
         let mut fs = ServiceFs::new();
         fs.dir("svc")
             .add_fidl_service(IncomingServices::I2cDevice)
-            .add_unified_service(IncomingServices::I2cDefaultService)
-            .add_unified_service_instance("other", IncomingServices::I2cOtherService);
+            .add_fidl_service_instance("default", IncomingServices::I2cDefaultService)
+            .add_fidl_service_instance("other", IncomingServices::I2cOtherService);
         fs.serve_connection(server).expect("error serving handle");
 
         Task::spawn(fs.for_each_concurrent(100, IncomingServices::handle)).detach_on_drop();

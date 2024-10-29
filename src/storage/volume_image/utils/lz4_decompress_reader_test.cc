@@ -4,10 +4,10 @@
 
 #include "src/storage/volume_image/utils/lz4_decompress_reader.h"
 
-#include <lib/stdcompat/span.h>
 #include <sys/types.h>
 
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 #include <gmock/gmock.h>
@@ -63,11 +63,11 @@ constexpr std::string_view kLoremIpsum =
     donec massa sapien faucibus et.)";
 
 fpromise::result<std::vector<uint8_t>, std::string> CompressedData(
-    cpp20::span<const uint8_t> source_data) {
+    std::span<const uint8_t> source_data) {
   std::vector<uint8_t> compressed_data;
   Lz4Compressor compressor;
   if (auto result =
-          compressor.Prepare([&compressed_data](cpp20::span<const uint8_t> compressed_chunk) {
+          compressor.Prepare([&compressed_data](std::span<const uint8_t> compressed_chunk) {
             compressed_data.insert(compressed_data.end(), compressed_chunk.begin(),
                                    compressed_chunk.end());
             return fpromise::ok();
@@ -94,8 +94,7 @@ class FakeReader : public Reader {
 
   uint64_t length() const final { return data_.size(); }
 
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     if (buffer.empty()) {
       return fpromise::ok();
     }
@@ -116,7 +115,7 @@ constexpr uint64_t kMaxBufferLength = kUncompressedDataPrefix + 1;
 // constexpr uint64_t kMaxReadBufferLength = kUncompressedDataPrefix / 3;
 
 fpromise::result<std::vector<uint8_t>, std::string> GetData() {
-  auto data_or = CompressedData(cpp20::span<const uint8_t>(
+  auto data_or = CompressedData(std::span<const uint8_t>(
       reinterpret_cast<const uint8_t*>(kLoremIpsum.data()), kLoremIpsum.size()));
   if (data_or.is_error()) {
     return data_or.take_error_result();
@@ -128,7 +127,7 @@ fpromise::result<std::vector<uint8_t>, std::string> GetData() {
 }
 
 void CheckRangeMatch(uint64_t offset, const Reader& reader,
-                     cpp20::span<const uint8_t> expected_data) {
+                     std::span<const uint8_t> expected_data) {
   uint64_t bytes_to_read = reader.length() - offset;
   if (bytes_to_read > expected_data.size()) {
     bytes_to_read = expected_data.size();
@@ -158,7 +157,7 @@ TEST(Lz4DecompressReaderTest, ReadingUncompressedAreaIsOk) {
   auto init_result = decompressed_reader.Initialize(kMaxBufferLength);
   ASSERT_TRUE(init_result.is_ok()) << init_result.error();
 
-  auto view = cpp20::span<uint8_t>(data);
+  auto view = std::span<uint8_t>(data);
 
   // Read part of uncompressed data only.
   ASSERT_NO_FATAL_FAILURE(
@@ -180,8 +179,8 @@ TEST(Lz4DecompressReaderTest, ReadingCompressedAreaIsOk) {
   auto init_result = decompressed_reader.Initialize(kMaxBufferLength);
   ASSERT_TRUE(init_result.is_ok()) << init_result.error();
 
-  auto lorem_ipsum = cpp20::span<const uint8_t>(
-      reinterpret_cast<const uint8_t*>(kLoremIpsum.data()), kLoremIpsum.size());
+  auto lorem_ipsum = std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(kLoremIpsum.data()),
+                                              kLoremIpsum.size());
 
   // Random chunk.
   ASSERT_NO_FATAL_FAILURE(CheckRangeMatch(kUncompressedDataPrefix + 500, decompressed_reader,
@@ -233,7 +232,7 @@ TEST(Lz4DecompressReaderTest, DecompressingSparseFvmIsOk) {
 
   // Read the header.
   fvm::SparseImage header;
-  cpp20::span<uint8_t> header_buffer(reinterpret_cast<uint8_t*>(&header), sizeof(header));
+  std::span<uint8_t> header_buffer(reinterpret_cast<uint8_t*>(&header), sizeof(header));
   auto header_read_result = compressed_reader.Read(0, header_buffer);
   ASSERT_TRUE(header_read_result.is_ok()) << header_read_result.error();
 
@@ -268,12 +267,12 @@ TEST(Lz4DecompressReaderTest, DecompressingSparseFvmIsOk) {
       bytes_to_read = decompressed_reader.length() - read_bytes;
     }
     auto actual_decompressed_view =
-        cpp20::span<uint8_t>(actual_decompressed_buffer).subspan(0, bytes_to_read);
+        std::span<uint8_t>(actual_decompressed_buffer).subspan(0, bytes_to_read);
     auto read_result = decompressed_reader.Read(read_bytes, actual_decompressed_view);
     ASSERT_TRUE(read_result.is_ok()) << read_result.error();
 
     auto expected_decompressed_view =
-        cpp20::span<uint8_t>(expected_decompressed_buffer).subspan(0, bytes_to_read);
+        std::span<uint8_t>(expected_decompressed_buffer).subspan(0, bytes_to_read);
     auto expected_read_result =
         expected_decompressed_reader.Read(read_bytes, expected_decompressed_view);
     ASSERT_TRUE(expected_read_result.is_ok()) << expected_read_result.error();

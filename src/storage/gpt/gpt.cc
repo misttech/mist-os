@@ -674,7 +674,7 @@ zx::result<std::unique_ptr<GptDevice>> GptDevice::Init(
     std::unique_ptr<block_client::BlockDevice> device, uint32_t blocksize, uint64_t block_count) {
   off_t offset;
 
-  uint8_t block[blocksize];
+  auto block = std::make_unique<uint8_t[]>(blocksize);
 
   if (blocksize < kMinimumBlockSize) {
     G_PRINTF("blocksize < %u not supported\n", kMinimumBlockSize);
@@ -688,7 +688,7 @@ zx::result<std::unique_ptr<GptDevice>> GptDevice::Init(
 
   offset = 0;
   block_client::Reader reader(*device);
-  if (zx_status_t status = reader.Read(offset, blocksize, block); status != ZX_OK) {
+  if (zx_status_t status = reader.Read(offset, blocksize, block.get()); status != ZX_OK) {
     G_PRINTF("Failed to read %u @ %lld: %s\n", blocksize, offset, zx_status_get_string(status));
     return zx::error(ZX_ERR_IO);
   }
@@ -900,8 +900,8 @@ zx_status_t GptDevice::ClearPartition(uint64_t offset, uint64_t blocks) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  char zero[blocksize_];
-  memset(zero, 0, sizeof(zero));
+  auto zero = std::make_unique<char[]>(blocksize_);
+  memset(zero.get(), 0, blocksize_);
 
   for (size_t i = first; i <= last; i++) {
     off_t offset;
@@ -910,7 +910,7 @@ zx_status_t GptDevice::ClearPartition(uint64_t offset, uint64_t blocks) {
     }
 
     block_client::Writer writer(*device_);
-    zx_status_t status = writer.Write(offset, blocksize_, zero);
+    zx_status_t status = writer.Write(offset, blocksize_, zero.get());
     if (status != ZX_OK) {
       G_PRINTF("Failed to write to block %zu; errno: %d\n", i, status);
       return ZX_ERR_IO;

@@ -235,7 +235,7 @@ async fn show_component_does_not_exist() {
         "doesnt_exist",
     ])
     .await;
-    assert_matches!(result, Ok(s) if s == "");
+    assert_matches!(result, Ok(s) if s.is_empty());
 }
 
 #[fuchsia::test]

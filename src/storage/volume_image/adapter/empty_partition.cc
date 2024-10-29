@@ -20,8 +20,7 @@ class DummyReader final : public Reader {
  public:
   uint64_t length() const final { return std::numeric_limits<uint64_t>::max(); }
 
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     return fpromise::ok();
   }
 };

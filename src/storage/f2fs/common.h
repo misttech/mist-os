@@ -5,19 +5,27 @@
 #ifndef SRC_STORAGE_F2FS_COMMON_H_
 #define SRC_STORAGE_F2FS_COMMON_H_
 
+#include <lib/fit/function.h>
+#include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
+#include <lib/zircon-internal/thread_annotations.h>
+#include <lib/zx/result.h>
 #include <sys/types.h>
-#include <zircon/listnode.h>
+#include <zircon/assert.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <fbl/macros.h>
 #include <fbl/no_destructor.h>
+#include <fbl/ref_ptr.h>
 #include <safemath/checked_math.h>
 
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
-#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace f2fs {
 
-class Page;
 class VnodeF2fs;
 
 using block_t = uint32_t;
@@ -27,8 +35,6 @@ using ino_t = uint32_t;
 using pgoff_t = uint64_t;
 using umode_t = uint16_t;
 using VnodeCallback = fit::function<zx_status_t(fbl::RefPtr<VnodeF2fs> &)>;
-using PageCallback = fit::function<zx_status_t(fbl::RefPtr<Page>)>;
-using PageTaggingCallback = fit::function<zx_status_t(fbl::RefPtr<Page>, bool is_last_page)>;
 using SyncCallback = fs::Vnode::SyncCallback;
 
 // A async_dispatcher_t* is needed for some functions on Fuchsia only. In order to avoid ifdefs on
@@ -44,7 +50,6 @@ using FuchsiaDispatcher = async_dispatcher_t *;
 //
 // Prefer using the appropriate vfs when the function is only used for one or the other.
 using PlatformVfs = fs::PagedVfs;
-using PageList = fbl::SizedDoublyLinkedList<fbl::RefPtr<Page>>;
 
 #if BYTE_ORDER == BIG_ENDIAN
 inline uint16_t LeToCpu(uint16_t x) { return SWAP_16(x); }
@@ -71,6 +76,16 @@ constexpr size_t kWriteTimeOut = 60;   // in seconds
 constexpr uint32_t kBlockSize = 4096;  // F2fs block size in byte
 constexpr block_t kNullAddr = 0x0U;
 constexpr block_t kNewAddr = -1U;
+// For INODE and NODE manager
+constexpr int kXattrNodeOffset = -1;
+// store xattrs to one node block per
+// file keeping -1 as its node offset to
+// distinguish from index node blocks.
+constexpr int kLinkMax = 32000;  // maximum link count per file
+
+// For readahead
+constexpr block_t kMaxReadaheadSize = 128;
+constexpr block_t kDefaultNodeReadSize = 16;
 
 // Checkpoint
 inline bool VerAfter(uint64_t a, uint64_t b) { return a > b; }
@@ -102,6 +117,23 @@ template <typename T>
 inline T CheckedDivRoundUp(const T n, const T d) {
   return safemath::CheckDiv<T>(fbl::round_up(n, d), d).ValueOrDie();
 }
+
+// The below are the page types.
+// The available types are:
+// kData         User data pages. It operates as async mode.
+// kNode         Node pages. It operates as async mode.
+// kMeta         FS metadata pages such as SIT, NAT, CP.
+// kNrPageType   The number of page types.
+// kMetaFlush    Make sure the previous pages are written
+//               with waiting the bio's completion
+// ...           Only can be used with META.
+enum class PageType {
+  kData = 0,
+  kNode,
+  kMeta,
+  kNrPageType,
+  kMetaFlush,
+};
 
 template <typename T = uint8_t>
 class BlockBuffer {

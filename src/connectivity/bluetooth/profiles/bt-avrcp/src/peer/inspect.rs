@@ -4,7 +4,7 @@
 
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect_contrib::inspect_log;
-use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt, TimeProperty};
+use fuchsia_inspect_contrib::nodes::{BoundedListNode, MonotonicTimeProperty, NodeTimeExt};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
@@ -22,7 +22,7 @@ pub struct RemotePeerInspect {
     target_info: Option<BoundedListNode>,
     controller_info: Option<BoundedListNode>,
     /// The last known connected time.
-    last_connected: Option<TimeProperty>,
+    last_connected: Option<MonotonicTimeProperty>,
     /// The shared node used to record cumulative metrics about any discovered peer.
     metrics_node: MetricsNode,
     inspect_node: inspect::Node,

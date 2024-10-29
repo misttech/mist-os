@@ -14,14 +14,12 @@ use fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy};
 use fidl_fuchsia_io::{self as fio};
 use fs_management::filesystem::{BlockConnector, DirBasedBlockConnector};
 use fs_management::format::{detect_disk_format, DiskFormat};
-use fuchsia_async::waker_list::WakerList;
+use fuchsia_async::condition::Condition;
 use fuchsia_component::client::connect_to_protocol_at_path;
 use ramdevice_client::RamdiskClient;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::future::poll_fn;
-use std::pin::pin;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::task::Poll;
 
 #[async_trait]
@@ -619,14 +617,11 @@ impl BlockConnector for RamdiskDeviceBlockConnector {
 
 /// RegisteredDevices keeps track of significant devices so that they can be found later as
 /// required.  Devices can be associated with a tag.
-pub struct RegisteredDevices {
-    map: Mutex<HashMap<DeviceTag, Box<dyn Device>>>,
-    waker_list: WakerList,
-}
+pub struct RegisteredDevices(Condition<HashMap<DeviceTag, Box<dyn Device>>>);
 
 impl Default for RegisteredDevices {
     fn default() -> Self {
-        Self { map: Mutex::default(), waker_list: WakerList::new() }
+        Self(Condition::new(HashMap::default()))
     }
 }
 
@@ -634,18 +629,18 @@ impl RegisteredDevices {
     /// Registers a device with the specified tag.  This *only* registers the first device with the
     /// tag.
     pub fn register_device(&self, tag: DeviceTag, device: Box<dyn Device>) {
-        let mut map = self.map.lock().unwrap();
+        let mut map = self.0.lock();
         if let Entry::Vacant(v) = map.entry(tag) {
             v.insert(device);
         }
-        for waker in self.waker_list.drain() {
+        for waker in map.drain_wakers() {
             waker.wake();
         }
     }
 
     /// Returns the topological path for the device with the specified tag, if registered.
     pub fn get_topological_path(&self, tag: DeviceTag) -> Option<String> {
-        self.map.lock().unwrap().get(&tag).map(|d| d.topological_path().to_string())
+        self.0.lock().get(&tag).map(|d| d.topological_path().to_string())
     }
 
     /// Returns a block_connector for the device with the specified tag.  This will wait till the
@@ -654,16 +649,9 @@ impl RegisteredDevices {
         &self,
         tag: DeviceTag,
     ) -> Result<Box<dyn BlockConnector>, Error> {
-        let mut entry = pin!(self.waker_list.new_entry());
-        poll_fn(|cx| {
-            let map = self.map.lock().unwrap();
-            if let Some(device) = map.get(&tag) {
-                return Poll::Ready(device.block_connector());
-            }
-            entry.as_mut().add(cx.waker().clone());
-            Poll::Pending
-        })
-        .await
+        self.0
+            .when(|map| map.get(&tag).map_or(Poll::Pending, |d| Poll::Ready(d.block_connector())))
+            .await
     }
 }
 

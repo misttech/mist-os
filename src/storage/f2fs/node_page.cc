@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/node_page.h"
+
+#include "src/storage/f2fs/common.h"
+#include "src/storage/f2fs/node.h"
 
 namespace f2fs {
 void NodePage::FillNodeFooter(nid_t nid, nid_t ino, size_t ofs) {

@@ -232,7 +232,17 @@ func (r *Repository) PrefetchUncompressedBlobs(
 			return err
 		}
 
-		blobs_to_decompress = append(blobs_to_decompress, path)
+		// Only decompress a blob if uncompressed blob does not exist, don't call BlobPath because
+		// that might decompress the blob for us, but we want to decompress all blobs in one ffx
+		// command so that it can be run in parallel.
+		_, err = os.Stat(filepath.Join(r.blobStore.Dir(), merkle.String()))
+		if err != nil {
+			blobs_to_decompress = append(blobs_to_decompress, path)
+		}
+	}
+
+	if len(blobs_to_decompress) == 0 {
+		return nil
 	}
 
 	return r.ffx.DecompressBlobs(ctx, blobs_to_decompress, r.blobStore.Dir())

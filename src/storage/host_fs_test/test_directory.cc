@@ -4,11 +4,11 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#include <lib/stdcompat/span.h>
 
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -26,8 +26,7 @@ struct ExpectedDirectoryEntry {
   unsigned char d_type;  // Same as the d_type entry from struct dirent.
 };
 
-void CheckDirectoryContents(const char* dirname,
-                            cpp20::span<const ExpectedDirectoryEntry> entries) {
+void CheckDirectoryContents(const char* dirname, std::span<const ExpectedDirectoryEntry> entries) {
   DIR* dir = emu_opendir(dirname);
   emu_rewinddir(dir);
   std::vector<bool> seen(entries.size());

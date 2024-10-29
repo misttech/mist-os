@@ -5,11 +5,12 @@
 use super::types::*;
 use super::MetadataValue;
 use crate::inspect_log;
-use crate::nodes::{BoundedListNode, NodeExt};
+use crate::nodes::{BoundedListNode, NodeTimeExt};
 use fuchsia_inspect::{self as inspect, InspectTypeReparentable};
+use fuchsia_sync::Mutex;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct MetaEventNode(inspect::Node);
 
@@ -61,17 +62,17 @@ where
 
     pub fn record_added(&self, id: &I, meta_event_node: MetaEventNode) {
         let meta_event_node = meta_event_node.take_node();
-        self.buffer.lock().unwrap().add_entry(|node| {
-            node.record_time("@time");
+        self.buffer.lock().add_entry(|node| {
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "add_vertex");
             node.record_string("vertex_id", id.get_id().as_ref());
-            let _ = meta_event_node.reparent(&node);
+            let _ = meta_event_node.reparent(node);
             node.record(meta_event_node);
         });
     }
 
     pub fn record_removed(&self, id: &str) {
-        let mut buffer = self.buffer.lock().unwrap();
+        let mut buffer = self.buffer.lock();
         inspect_log!(buffer, {
             event: "remove_vertex",
             vertex_id: id,
@@ -81,21 +82,21 @@ where
 
 impl GraphObjectEventTracker<EdgeMarker> {
     pub fn record_added(&self, from: &str, to: &str, id: u64, meta_event_node: MetaEventNode) {
-        let mut buffer = self.buffer.lock().unwrap();
+        let mut buffer = self.buffer.lock();
         let meta_event_node = meta_event_node.take_node();
         buffer.add_entry(|node| {
-            node.record_time("@time");
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "add_edge");
             node.record_string("from", from);
             node.record_string("to", to);
             node.record_uint("edge_id", id);
-            let _ = meta_event_node.reparent(&node);
+            let _ = meta_event_node.reparent(node);
             node.record(meta_event_node);
         });
     }
 
     pub fn record_removed(&self, id: u64) {
-        let mut buffer = self.buffer.lock().unwrap();
+        let mut buffer = self.buffer.lock();
         inspect_log!(buffer, {
             event: "remove_edge",
             edge_id: id,
@@ -108,20 +109,20 @@ where
     T: GraphObject,
 {
     pub fn metadata_updated(&self, id: &T::Id, key: &str, value: &MetadataValue<'_>) {
-        let mut buffer = self.buffer.lock().unwrap();
+        let mut buffer = self.buffer.lock();
         buffer.add_entry(|node| {
-            node.record_time("@time");
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "update_key");
             node.record_string("key", key);
-            value.record_inspect(&node, "update");
+            value.record_inspect(node, "update");
             T::write_to_node(node, id);
         });
     }
 
     pub fn metadata_dropped(&self, id: &T::Id, key: &str) {
-        let mut buffer = self.buffer.lock().unwrap();
+        let mut buffer = self.buffer.lock();
         buffer.add_entry(|node| {
-            node.record_time("@time");
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "drop_key");
             node.record_string("key", key);
             T::write_to_node(node, id);

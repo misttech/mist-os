@@ -97,7 +97,7 @@
 	canvas: canvas@ff638000{
 		compatible = "amlogic,canvas";
 		reg = <0x0 0xff638000 0x0 0x2000>;
-		iommus = <&dummy_iommu 2>;
+		iommus = <&dummy_iommu 12>;
 	};
 
 	clock: clock-controller@ff63c000 {
@@ -124,7 +124,7 @@
 			<GIC_SPI 89 GIC_IRQ_MODE_EDGE_RISING>,
 			<GIC_SPI 86 GIC_IRQ_MODE_EDGE_RISING>;
 		interrupt-names = "viu1-vsync", "rdma-done", "vdin1-write-done";
-		iommus = <&dummy_iommu 9>;
+		iommus = <&dummy_iommu 13>;
 		smcs = <2 1 0>;
 		gpios = <&gpio_expander 0 0>,
 			<&gpio A311D_GPIOH(2) 0>;

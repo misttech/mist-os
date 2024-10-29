@@ -63,13 +63,18 @@ using PowerModeMap = std::map<UfsPowerMode, std::pair<scsi::PowerCondition, Link
 // retrieve configuration information of the device.
 
 // Query requests and link-layer control should be sent from the DeviceManager.
+struct InspectProperties;
 class Ufs;
 class DeviceManager {
  public:
   static zx::result<std::unique_ptr<DeviceManager>> Create(
-      Ufs &controller, TransferRequestProcessor &transfer_request_processor);
-  explicit DeviceManager(Ufs &controller, TransferRequestProcessor &transfer_request_processor)
-      : controller_(controller), req_processor_(transfer_request_processor) {}
+      Ufs &controller, TransferRequestProcessor &transfer_request_processor,
+      InspectProperties &properties);
+  explicit DeviceManager(Ufs &controller, TransferRequestProcessor &transfer_request_processor,
+                         InspectProperties &properties)
+      : controller_(controller),
+        req_processor_(transfer_request_processor),
+        properties_(properties) {}
 
   // Device initialization.
   zx::result<> SendLinkStartUp();
@@ -136,6 +141,13 @@ class DeviceManager {
   zx::result<uint32_t> DmePeerGet(uint16_t mbi_attribute);
   zx::result<> DmeSet(uint16_t mbi_attribute, uint32_t value);
 
+  template <typename DescriptorReturnType>
+  zx::result<DescriptorReturnType> ReadDescriptor(DescriptorType descriptor, uint8_t index = 0);
+
+  zx::result<uint8_t> ReadFlag(Flags type);
+  zx::result<> SetFlag(Flags type);
+  zx::result<> ClearFlag(Flags type);
+
   zx::result<> SetPowerCondition(scsi::PowerCondition power_condition) TA_REQ(power_lock_);
 
   zx::result<bool> IsWriteBoosterBufferLifeTimeLeft();
@@ -145,6 +157,7 @@ class DeviceManager {
 
   Ufs &controller_;
   TransferRequestProcessor &req_processor_;
+  InspectProperties &properties_;
 
   DeviceDescriptor device_descriptor_;
   GeometryDescriptor geometry_descriptor_;

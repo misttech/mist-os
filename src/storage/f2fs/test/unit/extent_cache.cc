@@ -90,7 +90,7 @@ TEST_F(ExtentCacheTest, UpdateExtentCache) {
   ASSERT_EQ(extent_info->fofs, 0UL);
   ASSERT_EQ(extent_info->len, kNumPage);
 
-  auto path_or = GetNodePath(*file_, 0);
+  auto path_or = file_->GetNodePath(0);
   ASSERT_TRUE(path_or.is_ok());
   auto page_or = fs_->GetNodeManager().GetLockedDnodePage(*path_or, file_->IsDir());
   ASSERT_TRUE(page_or.is_ok());
@@ -160,7 +160,7 @@ TEST_F(ExtentCacheTest, Remount) {
   ASSERT_EQ(extent_info->fofs, 0UL);
   ASSERT_EQ(extent_info->len, kNumPage);
 
-  auto path_or = GetNodePath(*file_, 0);
+  auto path_or = file_->GetNodePath(0);
   ASSERT_TRUE(path_or.is_ok());
   auto page_or = fs_->GetNodeManager().GetLockedDnodePage(*path_or, file_->IsDir());
   ASSERT_TRUE(page_or.is_ok());
@@ -198,7 +198,7 @@ TEST_F(ExtentCacheTest, SplitAndMerge) TA_NO_THREAD_SAFETY_ANALYSIS {
     ASSERT_EQ(extent_info->len, kHolePos);
 
     // front
-    auto path_or = GetNodePath(*file_, 0);
+    auto path_or = file_->GetNodePath(0);
     ASSERT_TRUE(path_or.is_ok());
     auto page_or = fs_->GetNodeManager().GetLockedDnodePage(*path_or, file_->IsDir());
     ASSERT_TRUE(page_or.is_ok());
@@ -247,7 +247,7 @@ TEST_F(ExtentCacheTest, GcConsistency) {
 
   // Check extent cache before gc
   {
-    auto path_or = GetNodePath(*file_, 0);
+    auto path_or = file_->GetNodePath(0);
     ASSERT_TRUE(path_or.is_ok());
     auto page_or = fs_->GetNodeManager().GetLockedDnodePage(*path_or, file_->IsDir());
     ASSERT_TRUE(page_or.is_ok());
@@ -282,7 +282,7 @@ TEST_F(ExtentCacheTest, GcConsistency) {
 
   // Check extent cache after gc
   {
-    auto path_or = GetNodePath(*file_, 0);
+    auto path_or = file_->GetNodePath(0);
     ASSERT_TRUE(path_or.is_ok());
     auto page_or = fs_->GetNodeManager().GetLockedDnodePage(*path_or, file_->IsDir());
     ASSERT_TRUE(page_or.is_ok());
@@ -310,7 +310,7 @@ TEST_F(ExtentCacheTest, RecoveryConsistency) {
 
   // Check extent cache before modify
   {
-    auto path_or = GetNodePath(*file_, 0);
+    auto path_or = file_->GetNodePath(0);
     ASSERT_TRUE(path_or.is_ok());
     auto page_or = fs_->GetNodeManager().GetLockedDnodePage(*path_or, file_->IsDir());
     ASSERT_TRUE(page_or.is_ok());
@@ -342,7 +342,7 @@ TEST_F(ExtentCacheTest, RecoveryConsistency) {
 
   // Check extent cache after modify
   {
-    auto path_or = GetNodePath(*file_, 0);
+    auto path_or = file_->GetNodePath(0);
     ASSERT_TRUE(path_or.is_ok());
     auto page_or = fs_->GetNodeManager().GetLockedDnodePage(*path_or, file_->IsDir());
     ASSERT_TRUE(page_or.is_ok());

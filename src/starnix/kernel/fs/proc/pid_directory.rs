@@ -21,13 +21,13 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
+use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
+use starnix_types::time::duration_to_scheduler_clock;
 use starnix_uapi::auth::{Credentials, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::time::duration_to_scheduler_clock;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     errno, error, gid_t, off_t, pid_t, uapi, uid_t, OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN,

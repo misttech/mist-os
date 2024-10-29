@@ -6,16 +6,20 @@
 #
 # Parameters
 #
-#   name (optional)
-#     Name of the Go package.
+#   importpath (optional)
+#     The source import path of this library. Other libraries can import this
+#     library using this path.
 #     Defaults to "go.fuchsia.dev/fuchsia/${source_dir}".
 #
+#   name (optional)
+#     Alias to importpath for historical reasons.
+#
 #   name_file (optional)
-#     Path to a file containing the name of the Go package.
+#     Path to a file containing the importpath of the Go package.
 #     This should be used when the package's name requires some computation in
 #     its own build target.
 #
-#     NOTE: Exactly one of `name` or `name_file` may be set, but not both.
+#     NOTE: Exactly one of `importpath` or `name_file` may be set, but not both.
 #           If neither is set, then the target name is used.
 #
 #   source_dir (optional)
@@ -46,31 +50,7 @@ template("go_library") {
     source_dir = invoker.source_dir
   }
 
-  if (defined(invoker.name)) {
-    # All libraries should use the default `name` value, with just a couple
-    # exceptions:
-    assert(filter_exclude([ rebase_path(source_dir, "//") ],
-                          [
-                            # Third-party repositories must set `name` to the
-                            # canonical go package name.
-                            "third_party/*",
-
-                            # There's no standard naming scheme for libraries
-                            # that are generated at build time, so `name` must
-                            # be set.
-                            rebase_path(root_build_dir, "//") + "/*",
-
-                            # Required to support setting the `syzkaller_dir` GN
-                            # arg to point to a syzkaller checkout outside the
-                            # platform source tree.
-                            "../*",
-                          ]) == [],
-           "go_library name cannot be overridden")
-    name_args = [
-      "--name",
-      invoker.name,
-    ]
-  } else if (defined(invoker.name_file)) {
+  if (defined(invoker.name_file)) {
     # Make name_file a system-absolute path and add it to args.
     name_args = [
       "--name-file",
@@ -79,10 +59,54 @@ template("go_library") {
   } else {
     target_name_dir = get_label_info(":$target_name", "dir")
     source_dir = rebase_path(source_dir, target_name_dir)
-    name_args = [
-      "--name",
-      "go.fuchsia.dev/fuchsia/" + rebase_path(source_dir, "//"),
-    ]
+    default_importpath =
+        "go.fuchsia.dev/fuchsia/" + rebase_path(source_dir, "//")
+
+    if (defined(invoker.importpath) || defined(invoker.name)) {
+      assert(
+          !(defined(invoker.importpath) && defined(invoker.name)),
+          "importpath and name for go_library can't be defined at the same time (name is alias to importpath)")
+
+      importpath = ""
+      if (defined(invoker.importpath)) {
+        importpath = invoker.importpath
+      }
+      if (defined(invoker.name)) {
+        importpath = invoker.name
+      }
+
+      allow_importpath_override =
+          filter_exclude([ rebase_path(source_dir, "//") ],
+                         [
+                           # Third-party repositories must set `name` to the
+                           # canonical go package name.
+                           "third_party/*",
+
+                           # There's no standard naming scheme for libraries
+                           # that are generated at build time, so `name` must
+                           # be set.
+                           rebase_path(root_build_dir, "//") + "/*",
+
+                           # Required to support setting the `syzkaller_dir` GN
+                           # arg to point to a syzkaller checkout outside the
+                           # platform source tree.
+                           "../*",
+                         ]) == []
+      assert(
+          allow_importpath_override || importpath == default_importpath,
+          "Go importpath override is not allowed for this target, either omit importpath/name for this target or set it to ${importpath}")
+      not_needed([ "default_importpath" ])
+
+      name_args = [
+        "--name",
+        importpath,
+      ]
+    } else {
+      name_args = [
+        "--name",
+        default_importpath,
+      ]
+    }
   }
 
   action(target_name) {

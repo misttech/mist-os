@@ -10,8 +10,8 @@ use fidl_fuchsia_ui_pointer::{
 };
 use once_cell::sync::Lazy;
 use starnix_logging::log_warn;
+use starnix_types::time::{time_from_timeval, timeval_from_time};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::time::{time_from_timeval, timeval_from_time};
 use starnix_uapi::{error, uapi};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use {fidl_fuchsia_input_report as fir, fidl_fuchsia_ui_input3 as fuiinput};

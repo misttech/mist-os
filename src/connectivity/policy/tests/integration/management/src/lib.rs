@@ -38,7 +38,7 @@ use net_declare::{
     fidl_ip, fidl_ip_v4, fidl_subnet, net_ip_v6, net_prefix_length_v4, net_subnet_v6, std_ip,
 };
 use net_types::ethernet::Mac;
-use net_types::ip::{self as net_types_ip, Ipv4};
+use net_types::ip::{self as net_types_ip, IpVersion, Ipv4};
 use netemul::{RealmTcpListener, RealmTcpStream, RealmUdpSocket};
 use netstack_testing_common::interfaces::{self, TestInterfaceExt as _};
 use netstack_testing_common::nud::apply_nud_flake_workaround;
@@ -1924,9 +1924,11 @@ async fn disable_interface_while_having_dhcpv6_prefix<M: Manager, N: Netstack>(n
 struct MasqueradeTestSetup {
     client1_ip: std::net::IpAddr,
     client1_subnet: fnet::Subnet,
+    client1_masquerade_subnet: fnet::Subnet,
     client1_gateway: fnet::IpAddress,
     client2_ip: std::net::IpAddr,
     client2_subnet: fnet::Subnet,
+    client2_masquerade_subnet: fnet::Subnet,
     client2_gateway: fnet::IpAddress,
     server_ip: std::net::IpAddr,
     server_subnet: fnet::Subnet,
@@ -1936,6 +1938,7 @@ struct MasqueradeTestSetup {
     router_client2_ip: fnet::Subnet,
     router_server_ip: fnet::Subnet,
     router_if_config: fnet_interfaces_admin::Configuration,
+    ip_version: IpVersion,
 }
 
 impl MasqueradeTestSetup {
@@ -1943,9 +1946,11 @@ impl MasqueradeTestSetup {
         MasqueradeTestSetup {
             client1_ip: std_ip!("192.168.1.2"),
             client1_subnet: fidl_subnet!("192.168.1.2/24"),
+            client1_masquerade_subnet: fidl_subnet!("192.168.1.0/24"),
             client1_gateway: fidl_ip!("192.168.1.1"),
             client2_ip: std_ip!("192.168.2.2"),
             client2_subnet: fidl_subnet!("192.168.2.2/24"),
+            client2_masquerade_subnet: fidl_subnet!("192.168.2.0/24"),
             client2_gateway: fidl_ip!("192.168.2.1"),
             server_ip: std_ip!("192.168.0.2"),
             server_subnet: fidl_subnet!("192.168.0.2/24"),
@@ -1961,6 +1966,7 @@ impl MasqueradeTestSetup {
                 }),
                 ..Default::default()
             },
+            ip_version: IpVersion::V4,
         }
     }
 
@@ -1968,9 +1974,11 @@ impl MasqueradeTestSetup {
         MasqueradeTestSetup {
             client1_ip: std_ip!("fd00:0:0:1::2"),
             client1_subnet: fidl_subnet!("fd00:0:0:1::2/64"),
+            client1_masquerade_subnet: fidl_subnet!("fd00:0:0:1::0/64"),
             client1_gateway: fidl_ip!("fd00:0:0:1::1"),
             client2_ip: std_ip!("fd00:0:0:2::2"),
             client2_subnet: fidl_subnet!("fd00:0:0:2::2/64"),
+            client2_masquerade_subnet: fidl_subnet!("fd00:0:0:2::0/64"),
             client2_gateway: fidl_ip!("fd00:0:0:2::1"),
             server_ip: std_ip!("fd00:0:0:0::2"),
             server_subnet: fidl_subnet!("fd00:0:0:0::2/64"),
@@ -1986,6 +1994,7 @@ impl MasqueradeTestSetup {
                 }),
                 ..Default::default()
             },
+            ip_version: IpVersion::V6,
         }
     }
 
@@ -1997,9 +2006,11 @@ impl MasqueradeTestSetup {
         let MasqueradeTestSetup {
             client1_ip: _,
             client1_subnet,
+            client1_masquerade_subnet: _,
             client1_gateway,
             client2_ip: _,
             client2_subnet,
+            client2_masquerade_subnet: _,
             client2_gateway,
             server_ip: _,
             server_subnet,
@@ -2009,6 +2020,7 @@ impl MasqueradeTestSetup {
             router_client2_ip,
             router_server_ip,
             router_if_config,
+            ip_version: _,
         } = self;
 
         let client1_net = sandbox.create_network("client1").await.expect("create network");
@@ -2190,9 +2202,9 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
 
     let MasqueradeTestSetup {
         client1_ip: client_ip,
+        client1_masquerade_subnet: masquerade_subnet,
         server_ip,
         router_ip,
-        router_client1_ip: router_client_ip,
         ..
     } = setup.clone();
     let resources = setup.build::<N>(&sandbox, name).await;
@@ -2208,7 +2220,7 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
 
     masq.create(
         &fnet_masquerade::ControlConfig {
-            src_subnet: router_client_ip,
+            src_subnet: masquerade_subnet,
             output_interface: router_server_iface.id(),
         },
         server_end,
@@ -2229,6 +2241,83 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
     assert_eq!(client_ip, get_src_ip(SocketAddr::from((server_ip, 8082)), client, server).await);
 }
 
+enum MasqueradeErrorTestCase {
+    InvalidInterface,
+    UnspecifiedSubnet,
+    SubnetWithHostBits,
+}
+
+impl MasqueradeErrorTestCase {
+    fn expected_error(&self) -> fnet_masquerade::Error {
+        match self {
+            Self::InvalidInterface | Self::SubnetWithHostBits => {
+                fnet_masquerade::Error::InvalidArguments
+            }
+            Self::UnspecifiedSubnet => fnet_masquerade::Error::Unsupported,
+        }
+    }
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(M, Manager)]
+#[test_case::test_matrix(
+    [MasqueradeTestSetup::ipv4(), MasqueradeTestSetup::ipv6()],
+    [
+        MasqueradeErrorTestCase::InvalidInterface,
+        MasqueradeErrorTestCase::UnspecifiedSubnet,
+        MasqueradeErrorTestCase::SubnetWithHostBits
+    ]
+)]
+async fn test_masquerade_errors<N: Netstack, M: Manager>(
+    name: &str,
+    setup: MasqueradeTestSetup,
+    test_case: MasqueradeErrorTestCase,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+
+    let MasqueradeTestSetup {
+        client1_masquerade_subnet: masquerade_subnet,
+        client1_subnet,
+        ip_version,
+        ..
+    } = setup.clone();
+    let resources = setup.build::<N>(&sandbox, name).await;
+    let MasqueradeTestResources { router, router_server_iface, .. } = &resources;
+
+    let masq = router
+        .connect_to_protocol::<fnet_masquerade::FactoryMarker>()
+        .expect("connect to fuchsia.net.masquerade/Factory server");
+
+    let config = match test_case {
+        MasqueradeErrorTestCase::InvalidInterface => {
+            fnet_masquerade::ControlConfig { src_subnet: masquerade_subnet, output_interface: 0 }
+        }
+        MasqueradeErrorTestCase::SubnetWithHostBits => fnet_masquerade::ControlConfig {
+            src_subnet: client1_subnet,
+            output_interface: router_server_iface.id(),
+        },
+        MasqueradeErrorTestCase::UnspecifiedSubnet => {
+            let unspecified_subnet = match ip_version {
+                IpVersion::V4 => fidl_subnet!("0.0.0.0/0"),
+                IpVersion::V6 => fidl_subnet!("::/0"),
+            };
+            fnet_masquerade::ControlConfig {
+                src_subnet: unspecified_subnet,
+                output_interface: router_server_iface.id(),
+            }
+        }
+    };
+
+    let (_masq_control, server_end) =
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
+            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+    assert_eq!(
+        masq.create(&config, server_end).await.expect("masq create fidl"),
+        Err(test_case.expected_error())
+    );
+}
+
 // Verify that the masquerade configuration is associated with the lifetime of
 // the underlying FIDL connection.
 #[netstack_test]
@@ -2241,9 +2330,9 @@ async fn test_masquerade_lifetime<N: Netstack, M: Manager>(name: &str, setup: Ma
 
     let MasqueradeTestSetup {
         client1_ip: client_ip,
+        client1_masquerade_subnet: masquerade_subnet,
         server_ip,
         router_ip,
-        router_client1_ip: router_client_ip,
         ..
     } = setup.clone();
     let resources = setup.build::<N>(&sandbox, name).await;
@@ -2259,7 +2348,7 @@ async fn test_masquerade_lifetime<N: Netstack, M: Manager>(name: &str, setup: Ma
 
     masq.create(
         &fnet_masquerade::ControlConfig {
-            src_subnet: router_client_ip,
+            src_subnet: masquerade_subnet,
             output_interface: router_server_iface.id(),
         },
         server_end,
@@ -2311,11 +2400,11 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
 
     let MasqueradeTestSetup {
         client1_ip,
+        client1_masquerade_subnet,
         client2_ip,
+        client2_masquerade_subnet,
         server_ip,
         router_ip,
-        router_client1_ip,
-        router_client2_ip,
         ..
     } = setup.clone();
     let resources = setup.build::<N>(&sandbox, name).await;
@@ -2331,7 +2420,7 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
             .expect("create fuchsia.net.masquerade/Control proxy and server end");
     masq.create(
         &fnet_masquerade::ControlConfig {
-            src_subnet: router_client1_ip,
+            src_subnet: client1_masquerade_subnet,
             output_interface: router_server_iface.id(),
         },
         server_end1,
@@ -2357,7 +2446,7 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
     let result = masq
         .create(
             &fnet_masquerade::ControlConfig {
-                src_subnet: router_client1_ip,
+                src_subnet: client1_masquerade_subnet,
                 output_interface: router_server_iface.id(),
             },
             server_end2,
@@ -2375,7 +2464,7 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
             .expect("create fuchsia.net.masquerade/Control proxy and server end");
     masq.create(
         &fnet_masquerade::ControlConfig {
-            src_subnet: router_client2_ip,
+            src_subnet: client2_masquerade_subnet,
             output_interface: router_server_iface.id(),
         },
         server_end2,

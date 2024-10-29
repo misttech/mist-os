@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fidl::specific_router;
-use crate::{Connector, SpecificRouter, SpecificRouterResponse};
+use crate::fidl::router;
+use crate::{Connector, Router, RouterResponse};
 use fidl::handle::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::TryStreamExt;
 
-impl crate::RemotableCapability for SpecificRouter<Connector> {}
+impl crate::RemotableCapability for Router<Connector> {}
 
-impl From<SpecificRouter<Connector>> for fsandbox::Capability {
-    fn from(router: SpecificRouter<Connector>) -> Self {
+impl From<Router<Connector>> for fsandbox::Capability {
+    fn from(router: Router<Connector>) -> Self {
         let (client_end, sender_stream) =
             fidl::endpoints::create_request_stream::<fsandbox::ConnectorRouterMarker>().unwrap();
         router.serve_and_register(sender_stream, client_end.get_koid().unwrap());
@@ -19,25 +19,23 @@ impl From<SpecificRouter<Connector>> for fsandbox::Capability {
     }
 }
 
-impl TryFrom<SpecificRouterResponse<Connector>> for fsandbox::ConnectorRouterRouteResponse {
+impl TryFrom<RouterResponse<Connector>> for fsandbox::ConnectorRouterRouteResponse {
     type Error = fsandbox::RouterError;
 
-    fn try_from(resp: SpecificRouterResponse<Connector>) -> Result<Self, Self::Error> {
+    fn try_from(resp: RouterResponse<Connector>) -> Result<Self, Self::Error> {
         match resp {
-            SpecificRouterResponse::<Connector>::Capability(c) => {
+            RouterResponse::<Connector>::Capability(c) => {
                 Ok(fsandbox::ConnectorRouterRouteResponse::Connector(c.into()))
             }
-            SpecificRouterResponse::<Connector>::Unavailable => {
+            RouterResponse::<Connector>::Unavailable => {
                 Ok(fsandbox::ConnectorRouterRouteResponse::Unavailable(fsandbox::Unit {}))
             }
-            SpecificRouterResponse::<Connector>::Debug(_) => {
-                Err(fsandbox::RouterError::NotSupported)
-            }
+            RouterResponse::<Connector>::Debug(_) => Err(fsandbox::RouterError::NotSupported),
         }
     }
 }
 
-impl SpecificRouter<Connector> {
+impl Router<Connector> {
     async fn serve_router(
         self,
         mut stream: fsandbox::ConnectorRouterRequestStream,
@@ -45,7 +43,7 @@ impl SpecificRouter<Connector> {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fsandbox::ConnectorRouterRequest::Route { payload, responder } => {
-                    responder.send(specific_router::route_from_fidl(&self, payload).await)?;
+                    responder.send(router::route_from_fidl(&self, payload).await)?;
                 }
                 fsandbox::ConnectorRouterRequest::_UnknownMethod { ordinal, .. } => {
                     tracing::warn!(

@@ -39,7 +39,7 @@ impl Plugin for RoutingErrorsPlugin {
                         return;
                     }
                 };
-            if pattern_match.len() == 0 {
+            if pattern_match.is_empty() {
                 results.push(Action::new_synthetic_error(
                     "[DEBUG: BAD DATA] Routing Errors plugin encountered a bug analyzing log \
                      line, capture group missing"

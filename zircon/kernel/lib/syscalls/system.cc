@@ -718,7 +718,7 @@ zx_status_t sys_system_set_processor_power_domain(
         .status_value();
   }
 
-  if (num_power_levels == 0 || num_transitions == 0) {
+  if (num_power_levels == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -754,18 +754,23 @@ zx_status_t sys_system_set_processor_power_domain(
     return ZX_ERR_NO_MEMORY;
   }
 
-  auto sparse_transitions =
-      ktl::make_unique<zx_processor_power_level_transition_t[]>(&ac, num_transitions);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  ktl::unique_ptr<zx_processor_power_level_transition_t[]> sparse_transitions = nullptr;
+
+  if (num_transitions > 0) {
+    sparse_transitions =
+        ktl::make_unique<zx_processor_power_level_transition_t[]>(&ac, num_transitions);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
+
+    if (zx_status_t res =
+            transitions.copy_array_from_user(sparse_transitions.get(), num_transitions);
+        res != ZX_OK) {
+      return res;
+    }
   }
 
   if (zx_status_t res = power_levels.copy_array_from_user(levels.get(), num_power_levels);
-      res != ZX_OK) {
-    return res;
-  }
-
-  if (zx_status_t res = transitions.copy_array_from_user(sparse_transitions.get(), num_transitions);
       res != ZX_OK) {
     return res;
   }

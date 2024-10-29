@@ -64,6 +64,10 @@ closed protocol Device {
     }) error zx.Status;
     strict EnableFn() -> () error zx.Status;
     strict DisableFn() -> () error zx.Status;
+    /// Returns the value of the I/O Ready bit for this function in CCCR.
+    strict IoReady() -> (struct {
+        ready bool;
+    }) error zx.Status;
     strict EnableFnIntr() -> () error zx.Status;
     strict DisableFnIntr() -> () error zx.Status;
     strict UpdateBlockSize(struct {

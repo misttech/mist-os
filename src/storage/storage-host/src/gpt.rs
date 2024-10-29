@@ -148,7 +148,7 @@ impl GptPartition {
 
 fn convert_partition_info(info: &gpt::PartitionInfo) -> block_server::PartitionInfo {
     block_server::PartitionInfo {
-        block_count: info.num_blocks,
+        block_range: Some(info.start_block..info.start_block + info.num_blocks),
         type_guid: info.type_guid.to_bytes(),
         instance_guid: info.instance_guid.to_bytes(),
         name: Some(info.label.clone()),
@@ -358,33 +358,17 @@ impl GptManager {
         fn convert_partition_info(info: fstoragehost::PartitionInfo) -> gpt::PartitionInfo {
             gpt::PartitionInfo {
                 label: info.name,
-                instance_guid: gpt::Guid::nil(),
                 type_guid: gpt::Guid::from_bytes(info.type_guid.value),
-                start_block: 0,
+                instance_guid: gpt::Guid::from_bytes(info.instance_guid.value),
+                start_block: info.start_block,
                 num_blocks: info.num_blocks,
                 flags: info.flags,
             }
         }
         transaction.partitions =
             partitions.into_iter().map(convert_partition_info).collect::<Vec<_>>();
-        let mut start_block = inner
-            .gpt
-            .metadata_blocks_for_partition_table_size(transaction.partitions.len())
-            .map_err(|_| zx::Status::INTERNAL)?;
-        for partition in transaction.partitions.iter_mut() {
-            if partition.num_blocks > 0 {
-                partition.instance_guid = gpt::Guid::generate();
-                partition.start_block = start_block;
-                start_block = start_block
-                    .checked_add(partition.num_blocks)
-                    .ok_or(zx::Status::INVALID_ARGS)?;
-            }
-        }
 
-        if let Err(err) = inner.gpt.commit_transaction(transaction).await {
-            tracing::error!(?err, "Failed to commit transaction to reset partition table");
-            return Err(zx::Status::IO);
-        }
+        inner.gpt.commit_transaction(transaction).await?;
         tracing::info!("Rebinding partitions...");
         if let Err(err) = inner.bind_partitions(&self).await {
             tracing::error!(?err, "Failed to rebind partitions");
@@ -515,7 +499,7 @@ mod tests {
                     label: PART_2_NAME.to_string(),
                     type_guid: Guid::from_bytes(PART_TYPE_GUID),
                     instance_guid: Guid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 4,
+                    start_block: 5,
                     num_blocks: 1,
                     flags: 0,
                 },
@@ -631,7 +615,7 @@ mod tests {
                     label: PART_2_NAME.to_string(),
                     type_guid: Guid::from_bytes(PART_TYPE_GUID),
                     instance_guid: Guid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 4,
+                    start_block: 5,
                     num_blocks: 1,
                     flags: 0,
                 },
@@ -675,7 +659,7 @@ mod tests {
                     label: PART_2_NAME.to_string(),
                     type_guid: Guid::from_bytes(PART_TYPE_GUID),
                     instance_guid: Guid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 4,
+                    start_block: 5,
                     num_blocks: 1,
                     flags: 0,
                 },
@@ -901,13 +885,15 @@ mod tests {
 
     #[fuchsia::test]
     async fn reset_partition_tables() {
-        // The test will reset the tables from ["part", "part2"] to ["part3", <127 empty entries>].
+        // The test will reset the tables from ["part", "part2"] to
+        // ["part3", <empty>, "part4", <125 empty entries>].
         const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
         const PART_1_INSTANCE_GUID: [u8; 16] = [2u8; 16];
         const PART_1_NAME: &str = "part";
         const PART_2_INSTANCE_GUID: [u8; 16] = [3u8; 16];
         const PART_2_NAME: &str = "part2";
         const PART_3_NAME: &str = "part3";
+        const PART_4_NAME: &str = "part4";
 
         let vmo = zx::Vmo::create(1048576).unwrap();
         format_gpt(
@@ -939,6 +925,8 @@ mod tests {
         let nil_entry = fstoragehost::PartitionInfo {
             name: "".to_string(),
             type_guid: fpartition::Guid { value: [0u8; 16] },
+            instance_guid: fpartition::Guid { value: [0u8; 16] },
+            start_block: 0,
             num_blocks: 0,
             flags: 0,
         };
@@ -946,12 +934,23 @@ mod tests {
         new_partitions[0] = fstoragehost::PartitionInfo {
             name: PART_3_NAME.to_string(),
             type_guid: fpartition::Guid { value: PART_TYPE_GUID },
+            instance_guid: fpartition::Guid { value: [1u8; 16] },
+            start_block: 64,
             num_blocks: 2,
+            flags: 0,
+        };
+        new_partitions[2] = fstoragehost::PartitionInfo {
+            name: PART_4_NAME.to_string(),
+            type_guid: fpartition::Guid { value: PART_TYPE_GUID },
+            instance_guid: fpartition::Guid { value: [2u8; 16] },
+            start_block: 66,
+            num_blocks: 4,
             flags: 0,
         };
         runner.reset_partition_table(new_partitions).await.expect("reset_partition_table failed");
         partitions_dir.get_entry("part-0").expect("No entry found");
         partitions_dir.get_entry("part-1").map(|_| ()).expect_err("Extra entry found");
+        partitions_dir.get_entry("part-2").expect("No entry found");
 
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Failed to create connection endpoints");
@@ -976,6 +975,123 @@ mod tests {
         let (status, name) = block.get_name().await.expect("FIDL error");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert_eq!(name.unwrap(), PART_3_NAME);
+
+        runner.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn reset_partition_tables_fails_if_too_many_partitions() {
+        let vmo = zx::Vmo::create(16384).unwrap();
+        format_gpt(&vmo, 512, vec![]);
+        let (block_device, partitions_dir) = setup(vmo, 512);
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+            .await
+            .expect("load should succeed");
+        let nil_entry = fstoragehost::PartitionInfo {
+            name: "".to_string(),
+            type_guid: fpartition::Guid { value: [0u8; 16] },
+            instance_guid: fpartition::Guid { value: [0u8; 16] },
+            start_block: 0,
+            num_blocks: 0,
+            flags: 0,
+        };
+        let new_partitions = vec![nil_entry; 128];
+        runner
+            .reset_partition_table(new_partitions)
+            .await
+            .expect_err("reset_partition_table should fail");
+
+        runner.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn reset_partition_tables_fails_if_too_large_partitions() {
+        let vmo = zx::Vmo::create(16384).unwrap();
+        format_gpt(&vmo, 512, vec![]);
+        let (block_device, partitions_dir) = setup(vmo, 512);
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+            .await
+            .expect("load should succeed");
+        let new_partitions = vec![
+            fstoragehost::PartitionInfo {
+                name: "a".to_string(),
+                type_guid: fpartition::Guid { value: [1u8; 16] },
+                instance_guid: fpartition::Guid { value: [1u8; 16] },
+                start_block: 4,
+                num_blocks: 2,
+                flags: 0,
+            },
+            fstoragehost::PartitionInfo {
+                name: "b".to_string(),
+                type_guid: fpartition::Guid { value: [2u8; 16] },
+                instance_guid: fpartition::Guid { value: [2u8; 16] },
+                start_block: 6,
+                num_blocks: 200,
+                flags: 0,
+            },
+        ];
+        runner
+            .reset_partition_table(new_partitions)
+            .await
+            .expect_err("reset_partition_table should fail");
+
+        runner.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn reset_partition_tables_fails_if_partition_overlaps_metadata() {
+        let vmo = zx::Vmo::create(16384).unwrap();
+        format_gpt(&vmo, 512, vec![]);
+        let (block_device, partitions_dir) = setup(vmo, 512);
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+            .await
+            .expect("load should succeed");
+        let new_partitions = vec![fstoragehost::PartitionInfo {
+            name: "a".to_string(),
+            type_guid: fpartition::Guid { value: [1u8; 16] },
+            instance_guid: fpartition::Guid { value: [1u8; 16] },
+            start_block: 1,
+            num_blocks: 2,
+            flags: 0,
+        }];
+        runner
+            .reset_partition_table(new_partitions)
+            .await
+            .expect_err("reset_partition_table should fail");
+
+        runner.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn reset_partition_tables_fails_if_partitions_overlap() {
+        let vmo = zx::Vmo::create(32768).unwrap();
+        format_gpt(&vmo, 512, vec![]);
+        let (block_device, partitions_dir) = setup(vmo, 512);
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+            .await
+            .expect("load should succeed");
+        let new_partitions = vec![
+            fstoragehost::PartitionInfo {
+                name: "a".to_string(),
+                type_guid: fpartition::Guid { value: [1u8; 16] },
+                instance_guid: fpartition::Guid { value: [1u8; 16] },
+                start_block: 32,
+                num_blocks: 2,
+                flags: 0,
+            },
+            fstoragehost::PartitionInfo {
+                name: "b".to_string(),
+                type_guid: fpartition::Guid { value: [2u8; 16] },
+                instance_guid: fpartition::Guid { value: [2u8; 16] },
+                start_block: 33,
+                num_blocks: 1,
+                flags: 0,
+            },
+        ];
+        runner
+            .reset_partition_table(new_partitions)
+            .await
+            .expect_err("reset_partition_table should fail");
 
         runner.shutdown().await;
     }

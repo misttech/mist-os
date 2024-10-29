@@ -132,7 +132,7 @@ fn spawn_persist_services(
         info!("Launching persist service for {service_name}");
         PersistServer::create(
             service_name.clone(),
-            tags.keys().map(|k| k.clone()).collect(),
+            tags.keys().cloned().collect(),
             scheduler.clone(),
         )
         .launch_server(task_holder.clone(), fs);

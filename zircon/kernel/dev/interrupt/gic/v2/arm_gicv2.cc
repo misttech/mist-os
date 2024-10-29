@@ -72,6 +72,7 @@ uint64_t msi_frame_phys = 0;
 uint32_t ipi_base = 0;
 bool use_msi = false;
 
+constexpr uint MAX_INT = 1024;
 uint max_irqs = 0;
 
 arm_gicv2::CpuMaskTranslator mask_translator;
@@ -132,7 +133,7 @@ void gic_set_enable(uint vector, bool enable) {
   }
 }
 
-static void gic_init_percpu_early() {
+void gic_init_percpu_early() {
   arm_gicv2_write32(GICC_CTLR, 0x1);  // EnableGrp1
   arm_gicv2_write32(GICC_PMR, 0xff);  // unmask interrupts at all priority levels
 }

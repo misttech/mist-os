@@ -78,14 +78,15 @@ impl HandleRef<'_> {
     pub fn duplicate(
         &self,
         rights: impl AsFDomainRights,
-    ) -> impl Future<Output = Result<Handle, Error>> {
-        let client = self.0.client();
+    ) -> impl Future<Output = Result<Handle, Error>> + 'static {
+        let client_and_rights = self.0.client().and_then(move |client| {
+            rights
+                .as_fdomain_rights()
+                .ok_or(Error::ProtocolRightsIncompatible)
+                .map(|rights| (client, rights))
+        });
         let handle = self.0.proto();
-        let rights = rights.as_fdomain_rights();
-
-        async move {
-            let rights = rights.ok_or(Error::ProtocolRightsIncompatible)?;
-            let client = client?;
+        let result = client_and_rights.map(|(client, rights)| {
             let new_handle = client.new_hid();
             let id = new_handle.id;
             client
@@ -94,32 +95,37 @@ impl HandleRef<'_> {
                     proto::FDomainDuplicateRequest { handle, new_handle, rights },
                     Responder::Duplicate,
                 )
-                .await?;
-            Ok(Handle { id, client: Arc::downgrade(&client) })
-        }
+                .map(move |res| res.map(|_| Handle { id, client: Arc::downgrade(&client) }))
+        });
+
+        async move { result?.await }
     }
 
     /// Assert and deassert signals on this handle.
     pub fn fdomain_signal(
         &self,
-        ty: impl AsFDomainObjectType + Send + Sync + 'static,
-        set: impl AsFDomainSignals + Send + Sync + 'static,
-        clear: impl AsFDomainSignals + Send + Sync + 'static,
+        ty: impl AsFDomainObjectType,
+        set: impl AsFDomainSignals,
+        clear: impl AsFDomainSignals,
     ) -> impl Future<Output = Result<(), Error>> {
-        let client = self.client();
         let handle = self.proto();
-        async move {
+        let params = (move || {
+            let client = self.client()?;
             let ty = ty.as_fdomain_object_type().ok_or(Error::ProtocolObjectTypeIncompatible)?;
             let set = set.as_fdomain_signals(ty).ok_or(Error::ProtocolSignalsIncompatible)?;
             let clear = clear.as_fdomain_signals(ty).ok_or(Error::ProtocolSignalsIncompatible)?;
-            client?
-                .transaction(
-                    ordinals::SIGNAL,
-                    proto::FDomainSignalRequest { handle, set, clear },
-                    Responder::Signal,
-                )
-                .await
-        }
+            Ok((client, set, clear))
+        })();
+
+        let result: Result<_, Error> = params.map(|(client, set, clear)| {
+            client.transaction(
+                ordinals::SIGNAL,
+                proto::FDomainSignalRequest { handle, set, clear },
+                Responder::Signal,
+            )
+        });
+
+        async move { result?.await }
     }
 }
 
@@ -159,20 +165,24 @@ pub trait Peered: HandleBased {
         set: impl AsFDomainSignals + Send + Sync + 'static,
         clear: impl AsFDomainSignals + Send + Sync + 'static,
     ) -> impl Future<Output = Result<(), Error>> {
-        let client = self.as_handle_ref().client();
         let handle = self.as_handle_ref().proto();
-        async move {
+        let params = (move || {
+            let client = self.as_handle_ref().client()?;
             let ty = ty.as_fdomain_object_type().ok_or(Error::ProtocolObjectTypeIncompatible)?;
             let set = set.as_fdomain_signals(ty).ok_or(Error::ProtocolSignalsIncompatible)?;
             let clear = clear.as_fdomain_signals(ty).ok_or(Error::ProtocolSignalsIncompatible)?;
-            client?
-                .transaction(
-                    ordinals::SIGNAL_PEER,
-                    proto::FDomainSignalPeerRequest { handle, set, clear },
-                    Responder::SignalPeer,
-                )
-                .await
-        }
+            Ok((client, set, clear))
+        })();
+
+        let result: Result<_, Error> = params.map(|(client, set, clear)| {
+            client.transaction(
+                ordinals::SIGNAL_PEER,
+                proto::FDomainSignalPeerRequest { handle, set, clear },
+                Responder::SignalPeer,
+            )
+        });
+
+        async move { result?.await }
     }
 }
 
@@ -231,19 +241,16 @@ impl OnFDomainSignals {
     pub fn new(handle: &Handle, signals: proto::Signals) -> Self {
         let client = handle.client();
         let handle = handle.proto();
-        OnFDomainSignals {
-            fut: async move {
-                client?
-                    .transaction(
-                        ordinals::WAIT_FOR_SIGNALS,
-                        proto::FDomainWaitForSignalsRequest { handle, signals },
-                        Responder::WaitForSignals,
-                    )
-                    .map(|f| f.map(|mut x| proto_signals_to_fidl_take(&mut x.signals)))
-                    .await
-            }
-            .boxed(),
-        }
+        let result = client.map(|client| {
+            client
+                .transaction(
+                    ordinals::WAIT_FOR_SIGNALS,
+                    proto::FDomainWaitForSignalsRequest { handle, signals },
+                    Responder::WaitForSignals,
+                )
+                .map(|f| f.map(|mut x| proto_signals_to_fidl_take(&mut x.signals)))
+        });
+        OnFDomainSignals { fut: async move { result?.await }.boxed() }
     }
 }
 
@@ -263,42 +270,58 @@ impl Handle {
 
     /// Get a proto::Hid with the ID of this handle, then destroy this object
     /// without sending a request to close the handlel.
-    pub(crate) fn take_proto(self) -> proto::Hid {
+    pub(crate) fn take_proto(mut self) -> proto::Hid {
         let ret = self.proto();
-        std::mem::forget(self);
+        // Detach from the client so we don't close the handle when we drop self.
+        self.client = Weak::new();
         ret
     }
 
     /// Close this handle. Surfaces errors that dropping the handle will not.
     pub fn close(self) -> impl Future<Output = Result<(), Error>> {
         let client = self.client();
-        async move {
-            client?
-                .transaction(
-                    ordinals::CLOSE,
-                    proto::FDomainCloseRequest { handles: vec![self.take_proto()] },
-                    Responder::Close,
-                )
-                .await
-        }
+        let result = client.map(|client| {
+            client.transaction(
+                ordinals::CLOSE,
+                proto::FDomainCloseRequest { handles: vec![self.take_proto()] },
+                Responder::Close,
+            )
+        });
+        async move { result?.await }
     }
 
     /// Replace this handle with a new handle to the same object, with different
     /// rights.
-    pub async fn replace(self, rights: impl AsFDomainRights) -> Result<Handle, Error> {
-        let client = self.client()?;
-        let new_handle = client.new_hid();
-        let id = new_handle.id;
-        let rights = rights.as_fdomain_rights().ok_or(Error::ProtocolRightsIncompatible)?;
-        client
-            .transaction(
-                ordinals::REPLACE,
-                proto::FDomainReplaceRequest { handle: self.take_proto(), new_handle, rights },
-                Responder::Replace,
-            )
-            .await?;
+    pub fn replace(
+        self,
+        rights: impl AsFDomainRights,
+    ) -> impl Future<Output = Result<Handle, Error>> {
+        let params = (move || {
+            let client = self.client()?;
+            let handle = self.take_proto();
+            let new_handle = client.new_hid();
+            let rights = rights.as_fdomain_rights().ok_or(Error::ProtocolRightsIncompatible)?;
+            Ok((new_handle, handle, client, rights))
+        })();
 
-        Ok(Handle { id, client: Arc::downgrade(&client) })
+        let result: Result<_, Error> = params.map(|(new_handle, handle, client, rights)| {
+            let id = new_handle.id;
+            let ret = Handle { id, client: Arc::downgrade(&client) };
+            (
+                client.transaction(
+                    ordinals::REPLACE,
+                    proto::FDomainReplaceRequest { handle, new_handle, rights },
+                    Responder::Replace,
+                ),
+                ret,
+            )
+        });
+
+        async move {
+            let (fut, ret) = result?;
+            fut.await?;
+            Ok(ret)
+        }
     }
 }
 

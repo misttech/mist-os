@@ -10,7 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <iterator>
-#include <string>
+#include <span>
 
 #include <safemath/safe_conversions.h>
 
@@ -118,7 +118,7 @@ constexpr uint64_t kLowMask = 0x0F;
 
 }  // namespace
 
-fpromise::result<std::string, std::string> Guid::ToString(cpp20::span<const uint8_t> guid) {
+fpromise::result<std::string, std::string> Guid::ToString(std::span<const uint8_t> guid) {
   if (guid.size() != kGuidLength) {
     std::string error = "Input GUID size must be equal to |kGuidLength|. Input Size: ";
     error.append(std::to_string(guid.size())).append(".\n");
@@ -151,7 +151,7 @@ fpromise::result<std::string, std::string> Guid::ToString(cpp20::span<const uint
 }
 
 fpromise::result<std::array<uint8_t, kGuidLength>, std::string> Guid::FromString(
-    cpp20::span<const char> guid) {
+    std::span<const char> guid) {
   if (guid.size() != kGuidStrLength) {
     std::string error = "Input GUID size must be equal to |kGuidStrLength|. Input Size: ";
     error.append(std::to_string(guid.size())).append(".\n");

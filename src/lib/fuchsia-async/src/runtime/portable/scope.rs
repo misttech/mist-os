@@ -8,13 +8,12 @@
 // Refer to the documentation for the fuchsia implementation.
 #![doc(hidden)]
 
-use crate::waker_list::WakerList;
+use crate::condition::Condition;
 use std::collections::HashMap;
 use std::future::{poll_fn, Future};
 use std::ops::Deref;
-use std::pin::pin;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::task::{Poll, Waker};
 use std::{fmt, hash};
 use tokio::task::AbortHandle;
@@ -32,8 +31,7 @@ impl Scope {
         Self {
             inner: ScopeRef {
                 inner: Arc::new(ScopeInner {
-                    state: Mutex::new(ScopeState { all_tasks: HashMap::new() }),
-                    waker_list: WakerList::new(),
+                    state: Condition::new(ScopeState { all_tasks: HashMap::new() }),
                 }),
             },
         }
@@ -47,9 +45,7 @@ impl Scope {
 
 impl Drop for Scope {
     fn drop(&mut self) {
-        for (_, (abort_handle, _)) in
-            std::mem::take(&mut self.inner.inner.state.lock().unwrap().all_tasks)
-        {
+        for (_, (abort_handle, _)) in std::mem::take(&mut self.inner.inner.state.lock().all_tasks) {
             abort_handle.abort();
         }
     }
@@ -97,10 +93,10 @@ impl ScopeRef {
             fn drop(&mut self) {
                 if let Some(scope) = self.scope.upgrade() {
                     let wakers = {
-                        let mut state = scope.inner.state.lock().unwrap();
+                        let mut state = scope.inner.state.lock();
                         state.all_tasks.remove(&self.task_id);
                         if state.all_tasks.is_empty() {
-                            scope.inner.waker_list.drain().collect()
+                            state.drain_wakers().collect()
                         } else {
                             Vec::new()
                         }
@@ -116,7 +112,7 @@ impl ScopeRef {
 
         // Take the lock first so that the insert below happens before the task tries to take the
         // lock to set the waker.
-        let mut state = self.inner.state.lock().unwrap();
+        let mut state = self.inner.state.lock();
 
         let weak = self.downgrade();
         let task = crate::Task::spawn(async move {
@@ -125,7 +121,7 @@ impl ScopeRef {
             // Every time we poll, we must set the waker so that `wake_all` works.
             poll_fn(|cx| {
                 if let Some(scope) = weak.upgrade() {
-                    scope.inner.state.lock().unwrap().all_tasks.get_mut(&task_id).unwrap().1 =
+                    scope.inner.state.lock().all_tasks.get_mut(&task_id).unwrap().1 =
                         Some(cx.waker().clone());
                 }
                 future.as_mut().poll(cx)
@@ -146,24 +142,17 @@ impl ScopeRef {
     /// Waits for there to be no tasks.  This is racy: as soon as this returns it is possible for
     /// another task to have been spawned on this scope.
     pub async fn on_no_tasks(&self) {
-        let mut waker_entry = pin!(self.inner.waker_list.new_entry());
-
-        poll_fn(|cx| {
-            if self.inner.state.lock().unwrap().all_tasks.is_empty() {
-                Poll::Ready(())
-            } else {
-                waker_entry.as_mut().add(cx.waker().clone());
-                Poll::Pending
-            }
-        })
-        .await
+        self.inner
+            .state
+            .when(|state| if state.all_tasks.is_empty() { Poll::Ready(()) } else { Poll::Pending })
+            .await;
     }
 
     /// Wakes all the scope's futures.
     pub fn wake_all(&self) {
         let mut wakers = Vec::new();
         {
-            let mut state = self.inner.state.lock().unwrap();
+            let mut state = self.inner.state.lock();
             for (_, (_, waker)) in &mut state.all_tasks {
                 wakers.extend(waker.take());
             }
@@ -211,8 +200,7 @@ impl Eq for WeakScopeRef {
 }
 
 struct ScopeInner {
-    state: Mutex<ScopeState>,
-    waker_list: WakerList,
+    state: Condition<ScopeState>,
 }
 
 struct ScopeState {

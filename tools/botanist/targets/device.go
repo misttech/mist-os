@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
 	serialconstants "go.fuchsia.dev/fuchsia/tools/lib/serial/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
@@ -273,6 +275,9 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 		}()
 	}
 
+	// TODO(https://fxbug.dev/355507826): Remove once ffx supports flashing Kola.
+	useFastbootFlashing := os.Getenv("FUCHSIA_DEVICE_TYPE") == "Kola" && t.config.FastbootSernum != ""
+
 	// Boot Fuchsia.
 	if t.config.FastbootSernum != "" {
 		// Copy images locally, as fastboot does not support flashing
@@ -303,8 +308,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			if err := t.bootZedboot(ctx, imgs); err != nil {
 				return err
 			}
-		} else if os.Getenv("FUCHSIA_DEVICE_TYPE") == "Kola" {
-			// TODO(https://fxbug.dev/355507826): Remove once ffx supports flashing Kola.
+		} else if useFastbootFlashing {
 			if err := t.fastbootFlash(ctx, pbPath, imgs); err != nil {
 				return err
 			}
@@ -404,7 +408,17 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 	}
 
 	if serialSocketPath != "" {
-		return <-bootedLogChan
+		if err := <-bootedLogChan; err != nil {
+			return err
+		}
+		if t.opts.ExpectsSSH && useFastbootFlashing {
+			if err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(5*time.Second), 5), func() error {
+				return t.provisionSSHKey(ctx)
+			}, nil); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	return nil
@@ -471,8 +485,49 @@ func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) err
 	return err
 }
 
+func (t *Device) provisionSSHKey(ctx context.Context) error {
+	logger.Debugf(ctx, "provisioning SSH key")
+	serialSocketPath := t.SerialSocketPath()
+	socket, err := serial.NewSocket(ctx, serialSocketPath)
+	if err != nil {
+		return err
+	}
+	defer socket.Close()
+
+	p, err := os.ReadFile(t.opts.AuthorizedKey)
+	if err != nil {
+		return err
+	}
+	pubkey := string(p)
+	pubkey = strings.TrimSuffix(pubkey, "\n")
+	cmds := []serial.Command{
+		{Cmd: []string{"echo", fmt.Sprintf("\"%s\"", pubkey), ">", "/data/ssh/authorized_keys"}},
+		{Cmd: []string{"cat", "/data/ssh/authorized_keys"}},
+	}
+	waitChan := make(chan error, 1)
+	go func() {
+		truncCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		_, readErr := iomisc.ReadUntilMatchString(truncCtx, socket, "cat /data/ssh/authorized_keys")
+		if readErr == nil {
+			_, readErr = iomisc.ReadUntilMatchString(truncCtx, socket, pubkey)
+			cancel()
+			if readErr == nil {
+				logger.Infof(ctx, "successfully provisioned SSH key")
+			} else if errors.Is(readErr, truncCtx.Err()) {
+				logger.Warningf(ctx, "ssh key is corrupted")
+			} else {
+				logger.Errorf(ctx, "unexpected error checking for ssh key: %s", readErr)
+			}
+		}
+		waitChan <- readErr
+	}()
+	if err := serial.RunCommands(ctx, socket, cmds); err != nil {
+		return err
+	}
+	return <-waitChan
+}
+
 // fastbootFlash runs fastboot commands directly to flash the device.
-// TODO(https://fxbug.dev/355507826): Add support for provisioning SSH keys.
 func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []bootserver.Image) error {
 	fastboot := getImageByName(images, "exe.linux-x64_fastboot")
 	if fastboot == nil {
@@ -505,9 +560,11 @@ func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []boot
 		cmds = append(cmds, []string{"flash", "super", fvmImage.Path})
 	}
 	cmds = append(cmds, []string{"reboot"})
-	err = t.runFastboot(ctx, fastboot.Path, cmds)
+	if err := t.runFastboot(ctx, fastboot.Path, cmds); err != nil {
+		return err
+	}
 	logger.Debugf(ctx, "done flashing")
-	return err
+	return nil
 }
 
 func (t *Device) flash(ctx context.Context, productBundle string) error {

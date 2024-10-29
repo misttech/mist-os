@@ -53,7 +53,7 @@ impl UintExponentialHistogramProperty {
             offset *= self.step_multiplier;
             index += 1;
         }
-        index as usize
+        index
     }
 }
 

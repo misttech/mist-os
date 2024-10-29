@@ -5,13 +5,13 @@
 #include "device-partitioner.h"
 
 #include <lib/fdio/fd.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
 #include <algorithm>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <utility>
 
@@ -26,6 +26,8 @@
 namespace paver {
 
 using uuid::Uuid;
+
+namespace {
 
 // Information for each Partition enum value.
 struct PartitionInfo {
@@ -43,96 +45,102 @@ struct PartitionInfo {
   const char* debug_name;
 };
 
-const PartitionInfo* GetPartitionInfo(Partition partition) {
-  static std::unordered_map<Partition, PartitionInfo> map = {
-      {Partition::kBootloaderA, PartitionInfo{.name = GPT_BOOTLOADER_A_NAME,
-                                              .type = GPT_BOOTLOADER_ABR_TYPE_GUID,
-                                              .legacy_name = GUID_EFI_NAME,
-                                              .legacy_type = GUID_BOOTLOADER_VALUE,
-                                              .debug_name = "Bootloader A"}},
-      {Partition::kBootloaderB, PartitionInfo{.name = GPT_BOOTLOADER_B_NAME,
-                                              .type = GPT_BOOTLOADER_ABR_TYPE_GUID,
-                                              .legacy_name = GUID_EFI_NAME,
-                                              .legacy_type = GUID_BOOTLOADER_VALUE,
-                                              .debug_name = "Bootloader B"}},
-      {Partition::kBootloaderR, PartitionInfo{.name = GPT_BOOTLOADER_R_NAME,
-                                              .type = GPT_BOOTLOADER_ABR_TYPE_GUID,
-                                              .legacy_name = GUID_EFI_NAME,
-                                              .legacy_type = GUID_BOOTLOADER_VALUE,
-                                              .debug_name = "Bootloader R"}},
-
-      {Partition::kZirconA, PartitionInfo{.name = GPT_ZIRCON_A_NAME,
-                                          .type = GPT_ZIRCON_ABR_TYPE_GUID,
-                                          .legacy_name = GUID_ZIRCON_A_NAME,
-                                          .legacy_type = GUID_ZIRCON_A_VALUE,
-                                          .debug_name = "Zircon A"}},
-      {Partition::kZirconB, PartitionInfo{.name = GPT_ZIRCON_B_NAME,
-                                          .type = GPT_ZIRCON_ABR_TYPE_GUID,
-                                          .legacy_name = GUID_ZIRCON_B_NAME,
-                                          .legacy_type = GUID_ZIRCON_B_VALUE,
-                                          .debug_name = "Zircon B"}},
-      {Partition::kZirconR, PartitionInfo{.name = GPT_ZIRCON_R_NAME,
-                                          .type = GPT_ZIRCON_ABR_TYPE_GUID,
-                                          .legacy_name = GUID_ZIRCON_R_NAME,
-                                          .legacy_type = GUID_ZIRCON_R_VALUE,
-                                          .debug_name = "Zircon R"}},
-
-      {Partition::kVbMetaA, PartitionInfo{.name = GPT_VBMETA_A_NAME,
-                                          .type = GPT_VBMETA_ABR_TYPE_GUID,
-                                          .legacy_name = GUID_VBMETA_A_NAME,
-                                          .legacy_type = GUID_VBMETA_A_VALUE,
-                                          .debug_name = "VBMeta A"}},
-      {Partition::kVbMetaB, PartitionInfo{.name = GPT_VBMETA_B_NAME,
-                                          .type = GPT_VBMETA_ABR_TYPE_GUID,
-                                          .legacy_name = GUID_VBMETA_B_NAME,
-                                          .legacy_type = GUID_VBMETA_B_VALUE,
-                                          .debug_name = "VBMeta B"}},
-      {Partition::kVbMetaR, PartitionInfo{.name = GPT_VBMETA_R_NAME,
-                                          .type = GPT_VBMETA_ABR_TYPE_GUID,
-                                          .legacy_name = GUID_VBMETA_R_NAME,
-                                          .legacy_type = GUID_VBMETA_R_VALUE,
-                                          .debug_name = "VBMeta R"}},
-
-      {Partition::kAbrMeta, PartitionInfo{.name = GPT_DURABLE_BOOT_NAME,
-                                          .type = GPT_DURABLE_BOOT_TYPE_GUID,
-                                          .legacy_name = GUID_ABR_META_NAME,
-                                          .legacy_type = GUID_ABR_META_VALUE,
-                                          .debug_name = "A/B/R Metadata"}},
-
-      {Partition::kFuchsiaVolumeManager, PartitionInfo{.name = GPT_FVM_NAME,
-                                                       .type = GPT_FVM_TYPE_GUID,
-                                                       .legacy_name = GUID_FVM_NAME,
-                                                       .legacy_type = GUID_FVM_VALUE,
-                                                       .debug_name = "FVM"}},
-  };
-
-  auto iter = map.find(partition);
-  if (iter == map.end()) {
-    return nullptr;
+std::optional<PartitionInfo> GetPartitionInfo(Partition partition) {
+  switch (partition) {
+    case Partition::kBootloaderA:
+      return PartitionInfo{.name = GPT_BOOTLOADER_A_NAME,
+                           .type = GPT_BOOTLOADER_ABR_TYPE_GUID,
+                           .legacy_name = GUID_EFI_NAME,
+                           .legacy_type = GUID_BOOTLOADER_VALUE,
+                           .debug_name = "Bootloader A"};
+    case Partition::kBootloaderB:
+      return PartitionInfo{.name = GPT_BOOTLOADER_B_NAME,
+                           .type = GPT_BOOTLOADER_ABR_TYPE_GUID,
+                           .legacy_name = GUID_EFI_NAME,
+                           .legacy_type = GUID_BOOTLOADER_VALUE,
+                           .debug_name = "Bootloader B"};
+    case Partition::kBootloaderR:
+      return PartitionInfo{.name = GPT_BOOTLOADER_R_NAME,
+                           .type = GPT_BOOTLOADER_ABR_TYPE_GUID,
+                           .legacy_name = GUID_EFI_NAME,
+                           .legacy_type = GUID_BOOTLOADER_VALUE,
+                           .debug_name = "Bootloader R"};
+    case Partition::kZirconA:
+      return PartitionInfo{.name = GPT_ZIRCON_A_NAME,
+                           .type = GPT_ZIRCON_ABR_TYPE_GUID,
+                           .legacy_name = GUID_ZIRCON_A_NAME,
+                           .legacy_type = GUID_ZIRCON_A_VALUE,
+                           .debug_name = "Zircon A"};
+    case Partition::kZirconB:
+      return PartitionInfo{.name = GPT_ZIRCON_B_NAME,
+                           .type = GPT_ZIRCON_ABR_TYPE_GUID,
+                           .legacy_name = GUID_ZIRCON_B_NAME,
+                           .legacy_type = GUID_ZIRCON_B_VALUE,
+                           .debug_name = "Zircon B"};
+    case Partition::kZirconR:
+      return PartitionInfo{.name = GPT_ZIRCON_R_NAME,
+                           .type = GPT_ZIRCON_ABR_TYPE_GUID,
+                           .legacy_name = GUID_ZIRCON_R_NAME,
+                           .legacy_type = GUID_ZIRCON_R_VALUE,
+                           .debug_name = "Zircon R"};
+    case Partition::kVbMetaA:
+      return PartitionInfo{.name = GPT_VBMETA_A_NAME,
+                           .type = GPT_VBMETA_ABR_TYPE_GUID,
+                           .legacy_name = GUID_VBMETA_A_NAME,
+                           .legacy_type = GUID_VBMETA_A_VALUE,
+                           .debug_name = "VBMeta A"};
+    case Partition::kVbMetaB:
+      return PartitionInfo{.name = GPT_VBMETA_B_NAME,
+                           .type = GPT_VBMETA_ABR_TYPE_GUID,
+                           .legacy_name = GUID_VBMETA_B_NAME,
+                           .legacy_type = GUID_VBMETA_B_VALUE,
+                           .debug_name = "VBMeta B"};
+    case Partition::kVbMetaR:
+      return PartitionInfo{.name = GPT_VBMETA_R_NAME,
+                           .type = GPT_VBMETA_ABR_TYPE_GUID,
+                           .legacy_name = GUID_VBMETA_R_NAME,
+                           .legacy_type = GUID_VBMETA_R_VALUE,
+                           .debug_name = "VBMeta R"};
+    case Partition::kAbrMeta:
+      return PartitionInfo{.name = GPT_DURABLE_BOOT_NAME,
+                           .type = GPT_DURABLE_BOOT_TYPE_GUID,
+                           .legacy_name = GUID_ABR_META_NAME,
+                           .legacy_type = GUID_ABR_META_VALUE,
+                           .debug_name = "A/B/R Metadata"};
+    case Partition::kFuchsiaVolumeManager:
+      return PartitionInfo{.name = GPT_FVM_NAME,
+                           .type = GPT_FVM_TYPE_GUID,
+                           .legacy_name = GUID_FVM_NAME,
+                           .legacy_type = GUID_FVM_VALUE,
+                           .debug_name = "FVM"};
+    // sysconfig partition doesn't exist on any GPTs, so has no type GUID
+    case Partition::kSysconfig:
+    case Partition::kUnknown:
+      return std::nullopt;
   }
-  return &iter->second;
 }
 
+}  // namespace
+
 const char* PartitionName(Partition partition, PartitionScheme scheme) {
-  const PartitionInfo* info = GetPartitionInfo(partition);
+  std::optional<PartitionInfo> info = GetPartitionInfo(partition);
   if (info) {
     return scheme == PartitionScheme::kNew ? info->name : info->legacy_name;
   }
   return "Unknown";
 }
 
-// Returns the given partition's type GUID.
-zx::result<Uuid> PartitionTypeUuid(Partition partition, PartitionScheme scheme) {
-  const PartitionInfo* info = GetPartitionInfo(partition);
-  if (info) {
-    return zx::ok(scheme == PartitionScheme::kNew ? info->type : info->legacy_type);
+std::optional<Uuid> PartitionTypeGuid(Partition partition, PartitionScheme scheme) {
+  std::optional<PartitionInfo> info = GetPartitionInfo(partition);
+  if (!info) {
+    return std::nullopt;
   }
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
+  return scheme == PartitionScheme::kNew ? info->type : info->legacy_type;
 }
 
 fbl::String PartitionSpec::ToString() const {
   const char* debug_name = "<Unknown Partition>";
-  const PartitionInfo* info = GetPartitionInfo(partition);
+  std::optional<PartitionInfo> info = GetPartitionInfo(partition);
   if (info) {
     debug_name = info->debug_name;
   }
@@ -224,12 +232,9 @@ zx::result<std::unique_ptr<PartitionClient>> FixedDevicePartitioner::FindPartiti
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx::result<Uuid> type_or = PartitionTypeUuid(spec.partition, kFixedDevicePartitionScheme);
-  if (type_or.is_error()) {
-    ERROR("partition_type is invalid!\n");
-    return type_or.take_error();
-  }
-  Uuid type = type_or.value();
+  std::optional<Uuid> type = PartitionTypeGuid(spec.partition, kFixedDevicePartitionScheme);
+  // OK to assert; supported types all have a type GUID
+  ZX_ASSERT(type);
 
   zx::result partition = OpenBlockPartition(devices_, std::nullopt, type, ZX_SEC(5));
   if (partition.is_error()) {
@@ -259,7 +264,7 @@ zx::result<> FixedDevicePartitioner::WipePartitionTables() const {
 }
 
 zx::result<> FixedDevicePartitioner::ValidatePayload(const PartitionSpec& spec,
-                                                     cpp20::span<const uint8_t> data) const {
+                                                     std::span<const uint8_t> data) const {
   if (!SupportsPartition(spec)) {
     ERROR("Unsupported partition %s\n", spec.ToString().c_str());
     return zx::error(ZX_ERR_NOT_SUPPORTED);

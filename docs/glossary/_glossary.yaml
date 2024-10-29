@@ -1803,7 +1803,7 @@
              "<a href=\"/docs/glossary#product-owner\">Product Owner</a>",
              "<a href=\"/docs/glossary#abr\">A/B/R</a>",
   ]
-  related_guides: ["<a href=\"https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/\ffx/plugins/assembly/;l=1;drc=fdfc80d4f9295e3b078158b435054a5c497a9479?q=src%2Fdeveloper%2Fffx%2Fplugins%2Fassembly%2F&sq=&ss=fuchsia\">Product and Image Assembly</a>"]
+  related_guides: ["<a href=\"https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/ffx/plugins/assembly/\">Product and Image Assembly</a>"]
   area: ["System", "Software Assembly", "Developer"]
 
 - term: "Product Owner"

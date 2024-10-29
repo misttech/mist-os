@@ -77,6 +77,7 @@ test("aml-hrtimer-test") {
     ":common",
     "//sdk/lib/driver/power/cpp/testing",
     "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/fit-promise",
     "//src/devices/testing/fake-bti",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

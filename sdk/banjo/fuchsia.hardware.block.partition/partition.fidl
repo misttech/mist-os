@@ -25,6 +25,18 @@ type GUIDType = strict enum : uint8 {
     INSTANCE = 0x01;
 };
 
+type PartitionMetadata = struct {
+    name string:<MAX_PARTITION_NAME_LENGTH, optional>;
+    type_guid GUID;
+    instance_guid GUID;
+    /// start_block_offset will be 0 if the partition is non-contiguous.
+    start_block_offset uint64;
+    /// num_blocks will be 0 if the partition is a dynamic volume, in which case
+    /// fuchsia.hardware.block.volume.Volume/GetVolumeInfo should be called instead.
+    num_blocks uint64;
+    flags uint64;
+};
+
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
 closed protocol BlockPartition {
@@ -42,9 +54,11 @@ closed protocol BlockPartition {
         name string:<MAX_PARTITION_NAME_LENGTH, optional>;
     });
 
-    /// Get the flags of the partition.
-    strict GetFlags() -> (struct {
+    /// Gets the metadata for the partition.
+    ///
+    /// Fields may be empty if the underlying partition doesn't support them.
+    strict GetMetadata() -> (struct {
         status zx.Status;
-        flags uint64;
+        metadata PartitionMetadata;
     });
 };

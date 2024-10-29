@@ -1,7 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-@available(added=HEAD)
+@available(added=NEXT)
 library fuchsia.hardware.gpio;
 
 using zx;
@@ -39,11 +39,6 @@ open protocol Gpio {
     /// Configures the output buffer as per `mode`.
     strict SetBufferMode(struct {
         mode BufferMode;
-    }) -> () error zx.Status;
-
-    /// Sets the current value of the GPIO (any non-zero value maps to 1).
-    strict Write(struct {
-        value uint8;
     }) -> () error zx.Status;
 
     /// Gets an interrupt object pertaining to a particular GPIO pin. Only one interrupt may

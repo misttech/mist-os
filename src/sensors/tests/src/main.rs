@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashSet;
-
+use core::pin::pin;
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_sensors::*;
 use fidl_fuchsia_sensors_types::*;
+use fuchsia_async::TestExecutor;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at};
 use futures_util::StreamExt;
 use realm_client::{extend_namespace, InstalledNamespace};
+use std::collections::HashSet;
 use {fidl_fuchsia_hardware_sensors as playback_fidl, fidl_fuchsia_sensors_realm as sensors_realm};
 
 async fn setup_realm() -> anyhow::Result<InstalledNamespace> {
@@ -20,6 +21,24 @@ async fn setup_realm() -> anyhow::Result<InstalledNamespace> {
     let ns = extend_namespace(realm_factory, dict_client).await?;
 
     Ok(ns)
+}
+
+async fn get_events_from_stream(
+    num_events: usize,
+    stream: &mut ManagerEventStream,
+) -> Vec<SensorEvent> {
+    let mut events: Vec<SensorEvent> = Vec::new();
+    for _i in 1..num_events {
+        let mut event: SensorEvent =
+            stream.next().await.unwrap().unwrap().into_on_sensor_event().unwrap();
+        // The test cannot know these values ahead of time, so it can zero them so that it can
+        // match the rest of the event.
+        event.timestamp = 0;
+        event.sequence_number = 0;
+
+        events.push(event);
+    }
+    events
 }
 
 fn get_heart_rate_sensor() -> SensorInfo {
@@ -279,17 +298,7 @@ async fn test_sensor_event_stream() -> anyhow::Result<()> {
     assert!(proxy.configure_sensor_rates(id, &config.clone()).await?.is_ok());
 
     let mut event_stream = proxy.take_event_stream();
-    let mut events: Vec<SensorEvent> = Vec::new();
-    for _i in 1..4 {
-        let mut event: SensorEvent =
-            event_stream.next().await.unwrap().unwrap().into_on_sensor_event().unwrap();
-        // The test cannot know these values ahead of time, so it can zero them so that it can
-        // match the rest of the event.
-        event.timestamp = 0;
-        event.sequence_number = 0;
-
-        events.push(event);
-    }
+    let events = get_events_from_stream(4, &mut event_stream).await;
 
     assert_eq!(events.len(), 3);
 
@@ -325,32 +334,13 @@ async fn test_two_clients() -> anyhow::Result<()> {
 
     let id = get_heart_rate_sensor().sensor_id.unwrap();
     assert!(manager1.activate(id).await?.is_ok());
+    assert!(manager2.activate(id).await?.is_ok());
 
     let mut stream1 = manager1.take_event_stream();
     let mut stream2 = manager2.take_event_stream();
 
-    let mut events1: Vec<SensorEvent> = Vec::new();
-    let mut events2: Vec<SensorEvent> = Vec::new();
-
-    for _i in 1..4 {
-        let mut event: SensorEvent = stream1.next().await.unwrap()?.into_on_sensor_event().unwrap();
-        // The test cannot know these values ahead of time, so it can zero them so that it can
-        // match the rest of the event.
-        event.timestamp = 0;
-        event.sequence_number = 0;
-
-        events1.push(event);
-    }
-
-    for _i in 1..4 {
-        let mut event: SensorEvent = stream2.next().await.unwrap()?.into_on_sensor_event().unwrap();
-        // The test cannot know these values ahead of time, so it can zero them so that it can
-        // match the rest of the event.
-        event.timestamp = 0;
-        event.sequence_number = 0;
-
-        events2.push(event);
-    }
+    let events1: Vec<SensorEvent> = get_events_from_stream(4, &mut stream1).await;
+    let events2: Vec<SensorEvent> = get_events_from_stream(4, &mut stream2).await;
 
     let test_events = get_heart_rate_events();
     for event in &events1 {
@@ -382,23 +372,55 @@ async fn test_two_driver_providers() -> anyhow::Result<()> {
         assert!(proxy.configure_sensor_rates(id, &config.clone()).await?.is_ok());
     }
 
-    let mut unique_sensor_ids = HashSet::new();
-
     let mut event_stream = proxy.take_event_stream();
-    let mut events: Vec<SensorEvent> = Vec::new();
-    for _i in 1..8 {
-        let mut event: SensorEvent =
-            event_stream.next().await.unwrap().unwrap().into_on_sensor_event().unwrap();
+    let events: Vec<SensorEvent> = get_events_from_stream(8, &mut event_stream).await;
+
+    let mut unique_sensor_ids = HashSet::new();
+    for event in events {
         unique_sensor_ids.insert(event.sensor_id);
-        // The test cannot know these values ahead of time, so it can zero them so that it can
-        // match the rest of the event.
-        event.timestamp = 0;
-        event.sequence_number = 0;
-
-        events.push(event);
     }
-
     assert_eq!(unique_sensor_ids.len(), 2);
+
+    Ok(())
+}
+
+#[fuchsia::test]
+fn test_subscribe_unsubscribe() -> anyhow::Result<()> {
+    let mut exec = TestExecutor::new();
+    let (realm, manager1) = exec.run_singlethreaded(setup()).unwrap();
+    let manager2 = connect_to_protocol_at::<ManagerMarker>(&realm)?;
+
+    let mut stream1 = manager1.take_event_stream();
+    let mut stream2 = manager2.take_event_stream();
+
+    // Ensure there are no events before activating the sensors.
+    assert!(exec.run_until_stalled(&mut pin!(async { stream1.next().await })).is_pending());
+    assert!(exec.run_until_stalled(&mut pin!(async { stream2.next().await })).is_pending());
+
+    let id = get_heart_rate_sensor().sensor_id.unwrap();
+    assert!(exec.run_singlethreaded(manager1.activate(id)).unwrap().is_ok());
+    assert!(exec.run_singlethreaded(manager2.activate(id)).unwrap().is_ok());
+
+    // Ensure both clients receive events after activating the sensor.
+    let events1 = exec.run_singlethreaded(get_events_from_stream(4, &mut stream1));
+    let events2 = exec.run_singlethreaded(get_events_from_stream(4, &mut stream2));
+
+    let test_events = get_heart_rate_events();
+    for event in &events1 {
+        assert!(test_events.contains(&event));
+    }
+    assert_eq!(events1, events2);
+
+    // Unsubscribe the first client from the sensor and ensure it gets no more events.
+    assert!(exec.run_singlethreaded(manager1.deactivate(id)).unwrap().is_ok());
+    assert!(exec.run_until_stalled(&mut pin!(async { stream1.next().await })).is_pending());
+
+    // Ensure the second client continues to receive events.
+    let events2 = exec.run_singlethreaded(get_events_from_stream(4, &mut stream2));
+    let test_events = get_heart_rate_events();
+    for event in &events2 {
+        assert!(test_events.contains(&event));
+    }
 
     Ok(())
 }

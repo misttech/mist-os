@@ -35,7 +35,7 @@ impl AccessorServer {
         Ok(vec![FormattedContent::Json(fidl_fuchsia_mem::Buffer { vmo, size })])
     }
 
-    pub async fn send(mut self, data: &String) -> Result<(), ServerError> {
+    pub async fn send(mut self, data: &str) -> Result<(), ServerError> {
         if let Some(res) = self.requests.next().await {
             match res? {
                 BatchIteratorRequest::GetNext { responder } => {

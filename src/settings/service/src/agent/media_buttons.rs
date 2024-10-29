@@ -15,7 +15,7 @@ use crate::{service, trace_guard};
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use futures::StreamExt;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::rc::Rc;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 /// Setting types that the media buttons agent will send media button events to, if they're
@@ -45,7 +45,7 @@ impl MediaButtonsAgent {
         };
 
         let mut receptor = context.receptor;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Ok((Payload::Invocation(invocation), client)) =
                 receptor.next_of::<Payload>().await
             {
@@ -66,7 +66,7 @@ impl MediaButtonsAgent {
 
     async fn handle_service_lifespan(
         &mut self,
-        service_context: Arc<ServiceContext>,
+        service_context: Rc<ServiceContext>,
     ) -> InvocationResult {
         let (input_tx, mut input_rx) = futures::channel::mpsc::unbounded::<MediaButtonsEvent>();
         if let Err(e) = monitor_media_buttons(service_context, input_tx).await {
@@ -79,7 +79,7 @@ impl MediaButtonsAgent {
             messenger: self.messenger.clone(),
             recipient_settings: self.recipient_settings.clone(),
         };
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(event) = input_rx.next().await {
                 let id = ftrace::Id::new();
                 event_handler.handle_event(event, id);
@@ -124,7 +124,7 @@ impl EventHandler {
                 HandlerPayload::Request(setting_request.clone()).into(),
                 Audience::Address(service::Address::Handler(*setting_type)),
             );
-            fasync::Task::spawn(async move {
+            fasync::Task::local(async move {
                 let _ = receptor.next_payload().await;
                 drop(guard);
             })
@@ -160,7 +160,7 @@ mod tests {
         let result = agent
             .handle(Invocation {
                 lifespan: Lifespan::Initialization,
-                service_context: Arc::new(ServiceContext::new(None, None)),
+                service_context: Rc::new(ServiceContext::new(None, None)),
             })
             .await;
 
@@ -177,7 +177,7 @@ mod tests {
         let mut agent =
             MediaButtonsAgent { publisher, messenger, recipient_settings: HashSet::new() };
 
-        let service_context = Arc::new(ServiceContext::new(
+        let service_context = Rc::new(ServiceContext::new(
             // Create a service registry without a media buttons interface.
             Some(ServiceRegistry::serve(ServiceRegistry::create())),
             None,

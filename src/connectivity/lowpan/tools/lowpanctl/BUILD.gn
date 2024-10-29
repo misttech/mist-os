@@ -19,7 +19,6 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.lowpan.thread:fuchsia.lowpan.thread_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/rust/zx",
-    "//src/connectivity/lowpan/lib/openthread_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

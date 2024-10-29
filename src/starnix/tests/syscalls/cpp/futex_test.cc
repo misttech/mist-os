@@ -426,4 +426,58 @@ TEST(FutexTest, CanRequeueAllWaiters) {
   });
 }
 
+TEST(FutexTest, FutexFailsWithEFAULTOnNullAddress) {
+  EXPECT_THAT(syscall(SYS_futex, nullptr, FUTEX_WAIT, 0, NULL, 0, 0),
+              SyscallFailsWithErrno(EFAULT));
+}
+
+TEST(FutexTest, FutexFailsWithEFAULTOnInvalidLowAddress) {
+  // Zircon forbids creating mappings with addresses lower than 2MB.
+  constexpr uintptr_t kInvalidLowAddress = 0x10000;
+  EXPECT_THAT(syscall(SYS_futex, kInvalidLowAddress, FUTEX_WAIT, 0, NULL, 0, 0),
+              SyscallFailsWithErrno(EFAULT));
+}
+
+#if defined(__x86_64__)
+// From zircon/kernel/arch/x86/include/arch/kernel_aspace.h
+constexpr uintptr_t kLowestNormalModeAddress = ((1ULL << 46));
+#elif defined(__aarch64__)
+// From zircon/kernel/arch/arm64/include/arch/kernel_aspace.h
+constexpr uintptr_t kLowestNormalModeAddress = ((1ULL << 47));
+#elif defined(__riscv)
+// From zircon/kernel/arch/riscv64/include/arch/kernel_aspace.h
+// Currently we only support the RV39 address space model.
+constexpr uintptr_t kLowestNormalModeAddress = ((1ULL << 37));
+#else
+#error Unsupported architecture
+#endif
+
+TEST(FutexTest, FutexFailsWithEFAULTOnLowestNormalAddress) {
+  // The restricted / normal address space layout is Starnix-specific.
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP();
+  }
+  EXPECT_THAT(syscall(SYS_futex, kLowestNormalModeAddress, FUTEX_WAIT, 0, NULL, 0, 0),
+              SyscallFailsWithErrno(EFAULT));
+}
+
+TEST(FutexTest, FutexSucceedsHighestRestrictedAddress) {
+  // The restricted / normal address space layout is Starnix-specific.
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP();
+  }
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGESIZE));
+  const uintptr_t highest_restricted_mode_address = kLowestNormalModeAddress - page_size;
+  void *result = mmap(reinterpret_cast<void *>(highest_restricted_mode_address), page_size,
+                      PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+  ASSERT_NE(result, MAP_FAILED) << strerror(errno);
+  ASSERT_EQ(highest_restricted_mode_address, reinterpret_cast<uintptr_t>(result));
+  struct timespec wait_timeout = {};
+  long futex_result =
+      syscall(SYS_futex, highest_restricted_mode_address, FUTEX_WAIT, 0, &wait_timeout, 0, 0);
+  EXPECT_EQ(futex_result, -1);
+  EXPECT_EQ(errno, ETIMEDOUT);
+  SAFE_SYSCALL(munmap(reinterpret_cast<void *>(highest_restricted_mode_address), page_size));
+}
+
 }  // anonymous namespace

@@ -40,11 +40,14 @@ rustc_library("api_impl") {
     "src/binding_stubs.rs",
     "src/lib.rs",
     "src/mem.rs",
+    "src/props.rs",
     "src/storage.rs",
   ]
   deps = [
     ":malloc_fill_byte_zero_asan",
     ":malloc_fill_byte_zero_hwasan",
+    "//src/lib/fuchsia-sync",
+    "//src/tee/lib/tee_properties",
     "//src/tee/tee_internal_api:tee_internal",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:num-traits",
@@ -58,6 +61,12 @@ rustc_library("api_impl") {
 fuchsia_unittest_package("api-impl-tests") {
   package_name = "tee-runtime-api-impl-tests"
 
+  # TODO(https://fxbug.dev/376124532): Update panic behavior tests to not require this.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   deps = [ ":api_impl_test" ]
 }
 

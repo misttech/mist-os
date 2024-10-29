@@ -2,12 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/component_runner.h"
+
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
 
+#include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/inspect.h"
+#include "src/storage/f2fs/mount.h"
+#include "src/storage/f2fs/node.h"
+#include "src/storage/f2fs/reader.h"
+#include "src/storage/f2fs/segment.h"
 #include "src/storage/f2fs/service/admin.h"
 #include "src/storage/f2fs/service/lifecycle.h"
 #include "src/storage/f2fs/service/startup.h"
+#include "src/storage/f2fs/storage_buffer.h"
+#include "src/storage/f2fs/vnode.h"
+#include "src/storage/f2fs/vnode_cache.h"
+#include "src/storage/f2fs/writeback.h"
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
 
 namespace f2fs {

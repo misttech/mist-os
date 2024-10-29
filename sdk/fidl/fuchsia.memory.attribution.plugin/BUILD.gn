@@ -17,7 +17,7 @@ fidl("fuchsia.memory.attribution.plugin") {
 
   # TODO: https://fxbug.dev/307580082 - This protocol is under construction.
   visibility = [
-    "//sdk/fidl:sdk_partner_internal_libs",
+    "//sdk/fidl:*",
     "//src/developer/ffx/plugins/profile/memory/*",
     "//src/performance/memory/*",
   ]

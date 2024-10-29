@@ -537,7 +537,7 @@ TEST_P(MinfsTest, UnlinkFail) {
   ASSERT_NO_FATAL_FAILURE(GetFreeBlocks(fs(), &original_blocks));
 
   uint32_t fd_count = 100;
-  fbl::unique_fd fds[fd_count];
+  auto fds = std::make_unique<fbl::unique_fd[]>(fd_count);
 
   char data[minfs::kMinfsBlockSize];
   memset(data, 0xaa, sizeof(data));

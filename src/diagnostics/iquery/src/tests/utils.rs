@@ -18,9 +18,9 @@ use serde_json::ser::{PrettyFormatter, Serializer};
 use std::path::Path;
 use std::{fmt, fs};
 
-pub const BASIC_COMPONENT_URL: &'static str =
+pub const BASIC_COMPONENT_URL: &str =
     "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm";
-pub const TEST_COMPONENT_URL: &'static str =
+pub const TEST_COMPONENT_URL: &str =
     "fuchsia-pkg://fuchsia.com/iquery-tests#meta/test_component.cm";
 
 pub struct TestBuilder {
@@ -173,7 +173,7 @@ impl<'a> CommandAssertion<'a> {
             command,
             iquery_args,
             max_retry_time_seconds: 0,
-            expected: expected.into(),
+            expected,
             format,
             instance_child_name,
         }
@@ -188,7 +188,7 @@ impl<'a> CommandAssertion<'a> {
         let format_str = self.format.to_string();
         let command_str = self.command.to_string();
         let mut command_line = vec!["--format", &format_str, &command_str];
-        command_line.append(&mut self.iquery_args.iter().map(|s| s.as_ref()).collect::<Vec<_>>());
+        command_line.append(&mut self.iquery_args.to_vec());
         loop {
             match execute_command(&command_line[..]).await {
                 Ok(mut result) => {
@@ -199,10 +199,10 @@ impl<'a> CommandAssertion<'a> {
                             + zx::MonotonicDuration::from_seconds(self.max_retry_time_seconds)
                                 .into_nanos()
                     {
-                        self.assert_result(&result, &self.expected);
+                        self.assert_result(&result, self.expected);
                         break;
                     }
-                    if self.result_equals_expected(&result, &self.expected) {
+                    if self.result_equals_expected(&result, self.expected) {
                         break;
                     }
                 }
@@ -213,7 +213,7 @@ impl<'a> CommandAssertion<'a> {
                             + zx::MonotonicDuration::from_seconds(self.max_retry_time_seconds)
                                 .into_nanos()
                     {
-                        assert!(false, "Error: {:?}", e);
+                        panic!("Error: {:?}", e);
                     }
                 }
             }
@@ -273,7 +273,7 @@ impl<'a> CommandAssertion<'a> {
             if line.starts_with(" ") {
                 if include_data {
                     result.push_str(line);
-                    result.push_str("\n");
+                    result.push('\n');
                 }
                 continue;
             }
@@ -296,7 +296,7 @@ impl<'a> CommandAssertion<'a> {
             }
 
             result.push_str(line);
-            result.push_str("\n");
+            result.push('\n');
         }
         result.trim().to_string()
     }
@@ -376,7 +376,7 @@ impl<'a> CommandAssertion<'a> {
 
 /// Execute a command: [command, flags, and, iquery_args]
 pub async fn execute_command(command: &[&str]) -> Result<String, Error> {
-    let provider = ArchiveAccessorProvider::default();
+    let provider = ArchiveAccessorProvider;
     let command_line = CommandLine::from_args(&["iquery"], command).expect("create command line");
     command_line.execute(&provider).await
 }

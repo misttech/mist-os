@@ -43,9 +43,7 @@ class Tracing(tracing.Tracing):
         self._name: str = device_name
         self._fc_transport: fc_transport.FuchsiaController = fuchsia_controller
 
-        self._trace_controller_proxy: (
-            f_tracingcontroller.Session.Client | None
-        )
+        self._trace_controller_proxy: f_tracingcontroller.Session.Client | None
 
         self._trace_socket: AsyncSocket | None
         self._session_initialized: bool
@@ -99,11 +97,11 @@ class Tracing(tracing.Tracing):
                 starting at some later point.
 
         Raises:
-            errors.FuchsiaStateError: When trace session is already initialized.
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            errors.TracingStateError: When trace session is already initialized.
+            errors.TracingError: On FIDL communication failure.
         """
         if self._session_initialized:
-            raise errors.FuchsiaStateError(
+            raise errors.TracingStateError(
                 f"Trace session is already initialized on {self._name}. Can be "
                 "initialized only once"
             )
@@ -131,7 +129,7 @@ class Tracing(tracing.Tracing):
                 output=trace_socket_server.take(),
             )
         except fc.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise errors.TracingError(
                 "fuchsia.tracing.controller.Initialize FIDL Error"
             ) from status
         self._trace_controller_proxy = f_tracingcontroller.Session.Client(
@@ -144,17 +142,17 @@ class Tracing(tracing.Tracing):
         """Starts tracing.
 
         Raises:
-           errors.FuchsiaStateError: When trace session is not initialized or
+           errors.TracingStateError: When trace session is not initialized or
                already started.
-           errors.FuchsiaControllerError: On FIDL communication failure.
+           errors.TracingError: On FIDL communication failure.
         """
         if not self._session_initialized:
-            raise errors.FuchsiaStateError(
+            raise errors.TracingStateError(
                 "Cannot start: Trace session is not "
                 f"initialized on {self._name}"
             )
         if self._tracing_active:
-            raise errors.FuchsiaStateError(
+            raise errors.TracingStateError(
                 f"Cannot start: Trace already started on {self._name}"
             )
         _LOGGER.info("Starting trace on '%s'", self._name)
@@ -169,7 +167,7 @@ class Tracing(tracing.Tracing):
                 )
             )
         except fc.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise errors.TracingError(
                 "fuchsia.tracing.controller.Start FIDL Error"
             ) from status
         self._tracing_active = True
@@ -178,17 +176,17 @@ class Tracing(tracing.Tracing):
         """Stops the current trace.
 
         Raises:
-           errors.FuchsiaStateError: When trace session is not initialized or
+           errors.TracingStateError: When trace session is not initialized or
                not started.
-           errors.FuchsiaControllerError: On FIDL communication failure.
+           errors.TracingError: On FIDL communication failure.
         """
         if not self._session_initialized:
-            raise errors.FuchsiaStateError(
+            raise errors.TracingStateError(
                 "Cannot stop: Trace session is not "
                 f"initialized on {self._name}"
             )
         if not self._tracing_active:
-            raise errors.FuchsiaStateError(
+            raise errors.TracingStateError(
                 f"Cannot stop: Trace not started on {self._name}"
             )
         _LOGGER.info("Stopping trace on '%s'", self._name)
@@ -211,7 +209,7 @@ class Tracing(tracing.Tracing):
                             p.name,
                         )
         except fc.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise errors.TracingError(
                 "fuchsia.tracing.controller.Stop FIDL Error"
             ) from status
         self._tracing_active = False
@@ -241,11 +239,11 @@ class Tracing(tracing.Tracing):
             The path to the trace file.
 
          Raises:
-            errors.FuchsiaStateError: When trace session is not initialized or
+            errors.TracingStateError: When trace session is not initialized or
                 already started.
         """
         if not self._session_initialized:
-            raise errors.FuchsiaStateError(
+            raise errors.TracingStateError(
                 "Cannot download: Trace session is not "
                 f"initialized on {self._name}"
             )
@@ -277,7 +275,7 @@ class Tracing(tracing.Tracing):
             Bytes read from the socket.
 
         Raises:
-            errors.FuchsiaControllerError: When reading from the socket failed.
+            errors.TracingError: When reading from the socket failed.
         """
         assert self._trace_socket is not None
 

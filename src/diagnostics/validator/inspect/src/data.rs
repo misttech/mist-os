@@ -14,8 +14,8 @@ use diagnostics_hierarchy::{
 use fidl_diagnostics_validate::{self as validate, Value};
 use inspect_format::{ArrayFormat, BlockIndex, LinkNodeDisposition};
 use num_traits::Zero;
-use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 mod scanner;
 pub use scanner::Scanner;
@@ -211,7 +211,7 @@ impl Property {
                         "{}{} ->\n{}",
                         prefix,
                         self.name,
-                        parsed_data.nodes[&0.into()].to_string(&prefix, &parsed_data, true)
+                        parsed_data.nodes[&0.into()].to_string(prefix, parsed_data, true)
                     )],
                     properties: vec![],
                 },
@@ -224,7 +224,7 @@ impl Property {
                         .iter()
                         .map(|v| {
                             parsed_data.nodes.get(v).map_or("Missing child".into(), |n| {
-                                n.to_string(&prefix, &parsed_data, false)
+                                n.to_string(prefix, parsed_data, false)
                             })
                         })
                         .collect::<Vec<_>>();
@@ -236,7 +236,7 @@ impl Property {
                                     nodes: vec![],
                                     properties: vec!["Missing property".into()],
                                 },
-                                |p| p.format_entries(&prefix),
+                                |p| p.format_entries(prefix),
                             )
                         })
                     {
@@ -323,7 +323,7 @@ const SET: Op =
 
 macro_rules! insert_linear_fn {
     ($name:ident, $type:ident) => {
-        fn $name(numbers: &mut Vec<$type>, value: $type, count: u64) -> Result<(), Error> {
+        fn $name(numbers: &mut [$type], value: $type, count: u64) -> Result<(), Error> {
             let buckets: $type = (numbers.len() as i32 - 4).try_into().unwrap();
             let floor = numbers[0];
             let step_size = numbers[1];
@@ -354,7 +354,7 @@ insert_linear_fn! {insert_linear_d, f64}
 //     a fudge factor added to int results - but that's only correct up to a million or so.
 macro_rules! insert_exponential_fn {
     ($name:ident, $type:ident, $fudge_factor:expr) => {
-        fn $name(numbers: &mut Vec<$type>, value: $type, count: u64) -> Result<(), Error> {
+        fn $name(numbers: &mut [$type], value: $type, count: u64) -> Result<(), Error> {
             let buckets = numbers.len() - 5;
             let floor = numbers[0];
             let initial_step = numbers[1];
@@ -633,17 +633,11 @@ impl Data {
                             Value::DoubleT(value),
                         ) => insert_exponential_d(numbers, *value, 1),
                         unexpected => {
-                            return Err(format_err!(
-                                "Type mismatch {:?} trying to insert",
-                                unexpected
-                            ))
+                            Err(format_err!("Type mismatch {:?} trying to insert", unexpected))
                         }
                     }
                 } else {
-                    return Err(format_err!(
-                        "Tried to insert number on nonexistent property {}",
-                        id
-                    ));
+                    Err(format_err!("Tried to insert number on nonexistent property {}", id))
                 }
             }
             validate::Action::InsertMultiple(validate::InsertMultiple { id, value, count }) => {
@@ -694,21 +688,19 @@ impl Data {
                             },
                             Value::DoubleT(value),
                         ) => insert_exponential_d(numbers, *value, *count),
-                        unexpected => {
-                            return Err(format_err!(
-                                "Type mismatch {:?} trying to insert multiple",
-                                unexpected
-                            ))
-                        }
+                        unexpected => Err(format_err!(
+                            "Type mismatch {:?} trying to insert multiple",
+                            unexpected
+                        )),
                     }
                 } else {
-                    return Err(format_err!(
+                    Err(format_err!(
                         "Tried to insert_multiple number on nonexistent property {}",
                         id
-                    ));
+                    ))
                 }
             }
-            _ => return Err(format_err!("Unknown action {:?}", action)),
+            _ => Err(format_err!("Unknown action {:?}", action)),
         }
     }
 
@@ -738,7 +730,7 @@ impl Data {
         if self.tombstone_nodes.contains(&id) {
             return Err(format_err!("Tried to create implicitly deleted node {}", id));
         }
-        if let Some(_) = self.nodes.insert(id, node) {
+        if self.nodes.insert(id, node).is_some() {
             return Err(format_err!("Create called when node already existed at {}", id));
         }
         if let Some(parent_node) = self.nodes.get_mut(&parent) {
@@ -804,7 +796,7 @@ impl Data {
     }
 
     fn make_tombstone_property(&mut self, id: BlockIndex) -> Result<(), Error> {
-        if let None = self.properties.remove(&id) {
+        if self.properties.remove(&id).is_none() {
             return Err(format_err!(
                 "Internal error! Tried to tombstone nonexistent property {}",
                 id
@@ -830,7 +822,7 @@ impl Data {
             return Err(format_err!("Tried to create implicitly deleted property {}", id));
         }
         let property = Property { parent, id, name: name.into(), payload };
-        if let Some(_) = self.properties.insert(id, property) {
+        if self.properties.insert(id, property).is_some() {
             return Err(format_err!("Property insert called on existing id {}", id));
         }
         Ok(())
@@ -868,7 +860,7 @@ impl Data {
         value: &validate::Value,
         op: Op,
     ) -> Result<(), Error> {
-        if let Some(property) = self.properties.get_mut(&id.into()) {
+        if let Some(property) = self.properties.get_mut(&id) {
             match (&property, value) {
                 (Property { payload: Payload::Int(old), .. }, Value::IntT(value)) => {
                     property.payload = Payload::Int((op.int)(*old, *value));
@@ -1003,7 +995,7 @@ impl Data {
         actions: &Vec<validate::Action>,
     ) -> Result<(), Error> {
         let mut parsed_data = Data::new();
-        parsed_data.apply_multiple(&actions)?;
+        parsed_data.apply_multiple(actions)?;
         self.add_property(
             parent,
             id,
@@ -1113,11 +1105,6 @@ impl Data {
         }
     }
 
-    /// Generates a string fully representing the Inspect data.
-    pub fn to_string(&self) -> String {
-        self.to_string_internal(false)
-    }
-
     /// This creates a new Data. Note that the standard "root" node of the VMO API
     /// corresponds to the index-0 node added here.
     pub fn new() -> Data {
@@ -1148,17 +1135,9 @@ impl Data {
         }
     }
 
-    fn to_string_internal(&self, hide_root: bool) -> String {
-        if let Some(node) = self.nodes.get(&BlockIndex::ROOT) {
-            node.to_string(&"".to_owned(), self, hide_root)
-        } else {
-            "No root node; internal error\n".to_owned()
-        }
-    }
-
     fn apply_multiple(&mut self, actions: &Vec<validate::Action>) -> Result<(), Error> {
         for action in actions {
-            self.apply(&action)?;
+            self.apply(action)?;
         }
         Ok(())
     }
@@ -1171,7 +1150,7 @@ impl Data {
         let mut target_node_id = None;
         let root = &self.nodes[&BlockIndex::ROOT];
         for child_id in &root.children {
-            if let Some(node) = self.nodes.get(&child_id) {
+            if let Some(node) = self.nodes.get(child_id) {
                 if node.name == name {
                     target_node_id = Some(*child_id);
                     break;
@@ -1198,7 +1177,18 @@ impl Data {
 
         // Root has no properties and any children it may have are tombstoned.
         let root = &self.nodes[&BlockIndex::ROOT];
-        return root.children.is_subset(&self.tombstone_nodes) && root.properties.len() == 0;
+        root.children.is_subset(&self.tombstone_nodes) && root.properties.len() == 0
+    }
+}
+
+impl fmt::Display for Data {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = if let Some(node) = self.nodes.get(&BlockIndex::ROOT) {
+            node.to_string("", self, false)
+        } else {
+            "No root node; internal error\n".to_owned()
+        };
+        write!(f, "{s}",)
     }
 }
 
@@ -1221,7 +1211,7 @@ impl From<DiagnosticsHierarchy> for Data {
         let mut next_id = BlockIndex::new(1);
 
         while let Some((id, value)) = queue.pop() {
-            for ref node in value.children.iter() {
+            for node in value.children.iter() {
                 let child_id = next_id;
                 next_id += 1;
                 nodes.insert(
@@ -1292,7 +1282,7 @@ mod tests {
         Ok(())
     }
 
-    const EXPECTED_HIERARCHY: &'static str = r#"root ->
+    const EXPECTED_HIERARCHY: &str = r#"root ->
 > double: GenericNumber("2.5")
 > int: GenericNumber("-5")
 > string: String("value")
@@ -1628,7 +1618,7 @@ mod tests {
         assert!(info.to_string().contains("value: IntArray([4, 2, 0, 2, 1, 2], LinearHistogram)"));
         assert!(info.apply(&insert!(id: 3, value: Value::IntT(0))).is_ok());
         assert!(info.to_string().contains("value: IntArray([4, 2, 1, 2, 1, 2], LinearHistogram)"));
-        assert!(info.apply(&insert!(id: 3, value: Value::IntT(std::i64::MIN))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::IntT(i64::MIN))).is_ok());
         assert!(info.to_string().contains("value: IntArray([4, 2, 2, 2, 1, 2], LinearHistogram)"));
         assert!(info.apply(&insert!(id: 3, value: Value::UintT(0))).is_err());
         assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(0.0))).is_err());
@@ -1673,7 +1663,7 @@ mod tests {
         assert!(info
             .to_string()
             .contains("value: IntArray([5, 2, 4, 1, 2, 1, 2], ExponentialHistogram)"));
-        assert!(info.apply(&insert!(id: 3, value: Value::IntT(std::i64::MIN))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::IntT(i64::MIN))).is_ok());
         assert!(info
             .to_string()
             .contains("value: IntArray([5, 2, 4, 2, 2, 1, 2], ExponentialHistogram)"));
@@ -1895,15 +1885,15 @@ mod tests {
         assert!(info
             .to_string()
             .contains("value: DoubleArray([4.0, 0.5, 0.0, 2.0, 1.0, 1.0], LinearHistogram)"));
-        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(std::f64::MAX))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(f64::MAX))).is_ok());
         assert!(info
             .to_string()
             .contains("value: DoubleArray([4.0, 0.5, 0.0, 2.0, 1.0, 2.0], LinearHistogram)"));
-        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(std::f64::MIN_POSITIVE))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(f64::MIN_POSITIVE))).is_ok());
         assert!(info
             .to_string()
             .contains("value: DoubleArray([4.0, 0.5, 1.0, 2.0, 1.0, 2.0], LinearHistogram)"));
-        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(std::f64::MIN))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(f64::MIN))).is_ok());
         assert!(info
             .to_string()
             .contains("value: DoubleArray([4.0, 0.5, 2.0, 2.0, 1.0, 2.0], LinearHistogram)"));
@@ -1964,15 +1954,15 @@ mod tests {
         assert!(info.to_string().contains(
             "value: DoubleArray([5.0, 2.0, 4.0, 0.0, 2.0, 5.0, 2.0, 1.0], ExponentialHistogram)"
         ));
-        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(std::f64::MAX))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(f64::MAX))).is_ok());
         assert!(info.to_string().contains(
             "value: DoubleArray([5.0, 2.0, 4.0, 0.0, 2.0, 5.0, 2.0, 2.0], ExponentialHistogram)"
         ));
-        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(std::f64::MIN_POSITIVE))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(f64::MIN_POSITIVE))).is_ok());
         assert!(info.to_string().contains(
             "value: DoubleArray([5.0, 2.0, 4.0, 1.0, 2.0, 5.0, 2.0, 2.0], ExponentialHistogram)"
         ));
-        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(std::f64::MIN))).is_ok());
+        assert!(info.apply(&insert!(id: 3, value: Value::DoubleT(f64::MIN))).is_ok());
         assert!(info.to_string().contains(
             "value: DoubleArray([5.0, 2.0, 4.0, 2.0, 2.0, 5.0, 2.0, 2.0], ExponentialHistogram)"
         ));
@@ -2193,13 +2183,13 @@ mod tests {
         assert!(data.apply(&create_node!(parent: 0, id: 2, name: "new_root_second")).is_err());
     }
 
-    const DIFF_STRING: &'static str = r#"-- DIFF --
+    const DIFF_STRING: &str = r#"-- DIFF --
  same: "root ->"
  same: "> node ->"
 local: "> > prop1: String(\"foo\")"
 other: "> > prop1: String(\"bar\")""#;
 
-    const FULL_STRING: &'static str = r#"-- LOCAL --
+    const FULL_STRING: &str = r#"-- LOCAL --
 root ->
 > node ->
 > > prop1: String("foo")
@@ -2233,10 +2223,7 @@ root ->
         match local.compare(&remote, DiffType::Both) {
             Err(error) => {
                 let error_string = format!("{:?}", error);
-                assert_eq!(
-                    vec!["Trees differ:", FULL_STRING, DIFF_STRING].join("\n"),
-                    error_string
-                );
+                assert_eq!(["Trees differ:", FULL_STRING, DIFF_STRING].join("\n"), error_string);
             }
             _ => return Err(format_err!("Didn't get failure")),
         }

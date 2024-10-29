@@ -10,6 +10,7 @@ use ::gcs::client::{Client, ProgressResponse, ProgressState};
 use anyhow::{anyhow, Context};
 use async_fs::rename;
 use async_trait::async_trait;
+use ffx_config::EnvironmentContext;
 use ffx_product::{CommandStatus, MachineOutput, MachineUi};
 use ffx_product_download_args::DownloadCommand;
 use ffx_product_list::pb_list_impl;
@@ -22,6 +23,8 @@ use std::path::Path;
 pub struct PbDownloadTool {
     #[command]
     cmd: DownloadCommand,
+
+    context: EnvironmentContext,
 }
 
 #[async_trait(?Send)]
@@ -47,7 +50,7 @@ impl PbDownloadTool {
     ) -> fho::Result<()> {
         let ui = MachineUi::new(writer);
 
-        let cmd = match preprocess_cmd(&self.cmd, &ui).await {
+        let cmd = match preprocess_cmd(&self.cmd, &ui, &self.context).await {
             Ok(c) => c,
             Err(e) => {
                 ui.machine(MachineOutput::CommandStatus(CommandStatus::UserError {
@@ -90,7 +93,7 @@ impl PbDownloadTool {
         let mut input = stdin();
         let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
 
-        let cmd = preprocess_cmd(&self.cmd, &ui).await?;
+        let cmd = preprocess_cmd(&self.cmd, &ui, &self.context).await?;
 
         pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &cmd.product_dir, &client, &ui)
             .await
@@ -170,6 +173,7 @@ pub async fn pb_download_impl<I: structured_ui::Interface>(
 pub async fn preprocess_cmd<I: structured_ui::Interface>(
     cmd: &DownloadCommand,
     ui: &I,
+    context: &EnvironmentContext,
 ) -> fho::Result<DownloadCommand> {
     // If the manifest_url is a transfer url, we don't need to preprocess.
     if let Ok(_) = url::Url::parse(&cmd.manifest_url) {
@@ -178,13 +182,19 @@ pub async fn preprocess_cmd<I: structured_ui::Interface>(
 
     // If the manifest_url look like a product name, we try to convert it into a
     // transfer manifest url.
-    let products =
-        pb_list_impl(&cmd.auth, cmd.base_url.clone(), cmd.version.clone(), cmd.branch.clone(), ui)
-            .await?
-            .iter()
-            .cloned()
-            .filter(|x| x.name == cmd.manifest_url)
-            .collect::<Vec<_>>();
+    let products = pb_list_impl(
+        &cmd.auth,
+        cmd.base_url.clone(),
+        cmd.version.clone(),
+        cmd.branch.clone(),
+        ui,
+        &context,
+    )
+    .await?
+    .iter()
+    .cloned()
+    .filter(|x| x.name == cmd.manifest_url)
+    .collect::<Vec<_>>();
 
     if products.len() != 1 {
         return_user_error!(
@@ -201,10 +211,12 @@ pub async fn preprocess_cmd<I: structured_ui::Interface>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_config::{ConfigLevel, TestEnv};
     use fuchsia_hyper_test_support::handler::{ForPath, StaticResponse};
     use fuchsia_hyper_test_support::TestServer;
+    use std::fs::File;
     use std::io::Write;
-    use temp_test_env::TempTestEnv;
+    use std::path::Path;
 
     #[fuchsia::test]
     async fn test_gcs_pb_download_impl() {
@@ -281,12 +293,27 @@ mod test {
         assert!(download_dir.join("foo").join("payload.txt").exists());
     }
 
+    const PRODUCT_BUNDLE_INDEX_KEY: &str = "product.index";
+    const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
+
+    async fn setup_test_env(path: &Path) -> TestEnv {
+        let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query(PRODUCT_BUNDLE_INDEX_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(path.to_str().unwrap().into())
+            .await
+            .unwrap();
+
+        env
+    }
+
     #[fuchsia::test]
     async fn test_preprocess_cmd() {
-        let test_dir = tempfile::TempDir::new().expect("temp dir");
-        let test_env = TempTestEnv::new().expect("test_env");
-        let mut f =
-            std::fs::File::create(test_env.home.join("product_bundles.json")).expect("file create");
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(PB_MANIFEST_NAME);
+        let env = setup_test_env(&path).await;
+        let mut f = File::create(&path).expect("file create");
         f.write_all(
             r#"[{
             "name": "fake_name",
@@ -301,21 +328,20 @@ mod test {
         let force = false;
         let manifest_url = String::from("fake_name");
         let auth = pbms::AuthFlowChoice::NoAuth;
-        let product_dir = test_dir.path().join("download");
-        let base_url = Some(format!("file:{}", test_env.home.display()));
-        let version = Some(String::from("fake_version"));
+        let product_dir = tmp.path().join("download");
+        let base_url = Some(format!("file:{}", tmp.path().display()));
         let cmd = DownloadCommand {
             force,
             auth,
             manifest_url,
             product_dir,
             base_url,
-            version,
+            version: None,
             branch: None,
         };
 
         let processed_cmd =
-            preprocess_cmd(&cmd.clone(), &ui).await.expect("testing preprocess cmd");
+            preprocess_cmd(&cmd.clone(), &ui, &env.context).await.expect("testing preprocess cmd");
 
         assert_eq!(
             DownloadCommand { manifest_url: String::from("fake_url"), ..cmd },

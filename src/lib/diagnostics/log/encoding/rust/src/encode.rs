@@ -357,8 +357,8 @@ impl<B: MutableBuffer> WriteArgumentValue<B> for &str {
         encoder: &mut Encoder<B>,
     ) -> Result<(), EncodingError> {
         header.set_type(ArgType::String as u8);
-        header.set_value_ref(string_mask(*self));
-        encoder.write_string(*self)
+        header.set_value_ref(string_mask(self));
+        encoder.write_string(self)
     }
 }
 

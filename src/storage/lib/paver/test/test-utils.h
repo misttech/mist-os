@@ -148,7 +148,7 @@ class FakeDevicePartitioner : public paver::DevicePartitioner {
   zx::result<> WipePartitionTables() const override { return zx::ok(); }
 
   zx::result<> ValidatePayload(const paver::PartitionSpec& spec,
-                               cpp20::span<const uint8_t> data) const override {
+                               std::span<const uint8_t> data) const override {
     return zx::ok();
   }
 };

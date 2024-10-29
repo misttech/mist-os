@@ -53,11 +53,11 @@ impl FakeArchiveAccessor {
     /// inspect_data: Strings to supply to the program under test via the ArchiveAccessor protocol.
     /// event_signaler: Callbacks to report events.
     pub fn new(
-        inspect_data: &Vec<String>,
+        inspect_data: &[String],
         event_signaler: Option<Box<dyn EventSignaler>>,
     ) -> Arc<FakeArchiveAccessor> {
         Arc::new(FakeArchiveAccessor {
-            inspect_data: inspect_data.clone(),
+            inspect_data: inspect_data.to_vec(),
             event_signaler,
             next_data: AtomicUsize::new(0),
             selectors_requested: Mutex::new(vec![]),
@@ -84,7 +84,7 @@ impl FakeArchiveAccessor {
         self.selectors_requested.lock().push(
             selectors
                 .into_iter()
-                .map(|s| selectors::selector_to_string(s))
+                .map(selectors::selector_to_string)
                 .collect::<Result<BTreeSet<_>, Error>>()?,
         );
         if let Some(s) = self.event_signaler.as_ref() {
@@ -97,17 +97,15 @@ impl FakeArchiveAccessor {
             if let Some(s) = self.event_signaler.as_ref() {
                 s.signal_done().await;
             }
-        } else {
-            if let Err(problem) =
-                ArchiveAccessor::send(result_stream, &self.inspect_data[data_index]).await
-            {
-                if let Some(s) = self.event_signaler.as_ref() {
-                    s.signal_done().await;
-                    s.signal_error(&format!("{}", problem)).await;
-                }
-                error!("Problem in request: {}", problem);
-                return Err(problem);
+        } else if let Err(problem) =
+            ArchiveAccessor::send(result_stream, &self.inspect_data[data_index]).await
+        {
+            if let Some(s) = self.event_signaler.as_ref() {
+                s.signal_done().await;
+                s.signal_error(&format!("{}", problem)).await;
             }
+            error!("Problem in request: {}", problem);
+            return Err(problem);
         }
         Ok(())
     }

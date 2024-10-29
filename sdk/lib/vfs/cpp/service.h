@@ -108,8 +108,6 @@ class Service final : public Node {
               handler(fidl::InterfaceRequest<Interface>(std::move(channel)));
             }) {}
 
-  using Node::Serve;
-
  private:
   static vfs_internal_node_t* MakeServiceDeprecated(Connector connector) {
     vfs_internal_node_t* svc;

@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fidl::specific_router;
-use crate::{Dict, SpecificRouter, SpecificRouterResponse};
+use crate::fidl::router;
+use crate::{Dict, Router, RouterResponse};
 use fidl::handle::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::TryStreamExt;
 
-impl crate::RemotableCapability for SpecificRouter<Dict> {}
+impl crate::RemotableCapability for Router<Dict> {}
 
-impl From<SpecificRouter<Dict>> for fsandbox::Capability {
-    fn from(router: SpecificRouter<Dict>) -> Self {
+impl From<Router<Dict>> for fsandbox::Capability {
+    fn from(router: Router<Dict>) -> Self {
         let (client_end, sender_stream) =
             fidl::endpoints::create_request_stream::<fsandbox::DictionaryRouterMarker>().unwrap();
         router.serve_and_register(sender_stream, client_end.get_koid().unwrap());
@@ -19,23 +19,23 @@ impl From<SpecificRouter<Dict>> for fsandbox::Capability {
     }
 }
 
-impl TryFrom<SpecificRouterResponse<Dict>> for fsandbox::DictionaryRouterRouteResponse {
+impl TryFrom<RouterResponse<Dict>> for fsandbox::DictionaryRouterRouteResponse {
     type Error = fsandbox::RouterError;
 
-    fn try_from(resp: SpecificRouterResponse<Dict>) -> Result<Self, Self::Error> {
+    fn try_from(resp: RouterResponse<Dict>) -> Result<Self, Self::Error> {
         match resp {
-            SpecificRouterResponse::<Dict>::Capability(c) => {
+            RouterResponse::<Dict>::Capability(c) => {
                 Ok(fsandbox::DictionaryRouterRouteResponse::Dictionary(c.into()))
             }
-            SpecificRouterResponse::<Dict>::Unavailable => {
+            RouterResponse::<Dict>::Unavailable => {
                 Ok(fsandbox::DictionaryRouterRouteResponse::Unavailable(fsandbox::Unit {}))
             }
-            SpecificRouterResponse::<Dict>::Debug(_) => Err(fsandbox::RouterError::NotSupported),
+            RouterResponse::<Dict>::Debug(_) => Err(fsandbox::RouterError::NotSupported),
         }
     }
 }
 
-impl SpecificRouter<Dict> {
+impl Router<Dict> {
     async fn serve_router(
         self,
         mut stream: fsandbox::DictionaryRouterRequestStream,
@@ -43,7 +43,7 @@ impl SpecificRouter<Dict> {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fsandbox::DictionaryRouterRequest::Route { payload, responder } => {
-                    responder.send(specific_router::route_from_fidl(&self, payload).await)?;
+                    responder.send(router::route_from_fidl(&self, payload).await)?;
                 }
                 fsandbox::DictionaryRouterRequest::_UnknownMethod { ordinal, .. } => {
                     tracing::warn!(

@@ -5,7 +5,13 @@
 #ifndef SRC_STORAGE_F2FS_VNODE_CACHE_H_
 #define SRC_STORAGE_F2FS_VNODE_CACHE_H_
 
+#include <fbl/intrusive_wavl_tree.h>
+
+#include "src/storage/f2fs/common.h"
+
 namespace f2fs {
+
+class VnodeF2fs;
 
 class VnodeCache {
  public:
@@ -78,8 +84,8 @@ class VnodeCache {
 
   std::mutex table_lock_{};
   std::shared_mutex list_lock_{};
-  VnodeTable vnode_table_ __TA_GUARDED(table_lock_){};
-  DirtyVnodeList dirty_list_ __TA_GUARDED(list_lock_){};
+  VnodeTable vnode_table_ __TA_GUARDED(table_lock_);
+  DirtyVnodeList dirty_list_ __TA_GUARDED(list_lock_);
   uint64_t ndirty_dir_ __TA_GUARDED(list_lock_){0};
   uint64_t ndirty_ __TA_GUARDED(list_lock_){0};
 };

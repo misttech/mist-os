@@ -5,24 +5,24 @@ use crate::service_context::GenerateService;
 use crate::tests::fakes::base::Service;
 use anyhow::{format_err, Error};
 
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 
-pub(crate) type ServiceRegistryHandle = Arc<Mutex<ServiceRegistry>>;
+pub(crate) type ServiceRegistryHandle = Rc<Mutex<ServiceRegistry>>;
 
 /// A helper class that gathers services through registration and directs
 /// the appropriate channels to them.
 pub(crate) struct ServiceRegistry {
-    services: Vec<Arc<Mutex<dyn Service + Send + Sync>>>,
+    services: Vec<Rc<Mutex<dyn Service>>>,
 }
 
 impl ServiceRegistry {
     pub(crate) fn create() -> ServiceRegistryHandle {
-        Arc::new(Mutex::new(ServiceRegistry { services: Vec::new() }))
+        Rc::new(Mutex::new(ServiceRegistry { services: Vec::new() }))
     }
 
-    pub(crate) fn register_service(&mut self, service: Arc<Mutex<dyn Service + Send + Sync>>) {
+    pub(crate) fn register_service(&mut self, service: Rc<Mutex<dyn Service>>) {
         self.services.push(service);
     }
 
@@ -39,7 +39,9 @@ impl ServiceRegistry {
 
     pub(crate) fn serve(registry_handle: ServiceRegistryHandle) -> GenerateService {
         Box::new(
-            move |service_name: &str, channel: zx::Channel| -> BoxFuture<'_, Result<(), Error>> {
+            move |service_name: &str,
+                  channel: zx::Channel|
+                  -> LocalBoxFuture<'_, Result<(), Error>> {
                 let registry_handle_clone = registry_handle.clone();
                 let service_name_clone = String::from(service_name);
 

@@ -272,7 +272,7 @@ class TA_CAP("mutex") CriticalMutex : private Mutex {
   bool IsHeld() const { return Mutex::IsHeld(); }
 
   // See |Mutex::AssertHeld|.
-  void AssertHeld() const TA_ASSERT() { return Mutex::AssertHeld(); }
+  void AssertHeld() const TA_ASSERT() { Mutex::AssertHeld(); }
 
   // See |Mutex::IsContested|.
   bool IsContested() const { return Mutex::IsContested(); }

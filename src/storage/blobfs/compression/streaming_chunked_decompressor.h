@@ -11,13 +11,13 @@ static_assert(false, "Fuchsia only header");
 
 #include <lib/fit/function.h>
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 
 #include "src/lib/chunked-compression/chunked-archive.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
@@ -30,14 +30,14 @@ namespace blobfs {
 class StreamingChunkedDecompressor {
  public:
   // Type of callback used to handle streaming data as it is decompressed.
-  using StreamCallback = fit::function<zx::result<>(cpp20::span<const uint8_t>)>;
+  using StreamCallback = fit::function<zx::result<>(std::span<const uint8_t>)>;
 
   static zx::result<std::unique_ptr<StreamingChunkedDecompressor>> Create(
       DecompressorCreatorConnector& connector, const chunked_compression::SeekTable& seek_table,
       StreamCallback stream_callback);
 
   // Add more data to the internal state of the decompressor.
-  zx::result<> Update(cpp20::span<const uint8_t> data);
+  zx::result<> Update(std::span<const uint8_t> data);
 
  private:
   StreamingChunkedDecompressor(const chunked_compression::SeekTable& seek_table,

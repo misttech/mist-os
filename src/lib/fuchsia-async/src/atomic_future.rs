@@ -233,7 +233,10 @@ impl<'a> AtomicFuture<'a> {
 
         if let Poll::Ready(()) = result {
             // The future will have been dropped, so we just need to set the state.
-            self.state.fetch_or(DONE, Relaxed);
+            //
+            // This needs to be Release ordering because we need to synchronize with another thread
+            // that takes the result.
+            self.state.fetch_or(DONE, Release);
             // No one else will read `future` unless they see `INACTIVE`, which will never
             // happen again.
             AttemptPollResult::IFinished
@@ -318,8 +321,9 @@ impl<'a> AtomicFuture<'a> {
     ///
     /// The caller must guarantee that `R` is the correct type.
     pub unsafe fn take_result<R>(&self) -> Option<R> {
+        // This needs to be Acquire ordering to synchronize with the polling thread.
         if self.state.load(Relaxed) & (DONE | RESULT_TAKEN) == DONE
-            && self.state.fetch_or(RESULT_TAKEN, Relaxed) & RESULT_TAKEN == 0
+            && self.state.fetch_or(RESULT_TAKEN, Acquire) & RESULT_TAKEN == 0
         {
             Some(((*self.future.get()).get_result() as *const R).read())
         } else {

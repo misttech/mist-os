@@ -24,7 +24,7 @@ enum CreateChildArgs {
 
 #[fuchsia::main(logging = false)]
 async fn main() -> Result<(), Error> {
-    let log_tag = match std::env::args().nth(1).as_ref().map(|s| s.as_str()) {
+    let log_tag = match std::env::args().nth(1).as_deref() {
         Some(detect::PROGRAM_NAME) => detect::PROGRAM_NAME,
         Some(sampler::PROGRAM_NAME) => sampler::PROGRAM_NAME,
         Some(persistence::PROGRAM_NAME) => persistence::PROGRAM_NAME,

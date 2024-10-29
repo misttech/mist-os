@@ -20,16 +20,19 @@ constexpr size_t kVmoTestSize = 512 << 10;  // 512KB
 constexpr uint32_t kPageCount = kVmoTestSize / PAGE_SIZE;
 
 TEST(FakeBti, CreateFakeBti) {
-  zx_handle_t bti = ZX_HANDLE_INVALID;
-  EXPECT_OK(fake_bti_create(&bti));
-  EXPECT_NE(bti, ZX_HANDLE_INVALID);
-  ASSERT_NO_DEATH(([bti]() { zx_handle_close(bti); }));
+  zx::result result = fake_bti::CreateFakeBti();
+  ASSERT_TRUE(result.is_ok());
+  zx::bti bti = std::move(result.value());
+
+  EXPECT_NE(bti.get(), ZX_HANDLE_INVALID);
+  ASSERT_NO_DEATH(([&bti]() { zx_handle_close(bti.get()); }));
 }
 
 TEST(FakeBti, PinVmo) {
-  zx_handle_t bti = ZX_HANDLE_INVALID;
-  EXPECT_OK(fake_bti_create(&bti));
-  EXPECT_NE(bti, ZX_HANDLE_INVALID);
+  zx::result result = fake_bti::CreateFakeBti();
+  ASSERT_TRUE(result.is_ok());
+  zx::bti bti = std::move(result.value());
+  EXPECT_NE(bti.get(), ZX_HANDLE_INVALID);
 
   zx_handle_t vmo_handle, pmt_handle;
   EXPECT_OK(zx_vmo_create(kVmoTestSize, 0, &vmo_handle));
@@ -39,7 +42,7 @@ TEST(FakeBti, PinVmo) {
   addrs[kPageCount] = 42;
 
   // Now actually pin the region
-  EXPECT_OK(zx_bti_pin(bti, 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
+  EXPECT_OK(zx_bti_pin(bti.get(), 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
   EXPECT_NE(pmt_handle, ZX_HANDLE_INVALID);
 
   // Check that the addresses returned are correct, including that the sentinel value wasn't
@@ -50,13 +53,14 @@ TEST(FakeBti, PinVmo) {
   EXPECT_EQ(addrs[kPageCount], 42);
 
   ASSERT_NO_DEATH(([pmt_handle]() { EXPECT_OK(zx_pmt_unpin(pmt_handle)); }));
-  ASSERT_NO_DEATH(([bti]() { zx_handle_close(bti); }));
+  ASSERT_NO_DEATH(([&bti]() { zx_handle_close(bti.get()); }));
 }
 
 TEST(FakeBti, GetPinnedVmos) {
-  zx_handle_t bti = ZX_HANDLE_INVALID;
-  EXPECT_OK(fake_bti_create(&bti));
-  EXPECT_NE(bti, ZX_HANDLE_INVALID);
+  zx::result result = fake_bti::CreateFakeBti();
+  ASSERT_TRUE(result.is_ok());
+  zx::bti bti = std::move(result.value());
+  EXPECT_NE(bti.get(), ZX_HANDLE_INVALID);
 
   zx_handle_t vmo_handle, pmt_handle;
   EXPECT_OK(zx_vmo_create(kVmoTestSize, 0, &vmo_handle));
@@ -64,19 +68,15 @@ TEST(FakeBti, GetPinnedVmos) {
   zx_paddr_t addrs[kPageCount];
 
   // Now actually pin the region
-  EXPECT_OK(zx_bti_pin(bti, 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
+  EXPECT_OK(zx_bti_pin(bti.get(), 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
   EXPECT_NE(pmt_handle, ZX_HANDLE_INVALID);
 
   // Get VMO handle
-  uint64_t num_pinned_vmos = 0u;
-  std::vector<fake_bti_pinned_vmo_info_t> pinned_vmo_info;
+  auto vmo_result = fake_bti::GetPinnedVmo(bti.get());
+  EXPECT_TRUE(vmo_result.is_ok());
+  EXPECT_EQ(1u, vmo_result->size());
 
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, nullptr, 0u, &num_pinned_vmos));
-  EXPECT_EQ(num_pinned_vmos, 1u);
-  pinned_vmo_info.resize(num_pinned_vmos);
-
-  EXPECT_OK(
-      fake_bti_get_pinned_vmos(bti, pinned_vmo_info.data(), num_pinned_vmos, &num_pinned_vmos));
+  std::vector<fake_bti::FakeBtiPinnedVmoInfo> pinned_vmo_info = std::move(vmo_result.value());
 
   uint64_t size1 = 0u, size2 = 0u;
   zx_vmo_get_size(pinned_vmo_info[0].vmo, &size1);
@@ -93,16 +93,19 @@ TEST(FakeBti, GetPinnedVmos) {
 
   // Unpin all the PMT handles.
   ASSERT_NO_DEATH(([pmt_handle]() { EXPECT_OK(zx_pmt_unpin(pmt_handle)); }));
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, nullptr, 0u, &num_pinned_vmos));
-  EXPECT_EQ(num_pinned_vmos, 0u);
 
-  ASSERT_NO_DEATH(([bti]() { zx_handle_close(bti); }));
+  vmo_result = fake_bti::GetPinnedVmo(bti.get());
+  EXPECT_TRUE(vmo_result.is_ok());
+  EXPECT_TRUE(vmo_result->empty());
+
+  ASSERT_NO_DEATH(([&bti]() { zx_handle_close(bti.get()); }));
 }
 
 TEST(FakeBti, GetPinnedVmosWithOffset) {
-  zx_handle_t bti = ZX_HANDLE_INVALID;
-  EXPECT_OK(fake_bti_create(&bti));
-  EXPECT_NE(bti, ZX_HANDLE_INVALID);
+  zx::result result = fake_bti::CreateFakeBti();
+  ASSERT_TRUE(result.is_ok());
+  zx::bti bti = std::move(result.value());
+  EXPECT_NE(bti.get(), ZX_HANDLE_INVALID);
 
   zx_handle_t vmo_handle, pmt_handle;
   EXPECT_OK(zx_vmo_create(kVmoTestSize, 0, &vmo_handle));
@@ -110,19 +113,15 @@ TEST(FakeBti, GetPinnedVmosWithOffset) {
   zx_paddr_t addrs[kPageCount];
 
   // Now actually pin the region (with offset)
-  EXPECT_OK(zx_bti_pin(bti, 0, vmo_handle, /*offset=*/PAGE_SIZE, kVmoTestSize - PAGE_SIZE, addrs,
-                       kPageCount - 1u, &pmt_handle));
+  EXPECT_OK(zx_bti_pin(bti.get(), 0, vmo_handle, /*offset=*/PAGE_SIZE, kVmoTestSize - PAGE_SIZE,
+                       addrs, kPageCount - 1u, &pmt_handle));
   EXPECT_NE(pmt_handle, ZX_HANDLE_INVALID);
 
   // Get VMO handle
-  uint64_t num_pinned_vmos = 0u;
-  std::vector<fake_bti_pinned_vmo_info_t> pinned_vmo_info;
-
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, nullptr, 0u, &num_pinned_vmos));
-  EXPECT_EQ(num_pinned_vmos, 1u);
-  pinned_vmo_info.resize(num_pinned_vmos);
-
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, pinned_vmo_info.data(), num_pinned_vmos, nullptr));
+  auto vmo_result = fake_bti::GetPinnedVmo(bti.get());
+  EXPECT_TRUE(vmo_result.is_ok());
+  EXPECT_EQ(1u, vmo_result->size());
+  std::vector<fake_bti::FakeBtiPinnedVmoInfo> pinned_vmo_info = std::move(vmo_result.value());
 
   uint64_t size = 0u;
   zx_vmo_get_size(pinned_vmo_info[0].vmo, &size);
@@ -146,16 +145,17 @@ TEST(FakeBti, GetPinnedVmosWithOffset) {
 
   // Unpin all the PMT handles.
   ASSERT_NO_DEATH(([pmt_handle]() { EXPECT_OK(zx_pmt_unpin(pmt_handle)); }));
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, nullptr, 0u, &num_pinned_vmos));
-  EXPECT_EQ(num_pinned_vmos, 0u);
-
-  ASSERT_NO_DEATH(([bti]() { zx_handle_close(bti); }));
+  vmo_result = fake_bti::GetPinnedVmo(bti.get());
+  EXPECT_TRUE(vmo_result.is_ok());
+  EXPECT_TRUE(vmo_result->empty());
+  ASSERT_NO_DEATH(([&bti]() { zx_handle_close(bti.get()); }));
 }
 
 TEST(FakeBti, GetMultiplePinnedVmos) {
-  zx_handle_t bti = ZX_HANDLE_INVALID;
-  EXPECT_OK(fake_bti_create(&bti));
-  EXPECT_NE(bti, ZX_HANDLE_INVALID);
+  zx::result result = fake_bti::CreateFakeBti();
+  ASSERT_TRUE(result.is_ok());
+  zx::bti bti = std::move(result.value());
+  EXPECT_NE(bti.get(), ZX_HANDLE_INVALID);
 
   zx_handle_t vmo_handle, pmt_handle;
   zx_handle_t vmo2_handle, pmt2_handle;
@@ -165,22 +165,19 @@ TEST(FakeBti, GetMultiplePinnedVmos) {
   zx_paddr_t addrs[kPageCount];
 
   // Pin the first VMO.
-  EXPECT_OK(zx_bti_pin(bti, 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
+  EXPECT_OK(zx_bti_pin(bti.get(), 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
   EXPECT_NE(pmt_handle, ZX_HANDLE_INVALID);
 
   // Pin the second VMO region with a non-zero offset.
-  EXPECT_OK(zx_bti_pin(bti, 0, vmo2_handle, /*offset=*/PAGE_SIZE, kVmoTestSize - PAGE_SIZE, addrs,
-                       kPageCount - 1u, &pmt2_handle));
+  EXPECT_OK(zx_bti_pin(bti.get(), 0, vmo2_handle, /*offset=*/PAGE_SIZE, kVmoTestSize - PAGE_SIZE,
+                       addrs, kPageCount - 1u, &pmt2_handle));
   EXPECT_NE(pmt2_handle, ZX_HANDLE_INVALID);
 
   // Get VMO handles
-  uint64_t num_pinned_vmos = 0u;
-  std::vector<fake_bti_pinned_vmo_info_t> pinned_vmo_info;
-
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, nullptr, 0u, &num_pinned_vmos));
-  EXPECT_EQ(num_pinned_vmos, 2u);
-  pinned_vmo_info.resize(num_pinned_vmos);
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, pinned_vmo_info.data(), num_pinned_vmos, nullptr));
+  auto vmo_result = fake_bti::GetPinnedVmo(bti.get());
+  EXPECT_TRUE(vmo_result.is_ok());
+  EXPECT_EQ(2u, vmo_result->size());
+  std::vector<fake_bti::FakeBtiPinnedVmoInfo> pinned_vmo_info = std::move(vmo_result.value());
 
   uint64_t size;
   zx_vmo_get_size(pinned_vmo_info[0].vmo, &size);
@@ -199,14 +196,16 @@ TEST(FakeBti, GetMultiplePinnedVmos) {
 
   // Unpin all the PMT handles.
   ASSERT_NO_DEATH(([pmt_handle]() { EXPECT_OK(zx_pmt_unpin(pmt_handle)); }));
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, nullptr, 0u, &num_pinned_vmos));
-  EXPECT_EQ(num_pinned_vmos, 1u);
+  vmo_result = fake_bti::GetPinnedVmo(bti.get());
+  EXPECT_TRUE(vmo_result.is_ok());
+  EXPECT_EQ(1u, vmo_result->size());
 
   ASSERT_NO_DEATH(([pmt2_handle]() { EXPECT_OK(zx_pmt_unpin(pmt2_handle)); }));
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, nullptr, 0u, &num_pinned_vmos));
-  EXPECT_EQ(num_pinned_vmos, 0u);
+  vmo_result = fake_bti::GetPinnedVmo(bti.get());
+  EXPECT_TRUE(vmo_result.is_ok());
+  EXPECT_TRUE(vmo_result->empty());
 
-  ASSERT_NO_DEATH(([bti]() { zx_handle_close(bti); }));
+  ASSERT_NO_DEATH(([&bti]() { zx_handle_close(bti.get()); }));
 }
 
 TEST(FakeBti, PinVmoWithPaddrGenerator) {
@@ -215,9 +214,10 @@ TEST(FakeBti, PinVmoWithPaddrGenerator) {
     expected_addrs[i] = FAKE_BTI_PHYS_ADDR * (i + 1);
   }
 
-  zx_handle_t bti = ZX_HANDLE_INVALID;
-  EXPECT_OK(fake_bti_create_with_paddrs(expected_addrs, std::size(expected_addrs), &bti));
-  EXPECT_NE(bti, ZX_HANDLE_INVALID);
+  zx::result result = fake_bti::CreateFakeBtiWithPaddrs(expected_addrs);
+  ASSERT_TRUE(result.is_ok());
+  zx::bti bti = std::move(result.value());
+  EXPECT_NE(bti.get(), ZX_HANDLE_INVALID);
 
   zx_handle_t vmo_handle, pmt_handle;
   EXPECT_OK(zx_vmo_create(kVmoTestSize, 0, &vmo_handle));
@@ -227,7 +227,7 @@ TEST(FakeBti, PinVmoWithPaddrGenerator) {
   addrs[kPageCount] = 42;
 
   // Now actually pin the region
-  EXPECT_OK(zx_bti_pin(bti, 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
+  EXPECT_OK(zx_bti_pin(bti.get(), 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
   EXPECT_NE(pmt_handle, ZX_HANDLE_INVALID);
 
   // Check that the addresses returned are correct, including that the sentinel value wasn't
@@ -238,7 +238,7 @@ TEST(FakeBti, PinVmoWithPaddrGenerator) {
   EXPECT_EQ(addrs[kPageCount], 42);
 
   ASSERT_NO_DEATH(([pmt_handle]() { EXPECT_OK(zx_pmt_unpin(pmt_handle)); }));
-  ASSERT_NO_DEATH(([bti]() { zx_handle_close(bti); }));
+  ASSERT_NO_DEATH(([&bti]() { zx_handle_close(bti.get()); }));
 }
 
 TEST(FakeBti, GetPhysFromPinnedVmo) {
@@ -247,9 +247,10 @@ TEST(FakeBti, GetPhysFromPinnedVmo) {
     expected_addrs[i] = FAKE_BTI_PHYS_ADDR * (i + 1);
   }
 
-  zx_handle_t bti = ZX_HANDLE_INVALID;
-  EXPECT_OK(fake_bti_create_with_paddrs(expected_addrs, std::size(expected_addrs), &bti));
-  EXPECT_NE(bti, ZX_HANDLE_INVALID);
+  zx::result result = fake_bti::CreateFakeBtiWithPaddrs(expected_addrs);
+  ASSERT_TRUE(result.is_ok());
+  zx::bti bti = std::move(result.value());
+  EXPECT_NE(bti.get(), ZX_HANDLE_INVALID);
 
   zx_handle_t vmo_handle, pmt_handle;
   zx_handle_t vmo2_handle, pmt2_handle;
@@ -260,38 +261,28 @@ TEST(FakeBti, GetPhysFromPinnedVmo) {
   zx_paddr_t addrs2[kPageCount - 1u];
 
   // Pin the first VMO.
-  EXPECT_OK(zx_bti_pin(bti, 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
+  EXPECT_OK(zx_bti_pin(bti.get(), 0, vmo_handle, 0, kVmoTestSize, addrs, kPageCount, &pmt_handle));
   EXPECT_NE(pmt_handle, ZX_HANDLE_INVALID);
 
   // Pin the second VMO region with a non-zero offset.
-  EXPECT_OK(zx_bti_pin(bti, 0, vmo2_handle, /*offset=*/PAGE_SIZE, kVmoTestSize - PAGE_SIZE, addrs2,
-                       kPageCount - 1u, &pmt2_handle));
+  EXPECT_OK(zx_bti_pin(bti.get(), 0, vmo2_handle, /*offset=*/PAGE_SIZE, kVmoTestSize - PAGE_SIZE,
+                       addrs2, kPageCount - 1u, &pmt2_handle));
   EXPECT_NE(pmt2_handle, ZX_HANDLE_INVALID);
 
   // Get VMO handles
-  uint64_t num_pinned_vmos = 0u;
-  std::vector<fake_bti_pinned_vmo_info_t> pinned_vmo_info;
+  auto vmo_result = fake_bti::GetPinnedVmo(bti.get());
+  EXPECT_TRUE(vmo_result.is_ok());
+  EXPECT_EQ(2u, vmo_result->size());
+  std::vector<fake_bti::FakeBtiPinnedVmoInfo> pinned_vmo_info = std::move(vmo_result.value());
 
-  EXPECT_OK(fake_bti_get_pinned_vmos(bti, nullptr, 0u, &num_pinned_vmos));
-  EXPECT_EQ(num_pinned_vmos, 2u);
-  pinned_vmo_info.resize(num_pinned_vmos);
-  EXPECT_OK(
-      fake_bti_get_pinned_vmos(bti, pinned_vmo_info.data(), num_pinned_vmos, &num_pinned_vmos));
-
-  uint64_t num_paddrs;
-  std::vector<zx_paddr_t> paddrs;
-  EXPECT_OK(fake_bti_get_phys_from_pinned_vmo(bti, pinned_vmo_info[0], nullptr, 0, &num_paddrs));
-  EXPECT_EQ(num_paddrs, kPageCount);
-  paddrs.resize(num_paddrs);
-  EXPECT_OK(fake_bti_get_phys_from_pinned_vmo(bti, pinned_vmo_info[0], paddrs.data(), num_paddrs,
-                                              &num_paddrs));
+  zx::result phys_result = GetVmoPhysAddress(bti.get(), pinned_vmo_info[0]);
+  EXPECT_TRUE(phys_result.is_ok());
+  std::vector<zx_paddr_t> paddrs = std::move(phys_result.value());
   EXPECT_EQ(std::memcmp(addrs, paddrs.data(), sizeof(addrs)), 0);
 
-  EXPECT_OK(fake_bti_get_phys_from_pinned_vmo(bti, pinned_vmo_info[1], nullptr, 0, &num_paddrs));
-  EXPECT_EQ(num_paddrs, kPageCount - 1u);
-  paddrs.resize(num_paddrs);
-  EXPECT_OK(fake_bti_get_phys_from_pinned_vmo(bti, pinned_vmo_info[1], paddrs.data(), num_paddrs,
-                                              &num_paddrs));
+  phys_result = GetVmoPhysAddress(bti.get(), pinned_vmo_info[1]);
+  EXPECT_TRUE(phys_result.is_ok());
+  paddrs = std::move(phys_result.value());
   EXPECT_EQ(std::memcmp(addrs2, paddrs.data(), sizeof(addrs2)), 0);
 
   // Close the returned VMO handles.
@@ -301,44 +292,49 @@ TEST(FakeBti, GetPhysFromPinnedVmo) {
   // Unpin all the PMT handles.
   ASSERT_NO_DEATH(([pmt_handle]() { EXPECT_OK(zx_pmt_unpin(pmt_handle)); }));
   ASSERT_NO_DEATH(([pmt2_handle]() { EXPECT_OK(zx_pmt_unpin(pmt2_handle)); }));
-  ASSERT_NO_DEATH(([bti]() { zx_handle_close(bti); }));
+  ASSERT_NO_DEATH(([&bti]() { zx_handle_close(bti.get()); }));
 }
 
 TEST(FakeBti, CreateContiguousVmo) {
-  zx_handle_t bti = ZX_HANDLE_INVALID;
-  EXPECT_OK(fake_bti_create(&bti));
-  EXPECT_NE(bti, ZX_HANDLE_INVALID);
+  zx::result result = fake_bti::CreateFakeBti();
+  ASSERT_TRUE(result.is_ok());
+  zx::bti bti = std::move(result.value());
+  EXPECT_NE(bti.get(), ZX_HANDLE_INVALID);
 
   zx_handle_t vmo_handle, pmt_handle;
-  EXPECT_OK(zx_vmo_create_contiguous(bti, kVmoTestSize, 0, &vmo_handle));
+  EXPECT_OK(zx_vmo_create_contiguous(bti.get(), kVmoTestSize, 0, &vmo_handle));
   EXPECT_NE(vmo_handle, ZX_HANDLE_INVALID);
 
   zx_paddr_t addr;
-  EXPECT_OK(zx_bti_pin(bti, ZX_BTI_CONTIGUOUS, vmo_handle, 0, kVmoTestSize, &addr, 1, &pmt_handle));
+  EXPECT_OK(
+      zx_bti_pin(bti.get(), ZX_BTI_CONTIGUOUS, vmo_handle, 0, kVmoTestSize, &addr, 1, &pmt_handle));
   EXPECT_NE(pmt_handle, ZX_HANDLE_INVALID);
   EXPECT_EQ(addr, FAKE_BTI_PHYS_ADDR);
 
   ASSERT_NO_DEATH(([pmt_handle]() { EXPECT_OK(zx_pmt_unpin(pmt_handle)); }));
-  ASSERT_NO_DEATH(([bti]() { zx_handle_close(bti); }));
+  ASSERT_NO_DEATH(([&bti]() { zx_handle_close(bti.get()); }));
 }
 
 TEST(FakeBti, PmoCount) {
-  zx_handle_t bti = ZX_HANDLE_INVALID;
-  EXPECT_OK(fake_bti_create(&bti));
-  EXPECT_NE(bti, ZX_HANDLE_INVALID);
+  zx::result result = fake_bti::CreateFakeBti();
+  ASSERT_TRUE(result.is_ok());
+  zx::bti bti = std::move(result.value());
+  EXPECT_NE(bti.get(), ZX_HANDLE_INVALID);
 
   zx_handle_t vmo_handle, pmt_handle;
-  EXPECT_OK(zx_vmo_create_contiguous(bti, kVmoTestSize, 0, &vmo_handle));
+  EXPECT_OK(zx_vmo_create_contiguous(bti.get(), kVmoTestSize, 0, &vmo_handle));
   EXPECT_NE(vmo_handle, ZX_HANDLE_INVALID);
 
   zx_paddr_t addr;
-  EXPECT_OK(zx_bti_pin(bti, ZX_BTI_CONTIGUOUS, vmo_handle, 0, kVmoTestSize, &addr, 1, &pmt_handle));
+  EXPECT_OK(
+      zx_bti_pin(bti.get(), ZX_BTI_CONTIGUOUS, vmo_handle, 0, kVmoTestSize, &addr, 1, &pmt_handle));
   EXPECT_NE(pmt_handle, ZX_HANDLE_INVALID);
   EXPECT_EQ(addr, FAKE_BTI_PHYS_ADDR);
 
   size_t actual = 0, avail = 0;
   zx_info_bti_t bti_info;
-  EXPECT_OK(zx_object_get_info(bti, ZX_INFO_BTI, &bti_info, sizeof(bti_info), &actual, &avail));
+  EXPECT_OK(
+      zx_object_get_info(bti.get(), ZX_INFO_BTI, &bti_info, sizeof(bti_info), &actual, &avail));
 
   // After pinning, pmo_count should be 1.
   EXPECT_EQ(1, bti_info.pmo_count);
@@ -346,7 +342,8 @@ TEST(FakeBti, PmoCount) {
   EXPECT_OK(zx_pmt_unpin(pmt_handle));
 
   // After unpinning, pmo_count should be zero.
-  EXPECT_OK(zx_object_get_info(bti, ZX_INFO_BTI, &bti_info, sizeof(bti_info), &actual, &avail));
+  EXPECT_OK(
+      zx_object_get_info(bti.get(), ZX_INFO_BTI, &bti_info, sizeof(bti_info), &actual, &avail));
   EXPECT_EQ(0, bti_info.pmo_count);
 }
 

@@ -34,6 +34,14 @@ fn type_to_c_str(ty: &Type, ir: &FidlIr) -> Result<String, Error> {
         Type::Vector { ref element_type, .. } => type_to_c_str(element_type, ir),
         Type::Str { .. } => Ok(String::from("char*")),
         Type::Primitive { ref subtype } => primitive_type_to_c_str(subtype),
+        Type::Endpoint { role: EndpointRole::Client, protocol, .. } => {
+            let c_name = to_c_name(&protocol.get_name());
+            if not_callback(protocol, ir)? {
+                return Ok(format!("{}_protocol_t", c_name));
+            } else {
+                return Ok(format!("{}_t", c_name));
+            }
+        }
         Type::Identifier { identifier, .. } => match ir
             .get_declaration(identifier)
             .unwrap_or_else(|e| panic!("Could not find declaration for {:?}: {:?}", identifier, e))
@@ -43,14 +51,6 @@ fn type_to_c_str(ty: &Type, ir: &FidlIr) -> Result<String, Error> {
             | Declaration::Union
             | Declaration::Enum
             | Declaration::Bits => Ok(format!("{}_t", to_c_name(&identifier.get_name()))),
-            Declaration::Protocol => {
-                let c_name = to_c_name(&identifier.get_name());
-                if not_callback(identifier, ir)? {
-                    return Ok(format!("{}_protocol_t", c_name));
-                } else {
-                    return Ok(format!("{}_t", c_name));
-                }
-            }
             _ => Err(anyhow!("Identifier type not handled: {:?}", identifier)),
         },
         Type::Handle { .. } => Ok(String::from("zx_handle_t")),
@@ -178,7 +178,7 @@ fn field_to_c_str(
                 Type::Vector { nullable, .. } if nullable => "*",
                 Type::Str { nullable, .. } if nullable => "*",
                 Type::Handle { nullable, .. } if nullable => "*",
-                Type::Request { nullable, .. } if nullable => "*",
+                Type::Endpoint { nullable, .. } if nullable => "*",
                 Type::Identifier { nullable, .. } if nullable => "*",
                 _ => "",
             };
@@ -256,18 +256,6 @@ fn get_in_params(m: &Method, transform: bool, ir: &FidlIr) -> Result<Vec<String>
                         return Ok(format!("{} {}", ty_name, c_name));
                     }
                     match ir.get_declaration(identifier).unwrap() {
-                        Declaration::Protocol => {
-                            if transform && not_callback(identifier, ir)? {
-                                let ty_name = protocol_to_ops_c_str(identifier, ir).unwrap();
-                                Ok(format!(
-                                    "void* {name}_ctx, const {ty_name}* {name}_ops",
-                                    ty_name = ty_name,
-                                    name = c_name
-                                ))
-                            } else {
-                                Ok(format!("const {}* {}", ty_name, c_name))
-                            }
-                        }
                         Declaration::Struct | Declaration::Table | Declaration::Union => {
                             let prefix = if param.maybe_attributes.has("InOut")
                                 || param.maybe_attributes.has("Mutable")
@@ -282,6 +270,18 @@ fn get_in_params(m: &Method, transform: bool, ir: &FidlIr) -> Result<Vec<String>
                             Ok(format!("{} {}", ty_name, c_name))
                         }
                         decl => Err(anyhow!("Unsupported declaration: {:?}", decl)),
+                    }
+                }
+                Type::Endpoint { role: EndpointRole::Client, protocol, .. } => {
+                    if transform && not_callback(protocol, ir)? {
+                        let ty_name = protocol_to_ops_c_str(protocol, ir).unwrap();
+                        Ok(format!(
+                            "void* {name}_ctx, const {ty_name}* {name}_ops",
+                            ty_name = ty_name,
+                            name = c_name
+                        ))
+                    } else {
+                        Ok(format!("const {}* {}", ty_name, c_name))
                     }
                 }
                 Type::Str { .. } => Ok(format!("const {} {}", ty_name, c_name)),
@@ -345,6 +345,10 @@ fn get_out_params(name: &str, m: &Method, ir: &FidlIr) -> Result<(Vec<String>, S
                     let ty_name = type_to_c_str(&param._type, ir).unwrap();
                     match &param._type {
                         Type::Identifier { nullable, .. } => {
+                            let nullable_str = if *nullable { "*" } else { "" };
+                            format!("{}{}* out_{}", ty_name, nullable_str, c_name)
+                        }
+                        Type::Endpoint { role: EndpointRole::Client, nullable, .. } => {
                             let nullable_str = if *nullable { "*" } else { "" };
                             format!("{}{}* out_{}", ty_name, nullable_str, c_name)
                         }
@@ -791,14 +795,28 @@ impl<'a, W: io::Write> CBackend<'a, W> {
                     let proto_args = request
                         .iter()
                         .filter_map(|param| {
-                            if let Type::Identifier { ref identifier, .. } = param._type {
-                                if not_callback(identifier, ir).ok()? {
-                                    return Some((
-                                        to_c_name(&param.name.0),
-                                        type_to_c_str(&param._type, ir).unwrap(),
-                                    ));
+                            match param._type {
+                                Type::Identifier { ref identifier, .. } => {
+                                    if not_callback(identifier, ir).ok()? {
+                                        return Some((
+                                            to_c_name(&param.name.0),
+                                            type_to_c_str(&param._type, ir).unwrap(),
+                                        ));
+                                    }
                                 }
+                                Type::Endpoint {
+                                    role: EndpointRole::Client, ref protocol, ..
+                                } => {
+                                    if not_callback(protocol, ir).ok()? {
+                                        return Some((
+                                            to_c_name(&param.name.0),
+                                            type_to_c_str(&param._type, ir).unwrap(),
+                                        ));
+                                    }
+                                }
+                                _ => (),
                             }
+
                             None
                         })
                         .collect::<Vec<_>>();

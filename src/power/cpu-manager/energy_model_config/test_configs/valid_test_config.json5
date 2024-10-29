@@ -1,11 +1,13 @@
 [
     {
-        cpu_set: [
-            1,
-            2,
-            3,
-        ],
-        power_domain_id: 0,
+        power_domain: {
+            cpu_set: [
+                1,
+                2,
+                3,
+            ],
+            domain_id: 0,
+        },
         power_levels: [
             {
                 processing_rate: 100,
@@ -32,11 +34,13 @@
         ],
     },
     {
-        cpu_set: [
-            0,
-            5,
-        ],
-        power_domain_id: 0,
+        power_domain: {
+            cpu_set: [
+                0,
+                5,
+            ],
+            domain_id: 1,
+        },
         power_levels: [
             {
                 option: 'DomainIndependent',

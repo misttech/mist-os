@@ -1550,6 +1550,8 @@ pub(crate) mod testutil {
         type V6RoutesState = Optional;
         type V4RoutesSetProvider = Optional;
         type V6RoutesSetProvider = Optional;
+        type V4RouteTableProvider = Optional;
+        type V6RouteTableProvider = Optional;
 
         type InterfacesWorker = Required;
         type RoutesV4Worker = Optional;
@@ -1587,8 +1589,10 @@ pub(crate) mod testutil {
 
             v4_routes_state: EventLoopComponent::Absent(Optional),
             v6_routes_state: EventLoopComponent::Absent(Optional),
-            v4_routes_set_provider: EventLoopComponent::Absent(Optional),
-            v6_routes_set_provider: EventLoopComponent::Absent(Optional),
+            v4_main_route_table: EventLoopComponent::Absent(Optional),
+            v6_main_route_table: EventLoopComponent::Absent(Optional),
+            v4_route_table_provider: EventLoopComponent::Absent(Optional),
+            v6_route_table_provider: EventLoopComponent::Absent(Optional),
 
             unified_request_stream: request_stream,
         };

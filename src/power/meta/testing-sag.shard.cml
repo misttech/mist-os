@@ -11,13 +11,16 @@
             name: "fake-suspend",
             url: "fuchsia-boot:///fake-suspend-pkg#meta/fake-suspend.cm",
         },
+        {
+            name: "config-use-suspender",
+            url: "fuchsia-boot:///config-use-suspender#meta/config-use-suspender.cm",
+        },
     ],
     offer: [
         {
             config: [ "fuchsia.power.UseSuspender" ],
-            from: "void",
+            from: "#config-use-suspender",
             to: "#system-activity-governor",
-            availability: "optional",
         },
         {
             config: [ "fuchsia.power.WaitForSuspendingToken" ],

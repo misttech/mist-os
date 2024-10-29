@@ -943,7 +943,7 @@ TEST_P(SdmmcBlockDeviceTest, ErrorsPropagate) {
 TEST_P(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
   sdmmc_.set_host_info({
       .caps = 0,
-      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
+      .max_transfer_size = fuchsia_hardware_sdmmc::wire::kMaxTransferUnbounded,
   });
 
   ASSERT_OK(StartDriverForMmc());
@@ -964,7 +964,7 @@ TEST_P(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
 TEST_P(SdmmcBlockDeviceTest, SendCmd12OnCommandFailureWhenAutoCmd12) {
   sdmmc_.set_host_info({
       .caps = SDMMC_HOST_CAP_AUTO_CMD12,
-      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
+      .max_transfer_size = fuchsia_hardware_sdmmc::wire::kMaxTransferUnbounded,
   });
 
   ASSERT_OK(StartDriverForMmc());

@@ -19,11 +19,11 @@ use crate::vfs::{FdFlags, FdNumber};
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
+use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
+use starnix_types::time::{duration_from_timespec, timeval_from_duration};
 use starnix_uapi::errors::{Errno, ErrnoResultExt, EINTR, ETIMEDOUT};
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
-use starnix_uapi::time::{duration_from_timespec, timeval_from_duration};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
     errno, error, pid_t, rusage, sigaction, sigaltstack, timespec, MINSIGSTKSZ, P_ALL, P_PGID,
@@ -864,9 +864,9 @@ mod tests {
     use crate::signals::testing::dequeue_signal_for_test;
     use crate::task::{ExitStatus, ProcessExitInfo};
     use crate::testing::*;
+    use starnix_types::math::round_up_to_system_page_size;
     use starnix_uapi::auth::Credentials;
     use starnix_uapi::errors::ERESTARTSYS;
-    use starnix_uapi::math::round_up_to_system_page_size;
     use starnix_uapi::signals::{
         SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
         SIGUSR1,

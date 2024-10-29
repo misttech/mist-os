@@ -62,6 +62,7 @@ class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice> {
     void GetDevHwInfo(fdf::Arena& arena, GetDevHwInfoCompleter::Sync& completer) override;
     void EnableFn(fdf::Arena& arena, EnableFnCompleter::Sync& completer) override;
     void DisableFn(fdf::Arena& arena, DisableFnCompleter::Sync& completer) override;
+    void IoReady(fdf::Arena& arena, IoReadyCompleter::Sync& completer) override;
     void EnableFnIntr(fdf::Arena& arena, EnableFnIntrCompleter::Sync& completer) override;
     void DisableFnIntr(fdf::Arena& arena, DisableFnIntrCompleter::Sync& completer) override;
     void UpdateBlockSize(fuchsia_hardware_sdio::wire::DeviceUpdateBlockSizeRequest* request,
@@ -100,6 +101,7 @@ class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice> {
     void DisableFn(DisableFnCompleter::Sync& completer) override;
     void EnableFnIntr(EnableFnIntrCompleter::Sync& completer) override;
     void DisableFnIntr(DisableFnIntrCompleter::Sync& completer) override;
+    void IoReady(IoReadyCompleter::Sync& completer) override;
     void UpdateBlockSize(UpdateBlockSizeRequestView request,
                          UpdateBlockSizeCompleter::Sync& completer) override;
     void GetBlockSize(GetBlockSizeCompleter::Sync& completer) override;
@@ -140,6 +142,9 @@ class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice> {
   zx::result<> EnableFn();
 
   zx::result<> DisableFn();
+
+  zx::result<fuchsia_hardware_sdio::wire::DeviceIoReadyResponse*> IoReady(
+      fuchsia_hardware_sdio::wire::DeviceIoReadyResponse*);
 
   zx::result<> EnableFnIntr();
 

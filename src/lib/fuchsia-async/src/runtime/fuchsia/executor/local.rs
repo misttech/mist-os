@@ -128,6 +128,8 @@ impl Drop for LocalExecutor {
 
 /// A single-threaded executor for testing. Exposes additional APIs for manipulating executor state
 /// and validating behavior of executed tasks.
+///
+/// TODO(https://fxbug.dev/375631801): This is lack of BootInstant support.
 pub struct TestExecutor {
     /// LocalExecutor used under the hood, since most of the logic is shared.
     local: LocalExecutor,

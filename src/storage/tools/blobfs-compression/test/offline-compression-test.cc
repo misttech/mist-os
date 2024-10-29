@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <array>
+#include <span>
 
 #include <gtest/gtest.h>
 
@@ -23,7 +24,7 @@ TEST(OfflineCompressionTest, Type1EmptyBlob) {
   ASSERT_EQ(delivery_blob->size(), sizeof(DeliveryBlobHeader) + sizeof(MetadataType1));
 
   // Decode headers/metadata and validate.
-  const cpp20::span<const uint8_t> buffer(delivery_blob->data(), delivery_blob->size());
+  const std::span<const uint8_t> buffer(delivery_blob->data(), delivery_blob->size());
   const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
   ASSERT_TRUE(header.is_ok());
   ASSERT_TRUE(header->IsValid());
@@ -53,21 +54,21 @@ TEST(OfflineCompressionTest, Type1ShouldNotCompress) {
             sizeof(DeliveryBlobHeader) + sizeof(MetadataType1) + blob_data.size());
 
   // Decode headers/metadata and validate.
-  const cpp20::span buffer(delivery_blob->data(), delivery_blob->size());
+  const std::span buffer(delivery_blob->data(), delivery_blob->size());
   const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
   ASSERT_TRUE(header.is_ok());
   ASSERT_TRUE(header->IsValid());
   ASSERT_EQ(header->type, DeliveryBlobType::kType1);
   EXPECT_EQ(header->header_length, sizeof(DeliveryBlobHeader) + sizeof(MetadataType1));
 
-  const cpp20::span metadata_buffer = buffer.subspan(sizeof(DeliveryBlobHeader));
+  const std::span metadata_buffer = buffer.subspan(sizeof(DeliveryBlobHeader));
   const zx::result<MetadataType1> metadata = MetadataType1::FromBuffer(metadata_buffer, *header);
   ASSERT_TRUE(metadata.is_ok());
   ASSERT_TRUE(metadata->IsValid(*header));
   EXPECT_EQ(metadata->payload_length, blob_data.size());
 
   // Validate payload itself.
-  const cpp20::span payload_buffer = metadata_buffer.subspan(sizeof(MetadataType1));
+  const std::span payload_buffer = metadata_buffer.subspan(sizeof(MetadataType1));
   ASSERT_EQ(payload_buffer.size(), blob_data.size());
   ASSERT_TRUE(std::equal(payload_buffer.begin(), payload_buffer.end(), blob_data.cbegin()));
 }
@@ -83,14 +84,14 @@ TEST(OfflineCompressionTest, Type1ShouldCompress) {
             sizeof(DeliveryBlobHeader) + sizeof(MetadataType1) + blob_data.size());
 
   // Decode headers/metadata and validate.
-  const cpp20::span buffer(delivery_blob->data(), delivery_blob->size());
+  const std::span buffer(delivery_blob->data(), delivery_blob->size());
   const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
   ASSERT_TRUE(header.is_ok());
   ASSERT_TRUE(header->IsValid());
   ASSERT_EQ(header->type, DeliveryBlobType::kType1);
   EXPECT_EQ(header->header_length, sizeof(DeliveryBlobHeader) + sizeof(MetadataType1));
 
-  const cpp20::span metadata_buffer = buffer.subspan(sizeof(DeliveryBlobHeader));
+  const std::span metadata_buffer = buffer.subspan(sizeof(DeliveryBlobHeader));
   const zx::result<MetadataType1> metadata = MetadataType1::FromBuffer(metadata_buffer, *header);
   ASSERT_TRUE(metadata.is_ok());
   ASSERT_TRUE(metadata->IsValid(*header));
@@ -99,7 +100,7 @@ TEST(OfflineCompressionTest, Type1ShouldCompress) {
   EXPECT_TRUE((metadata->flags & MetadataType1::kValidFlagsMask) != 0u);
 
   // Ensure that we can correctly decompress the payload.
-  const cpp20::span payload_buffer = metadata_buffer.subspan(sizeof(MetadataType1));
+  const std::span payload_buffer = metadata_buffer.subspan(sizeof(MetadataType1));
   fbl::Array<uint8_t> decompressed_result;
   size_t unused;
   ASSERT_EQ(chunked_compression::ChunkedDecompressor::DecompressBytes(

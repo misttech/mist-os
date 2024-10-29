@@ -22,7 +22,11 @@ impl From<handle::Handle> for Handle {
     }
 }
 
-impl CapabilityBound for Handle {}
+impl CapabilityBound for Handle {
+    fn debug_typename() -> &'static str {
+        "Handle"
+    }
+}
 
 impl Handle {
     pub fn try_clone(&self) -> Result<Self, ()> {

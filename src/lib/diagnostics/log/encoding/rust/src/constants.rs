@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub(crate) const PID: &'static str = "pid";
-pub(crate) const TID: &'static str = "tid";
-pub(crate) const TAG: &'static str = "tag";
-pub(crate) const NUM_DROPPED: &'static str = "num_dropped";
-pub(crate) const MESSAGE: &'static str = "message";
-pub(crate) const FILE: &'static str = "file";
-pub(crate) const LINE: &'static str = "line";
+pub(crate) const PID: &str = "pid";
+pub(crate) const TID: &str = "tid";
+pub(crate) const TAG: &str = "tag";
+pub(crate) const NUM_DROPPED: &str = "num_dropped";
+pub(crate) const MESSAGE: &str = "message";
+pub(crate) const FILE: &str = "file";
+pub(crate) const LINE: &str = "line";

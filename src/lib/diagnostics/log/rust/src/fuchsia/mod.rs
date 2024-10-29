@@ -229,7 +229,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
         install_panic_hook,
         panic_prefix,
     } = opts;
-    let tags = tags.into_iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    let tags = tags.iter().map(|s| s.to_string()).collect::<Vec<_>>();
 
     let bg_thread = std::thread::spawn(move || {
         let options = PublishOptions {
@@ -267,7 +267,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
         let _ = ready_recv.recv();
     }
 
-    AbortAndJoinOnDrop(recv.recv().map_or(None, |value| Some(value)), Some(bg_thread))
+    AbortAndJoinOnDrop(recv.recv().ok(), Some(bg_thread))
 }
 
 /// This custom Lazy implementation can be replaced by LazyLock once that is stabilized:
@@ -302,6 +302,7 @@ impl<T, F: FnOnce() -> T> Deref for Lazy<T, F> {
 /// A `Publisher` acts as broker, implementing [`tracing::Subscriber`] to receive diagnostic
 /// events from a component, and then forwarding that data on to a diagnostics service.
 pub struct Publisher {
+    #[allow(clippy::type_complexity)]
     inner: Lazy<
         Layered<InterestFilter, Layered<Sink, Registry>>,
         Box<dyn FnOnce() -> Layered<InterestFilter, Layered<Sink, Registry>> + Send>,
@@ -329,7 +330,7 @@ impl Publisher {
         let sink = Sink::new(
             &proxy,
             SinkConfig {
-                tags: opts.tags.into_iter().map(|s| s.to_string()).collect(),
+                tags: opts.tags.iter().map(|s| s.to_string()).collect(),
                 metatags: opts.metatags,
                 retry_on_buffer_full: opts.blocking,
                 always_log_file_line: opts.always_log_file_line,

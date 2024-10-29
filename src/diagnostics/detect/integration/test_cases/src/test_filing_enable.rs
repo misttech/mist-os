@@ -31,17 +31,17 @@ pub(crate) fn test_with_enable() -> TestData {
         .add_inspect_data(INSPECT_EMPTY)
         .add_triage_config(TRIAGE_CONFIG)
         .expect_events(vec![
-            TestEvent::OnCrashReportingProductRegistration {
+            TestEvent::CrashReportingProductRegistration {
                 product_name: "FuchsiaDetect".to_string(),
                 program_name: "triage_detect".to_string(),
             },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnCrashReport {
+            TestEvent::DiagnosticFetch,
+            TestEvent::CrashReport {
                 crash_signature: "fuchsia-detect-yes".to_string(),
                 crash_program_name: "triage_detect".to_string(),
             },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnDone,
+            TestEvent::DiagnosticFetch,
+            TestEvent::Done,
         ])
 }
 
@@ -50,7 +50,7 @@ pub(crate) fn test_bad_enable() -> TestData {
         .set_program_config("{enable_filing: 1}")
         .add_inspect_data(INSPECT_EMPTY)
         .add_triage_config(TRIAGE_CONFIG)
-        .expect_events(vec![TestEvent::OnBail])
+        .expect_events(vec![TestEvent::Bail])
 }
 
 pub(crate) fn test_false_enable() -> TestData {
@@ -59,13 +59,13 @@ pub(crate) fn test_false_enable() -> TestData {
         .add_inspect_data(INSPECT_EMPTY)
         .add_triage_config(TRIAGE_CONFIG)
         .expect_events(vec![
-            TestEvent::OnCrashReportingProductRegistration {
+            TestEvent::CrashReportingProductRegistration {
                 product_name: "FuchsiaDetect".to_string(),
                 program_name: "triage_detect".to_string(),
             },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnDone,
+            TestEvent::DiagnosticFetch,
+            TestEvent::DiagnosticFetch,
+            TestEvent::Done,
         ])
 }
 
@@ -75,13 +75,13 @@ pub(crate) fn test_no_enable() -> TestData {
         .add_inspect_data(INSPECT_EMPTY)
         .add_triage_config(TRIAGE_CONFIG)
         .expect_events(vec![
-            TestEvent::OnCrashReportingProductRegistration {
+            TestEvent::CrashReportingProductRegistration {
                 product_name: "FuchsiaDetect".to_string(),
                 program_name: "triage_detect".to_string(),
             },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnDone,
+            TestEvent::DiagnosticFetch,
+            TestEvent::DiagnosticFetch,
+            TestEvent::Done,
         ])
 }
 
@@ -90,12 +90,12 @@ pub(crate) fn test_without_file() -> TestData {
         .add_inspect_data(INSPECT_EMPTY)
         .add_triage_config(TRIAGE_CONFIG)
         .expect_events(vec![
-            TestEvent::OnCrashReportingProductRegistration {
+            TestEvent::CrashReportingProductRegistration {
                 product_name: "FuchsiaDetect".to_string(),
                 program_name: "triage_detect".to_string(),
             },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnDone,
+            TestEvent::DiagnosticFetch,
+            TestEvent::DiagnosticFetch,
+            TestEvent::Done,
         ])
 }

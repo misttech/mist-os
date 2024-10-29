@@ -2316,12 +2316,18 @@ TEST(Pager, FailEarlyWake) {
   Vmo* vmo;
   ASSERT_TRUE(pager.CreateVmo(3, &vmo));
 
+  // To account for pages potentially getting evicted start a page fault handler to re-supply
+  // anything.
+  vmo->SetPageFaultSupplyLimit(0);
+  ASSERT_TRUE(pager.StartTaggedPageFaultHandler());
+
   TestThread t([vmo]() -> bool { return vmo->CheckVmo(0, 3); });
   ASSERT_TRUE(t.Start());
 
-  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 3, ZX_TIME_INFINITE));
+  ASSERT_TRUE(t.WaitForBlocked());
 
   // Supply the first page, this should wake up the internal kernel request and process that page.
+  vmo->SetPageFaultSupplyLimit(1);
   ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1, 0));
 
   // Wait for the thread to have completed processing that page and be blocked again. This ensures
@@ -2336,10 +2342,6 @@ TEST(Pager, FailEarlyWake) {
   // from the first request it is the next page to be processed and so should complete and fail the
   // request, even though we have not supplied or failed the third page.
   ASSERT_TRUE(pager.FailPages(vmo, 1, 1, ZX_ERR_IO));
-
-  // No more requests.
-  uint64_t offset, length;
-  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 
   ASSERT_TRUE(t.WaitForFailure());
 }

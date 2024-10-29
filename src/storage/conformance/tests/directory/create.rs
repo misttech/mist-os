@@ -16,7 +16,7 @@ async fn create_directory_with_create_if_absent_flag() {
     }
 
     let root = root_directory(vec![]);
-    let root_dir = harness.get_directory(root, harness.dir_rights.all());
+    let root_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
     let mnt_dir = open_dir_with_flags(
         &root_dir,
@@ -55,9 +55,11 @@ async fn create_file_with_sufficient_rights() {
         return;
     }
 
-    for dir_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in
+        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
+    {
         let root = root_directory(vec![]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         // Re-open directory with the flags being tested.
         let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
@@ -85,9 +87,9 @@ async fn create_file_with_insufficient_rights() {
         return;
     }
 
-    for dir_flags in harness.file_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
+    for dir_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
         let root = root_directory(vec![]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
         // Re-open directory with the flags being tested.
         let dir = open_dir_with_flags(&test_dir, dir_flags, ".").await;
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");

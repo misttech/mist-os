@@ -18,7 +18,6 @@ impl From<Capability> for fsandbox::Capability {
             Capability::ConnectorRouter(s) => s.into(),
             Capability::DirEntryRouter(s) => s.into(),
             Capability::DataRouter(s) => s.into(),
-            Capability::Router(s) => s.into(),
             Capability::Dictionary(s) => s.into(),
             Capability::Data(s) => s.into(),
             Capability::Unit(s) => s.into(),
@@ -54,14 +53,6 @@ impl TryFrom<fsandbox::Capability> for Capability {
             }
             fsandbox::Capability::Directory(client_end) => {
                 Ok(crate::Directory::new(client_end).into())
-            }
-            fsandbox::Capability::Router(client_end) => {
-                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
-                match &any {
-                    Capability::Router(_) => (),
-                    _ => return Err(RemoteError::BadCapability),
-                };
-                Ok(any)
             }
             fsandbox::Capability::ConnectorRouter(client_end) => {
                 let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
@@ -113,7 +104,6 @@ impl RemotableCapability for Capability {
         match self {
             Self::Connector(s) => s.try_into_directory_entry(),
             Self::DirEntry(s) => s.try_into_directory_entry(),
-            Self::Router(s) => s.try_into_directory_entry(),
             Self::ConnectorRouter(s) => s.try_into_directory_entry(),
             Self::DictionaryRouter(s) => s.try_into_directory_entry(),
             Self::DirEntryRouter(s) => s.try_into_directory_entry(),

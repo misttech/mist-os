@@ -16,7 +16,6 @@ group("compute") {
     "spinel-vk-rs",
     "spinel/platforms/vk",
     "surpass",
-    "svg",
   ]
 }
 

@@ -100,7 +100,7 @@ fn basic_int() -> Trial {
             crate::create_numeric_property!(parent: ROOT_ID, id: 5, name: "int", value: Value::IntT(10)),
             crate::set_number!(id: 5, value: Value::IntT(i64::MAX)),
             crate::subtract_number!(id: 5, value: Value::IntT(3)),
-            crate::set_number!(id: 5, value: Value::IntT(std::i64::MIN)),
+            crate::set_number!(id: 5, value: Value::IntT(i64::MIN)),
             crate::add_number!(id: 5, value: Value::IntT(2)),
             crate::delete_property!(id: 5),
         ])],
@@ -127,10 +127,10 @@ fn basic_double() -> Trial {
         steps: vec![Step::Actions(vec![
             crate::create_numeric_property!(parent: ROOT_ID, id: 5, name: "double",
                                      value: Value::DoubleT(1.0)),
-            crate::set_number!(id: 5, value: Value::DoubleT(std::f64::MAX)),
-            crate::subtract_number!(id: 5, value: Value::DoubleT(std::f64::MAX/10_f64)),
-            crate::set_number!(id: 5, value: Value::DoubleT(std::f64::MIN)),
-            crate::add_number!(id: 5, value: Value::DoubleT(std::f64::MAX / 10_f64)),
+            crate::set_number!(id: 5, value: Value::DoubleT(f64::MAX)),
+            crate::subtract_number!(id: 5, value: Value::DoubleT(f64::MAX/10_f64)),
+            crate::set_number!(id: 5, value: Value::DoubleT(f64::MIN)),
+            crate::add_number!(id: 5, value: Value::DoubleT(f64::MAX / 10_f64)),
             crate::delete_property!(id: 5),
         ])],
     }
@@ -252,10 +252,10 @@ fn int_histogram_ops_trial() -> Trial {
                                  initial_step: 2, step_multiplier: 4,
                                  buckets: 3, type: IntT),
     ];
-    for value in &[std::i64::MIN, i64::MAX, 0] {
-        push_ops(&mut actions, *value);
+    for value in [i64::MIN, i64::MAX, 0] {
+        push_ops(&mut actions, value);
     }
-    for value in vec![-10_i64, -5_i64, 0_i64, 3_i64, 100_i64] {
+    for value in [-10_i64, -5_i64, 0_i64, 3_i64, 100_i64] {
         push_ops(&mut actions, value);
     }
     actions.push(crate::delete_property!(id: 4));
@@ -277,10 +277,10 @@ fn uint_histogram_ops_trial() -> Trial {
                                  initial_step: 2, step_multiplier: 4,
                                  buckets: 3, type: UintT),
     ];
-    for value in &[u64::MAX, 0] {
-        push_ops(&mut actions, *value);
+    for value in [u64::MAX, 0] {
+        push_ops(&mut actions, value);
     }
-    for value in vec![0_u64, 5_u64, 8_u64, 20u64, 200_u64] {
+    for value in [0_u64, 5_u64, 8_u64, 20u64, 200_u64] {
         push_ops(&mut actions, value);
     }
     actions.push(crate::delete_property!(id: 4));
@@ -304,11 +304,11 @@ fn double_histogram_ops_trial() -> Trial {
         crate::create_linear_histogram!(parent: ROOT_ID, id: 4, name: "Lhist", floor: 5.0,
                                  step_size: 3.0, buckets: 3, type: DoubleT),
     ];
-    for value in &[std::f64::MIN, std::f64::MAX, std::f64::MIN_POSITIVE, 0.0] {
+    for value in &[f64::MIN, f64::MAX, f64::MIN_POSITIVE, 0.0] {
         push_ops(&mut actions, *value);
     }
-    for value in vec![3.0, 3.15, 5.0, 10.0] {
-        push_ops(&mut actions, value as f64);
+    for value in [3.0, 3.15, 5.0, 10.0] {
+        push_ops(&mut actions, value);
     }
     actions.push(crate::delete_property!(id: 4));
     actions.push(crate::delete_property!(id: 5));
@@ -360,29 +360,30 @@ fn deletions_trial() -> Trial {
     fn x3() -> Action {
         crate::delete_property!(id: 6)
     }
-    let mut steps = Vec::new();
-    steps.push(Step::Actions(create()));
-    steps.push(Step::Actions(vec![d3(), d2(), d1(), x3(), x2(), x1()]));
-    steps.push(Step::Actions(create2()));
-    steps.push(Step::WithMetrics(vec![d1(), d2()], "Delete Except Grandchild".into()));
-    steps.push(Step::WithMetrics(vec![d3(), x3(), x2(), x1()], "Deleted Grandchild".into()));
-    // This list tests all 6 sequences of node deletion.
-    // TODO(https://fxbug.dev/42116860): Get the permutohedron crate and test all 720 sequences.
-    steps.push(Step::Actions(create()));
-    steps.push(Step::Actions(vec![d1(), d2(), d3(), x3(), x2(), x1()]));
-    steps.push(Step::Actions(create2()));
-    steps.push(Step::Actions(vec![d1(), x3(), d2(), x1(), d3(), x2()]));
-    steps.push(Step::Actions(create()));
-    steps.push(Step::Actions(vec![d1(), x2(), d3(), x3(), d2(), x1()]));
-    steps.push(Step::Actions(create2()));
-    steps.push(Step::Actions(vec![x1(), x3(), d2(), d1(), d3(), x2()]));
-    steps.push(Step::Actions(create()));
-    steps.push(Step::Actions(vec![d2(), x3(), x2(), x1(), d3(), d1()]));
-    steps.push(Step::Actions(create2()));
-    steps.push(Step::Actions(vec![d3(), x3(), d2(), x1(), d1(), x2()]));
-    steps.push(Step::Actions(create2()));
-    steps.push(Step::Actions(vec![x3(), d3(), d1(), x1(), d2(), x2()]));
-    steps.push(Step::WithMetrics(vec![], "Everything should be gone".into()));
+    let steps = vec![
+        Step::Actions(create()),
+        Step::Actions(vec![d3(), d2(), d1(), x3(), x2(), x1()]),
+        Step::Actions(create2()),
+        Step::WithMetrics(vec![d1(), d2()], "Delete Except Grandchild".into()),
+        Step::WithMetrics(vec![d3(), x3(), x2(), x1()], "Deleted Grandchild".into()),
+        // This list tests all 6 sequences of node deletion.
+        // TODO(https://fxbug.dev/42116860): Get the permutohedron crate and test all 720 sequences.
+        Step::Actions(create()),
+        Step::Actions(vec![d1(), d2(), d3(), x3(), x2(), x1()]),
+        Step::Actions(create2()),
+        Step::Actions(vec![d1(), x3(), d2(), x1(), d3(), x2()]),
+        Step::Actions(create()),
+        Step::Actions(vec![d1(), x2(), d3(), x3(), d2(), x1()]),
+        Step::Actions(create2()),
+        Step::Actions(vec![x1(), x3(), d2(), d1(), d3(), x2()]),
+        Step::Actions(create()),
+        Step::Actions(vec![d2(), x3(), x2(), x1(), d3(), d1()]),
+        Step::Actions(create2()),
+        Step::Actions(vec![d3(), x3(), d2(), x1(), d1(), x2()]),
+        Step::Actions(create2()),
+        Step::Actions(vec![x3(), d3(), d1(), x1(), d2(), x2()]),
+        Step::WithMetrics(vec![], "Everything should be gone".into()),
+    ];
     Trial { name: "Delete With Metrics".into(), steps }
 }
 

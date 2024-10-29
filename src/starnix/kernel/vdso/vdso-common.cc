@@ -15,10 +15,15 @@ int64_t calculate_monotonic_time_nsec() {
   return fasttime::compute_monotonic_time(time_values_addr);
 }
 
+int64_t calculate_boot_time_nsec() {
+  zx_vaddr_t time_values_addr = reinterpret_cast<zx_vaddr_t>(&time_values);
+  return fasttime::compute_boot_time(time_values_addr);
+}
+
 int clock_gettime_impl(int clock_id, timespec* tp) {
   int ret = 0;
   if ((clock_id == CLOCK_MONOTONIC) || (clock_id == CLOCK_MONOTONIC_RAW) ||
-      (clock_id == CLOCK_MONOTONIC_COARSE) || (clock_id == CLOCK_BOOTTIME)) {
+      (clock_id == CLOCK_MONOTONIC_COARSE)) {
     int64_t monot_nsec = calculate_monotonic_time_nsec();
     if (monot_nsec == ZX_TIME_INFINITE_PAST) {
       // If calculate_monotonic_time_nsec returned ZX_TIME_INFINITE_PAST, then either:
@@ -31,6 +36,19 @@ int clock_gettime_impl(int clock_id, timespec* tp) {
     }
     tp->tv_sec = monot_nsec / kNanosecondsPerSecond;
     tp->tv_nsec = monot_nsec % kNanosecondsPerSecond;
+  } else if (clock_id == CLOCK_BOOTTIME) {
+    int64_t boot_nsec = calculate_boot_time_nsec();
+    if (boot_nsec == ZX_TIME_INFINITE_PAST) {
+      // Once again, if calculate_boot_time_nsec returned ZX_TIME_INFINITE_PAST, then either:
+      // 1. The ticks register is not userspace accessible, or
+      // 2. The version of libfasttime is out of sync with the version of the time values VMO.
+      // In either case, we must invoke a syscall to get the correct time value.
+      ret = syscall(__NR_clock_gettime, static_cast<intptr_t>(clock_id),
+                    reinterpret_cast<intptr_t>(tp), 0);
+      return ret;
+    }
+    tp->tv_sec = boot_nsec / kNanosecondsPerSecond;
+    tp->tv_nsec = boot_nsec % kNanosecondsPerSecond;
   } else if (clock_id == CLOCK_REALTIME) {
     uint64_t utc_nsec = calculate_utc_time_nsec();
     if (utc_nsec == kUtcInvalid) {

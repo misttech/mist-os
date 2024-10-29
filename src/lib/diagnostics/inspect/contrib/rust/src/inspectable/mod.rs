@@ -62,7 +62,7 @@ use std::collections::HashSet;
 /// Not correct for `V`s with interior mutability, because `Inspectable`
 /// `Deref`s to `V`, mutations to which will bypass the `watcher`.
 #[derive(Derivative)]
-#[derivative(Debug, Eq, PartialEq, Hash)]
+#[derivative(Debug, Eq, PartialEq)]
 pub struct Inspectable<V, W>
 where
     W: Watch<V>,
@@ -169,6 +169,9 @@ pub struct InspectableLenWatcher {
 /// [`InspectableLen`][InspectableLen] must implement this.
 pub trait Len {
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl<V> Watch<V> for InspectableLenWatcher
@@ -344,18 +347,6 @@ mod test {
         let inspectable = make_inspectable(1).0;
 
         assert_eq!(Borrow::<i64>::borrow(&inspectable), &1);
-    }
-
-    #[fuchsia::test]
-    fn test_inspectable_in_hash_set() {
-        let inspectable = make_inspectable(1).0;
-        let mut set = HashSet::new();
-
-        set.insert(inspectable);
-        assert!(set.contains(&1));
-
-        set.remove(&1);
-        assert!(set.is_empty());
     }
 }
 

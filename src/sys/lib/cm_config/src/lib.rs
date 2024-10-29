@@ -94,6 +94,9 @@ pub struct RuntimeConfig {
 
     /// Where to get the vmex resource from.
     pub vmex_source: VmexSource,
+
+    /// Components that opt into health checks before an update is committed.
+    pub health_check: HealthCheck,
 }
 
 /// A single security policy allowlist entry.
@@ -429,6 +432,26 @@ impl Default for VmexSource {
     }
 }
 
+/// Information about the health checks during the update process.
+#[derive(Debug, PartialEq, Eq, Default, Clone)]
+pub struct HealthCheck {
+    pub monikers: Vec<String>,
+}
+
+impl HealthCheck {
+    pub fn new(monikers: Vec<String>) -> Self {
+        Self { monikers }
+    }
+}
+
+impl TryFrom<component_internal::HealthCheck> for HealthCheck {
+    type Error = Error;
+
+    fn try_from(health_check: component_internal::HealthCheck) -> Result<Self, Error> {
+        Ok(Self::new(health_check.monikers.unwrap()))
+    }
+}
+
 /// Allowlist key for capability routing policy. Part of the runtime
 /// security policy. This defines all the required keying information to lookup
 /// whether a capability exists in the policy map or not.
@@ -462,6 +485,7 @@ impl Default for RuntimeConfig {
             realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner::None,
             abi_revision_policy: Default::default(),
             vmex_source: Default::default(),
+            health_check: Default::default(),
         }
     }
 }
@@ -627,6 +651,13 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
 
         let vmex_source = config.vmex_source.map(VmexSource::from).unwrap_or_default();
 
+        let health_check = config
+            .health_check
+            .map(HealthCheck::try_from)
+            .transpose()
+            .context("Unable to parse health checks policy")?
+            .unwrap_or_default();
+
         Ok(RuntimeConfig {
             list_children_batch_size,
             security_policy: Arc::new(security_policy),
@@ -657,6 +688,7 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
                 .unwrap_or(default.realm_builder_resolver_and_runner),
             abi_revision_policy,
             vmex_source,
+            health_check,
         })
     }
 }
@@ -1014,6 +1046,7 @@ mod tests {
                     ..Default::default()
                 }),
                 vmex_source: Some(component_internal::VmexSource::Namespace),
+                health_check: Some(component_internal::HealthCheck{ monikers: Some(vec!()), ..Default::default()}),
                 ..Default::default()
             },
             RuntimeConfig {
@@ -1140,6 +1173,7 @@ mod tests {
                 builtin_boot_resolver: BuiltinBootResolver::None,
                 realm_builder_resolver_and_runner: RealmBuilderResolverAndRunner::None,
                 vmex_source: VmexSource::Namespace,
+                health_check: HealthCheck{monikers: vec!()},
             }
         ),
     }

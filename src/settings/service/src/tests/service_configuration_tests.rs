@@ -14,7 +14,8 @@ use crate::{
 use fidl_fuchsia_settings::{AccessibilityMarker, DisplayMarker, PrivacyMarker};
 use fuchsia_inspect::component;
 use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
+use std::sync::Mutex;
 
 const ENV_NAME: &str = "settings_service_configuration_test_environment";
 
@@ -33,7 +34,7 @@ async fn test_no_configuration_provided() {
     let configuration =
         ServiceConfiguration::from(AgentConfiguration::default(), default_configuration, flags);
 
-    let env = EnvironmentBuilder::new(Arc::new(factory))
+    let env = EnvironmentBuilder::new(Rc::new(factory))
         .configuration(configuration)
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
@@ -48,13 +49,13 @@ async fn test_no_configuration_provided() {
 async fn test_default_interfaces_configuration_provided() {
     let factory = InMemoryStorageFactory::new();
     let config_logger =
-        Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+        Rc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root())));
 
     // Load test configuration, which only has Display, default will not be used.
     let configuration = DefaultSetting::new(
         None,
         "/config/data/interface_configuration.json",
-        Arc::clone(&config_logger),
+        Rc::clone(&config_logger),
     )
     .load_default_value()
     .expect("invalid interface configuration")
@@ -65,7 +66,7 @@ async fn test_default_interfaces_configuration_provided() {
         ServiceConfiguration::from(AgentConfiguration::default(), configuration, flags);
     let display_configuration = build_display_default_settings(config_logger);
 
-    let env = EnvironmentBuilder::new(Arc::new(factory))
+    let env = EnvironmentBuilder::new(Rc::new(factory))
         .configuration(configuration)
         .display_configuration(display_configuration)
         .spawn_and_get_protocol_connector(ENV_NAME)

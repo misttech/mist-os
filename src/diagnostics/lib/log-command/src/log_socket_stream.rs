@@ -27,8 +27,7 @@ where
     T: DeserializeOwned,
 {
     stream! {
-        let mut buffer = vec![];
-        buffer.resize(BUFFER_SIZE, 0);
+        let mut buffer = vec![0; BUFFER_SIZE];
         let mut write_offset = 0;
         let mut read_offset = 0;
         let mut available = 0;
@@ -75,7 +74,7 @@ where
     T: DeserializeOwned,
 {
     stream_raw_json::<T, READ_BUFFER_SIZE, READ_BUFFER_INCREMENT>(socket)
-        .map(|value| futures_util::stream::iter(value))
+        .map(futures_util::stream::iter)
         .flatten()
 }
 
@@ -234,9 +233,7 @@ mod test {
         let (local, remote) = zx::Socket::create_stream();
         let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = Box::pin(
-            stream_raw_json::<LogsData, 100, 10>(socket)
-                .map(|value| futures_util::stream::iter(value))
-                .flatten(),
+            stream_raw_json::<LogsData, 100, 10>(socket).map(futures_util::stream::iter).flatten(),
         );
         let test_logs = (0..MSG_COUNT)
             .map(|value| {
@@ -260,8 +257,8 @@ mod test {
                 local.write_all(serialized_bytes).await.unwrap();
             }
         });
-        for i in 0..MSG_COUNT {
-            assert_eq!(&decoder.next().await.unwrap(), &test_logs_clone[i]);
+        for item in test_logs_clone.iter().take(MSG_COUNT) {
+            assert_eq!(&decoder.next().await.unwrap(), item);
         }
     }
 
@@ -273,7 +270,7 @@ mod test {
         let socket = fuchsia_async::Socket::from_socket(remote);
         let mut decoder = Box::pin(
             stream_raw_json::<LogsData, 256000, 20000>(socket)
-                .map(|value| futures_util::stream::iter(value))
+                .map(futures_util::stream::iter)
                 .flatten(),
         );
         let test_log = LogsDataBuilder::new(BuilderArgs {

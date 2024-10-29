@@ -14,7 +14,6 @@ mod handle;
 mod instance_token;
 mod receiver;
 mod router;
-mod specific_router;
 mod unit;
 
 #[cfg(target_os = "fuchsia")]
@@ -29,9 +28,11 @@ pub use self::directory::Directory;
 pub use self::handle::Handle;
 pub use self::instance_token::{WeakInstanceToken, WeakInstanceTokenAny};
 pub use self::receiver::Receiver;
-pub use self::router::{Request, Routable, Router};
-pub use self::specific_router::{SpecificRoutable, SpecificRouter, SpecificRouterResponse};
+pub use self::router::{Request, Routable, Router, RouterResponse};
 pub use self::unit::Unit;
 
 #[cfg(target_os = "fuchsia")]
-pub use {self::fidl::store::serve_capability_store, fidl::RemotableCapability};
+pub use {
+    self::fidl::store::serve_capability_store, fidl::router::dict_routers_to_dir_entry,
+    fidl::RemotableCapability,
+};

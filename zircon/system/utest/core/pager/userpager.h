@@ -253,21 +253,31 @@ class UserPager {
 
   bool CreateVmoInternal(uint64_t byte_size, uint32_t options, Vmo** vmo_out);
 
+  void OvertimeHandler();
+  void DumpRequestsLocked() __TA_REQUIRES(pager_mutex_);
+  void DumpVmosLocked() __TA_REQUIRES(pager_mutex_);
+
   zx::pager pager_;
   zx::port port_;
   static constexpr uint64_t kShutdownKey = 1;
   uint64_t next_key_ = kShutdownKey + 1;
 
-  fbl::DoublyLinkedList<std::unique_ptr<Vmo>> vmos_;
+  // Lock to guard modifications to vmos_ and requests_ so the OvertimeHandler can safely inspect
+  // them.
+  mutable std::mutex pager_mutex_;
+
+  fbl::DoublyLinkedList<std::unique_ptr<Vmo>> vmos_ __TA_GUARDED(pager_mutex_);
 
   typedef struct request : fbl::DoublyLinkedListable<std::unique_ptr<struct request>> {
     zx_port_packet_t req;
   } request_t;
 
-  fbl::DoublyLinkedList<std::unique_ptr<request_t>> requests_;
+  fbl::DoublyLinkedList<std::unique_ptr<request_t>> requests_ __TA_GUARDED(pager_mutex_);
 
   zx::event shutdown_event_;
   TestThread pager_thread_;
+  zx::event overtime_event_;
+  TestThread timeout_thread_;
 };
 
 inline bool check_buffer_data(Vmo* vmo, uint64_t offset, uint64_t len, const void* data,

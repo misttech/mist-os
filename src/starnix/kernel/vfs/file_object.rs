@@ -5,7 +5,10 @@
 use crate::mm::memory::MemoryObject;
 use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags};
 use crate::power::OnWakeOps;
-use crate::task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter};
+use crate::security;
+use crate::task::{
+    CurrentTask, EncryptionKeyId, EventHandler, Task, WaitCallback, WaitCanceler, Waiter,
+};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::file_server::serve_file;
 use crate::vfs::fsverity::{
@@ -17,37 +20,54 @@ use crate::vfs::{
     FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
 use fidl::HandleBased;
+use fidl_fuchsia_fxfs::CryptManagementMarker;
 use fuchsia_inspect_contrib::profile_duration;
-
+use hkdf::Hkdf;
+use linux_uapi::{FSCRYPT_MODE_AES_256_CTS, FSCRYPT_MODE_AES_256_XTS};
 use starnix_logging::{
-    impossible_error, log_error, trace_duration, track_stub, CATEGORY_STARNIX_MM,
+    impossible_error, log_error, log_info, log_warn, trace_duration, track_stub,
+    CATEGORY_STARNIX_MM,
 };
 use starnix_sync::{
     BeforeFsNodeAppend, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
+use starnix_types::math::round_up_to_system_page_size;
+use starnix_types::ownership::Releasable;
 use starnix_uapi::as_any::AsAny;
+use starnix_uapi::auth::CAP_FOWNER;
 use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
 use starnix_uapi::file_lease::FileLeaseType;
 use starnix_uapi::inotify_mask::InotifyMask;
-use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::Releasable;
 use starnix_uapi::seal_flags::SealFlags;
-use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, fsxattr, off_t, pid_t, uapi, FIGETBSZ, FIONBIO, FIONREAD, FIOQSIZE,
-    FS_CASEFOLD_FL, FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
-    FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR,
-    SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
+    errno, error, fscrypt_add_key_arg, fscrypt_identifier, fsxattr, off_t, pid_t, uapi, FIGETBSZ,
+    FIONBIO, FIONREAD, FIOQSIZE, FSCRYPT_KEY_IDENTIFIER_SIZE, FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER,
+    FSCRYPT_POLICY_V2, FS_CASEFOLD_FL, FS_IOC_ADD_ENCRYPTION_KEY, FS_IOC_ENABLE_VERITY,
+    FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY,
+    FS_IOC_READ_VERITY_METADATA, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SETFLAGS,
+    FS_IOC_SET_ENCRYPTION_POLICY, FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET,
+    TCGETS,
 };
+use std::collections::hash_map::Entry;
 use std::collections::HashSet;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
+use syncio::zxio_node_attr_has_t;
+use zerocopy::IntoBytes;
 
 pub const MAX_LFS_FILESIZE: usize = 0x7fff_ffff_ffff_ffff;
+
+// In this implementation of fscrypt, we use a HKDF (Hmac Key Derivation Function) to derive a
+// a wrapping key and wrapping key id from the raw key bytes passed in by a user on
+// FS_IOC_ADD_ENCRYPTION_KEY. HKDFs requires an input "info" string. We define constants for the
+// respective "info" strings here.
+const FSCRYPT_KEY_IDENTIFIER_INFO: &'static str = "fscrypt0";
+const FSCRYPT_WRAPPING_KEY_INFO: &'static str = "fscrypt1";
 
 pub fn checked_add_offset_and_length(offset: usize, length: usize) -> Result<usize, Errno> {
     let end = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
@@ -117,6 +137,20 @@ fn add_equivalent_fd_events(mut events: FdEvents) -> FdEvents {
         events |= FdEvents::POLLWRNORM;
     }
     events
+}
+
+/// Uses an HKDF to derive an fscrypt wrapping key and key identifier from a raw user key.
+fn derive_wrapping_key(
+    raw_key: &[u8],
+) -> ([u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize], [u8; AES256_KEY_SIZE]) {
+    let hk = Hkdf::<sha2::Sha256>::new(None, raw_key);
+    let mut key_identifier = [0u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize];
+    hk.expand(FSCRYPT_KEY_IDENTIFIER_INFO.as_bytes(), &mut key_identifier)
+        .expect("FSCRYPT_KEY_IDENTIFIER_SIZE is a valid length for Sha256 to output");
+    let mut wrapping_key = [0u8; AES256_KEY_SIZE];
+    hk.expand(FSCRYPT_WRAPPING_KEY_INFO.as_bytes(), &mut wrapping_key)
+        .expect("AES256_KEY_SIZE is a valid length for Sha256 to output");
+    (key_identifier, wrapping_key)
 }
 
 /// Corresponds to struct file_operations in Linux, plus any filesystem-specific data.
@@ -807,6 +841,7 @@ pub use {
     fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
     fileops_impl_nonseekable, fileops_impl_noop_sync, fileops_impl_seekable, fileops_impl_seekless,
 };
+pub const AES256_KEY_SIZE: usize = 32;
 
 pub fn default_ioctl(
     file: &FileObject,
@@ -905,6 +940,192 @@ pub fn default_ioctl(
         }
         FS_IOC_READ_VERITY_METADATA => {
             Ok(fsverity::ioctl::read_metadata(current_task, UserAddress::from(arg).into(), file)?)
+        }
+        FS_IOC_ADD_ENCRYPTION_KEY => {
+            let fscrypt_add_key_ref = UserRef::<fscrypt_add_key_arg>::from(arg);
+            let key_ref_addr = fscrypt_add_key_ref.next().addr();
+            let mut fscrypt_add_key_arg = current_task.read_object(fscrypt_add_key_ref.clone())?;
+            if fscrypt_add_key_arg.key_id != 0 {
+                track_stub!(TODO("https://fxbug.dev/375649227"), "non-zero key ids");
+                return error!(ENOTSUP);
+            }
+            if fscrypt_add_key_arg.key_spec.type_ != FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER {
+                track_stub!(TODO("https://fxbug.dev/375648306"), "fscrypt descriptor type");
+                return error!(ENOTSUP);
+            }
+            let key = current_task
+                .read_memory_to_vec(key_ref_addr, fscrypt_add_key_arg.raw_size as usize)?;
+            let root = current_task.fs().root();
+            let path_from_root = file.name.path_from_root(Some(&root)).into_path();
+            let user_id = current_task.creds().uid;
+            let (key_identifier, wrapping_key) = derive_wrapping_key(key.as_bytes());
+
+            match current_task
+                .kernel()
+                .encryption_keys
+                .write()
+                .entry(EncryptionKeyId::from(key_identifier))
+            {
+                Entry::Occupied(mut e) => {
+                    e.get_mut().push(user_id);
+                }
+                Entry::Vacant(e) => {
+                    e.insert(vec![user_id]);
+                    // Connect to the fuchsia.fxfs.CryptManagement service for adding keys.
+                    let crypt_management_proxy = current_task
+                        .kernel()
+                        .connect_to_protocol_at_container_svc::<CryptManagementMarker>()
+                        .map_err(|_| errno!(ENOENT))?
+                        .into_sync_proxy();
+
+                    crypt_management_proxy
+                        .add_wrapping_key(
+                            &key_identifier,
+                            wrapping_key.as_bytes(),
+                            zx::MonotonicInstant::INFINITE,
+                        )
+                        .map_err(|e| errno!(EINVAL, e))?
+                        .map_err(|e| {
+                            log_warn!("add wrapping key failed with {:?}", e);
+                            errno!(EIO, zx::Status::from_raw(e))
+                        })?;
+                }
+            }
+            log_info!(
+                "Adding encryption key {:?} for {:?} for user {:?}",
+                &key_identifier,
+                &path_from_root,
+                user_id
+            );
+            fscrypt_add_key_arg.key_spec.u.identifier =
+                fscrypt_identifier { value: key_identifier, ..Default::default() };
+            current_task.write_object(fscrypt_add_key_ref, &fscrypt_add_key_arg)?;
+            Ok(SUCCESS)
+        }
+        FS_IOC_SET_ENCRYPTION_POLICY => {
+            let fscrypt_policy_ref = UserRef::<uapi::fscrypt_policy_v2>::from(arg);
+            let policy = current_task.read_object(fscrypt_policy_ref)?;
+            if policy.version as u32 != FSCRYPT_POLICY_V2 {
+                track_stub!(TODO("https://fxbug.dev/375649656"), "fscrypt policy v1");
+                return error!(ENOTSUP);
+            }
+            if policy.flags != 0 {
+                track_stub!(
+                    TODO("https://fxbug.dev/375700939"),
+                    "fscrypt policy flags",
+                    policy.flags
+                );
+            }
+            if policy.contents_encryption_mode as u32 != FSCRYPT_MODE_AES_256_XTS {
+                track_stub!(
+                    TODO("https://fxbug.dev/375684057"),
+                    "fscrypt encryption modes",
+                    policy.contents_encryption_mode
+                );
+            }
+            if policy.filenames_encryption_mode as u32 != FSCRYPT_MODE_AES_256_CTS {
+                track_stub!(
+                    TODO("https://fxbug.dev/375684057"),
+                    "fscrypt encryption modes",
+                    policy.filenames_encryption_mode
+                );
+            }
+            let root = current_task.fs().root();
+            let path_from_root = file.name.path_from_root(Some(&root)).into_path();
+            let user_id = current_task.creds().uid;
+            log_info!(
+                "Setting encryption policy for {:?} with key {:?} for user {:?}",
+                &path_from_root,
+                &policy.master_key_identifier,
+                user_id,
+            );
+
+            if user_id != file.node().info().uid && !current_task.creds().has_capability(CAP_FOWNER)
+            {
+                return error!(EACCES);
+            }
+
+            if let Some(users) = &current_task
+                .kernel()
+                .encryption_keys
+                .read()
+                .get(&EncryptionKeyId::from(policy.master_key_identifier))
+            {
+                if !users.contains(&user_id) {
+                    return error!(ENOKEY);
+                }
+            } else {
+                track_stub!(
+                    TODO("https://fxbug.dev/375067633"),
+                    "users with CAP_FOWNER can set encryption policies with unadded keys"
+                );
+                return error!(ENOKEY);
+            }
+
+            let has = zxio_node_attr_has_t { wrapping_key_id: true, ..Default::default() };
+            let attributes = file.node().ops().get_attr(has)?;
+            if attributes.has.wrapping_key_id {
+                if attributes.wrapping_key_id != policy.master_key_identifier {
+                    return Err(errno!(EEXIST));
+                }
+            } else {
+                file.node().update_info(|info| {
+                    info.wrapping_key_id = Some(policy.master_key_identifier);
+                });
+                let has = zxio_node_attr_has_t { wrapping_key_id: true, ..Default::default() };
+                file.node().ops().update_attributes(
+                    &mut locked.cast_locked::<FileOpsCore>(),
+                    current_task,
+                    &file.node().info(),
+                    has,
+                )?;
+            }
+            Ok(SUCCESS)
+        }
+        FS_IOC_REMOVE_ENCRYPTION_KEY => {
+            let fscrypt_remove_key_arg_ref = UserRef::<uapi::fscrypt_remove_key_arg>::from(arg);
+            let fscrypt_remove_key_arg = current_task.read_object(fscrypt_remove_key_arg_ref)?;
+            if fscrypt_remove_key_arg.key_spec.type_ != FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER {
+                track_stub!(TODO("https://fxbug.dev/375648306"), "fscrypt descriptor type");
+                return error!(ENOTSUP);
+            }
+            let user_id = current_task.creds().uid;
+            let identifier = unsafe { fscrypt_remove_key_arg.key_spec.u.identifier.value };
+            match current_task
+                .kernel()
+                .encryption_keys
+                .write()
+                .entry(EncryptionKeyId::from(identifier))
+            {
+                Entry::Occupied(mut e) => {
+                    let user_ids = e.get_mut();
+                    if !user_ids.contains(&user_id) {
+                        return error!(ENOKEY);
+                    } else {
+                        let index = user_ids.iter().position(|x: &u32| *x == user_id).unwrap();
+                        user_ids.remove(index);
+                        if user_ids.is_empty() {
+                            // Connect to the fuchsia.fxfs.CryptManagement service for forgetting
+                            // keys.
+                            let crypt_management_proxy = current_task
+                                .kernel()
+                                .connect_to_protocol_at_container_svc::<CryptManagementMarker>()
+                                .map_err(|_| errno!(ENOENT))?
+                                .into_sync_proxy();
+                            crypt_management_proxy
+                                .forget_wrapping_key(&identifier, zx::MonotonicInstant::INFINITE)
+                                .map_err(|e| errno!(EINVAL, e))?
+                                .map_err(|e| errno!(EIO, zx::Status::from_raw(e)))?;
+                            e.remove();
+                        }
+                    }
+                }
+                Entry::Vacant(_) => {
+                    return error!(ENOKEY);
+                }
+            }
+            log_info!("Removing encryption key {:?} for user {:?}", &identifier, user_id,);
+            Ok(SUCCESS)
         }
         _ => {
             track_stub!(TODO("https://fxbug.dev/322874917"), "ioctl fallthrough", request);
@@ -1208,6 +1429,8 @@ pub struct FileObject {
     lease: Mutex<FileLeaseType>,
 
     _file_write_guard: Option<FileWriteGuard>,
+
+    _security_state: security::FileObjectState,
 }
 
 pub type FileHandle = Arc<FileReleaser>;
@@ -1222,12 +1445,13 @@ impl FileObject {
     ///
     /// The returned FileObject does not have a name.
     pub fn new_anonymous(
+        current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         node: FsNodeHandle,
         flags: OpenFlags,
     ) -> FileHandle {
         assert!(!node.fs().has_permanent_entries());
-        Self::new(ops, NamespaceNode::new_anonymous_unrooted(node), flags)
+        Self::new(current_task, ops, NamespaceNode::new_anonymous_unrooted(node), flags)
             .expect("Failed to create anonymous FileObject")
     }
 
@@ -1236,6 +1460,7 @@ impl FileObject {
     /// This function is not typically called directly. Instead, consider
     /// calling NamespaceNode::open.
     pub fn new(
+        current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         name: NamespaceNode,
         flags: OpenFlags,
@@ -1248,6 +1473,7 @@ impl FileObject {
         let fs = name.entry.node.fs();
         let kernel = fs.kernel.upgrade().ok_or_else(|| errno!(ENOENT))?;
         let id = FileObjectId(kernel.next_file_object_id.next());
+        let _security_state = security::file_alloc_security(current_task);
         let file = FileHandle::new_cyclic(|weak_handle| {
             Self {
                 weak_handle: weak_handle.clone(),
@@ -1261,6 +1487,7 @@ impl FileObject {
                 epoll_files: Default::default(),
                 lease: Default::default(),
                 _file_write_guard: file_write_guard,
+                _security_state,
             }
             .into()
         });

@@ -183,6 +183,14 @@ typedef struct {
 
 } zx_processor_power_domain_t;
 
+typedef struct {
+  zx_cpu_set_t cpus;
+  uint32_t domain_id;
+  uint8_t idle_power_levels;
+  uint8_t active_power_levels;
+  uint8_t padding1[2];
+} zx_power_domain_info_t;
+
 // ====== End of runtime processor power management support ====== //
 // ====== Upcoming IOB support ====== //
 

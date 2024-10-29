@@ -13,7 +13,6 @@
 
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <sys/types.h>
 #include <zircon/assert.h>
@@ -23,6 +22,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <variant>
 #include <vector>
@@ -53,8 +53,8 @@ class FileMapping {
 
   static zx::result<FileMapping> Create(int fd);
 
-  cpp20::span<const uint8_t> data() const {
-    return cpp20::span(static_cast<const uint8_t*>(data_), length_);
+  std::span<const uint8_t> data() const {
+    return std::span(static_cast<const uint8_t*>(data_), length_);
   }
 
  private:
@@ -85,15 +85,13 @@ class BlobInfo {
 
   // If the blob was compressed then this function will return the compressed data. Otherwise the
   // uncompressed data is returned.
-  cpp20::span<const uint8_t> GetData() const { return std::visit(BlobDataVisitor{}, blob_data_); }
+  std::span<const uint8_t> GetData() const { return std::visit(BlobDataVisitor{}, blob_data_); }
 
   // Returns true if the data returned by |GetData| is compressed.
   bool IsCompressed() const { return std::holds_alternative<CompressedBlobData>(blob_data_); }
 
   const Digest& GetDigest() const { return digest_; }
-  cpp20::span<const uint8_t> GetMerkleTree() const {
-    return cpp20::span<const uint8_t>(merkle_tree_);
-  }
+  std::span<const uint8_t> GetMerkleTree() const { return std::span<const uint8_t>(merkle_tree_); }
   const BlobLayout& GetBlobLayout() const { return *blob_layout_; }
   const std::filesystem::path& GetSrcFilePath() const { return src_file_path_; }
 
@@ -110,13 +108,13 @@ class BlobInfo {
   using CompressedBlobData = fbl::Array<uint8_t>;
   using UncompressedBlobData = FileMapping;
   struct BlobDataVisitor {
-    cpp20::span<const uint8_t> operator()(const std::monostate& /*unused*/) {
+    std::span<const uint8_t> operator()(const std::monostate& /*unused*/) {
       ZX_PANIC("Blob data was not set");
     }
-    cpp20::span<const uint8_t> operator()(const CompressedBlobData& compressed_data) {
-      return cpp20::span<const uint8_t>(compressed_data);
+    std::span<const uint8_t> operator()(const CompressedBlobData& compressed_data) {
+      return std::span<const uint8_t>(compressed_data);
     }
-    cpp20::span<const uint8_t> operator()(const UncompressedBlobData& file_mapping) {
+    std::span<const uint8_t> operator()(const UncompressedBlobData& file_mapping) {
       return file_mapping.data();
     }
   };
@@ -133,8 +131,8 @@ class Blobfs : public fbl::RefCounted<Blobfs> {
   DISALLOW_COPY_ASSIGN_AND_MOVE(Blobfs);
 
   struct BlobView {
-    cpp20::span<const uint8_t> merkle_hash;
-    cpp20::span<const uint8_t> blob_contents;
+    std::span<const uint8_t> merkle_hash;
+    std::span<const uint8_t> blob_contents;
   };
 
   using BlobVisitor = fit::function<fpromise::result<void, std::string>(BlobView)>;

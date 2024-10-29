@@ -206,7 +206,7 @@ async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     fs.dir("svc")
         .add_fidl_service(IncomingService::Server)
-        .add_unified_service(IncomingService::Svc);
+        .add_fidl_service_instance("default", IncomingService::Svc);
 
     fs.take_and_serve_directory_handle()?;
 

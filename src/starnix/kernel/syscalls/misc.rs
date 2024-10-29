@@ -24,11 +24,11 @@ use starnix_logging::{log_error, log_info, log_warn, track_stub};
 use starnix_syscalls::{
     for_each_syscall, syscall_number_to_name_literal_callback, SyscallResult, SUCCESS,
 };
+use starnix_types::user_buffer::MAX_RW_COUNT;
 use starnix_uapi::auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT, CAP_SYS_MODULE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
-use starnix_uapi::user_buffer::MAX_RW_COUNT;
 use starnix_uapi::version::KERNEL_RELEASE;
 use starnix_uapi::{
     c_char, errno, error, from_status_like_fdio, perf_event_attr, pid_t, uapi, utsname, EFAULT,
@@ -241,6 +241,14 @@ pub fn sys_reboot(
         return error!(EPERM);
     }
 
+    let arg_bytes = if matches!(cmd, LINUX_REBOOT_CMD_RESTART2) {
+        // This is an arbitrary limit that should be large enough.
+        const MAX_REBOOT_ARG_LEN: usize = 256;
+        current_task.read_c_string_to_vec(UserCString::new(arg), MAX_REBOOT_ARG_LEN)?
+    } else {
+        FsString::default()
+    };
+
     let proxy = connect_to_protocol_sync::<fpower::AdminMarker>().or_else(|_| error!(EINVAL))?;
 
     match cmd {
@@ -266,11 +274,6 @@ pub fn sys_reboot(
         }
 
         LINUX_REBOOT_CMD_RESTART | LINUX_REBOOT_CMD_RESTART2 => {
-            // This is an arbitrary limit that should be large enough.
-            const MAX_REBOOT_ARG_LEN: usize = 256;
-            let arg_bytes = current_task
-                .read_c_string_to_vec(UserCString::new(arg), MAX_REBOOT_ARG_LEN)
-                .unwrap_or_default();
             let reboot_args: Vec<_> = arg_bytes.split_str(b",").collect();
 
             if reboot_args.contains(&&b"bootloader"[..]) {

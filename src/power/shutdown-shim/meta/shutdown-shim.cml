@@ -4,8 +4,9 @@
 {
     include: [ "//src/power/shutdown-shim/meta/shutdown-shim.base.cml" ],
     program: {
+        runner: "builtin",
+        type: "shutdown-shim",
         main_process_critical: "true",
-        forward_stdout_to: "none",
-        forward_stderr_to: "none",
+        lifecycle: { stop_event: "notify" },
     },
 }

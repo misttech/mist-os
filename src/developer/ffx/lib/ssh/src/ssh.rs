@@ -32,6 +32,8 @@ pub enum SshError {
     InvalidArgument,
     #[error("target not compatible")]
     TargetIncompatible,
+    #[error("connection closed by remote host")]
+    ConnectionClosedByRemoteHost,
 }
 
 impl From<String> for SshError {
@@ -62,6 +64,9 @@ impl From<String> for SshError {
         }
         if s.contains("not compatible") {
             return Self::TargetIncompatible;
+        }
+        if s.contains("Connection closed by remote host") {
+            return Self::ConnectionClosedByRemoteHost;
         }
         return Self::Unknown(s);
     }

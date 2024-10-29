@@ -9,6 +9,7 @@ use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
 use std::path::Path;
+use std::sync::Arc;
 use tee_internal::{Identity, Login, Uuid};
 
 // Maps to GlobalPlatform TEE Internal Core API Section 4.4: Property Access Functions
@@ -58,32 +59,25 @@ pub enum PropSetType {
 
 pub type PropertiesMap = IndexMap<String, (PropType, String)>;
 
-#[allow(dead_code)]
+#[derive(Clone)]
 pub struct PropSet {
-    prop_set_type: PropSetType,
     properties: PropertiesMap,
 }
 
 impl PropSet {
     #[cfg(test)]
-    pub(crate) fn new(prop_set_type: PropSetType, properties: PropertiesMap) -> Self {
-        Self { prop_set_type, properties }
+    pub(crate) fn new(properties: PropertiesMap) -> Self {
+        Self { properties }
     }
 
-    pub fn from_config_file(
-        config_path: &Path,
-        prop_set: PropSetType,
-    ) -> Result<Self, PropertyError> {
+    pub fn from_config_file(config_path: &Path) -> Result<Self, PropertyError> {
         match read_to_string(config_path) {
-            Ok(config_string) => Self::from_config_string(&config_string, prop_set),
+            Ok(config_string) => Self::from_config_string(&config_string),
             Err(e) => Err(PropertyError::Generic { msg: e.to_string() }),
         }
     }
 
-    pub fn from_config_string(
-        config_string: &str,
-        prop_set: PropSetType,
-    ) -> Result<Self, PropertyError> {
+    pub fn from_config_string(config_string: &str) -> Result<Self, PropertyError> {
         let props: TeeProperties = match serde_json5::from_str(config_string) {
             Ok(tee_props) => tee_props,
             Err(e) => return Err(PropertyError::Generic { msg: e.to_string() }),
@@ -94,7 +88,7 @@ impl PropSet {
             property_map.insert(property.name, (property.prop_type, property.value));
         }
 
-        Ok(Self { prop_set_type: prop_set, properties: property_map })
+        Ok(Self { properties: property_map })
     }
 
     fn get_value(&self, prop_name: String) -> Result<String, PropertyError> {
@@ -145,10 +139,14 @@ impl PropSet {
             None => Err(PropertyError::ItemNotFound { name: format!("item at index {}", index) }),
         }
     }
+
+    pub fn get_number_of_props(&self) -> usize {
+        self.properties.len()
+    }
 }
 
 pub struct PropEnumerator {
-    properties: Option<PropSet>,
+    properties: Option<Arc<PropSet>>,
     index: usize,
 }
 
@@ -159,22 +157,26 @@ impl PropEnumerator {
 
     // Spec indicates that callers should start() before doing other operations.
     // This impl doesn't need to do any functional work here since the initial state is valid.
-    pub fn start(&mut self, propset: PropSet) {
+    pub fn start(&mut self, propset: Arc<PropSet>) {
         self.properties = Some(propset);
         self.index = 0;
     }
 
-    pub fn restart(&mut self) {
+    pub fn reset(&mut self) {
         self.index = 0;
     }
 
+    // Spec: return ItemNotFound if enumerator not started or has reached end.
     pub fn next(&mut self) -> Result<(), PropertyError> {
-        if self.properties.is_none() {
+        // The get_props()? call will cover the not_started case.
+        let num_props = self.get_props()?.get_number_of_props();
+
+        self.index = self.index + 1;
+        if self.index >= num_props {
             return Err(PropertyError::ItemNotFound {
-                name: "enumerator has not been started".to_string(),
+                name: "enumerator has reached the end of the property set".to_string(),
             });
         }
-        self.index = self.index + 1;
         Ok(())
     }
 
@@ -244,6 +246,7 @@ fn parse_bool(value: String) -> Result<bool, PropertyError> {
 // TODO(https://fxbug.dev/369916290): Support the full list of integer value encodings (See 4.4 in
 // the spec).
 fn parse_uint32(value: String) -> Result<u32, PropertyError> {
+    // TODO(b/369916290): Ensure parse matches spec-acceptable string number formats in section 4.4.
     match value.parse::<u32>() {
         Ok(val) => Ok(val),
         Err(_) => Err(PropertyError::BadFormat { prop_type: PropType::UnsignedInt32, value }),
@@ -253,6 +256,7 @@ fn parse_uint32(value: String) -> Result<u32, PropertyError> {
 // TODO(https://fxbug.dev/369916290): Support the full list of integer value encodings (See 4.4 in
 // the spec).
 fn parse_uint64(value: String) -> Result<u64, PropertyError> {
+    // TODO(b/369916290): Ensure parse matches spec-acceptable string number formats in section 4.4.
     match value.parse::<u64>() {
         Ok(val) => Ok(val),
         Err(_) => Err(PropertyError::BadFormat { prop_type: PropType::UnsignedInt64, value }),
@@ -316,16 +320,17 @@ pub mod tests {
     const TEST_PROP_VAL_U64: &str = "4294967296"; // U32::MAX + 1
     const TEST_PROP_VAL_BINARY_BLOCK: &str = "ZnVjaHNpYQ=="; // base64 encoding of "fuchsia"
 
-    const TEST_PROP_VAL_UUID: &str = "5b9e0e40-2636-11e1-ad9e-0002a5d5c51b"; // OS Test TA UUID
+    // Randomly generated UUID for testing.
+    const TEST_PROP_VAL_UUID: &str = "9cccff19-13b5-4d4c-aa9e-5c8901a52e2f";
     const TEST_PROP_UUID: Uuid = Uuid {
-        time_low: 0x5b9e0e40,
-        time_mid: 0x2636,
-        time_hi_and_version: 0x11e1,
-        clock_seq_and_node: [0xad, 0x9e, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b],
+        time_low: 0x9cccff19,
+        time_mid: 0x13b5,
+        time_hi_and_version: 0x4d4c,
+        clock_seq_and_node: [0xaa, 0x9e, 0x5c, 0x89, 0x01, 0xa5, 0x2e, 0x2f],
     };
 
     // TODO(https://fxbug.dev/369916290): Spell as 0xf0000000 when hex encodings are supported.
-    const TEST_PROP_VAL_IDENTITY: &str = "4026531840:5b9e0e40-2636-11e1-ad9e-0002a5d5c51b";
+    const TEST_PROP_VAL_IDENTITY: &str = "4026531840:9cccff19-13b5-4d4c-aa9e-5c8901a52e2f";
     const TEST_PROP_IDENTITY: Identity =
         Identity { login: Login::TrustedApp, uuid: TEST_PROP_UUID };
 
@@ -363,7 +368,7 @@ pub mod tests {
     }
 
     fn create_test_prop_set() -> PropSet {
-        PropSet::new(PropSetType::TeeImplementation, create_test_prop_map())
+        PropSet::new(create_test_prop_map())
     }
 
     #[test]
@@ -382,9 +387,7 @@ pub mod tests {
         ]
         "#;
 
-        let prop_set: PropSet =
-            PropSet::from_config_string(config_json, PropSetType::TeeImplementation)
-                .expect("loading config");
+        let prop_set: PropSet = PropSet::from_config_string(config_json).expect("loading config");
 
         let bool_prop_value =
             prop_set.get_boolean_property("gpd.tee.asdf".to_string()).expect("getting bool prop");
@@ -407,7 +410,7 @@ pub mod tests {
         ]
         "#;
 
-        let res = PropSet::from_config_string(config_json, PropSetType::TeeImplementation);
+        let res = PropSet::from_config_string(config_json);
 
         match res.err() {
             Some(PropertyError::Generic { .. }) => (),
@@ -421,7 +424,7 @@ pub mod tests {
         let mut enumerator = PropEnumerator::new();
 
         // Enumerate in the order of test prop set, starting with string.
-        enumerator.start(create_test_prop_set());
+        enumerator.start(Arc::new(create_test_prop_set()));
 
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_STRING.to_string(), prop_name);
@@ -515,10 +518,8 @@ pub mod tests {
         assert_eq!(TEST_PROP_IDENTITY.uuid.time_hi_and_version, prop_val.uuid.time_hi_and_version);
         assert_eq!(TEST_PROP_IDENTITY.uuid.clock_seq_and_node, prop_val.uuid.clock_seq_and_node);
 
-        // Test error upon going out of bounds and attempting to query next property.
-        enumerator.next().expect("moving enumerator to next prop");
-
-        let res = enumerator.get_property_name();
+        // Test error upon going out of bounds via next().
+        let res = enumerator.next();
         match res.err() {
             Some(PropertyError::ItemNotFound { .. }) => (),
             _ => assert!(false, "Unexpected error type"),
@@ -526,9 +527,9 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_enumerator_restart() {
+    pub fn test_enumerator_reset() {
         let mut enumerator = PropEnumerator::new();
-        enumerator.start(create_test_prop_set());
+        enumerator.start(Arc::new(create_test_prop_set()));
 
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_STRING.to_string(), prop_name);
@@ -538,7 +539,7 @@ pub mod tests {
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_BOOL.to_string(), prop_name);
 
-        enumerator.restart();
+        enumerator.reset();
 
         let prop_name = enumerator.get_property_name().expect("getting prop name");
         assert_eq!(TEST_PROP_NAME_STRING.to_string(), prop_name);
@@ -547,7 +548,7 @@ pub mod tests {
     #[test]
     pub fn test_enumerator_wrong_prop_type_error() {
         let mut enumerator = PropEnumerator::new();
-        enumerator.start(create_test_prop_set());
+        enumerator.start(Arc::new(create_test_prop_set()));
 
         // First value is string type and not interpretable as bool, should error.
         let res = enumerator.get_property_as_bool();
@@ -951,8 +952,21 @@ pub mod tests {
     }
 
     #[test]
+    pub fn test_parse_binary_block_invalid_padding_chars_only() {
+        // Include characters outside of standard base64 set.
+        let bad_val = "====".to_string();
+
+        let res = parse_binary_block(bad_val);
+
+        match res.err() {
+            Some(PropertyError::BadFormat { .. }) => (),
+            _ => assert!(false, "Unexpected error type"),
+        }
+    }
+
+    #[test]
     pub fn test_parse_uuid_success() {
-        let valid_uuid = "5b9e0e40-2636-11e1-ad9e-0002a5d5c51b".to_string();
+        let valid_uuid = "9cccff19-13b5-4d4c-aa9e-5c8901a52e2f".to_string();
 
         let res = parse_uuid(valid_uuid);
 
@@ -1001,7 +1015,7 @@ pub mod tests {
         // 0xefffffff is an implementation-reserved value.
         //
         // TODO(https://fxbug.dev/369916290): Spell as 0xefffffff when hex encodings are supported.
-        let res = parse_identity("4026531839:5b9e0e40-2636-11e1-ad9e-0002a5d5c51b".to_string());
+        let res = parse_identity("4026531839:9cccff19-13b5-4d4c-aa9e-5c8901a52e2f".to_string());
         match res.err() {
             Some(PropertyError::BadFormat { .. }) => (),
             _ => assert!(false, "Unexpected error type"),

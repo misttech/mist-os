@@ -19,7 +19,7 @@ const LIGHT_KEY: &str = "settings_light_info";
 /// Migrates Light settings data from stash and stores it in persistent fidl-serialized files.
 pub(crate) struct V1653667208LightMigration(pub(crate) StoreProxy);
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl Migration for V1653667208LightMigration {
     fn id(&self) -> u64 {
         1653667208
@@ -95,13 +95,13 @@ mod tests {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
         let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
-        let task = fasync::Task::spawn(async move {
+        let task = fasync::Task::local(async move {
             let mut tasks = vec![];
             while let Some(Ok(request)) = request_stream.next().await {
                 if let StoreRequest::CreateAccessor { accessor_request, .. } = request {
                     let mut request_stream =
                         accessor_request.into_stream().expect("should be able to get stream");
-                    tasks.push(fasync::Task::spawn(async move {
+                    tasks.push(fasync::Task::local(async move {
                         while let Some(Ok(request)) = request_stream.next().await {
                             if let StoreAccessorRequest::GetValue { responder, .. } = request {
                                 // Just ignore the responder so the client receives an error.
@@ -138,13 +138,13 @@ mod tests {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
         let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
-        let task = fasync::Task::spawn(async move {
+        let task = fasync::Task::local(async move {
             let mut tasks = vec![];
             while let Some(Ok(request)) = request_stream.next().await {
                 if let StoreRequest::CreateAccessor { accessor_request, .. } = request {
                     let mut request_stream =
                         accessor_request.into_stream().expect("should be able to get stream");
-                    tasks.push(fasync::Task::spawn(async move {
+                    tasks.push(fasync::Task::local(async move {
                         while let Some(Ok(request)) = request_stream.next().await {
                             if let StoreAccessorRequest::GetValue { responder, .. } = request {
                                 responder.send(None).expect("should be able to send response");
@@ -177,14 +177,14 @@ mod tests {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
         let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
-        let task = fasync::Task::spawn(async move {
+        let task = fasync::Task::local(async move {
             let mut tasks = vec![];
             while let Some(Ok(request)) = request_stream.next().await {
                 if let StoreRequest::CreateAccessor { read_only, accessor_request, .. } = request {
                     assert!(read_only);
                     let mut request_stream =
                         accessor_request.into_stream().expect("should be able to get stream");
-                    tasks.push(fasync::Task::spawn(async move {
+                    tasks.push(fasync::Task::local(async move {
                         while let Some(Ok(request)) = request_stream.next().await {
                             if let StoreAccessorRequest::GetValue { key, responder } = request {
                                 assert_eq!(key, LIGHT_KEY);

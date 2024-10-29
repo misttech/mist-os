@@ -23,7 +23,11 @@ pub struct DirEntry {
     pub(crate) entry: std::sync::Arc<dyn vfs::directory::entry::DirectoryEntry>,
 }
 
-impl CapabilityBound for DirEntry {}
+impl CapabilityBound for DirEntry {
+    fn debug_typename() -> &'static str {
+        "DirEntry"
+    }
+}
 
 #[cfg(target_os = "fuchsia")]
 impl fmt::Debug for DirEntry {

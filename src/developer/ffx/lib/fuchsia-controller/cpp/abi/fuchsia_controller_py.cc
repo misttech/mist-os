@@ -593,21 +593,25 @@ PyObject *connect_handle_notifier(PyObject *self, PyObject *Py_UNUSED(arg)) {
 
 PyObject *context_target_wait(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
-  uint64_t seconds = 0;
+  uint64_t timeout_seconds = 0;
   bool offline = false;
-  // The python docs state "K" converts to "unsigned long long" so static assert they're
-  // matching the expected ABI.
+  // The python docs state "K" converts to "unsigned long long" so static assert they're matching
+  // the expected ABI.
   //
   // https://docs.python.org/3/c-api/arg.html#numbers
+  //
+  // TODO(https://fxbug.dev/346628306): Consider moving this assertion, and possibly others like it,
+  // to the top of this file. There may also be another approach that uses types like
+  // ctypes.c_uint64.
   static_assert(sizeof(uint64_t) == sizeof(unsigned long long));  // NOLINT
-  if (!PyArg_ParseTuple(args, "OKb", &obj, &seconds, &offline)) {
+  if (!PyArg_ParseTuple(args, "OKb", &obj, &timeout_seconds, &offline)) {
     return nullptr;
   }
   auto context = DowncastPyObject<PythonContext>(obj);
   if (!context) {
     return nullptr;
   }
-  zx_status_t status = ffx_target_wait(context->context(), seconds, offline);
+  zx_status_t status = ffx_target_wait(context->context(), timeout_seconds, offline);
   if (status != ZX_OK) {
     mod::dump_python_err();
     return nullptr;
@@ -617,9 +621,9 @@ PyObject *context_target_wait(PyObject *self, PyObject *args) {
 
 PyObject *channel_write(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
-  PyObject *bytes = nullptr;
+  PyObject *buffer = nullptr;
   PyObject *handles = nullptr;
-  if (!PyArg_ParseTuple(args, "OOO", &obj, &bytes, &handles)) {
+  if (!PyArg_ParseTuple(args, "OOO", &obj, &buffer, &handles)) {
     return nullptr;
   }
   auto channel = DowncastChannel(obj);
@@ -645,7 +649,7 @@ PyObject *channel_write(PyObject *self, PyObject *args) {
   // channel_write_etc call.
   memcpy(c_handles, view.buf, view.len);
   PyBuffer_Release(&view);
-  if (PyObject_GetBuffer(bytes, &view, PyBUF_CONTIG_RO) < 0) {
+  if (PyObject_GetBuffer(buffer, &view, PyBUF_CONTIG_RO) < 0) {
     PyErr_SetString(PyExc_TypeError, "Expected a buffer.");
     return nullptr;
   }
@@ -712,8 +716,8 @@ PyObject *channel_read(PyObject *self, PyObject *args) {
 
 PyObject *socket_write(PyObject *self, PyObject *args) {
   PyObject *obj = nullptr;
-  PyObject *data = nullptr;
-  if (!PyArg_ParseTuple(args, "OO", &obj, &data)) {
+  PyObject *buffer = nullptr;
+  if (!PyArg_ParseTuple(args, "OO", &obj, &buffer)) {
     return nullptr;
   }
   auto socket = DowncastSocket(obj);
@@ -721,7 +725,7 @@ PyObject *socket_write(PyObject *self, PyObject *args) {
     return nullptr;
   }
   Py_buffer view;
-  if (PyObject_GetBuffer(data, &view, PyBUF_CONTIG_RO) < 0) {
+  if (PyObject_GetBuffer(buffer, &view, PyBUF_CONTIG_RO) < 0) {
     PyErr_SetString(PyExc_TypeError, "Expected a buffer.");
     return nullptr;
   }

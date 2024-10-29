@@ -20,6 +20,7 @@
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
+#include <zircon/hw/gpt.h>
 #include <zircon/syscalls.h>
 
 #include <algorithm>
@@ -141,8 +142,16 @@ zx_status_t PartitionDevice::BlockPartitionGetName(char* out_name, size_t capaci
   return GetPartitionName(gpt_entry_, out_name, capacity).status_value();
 }
 
-zx_status_t PartitionDevice::BlockPartitionGetFlags(uint64_t* out_flags) {
-  *out_flags = gpt_entry_.flags;
+zx_status_t PartitionDevice::BlockPartitionGetMetadata(partition_metadata_t* out_metadata) {
+  zx::result name = GetPartitionName(gpt_entry_, out_metadata->name, sizeof(out_metadata->name));
+  if (name.is_error()) {
+    return name.status_value();
+  }
+  memcpy(&out_metadata->type_guid, gpt_entry_.type, GPT_GUID_LEN);
+  memcpy(&out_metadata->instance_guid, gpt_entry_.guid, GPT_GUID_LEN);
+  out_metadata->start_block_offset = gpt_entry_.first;
+  out_metadata->num_blocks = gpt_entry_.last - gpt_entry_.first + 1;
+  out_metadata->flags = gpt_entry_.flags;
   return ZX_OK;
 }
 

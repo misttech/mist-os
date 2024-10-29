@@ -71,7 +71,7 @@ impl<'buf> WireEnvelope<'buf> {
         } else {
             let bytes_before = encoder.bytes_written();
 
-            encoder.encode(value)?;
+            encoder.encode_next(value)?;
 
             *maybe_num_bytes =
                 u32_le::from_native((encoder.bytes_written() - bytes_before).try_into().unwrap());

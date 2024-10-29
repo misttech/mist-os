@@ -13,34 +13,34 @@ use fidl_fuchsia_camera3::{
 };
 use fuchsia_async::{self as fasync, DurationExt};
 use futures::TryStreamExt;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use zx::{self as zx, MonotonicDuration};
 
 pub(crate) struct Camera3Service {
-    camera_sw_muted: Arc<AtomicBool>,
+    camera_sw_muted: Rc<AtomicBool>,
     // If true, sends the camera device response immediately. If false, sends
     // an empty device list. If None, delay_camera_device should be provided.
-    has_camera_device: Arc<AtomicBool>,
+    has_camera_device: Rc<AtomicBool>,
     // If true, first sends an empty device list on watch, then delays, then
     // sends the camera device response.
-    delay_camera_device: Arc<AtomicBool>,
+    delay_camera_device: Rc<AtomicBool>,
 }
 
 impl Camera3Service {
     pub(crate) fn new(has_camera_device: bool) -> Self {
         Self {
-            camera_sw_muted: Arc::new(AtomicBool::new(false)),
-            has_camera_device: Arc::new(AtomicBool::new(has_camera_device)),
-            delay_camera_device: Arc::new(AtomicBool::new(false)),
+            camera_sw_muted: Rc::new(AtomicBool::new(false)),
+            has_camera_device: Rc::new(AtomicBool::new(has_camera_device)),
+            delay_camera_device: Rc::new(AtomicBool::new(false)),
         }
     }
 
     pub(crate) fn new_delayed_devices(delay_camera_device: bool) -> Self {
         Self {
-            camera_sw_muted: Arc::new(AtomicBool::new(false)),
-            has_camera_device: Arc::new(AtomicBool::new(false)),
-            delay_camera_device: Arc::new(AtomicBool::new(delay_camera_device)),
+            camera_sw_muted: Rc::new(AtomicBool::new(false)),
+            has_camera_device: Rc::new(AtomicBool::new(false)),
+            delay_camera_device: Rc::new(AtomicBool::new(delay_camera_device)),
         }
     }
 
@@ -66,11 +66,11 @@ impl Service for Camera3Service {
         let mut device_watcher_stream =
             ServerEnd::<DeviceWatcherMarker>::new(channel).into_stream()?;
 
-        let camera_sw_muted = Arc::clone(&self.camera_sw_muted);
-        let has_camera_device = Arc::clone(&self.has_camera_device);
-        let delay_camera_device = Arc::clone(&self.delay_camera_device);
+        let camera_sw_muted = Rc::clone(&self.camera_sw_muted);
+        let has_camera_device = Rc::clone(&self.has_camera_device);
+        let delay_camera_device = Rc::clone(&self.delay_camera_device);
         let mut watch_count = 0;
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(req) = device_watcher_stream.try_next().await.unwrap() {
                 // Support future expansion of FIDL.
                 #[allow(unreachable_patterns)]
@@ -105,8 +105,8 @@ impl Service for Camera3Service {
                         control_handle: _,
                     } => {
                         let mut stream = request.into_stream().unwrap();
-                        let camera_sw_muted = Arc::clone(&camera_sw_muted);
-                        fasync::Task::spawn(async move {
+                        let camera_sw_muted = Rc::clone(&camera_sw_muted);
+                        fasync::Task::local(async move {
                             while let Some(req) = stream.try_next().await.unwrap() {
                                 // Support future expansion of FIDL.
                                 match req {

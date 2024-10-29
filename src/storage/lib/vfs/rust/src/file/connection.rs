@@ -573,11 +573,9 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 trace::duration!(c"storage", c"File::Clone");
                 self.handle_clone(flags, object);
             }
-            fio::FileRequest::Reopen { rights_request: _, object_request, control_handle: _ } => {
-                trace::duration!(c"storage", c"File::Reopen");
-                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
-                // Suppress any errors in the event a bad `object_request` channel was provided.
-                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
+            fio::FileRequest::Clone2 { request, control_handle: _ } => {
+                trace::duration!(c"storage", c"File::Clone2");
+                self.handle_clone2(ServerEnd::new(request.into_channel()));
             }
             fio::FileRequest::Close { responder } => {
                 return Ok(ConnectionState::Closed(responder));
@@ -850,6 +848,21 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         });
     }
 
+    fn handle_clone2(&mut self, server_end: ServerEnd<fio::FileMarker>) {
+        let connection = match self.file.clone_connection(self.options) {
+            Ok(file) => Self { scope: self.scope.clone(), file, options: self.options },
+            Err(status) => {
+                let _ = server_end.close_with_epitaph(status);
+                return;
+            }
+        };
+        self.scope.spawn(async move {
+            if let Ok(requests) = server_end.into_stream() {
+                connection.handle_requests(requests).await;
+            }
+        });
+    }
+
     async fn handle_read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
         if !self.options.rights.intersects(fio::Operations::READ_BYTES) {
             return Err(Status::BAD_HANDLE);
@@ -1014,7 +1027,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::Representation, Status> {
-        // TODO(https://fxbug.dev/42157659): Add support for connecting as Node.
+        // TODO(https://fxbug.dev/324112547): Add support for connecting as Node.
         Ok(fio::Representation::File(fio::FileInfo {
             is_append: Some(self.options.is_append),
             observer: self.file.event()?,

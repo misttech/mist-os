@@ -149,7 +149,9 @@ if (current_cpu == "arm64" || current_cpu == "riscv64") {
 
       supported_environments = [ qemu_env ]
       if (current_cpu == "arm64") {
-        # TODO(https://fxbug.dev/371274109): Also crosvm_env.
+        # We don't add crosvm_env since it uses a different UART on ARM than our
+        # QEMU configuration does, meaning that the QEMU kernel boot tests will
+        # not work with crosvm in this case.
         supported_environments += [ aemu_env ]
       }
     },

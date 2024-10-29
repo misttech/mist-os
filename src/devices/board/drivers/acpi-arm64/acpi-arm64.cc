@@ -104,8 +104,13 @@ zx::result<> AcpiArm64::SmbiosInit() {
   bootloader_info.vendor() = "<unknown>";
 
   // Load SMBIOS information.
+  auto client = DdkConnectRuntimeProtocol<fuchsia_hardware_platform_bus::Service::Firmware>();
+  if (client.is_error()) {
+    return client.take_error();
+  }
   smbios::SmbiosInfo smbios;
-  zx_status_t status = smbios.Load(zx::unowned_resource(get_mmio_resource(parent())));
+  zx_status_t status =
+      smbios.Load(zx::unowned_resource(get_mmio_resource(parent())), std::move(client.value()));
   if (status == ZX_OK) {
     board_info.board_name() = smbios.board_name();
     bootloader_info.vendor() = smbios.vendor();

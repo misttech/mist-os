@@ -19,7 +19,8 @@ use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, ArchiveAccessorRequest,
 };
 use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
-use std::sync::{Arc, Mutex};
+use std::cell::RefCell;
+use std::rc::Rc;
 use {errors as _, ffx_writer as _, fidl_fuchsia_sys2 as fsys};
 
 #[derive(Default)]
@@ -35,7 +36,7 @@ impl FakeArchiveIteratorResponse {
 
 pub fn setup_fake_accessor_provider(
     mut server_end: fuchsia_async::Socket,
-    responses: Arc<Vec<FakeArchiveIteratorResponse>>,
+    responses: Rc<Vec<FakeArchiveIteratorResponse>>,
 ) -> Result<()> {
     fuchsia_async::Task::local(async move {
         if responses.is_empty() {
@@ -50,13 +51,13 @@ pub fn setup_fake_accessor_provider(
 
 pub struct FakeAccessorData {
     parameters: StreamParameters,
-    responses: Arc<Vec<FakeArchiveIteratorResponse>>,
+    responses: Rc<Vec<FakeArchiveIteratorResponse>>,
 }
 
 impl FakeAccessorData {
     pub fn new(
         parameters: StreamParameters,
-        responses: Arc<Vec<FakeArchiveIteratorResponse>>,
+        responses: Rc<Vec<FakeArchiveIteratorResponse>>,
     ) -> Self {
         FakeAccessorData { parameters, responses }
     }
@@ -109,7 +110,7 @@ pub fn setup_fake_rcs() -> RemoteControlProxy {
     let (proxy, mut stream) =
         fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
     fuchsia_async::Task::local(async move {
-        let querier = Arc::new(mock_realm_query);
+        let querier = Rc::new(mock_realm_query);
         while let Ok(Some(req)) = stream.try_next().await {
             match req {
                 RemoteControlRequest::OpenCapability {
@@ -123,7 +124,7 @@ pub fn setup_fake_rcs() -> RemoteControlProxy {
                     assert_eq!(moniker, "toolbox");
                     assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
                     assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
-                    let querier = Arc::clone(&querier);
+                    let querier = Rc::clone(&querier);
                     fuchsia_async::Task::local(querier.serve(ServerEnd::new(server_channel)))
                         .detach();
                     responder.send(Ok(())).unwrap();
@@ -140,14 +141,14 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
     accessor_proxy: ArchiveAccessorProxy,
     expected_moniker: String,
     expected_protocol: String,
-) -> (RemoteControlProxy, Arc<Mutex<Vec<fuchsia_async::Task<()>>>>) {
+) -> (RemoteControlProxy, Rc<RefCell<Vec<fuchsia_async::Task<()>>>>) {
     let mock_realm_query = iquery_test_support::MockRealmQuery::default();
     let (proxy, mut stream) =
         fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
-    let running_tasks = Arc::new(Mutex::new(vec![]));
+    let running_tasks = Rc::new(RefCell::new(vec![]));
     let running_tasks_clone = running_tasks.clone();
     let task = fuchsia_async::Task::local(async move {
-        let querier = Arc::new(mock_realm_query);
+        let querier = Rc::new(mock_realm_query);
         if let Ok(Some(req)) = stream.try_next().await {
             match req {
                 RemoteControlRequest::OpenCapability {
@@ -161,9 +162,9 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
                     if moniker == "toolbox" {
                         assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
                         assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
-                        let querier = Arc::clone(&querier);
-                        let mut tasks = running_tasks_clone.lock().unwrap();
-                        tasks.push(fuchsia_async::Task::spawn(async move {
+                        let querier = Rc::clone(&querier);
+                        let mut tasks = running_tasks_clone.borrow_mut();
+                        tasks.push(fuchsia_async::Task::local(async move {
                             querier.serve(ServerEnd::new(server_channel)).await
                         }));
                         responder.send(Ok(())).unwrap();
@@ -176,7 +177,7 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
                             server_channel,
                             accessor_proxy,
                         );
-                        let mut tasks = running_tasks_clone.lock().unwrap();
+                        let mut tasks = running_tasks_clone.borrow_mut();
                         tasks.push(task);
                     } else {
                         panic!("Got unexpected moniker: {moniker}");
@@ -187,7 +188,7 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
         }
     });
     {
-        let mut tasks = running_tasks.lock().unwrap();
+        let mut tasks = running_tasks.borrow_mut();
         tasks.push(task);
     }
     (proxy, running_tasks)
@@ -257,7 +258,7 @@ pub fn inspect_accessor_data(
         ..Default::default()
     };
     let value = serde_json::to_string(&inspects).unwrap();
-    let expected_responses = Arc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
+    let expected_responses = Rc::new(vec![FakeArchiveIteratorResponse::new_with_value(value)]);
     FakeAccessorData::new(params, expected_responses)
 }
 

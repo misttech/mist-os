@@ -15,8 +15,8 @@ use {fuchsia_async as fasync, serde_json as json};
 
 // nodes
 use crate::{
-    cpu_control_handler, cpu_device_handler, cpu_manager_main, cpu_stats_handler, syscall_handler,
-    thermal_watcher,
+    cpu_control_handler, cpu_device_handler, cpu_manager_main, cpu_stats_handler, rppm_handler,
+    syscall_handler, thermal_watcher,
 };
 
 pub struct CpuManager {
@@ -135,6 +135,12 @@ impl CpuManager {
             "CpuStatsHandler" => {
                 cpu_stats_handler::CpuStatsHandlerBuilder::new_from_json(json_data, &self.nodes)
                     .build()
+                    .await?
+            }
+
+            "RppmHandler" => {
+                rppm_handler::RppmHandlerBuilder::new_from_json(json_data, &self.nodes)
+                    .build(node_futures)
                     .await?
             }
 

@@ -8,7 +8,7 @@ use fidl_diagnostics_validate::*;
 use serde::Serialize;
 use std::collections::HashSet;
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Default)]
 pub struct Results {
     messages: Vec<String>,
     unimplemented: HashSet<String>,
@@ -110,13 +110,7 @@ struct TrialMetrics {
 
 impl Results {
     pub fn new() -> Results {
-        Results {
-            messages: Vec::new(),
-            metrics: Vec::new(),
-            unimplemented: HashSet::new(),
-            failed: false,
-            diff_type: DiffType::Full,
-        }
+        Results::default()
     }
 
     pub fn error(&mut self, message: String) {
@@ -175,7 +169,7 @@ impl Results {
                 name
             );
         }
-        println!("");
+        println!();
     }
 
     pub fn print_pretty_text(&self) {
@@ -187,13 +181,13 @@ impl Results {
         for message in self.messages.iter() {
             println!("{}", message);
         }
-        if self.unimplemented.len() > 0 {
+        if !self.unimplemented.is_empty() {
             println!("\nUnimplemented:");
             for info in self.unimplemented.iter() {
                 println!("  {}", info);
             }
         }
-        if self.metrics.len() > 0 {
+        if !self.metrics.is_empty() {
             println!("\nMetrics:");
             for metric in self.metrics.iter() {
                 Self::print_pretty_metric(metric);

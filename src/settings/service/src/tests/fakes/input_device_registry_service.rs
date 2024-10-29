@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::sync::Arc;
-
 use anyhow::{format_err, Error};
 use fidl::endpoints::ServerEnd;
 use fidl::prelude::*;
 use fuchsia_async as fasync;
 use fuchsia_sync::RwLock;
 use futures::TryStreamExt;
+use std::rc::Rc;
 
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fidl_fuchsia_ui_policy::MediaButtonsListenerProxy;
@@ -17,16 +16,16 @@ use fidl_fuchsia_ui_policy::MediaButtonsListenerProxy;
 use crate::tests::fakes::base::Service;
 
 pub(crate) struct InputDeviceRegistryService {
-    listeners: Arc<RwLock<Vec<MediaButtonsListenerProxy>>>,
-    last_sent_event: Arc<RwLock<Option<MediaButtonsEvent>>>,
+    listeners: Rc<RwLock<Vec<MediaButtonsListenerProxy>>>,
+    last_sent_event: Rc<RwLock<Option<MediaButtonsEvent>>>,
     fail: bool,
 }
 
 impl InputDeviceRegistryService {
     pub(crate) fn new() -> Self {
         Self {
-            listeners: Arc::new(RwLock::new(Vec::new())),
-            last_sent_event: Arc::new(RwLock::new(None)),
+            listeners: Rc::new(RwLock::new(Vec::new())),
+            last_sent_event: Rc::new(RwLock::new(None)),
             fail: false,
         }
     }
@@ -65,7 +64,7 @@ impl Service for InputDeviceRegistryService {
             return Err(format_err!("exiting early"));
         }
 
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             while let Some(req) = manager_stream.try_next().await.unwrap() {
                 if let fidl_fuchsia_ui_policy::DeviceListenerRegistryRequest::RegisterListener {
                     listener,

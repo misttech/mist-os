@@ -84,10 +84,10 @@ impl Emulator {
         let dev = self.dev.as_ref().expect("emulator device accessed after it was destroyed!");
         let topo = dev.get_topological_path().await?;
         let TestDevice { dev_directory, controller: _, emulator: _ } = dev;
-        let hci_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+        let hci_dir = fuchsia_fs::directory::open_directory_async(
             dev_directory,
             HCI_DEVICE_DIR,
-            fuchsia_fs::OpenFlags::empty(),
+            fuchsia_fs::Flags::empty(),
         )?;
 
         let hci_device_path = device_watcher::wait_for_device_with(
@@ -167,10 +167,10 @@ impl TestDevice {
                 format_err!("name absent from EmulatorController::Create FIDL response")
             })?;
 
-        let emulator_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+        let emulator_dir = fuchsia_fs::directory::open_directory_async(
             &dev_directory,
             EMULATOR_DEVICE_DIR,
-            fuchsia_fs::OpenFlags::empty(),
+            fuchsia_fs::Flags::empty(),
         )?;
 
         // Wait until a bt-emulator device gets published under our test device.
@@ -183,10 +183,10 @@ impl TestDevice {
                 let topological_path = topological_path.strip_prefix('/')?;
                 let topological_path = topological_path.strip_prefix(&name)?;
                 let _: &str = topological_path;
-                Some(fuchsia_fs::directory::open_directory_no_describe_deprecated(
+                Some(fuchsia_fs::directory::open_directory_async(
                     &emulator_dir,
                     filename,
-                    fuchsia_fs::OpenFlags::empty(),
+                    fuchsia_fs::Flags::empty(),
                 ))
             },
         )
@@ -291,10 +291,10 @@ mod tests {
         let TestDevice { dev_directory, controller: _, emulator: _ } = dev;
 
         // A bt-emulator device should already exist by now.
-        let emulator_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+        let emulator_dir = fuchsia_fs::directory::open_directory_async(
             &dev_directory,
             EMULATOR_DEVICE_DIR,
-            fuchsia_fs::OpenFlags::empty(),
+            fuchsia_fs::Flags::empty(),
         )
         .expect("open emulator directory");
         emul_dev = device_watcher::wait_for_device_with(

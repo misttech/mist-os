@@ -398,8 +398,13 @@ class PathRewriter(object):
         # the local variable by that name.
         paths[:] = self.path_list(paths)
 
-    def rewrite_metadata(self, meta: T.Any) -> None:
-        """Rewrite metadata JSON value in-place."""
+    def rewrite_metadata(self, meta: T.Any, meta_dir: str) -> None:
+        """Rewrite metadata JSON value in-place.
+
+        Args:
+            meta: The meta.json file as a JSON dict.
+            meta_dir: The directory where the file lives in.
+        """
         atom_type = meta.get("type")
         # version_history.json places the type under data.type
         if atom_type is None and "data" in meta:
@@ -411,7 +416,6 @@ class PathRewriter(object):
 
         if atom_type == "cc_prebuilt_library":
             self.path_list_inplace(meta["headers"])
-            # self.property_inplace(meta, "ifs")
             binaries = meta.get("binaries", {})
             for arch, binary_group in binaries.items():
                 self.properties_inplace(binary_group, ("debug", "dist", "link"))
@@ -420,6 +424,12 @@ class PathRewriter(object):
                 self.properties_inplace(
                     values, ("debug", "dist_lib", "link_lib")
                 )
+            # Handle the symlink for the ifs file, which is listed by
+            # name only, instead of an SDK-relative file path.
+            # E.g. 'foo.ifs' instead of 'pkg/foo/foo.ifs'
+            meta_ifs = meta.get("ifs")
+            if meta_ifs:
+                self.path(f"{meta_dir}/{meta_ifs}")
             return
 
         if atom_type == "cc_source_library":
@@ -505,7 +515,6 @@ class PathRewriter(object):
                     "Scrt1.o",
                 ]
             )
-            # sysroot_rewriter.path_list_inplace(meta["ifs_files"])
             for variant in meta.get("variants", []):
                 values = variant["values"]
                 sysroot_rewriter.path_list_inplace(values["debug_libs"])
@@ -518,6 +527,9 @@ class PathRewriter(object):
                 sysroot_rewriter.path_list_inplace(version["dist_libs"])
                 sysroot_rewriter.path_list_inplace(version["headers"])
                 sysroot_rewriter.path_list_inplace(version["link_libs"])
+
+            for ifs in meta.get("ifs_files", []):
+                sysroot_rewriter.path(f"{meta_dir}/{ifs}")
             return
 
         if atom_type == "version_history":
@@ -627,7 +639,8 @@ def main():
             )
             raise
 
-        rewriter.rewrite_metadata(meta)
+        meta_dir = os.path.dirname(part_meta_path)
+        rewriter.rewrite_metadata(meta, meta_dir)
 
         output_idk.add_json_file(part_meta_path, meta, is_meta=True)
 

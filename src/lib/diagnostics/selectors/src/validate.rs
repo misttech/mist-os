@@ -109,20 +109,18 @@ trait ValidateStringSelectorExt {
 impl<T: StringSelector> ValidateStringSelectorExt for T {
     fn validate(&self, opts: StringSelectorValidationOpts) -> Result<(), ValidationError> {
         match (self.exact_match(), self.pattern()) {
-            (None, None) | (Some(_), Some(_)) => {
-                return Err(ValidationError::InvalidStringSelector)
-            }
+            (None, None) | (Some(_), Some(_)) => Err(ValidationError::InvalidStringSelector),
             (Some(exact_match), None) => {
                 if !opts.allow_empty && exact_match.is_empty() {
                     return Err(ValidationError::InvalidStringSelector);
                 }
-                return Ok(());
+                Ok(())
             }
             (None, Some(pattern)) => {
                 if opts.allow_recursive_glob && pattern == "**" {
-                    return Ok(());
+                    Ok(())
                 } else {
-                    return validate_pattern(pattern);
+                    validate_pattern(pattern)
                 }
             }
         }
@@ -185,7 +183,7 @@ impl ComponentSelector for fdiagnostics::ComponentSelector {
     type Segment = fdiagnostics::StringSelector;
 
     fn segments(&self) -> Option<&[Self::Segment]> {
-        self.moniker_segments.as_ref().map(|s| s.as_slice())
+        self.moniker_segments.as_deref()
     }
 }
 
@@ -313,17 +311,14 @@ mod tests {
 
     #[fuchsia::test]
     fn tree_selector_validator_test() {
-        let unique_failing_test_cases = vec![
+        let unique_failing_test_cases = [
             // All failing validators due to property selectors are
             // unique since the component validator doesn't look at them.
             (vec![r#"a"#], r#"**"#),
             (vec![r#"a"#], r#"/"#),
         ];
 
-        fn create_tree_selector(
-            node_path: &Vec<&str>,
-            property: &str,
-        ) -> fdiagnostics::TreeSelector {
+        fn create_tree_selector(node_path: &[&str], property: &str) -> fdiagnostics::TreeSelector {
             let node_path = node_path
                 .iter()
                 .map(|path_node_str| {
@@ -365,18 +360,19 @@ mod tests {
     #[fuchsia::test]
     fn component_selector_validator_test() {
         fn create_component_selector(
-            component_moniker: &Vec<&str>,
+            component_moniker: &[&str],
         ) -> fdiagnostics::ComponentSelector {
-            let mut component_selector = fdiagnostics::ComponentSelector::default();
-            component_selector.moniker_segments = Some(
-                component_moniker
-                    .into_iter()
-                    .map(|path_node_str| {
-                        fdiagnostics::StringSelector::StringPattern(path_node_str.to_string())
-                    })
-                    .collect::<Vec<fdiagnostics::StringSelector>>(),
-            );
-            component_selector
+            fdiagnostics::ComponentSelector {
+                moniker_segments: Some(
+                    component_moniker
+                        .iter()
+                        .map(|path_node_str| {
+                            fdiagnostics::StringSelector::StringPattern(path_node_str.to_string())
+                        })
+                        .collect::<Vec<fdiagnostics::StringSelector>>(),
+                ),
+                ..fdiagnostics::ComponentSelector::default()
+            }
         }
 
         for (component_moniker, _) in SHARED_PASSING_TEST_CASES.iter() {

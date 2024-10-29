@@ -38,7 +38,7 @@ impl Snapshot {
 
     /// Gets the block at the given |index|.
     pub fn get_block(&self, index: BlockIndex) -> Option<ScannedBlock<'_>> {
-        if index.offset() < (&self.buffer).len() {
+        if index.offset() < self.buffer.len() {
             Some(self.buffer.block_at(index))
         } else {
             None
@@ -57,7 +57,7 @@ impl Snapshot {
         read_callback: &mut F,
     ) -> Result<Snapshot, ReaderError>
     where
-        F: FnMut() -> (),
+        F: FnMut(),
     {
         // Read the generation count one time
         let mut header_bytes: [u8; 32] = [0; 32];
@@ -69,10 +69,8 @@ impl Snapshot {
             return Err(ReaderError::InconsistentSnapshot);
         };
         if gen == constants::VMO_FROZEN {
-            match BackingBuffer::try_from(source) {
-                Ok(buffer) => return Ok(Snapshot { buffer }),
-                // on error, try and read via the full snapshot algo
-                Err(_) => {}
+            if let Ok(buffer) = BackingBuffer::try_from(source) {
+                return Ok(Snapshot { buffer });
             }
         }
 
@@ -104,7 +102,7 @@ impl Snapshot {
         mut read_callback: F,
     ) -> Result<Snapshot, ReaderError>
     where
-        F: FnMut() -> (),
+        F: FnMut(),
     {
         let mut i = 0;
         loop {
@@ -259,9 +257,8 @@ impl Snapshot {
                         }
 
                         self.get_block(string_idx)
-                            .map(|b| self.load_string_reference(b))
-                            .flatten()
-                            .unwrap_or(String::new())
+                            .and_then(|b| self.load_string_reference(b))
+                            .unwrap_or_default()
                     })
                     .collect::<Vec<String>>();
                 Property::StringList(name, values)
@@ -351,7 +348,7 @@ impl TryFrom<Vec<u8>> for Snapshot {
         if header_generation_count(&bytes).is_some() {
             Ok(Snapshot { buffer: BackingBuffer::from(bytes) })
         } else {
-            return Err(ReaderError::MissingHeaderOrLocked);
+            Err(ReaderError::MissingHeaderOrLocked)
         }
     }
 }
@@ -559,7 +556,7 @@ mod tests {
             0x00, /* order/reserved */
             0x02, /* type */
             0xff, /* invalid version number */
-            'I' as u8, 'N' as u8, 'S' as u8, 'P' as u8,
+            b'I', b'N', b'S', b'P',
         ]);
         assert!(get_snapshot!(container, storage, || {}).is_err());
         Ok(())

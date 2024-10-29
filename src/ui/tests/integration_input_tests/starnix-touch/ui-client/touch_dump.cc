@@ -12,6 +12,7 @@
 #include <array>
 #include <cstddef>
 #include <iostream>
+#include <sstream>
 
 #include "src/ui/tests/integration_input_tests/starnix-touch/relay-api.h"
 #include "third_party/android/platform/bionic/libc/kernel/uapi/linux/input.h"
@@ -77,12 +78,11 @@ auto ensure(size_t caller_lineno, const std::string& callee, Args... args) {
     }                                 \
   } while (0)
 
-void relay_events(int epoll_fd) {
-  // We expect two taps received across two to four calls to `read`, depending
-  // on the state of what's been written at the time that we read. To account
-  // for variable call counts, we subtract each batch from a running count.
-  // If we ever read more than the expected amount, something has gone wrong.
-  size_t num_remaining = relay_api::kDownUpNumPackets * 2;
+void relay_events(int epoll_fd, size_t num_of_events) {
+  // To account for variable call counts, we subtract each batch from a
+  // running count. If we ever read more than the expected amount, something
+  // has gone wrong.
+  size_t num_remaining = num_of_events;
   constexpr size_t kExpectedEventLen = sizeof(input_event);
   constexpr int kMaxEvents = 1;
   constexpr int kInfiniteTimeout = -1;
@@ -125,19 +125,75 @@ void relay_events(int epoll_fd) {
   }
 }
 
+int open_device(int epoll_fd, const std::string& device_path) {
+  int device_fd = ENSURE(open, device_path.c_str(), O_RDONLY);
+  epoll_event epoll_params = {.events = EPOLLIN, .data = {.fd = device_fd}};
+  ENSURE(epoll_ctl, epoll_fd, EPOLL_CTL_ADD, device_fd, &epoll_params);
+  return device_fd;
+}
+
+void close_device(int device_fd, int epoll_fd) {
+  ENSURE(epoll_ctl, epoll_fd, EPOLL_CTL_DEL, device_fd, nullptr);
+  ENSURE(close, device_fd);
+}
+
+void write_message_to_stdout(const std::string& message) {
+  auto n_written = ENSURE(write, STDOUT_FILENO, message.data(), message.size());
+  ASSERT_EQ(message.size(), static_cast<size_t>(n_written), "expected n_written=%zu, but got %zd");
+}
+
+constexpr std::string kDevice = "/dev/input/event0";
+
 int main() {
-  // Get ready to read input events.
-  const int touch_fd = ENSURE(open, "/dev/input/event0", O_RDONLY);
   int epoll_fd = ENSURE(epoll_create, 1);  // Per manual page, must be >0.
-  epoll_event epoll_params = {.events = EPOLLIN, .data = {.fd = touch_fd}};
-  ENSURE(epoll_ctl, epoll_fd, EPOLL_CTL_ADD, touch_fd, &epoll_params);
 
-  // Let `starnix-touch-test.cc` know that we're ready for it to inject
-  // touch events.
-  std::string packet(relay_api::kReadyMessage);
-  auto n_written = ENSURE(write, STDOUT_FILENO, packet.data(), packet.size());
-  ASSERT_EQ(packet.size(), static_cast<size_t>(n_written), "expected n_written=%zu, but got %zd");
+  char input_buffer[128];
 
-  // Now just copy events from `evdev` to stdout.
-  relay_events(epoll_fd);
+  while (true) {
+    // Let `starnix-touch-test.cc` know that we are ready for input message.
+    write_message_to_stdout(relay_api::kWaitForStdinMessage);
+
+    std::string cmd;
+
+    // Read input from STDIN_FILENO
+    ssize_t bytes_read = read(STDIN_FILENO, input_buffer, sizeof(input_buffer) - 1);
+    if (bytes_read <= 0) {
+      write_message_to_stdout(relay_api::kFailedMessage);
+      return 0;
+    }
+    // Null-terminate the string
+    input_buffer[bytes_read] = '\0';
+
+    std::stringstream ss(input_buffer);
+
+    ss >> cmd;
+    if (cmd == relay_api::kQuitCmd) {
+      return 0;
+    }
+
+    if (cmd == relay_api::kEventCmd) {
+      // open the device, handle X events, then close.
+      size_t num_of_events;
+      ss >> num_of_events;
+
+      int touch_fd = open_device(epoll_fd, kDevice);
+
+      // Let `starnix-touch-test.cc` know that we're ready for it to inject
+      // touch events.
+      write_message_to_stdout(relay_api::kReadyMessage);
+
+      // Now just copy events from `evdev` to stdout.
+      // We expect two taps received across two to four calls to `read`, depending
+      // on the state of what's been written at the time that we read.
+      relay_events(epoll_fd, num_of_events);
+
+      // Close file.
+      close_device(touch_fd, epoll_fd);
+
+    } else {
+      // Unknown command.
+      write_message_to_stdout(relay_api::kFailedMessage);
+      return 0;
+    }
+  }
 }

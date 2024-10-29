@@ -543,10 +543,7 @@ template("aidl_rust") {
       ":${main_target_name}_aidl_rust_glue",
       "//src/lib/android/binder/rust:binder",
       "//third_party/rust_crates:async-trait",
-      "//third_party/rust_crates:lazy_static",
       "//third_party/rust_crates:static_assertions",
-
-      # "//src/lib/android/remote_hal/rust:rust", # XXX
     ]
     if (defined(invoker.deps)) {
       deps += invoker.deps

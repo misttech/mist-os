@@ -83,8 +83,8 @@ pub enum Error {
     ParseError(#[from] selectors::Error),
 }
 
-const DRIVER_COLLECTION_SEGMENT: &'static str = r"*-drivers\:*";
-const BOOTSTRAP_SEGMENT: &'static str = "bootstrap";
+const DRIVER_COLLECTION_SEGMENT: &str = r"*-drivers\:*";
+const BOOTSTRAP_SEGMENT: &str = "bootstrap";
 
 // `selector` must be validated.
 fn verify_wildcard_restrictions(selector: &Selector, raw_selector: &str) -> Result<(), Error> {
@@ -145,7 +145,7 @@ fn verify_wildcard_restrictions(selector: &Selector, raw_selector: &str) -> Resu
     Ok(())
 }
 
-pub(crate) fn parse_selector<E>(selector_str: &str) -> Result<ParsedSelector, Error> {
+pub(crate) fn parse_selector(selector_str: &str) -> Result<ParsedSelector, Error> {
     let selector = selectors::parse_selector::<FastError>(selector_str)?;
     verify_wildcard_restrictions(&selector, selector_str)?;
     Ok(ParsedSelector {
@@ -173,7 +173,7 @@ impl<'de> Deserialize<'de> for SelectorList {
             where
                 E: serde::de::Error,
             {
-                Ok(vec![Some(parse_selector::<E>(value).map_err(E::custom)?)])
+                Ok(vec![Some(parse_selector(value).map_err(E::custom)?)])
             }
 
             fn visit_seq<A>(self, mut value: A) -> Result<Self::Value, A::Error>
@@ -184,7 +184,7 @@ impl<'de> Deserialize<'de> for SelectorList {
 
                 let mut out = vec![];
                 while let Some(s) = value.next_element::<String>()? {
-                    out.push(Some(parse_selector::<A::Error>(&s).map_err(A::Error::custom)?));
+                    out.push(Some(parse_selector(&s).map_err(A::Error::custom)?));
                 }
                 if out.is_empty() {
                     Err(A::Error::invalid_length(0, &"expected at least one selector"))
@@ -207,11 +207,11 @@ mod tests {
     fn require_string(data: &StringSelector, required: &str) {
         match data {
             StringSelector::ExactMatch(string) => assert_eq!(string, required),
-            _ => assert!(false, "Expected an exact match"),
+            _ => unreachable!("Expected an exact match"),
         }
     }
 
-    fn require_strings(data: &Vec<StringSelector>, required: Vec<&str>) {
+    fn require_strings(data: &[StringSelector], required: Vec<&str>) {
         assert_eq!(data.len(), required.len());
         for (data, required) in data.iter().zip(required.iter()) {
             require_string(data, required);
@@ -230,7 +230,7 @@ mod tests {
                 require_strings(&selector.node_path, vec!["root", "branch"]);
                 require_string(&selector.target_properties, "leaf");
             }
-            _ => assert!(false, "Expected a property selector"),
+            _ => unreachable!("Expected a property selector"),
         }
         Ok(())
     }
@@ -247,7 +247,7 @@ mod tests {
                 require_strings(&selector.node_path, vec!["root", "branch"]);
                 require_string(&selector.target_properties, "leaf");
             }
-            _ => assert!(false, "Expected a property selector"),
+            _ => unreachable!("Expected a property selector"),
         }
         let ParsedSelector { selector_string, selector, .. } = selectors[1].as_ref().unwrap();
         assert_eq!(selector_string, "core/bar:root/twig:leaf");
@@ -256,7 +256,7 @@ mod tests {
                 require_strings(&selector.node_path, vec!["root", "twig"]);
                 require_string(&selector.target_properties, "leaf");
             }
-            _ => assert!(false, "Expected a property selector"),
+            _ => unreachable!("Expected a property selector"),
         }
         Ok(())
     }

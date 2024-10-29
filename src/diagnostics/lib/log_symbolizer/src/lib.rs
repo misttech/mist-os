@@ -17,7 +17,9 @@ use tokio::process::Command;
 
 // TODO(https://fxbug.dev/42072442): Remove this.
 /// No-op symbolizer used for testing
+#[derive(Default)]
 pub struct NoOpSymbolizer {
+    #[allow(clippy::type_complexity)]
     _task: Cell<Option<fuchsia_async::Task<Result<(), async_channel::SendError<String>>>>>,
 }
 
@@ -29,7 +31,7 @@ impl std::fmt::Debug for NoOpSymbolizer {
 
 impl NoOpSymbolizer {
     pub fn new() -> Self {
-        Self { _task: Cell::new(None) }
+        Self::default()
     }
 }
 
@@ -58,11 +60,11 @@ pub fn is_symbolizer_context_marker(s: &str) -> bool {
     // In some cases, log producers add additional text at the beginning
     // of a stacktrace log, so we use contains instead of starts_with
     // to check for the beginning of a stacktrace.
-    return s.contains("{{{reset")
+    s.contains("{{{reset")
         || s.starts_with("{{{bt")
         || s.starts_with("{{{mmap")
         || s.starts_with("{{{dumpfile")
-        || s.starts_with("{{{module");
+        || s.starts_with("{{{module")
 }
 
 /// Symbolizer trait used for communicating with a symbolizer
@@ -82,18 +84,19 @@ struct LogSymbolizerInner {
 }
 
 /// Real symbolizer implementation
+#[derive(Default)]
 pub struct LogSymbolizer {
     inner: std::cell::RefCell<Option<LogSymbolizerInner>>,
 }
 
 impl LogSymbolizer {
     pub fn new() -> Self {
-        Self { inner: std::cell::RefCell::new(None) }
+        Self::default()
     }
 }
 
 #[async_trait::async_trait(?Send)]
-impl<'a> Symbolizer for LogSymbolizer {
+impl Symbolizer for LogSymbolizer {
     async fn start(
         &self,
         mut rx: Receiver<String>,
@@ -171,7 +174,6 @@ impl<'a> Symbolizer for LogSymbolizer {
                             if let Err(e) = r {
                                 tracing::warn!("got error trying to write to symbolizer output channel: {}", e);
                             }
-                            ()
                         }).await;
 
                     }
@@ -179,7 +181,6 @@ impl<'a> Symbolizer for LogSymbolizer {
                         if let Err(e) = r {
                             tracing::warn!("got error trying to write to symbolizer output channel: {}", e);
                         }
-                        ()
                     }).await;
                 }
                 Ok(())
@@ -223,7 +224,7 @@ impl Symbolizer for FakeSymbolizerForTest {
         t.replace(Task::local(async move {
             while let Some(out) = rx.next().await {
                 if !is_symbolizer_context_marker(&out) {
-                    tx.send(format!("{}", out)).await.unwrap();
+                    tx.send(out.to_string()).await.unwrap();
                     continue;
                 }
                 let mut new_line = prefix.clone();

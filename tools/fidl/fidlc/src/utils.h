@@ -10,6 +10,7 @@
 #include <zircon/assert.h>
 
 #include <clocale>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>

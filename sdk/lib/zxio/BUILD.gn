@@ -53,6 +53,18 @@ library_headers("inception") {
   ]
 }
 
+library_headers("udp_socket_private") {
+  headers = [ "lib/zxio/cpp/udp_socket_private.h" ]
+  public_deps = [ "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_cpp" ]
+  visibility = [
+    "//sdk/lib/zxio/*",
+
+    # The udp_serde library needs access to the constants in this file as part of the serialization
+    # protocol used for sending UDP packets between netstack and clients using fdio.
+    "//src/connectivity/network/netstack/udp_serde:*",
+  ]
+}
+
 source_set("zxio") {
   sources = [
     "create.cc",
@@ -73,6 +85,8 @@ source_set("zxio") {
   ]
   public_deps = [ ":headers" ]
   deps = [
+    ":inception",
+    ":udp_socket_private",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
@@ -81,7 +95,6 @@ source_set("zxio") {
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_cpp",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_cpp",
     "//sdk/lib/stdcompat",
-    "//sdk/lib/zxio:inception",
     "//src/connectivity/network/netstack/udp_serde",
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",

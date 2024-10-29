@@ -191,15 +191,15 @@ static zx_status_t brcmf_set_macaddr(struct brcmf_if* ifp) {
     // by using brcmf_set_macaddr_from_firmware();
 
     // Fallback to a random mac address.
-    BRCMF_ERR("Failed to get mac address from bootloader: %s. Falling back to random mac address",
-              zx_status_get_string(err));
+    BRCMF_WARN("Failed to get mac address from bootloader: %s. Falling back to random mac address",
+               zx_status_get_string(err));
     err = brcmf_gen_random_mac_addr(mac_addr);
     if (err != ZX_OK) {
       return err;
     }
-    BRCMF_ERR("random mac address to be assigned.");
+    BRCMF_INFO("random mac address to be assigned.");
 #if !defined(NDEBUG)
-    BRCMF_ERR("  address: " FMT_MAC, FMT_MAC_ARGS(mac_addr));
+    BRCMF_INFO("  address: " FMT_MAC, FMT_MAC_ARGS(mac_addr));
 #endif /* !defined(NDEBUG) */
   }
 

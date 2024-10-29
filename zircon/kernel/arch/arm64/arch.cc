@@ -54,9 +54,6 @@ Arm64AlternateVbar gAlternateVbar;
 
 }  // namespace
 
-// Counter-timer Kernel Control Register, EL1.
-static constexpr uint64_t CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER = 1 << 1;
-
 // Performance Monitors Count Enable Set, EL0.
 static constexpr uint64_t PMCNTENSET_EL0_ENABLE = 1UL << 31;  // Enable cycle count register.
 
@@ -91,6 +88,40 @@ static_assert(TP_OFFSET(unsafe_sp) == ZX_TLS_UNSAFE_SP_OFFSET, "");
 
 // Used to hold up the boot sequence on secondary CPUs until signaled by the primary.
 static ktl::atomic<bool> secondaries_released;
+
+// Whether or not to allow access to the PCT (physical counter) from EL0, in
+// addition to allowing access to the VCT (virtual counter).  This decision
+// needs to be programmed into each CPU's copy of the CNTKCTL_EL1 register
+// during initialization.  By default, we deny access to the PCT and allow
+// access to the VCT, but if we determine that we _have_ to use PCT during clock
+// selection, we will come back and change this.  Clock selection happens before
+// the secondaries have started, so if we change our minds, we only need to
+// re-program the boot CPU's register and set this flag.  The secondaries will
+// Do The Right Thing during their early init.
+//
+// Note: this variable is atomic and accessed with relaxed semantics, but it may
+// not even need to be that.  Counter selection (the only time this variable is
+// mutated) on ARM happens before the secondary CPUs are started and perform
+// their early init (the only time they will read this variable).  There should
+// be no real chance of a data race here.
+static ktl::atomic<bool> allow_pct_in_el0{false};
+
+static void SetupCntkctlEl1() {
+  // If the process of clock reference selection has forced us to use the
+  // physical counter as our reference, make sure we give EL0 permission to
+  // access it.  For now, we still allow access to the virtual counter because
+  // there exists some code out there which actually tries to read the VCT in
+  // user-mode directly.
+  //
+  // If/when this eventually changes, we should come back here and lock out
+  // access to the VCT when we decide to use the PCT.
+  static constexpr uint64_t CNTKCTL_EL1_ENABLE_PHYSICAL_COUNTER = 1 << 0;
+  static constexpr uint64_t CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER = 1 << 1;
+  const uint64_t val = CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER |
+                       (allow_pct_in_el0.load() ? CNTKCTL_EL1_ENABLE_PHYSICAL_COUNTER : 0);
+  __arm_wsr64("cntkctl_el1", val);
+  __isb(ARM_MB_SY);
+}
 
 static volatile int secondaries_to_init = 0;
 
@@ -293,9 +324,8 @@ static void arm64_cpu_early_init() {
   __arm_wsr64("oslar_el1", 0x0);
   __isb(ARM_MB_SY);
 
-  // Enable user space access to virtual counter (CNTVCT_EL0).
-  __arm_wsr64("cntkctl_el1", CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER);
-  __isb(ARM_MB_SY);
+  // Give EL0 access to the chosen reference counter, but nothing else.
+  SetupCntkctlEl1();
 
   __arm_wsr64("mdscr_el1", MSDCR_EL1_INITIAL_VALUE);
   __isb(ARM_MB_SY);
@@ -399,6 +429,12 @@ void arch_enter_uspace(iframe_t* iframe) {
   arm64_uspace_entry(iframe, ct->stack().top());
 #endif
   __UNREACHABLE;
+}
+
+void arm64_allow_pct_in_el0() {
+  ASSERT(secondaries_released.load() == false);
+  allow_pct_in_el0.store(true, ktl::memory_order_relaxed);
+  SetupCntkctlEl1();
 }
 
 // called from assembly.

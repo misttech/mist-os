@@ -2,29 +2,40 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""CPU trace metrics."""
 
+import itertools
 import logging
 import statistics
-from typing import Iterable, Iterator, Sequence
+import sys
+from typing import Any, Iterable, Iterator, Self, Sequence, TypeAlias
 
-from trace_processing import trace_metrics, trace_model, trace_utils
+from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 _CPU_USAGE_EVENT_NAME: str = "cpu_usage"
+_DEFAULT_PERCENT_CUTOFF = 0.0
+
+CpuBreakdown: TypeAlias = list[dict[str, trace_metrics.JsonType]]
 
 
 class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
-    """Computes the CPU utilization metrics."""
+    """Computes CPU utilization metrics, both structured and freeform."""
 
-    def __init__(self, aggregates_only: bool = True):
+    def __init__(
+        self,
+        aggregates_only: bool = True,
+        percent_cutoff: float = _DEFAULT_PERCENT_CUTOFF,
+    ):
         """Constructor.
 
         Args:
             aggregates_only: When True, generates CpuMin, CpuMax, CpuAverage and CpuP* (%iles).
                 Otherwise generates CpuLoad metric with all cpu values.
+            percent_cutoff: Any process that has CPU below this won't be listed in the CPU usage
+                breakdown reported in freeform metrics.
         """
         self.aggregates_only: bool = aggregates_only
+        self._percent_cutoff = percent_cutoff
 
     def process_metrics(
         self, model: trace_model.Model
@@ -85,3 +96,220 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
                 "CpuLoad", trace_metrics.Unit.percent, cpu_percentages
             )
         ]
+
+    def process_freeform_metrics(
+        self, model: trace_model.Model
+    ) -> CpuBreakdown | tuple[str, CpuBreakdown]:
+        """
+        Given trace_model.Model, iterates through all the SchedulingRecords and calculates the
+        duration for each Process's Threads, and saves them by CPU.
+
+        TODO(b/376097015): Return type is a union to support cross-repo dependencies.
+
+        Args:
+            model: The input trace model.
+
+        Returns:
+            str: stable identifier to use in freeform metrics file name.
+            CpuBreakdown: Per-process, per-thread CPU usage breakdown.
+        """
+        (breakdown, _) = self.process_metrics_and_get_total_time(model)
+        return breakdown
+
+    def process_metrics_and_get_total_time(
+        self, model: trace_model.Model
+    ) -> tuple[CpuBreakdown, float]:
+        """
+        Given trace_model.Model, iterates through all the SchedulingRecords and calculates the
+        duration for each Process's Threads, and saves them by CPU.
+
+        Args:
+            model: The input trace model.
+
+        Returns:
+            CpuBreakdown: Per-process, per-thread CPU usage breakdown.
+            float: The total duration of the trace.
+        """
+        # Map tids to names.
+        tid_to_process_name: dict[int, str] = {}
+        tid_to_thread_name: dict[int, str] = {}
+        for p in model.processes:
+            for t in p.threads:
+                tid_to_process_name[t.tid] = p.name
+                tid_to_thread_name[t.tid] = t.name
+
+        # Calculate durations for each CPU for each tid.
+        durations = DurationsBreakdown.calculate(
+            model.scheduling_records,
+            tid_to_thread_name,
+        )
+
+        # Calculate the percent of time the thread spent on this CPU,
+        # compared to the total CPU duration.
+        # If the percent spent is at or above our cutoff, add metric to
+        # breakdown.
+        full_breakdown: list[dict[str, trace_metrics.JsonType]] = []
+        for tid, breakdown in durations.tid_to_durations.items():
+            if tid in tid_to_thread_name:
+                for cpu, duration in breakdown.items():
+                    percent = (
+                        duration / durations.cpu_to_total_duration[cpu] * 100
+                    )
+                    if percent >= self._percent_cutoff:
+                        metric: dict[str, trace_metrics.JsonType] = {
+                            "process_name": tid_to_process_name[tid],
+                            "thread_name": tid_to_thread_name[tid],
+                            "tid": tid,
+                            "cpu": cpu,
+                            "percent": percent,
+                            "duration": duration,
+                        }
+                        full_breakdown.append(metric)
+
+        if durations.cpu_to_skipped_duration:
+            _LOGGER.warning(
+                "Possibly missing ContextSwitch record(s) in trace for these CPUs and durations: "
+                f"{durations.cpu_to_skipped_duration}"
+            )
+
+        # Sort metrics by CPU (desc) and percent (desc).
+        full_breakdown.sort(
+            key=lambda m: (m["cpu"], m["percent"]),
+            reverse=True,
+        )
+        return full_breakdown, durations.max_timestamp - durations.min_timestamp
+
+
+class DurationsBreakdown:
+    def __init__(self) -> None:
+        # Maps TID to a dict of CPUs to total duration (ms) on that CPU.
+        # E.g. For a TID of 1001 with 3 CPUs, this would be:
+        #   {1001: {0: 1123.123, 1: 123123.123, 3: 1231.23}}
+        self.tid_to_durations: dict[int, dict[int, float]] = {}
+        # Map of CPU to total duration used (ms).
+        self.cpu_to_total_duration: dict[int, float] = {}
+        self.cpu_to_skipped_duration: dict[int, float] = {}
+        self.min_timestamp: float = sys.float_info.max
+        self.max_timestamp: float = 0
+
+    def _calculate_duration_per_cpu(
+        self,
+        cpu: int,
+        records: list[trace_model.ContextSwitch],
+        tid_to_thread_name: dict[int, str],
+    ) -> None:
+        """
+        Calculates the total duration for each thread, on a particular CPU.
+
+        Uses a list of sorted ContextSwitch records to sum up the duration for each thread.
+        It's possible that consecutive records do not have matching incoming_tid and outgoing_tid.
+        """
+        smallest_timestamp = self._timestamp_ms(records[0].start)
+        if smallest_timestamp < self.min_timestamp:
+            self.min_timestamp = smallest_timestamp
+        largest_timestamp = self._timestamp_ms(records[-1].start)
+        if largest_timestamp > self.max_timestamp:
+            self.max_timestamp = largest_timestamp
+        total_duration = largest_timestamp - smallest_timestamp
+        skipped_duration = 0.0
+        self.cpu_to_total_duration[cpu] = total_duration
+
+        for prev_record, curr_record in itertools.pairwise(records):
+            # Check that the previous ContextSwitch's incoming_tid ("this thread is starting work
+            # on this CPU") matches the current ContextSwitch's outgoing_tid ("this thread is being
+            # switched away from"). If so, there is a duration to calculate. Otherwise, it means
+            # maybe there is skipped data or something.
+            if prev_record.tid != curr_record.outgoing_tid:
+                start_ts = self._timestamp_ms(prev_record.start)
+                stop_ts = self._timestamp_ms(curr_record.start)
+                skipped_duration += stop_ts - start_ts
+            # Purposely skip saving idle thread durations.
+            elif prev_record.is_idle():
+                continue
+            else:
+                start_ts = self._timestamp_ms(prev_record.start)
+                stop_ts = self._timestamp_ms(curr_record.start)
+                duration = stop_ts - start_ts
+                assert duration >= 0
+                if curr_record.outgoing_tid in tid_to_thread_name:
+                    # Add duration to the total duration for that tid and CPU.
+                    self.tid_to_durations.setdefault(
+                        curr_record.outgoing_tid, {}
+                    ).setdefault(cpu, 0)
+                    self.tid_to_durations[curr_record.outgoing_tid][
+                        cpu
+                    ] += duration
+
+        if skipped_duration > 0:
+            self.cpu_to_skipped_duration[cpu] = skipped_duration
+
+    @staticmethod
+    def _timestamp_ms(timestamp: trace_time.TimePoint) -> float:
+        """
+        Return timestamp in ms.
+        """
+        return timestamp.to_epoch_delta().to_milliseconds_f()
+
+    @classmethod
+    def calculate(
+        cls,
+        per_cpu_scheduling_records: dict[
+            int, list[trace_model.SchedulingRecord]
+        ],
+        tid_to_thread_name: dict[int, str],
+    ) -> Self:
+        durations = cls()
+        for cpu, records in per_cpu_scheduling_records.items():
+            durations._calculate_duration_per_cpu(
+                cpu,
+                sorted(
+                    trace_utils.filter_records(
+                        records, trace_model.ContextSwitch
+                    ),
+                    key=lambda record: record.start,
+                ),
+                tid_to_thread_name,
+            )
+        return durations
+
+
+def group_by_process_name(
+    breakdown: list[dict[str, trace_metrics.JsonType]]
+) -> list[dict[str, trace_metrics.JsonType]]:
+    """
+    Given a breakdown, group the metrics by process_name only,
+    ignoring thread name.
+    """
+    consolidated_breakdown: list[dict[str, trace_metrics.JsonType]] = []
+    breakdown.sort(key=lambda m: (m["cpu"], m["process_name"]))
+    if not breakdown:
+        return []
+    consolidated_breakdown = [breakdown[0]]
+    for metric in breakdown[1:]:
+        if (
+            metric["cpu"] == consolidated_breakdown[-1]["cpu"]
+            and metric["process_name"]
+            == consolidated_breakdown[-1]["process_name"]
+        ):
+            consolidated_breakdown[-1] = _merge(
+                metric, consolidated_breakdown[-1]
+            )
+        else:
+            metric.pop("thread_name", None)
+            metric.pop("tid", None)
+            consolidated_breakdown.append(metric)
+
+    return sorted(
+        consolidated_breakdown,
+        key=lambda m: (m["cpu"], m["percent"]),
+        reverse=True,
+    )
+
+
+def _merge(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "process_name": a["process_name"],
+        "cpu": a["cpu"],
+        "duration": a["duration"] + b["duration"],
+        "percent": a["percent"] + b["percent"],
+    }

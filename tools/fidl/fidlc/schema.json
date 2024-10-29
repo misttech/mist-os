@@ -640,11 +640,41 @@
                                 },
                                 "resource": {
                                     "type": "boolean"
+                                },
+                                "type_shape_v2": {
+                                    "$ref": "#/definitions/typeshape",
+                                    "description": "Type shape of this external declaration"
                                 }
                             },
                             "required": [
                                 "kind",
-                                "resource"
+                                "resource",
+                                "type_shape_v2"
+                            ],
+                            "type": "object"
+                        },
+                        {
+                            "additionalProperties": false,
+                            "patternProperties": {
+                                "^experimental_": {}
+                            },
+                            "properties": {
+                                "kind": {
+                                    "enum": [
+                                        "bits",
+                                        "enum",
+                                        "new_type"
+                                    ],
+                                    "type": "string"
+                                },
+                                "type_shape_v2": {
+                                    "$ref": "#/definitions/typeshape",
+                                    "description": "Type shape of this external declaration"
+                                }
+                            },
+                            "required": [
+                                "kind",
+                                "type_shape_v2"
                             ],
                             "type": "object"
                         },
@@ -657,11 +687,8 @@
                                 "kind": {
                                     "enum": [
                                         "alias",
-                                        "bits",
                                         "const",
-                                        "enum",
                                         "experimental_resource",
-                                        "new_type",
                                         "protocol",
                                         "service"
                                     ],

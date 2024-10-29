@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire_types.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire_types.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
-#include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -19,6 +18,7 @@
 #include <cstdint>
 #include <cstring>
 #include <optional>
+#include <span>
 #include <type_traits>
 
 #include <fbl/algorithm.h>
@@ -214,7 +214,7 @@ zx_status_t WriteFilesystemToDisk(BlockDevice* device, const Superblock& superbl
 
   auto base_offset = superblock_blocks + blockmap_blocks + nodemap_blocks;
   fs::WriteBlocksFn write_blocks_fn = [&vmo, &superblock, base_offset](
-                                          cpp20::span<const uint8_t> buffer, uint64_t block_offset,
+                                          std::span<const uint8_t> buffer, uint64_t block_offset,
                                           uint64_t block_count) {
     uint64_t offset =
         safemath::CheckMul<uint64_t>(safemath::CheckAdd(base_offset, block_offset).ValueOrDie(),

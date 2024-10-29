@@ -5,10 +5,13 @@
 #ifndef SRC_STORAGE_F2FS_XATTR_H_
 #define SRC_STORAGE_F2FS_XATTR_H_
 
-#include "src/storage/f2fs/f2fs_layout.h"
-#include "src/storage/f2fs/file_cache.h"
+#include <span>
+
+#include "src/storage/f2fs/common.h"
+#include "src/storage/f2fs/layout.h"
 
 namespace f2fs {
+class LockedPage;
 constexpr uint32_t kXattrMagic = 0xF2F52011;
 constexpr uint32_t kXattrMaxRefcount = 1024;
 
@@ -82,9 +85,9 @@ class XattrOperator {
   XattrOperator &operator=(XattrOperator &&) = delete;
 
   zx::result<uint32_t> FindSlotOffset(XattrIndex index, std::string_view name);
-  zx_status_t Add(XattrIndex index, std::string_view name, cpp20::span<const uint8_t> value);
+  zx_status_t Add(XattrIndex index, std::string_view name, std::span<const uint8_t> value);
   void Remove(uint32_t offset);
-  zx::result<size_t> Lookup(XattrIndex index, std::string_view name, cpp20::span<uint8_t> out);
+  zx::result<size_t> Lookup(XattrIndex index, std::string_view name, std::span<uint8_t> out);
 
   void WriteTo(LockedPage &ipage, LockedPage &xattr_page);
 

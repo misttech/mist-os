@@ -8,11 +8,12 @@
 #include "validation.h"
 
 #include <lib/cksum.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
+
+#include <span>
 
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
@@ -48,7 +49,7 @@ bool ZbiHeaderCrcValid(const zbi_header_t* hdr) {
   return hdr->crc32 == crc32(0, reinterpret_cast<const uint8_t*>(hdr + 1), hdr->length);
 }
 
-bool CheckMagic(cpp20::span<const uint8_t> data, std::string_view magic,
+bool CheckMagic(std::span<const uint8_t> data, std::string_view magic,
                 const std::string& kernel_name) {
   if (data.size() < magic.size()) {
     ERROR("%s kernel payload too small.\n", kernel_name.c_str());
@@ -64,8 +65,8 @@ bool CheckMagic(cpp20::span<const uint8_t> data, std::string_view magic,
 
 }  // namespace
 
-bool ExtractZbiPayload(cpp20::span<const uint8_t> data, const zbi_header_t** header,
-                       cpp20::span<const uint8_t>* payload) {
+bool ExtractZbiPayload(std::span<const uint8_t> data, const zbi_header_t** header,
+                       std::span<const uint8_t>* payload) {
   // Validate data header.
   if (data.size() < sizeof(zbi_header_t)) {
     return false;
@@ -101,10 +102,10 @@ bool ExtractZbiPayload(cpp20::span<const uint8_t> data, const zbi_header_t** hea
   return true;
 }
 
-bool IsValidKernelZbi(Arch arch, cpp20::span<const uint8_t> data) {
+bool IsValidKernelZbi(Arch arch, std::span<const uint8_t> data) {
   // Get container header.
   const zbi_header_t* container_header;
-  cpp20::span<const uint8_t> container_data;
+  std::span<const uint8_t> container_data;
   if (!ExtractZbiPayload(data, &container_header, &container_data)) {
     ERROR("Kernel payload does not look like a ZBI container");
     return false;
@@ -122,7 +123,7 @@ bool IsValidKernelZbi(Arch arch, cpp20::span<const uint8_t> data) {
 
   // Extract kernel.
   const zbi_header_t* kernel_header;
-  cpp20::span<const uint8_t> kernel_data;
+  std::span<const uint8_t> kernel_data;
   if (!ExtractZbiPayload(container_data, &kernel_header, &kernel_data)) {
     return false;
   }
@@ -145,15 +146,15 @@ bool IsValidKernelZbi(Arch arch, cpp20::span<const uint8_t> data) {
   return true;
 }
 
-bool IsValidAndroidKernel(cpp20::span<const uint8_t> data) {
+bool IsValidAndroidKernel(std::span<const uint8_t> data) {
   return CheckMagic(data, kAndroidBootMagic, "Android");
 }
 
-bool IsValidAndroidVendorKernel(cpp20::span<const uint8_t> data) {
+bool IsValidAndroidVendorKernel(std::span<const uint8_t> data) {
   return CheckMagic(data, kAndroidVendorBootMagic, "Android Vendor");
 }
 
-bool IsValidChromeOsKernel(cpp20::span<const uint8_t> data) {
+bool IsValidChromeOsKernel(std::span<const uint8_t> data) {
   return CheckMagic(data, kChromeOsMagicHeader, "ChromeOS");
 }
 

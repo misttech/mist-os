@@ -29,7 +29,7 @@ use crate::state::Hook;
 /// either `true` (NAT the connection) or `false` (do not NAT), but the
 /// `OnceCell` containing the configuration should always be initialized by the
 /// time a connection is inserted in the conntrack table.
-#[derive(Default, Debug)]
+#[derive(Default, Debug, PartialEq)]
 pub struct NatConfig {
     destination: OnceCell<bool>,
     source: OnceCell<bool>,
@@ -474,10 +474,7 @@ where
                 ConfigureNatResult { verdict: Verdict::Accept.into(), should_nat: false }
             }
             (Connection::Exclusive(conn), ConnectionDirection::Original) => {
-                // TODO(https://fxbug.dev/368131272): remap source ports for all outgoing
-                // traffic by default to prevent forwarded masqueraded traffic from clashing
-                // with locally-generated traffic.
-                configure_nat::<N, _, _, _, _>(
+                let ConfigureNatResult { verdict, should_nat } = configure_nat::<N, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
                     table,
@@ -485,7 +482,25 @@ where
                     hook,
                     packet,
                     interfaces,
-                )
+                );
+                // Configure source port remapping for a connection by default even if its first
+                // packet does not match any NAT rules, in order to ensure that source ports for
+                // locally-generated traffic do not clash with ports used by existing NATed
+                // connections (such as for forwarded masqueraded traffic).
+                if verdict == Verdict::Accept.into()
+                    && !should_nat
+                    && N::NAT_TYPE == NatType::Source
+                {
+                    let ConfigureNatResult { verdict, should_nat } = configure_snat_port(
+                        bindings_ctx,
+                        table,
+                        conn.reply_tuple_mut(),
+                        None, /* src_port_range */
+                    );
+                    ConfigureNatResult { verdict: verdict.into(), should_nat }
+                } else {
+                    ConfigureNatResult { verdict, should_nat }
+                }
             }
         };
         conn.set_nat_config(N::NAT_TYPE, direction, should_nat).unwrap_or_else(
@@ -584,17 +599,20 @@ where
 
     let verdict = dst_port_range
         .map(|range| {
-            rewrite_tuple_port(bindings_ctx, table, reply_tuple, ReplyTuplePort::Source, range)
+            // We are already NATing the address, so even if NATing the port is unnecessary,
+            // `should_nat` is still going to be true for the connection.
+            let ConfigureNatResult { verdict, should_nat: _ } = rewrite_tuple_port(
+                bindings_ctx,
+                table,
+                reply_tuple,
+                ReplyTuplePort::Source,
+                range,
+                true, /* ensure_port_in_range */
+            );
+            verdict
         })
         .unwrap_or(Verdict::Accept);
-
-    ConfigureNatResult {
-        verdict: verdict.into(),
-        should_nat: match verdict {
-            Verdict::Drop => false,
-            Verdict::Accept => true,
-        },
-    }
+    ConfigureNatResult { verdict: verdict.into(), should_nat: true }
 }
 
 /// Configure Masquerade NAT, a special case of SNAT that rewrites the source IP
@@ -635,33 +653,56 @@ where
     reply_tuple.dst_addr = new_src_addr;
 
     // Rewrite the source port if necessary to avoid conflicting with existing
-    // tracked connections. If a source port range was specified, rewrite into that
-    // range; otherwise, attempt to rewrite into a "similar" range to the current
-    // value.
-    let range = src_port_range
-        .or_else(|| rewrite_port_or_id_range(reply_tuple.protocol, reply_tuple.dst_port_or_id));
-    let Some(range) = range else {
-        return ConfigureNatResult::drop_packet();
-    };
-    let verdict =
-        rewrite_tuple_port(bindings_ctx, table, reply_tuple, ReplyTuplePort::Destination, range);
-
-    ConfigureNatResult {
-        verdict,
-        should_nat: match verdict {
-            Verdict::Drop => false,
-            Verdict::Accept => true,
-        },
-    }
+    // tracked connections.
+    //
+    // Note that we are already NATing the address, so even if NATing the port is
+    // unnecessary, `should_nat` is still going to be true for the connection.
+    let ConfigureNatResult { verdict, should_nat: _ } =
+        configure_snat_port(bindings_ctx, table, reply_tuple, src_port_range);
+    ConfigureNatResult { verdict, should_nat: true }
 }
 
-/// Rewrite the transport-layer port or ID to a "similar" value -- that is, a
-/// value that is likely to be a similar range to the original value with
-/// respect to privilege (or lack thereof).
+fn configure_snat_port<I, BC>(
+    bindings_ctx: &mut BC,
+    table: &Table<I, BC, NatConfig>,
+    reply_tuple: &mut Tuple<I>,
+    src_port_range: Option<RangeInclusive<NonZeroU16>>,
+) -> ConfigureNatResult<Verdict>
+where
+    I: IpExt,
+    BC: FilterBindingsContext,
+{
+    // Rewrite the source port if necessary to avoid conflicting with existing
+    // tracked connections. If a source port range was specified, we also ensure the
+    // port is in that range; otherwise, we attempt to rewrite into a "similar"
+    // range to the current value, and only if required to avoid a conflict.
+    let (range, ensure_port_in_range) = if let Some(range) = src_port_range {
+        (range, true)
+    } else {
+        let Some(range) =
+            similar_port_or_id_range(reply_tuple.protocol, reply_tuple.dst_port_or_id)
+        else {
+            return ConfigureNatResult::drop_packet();
+        };
+        (range, false)
+    };
+    rewrite_tuple_port(
+        bindings_ctx,
+        table,
+        reply_tuple,
+        ReplyTuplePort::Destination,
+        range,
+        ensure_port_in_range,
+    )
+}
+
+/// Choose a range of "similar" values to which transport-layer port or ID can
+/// be rewritten -- that is, a value that is likely to be similar in terms of
+/// privilege, or lack thereof.
 ///
 /// The heuristics used in this function are chosen to roughly match those used
 /// by Netstack2/gVisor and Linux.
-fn rewrite_port_or_id_range(
+fn similar_port_or_id_range(
     protocol: TransportProtocol,
     port_or_id: u16,
 ) -> Option<RangeInclusive<NonZeroU16>> {
@@ -688,25 +729,28 @@ enum ReplyTuplePort {
     Destination,
 }
 
-/// Attempt to rewrite the source port of the provided tuple such that it fits
-/// in the specified range and results in a new unique tuple.
+/// Attempt to rewrite the source port of the provided tuple such that it
+/// results in a new unique tuple, and, if `ensure_port_in_range` is `true`,
+/// also that it fits in the specified range.
 fn rewrite_tuple_port<I: IpExt, BC: FilterBindingsContext>(
     bindings_ctx: &mut BC,
     table: &Table<I, BC, NatConfig>,
     tuple: &mut Tuple<I>,
     which_port: ReplyTuplePort,
     port_range: RangeInclusive<NonZeroU16>,
-) -> Verdict {
-    // If the current port is already in the specified range, and the resulting
-    // reply tuple is already unique, then there is no need to change the port.
+    ensure_port_in_range: bool,
+) -> ConfigureNatResult<Verdict> {
+    // We only need to rewrite the port if the reply tuple of the connection
+    // conflicts with another connection in the table, or if the port must be
+    // rewritten to fall in the specified range.
     let current_port = match which_port {
         ReplyTuplePort::Source => tuple.src_port_or_id,
         ReplyTuplePort::Destination => tuple.dst_port_or_id,
     };
-    if NonZeroU16::new(current_port).map(|port| port_range.contains(&port)).unwrap_or(false)
-        && !table.contains_tuple(&tuple)
-    {
-        return Verdict::Accept;
+    let already_in_range = !ensure_port_in_range
+        || NonZeroU16::new(current_port).map(|port| port_range.contains(&port)).unwrap_or(false);
+    if already_in_range && !table.contains_tuple(&tuple) {
+        return ConfigureNatResult { verdict: Verdict::Accept, should_nat: false };
     }
 
     // Attempt to find a new port in the provided range that results in a unique
@@ -732,11 +776,11 @@ fn rewrite_tuple_port<I: IpExt, BC: FilterBindingsContext>(
         };
         *port_mut = new_port.get();
         if !table.contains_tuple(&tuple) {
-            return Verdict::Accept;
+            return ConfigureNatResult { verdict: Verdict::Accept, should_nat: true };
         }
     }
 
-    Verdict::Drop
+    ConfigureNatResult::drop_packet()
 }
 
 /// Perform NAT on a packet, using its connection in the conntrack table as a
@@ -1606,14 +1650,39 @@ mod tests {
         // If the port is already in the specified range, rewriting should succeed and
         // be a no-op.
         let original = tuple.clone();
-        let verdict = rewrite_tuple_port(
+        let result = rewrite_tuple_port(
             &mut bindings_ctx,
             &table,
             &mut tuple,
             which,
             LOCAL_PORT..=LOCAL_PORT,
+            true, /* ensure_port_in_range */
         );
-        assert_eq!(verdict, Verdict::Accept);
+        assert_eq!(result, ConfigureNatResult::accept_packet());
+        assert_eq!(tuple, original);
+    }
+
+    #[test_case(ReplyTuplePort::Source)]
+    #[test_case(ReplyTuplePort::Destination)]
+    fn rewrite_port_noop_if_no_conflict(which: ReplyTuplePort) {
+        let mut bindings_ctx = FakeBindingsCtx::<Ipv4>::new();
+        let table = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+        let mut tuple = tuple_with_port(which, LOCAL_PORT.get());
+
+        // If there is no conflicting tuple in the table and we provide `false` for
+        // `ensure_port_in_range` (as is done for implicit SNAT), then rewriting should
+        // succeed and be a no-op, even if the port is not in the specified range,
+        let original = tuple.clone();
+        const NEW_PORT: NonZeroU16 = const_unwrap_option(LOCAL_PORT.checked_add(1));
+        let result = rewrite_tuple_port(
+            &mut bindings_ctx,
+            &table,
+            &mut tuple,
+            which,
+            NEW_PORT..=NEW_PORT,
+            false, /* ensure_port_in_range */
+        );
+        assert_eq!(result, ConfigureNatResult::accept_packet());
         assert_eq!(tuple, original);
     }
 
@@ -1627,9 +1696,15 @@ mod tests {
         // If the port is not in the specified range, but there is an available port,
         // rewriting should succeed.
         const NEW_PORT: NonZeroU16 = const_unwrap_option(LOCAL_PORT.checked_add(1));
-        let verdict =
-            rewrite_tuple_port(&mut bindings_ctx, &table, &mut tuple, which, NEW_PORT..=NEW_PORT);
-        assert_eq!(verdict, Verdict::Accept);
+        let result = rewrite_tuple_port(
+            &mut bindings_ctx,
+            &table,
+            &mut tuple,
+            which,
+            NEW_PORT..=NEW_PORT,
+            true, /* ensure_port_in_range */
+        );
+        assert_eq!(result, ConfigureNatResult { verdict: Verdict::Accept, should_nat: true });
         assert_eq!(tuple, tuple_with_port(which, NEW_PORT.get()));
     }
 
@@ -1655,14 +1730,15 @@ mod tests {
         );
 
         let mut tuple = tuple_with_port(which, LOCAL_PORT.get());
-        let verdict = rewrite_tuple_port(
+        let result = rewrite_tuple_port(
             &mut bindings_ctx,
             &table,
             &mut tuple,
             which,
             LOCAL_PORT..=LOCAL_PORT,
+            true, /* ensure_port_in_range */
         );
-        assert_eq!(verdict, Verdict::Drop);
+        assert_eq!(result, ConfigureNatResult::drop_packet());
     }
 
     #[test_case(ReplyTuplePort::Source)]
@@ -1694,9 +1770,15 @@ mod tests {
         // results in a unique tuple.
         let mut tuple = tuple_with_port(which, LOCAL_PORT.get());
         const MIN_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(LOCAL_PORT.get() - 1));
-        let verdict =
-            rewrite_tuple_port(&mut bindings_ctx, &table, &mut tuple, which, MIN_PORT..=MAX_PORT);
-        assert_eq!(verdict, Verdict::Accept);
+        let result = rewrite_tuple_port(
+            &mut bindings_ctx,
+            &table,
+            &mut tuple,
+            which,
+            MIN_PORT..=MAX_PORT,
+            true, /* ensure_port_in_range */
+        );
+        assert_eq!(result, ConfigureNatResult { verdict: Verdict::Accept, should_nat: true });
         assert_eq!(tuple, tuple_with_port(which, MIN_PORT.get()));
     }
 }

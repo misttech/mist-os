@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
-use fidl::encoding::ProxyChannelBox;
+use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -306,7 +306,6 @@ pub struct InterfaceMarker;
 impl fidl::endpoints::ProtocolMarker for InterfaceMarker {
     type Proxy = InterfaceProxy;
     type RequestStream = InterfaceRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = InterfaceSynchronousProxy;
 
@@ -316,7 +315,6 @@ impl fidl::endpoints::ProtocolMarker for InterfaceMarker {
 pub trait InterfaceProxyInterface: Send + Sync {
     fn r#method(&self) -> Result<(), fidl::Error>;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct InterfaceSynchronousProxy {
@@ -375,13 +373,13 @@ impl InterfaceSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct InterfaceProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for InterfaceProxy {
     type Protocol = InterfaceMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -396,7 +394,7 @@ impl fidl::endpoints::Proxy for InterfaceProxy {
 
 impl InterfaceProxy {
     /// Create a new Proxy for test.doccomments/Interface.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <InterfaceMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -429,7 +427,7 @@ impl InterfaceProxyInterface for InterfaceProxy {
 }
 
 pub struct InterfaceEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for InterfaceEventStream {}
@@ -473,7 +471,9 @@ impl InterfaceEvent {
     }
 
     /// Decodes a message buffer as a [`InterfaceEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<InterfaceEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<InterfaceEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -496,7 +496,7 @@ impl InterfaceEvent {
 
 /// A Stream of incoming requests for test.doccomments/Interface.
 pub struct InterfaceRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -512,7 +512,7 @@ impl fidl::endpoints::RequestStream for InterfaceRequestStream {
     type Protocol = InterfaceMarker;
     type ControlHandle = InterfaceControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -520,11 +520,17 @@ impl fidl::endpoints::RequestStream for InterfaceRequestStream {
         InterfaceControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -616,14 +622,13 @@ impl InterfaceRequest {
 
 #[derive(Debug, Clone)]
 pub struct InterfaceControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for InterfaceControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -631,7 +636,6 @@ impl fidl::endpoints::ControlHandle for InterfaceControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }

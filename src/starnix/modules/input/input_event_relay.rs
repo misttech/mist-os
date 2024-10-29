@@ -705,6 +705,7 @@ mod test {
         ));
         open_files.lock().push(Arc::downgrade(&device_id_10_file));
         let device_id_10_file_object = FileObject::new(
+            &current_task,
             Box::new(device_id_10_file),
             current_task
                 .lookup_path_from_root(&mut locked, ".".into())
@@ -788,6 +789,7 @@ mod test {
         ));
         open_files.lock().push(Arc::downgrade(&device_id_10_file));
         let device_id_10_file_object = FileObject::new(
+            &current_task,
             Box::new(device_id_10_file),
             current_task
                 .lookup_path_from_root(&mut locked, ".".into())
@@ -866,6 +868,7 @@ mod test {
         ));
         open_files.lock().push(Arc::downgrade(&device_id_10_file));
         let device_id_10_file_object = FileObject::new(
+            &current_task,
             Box::new(device_id_10_file),
             current_task
                 .lookup_path_from_root(&mut locked, ".".into())

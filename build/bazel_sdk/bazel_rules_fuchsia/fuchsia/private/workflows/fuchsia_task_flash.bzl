@@ -9,7 +9,7 @@ load(":fuchsia_task_ffx.bzl", "ffx_task_rule")
 load(":providers.bzl", "FuchsiaProductBundleInfo")
 
 def _fuchsia_task_flash_impl(ctx, _make_ffx_task):
-    pb_path = get_product_bundle_dir(ctx.attr.product_bundle[FuchsiaProductBundleInfo])
+    pb_path = get_product_bundle_dir(ctx)
     return _make_ffx_task(
         prepend_args = [
             "target",

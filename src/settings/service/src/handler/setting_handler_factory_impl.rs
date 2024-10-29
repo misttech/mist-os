@@ -13,8 +13,8 @@ use crate::service_context::ServiceContext;
 use async_trait::async_trait;
 use futures::StreamExt;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
 
 /// SettingHandlerFactoryImpl houses registered closures for generating setting
 /// handlers.
@@ -23,10 +23,10 @@ pub(crate) struct SettingHandlerFactoryImpl {
     generators: HashMap<SettingType, GenerateHandler>,
 
     /// Atomic counter used to generate new IDs, which uniquely identify a context.
-    context_id_counter: Arc<AtomicU64>,
+    context_id_counter: Rc<AtomicU64>,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl SettingHandlerFactory for SettingHandlerFactoryImpl {
     async fn generate(
         &mut self,
@@ -108,8 +108,8 @@ impl SettingHandlerFactory for SettingHandlerFactoryImpl {
 impl SettingHandlerFactoryImpl {
     pub(crate) fn new(
         settings: HashSet<SettingType>,
-        service_context: Arc<ServiceContext>,
-        context_id_counter: Arc<AtomicU64>,
+        service_context: Rc<ServiceContext>,
+        context_id_counter: Rc<AtomicU64>,
     ) -> SettingHandlerFactoryImpl {
         SettingHandlerFactoryImpl {
             environment: Environment::new(settings, service_context),
@@ -142,17 +142,17 @@ mod tests {
 
     /// Test controller used to test startup waiting behavior in SettingHandlerFactoryImpl.
     struct TestController {
-        client: Arc<ClientImpl>,
+        client: Rc<ClientImpl>,
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl Create for TestController {
-        async fn create(client: Arc<ClientImpl>) -> Result<Self, ControllerError> {
+        async fn create(client: Rc<ClientImpl>) -> Result<Self, ControllerError> {
             Ok(Self { client })
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl Handle for TestController {
         // Not relevant.
         async fn handle(&self, _request: Request) -> Option<SettingHandlerResult> {
@@ -174,8 +174,8 @@ mod tests {
         let delegate = service::MessageHub::create_hub();
         let mut factory_impl = SettingHandlerFactoryImpl::new(
             [SettingType::Unknown].into(),
-            Arc::new(ServiceContext::new(None, Some(delegate.clone()))),
-            Arc::new(AtomicU64::new(0)),
+            Rc::new(ServiceContext::new(None, Some(delegate.clone()))),
+            Rc::new(AtomicU64::new(0)),
         );
 
         // Register generation of controller with factory_impl.

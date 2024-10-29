@@ -35,13 +35,27 @@ pub use channel::{
     AnyHandle, Channel, ChannelMessage, ChannelMessageStream, ChannelWriter, HandleInfo,
 };
 pub use event::Event;
-pub use event_pair::Eventpair;
+pub use event_pair::Eventpair as EventPair;
 pub use handle::{AsHandleRef, Handle, HandleBased, HandleRef, OnFDomainSignals, Peered};
 pub use proto::{Error as FDomainError, ObjType, WriteChannelError, WriteSocketError};
 pub use socket::{Socket, SocketDisposition, SocketReadStream, SocketWriter};
 
 // Unsupported handle types.
+#[rustfmt::skip]
+pub use Handle as Fifo;
+#[rustfmt::skip]
+pub use Handle as Job;
+#[rustfmt::skip]
+pub use Handle as Process;
+#[rustfmt::skip]
+pub use Handle as Resource;
+#[rustfmt::skip]
 pub use Handle as Stream;
+#[rustfmt::skip]
+pub use Handle as Thread;
+#[rustfmt::skip]
+pub use Handle as Vmar;
+#[rustfmt::skip]
 pub use Handle as Vmo;
 
 fdomain_macros::extract_ordinals_env!("FDOMAIN_FIDL_PATH");
@@ -259,7 +273,7 @@ pub trait FDomainTransport: StreamTrait<Item = Result<Box<[u8]>, std::io::Error>
 /// 2) Drops the transport on error, then returns the last observed error for
 ///    all future operations.
 enum Transport {
-    Transport(Pin<Box<dyn FDomainTransport>>, VecDeque<Box<[u8]>>, Waker),
+    Transport(Pin<Box<dyn FDomainTransport>>, VecDeque<Box<[u8]>>, Vec<Waker>),
     Error(InnerError),
 }
 
@@ -268,7 +282,7 @@ impl Transport {
     fn push_msg(&mut self, msg: Box<[u8]>) {
         if let Transport::Transport(_, v, w) = self {
             v.push_back(msg);
-            w.wake_by_ref();
+            w.drain(..).for_each(Waker::wake);
         }
     }
 
@@ -292,7 +306,7 @@ impl Transport {
                 }
 
                 if v.is_empty() {
-                    *w = ctx.waker().clone();
+                    w.push(ctx.waker().clone());
                 } else {
                     ctx.waker().wake_by_ref();
                 }
@@ -488,20 +502,35 @@ impl Client {
     /// Create a new FDomain client. The `transport` argument should contain the
     /// established connection to the target, ready to communicate the FDomain
     /// protocol.
-    pub fn new(transport: impl FDomainTransport + 'static) -> Arc<Self> {
-        Arc::new(Client(Mutex::new(ClientInner {
-            transport: Transport::Transport(
-                Box::pin(transport),
-                VecDeque::new(),
-                futures::task::noop_waker(),
-            ),
+    ///
+    /// The second return item is a future that must be polled to keep
+    /// transactions running. It's *possibly* unnecessary if you always poll the
+    /// futures attached to calls but if you'd like to be able to drop those and
+    /// ignore results you have to poll this one to completion.
+    pub fn new(
+        transport: impl FDomainTransport + 'static,
+    ) -> (Arc<Self>, impl Future<Output = ()> + Send + 'static) {
+        let ret = Arc::new(Client(Mutex::new(ClientInner {
+            transport: Transport::Transport(Box::pin(transport), VecDeque::new(), Vec::new()),
             transactions: HashMap::new(),
             socket_read_subscriptions: HashMap::new(),
             channel_read_subscriptions: HashMap::new(),
             next_tx_id: 1,
             namespace_taken: false,
             waiting_to_close: Vec::new(),
-        })))
+        })));
+
+        let client_weak = Arc::downgrade(&ret);
+        let fut = futures::future::poll_fn(move |ctx| {
+            let Some(client) = client_weak.upgrade() else {
+                return Poll::Ready(());
+            };
+
+            client.0.lock().unwrap().poll_transport(ctx);
+            Poll::Pending
+        });
+
+        (ret, fut)
     }
 
     /// Get the namespace for the connected FDomain. Calling this more than once is an error.
@@ -584,7 +613,7 @@ impl Client {
     }
 
     /// Create a new event pair in the connected FDomain.
-    pub async fn create_event_pair(self: &Arc<Self>) -> Result<(Eventpair, Eventpair), Error> {
+    pub async fn create_event_pair(self: &Arc<Self>) -> Result<(EventPair, EventPair), Error> {
         let id_a = self.new_hid();
         let id_b = self.new_hid();
         self.transaction(
@@ -594,8 +623,8 @@ impl Client {
         )
         .await?;
         Ok((
-            Eventpair(Handle { id: id_a.id, client: Arc::downgrade(self) }),
-            Eventpair(Handle { id: id_b.id, client: Arc::downgrade(self) }),
+            EventPair(Handle { id: id_a.id, client: Arc::downgrade(self) }),
+            EventPair(Handle { id: id_b.id, client: Arc::downgrade(self) }),
         ))
     }
 
@@ -626,19 +655,22 @@ impl Client {
     /// Calling this method queues the transaction synchronously. Awaiting is
     /// only necessary to wait for the response and pump the transport.
     pub(crate) fn transaction<S: fidl_message::Body, R: 'static>(
-        &self,
+        self: &Arc<Self>,
         ordinal: u64,
         request: S,
         f: impl Fn(Sender<Result<R, Error>>) -> Responder,
-    ) -> impl Future<Output = Result<R, Error>> + '_ {
+    ) -> impl Future<Output = Result<R, Error>> + 'static {
         let mut inner = self.0.lock().unwrap();
 
         let (sender, mut receiver) = futures::channel::oneshot::channel();
         match inner.request(ordinal, request, f(sender)) {
-            Ok(()) => Either::Left(poll_fn(move |ctx| {
-                self.0.lock().unwrap().poll_transport(ctx);
-                receiver.poll_unpin(ctx).map(|x| x.expect("Oneshot went away without reply!"))
-            })),
+            Ok(()) => {
+                let this = Arc::clone(self);
+                Either::Left(poll_fn(move |ctx| {
+                    this.0.lock().unwrap().poll_transport(ctx);
+                    receiver.poll_unpin(ctx).map(|x| x.expect("Oneshot went away without reply!"))
+                }))
+            }
             Err(e) => Either::Right(async move { Err(e.into()) }),
         }
     }

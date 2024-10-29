@@ -36,6 +36,9 @@ class TouchDevice(abc.ABC):
 
             duration_ms: Duration of the event(s) in milliseconds, defaults to
                 300.
+
+        Raises:
+            UserInputError: if failed tap operation.
         """
 
 
@@ -52,4 +55,7 @@ class UserInput(abc.ABC):
         Args:
             touch_screen_size: resolution of the touch screen, defaults to
                 1000 x 1000.
+
+        Raises:
+            UserInputError: if failed to create virtual touch device.
         """

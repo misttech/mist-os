@@ -11,7 +11,6 @@ group("tests") {
     "fuchsia.hwinfo:tests",
     "fuchsia.intl:tests",
     "fuchsia.settings:tests",
-    "fuchsia.ui.composition:tests",
   ]
   testonly = true
 }
@@ -25,6 +24,5 @@ group("ctf-tests") {
     "fuchsia.hwinfo:ctf-tests",
     "fuchsia.intl:ctf-tests",
     "fuchsia.settings:ctf-tests",
-    "fuchsia.ui.composition:ctf-tests",
   ]
 }

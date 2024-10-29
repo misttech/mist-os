@@ -18,7 +18,7 @@ async fn main() {
     tracing::info!("Puppet started.");
     tracing::dispatcher::get_default(|dispatcher| {
         let publisher: &diagnostics_log::Publisher = dispatcher.downcast_ref().unwrap();
-        publisher.set_interest_listener(Listener::new());
+        publisher.set_interest_listener(Listener);
     });
 
     let mut fs = ServiceFs::new_local();
@@ -30,7 +30,7 @@ async fn main() {
     }
 }
 
-struct Listener {}
+struct Listener;
 
 impl OnInterestChanged for Listener {
     fn on_changed(&self, severity: Severity) {
@@ -54,12 +54,6 @@ impl OnInterestChanged for Listener {
                 panic!("Changed severity");
             }
         }
-    }
-}
-
-impl Listener {
-    pub fn new() -> Listener {
-        return Self {};
     }
 }
 

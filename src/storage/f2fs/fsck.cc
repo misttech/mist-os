@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/fsck.h"
+
 #include <safemath/checked_math.h>
 
+#include "src/storage/f2fs/common.h"
+#include "src/storage/f2fs/dir.h"
 #include "src/storage/f2fs/f2fs.h"
 
 namespace f2fs {

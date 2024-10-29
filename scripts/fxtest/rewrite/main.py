@@ -541,6 +541,7 @@ class AsyncMain:
             selections = await selection.select_tests(
                 tests,
                 flags.selection,
+                exec_env,
                 mode,
                 flags.fuzzy,
                 recorder=recorder,
@@ -558,6 +559,11 @@ class AsyncMain:
             recorder.emit_test_selections(selections)
         except selection.SelectionError as e:
             recorder.emit_end(f"Selection is invalid: {e}")
+            return 1
+        except RuntimeError as e:
+            recorder.emit_end(
+                "There was an internal error calling the selection matcher program: {e}"
+            )
             return 1
 
         # Check that the selected tests are valid.

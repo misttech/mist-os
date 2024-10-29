@@ -636,6 +636,7 @@ void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {
           page->paddr());
 
   DEBUG_ASSERT(!page->is_free());
+  DEBUG_ASSERT(!page->is_free_loaned());
   DEBUG_ASSERT(page->state() != vm_page_state::OBJECT || page->object.pin_count == 0);
 
   // mark it free. This makes the page owned the PmmNode, even though it may not be in any page

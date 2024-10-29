@@ -6,6 +6,8 @@ library fuchsia.developer.remotecontrol;
 
 using fuchsia.component as component;
 using fuchsia.diagnostics as diagnostics;
+// TODO(https://fxbug.dev/324081103): Remove the dependency on fuchsia.io when the OpenCapability
+// method is removed from the RemoteControl protocol.
 using fuchsia.io as io;
 using fuchsia.sys2 as sys2;
 using zx;
@@ -44,15 +46,26 @@ open protocol RemoteControl {
         response IdentifyHostResponse;
     }) error IdentifyHostError;
 
-    // Connects a channel to a service, given a moniker and a channel iff the
-    // component identified by the given moniker exposes a capability of the
-    // requested name.
+    /// Connects a channel to a service, given a moniker and a channel iff the component identified
+    /// by the given moniker exposes a capability of the requested name.
+    // TODO(https://fxbug.dev/324081103): Mark this as removed=NEXT once we ship API level 25.
+    @available(deprecated=NEXT, removed=HEAD, note="Use ConnectCapability instead.")
     flexible OpenCapability(resource struct {
         moniker string:component.MAX_MONIKER_LENGTH;
         capability_set sys2.OpenDirType;
         capability_name component.name;
         server_channel zx.Handle:CHANNEL;
         flags io.OpenFlags;
+    }) -> () error ConnectCapabilityError;
+
+    /// Connects a channel to a service, given a moniker and a channel iff the component identified
+    /// by the given moniker exposes a capability of the requested name.
+    @available(added=NEXT)
+    flexible ConnectCapability(resource struct {
+        moniker string:component.MAX_MONIKER_LENGTH;
+        capability_set sys2.OpenDirType;
+        capability_name component.name;
+        server_channel zx.Handle:CHANNEL;
     }) -> () error ConnectCapabilityError;
 
     // Gets the current monotonic time in nanoseconds.

@@ -7,8 +7,8 @@
 
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 
+#include <span>
 #include <string>
 
 namespace storage::volume_image {
@@ -41,7 +41,7 @@ class Decompressor {
   // The decompressor wil not provide the handler with consumbed byte count if the decompressions is
   // completed.
   using Handler = fit::function<fpromise::result<void, std::string>(
-      cpp20::span<const uint8_t> decompressed_data)>;
+      std::span<const uint8_t> decompressed_data)>;
 
   struct DecompressResult {
     // Zero if decompression is finished, otherwise provides a hint with respect to the size of the
@@ -65,7 +65,7 @@ class Decompressor {
   //
   // On failure, returns a string decribing the error condition.
   virtual fpromise::result<DecompressResult, std::string> Decompress(
-      cpp20::span<const uint8_t> compressed_data) = 0;
+      std::span<const uint8_t> compressed_data) = 0;
 
   // Returns |fpromise::ok| on success. At this point all remaining symbols for the decompressed
   // representation will be emitted.

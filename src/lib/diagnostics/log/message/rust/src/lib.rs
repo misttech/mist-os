@@ -32,7 +32,7 @@ pub struct MonikerWithUrl {
 pub fn from_logger(source: MonikerWithUrl, msg: LoggerMessage) -> LogsData {
     let (raw_severity, severity) = Severity::parse_exact(msg.raw_severity);
     let mut builder = LogsDataBuilder::new(BuilderArgs {
-        timestamp: msg.timestamp.into(),
+        timestamp: msg.timestamp,
         component_url: Some(source.url),
         moniker: source.moniker,
         severity,

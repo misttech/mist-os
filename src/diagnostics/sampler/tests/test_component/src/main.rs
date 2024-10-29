@@ -22,7 +22,7 @@ async fn main() {
 
     let mut fs = ServiceFs::new();
     tracing::info!("Started SamplerTestController");
-    fs.dir("svc").add_fidl_service(move |stream| serve_sampler_test_controller(stream));
+    fs.dir("svc").add_fidl_service(serve_sampler_test_controller);
 
     fs.take_and_serve_directory_handle().unwrap();
 

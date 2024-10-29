@@ -5,7 +5,6 @@
 #include "src/storage/volume_image/utils/block_writer.h"
 
 #include <lib/fpromise/result.h>
-#include <lib/stdcompat/span.h>
 #include <string.h>
 
 #include <array>
@@ -24,13 +23,12 @@ namespace {
 
 class FakeReader final : public Reader {
  public:
-  explicit FakeReader(cpp20::span<const uint8_t> data, uint64_t block_size)
+  explicit FakeReader(std::span<const uint8_t> data, uint64_t block_size)
       : data_(data), block_size_(block_size) {}
 
   uint64_t length() const final { return data_.size(); }
 
-  fpromise::result<void, std::string> Read(uint64_t offset,
-                                           cpp20::span<uint8_t> buffer) const final {
+  fpromise::result<void, std::string> Read(uint64_t offset, std::span<uint8_t> buffer) const final {
     if (offset % block_size_ != 0) {
       return fpromise::error("Offset(" + std::to_string(offset) +
                              ") must be block aligned(block_size:" + std::to_string(block_size_) +
@@ -51,17 +49,17 @@ class FakeReader final : public Reader {
   }
 
  private:
-  cpp20::span<const uint8_t> data_;
+  std::span<const uint8_t> data_;
   uint64_t block_size_;
 };
 
 class FakeWriter final : public Writer {
  public:
-  explicit FakeWriter(cpp20::span<uint8_t> data, uint64_t block_size)
+  explicit FakeWriter(std::span<uint8_t> data, uint64_t block_size)
       : data_(data), block_size_(block_size) {}
 
   fpromise::result<void, std::string> Write(uint64_t offset,
-                                            cpp20::span<const uint8_t> buffer) final {
+                                            std::span<const uint8_t> buffer) final {
     if (offset % block_size_ != 0) {
       return fpromise::error("Offset(" + std::to_string(offset) +
                              ") must be block aligned(block_size:" + std::to_string(block_size_) +
@@ -82,7 +80,7 @@ class FakeWriter final : public Writer {
   }
 
  private:
-  cpp20::span<uint8_t> data_;
+  std::span<uint8_t> data_;
   uint64_t block_size_;
 };
 

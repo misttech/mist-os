@@ -17,6 +17,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <span>
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
@@ -321,7 +322,7 @@ TEST(BlobfsHostTest, WriteEmptyBlobWithCompactFormatIsCorrect) {
   EXPECT_TRUE(checker.Check());
 }
 
-void CheckBlobContents(File& blob, cpp20::span<const uint8_t> contents) {
+void CheckBlobContents(File& blob, std::span<const uint8_t> contents) {
   std::vector<uint8_t> buffer(kBlobfsBlockSize);
 
   ssize_t read_result = 0;
@@ -361,7 +362,7 @@ TEST(BlobfsHostTest, VisitBlobsVisitsAllBlobsAndProvidesTheCorrectContents) {
   }
 
   auto get_blob_index_by_digest =
-      [&](cpp20::span<const uint8_t> merkle_root_hash) -> std::optional<int> {
+      [&](std::span<const uint8_t> merkle_root_hash) -> std::optional<int> {
     int i = 0;
     for (auto& blob_info : blob_infos) {
       if (blob_info.GetDigest().Equals(merkle_root_hash.data(), merkle_root_hash.size())) {

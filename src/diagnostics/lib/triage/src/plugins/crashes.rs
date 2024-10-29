@@ -24,27 +24,23 @@ impl Plugin for CrashesPlugin {
         let re = Regex::new(r"\[(\d+)\.(\d+)\].*(?:CRASH:|fatal :)\s*([\w\-_\s\.]+)")
             .expect("regex compilation");
         for line in inputs.klog.lines.iter().chain(inputs.syslog.lines.iter()) {
-            match re.captures(line) {
-                Some(captures) => {
-                    let s = captures.get(1).unwrap().as_str().parse::<i32>().unwrap_or_default();
-                    let ms = captures.get(2).unwrap().as_str().parse::<i32>().unwrap_or_default();
+            if let Some(captures) = re.captures(line) {
+                let s = captures.get(1).unwrap().as_str().parse::<i32>().unwrap_or_default();
+                let ms = captures.get(2).unwrap().as_str().parse::<i32>().unwrap_or_default();
 
-                    let formatted_time =
-                        format!("{}h{}m{}.{}s", s / 3600, s % 3600 / 60, s % 60, ms);
+                let formatted_time = format!("{}h{}m{}.{}s", s / 3600, s % 3600 / 60, s % 60, ms);
 
-                    results.push(Action::new_synthetic_error(
-                        format!(
-                            "[ERROR]: {} crashed at {} [{}.{}]",
-                            captures.get(3).unwrap().as_str(),
-                            formatted_time,
-                            s,
-                            ms,
-                        ),
-                        "DeveloperExperience>Forensics>CrashReporting".to_string(),
-                    ));
-                }
-                _ => {}
-            };
+                results.push(Action::new_synthetic_error(
+                    format!(
+                        "[ERROR]: {} crashed at {} [{}.{}]",
+                        captures.get(3).unwrap().as_str(),
+                        formatted_time,
+                        s,
+                        ms,
+                    ),
+                    "DeveloperExperience>Forensics>CrashReporting".to_string(),
+                ));
+            }
         }
         results
     }

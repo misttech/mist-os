@@ -11,6 +11,6 @@ async fn main() {
     let inspector = component::inspector();
     inspector.root().record_string("iquery", "rocks");
     component::health().set_ok();
-    let task = inspect_runtime::publish(&inspector, PublishOptions::default());
+    let task = inspect_runtime::publish(inspector, PublishOptions::default());
     task.unwrap().await;
 }

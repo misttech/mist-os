@@ -10,18 +10,20 @@
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct {{ $protocol.Marker }};
 
-impl fidl::endpoints::ProtocolMarker for {{ $protocol.Marker }} {
+impl {{ MarkerNamespace }}::ProtocolMarker for {{ $protocol.Marker }} {
     type Proxy = {{ $protocol.Proxy }};
     type RequestStream = {{ $protocol.RequestStream }};
 
+{{- if not FDomain }}
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = {{ $protocol.SynchronousProxy }};
+{{- end }}
 
     const DEBUG_NAME: &'static str = "{{ $protocol.DebugName }}";
 }
 
 {{- if $protocol.Discoverable }}
-impl fidl::endpoints::DiscoverableProtocolMarker for {{ $protocol.Marker }} {}
+impl {{ MarkerNamespace }}::DiscoverableProtocolMarker for {{ $protocol.Marker }} {}
 {{- end }}
 
 {{- range $method := $protocol.Methods }}
@@ -52,6 +54,7 @@ pub trait {{ $protocol.ProxyInterface }}: Send + Sync {
     {{- end }}
 }
 
+{{- if not FDomain }}
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct {{ $protocol.SynchronousProxy }} {
@@ -110,8 +113,8 @@ impl {{ $protocol.SynchronousProxy }} {
     ) -> Result<{{- or $method.Response.TupleType "()" }}, fidl::Error> {
         {{- if $method.HasResponse }}
         let _response = self.client.send_query::<
-            {{ $method.Request.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }},
-            {{ $method.Response.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }},
+            {{ $method.Request.FidlType ResourceDialect }},
+            {{ $method.Response.FidlType ResourceDialect }},
         >(
             {{ $method.Request.EncodeExpr }},
             {{ $method.Ordinal | printf "%#x" }},
@@ -123,7 +126,7 @@ impl {{ $protocol.SynchronousProxy }} {
         {{- end }};
         Ok({{ call $method.Response.ConvertToTuple "_response" }})
         {{- else }}
-        self.client.send::<{{ $method.Request.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}>(
+        self.client.send::<{{ $method.Request.FidlType ResourceDialect }}>(
             {{ $method.Request.EncodeExpr }},
             {{ $method.Ordinal | printf "%#x" }},
             {{ $method.DynamicFlags }},
@@ -133,32 +136,33 @@ impl {{ $protocol.SynchronousProxy }} {
     {{- end }}
     {{- end }}
 }
+{{- end }}
 
 #[derive(Debug, Clone)]
 pub struct {{ $protocol.Proxy }} {
-    client: fidl::client::Client,
+    client: fidl::client::Client<{{ ResourceDialect }}>,
 }
 
-impl fidl::endpoints::Proxy for {{ $protocol.Proxy }} {
+impl {{ MarkerNamespace }}::Proxy for {{ $protocol.Proxy }} {
     type Protocol = {{ $protocol.Marker }};
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: {{ ChannelType }}) -> Self {
         Self::new(inner)
     }
 
-    fn into_channel(self) -> Result<::fidl::AsyncChannel, Self> {
+    fn into_channel(self) -> Result<{{ ChannelType }}, Self> {
         self.client.into_channel().map_err(|client| Self { client })
     }
 
-    fn as_channel(&self) -> &::fidl::AsyncChannel {
+    fn as_channel(&self) -> &{{ ChannelType }} {
         self.client.as_channel()
     }
 }
 
 impl {{ $protocol.Proxy }} {
     /// Create a new Proxy for {{ $protocol.ECI }}.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
-        let protocol_name = <{{ $protocol.Marker }} as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
+    pub fn new(channel: {{ ChannelType }}) -> Self {
+        let protocol_name = <{{ $protocol.Marker }} as {{ MarkerNamespace }}::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
 
@@ -186,7 +190,7 @@ impl {{ $protocol.Proxy }} {
         {{- end }}
     )
     {{- if $method.HasResponse }}
-    -> fidl::client::QueryResponseFut<{{ $method.Response.TupleType }}> {
+    -> fidl::client::QueryResponseFut<{{ $method.Response.TupleType }}, {{ ResourceDialect }}> {
     {{- else }}
     -> Result<(), fidl::Error> {
     {{- end }}
@@ -205,22 +209,26 @@ impl {{ $protocol.ProxyInterface }} for {{ $protocol.Proxy }} {
     {{- if $method.HasRequest }}
     {{ "" }}
     {{- if $method.HasResponse }}
-    type {{ $method.ResponseFut }} = fidl::client::QueryResponseFut<{{ $method.Response.TupleType }}>;
+    type {{ $method.ResponseFut }} = fidl::client::QueryResponseFut<{{ $method.Response.TupleType }}, {{ ResourceDialect }}>;
     fn r#{{ $method.Name }}(
         &self,
         {{- range $method.Request.Parameters }}
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
     ) -> Self::{{ $method.ResponseFut }} {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<{{ $method.Response.TupleType }}, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<{{ $method.Response.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}, {{ ResourceDialect }}, {{ $method.Ordinal | printf "%#x" }}>(_buf?)?
+        fn _decode(mut _buf: Result<<{{ ResourceDialect }} as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>) -> Result<{{ $method.Response.TupleType }}, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<{{ $method.Response.FidlType ResourceDialect }}, {{ ResourceDialect }}, {{ $method.Ordinal | printf "%#x" }}>(_buf?)?
             {{- if $method.IsFlexible }}
+            {{- if FDomain }}
+            .into_result_fdomain::<{{ $protocol.Marker }}>("{{ $method.Name }}")?
+            {{- else }}
             .into_result::<{{ $protocol.Marker }}>("{{ $method.Name }}")?
+            {{- end }};
             {{- end }};
             Ok({{ call $method.Response.ConvertToTuple "_response" }})
         }
         self.client.send_query_and_decode::<
-            {{ $method.Request.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }},
+            {{ $method.Request.FidlType ResourceDialect }},
             {{ $method.Response.TupleType }},
         >(
             {{ $method.Request.EncodeExpr }},
@@ -236,7 +244,7 @@ impl {{ $protocol.ProxyInterface }} for {{ $protocol.Proxy }} {
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
     ) -> Result<(), fidl::Error> {
-        self.client.send::<{{ $method.Request.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}>(
+        self.client.send::<{{ $method.Request.FidlType ResourceDialect }}>(
             {{ $method.Request.EncodeExpr }},
             {{ $method.Ordinal | printf "%#x" }},
             {{ $method.DynamicFlags }},
@@ -248,7 +256,7 @@ impl {{ $protocol.ProxyInterface }} for {{ $protocol.Proxy }} {
 }
 
 pub struct {{ $protocol.EventStream }} {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<{{ ResourceDialect }}>,
 }
 
 impl std::marker::Unpin for {{ $protocol.EventStream }} {}
@@ -318,7 +326,7 @@ impl {{ $protocol.Event }} {
     {{- end }}
 
     /// Decodes a message buffer as a [`{{ $protocol.Event }}`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<{{ $protocol.Event }}, fidl::Error> {
+    fn decode(mut buf: <{{ ResourceDialect }} as fidl::encoding::ResourceDialect>::MessageBufEtc) -> Result<{{ $protocol.Event }}, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -326,8 +334,8 @@ impl {{ $protocol.Event }} {
             {{- range $method := $protocol.Methods }}
             {{- if not $method.HasRequest }}
             {{ .Ordinal | printf "%#x" }} => {
-                let mut out = fidl::new_empty!({{ $method.Response.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}, fidl::encoding::DefaultFuchsiaResourceDialect);
-                fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<{{ $method.Response.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}>(&tx_header, _body_bytes, _handles, &mut out)?;
+                let mut out = fidl::new_empty!({{ $method.Response.FidlType ResourceDialect }}, {{ ResourceDialect }});
+                fidl::encoding::Decoder::<{{ ResourceDialect }}>::decode_into::<{{ $method.Response.FidlType ResourceDialect }}>(&tx_header, _body_bytes, _handles, &mut out)?;
                 Ok((
                     {{ $protocol.Event }}::{{ $method.CamelName }} {
                         {{- call $method.Response.ConvertToFields "out" }}
@@ -345,7 +353,7 @@ impl {{ $protocol.Event }} {
             {{- end }}
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal,
-                protocol_name: <{{ $protocol.Marker }} as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                protocol_name: <{{ $protocol.Marker }} as {{ MarkerNamespace }}::ProtocolMarker>::DEBUG_NAME,
             })
         }
     }
@@ -353,7 +361,7 @@ impl {{ $protocol.Event }} {
 
 /// A Stream of incoming requests for {{ $protocol.ECI }}.
 pub struct {{ $protocol.RequestStream }} {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<{{ ResourceDialect }}>>,
     is_terminated: bool,
 }
 
@@ -365,11 +373,11 @@ impl futures::stream::FusedStream for {{ $protocol.RequestStream }} {
     }
 }
 
-impl fidl::endpoints::RequestStream for {{ $protocol.RequestStream }} {
+impl {{ MarkerNamespace }}::RequestStream for {{ $protocol.RequestStream }} {
     type Protocol = {{ $protocol.Marker }};
     type ControlHandle = {{ $protocol.ControlHandle }};
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: {{ ChannelType }}) -> Self {
         Self {
             inner: std::sync::Arc::new(fidl::ServeInner::new(channel)),
             is_terminated: false,
@@ -380,11 +388,11 @@ impl fidl::endpoints::RequestStream for {{ $protocol.RequestStream }} {
         {{ $protocol.ControlHandle }} { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner<{{ ResourceDialect }}>>, bool) {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(inner: std::sync::Arc<fidl::ServeInner<{{ ResourceDialect }}>>, is_terminated: bool) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -407,11 +415,19 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
             match this.inner.channel().read_etc(cx, bytes, handles) {
                 std::task::Poll::Ready(Ok(())) => {},
                 std::task::Poll::Pending => return std::task::Poll::Pending,
+                {{- if FDomain }}
+                std::task::Poll::Ready(Err(None)) => {
+                    this.is_terminated = true;
+                    return std::task::Poll::Ready(None);
+                }
+                std::task::Poll::Ready(Err(Some(e))) => return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e.into())))),
+                {{- else }}
                 std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
                     this.is_terminated = true;
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e.into())))),
+                {{- end }}
             }
 
             // A message has been received from the channel
@@ -428,8 +444,8 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                         fidl::MethodType::OneWay
                     {{- end -}}
                     )?;
-                    let mut req = fidl::new_empty!({{ $method.Request.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<{{ $method.Request.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}>(&header, _body_bytes, handles, &mut req)?;
+                    let mut req = fidl::new_empty!({{ $method.Request.FidlType ResourceDialect }}, {{ ResourceDialect }});
+                    fidl::encoding::Decoder::<{{ ResourceDialect }}>::decode_into::<{{ $method.Request.FidlType ResourceDialect }}>(&header, _body_bytes, handles, &mut req)?;
                     let control_handle = {{ $protocol.ControlHandle }} {
                         inner: this.inner.clone(),
                     };
@@ -476,7 +492,7 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
                 {{- end }}
                 _ => Err(fidl::Error::UnknownOrdinal {
                     ordinal: header.ordinal,
-                    protocol_name: <{{ $protocol.Marker }} as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                    protocol_name: <{{ $protocol.Marker }} as {{ MarkerNamespace }}::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))
         })
@@ -587,22 +603,29 @@ impl {{ $protocol.Request }} {
 
 #[derive(Debug, Clone)]
 pub struct {{ $protocol.ControlHandle }} {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<{{ ResourceDialect }}>>,
 }
 
-impl fidl::endpoints::ControlHandle for {{ $protocol.ControlHandle }} {
+impl {{ MarkerNamespace }}::ControlHandle for {{ $protocol.ControlHandle }} {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
 
+{{- if not FDomain }}
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
+{{- end }}
 
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
 
+{{- if FDomain }}
+    fn on_closed(&self) -> fdomain_client::OnFDomainSignals {
+        self.inner.channel().on_closed()
+    }
+{{- else }}
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -616,6 +639,7 @@ impl fidl::endpoints::ControlHandle for {{ $protocol.ControlHandle }} {
         use fidl::Peered;
         self.inner.channel().signal_peer(clear_mask, set_mask)
     }
+{{- end }}
 }
 
 impl {{ $protocol.ControlHandle }} {
@@ -627,7 +651,7 @@ impl {{ $protocol.ControlHandle }} {
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
     ) -> Result<(), fidl::Error> {
-        self.inner.send::<{{ $method.Response.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}>(
+        self.inner.send::<{{ $method.Response.FidlType ResourceDialect }}>(
             {{ $method.Response.EncodeExpr }},
             0,
             {{ $method.Ordinal | printf "%#x" }},
@@ -659,7 +683,7 @@ impl std::ops::Drop for {{ $method.Responder }} {
     }
 }
 
-impl fidl::endpoints::Responder for {{ $method.Responder }} {
+impl {{ MarkerNamespace }}::Responder for {{ $method.Responder }} {
     type ControlHandle = {{ $protocol.ControlHandle }};
 
     fn control_handle(&self) -> &{{ $protocol.ControlHandle }} {
@@ -716,7 +740,7 @@ impl {{ $method.Responder }} {
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
     ) -> Result<(), fidl::Error> {
-        self.control_handle.inner.send::<{{ $method.Response.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}>(
+        self.control_handle.inner.send::<{{ $method.Response.FidlType ResourceDialect }}>(
             {{ $method.Response.EncodeExpr }},
             self.tx_id,
             {{ $method.Ordinal | printf "%#x" }},

@@ -11,13 +11,13 @@
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/fake-bti/cpp/fake-bti.h>
 #include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
-#include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/mmio-ptr/fake.h>
@@ -86,20 +86,23 @@ class TestAmlSdmmcWithBanjo : public AmlSdmmcWithBanjo {
   }
 
   zx_status_t WaitForInterruptImpl() override {
-    fake_bti_pinned_vmo_info_t pinned_vmos[2];
-    size_t actual = 0;
-    zx_status_t status =
-        fake_bti_get_pinned_vmos(bti().get(), pinned_vmos, std::size(pinned_vmos), &actual);
+    zx::result result = fake_bti::GetPinnedVmo(bti().get());
+    if (result.is_error()) {
+      return result.status_value();
+    }
+
     // In the tuning case there are exactly two VMOs pinned: one to hold the DMA descriptors, and
     // one to hold the received tuning block. Write the expected tuning data to the second pinned
     // VMO so that the tuning check always passes.
-    if (status == ZX_OK && actual == std::size(pinned_vmos) &&
+    constexpr size_t kTuningVmoSize = 2;
+    std::vector<fake_bti::FakeBtiPinnedVmoInfo> pinned_vmos = std::move(result.value());
+    if (pinned_vmos.size() == kTuningVmoSize &&
         pinned_vmos[0].size >= sizeof(aml_sdmmc_tuning_blk_pattern_4bit)) {
       zx_vmo_write(pinned_vmos[1].vmo, aml_sdmmc_tuning_blk_pattern_4bit, pinned_vmos[1].offset,
                    sizeof(aml_sdmmc_tuning_blk_pattern_4bit));
     }
-    for (size_t i = 0; i < std::min(actual, std::size(pinned_vmos)); i++) {
-      zx_handle_close(pinned_vmos[i].vmo);
+    for (auto& pinned_vmo : pinned_vmos) {
+      zx_handle_close(pinned_vmo.vmo);
     }
 
     if (request_index_ < request_results_.size() && request_results_[request_index_] == 0) {
@@ -413,7 +416,7 @@ struct IncomingNamespace {
 
   fdf_testing::TestNode node{"root"};
   fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
-  fdf_fake_platform_device::FakePDev pdev_server;
+  fdf_fake::FakePDev pdev_server;
   FakeClock clock_server;
   zx::event exec_opportunistic, wake_assertive;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
@@ -437,13 +440,10 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
     // This is used by AmlSdmmc::Init() to create the descriptor buffer -- can be any nonzero paddr.
     bti_paddrs_[0] = zx_system_get_page_size();
 
-    zx::bti bti;
-    if (create_fake_bti_with_paddrs) {
-      ASSERT_OK(fake_bti_create_with_paddrs(bti_paddrs_, std::size(bti_paddrs_),
-                                            bti.reset_and_get_address()));
-    } else {
-      ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
-    }
+    zx::result result = create_fake_bti_with_paddrs ? fake_bti::CreateFakeBtiWithPaddrs(bti_paddrs_)
+                                                    : fake_bti::CreateFakeBti();
+    ASSERT_TRUE(result.is_ok());
+    zx::bti bti = std::move(result.value());
 
     // Initialize driver test environment.
     fuchsia_driver_framework::DriverStartArgs start_args;
@@ -456,8 +456,8 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
       ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
 
       // Serve (fake) pdev_server.
-      fdf_fake_platform_device::FakePDev::Config config{.use_fake_irq = true,
-                                                        .device_info = fdf::PDev::DeviceInfo{}};
+      fdf_fake::FakePDev::Config config{.use_fake_irq = true,
+                                        .device_info = fdf::PDev::DeviceInfo{}};
       zx::vmo dup;
       mmio_buffer_.get_vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
       config.mmios[0] = fdf::PDev::MmioInfo{

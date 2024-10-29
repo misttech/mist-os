@@ -101,7 +101,7 @@ impl<'a> InputTakeAtPosition for ParsingContext<'a> {
     {
         self.input
             .position(predicate)
-            .map(|idx| Self::take_split(&self, idx))
+            .map(|idx| Self::take_split(self, idx))
             .ok_or(Err::Incomplete(Needed::Size(NonZero::new(1).unwrap())))
     }
 
@@ -114,8 +114,8 @@ impl<'a> InputTakeAtPosition for ParsingContext<'a> {
         P: Fn(Self::Item) -> bool,
     {
         match self.input.position(predicate) {
-            Some(0) => Err(Err::Error(E::from_error_kind(self.clone(), e))),
-            Some(idx) => Ok(Self::take_split(&self, idx)),
+            Some(0) => Err(Err::Error(E::from_error_kind(*self, e))),
+            Some(idx) => Ok(Self::take_split(self, idx)),
             None => Err(Err::Incomplete(Needed::Size(NonZero::new(1).unwrap()))),
         }
     }
@@ -128,7 +128,7 @@ impl<'a> InputTakeAtPosition for ParsingContext<'a> {
         P: Fn(Self::Item) -> bool,
     {
         match self.split_at_position(predicate) {
-            Err(Err::Incomplete(_)) => Ok(Self::take_split(&self, self.input.input_len())),
+            Err(Err::Incomplete(_)) => Ok(Self::take_split(self, self.input.input_len())),
             elt => elt,
         }
     }
@@ -141,16 +141,16 @@ impl<'a> InputTakeAtPosition for ParsingContext<'a> {
         P: Fn(Self::Item) -> bool,
     {
         match self.input.position(predicate) {
-            Some(0) => Err(Err::Error(E::from_error_kind(self.clone(), e))),
-            Some(idx) => Ok(Self::take_split(&self, idx)),
-            None => Ok(Self::take_split(&self, self.input.input_len())),
+            Some(0) => Err(Err::Error(E::from_error_kind(*self, e))),
+            Some(idx) => Ok(Self::take_split(self, idx)),
+            None => Ok(Self::take_split(self, self.input.input_len())),
         }
     }
 }
 
 impl<'a> Offset for ParsingContext<'a> {
     fn offset(&self, second: &Self) -> usize {
-        self.input.offset(&second.input)
+        self.input.offset(second.input)
     }
 }
 

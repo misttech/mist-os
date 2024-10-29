@@ -6,22 +6,25 @@ use std::collections::HashMap;
 
 use derivative::Derivative;
 use fidl::endpoints::ControlHandle;
-use fidl_fuchsia_net::Subnet;
+use fidl_fuchsia_net_filter_ext::{
+    AddressMatcher, AddressMatcherType, CommitError, FidlConversionError, InterfaceMatcher,
+    Matchers, PushChangesError, RuleId, Subnet,
+};
 use fnet_masquerade::Error;
-use fuchsia_async::DurationExt as _;
 use futures::stream::LocalBoxStream;
 use futures::{future, StreamExt as _, TryStreamExt as _};
 use net_declare::fidl_subnet;
 use tracing::{error, warn};
 use {
-    fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
     fidl_fuchsia_net_masquerade as fnet_masquerade,
 };
 
-use crate::filter::FilterEnabledState;
+use crate::filter::{FilterControl, FilterEnabledState, FilterError};
 use crate::{InterfaceId, InterfaceState};
 
-const UNSPECIFIED_SUBNET: Subnet = fidl_subnet!("0.0.0.0/0");
+const V4_UNSPECIFIED_SUBNET: fnet::Subnet = fidl_subnet!("0.0.0.0/0");
+const V6_UNSPECIFIED_SUBNET: fnet::Subnet = fidl_subnet!("::/0");
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -37,7 +40,7 @@ pub(super) type EventStream = LocalBoxStream<'static, Result<Event, fidl::Error>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) struct ValidatedConfig {
     /// The network to be masqueraded.
-    pub src_subnet: fidl_fuchsia_net::Subnet,
+    pub src_subnet: Subnet,
     /// The interface through which to masquerade.
     pub output_interface: InterfaceId,
 }
@@ -46,38 +49,98 @@ impl TryFrom<fnet_masquerade::ControlConfig> for ValidatedConfig {
     type Error = fnet_masquerade::Error;
 
     fn try_from(
-        fnet_masquerade::ControlConfig { src_subnet, output_interface }: fnet_masquerade::ControlConfig,
-    ) -> Result<Self, Self::Error> {
-        Ok(Self {
+        fnet_masquerade::ControlConfig {
             src_subnet,
+            output_interface
+        }: fnet_masquerade::ControlConfig,
+    ) -> Result<Self, Self::Error> {
+        if src_subnet == V4_UNSPECIFIED_SUBNET || src_subnet == V6_UNSPECIFIED_SUBNET {
+            return Err(Error::Unsupported);
+        }
+        Ok(Self {
+            src_subnet: src_subnet
+                .try_into()
+                .map_err(|_: FidlConversionError| Error::InvalidArguments)?,
             output_interface: InterfaceId::new(output_interface).ok_or(Error::InvalidArguments)?,
         })
     }
 }
 
+/// State of a masquerade configuration, variant on the underlying filter API.
+#[derive(Clone, Debug)]
+enum MasqueradeFilterState {
+    /// The masquerade config is inactive.
+    Inactive,
+    /// The masquerade config is active in `fuchsia.net.filter.deprecated`.
+    ActiveDeprecated,
+    /// The masquerade config is active in `fuchsia.net.filter`.
+    ActiveCurrent { rule: RuleId },
+}
+
+impl MasqueradeFilterState {
+    fn is_active(&self) -> bool {
+        match self {
+            MasqueradeFilterState::Inactive => false,
+            MasqueradeFilterState::ActiveDeprecated
+            | MasqueradeFilterState::ActiveCurrent { rule: _ } => true,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct MasqueradeState {
-    active: bool,
+    filter_state: MasqueradeFilterState,
     control: fnet_masquerade::ControlControlHandle,
 }
 
 impl MasqueradeState {
     fn new(control: fnet_masquerade::ControlControlHandle) -> Self {
-        Self { active: false, control }
+        Self { filter_state: MasqueradeFilterState::Inactive, control }
     }
 }
 
-pub(super) struct Masquerade<Filter = fnet_filter_deprecated::FilterProxy> {
-    filter: Filter,
-    active_controllers: HashMap<ValidatedConfig, MasqueradeState>,
+// Convert errors observed on `fuchsia.net.filter` to errors on the Masquerade
+// API.
+impl From<FilterError> for Error {
+    fn from(error: FilterError) -> Error {
+        match error {
+            FilterError::Push(e) => {
+                error!("failed to push filtering changes: {e}");
+                match e {
+                    PushChangesError::CallMethod(e) => crate::exit_with_fidl_error(e),
+                    PushChangesError::TooManyChanges
+                    | PushChangesError::FidlConversion(_)
+                    | PushChangesError::ErrorOnChange(_) => {
+                        panic!("failed to push: generated filtering state was invalid.")
+                    }
+                }
+            }
+            FilterError::Commit(e) => {
+                error!("failed to commit filtering changes: {e}");
+                match e {
+                    CommitError::CallMethod(e) => crate::exit_with_fidl_error(e),
+                    CommitError::CyclicalRoutineGraph(_)
+                    | CommitError::MasqueradeWithInvalidMatcher(_)
+                    | CommitError::TransparentProxyWithInvalidMatcher(_)
+                    | CommitError::RedirectWithInvalidMatcher(_)
+                    | CommitError::RuleWithInvalidAction(_)
+                    | CommitError::RuleWithInvalidMatcher(_)
+                    | CommitError::ErrorOnChange(_)
+                    | CommitError::FidlConversion(_) => {
+                        panic!("failed to commit: generated filtering state was invalid.")
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Updates the interface enabled state to acknowledge the change in masquerade
 /// configuration.
 ///
 /// Note: It is incorrect to call this function if no change has occurred.
-async fn update_interface<Filter: fnet_filter_deprecated::FilterProxyInterface>(
-    filter: &Filter,
+async fn update_interface(
+    filter: &mut FilterControl,
     interface: InterfaceId,
     enabled: bool,
     filter_enabled_state: &mut FilterEnabledState,
@@ -88,32 +151,101 @@ async fn update_interface<Filter: fnet_filter_deprecated::FilterProxyInterface>(
     } else {
         filter_enabled_state.decrement_masquerade_count_on_interface(interface);
     }
-    if let Err(e) = filter_enabled_state
-        .maybe_update_deprecated(
-            interface_states.get(&interface).map(|is| is.device_class.into()),
-            interface,
-            filter,
-        )
-        .await
-    {
-        match e {
-            fnet_filter_deprecated::EnableDisableInterfaceError::NotFound => {
-                warn!("specified input_interface not found: {interface}");
-                return Err(Error::NotFound);
-            }
-        }
-    }
 
-    Ok(())
+    let interface_type = interface_states.get(&interface).map(|is| is.device_class.into());
+
+    match filter {
+        FilterControl::Deprecated(f) => filter_enabled_state
+            .maybe_update_deprecated(interface_type, interface, f)
+            .await
+            .map_err(|e| match e {
+                fnet_filter_deprecated::EnableDisableInterfaceError::NotFound => {
+                    warn!("specified input_interface not found: {interface}");
+                    Error::NotFound
+                }
+            }),
+        FilterControl::Current(f) => filter_enabled_state
+            .maybe_update_current(interface_type, interface, f)
+            .await
+            .map_err(Error::from),
+    }
 }
 
-impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
-    pub fn new(filter: Filter) -> Self {
-        Self { filter, active_controllers: HashMap::new() }
+/// Adds or removes a masquerade rule.
+///
+/// If the existing state is inactive, a rule will be added. Otherwise, the
+/// existing rule is removed.
+async fn add_or_remove_masquerade_rule(
+    filter: &mut FilterControl,
+    config: ValidatedConfig,
+    existing_state: &MasqueradeFilterState,
+) -> Result<MasqueradeFilterState, Error> {
+    let ValidatedConfig { src_subnet, output_interface } = config;
+    match (filter, existing_state) {
+        (FilterControl::Deprecated(filter), MasqueradeFilterState::Inactive) => {
+            crate::filter::add_masquerade_rule_deprecated(
+                filter,
+                fnet_filter_deprecated::Nat {
+                    proto: fnet_filter_deprecated::SocketProtocol::Any,
+                    src_subnet: src_subnet.into(),
+                    outgoing_nic: output_interface.get(),
+                },
+            )
+            .await?;
+            Ok(MasqueradeFilterState::ActiveDeprecated)
+        }
+        (FilterControl::Deprecated(filter), MasqueradeFilterState::ActiveDeprecated) => {
+            crate::filter::remove_masquerade_rule_deprecated(
+                filter,
+                fnet_filter_deprecated::Nat {
+                    proto: fnet_filter_deprecated::SocketProtocol::Any,
+                    src_subnet: src_subnet.into(),
+                    outgoing_nic: output_interface.get(),
+                },
+            )
+            .await?;
+            Ok(MasqueradeFilterState::Inactive)
+        }
+        (FilterControl::Current(filter), MasqueradeFilterState::Inactive) => {
+            let rule = crate::filter::add_masquerade_rule_current(
+                filter,
+                Matchers {
+                    out_interface: Some(InterfaceMatcher::Id(output_interface.into())),
+                    src_addr: Some(AddressMatcher {
+                        matcher: AddressMatcherType::Subnet(src_subnet),
+                        invert: false,
+                    }),
+                    ..Default::default()
+                },
+            )
+            .await
+            .map_err(Error::from)?;
+            Ok(MasqueradeFilterState::ActiveCurrent { rule })
+        }
+        (FilterControl::Current(filter), MasqueradeFilterState::ActiveCurrent { rule }) => {
+            crate::filter::remove_masquerade_rule_current(filter, rule)
+                .await
+                .map_err(Error::from)?;
+            Ok(MasqueradeFilterState::Inactive)
+        }
+        (FilterControl::Deprecated(_), MasqueradeFilterState::ActiveCurrent { rule: _ }) => {
+            panic!("deprecated `filter` with current `existing_state` is impossible")
+        }
+        (FilterControl::Current(_), MasqueradeFilterState::ActiveDeprecated) => {
+            panic!("current `filter` with deprecated `existing_state` is impossible")
+        }
     }
+}
 
+#[derive(Debug, Default)]
+pub(super) struct MasqueradeHandler {
+    active_controllers: HashMap<ValidatedConfig, MasqueradeState>,
+}
+
+impl MasqueradeHandler {
     async fn set_enabled(
         &mut self,
+        filter: &mut FilterControl,
         config: ValidatedConfig,
         enabled: bool,
         filter_enabled_state: &mut FilterEnabledState,
@@ -121,89 +253,25 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
     ) -> Result<bool, Error> {
         let state =
             self.active_controllers.get_mut(&config).ok_or_else(|| Error::InvalidArguments)?;
-        if state.active == enabled {
+
+        let original_state = state.filter_state.is_active();
+        if original_state == enabled {
             // The current state is already the desired state; short circuit.
             // This prevents calling `update_interface` in the no-change case.
-            return Ok(state.active);
+            return Ok(original_state);
         }
-
-        let ValidatedConfig { src_subnet, output_interface } = config;
-        let outgoing_nic = output_interface.get();
         update_interface(
-            &self.filter,
-            output_interface,
+            filter,
+            config.output_interface,
             enabled,
             filter_enabled_state,
             interface_states,
         )
         .await?;
+        let new_state = add_or_remove_masquerade_rule(filter, config, &state.filter_state).await?;
 
-        for _ in 0..crate::filter::FILTER_CAS_RETRY_MAX {
-            let (mut rules, generation) =
-                self.filter.get_nat_rules().await.expect("call to GetNatRules failed");
-
-            if enabled {
-                if rules.iter().any(
-                    |fnet_filter_deprecated::Nat {
-                         src_subnet: old_src_subnet,
-                         outgoing_nic: old_outgoing_nic,
-                         proto,
-                     }| {
-                        *old_src_subnet == src_subnet
-                            && *old_outgoing_nic == outgoing_nic
-                            && *proto == fnet_filter_deprecated::SocketProtocol::Any
-                    },
-                ) {
-                    return Err(Error::AlreadyExists);
-                }
-                rules.push(fnet_filter_deprecated::Nat {
-                    proto: fnet_filter_deprecated::SocketProtocol::Any,
-                    src_subnet,
-                    outgoing_nic,
-                });
-            } else {
-                rules.retain(
-                    |fnet_filter_deprecated::Nat {
-                         src_subnet: old_src_subnet,
-                         outgoing_nic: old_outgoing_nic,
-                         proto,
-                     }| {
-                        !(*proto == fnet_filter_deprecated::SocketProtocol::Any
-                            && *old_src_subnet == src_subnet
-                            && *old_outgoing_nic == outgoing_nic)
-                    },
-                );
-            }
-
-            match self
-                .filter
-                .update_nat_rules(&rules, generation)
-                .await
-                .expect("call to UpdateNatRules failed")
-            {
-                Ok(()) => {
-                    let was_enabled = state.active;
-                    state.active = enabled;
-                    return Ok(was_enabled);
-                }
-                Err(fnet_filter_deprecated::FilterUpdateNatRulesError::GenerationMismatch) => {
-                    // We need to try again.
-                    fuchsia_async::Timer::new(
-                        zx::MonotonicDuration::from_millis(
-                            crate::filter::FILTER_CAS_RETRY_INTERVAL_MILLIS,
-                        )
-                        .after_now(),
-                    )
-                    .await;
-                }
-                Err(fnet_filter_deprecated::FilterUpdateNatRulesError::BadRule) => {
-                    panic!("Generated Nat rule was invalid. This should never happen: {rules:?}");
-                }
-            }
-        }
-
-        error!("Failed to set new Nat rule");
-        Err(Error::RetryExceeded)
+        state.filter_state = new_state;
+        Ok(original_state)
     }
 
     /// Attempts to create a new fuchsia_net_masquerade/Control connection.
@@ -215,10 +283,6 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
         config: ValidatedConfig,
         control: fnet_masquerade::ControlControlHandle,
     ) -> Result<(), (Error, fnet_masquerade::ControlControlHandle)> {
-        if config.src_subnet == UNSPECIFIED_SUBNET {
-            return Err((Error::Unsupported, control));
-        }
-
         match self.active_controllers.entry(config) {
             std::collections::hash_map::Entry::Vacant(e) => {
                 // No need to modify the just-added state.
@@ -235,10 +299,11 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
         }
     }
 
-    pub async fn handle_event<'a>(
+    pub(super) async fn handle_event(
         &mut self,
         event: Event,
         events: &mut futures::stream::SelectAll<EventStream>,
+        filter: &mut FilterControl,
         filter_enabled_state: &mut FilterEnabledState,
         interface_states: &HashMap<InterfaceId, InterfaceState>,
     ) {
@@ -294,8 +359,9 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                 config,
                 fnet_masquerade::ControlRequest::SetEnabled { enabled, responder },
             ) => {
-                let response =
-                    self.set_enabled(config, enabled, filter_enabled_state, interface_states).await;
+                let response = self
+                    .set_enabled(filter, config, enabled, filter_enabled_state, interface_states)
+                    .await;
                 let state = self
                     .active_controllers
                     .get_mut(&config)
@@ -303,7 +369,9 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                 state.respond_and_maybe_shutdown(response, |r| responder.send(r));
             }
             Event::Disconnect(config) => {
-                match self.set_enabled(config, false, filter_enabled_state, interface_states).await
+                match self
+                    .set_enabled(filter, config, false, filter_enabled_state, interface_states)
+                    .await
                 {
                     Ok(_prev_enabled) => {}
                     // Note: `NotFound` errors here aren't problematic. They may
@@ -398,173 +466,360 @@ pub mod test {
     use std::sync::{Arc, Mutex};
 
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
+    use fidl_fuchsia_net_filter::{ControlRequest, NamespaceControllerRequest};
+    use fidl_fuchsia_net_filter_deprecated::FilterRequest;
+    use fidl_fuchsia_net_filter_ext::{
+        Action, AddressMatcherType, Change, InterfaceMatcher, Resource, ResourceId,
+    };
+    use futures::future::FusedFuture;
+    use futures::FutureExt;
     use test_case::test_case;
 
     use super::*;
 
-    impl ValidatedConfig {
-        const fn new(src_subnet: fidl_fuchsia_net::Subnet, output_interface: InterfaceId) -> Self {
-            Self { src_subnet, output_interface }
-        }
-    }
+    const VALID_OUTPUT_INTERFACE: u64 = 11;
+    const NON_EXISTENT_INTERFACE: u64 = 1005;
 
+    const VALID_SUBNET: fnet::Subnet = fidl_subnet!("192.0.2.0/24");
+    // Note: Invalid because the host-bits are set.
+    const INVALID_SUBNET: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+
+    const DEFAULT_CONFIG: fnet_masquerade::ControlConfig = fnet_masquerade::ControlConfig {
+        src_subnet: VALID_SUBNET,
+        output_interface: VALID_OUTPUT_INTERFACE,
+    };
+
+    /// A mock implementation of `fuchsia.net.filter.deprecated`.
     #[derive(Default)]
-    struct MockFilterState {
+    struct MockFilterStateDeprecated {
         active_interfaces: HashSet<u64>,
         nat_rules: Vec<fnet_filter_deprecated::Nat>,
         nat_rules_generation: u32,
         fail_generations: i32,
     }
 
-    const VALID_OUTPUT_INTERFACE: InterfaceId = const_unwrap_option(InterfaceId::new(11));
-    const NON_EXISTENT_INTERFACE: InterfaceId = const_unwrap_option(InterfaceId::new(1005));
+    impl MockFilterStateDeprecated {
+        fn handle_request(&mut self, req: FilterRequest) {
+            match req {
+                FilterRequest::EnableInterface { id, responder } => {
+                    let result = if id == NON_EXISTENT_INTERFACE {
+                        Err(fnet_filter_deprecated::EnableDisableInterfaceError::NotFound)
+                    } else {
+                        let _: bool = self.active_interfaces.insert(id);
+                        Ok(())
+                    };
+                    responder.send(result).expect("failed to respond")
+                }
+                FilterRequest::DisableInterface { id, responder } => {
+                    let result = if id == NON_EXISTENT_INTERFACE {
+                        Err(fnet_filter_deprecated::EnableDisableInterfaceError::NotFound)
+                    } else {
+                        let _: bool = self.active_interfaces.remove(&id);
+                        Ok(())
+                    };
+                    responder.send(result).expect("failed to respond")
+                }
+                FilterRequest::GetNatRules { responder } => {
+                    responder
+                        .send(&self.nat_rules[..], self.nat_rules_generation)
+                        .expect("failed to respond");
+                    if self.fail_generations > 0 {
+                        self.nat_rules_generation += 1;
+                        self.fail_generations -= 1;
+                    }
+                }
+                FilterRequest::UpdateNatRules { rules, generation, responder } => {
+                    let result = if self.nat_rules_generation != generation {
+                        Err(fnet_filter_deprecated::FilterUpdateNatRulesError::GenerationMismatch)
+                    } else {
+                        let new_nat_rules: Vec<fnet_filter_deprecated::Nat> =
+                            rules.iter().map(|r| r.clone()).collect();
+                        self.nat_rules = new_nat_rules;
+                        self.nat_rules_generation += 1;
+                        Ok(())
+                    };
+                    responder.send(result).expect("failed to respond")
+                }
+                _ => unimplemented!(
+                    "fuchsia.net.filter.deprecated mock called with unsupported request"
+                ),
+            }
+        }
+    }
 
-    const VALID_SUBNET: Subnet = fidl_subnet!("192.0.2.0/24");
-
-    const DEFAULT_CONFIG: ValidatedConfig =
-        ValidatedConfig::new(VALID_SUBNET, VALID_OUTPUT_INTERFACE);
-
+    /// A mock implementation of `fuchsia.net.filter`.
     #[derive(Default)]
-    struct MockFilter {
-        state: Arc<Mutex<MockFilterState>>,
+    struct MockFilterStateCurrent {
+        pending_changes: Vec<Change>,
+        resources: HashMap<ResourceId, Resource>,
     }
 
-    impl fnet_filter_deprecated::FilterProxyInterface for MockFilter {
-        type EnableInterfaceResponseFut =
-            future::Ready<Result<fnet_filter_deprecated::FilterEnableInterfaceResult, fidl::Error>>;
-
-        fn enable_interface(&self, id: u64) -> Self::EnableInterfaceResponseFut {
-            if id == NON_EXISTENT_INTERFACE.get() {
-                future::ok(Err(fnet_filter_deprecated::EnableDisableInterfaceError::NotFound))
-            } else {
-                let _: bool =
-                    self.state.lock().expect("lock poisoned").active_interfaces.insert(id);
-                future::ok(Ok(()))
+    impl MockFilterStateCurrent {
+        fn handle_request(&mut self, req: NamespaceControllerRequest) {
+            match req {
+                NamespaceControllerRequest::PushChanges { changes, responder } => {
+                    let changes = changes
+                        .into_iter()
+                        .map(|change| Change::try_from(change).expect("invalid change"));
+                    self.pending_changes.extend(changes);
+                    responder
+                        .send(fidl_fuchsia_net_filter::ChangeValidationResult::Ok(
+                            fidl_fuchsia_net_filter::Empty,
+                        ))
+                        .expect("failed to respond");
+                }
+                NamespaceControllerRequest::Commit { payload: _, responder } => {
+                    for change in self.pending_changes.drain(..) {
+                        match change {
+                            Change::Create(resource) => {
+                                let id = resource.id();
+                                assert_matches!(
+                                    self.resources.insert(id.clone(), resource),
+                                    None,
+                                    "resource {id:?} already exists"
+                                );
+                            }
+                            Change::Remove(resource) => {
+                                assert_matches!(
+                                    self.resources.remove(&resource),
+                                    Some(_),
+                                    "resource {resource:?} does not exist"
+                                );
+                            }
+                        }
+                    }
+                    responder
+                        .send(fidl_fuchsia_net_filter::CommitResult::Ok(
+                            fidl_fuchsia_net_filter::Empty,
+                        ))
+                        .expect("failed to respond");
+                }
+                _ => unimplemented!("fuchsia.net.filter mock called with unsupported request"),
             }
-        }
-
-        type DisableInterfaceResponseFut = future::Ready<
-            Result<fnet_filter_deprecated::FilterDisableInterfaceResult, fidl::Error>,
-        >;
-
-        fn disable_interface(&self, id: u64) -> Self::DisableInterfaceResponseFut {
-            if id == NON_EXISTENT_INTERFACE.get() {
-                future::ok(Err(fnet_filter_deprecated::EnableDisableInterfaceError::NotFound))
-            } else {
-                let _: bool =
-                    self.state.lock().expect("lock poisoned").active_interfaces.remove(&id);
-                future::ok(Ok(()))
-            }
-        }
-
-        type GetNatRulesResponseFut =
-            future::Ready<Result<(Vec<fnet_filter_deprecated::Nat>, u32), fidl::Error>>;
-
-        fn get_nat_rules(&self) -> Self::GetNatRulesResponseFut {
-            let mut state = self.state.lock().expect("lock poisoned");
-
-            let result = future::ok((state.nat_rules.clone(), state.nat_rules_generation));
-            if state.fail_generations > 0 {
-                state.nat_rules_generation += 1;
-                state.fail_generations -= 1;
-            }
-            result
-        }
-
-        type UpdateNatRulesResponseFut =
-            future::Ready<Result<fnet_filter_deprecated::FilterUpdateNatRulesResult, fidl::Error>>;
-
-        fn update_nat_rules(
-            &self,
-            rules: &[fnet_filter_deprecated::Nat],
-            generation: u32,
-        ) -> Self::UpdateNatRulesResponseFut {
-            let mut state = self.state.lock().expect("lock poisoned");
-            if state.nat_rules_generation != generation {
-                future::ok(Err(
-                    fnet_filter_deprecated::FilterUpdateNatRulesError::GenerationMismatch,
-                ))
-            } else {
-                let new_nat_rules: Vec<fnet_filter_deprecated::Nat> =
-                    rules.iter().map(|r| r.clone()).collect();
-                state.nat_rules = new_nat_rules;
-                state.nat_rules_generation += 1;
-                future::ok(Ok(()))
-            }
-        }
-
-        type GetRulesResponseFut =
-            future::Ready<Result<(Vec<fnet_filter_deprecated::Rule>, u32), fidl::Error>>;
-        fn get_rules(&self) -> Self::GetRulesResponseFut {
-            unreachable!();
-        }
-        type UpdateRulesResponseFut =
-            future::Ready<Result<fnet_filter_deprecated::FilterUpdateRulesResult, fidl::Error>>;
-        fn update_rules(
-            &self,
-            _: &[fnet_filter_deprecated::Rule],
-            _: u32,
-        ) -> Self::UpdateRulesResponseFut {
-            unreachable!();
-        }
-        type GetRdrRulesResponseFut =
-            future::Ready<Result<(Vec<fnet_filter_deprecated::Rdr>, u32), fidl::Error>>;
-        fn get_rdr_rules(&self) -> Self::GetRdrRulesResponseFut {
-            unreachable!();
-        }
-        type UpdateRdrRulesResponseFut =
-            future::Ready<Result<fnet_filter_deprecated::FilterUpdateRdrRulesResult, fidl::Error>>;
-        fn update_rdr_rules(
-            &self,
-            _: &[fnet_filter_deprecated::Rdr],
-            _: u32,
-        ) -> Self::UpdateRdrRulesResponseFut {
-            unreachable!();
-        }
-        type CheckPresenceResponseFut = future::Ready<Result<(), fidl::Error>>;
-        fn check_presence(&self) -> Self::CheckPresenceResponseFut {
-            unreachable!();
         }
     }
 
+    #[derive(Clone)]
+    enum MockFilter {
+        Deprecated(Arc<Mutex<MockFilterStateDeprecated>>),
+        Current(Arc<Mutex<MockFilterStateCurrent>>),
+    }
+
+    impl MockFilter {
+        fn new_deprecated(initial_state: MockFilterStateDeprecated) -> Self {
+            Self::Deprecated(Arc::new(Mutex::new(initial_state)))
+        }
+        fn new_current(initial_state: MockFilterStateCurrent) -> Self {
+            Self::Current(Arc::new(Mutex::new(initial_state)))
+        }
+
+        // Lists the masquerade configurations that are currently installed.
+        fn list_configurations(&self) -> Vec<fnet_masquerade::ControlConfig> {
+            match self {
+                Self::Deprecated(state) => state
+                    .lock()
+                    .expect("poisoned lock")
+                    .nat_rules
+                    .iter()
+                    .map(|fnet_filter_deprecated::Nat { src_subnet, outgoing_nic, proto: _ }| {
+                        fnet_masquerade::ControlConfig {
+                            src_subnet: *src_subnet,
+                            output_interface: *outgoing_nic,
+                        }
+                    })
+                    .collect(),
+                Self::Current(state) => state
+                    .lock()
+                    .expect("poisoned lock")
+                    .resources
+                    .values()
+                    .filter_map(|resource| match resource {
+                        Resource::Rule(rule) => match rule.action {
+                            Action::Masquerade { src_port: _ } => {
+                                let output_interface = rule
+                                    .matchers
+                                    .out_interface
+                                    .clone()
+                                    .expect("out_interface should be Some");
+                                let output_interface = match output_interface {
+                                    InterfaceMatcher::Id(value) => value.get(),
+                                    matcher => panic!("unexpected interface matcher: {matcher:?}"),
+                                };
+                                let src_subnet = rule
+                                    .matchers
+                                    .src_addr
+                                    .clone()
+                                    .expect("src_addr should be Some");
+                                assert!(!src_subnet.invert);
+                                let src_subnet = match src_subnet.matcher {
+                                    AddressMatcherType::Subnet(value) => value.into(),
+                                    matcher => panic!("unexpected address matcher: {matcher:?}"),
+                                };
+                                Some(fnet_masquerade::ControlConfig {
+                                    output_interface,
+                                    src_subnet,
+                                })
+                            }
+                            _ => None,
+                        },
+                        _ => None,
+                    })
+                    .collect(),
+            }
+        }
+
+        // Returns true if the provided interface is active.
+        fn is_interface_active(&self, interface_id: u64) -> bool {
+            match self {
+                Self::Deprecated(state) => {
+                    state.lock().expect("poisoned_lock").active_interfaces.contains(&interface_id)
+                }
+                Self::Current(_) => self
+                    .list_configurations()
+                    .iter()
+                    .any(|config| config.output_interface == interface_id),
+            }
+        }
+
+        /// Create a client (`FilterControl`), and server (future) from a mock.
+        ///
+        /// The server future must be polled in order for operations against the
+        /// client to make progress.
+        async fn into_client_and_server(self) -> (FilterControl, impl FusedFuture<Output = ()>) {
+            match self {
+                MockFilter::Deprecated(state) => {
+                    let (client, server) = fidl::endpoints::create_endpoints::<
+                        fidl_fuchsia_net_filter_deprecated::FilterMarker,
+                    >();
+                    let client = client.into_proxy().expect("failed to convert client to proxy");
+                    let server_fut = server
+                        .into_stream()
+                        .expect("failed to get request stream")
+                        .fold(state, |state, req| {
+                            state
+                                .lock()
+                                .expect("lock poisoned")
+                                .handle_request(req.expect("failed to receive request"));
+                            futures::future::ready(state)
+                        })
+                        .map(|_state| ())
+                        .fuse();
+                    (FilterControl::Deprecated(client), futures::future::Either::Left(server_fut))
+                }
+                MockFilter::Current(state) => {
+                    // Note: we have to go through `fuchsia.net.filter/Control` to
+                    // get a connection to `fuchsia.net.filter/NamespaceController`.
+                    let (control_client, control_server) = fidl::endpoints::create_endpoints::<
+                        fidl_fuchsia_net_filter::ControlMarker,
+                    >();
+                    let client_fut = FilterControl::new(
+                        None,
+                        Some(
+                            control_client.into_proxy().expect("failed to convert client to proxy"),
+                        ),
+                    )
+                    .map(|result| result.expect("error creating controller"));
+                    let mut control_stream =
+                        control_server.into_stream().expect("failed to get request stream");
+                    let control_server_fut = control_stream.next().map(|req| {
+                        match req
+                            .expect("stream shouldn't close")
+                            .expect("stream shouldn't have an error")
+                        {
+                            ControlRequest::OpenController { id, request, control_handle: _ } => {
+                                let (request_stream, control_handle) = request
+                                    .into_stream_and_control_handle()
+                                    .expect("failed to get stream + control handle");
+                                control_handle
+                                    .send_on_id_assigned(id.as_str())
+                                    .expect("failed to respond");
+                                request_stream
+                            }
+                            ControlRequest::ReopenDetachedController {
+                                key: _,
+                                request: _,
+                                control_handle: _,
+                            } => unimplemented!(
+                                "fuchsia.net.filter mock called with unsupported request"
+                            ),
+                        }
+                    });
+                    let (client, server_request_stream) =
+                        futures::join!(client_fut, control_server_fut);
+
+                    let server_fut = server_request_stream
+                        .fold(state, |state, req| {
+                            state
+                                .lock()
+                                .expect("lock poisoned")
+                                .handle_request(req.expect("failed to receive request"));
+                            futures::future::ready(state)
+                        })
+                        .map(|_state| ())
+                        .fuse();
+                    (client, futures::future::Either::Right(server_fut))
+                }
+            }
+        }
+    }
+
+    enum FilterBackend {
+        Deprecated,
+        Current,
+    }
+
+    impl FilterBackend {
+        fn into_mock(self) -> MockFilter {
+            match self {
+                FilterBackend::Deprecated => MockFilter::new_deprecated(Default::default()),
+                FilterBackend::Current => MockFilter::new_current(Default::default()),
+            }
+        }
+    }
+
+    #[test_case(FilterBackend::Deprecated)]
+    #[test_case(FilterBackend::Current)]
     #[fuchsia::test]
-    async fn enable_disable_masquerade() {
-        let filter = MockFilter::default();
+    async fn enable_disable_masquerade(filter_backend: FilterBackend) {
+        let config = ValidatedConfig::try_from(DEFAULT_CONFIG).unwrap();
+
+        let mock = filter_backend.into_mock();
+        let (mut filter_control, mut server_fut) = mock.clone().into_client_and_server().await;
+
         let mut filter_enabled_state = FilterEnabledState::default();
         let interface_states = HashMap::new();
-        let state = filter.state.clone();
-        let mut masq = Masquerade::new(filter);
+
+        let mut masq = MasqueradeHandler::default();
         let (_client, server) =
             fidl::endpoints::create_endpoints::<fidl_fuchsia_net_masquerade::ControlMarker>();
         let (_request_stream, control) =
             server.into_stream_and_control_handle().expect("failed to extract control handle");
-        assert_matches!(masq.create_control(DEFAULT_CONFIG, control), Ok(()));
-        assert_matches!(
-            masq.set_enabled(DEFAULT_CONFIG, true, &mut filter_enabled_state, &interface_states)
-                .await,
-            Ok(false)
-        );
-        {
-            let s = state.lock().expect("lock poison");
-            assert_eq!(s.active_interfaces.len(), 1);
-            assert!(s.active_interfaces.contains(&VALID_OUTPUT_INTERFACE.get()));
 
-            assert_eq!(s.nat_rules.len(), 1);
-            assert_eq!(s.nat_rules[0].outgoing_nic, VALID_OUTPUT_INTERFACE.get());
-        }
-        assert_matches!(
-            masq.set_enabled(DEFAULT_CONFIG, false, &mut filter_enabled_state, &interface_states)
-                .await,
-            Ok(true)
-        );
-        {
-            let s = state.lock().expect("lock poison");
-            assert_eq!(s.active_interfaces.len(), 0);
-            assert_eq!(s.nat_rules.len(), 0);
+        assert_matches!(masq.create_control(config, control), Ok(()));
+
+        for (enable, expected_configs) in [(true, vec![DEFAULT_CONFIG]), (false, vec![])] {
+            let set_enabled_fut = masq
+                .set_enabled(
+                    &mut filter_control,
+                    config,
+                    enable,
+                    &mut filter_enabled_state,
+                    &interface_states,
+                )
+                .fuse();
+            futures::pin_mut!(set_enabled_fut);
+            let response = futures::select!(
+                r = set_enabled_fut => r,
+                () = server_fut => panic!("mock filter server should never exit"),
+            );
+            pretty_assertions::assert_eq!(response, Ok(!enable));
+            assert_eq!(mock.list_configurations(), expected_configs);
+            assert_eq!(mock.is_interface_active(DEFAULT_CONFIG.output_interface), enable);
         }
     }
 
+    // Verifies errors that can only occur on the `fuchsia.net.filter.deprecated`
+    // API surface.
     #[test_case(
         DEFAULT_CONFIG,
         Some(crate::filter::FILTER_CAS_RETRY_MAX),
@@ -574,7 +829,7 @@ pub mod test {
         "repeated generation mismatch"
     )]
     #[test_case(
-        ValidatedConfig {
+        fnet_masquerade::ControlConfig {
             output_interface: NON_EXISTENT_INTERFACE,
             ..DEFAULT_CONFIG
         },
@@ -584,47 +839,90 @@ pub mod test {
         Err(Error::NotFound);
         "non existent interface"
     )]
-    #[test_case(
-        ValidatedConfig {
-            src_subnet: UNSPECIFIED_SUBNET,
-            ..DEFAULT_CONFIG
-        },
-        None,
-        Err(Error::Unsupported),
-        Err(Error::InvalidArguments),
-        Err(Error::InvalidArguments);
-        "invalid subnet"
-    )]
     #[fuchsia::test]
-    async fn masquerade(
-        config: ValidatedConfig,
+    async fn masquerade_errors_deprecated(
+        config: fnet_masquerade::ControlConfig,
         fail_generations: Option<i32>,
         create_control_response: Result<(), Error>,
         first_response: Result<bool, Error>,
         second_response: Result<bool, Error>,
     ) {
-        let filter = MockFilter::default();
+        let config = ValidatedConfig::try_from(config).unwrap();
+
+        let filter_state = if let Some(generations) = fail_generations {
+            MockFilterStateDeprecated { fail_generations: generations, ..Default::default() }
+        } else {
+            Default::default()
+        };
+        let mock = MockFilter::new_deprecated(filter_state);
+        let (mut filter_control, mut server_fut) = mock.into_client_and_server().await;
+
         let mut filter_enabled_state = FilterEnabledState::default();
         let interface_states = HashMap::new();
-        if let Some(generations) = fail_generations {
-            filter.state.lock().expect("lock poison").fail_generations = generations;
-        }
+
         let (_client, server) =
             fidl::endpoints::create_endpoints::<fidl_fuchsia_net_masquerade::ControlMarker>();
         let (_request_stream, control) =
             server.into_stream_and_control_handle().expect("failed to extract control handle");
-        let mut masq = Masquerade::new(filter);
+        let mut masq = MasqueradeHandler::default();
         pretty_assertions::assert_eq!(
             masq.create_control(config.clone(), control).map_err(|(e, _control)| e),
             create_control_response
         );
-        pretty_assertions::assert_eq!(
-            masq.set_enabled(config, true, &mut filter_enabled_state, &interface_states).await,
-            first_response
-        );
-        pretty_assertions::assert_eq!(
-            masq.set_enabled(config, true, &mut filter_enabled_state, &interface_states).await,
-            second_response
-        );
+
+        for expected_response in [first_response, second_response] {
+            let set_enabled_fut = masq
+                .set_enabled(
+                    &mut filter_control,
+                    config,
+                    true,
+                    &mut filter_enabled_state,
+                    &interface_states,
+                )
+                .fuse();
+            futures::pin_mut!(set_enabled_fut);
+            let response = futures::select!(
+                r = set_enabled_fut => r,
+                () = server_fut => panic!("mock filter server should never exit"),
+            );
+            pretty_assertions::assert_eq!(response, expected_response);
+        }
+    }
+
+    #[test_case(
+        DEFAULT_CONFIG => Ok(());
+        "valid_config"
+    )]
+    #[test_case(
+        fnet_masquerade::ControlConfig {
+            src_subnet: V4_UNSPECIFIED_SUBNET,
+            .. DEFAULT_CONFIG
+        } => Err(Error::Unsupported);
+        "v4_unspecified_subnet"
+    )]
+    #[test_case(
+        fnet_masquerade::ControlConfig {
+            src_subnet: V6_UNSPECIFIED_SUBNET,
+            .. DEFAULT_CONFIG
+        } => Err(Error::Unsupported);
+        "v6_unspecified_subnet"
+    )]
+    #[test_case(
+        fnet_masquerade::ControlConfig {
+            src_subnet: INVALID_SUBNET,
+            .. DEFAULT_CONFIG
+        } => Err(Error::InvalidArguments);
+        "invalid_subnet"
+    )]
+    #[test_case(
+        fnet_masquerade::ControlConfig {
+            output_interface: 0,
+            .. DEFAULT_CONFIG
+        } => Err(Error::InvalidArguments);
+        "invalid_output_interface"
+    )]
+    #[fuchsia::test]
+    fn validate_config(config: fnet_masquerade::ControlConfig) -> Result<(), Error> {
+        ValidatedConfig::try_from(config).map(|_| ())
     }
 }

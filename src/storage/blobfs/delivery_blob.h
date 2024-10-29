@@ -8,12 +8,12 @@
 #ifndef SRC_STORAGE_BLOBFS_DELIVERY_BLOB_H_
 #define SRC_STORAGE_BLOBFS_DELIVERY_BLOB_H_
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -59,7 +59,7 @@ struct DeliveryBlobHeader {
   static DeliveryBlobHeader Create(DeliveryBlobType type, size_t metadata_length);
 
   // Parse and return a `DeliveryBlobHeader` from a byte `buffer`.
-  static zx::result<DeliveryBlobHeader> FromBuffer(cpp20::span<const uint8_t> buffer);
+  static zx::result<DeliveryBlobHeader> FromBuffer(std::span<const uint8_t> buffer);
 };
 
 // Helper function to prepend the final component of `path` with the prefix specified in RFC 0207.
@@ -75,7 +75,7 @@ std::string GetDeliveryBlobPath(const std::string_view& path);
 // *WARNING*: Modifying the compression parameters used by this function can cause a mismatch
 // between the calculated on-disk size used for size checking. This function is used to calculate
 // `compressed_file_size` in the blob info JSON file.
-zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint8_t> data,
+zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(std::span<const uint8_t> data,
                                                           std::optional<bool> compress);
 
 // Calculate the Merkle root of an RFC 0207 compliant delivery blob. `data` must be a complete
@@ -84,7 +84,7 @@ zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint
 // *WARNING*: Aside from checksum verification and basic validity checks provided by the
 // chunked_compression library, this function makes no security guarantees. Decompression is
 // performed in the thread/address space of the caller.
-zx::result<Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t> data);
+zx::result<Digest> CalculateDeliveryBlobDigest(std::span<const uint8_t> data);
 
 }  // namespace blobfs
 

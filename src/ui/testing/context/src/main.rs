@@ -127,6 +127,7 @@ async fn assemble_puppet_realm(
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<LogSinkMarker>())
+                .capability(Capability::dictionary("diagnostics"))
                 .capability(Capability::protocol::<RoleManagerMarker>())
                 .capability(Capability::protocol::<fsysmem::AllocatorMarker>())
                 .capability(Capability::protocol::<fsysmem2::AllocatorMarker>())

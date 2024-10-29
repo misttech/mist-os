@@ -29,7 +29,7 @@ pub fn basic_info(buf: &[u8]) -> Result<(zx::BootInstant, RawSeverity), nom::Err
 
 /// Attempt to parse a diagnostic record from the head of this buffer, returning the record and any
 /// unused portion of the buffer if successful.
-pub fn parse_record<'a>(buf: &'a [u8]) -> Result<(Record<'a>, &'a [u8]), ParseError> {
+pub fn parse_record(buf: &[u8]) -> Result<(Record<'_>, &[u8]), ParseError> {
     match try_parse_record(buf) {
         Ok((remainder, record)) => Ok((record, remainder)),
         Err(Err::Incomplete(n)) => Err(ParseError::Incomplete(n)),
@@ -48,7 +48,7 @@ enum ParseState {
     InArguments,
 }
 
-pub(crate) fn try_parse_record<'a>(buf: &'a [u8]) -> ParseResult<'a, Record<'a>> {
+pub(crate) fn try_parse_record(buf: &[u8]) -> ParseResult<'_, Record<'_>> {
     let (after_header, header) = parse_header(buf)?;
 
     if header.raw_type() != crate::TRACING_FORMAT_LOG_RECORD_TYPE {
@@ -82,7 +82,7 @@ fn parse_header(buf: &[u8]) -> ParseResult<'_, Header> {
 }
 
 /// Parses an argument
-pub fn parse_argument<'a>(buf: &'a [u8]) -> ParseResult<'a, Argument<'a>> {
+pub fn parse_argument(buf: &[u8]) -> ParseResult<'_, Argument<'_>> {
     let mut state = ParseState::Initial;
     parse_argument_internal(buf, &mut state)
 }

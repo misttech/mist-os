@@ -6,6 +6,15 @@ library fuchsia.wlan.policy;
 using fuchsia.wlan.ieee80211 as ieee80211;
 
 // Basic definitions for wlan APIs.
+@available(added=NEXT)
+type RequestStatus = strict enum {
+    ACKNOWLEDGED = 0;
+    REJECTED_NOT_SUPPORTED = 1;
+    REJECTED_INCOMPATIBLE_MODE = 2;
+    REJECTED_ALREADY_IN_USE = 3;
+    REJECTED_DUPLICATE_REQUEST = 4;
+};
+
 
 /// High level protection type for the network.  This does not convey all details needed
 /// for the mechanism of the connection, but is primarily used to map the target network

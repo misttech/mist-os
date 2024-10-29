@@ -11,10 +11,8 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <safemath/checked_math.h>
-#include <storage/buffer/block_buffer.h>
 
 #include "src/storage/f2fs/common.h"
-#include "src/storage/f2fs/vmo_manager.h"
 
 namespace f2fs {
 

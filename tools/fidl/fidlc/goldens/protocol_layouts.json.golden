@@ -24,107 +24,341 @@
         },
         "test.protocollayouts.imported/ComposedOpenProtocolFlexibleEventRequest": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocolFlexibleOneWayRequest": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocolFlexibleTwoWayNoErrorRequest": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocolFlexibleTwoWayWithErrorRequest": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocolStrictEventRequest": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocolStrictOneWayRequest": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocolStrictTwoWayNoErrorRequest": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocolStrictTwoWayNoErrorResponse": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocolStrictTwoWayWithErrorRequest": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocol_FlexibleTwoWayNoError_Response": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocol_FlexibleTwoWayWithError_Response": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocol_StrictTwoWayWithError_Response": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ImportStructPayload": {
           "kind": "struct",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 4,
+            "alignment": 4,
+            "depth": 0,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedProtocolOneWayAnonComposedRequest": {
           "kind": "table",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 2,
+            "max_handles": 0,
+            "max_out_of_line": 8,
+            "has_padding": true,
+            "has_flexible_envelope": true
+          }
         },
         "test.protocollayouts.imported/ComposedProtocolTwoWayAnonComposedResponse": {
           "kind": "table",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 2,
+            "max_handles": 0,
+            "max_out_of_line": 8,
+            "has_padding": true,
+            "has_flexible_envelope": true
+          }
         },
         "test.protocollayouts.imported/ComposedProtocolTwoWayAnonComposedWithErrorRequest": {
           "kind": "table",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 2,
+            "max_handles": 0,
+            "max_out_of_line": 8,
+            "has_padding": true,
+            "has_flexible_envelope": true
+          }
         },
         "test.protocollayouts.imported/ImportTablePayload": {
           "kind": "table",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 2,
+            "max_handles": 0,
+            "max_out_of_line": 8,
+            "has_padding": true,
+            "has_flexible_envelope": true
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocol_FlexibleTwoWayNoError_Result": {
           "kind": "union",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 1,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocol_FlexibleTwoWayWithError_Result": {
           "kind": "union",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 1,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedOpenProtocol_StrictTwoWayWithError_Result": {
           "kind": "union",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 1,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": false,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedProtocolOnAnonComposedRequest": {
           "kind": "union",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 1,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": true,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedProtocolTwoWayAnonComposedRequest": {
           "kind": "union",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 1,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": true,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedProtocol_TwoWayAnonComposedWithError_Response": {
           "kind": "union",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 1,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": true,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedProtocol_TwoWayAnonComposedWithError_Result": {
           "kind": "union",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 2,
+            "max_handles": 0,
+            "max_out_of_line": 16,
+            "has_padding": true,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ComposedProtocol_TwoWayNamedComposedWithError_Result": {
           "kind": "union",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 2,
+            "max_handles": 0,
+            "max_out_of_line": 16,
+            "has_padding": true,
+            "has_flexible_envelope": false
+          }
         },
         "test.protocollayouts.imported/ImportUnionPayload": {
           "kind": "union",
-          "resource": false
+          "resource": false,
+          "type_shape_v2": {
+            "inline_size": 16,
+            "alignment": 8,
+            "depth": 1,
+            "max_handles": 0,
+            "max_out_of_line": 0,
+            "has_padding": true,
+            "has_flexible_envelope": false
+          }
         }
       }
     }

@@ -13,7 +13,6 @@ import (
 	"runtime/trace"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/archive"
 	buildcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/publish"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/serve"
@@ -27,7 +26,6 @@ IMPORTANT: Please note that pm is being sunset and will be removed.
 
 Package Commands:
     build    - perform update and seal in order
-    archive  - construct a single .far representation of the package
 
 Repository Commands:
     publish  - publish a package to a local repository
@@ -72,7 +70,8 @@ func doMain() int {
 	var err error
 	switch flag.Arg(0) {
 	case "archive":
-		err = archive.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "please use 'ffx package archive' instead")
+		err = nil
 
 	case "build":
 		err = buildcmd.Run(cfg, flag.Args()[1:])

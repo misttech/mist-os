@@ -6,5 +6,6 @@
     program: {
         runner: "elf",
         binary: "bin/cpu_manager",
+        use_next_vdso: "true",
     },
 }

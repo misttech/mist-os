@@ -36,18 +36,20 @@ pub fn is_zbi_type_driver_metadata(zbi_type_raw: u32) -> bool {
 /// Defines the types supported by the Rust ZBI parser. This is a subset from
 /// sdk/lib/zbi-format/include/lib/zbi-format/zbi.h, and should be updated as needed.
 pub enum ZbiType {
-    Container = 0x544f_4f42,
-    Cmdline = 0x4c44_4d43,
-    Crashlog = 0x4d4f_4f42,
-    KernelDriver = 0x5652_444B,
-    PlatformId = 0x4449_4C50,
-    StorageBootfsFactory = 0x4653_4642,
-    StorageRamdisk = 0x4b53_4452,
-    ImageArgs = 0x4752_4149,
-    SerialNumber = 0x4e4c_5253,
-    BootloaderFile = 0x4C46_5442,
-    DeviceTree = 0xd00d_feed,
-    CpuTopology = 0x544f_504f,
+    Container = 0x544f_4f42,            // 'BOOT'
+    Cmdline = 0x4c44_4d43,              // 'CMDL'
+    Crashlog = 0x4d4f_4f42,             // 'BOOM'
+    KernelDriver = 0x5652_444B,         // 'KDRV'
+    PlatformId = 0x4449_4C50,           // 'PLID'
+    StorageBootfsFactory = 0x4653_4642, // 'BFSF'
+    StorageRamdisk = 0x4b53_4452,       // 'RDSK'
+    ImageArgs = 0x4752_4149,            // 'IARG'
+    SerialNumber = 0x4e4c_5253,         // 'SRLN'
+    BootloaderFile = 0x4C46_5442,       // 'BTFL'
+    DeviceTree = 0xd00d_feed,           // ??
+    CpuTopology = 0x544f_504f,          // 'TOPO'
+    AcpiRsdp = 0x5044_5352,             // 'RSDP'
+    Smbios = 0x4942_4d53,               // 'SMBI'
 
     // DriverMetadata is a special case, where only the LSB of the u32 needs to match this
     // value. See the IsZbiTypeDriverMetadata function for details.
@@ -70,6 +72,8 @@ impl ZbiType {
             x if x == ZbiType::BootloaderFile.into_raw() => ZbiType::BootloaderFile,
             x if x == ZbiType::DeviceTree.into_raw() => ZbiType::DeviceTree,
             x if x == ZbiType::CpuTopology.into_raw() => ZbiType::CpuTopology,
+            x if x == ZbiType::AcpiRsdp.into_raw() => ZbiType::AcpiRsdp,
+            x if x == ZbiType::Smbios.into_raw() => ZbiType::Smbios,
             x if is_zbi_type_driver_metadata(x) => ZbiType::DriverMetadata,
             _ => ZbiType::Unknown,
         }

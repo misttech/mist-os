@@ -21,8 +21,7 @@ pub async fn load_hierarchy(proxy: InspectProxy) -> Result<DiagnosticsHierarchy,
     let mut pending_nodes = vec![];
     let root = read_node(proxy).await?;
     pending_nodes.push(root);
-    while !pending_nodes.is_empty() {
-        let mut current_node = pending_nodes.pop().unwrap();
+    while let Some(mut current_node) = pending_nodes.pop() {
         if current_node.pending_children.is_empty() {
             if pending_nodes.is_empty() {
                 return Ok(current_node.hierarchy);
@@ -47,7 +46,7 @@ pub async fn load_hierarchy(proxy: InspectProxy) -> Result<DiagnosticsHierarchy,
             pending_nodes.push(child_node);
         }
     }
-    return Err(format_err!("failed to load hierarchy"));
+    Err(format_err!("failed to load hierarchy"))
 }
 
 struct PartialNodeHierarchy {

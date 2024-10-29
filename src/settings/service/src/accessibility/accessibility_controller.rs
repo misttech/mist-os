@@ -34,14 +34,14 @@ impl StorageAccess for AccessibilityController {
     const STORAGE_KEY: &'static str = AccessibilityInfo::KEY;
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl data_controller::Create for AccessibilityController {
     async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
         Ok(AccessibilityController { client })
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl controller::Handle for AccessibilityController {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {

@@ -211,6 +211,12 @@ void SdioFunctionDevice::DriverTransportImpl::DisableFn(fdf::Arena& arena,
   completer.buffer(arena).Reply(parent_->DisableFn());
 }
 
+void SdioFunctionDevice::DriverTransportImpl::IoReady(fdf::Arena& arena,
+                                                      IoReadyCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceIoReadyResponse response{};
+  completer.buffer(arena).Reply(parent_->IoReady(&response));
+}
+
 void SdioFunctionDevice::DriverTransportImpl::EnableFnIntr(fdf::Arena& arena,
                                                            EnableFnIntrCompleter::Sync& completer) {
   completer.buffer(arena).Reply(parent_->EnableFnIntr());
@@ -315,6 +321,11 @@ void SdioFunctionDevice::ZirconTransportImpl::EnableFn(EnableFnCompleter::Sync& 
 
 void SdioFunctionDevice::ZirconTransportImpl::DisableFn(DisableFnCompleter::Sync& completer) {
   completer.Reply(parent_->DisableFn());
+}
+
+void SdioFunctionDevice::ZirconTransportImpl::IoReady(IoReadyCompleter::Sync& completer) {
+  fuchsia_hardware_sdio::wire::DeviceIoReadyResponse response{};
+  completer.Reply(parent_->IoReady(&response));
 }
 
 void SdioFunctionDevice::ZirconTransportImpl::EnableFnIntr(EnableFnIntrCompleter::Sync& completer) {
@@ -432,6 +443,11 @@ zx::result<> SdioFunctionDevice::EnableFn() {
 
 zx::result<> SdioFunctionDevice::DisableFn() {
   return zx::make_result(sdio_parent_->SdioDisableFn(function_));
+}
+
+zx::result<fuchsia_hardware_sdio::wire::DeviceIoReadyResponse*> SdioFunctionDevice::IoReady(
+    fuchsia_hardware_sdio::wire::DeviceIoReadyResponse* response) {
+  return zx::make_result(sdio_parent_->SdioIoReady(function_, &response->ready), response);
 }
 
 zx::result<> SdioFunctionDevice::EnableFnIntr() {

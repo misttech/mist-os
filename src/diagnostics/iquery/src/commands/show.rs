@@ -37,7 +37,7 @@ impl Ord for ShowResultItem {
         self.moniker.cmp(&other.moniker).then_with(|| {
             let this_name = self.metadata.name.as_ref();
             let other_name = other.metadata.name.as_ref();
-            this_name.cmp(&other_name)
+            this_name.cmp(other_name)
         })
     }
 }
@@ -112,7 +112,7 @@ impl Command for ShowCommand {
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
         let selectors = utils::get_selectors_for_manifest(
             &self.manifest,
-            &self.selectors,
+            self.selectors,
             &self.accessor,
             provider,
         )

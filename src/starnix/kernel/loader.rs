@@ -22,11 +22,11 @@ use crate::vfs::{FdNumber, FileHandle, FileWriteGuardMode, FileWriteGuardRef};
 use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_types::math::round_up_to_system_page_size;
+use starnix_types::time::SCHEDULER_CLOCK_HZ;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
-use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::time::SCHEDULER_CLOCK_HZ;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{

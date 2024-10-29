@@ -156,6 +156,7 @@ impl InputDevice {
         };
         self.open_files.lock().push(Arc::downgrade(&input_file));
         let file_object = starnix_core::vfs::FileObject::new(
+            current_task,
             Box::new(input_file),
             current_task
                 .lookup_path_from_root(locked, ".".into())
@@ -216,8 +217,8 @@ mod test {
     use starnix_core::testing::create_kernel_task_and_unlocked;
     use starnix_core::vfs::buffers::VecOutputBuffer;
     use starnix_core::vfs::FileHandle;
+    use starnix_types::time::timeval_from_time;
     use starnix_uapi::errors::EAGAIN;
-    use starnix_uapi::time::timeval_from_time;
     use starnix_uapi::uapi;
     use starnix_uapi::vfs::FdEvents;
     use test_case::test_case;

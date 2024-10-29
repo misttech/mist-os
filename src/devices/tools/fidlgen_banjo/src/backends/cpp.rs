@@ -259,17 +259,14 @@ impl<'a, W: io::Write> CppBackend<'a, W> {
                     .unwrap_or(&Vec::new())
                     .iter()
                     .filter_map(|param| {
-                        if let Type::Identifier { ref identifier, .. } = param._type {
-                            match ir.get_declaration(identifier).unwrap() {
-                                Declaration::Protocol => {
-                                    if not_callback(identifier, ir).unwrap() {
-                                        return Some((
-                                            to_c_name(&param.name.0),
-                                            type_to_cpp_str(&param._type, true, ir).unwrap(),
-                                        ));
-                                    }
-                                }
-                                _ => {}
+                        if let Type::Endpoint { role: EndpointRole::Client, ref protocol, .. } =
+                            param._type
+                        {
+                            if not_callback(protocol, ir).unwrap() {
+                                return Some((
+                                    to_c_name(&param.name.0),
+                                    type_to_cpp_str(&param._type, true, ir).unwrap(),
+                                ));
                             }
                         }
                         None

@@ -106,6 +106,7 @@ impl HostRealm {
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<LogSinkMarker>())
+                    .capability(Capability::dictionary("diagnostics"))
                     .from(Ref::parent())
                     .to(Ref::collection(BT_HOST_COLLECTION.to_string())),
             )

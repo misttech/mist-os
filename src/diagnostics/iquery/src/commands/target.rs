@@ -39,7 +39,7 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
             .add_selectors(selectors.into_iter())
             .snapshot::<D>()
             .await
-            .map_err(|e| Error::Fetch(e))
+            .map_err(Error::Fetch)
     }
 
     async fn get_accessor_paths(&self) -> Result<Vec<String>, Error> {
@@ -198,21 +198,21 @@ mod test {
     use assert_matches::assert_matches;
     use fidl_fuchsia_diagnostics::{ComponentSelector, PropertySelector};
     use iquery_test_support::MockRealmQuery;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     #[fuchsia::test]
     async fn test_get_dir_proxy_selector_empty() {
-        let fake_realm_query = Arc::new(MockRealmQuery::default());
+        let fake_realm_query = Rc::new(MockRealmQuery::default());
         let selector =
             Selector { component_selector: None, tree_selector: None, ..Default::default() };
-        let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
+        let mut proxy = Rc::clone(&fake_realm_query).get_proxy().await;
 
         assert_matches!(get_dir_proxy(&selector, &mut proxy).await, Err(_));
     }
 
     #[fuchsia::test]
     async fn test_get_dir_proxy_selector_bad_property_selector() {
-        let fake_realm_query = Arc::new(MockRealmQuery::default());
+        let fake_realm_query = Rc::new(MockRealmQuery::default());
         let selector = Selector {
             component_selector: Some(ComponentSelector {
                 moniker_segments: Some(vec![
@@ -231,13 +231,13 @@ mod test {
             }),
             ..Default::default()
         };
-        let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
+        let mut proxy = Rc::clone(&fake_realm_query).get_proxy().await;
 
         assert_matches!(get_dir_proxy(&selector, &mut proxy).await, Err(_));
     }
     #[fuchsia::test]
     async fn test_get_dir_proxy_selector_bad_component() {
-        let fake_realm_query = Arc::new(MockRealmQuery::default());
+        let fake_realm_query = Rc::new(MockRealmQuery::default());
         let selector = Selector {
             component_selector: Some(ComponentSelector {
                 moniker_segments: Some(vec![
@@ -256,14 +256,14 @@ mod test {
             }),
             ..Default::default()
         };
-        let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
+        let mut proxy = Rc::clone(&fake_realm_query).get_proxy().await;
 
         assert_matches!(get_dir_proxy(&selector, &mut proxy).await, Err(_));
     }
 
     #[fuchsia::test]
     async fn test_get_dir_proxy_ok() {
-        let fake_realm_query = Arc::new(MockRealmQuery::default());
+        let fake_realm_query = Rc::new(MockRealmQuery::default());
         let selector = Selector {
             component_selector: Some(ComponentSelector {
                 moniker_segments: Some(vec![
@@ -282,14 +282,14 @@ mod test {
             }),
             ..Default::default()
         };
-        let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
+        let mut proxy = Rc::clone(&fake_realm_query).get_proxy().await;
 
         assert_matches!(get_dir_proxy(&selector, &mut proxy).await, Ok(_));
     }
 
     #[fuchsia::test]
     async fn test_get_dir_proxy_ok_expose() {
-        let fake_realm_query = Arc::new(MockRealmQuery::default());
+        let fake_realm_query = Rc::new(MockRealmQuery::default());
         let selector = Selector {
             component_selector: Some(ComponentSelector {
                 moniker_segments: Some(vec![
@@ -308,7 +308,7 @@ mod test {
             }),
             ..Default::default()
         };
-        let mut proxy = Arc::clone(&fake_realm_query).get_proxy().await;
+        let mut proxy = Rc::clone(&fake_realm_query).get_proxy().await;
 
         assert_matches!(get_dir_proxy(&selector, &mut proxy).await, Ok(_));
     }

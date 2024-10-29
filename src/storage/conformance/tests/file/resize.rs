@@ -9,15 +9,17 @@ use io_conformance_util::*;
 #[fuchsia::test]
 async fn file_resize_with_sufficient_rights() {
     let harness = TestHarness::new().await;
+    if !harness.config.supports_append {
+        return;
+    }
 
-    for file_flags in harness
-        .file_rights
-        .valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY)
+    for file_flags in
+        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
     {
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
-        let file = open_node::<fio::FileMarker>(&test_dir, file_flags, TEST_FILE).await;
+        let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
         file.resize(0)
             .await
             .expect("resize failed")
@@ -29,14 +31,16 @@ async fn file_resize_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_resize_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    for file_flags in harness
-        .file_rights
-        .valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY)
+    if !harness.config.supports_append {
+        return;
+    }
+
+    for file_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES)
     {
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
-        let test_dir = harness.get_directory(root, harness.dir_rights.all());
+        let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
 
-        let file = open_node::<fio::FileMarker>(&test_dir, file_flags, TEST_FILE).await;
+        let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
         let result = file.resize(0).await.expect("resize failed").map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::BAD_HANDLE));
     }

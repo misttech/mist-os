@@ -6,7 +6,6 @@
 
 use crate::uapi;
 
-use static_assertions::const_assert_eq;
 use std::fmt::{Debug, Display, Formatter};
 
 pub struct Errno {
@@ -76,35 +75,35 @@ impl Display for Errno {
 
 impl std::error::Error for Errno {}
 
-impl From<Errno> for zx::Status {
+impl From<Errno> for zx_status::Status {
     fn from(e: Errno) -> Self {
         match e.code.error_code() {
-            uapi::ENOENT => zx::Status::NOT_FOUND,
-            uapi::ENOMEM => zx::Status::NO_MEMORY,
-            uapi::EINVAL => zx::Status::INVALID_ARGS,
-            uapi::ETIMEDOUT => zx::Status::TIMED_OUT,
-            uapi::EBUSY => zx::Status::UNAVAILABLE,
-            uapi::EEXIST => zx::Status::ALREADY_EXISTS,
-            uapi::EPIPE => zx::Status::PEER_CLOSED,
-            uapi::ENAMETOOLONG => zx::Status::BAD_PATH,
-            uapi::EIO => zx::Status::IO,
-            uapi::EISDIR => zx::Status::NOT_FILE,
-            uapi::ENOTDIR => zx::Status::NOT_DIR,
-            uapi::EOPNOTSUPP => zx::Status::NOT_SUPPORTED,
-            uapi::EBADF => zx::Status::BAD_HANDLE,
-            uapi::EACCES => zx::Status::ACCESS_DENIED,
-            uapi::EAGAIN => zx::Status::SHOULD_WAIT,
-            uapi::EFBIG => zx::Status::FILE_BIG,
-            uapi::ENOSPC => zx::Status::NO_SPACE,
-            uapi::ENOTEMPTY => zx::Status::NOT_EMPTY,
-            uapi::EPROTONOSUPPORT => zx::Status::PROTOCOL_NOT_SUPPORTED,
-            uapi::ENETUNREACH => zx::Status::ADDRESS_UNREACHABLE,
-            uapi::EADDRINUSE => zx::Status::ADDRESS_IN_USE,
-            uapi::ENOTCONN => zx::Status::NOT_CONNECTED,
-            uapi::ECONNREFUSED => zx::Status::CONNECTION_REFUSED,
-            uapi::ECONNRESET => zx::Status::CONNECTION_RESET,
-            uapi::ECONNABORTED => zx::Status::CONNECTION_ABORTED,
-            _ => zx::Status::NOT_SUPPORTED,
+            uapi::ENOENT => zx_status::Status::NOT_FOUND,
+            uapi::ENOMEM => zx_status::Status::NO_MEMORY,
+            uapi::EINVAL => zx_status::Status::INVALID_ARGS,
+            uapi::ETIMEDOUT => zx_status::Status::TIMED_OUT,
+            uapi::EBUSY => zx_status::Status::UNAVAILABLE,
+            uapi::EEXIST => zx_status::Status::ALREADY_EXISTS,
+            uapi::EPIPE => zx_status::Status::PEER_CLOSED,
+            uapi::ENAMETOOLONG => zx_status::Status::BAD_PATH,
+            uapi::EIO => zx_status::Status::IO,
+            uapi::EISDIR => zx_status::Status::NOT_FILE,
+            uapi::ENOTDIR => zx_status::Status::NOT_DIR,
+            uapi::EOPNOTSUPP => zx_status::Status::NOT_SUPPORTED,
+            uapi::EBADF => zx_status::Status::BAD_HANDLE,
+            uapi::EACCES => zx_status::Status::ACCESS_DENIED,
+            uapi::EAGAIN => zx_status::Status::SHOULD_WAIT,
+            uapi::EFBIG => zx_status::Status::FILE_BIG,
+            uapi::ENOSPC => zx_status::Status::NO_SPACE,
+            uapi::ENOTEMPTY => zx_status::Status::NOT_EMPTY,
+            uapi::EPROTONOSUPPORT => zx_status::Status::PROTOCOL_NOT_SUPPORTED,
+            uapi::ENETUNREACH => zx_status::Status::ADDRESS_UNREACHABLE,
+            uapi::EADDRINUSE => zx_status::Status::ADDRESS_IN_USE,
+            uapi::ENOTCONN => zx_status::Status::NOT_CONNECTED,
+            uapi::ECONNREFUSED => zx_status::Status::CONNECTION_REFUSED,
+            uapi::ECONNRESET => zx_status::Status::CONNECTION_RESET,
+            uapi::ECONNABORTED => zx_status::Status::CONNECTION_ABORTED,
+            _ => zx_status::Status::NOT_SUPPORTED,
         }
     }
 }
@@ -373,8 +372,8 @@ macro_rules! errno_from_zxio_code {
     }};
 }
 
-// There isn't really a mapping from zx::Status to Errno. The correct mapping is context-speific
-// but this converter is a reasonable first-approximation. The translation matches
+// There isn't really a mapping from zx_status::Status to Errno. The correct mapping is
+// context-specific but this converter is a reasonable first-approximation. The translation matches
 // fdio_status_to_errno. See https://fxbug.dev/42105838 for more context.
 // TODO: Replace clients with more context-specific mappings.
 #[macro_export]
@@ -384,173 +383,45 @@ macro_rules! from_status_like_fdio {
     }};
     ($status:expr, $context:expr) => {{
         match $status {
-            zx::Status::NOT_FOUND => $crate::errno!(ENOENT, $context),
-            zx::Status::NO_MEMORY => $crate::errno!(ENOMEM, $context),
-            zx::Status::INVALID_ARGS => $crate::errno!(EINVAL, $context),
-            zx::Status::BUFFER_TOO_SMALL => $crate::errno!(EINVAL, $context),
-            zx::Status::TIMED_OUT => $crate::errno!(ETIMEDOUT, $context),
-            zx::Status::UNAVAILABLE => $crate::errno!(EBUSY, $context),
-            zx::Status::ALREADY_EXISTS => $crate::errno!(EEXIST, $context),
-            zx::Status::PEER_CLOSED => $crate::errno!(EPIPE, $context),
-            zx::Status::BAD_STATE => $crate::errno!(EPIPE, $context),
-            zx::Status::BAD_PATH => $crate::errno!(ENAMETOOLONG, $context),
-            zx::Status::IO => $crate::errno!(EIO, $context),
-            zx::Status::NOT_FILE => $crate::errno!(EISDIR, $context),
-            zx::Status::NOT_DIR => $crate::errno!(ENOTDIR, $context),
-            zx::Status::NOT_SUPPORTED => $crate::errno!(EOPNOTSUPP, $context),
-            zx::Status::WRONG_TYPE => $crate::errno!(EOPNOTSUPP, $context),
-            zx::Status::OUT_OF_RANGE => $crate::errno!(EINVAL, $context),
-            zx::Status::NO_RESOURCES => $crate::errno!(ENOMEM, $context),
-            zx::Status::BAD_HANDLE => $crate::errno!(EBADF, $context),
-            zx::Status::ACCESS_DENIED => $crate::errno!(EACCES, $context),
-            zx::Status::SHOULD_WAIT => $crate::errno!(EAGAIN, $context),
-            zx::Status::FILE_BIG => $crate::errno!(EFBIG, $context),
-            zx::Status::NO_SPACE => $crate::errno!(ENOSPC, $context),
-            zx::Status::NOT_EMPTY => $crate::errno!(ENOTEMPTY, $context),
-            zx::Status::IO_REFUSED => $crate::errno!(ECONNREFUSED, $context),
-            zx::Status::IO_INVALID => $crate::errno!(EIO, $context),
-            zx::Status::CANCELED => $crate::errno!(EBADF, $context),
-            zx::Status::PROTOCOL_NOT_SUPPORTED => {
+            zx_status::Status::NOT_FOUND => $crate::errno!(ENOENT, $context),
+            zx_status::Status::NO_MEMORY => $crate::errno!(ENOMEM, $context),
+            zx_status::Status::INVALID_ARGS => $crate::errno!(EINVAL, $context),
+            zx_status::Status::BUFFER_TOO_SMALL => $crate::errno!(EINVAL, $context),
+            zx_status::Status::TIMED_OUT => $crate::errno!(ETIMEDOUT, $context),
+            zx_status::Status::UNAVAILABLE => $crate::errno!(EBUSY, $context),
+            zx_status::Status::ALREADY_EXISTS => $crate::errno!(EEXIST, $context),
+            zx_status::Status::PEER_CLOSED => $crate::errno!(EPIPE, $context),
+            zx_status::Status::BAD_STATE => $crate::errno!(EPIPE, $context),
+            zx_status::Status::BAD_PATH => $crate::errno!(ENAMETOOLONG, $context),
+            zx_status::Status::IO => $crate::errno!(EIO, $context),
+            zx_status::Status::NOT_FILE => $crate::errno!(EISDIR, $context),
+            zx_status::Status::NOT_DIR => $crate::errno!(ENOTDIR, $context),
+            zx_status::Status::NOT_SUPPORTED => $crate::errno!(EOPNOTSUPP, $context),
+            zx_status::Status::WRONG_TYPE => $crate::errno!(EOPNOTSUPP, $context),
+            zx_status::Status::OUT_OF_RANGE => $crate::errno!(EINVAL, $context),
+            zx_status::Status::NO_RESOURCES => $crate::errno!(ENOMEM, $context),
+            zx_status::Status::BAD_HANDLE => $crate::errno!(EBADF, $context),
+            zx_status::Status::ACCESS_DENIED => $crate::errno!(EACCES, $context),
+            zx_status::Status::SHOULD_WAIT => $crate::errno!(EAGAIN, $context),
+            zx_status::Status::FILE_BIG => $crate::errno!(EFBIG, $context),
+            zx_status::Status::NO_SPACE => $crate::errno!(ENOSPC, $context),
+            zx_status::Status::NOT_EMPTY => $crate::errno!(ENOTEMPTY, $context),
+            zx_status::Status::IO_REFUSED => $crate::errno!(ECONNREFUSED, $context),
+            zx_status::Status::IO_INVALID => $crate::errno!(EIO, $context),
+            zx_status::Status::CANCELED => $crate::errno!(EBADF, $context),
+            zx_status::Status::PROTOCOL_NOT_SUPPORTED => {
                 $crate::errno!(EPROTONOSUPPORT, $context)
             }
-            zx::Status::ADDRESS_UNREACHABLE => $crate::errno!(ENETUNREACH, $context),
-            zx::Status::ADDRESS_IN_USE => $crate::errno!(EADDRINUSE, $context),
-            zx::Status::NOT_CONNECTED => $crate::errno!(ENOTCONN, $context),
-            zx::Status::CONNECTION_REFUSED => $crate::errno!(ECONNREFUSED, $context),
-            zx::Status::CONNECTION_RESET => $crate::errno!(ECONNRESET, $context),
-            zx::Status::CONNECTION_ABORTED => $crate::errno!(ECONNABORTED, $context),
+            zx_status::Status::ADDRESS_UNREACHABLE => $crate::errno!(ENETUNREACH, $context),
+            zx_status::Status::ADDRESS_IN_USE => $crate::errno!(EADDRINUSE, $context),
+            zx_status::Status::NOT_CONNECTED => $crate::errno!(ENOTCONN, $context),
+            zx_status::Status::CONNECTION_REFUSED => $crate::errno!(ECONNREFUSED, $context),
+            zx_status::Status::CONNECTION_RESET => $crate::errno!(ECONNRESET, $context),
+            zx_status::Status::CONNECTION_ABORTED => $crate::errno!(ECONNABORTED, $context),
             _ => $crate::errno!(EIO, $context),
         }
     }};
 }
-
-// Fuchsia error codes should match Linux.
-const_assert_eq!(syncio::zxio::EPERM, uapi::EPERM);
-const_assert_eq!(syncio::zxio::ENOENT, uapi::ENOENT);
-const_assert_eq!(syncio::zxio::ESRCH, uapi::ESRCH);
-const_assert_eq!(syncio::zxio::EINTR, uapi::EINTR);
-const_assert_eq!(syncio::zxio::EIO, uapi::EIO);
-const_assert_eq!(syncio::zxio::ENXIO, uapi::ENXIO);
-const_assert_eq!(syncio::zxio::ENOEXEC, uapi::ENOEXEC);
-const_assert_eq!(syncio::zxio::EBADF, uapi::EBADF);
-const_assert_eq!(syncio::zxio::ECHILD, uapi::ECHILD);
-const_assert_eq!(syncio::zxio::EAGAIN, uapi::EAGAIN);
-const_assert_eq!(syncio::zxio::ENOMEM, uapi::ENOMEM);
-const_assert_eq!(syncio::zxio::EACCES, uapi::EACCES);
-const_assert_eq!(syncio::zxio::EFAULT, uapi::EFAULT);
-const_assert_eq!(syncio::zxio::ENOTBLK, uapi::ENOTBLK);
-const_assert_eq!(syncio::zxio::EBUSY, uapi::EBUSY);
-const_assert_eq!(syncio::zxio::EEXIST, uapi::EEXIST);
-const_assert_eq!(syncio::zxio::EXDEV, uapi::EXDEV);
-const_assert_eq!(syncio::zxio::ENODEV, uapi::ENODEV);
-const_assert_eq!(syncio::zxio::ENOTDIR, uapi::ENOTDIR);
-const_assert_eq!(syncio::zxio::EISDIR, uapi::EISDIR);
-const_assert_eq!(syncio::zxio::EINVAL, uapi::EINVAL);
-const_assert_eq!(syncio::zxio::ENFILE, uapi::ENFILE);
-const_assert_eq!(syncio::zxio::EMFILE, uapi::EMFILE);
-const_assert_eq!(syncio::zxio::ENOTTY, uapi::ENOTTY);
-const_assert_eq!(syncio::zxio::ETXTBSY, uapi::ETXTBSY);
-const_assert_eq!(syncio::zxio::EFBIG, uapi::EFBIG);
-const_assert_eq!(syncio::zxio::ENOSPC, uapi::ENOSPC);
-const_assert_eq!(syncio::zxio::ESPIPE, uapi::ESPIPE);
-const_assert_eq!(syncio::zxio::EROFS, uapi::EROFS);
-const_assert_eq!(syncio::zxio::EMLINK, uapi::EMLINK);
-const_assert_eq!(syncio::zxio::EPIPE, uapi::EPIPE);
-const_assert_eq!(syncio::zxio::EDOM, uapi::EDOM);
-const_assert_eq!(syncio::zxio::ERANGE, uapi::ERANGE);
-const_assert_eq!(syncio::zxio::EDEADLK, uapi::EDEADLK);
-const_assert_eq!(syncio::zxio::ENAMETOOLONG, uapi::ENAMETOOLONG);
-const_assert_eq!(syncio::zxio::ENOLCK, uapi::ENOLCK);
-const_assert_eq!(syncio::zxio::ENOSYS, uapi::ENOSYS);
-const_assert_eq!(syncio::zxio::ENOTEMPTY, uapi::ENOTEMPTY);
-const_assert_eq!(syncio::zxio::ELOOP, uapi::ELOOP);
-const_assert_eq!(syncio::zxio::ENOMSG, uapi::ENOMSG);
-const_assert_eq!(syncio::zxio::EIDRM, uapi::EIDRM);
-const_assert_eq!(syncio::zxio::ECHRNG, uapi::ECHRNG);
-const_assert_eq!(syncio::zxio::ELNRNG, uapi::ELNRNG);
-const_assert_eq!(syncio::zxio::EUNATCH, uapi::EUNATCH);
-const_assert_eq!(syncio::zxio::ENOCSI, uapi::ENOCSI);
-const_assert_eq!(syncio::zxio::EBADE, uapi::EBADE);
-const_assert_eq!(syncio::zxio::EBADR, uapi::EBADR);
-const_assert_eq!(syncio::zxio::EXFULL, uapi::EXFULL);
-const_assert_eq!(syncio::zxio::ENOANO, uapi::ENOANO);
-const_assert_eq!(syncio::zxio::EBADRQC, uapi::EBADRQC);
-const_assert_eq!(syncio::zxio::EBADSLT, uapi::EBADSLT);
-const_assert_eq!(syncio::zxio::EBFONT, uapi::EBFONT);
-const_assert_eq!(syncio::zxio::ENOSTR, uapi::ENOSTR);
-const_assert_eq!(syncio::zxio::ENODATA, uapi::ENODATA);
-const_assert_eq!(syncio::zxio::ETIME, uapi::ETIME);
-const_assert_eq!(syncio::zxio::ENOSR, uapi::ENOSR);
-const_assert_eq!(syncio::zxio::ENONET, uapi::ENONET);
-const_assert_eq!(syncio::zxio::ENOPKG, uapi::ENOPKG);
-const_assert_eq!(syncio::zxio::EREMOTE, uapi::EREMOTE);
-const_assert_eq!(syncio::zxio::ENOLINK, uapi::ENOLINK);
-const_assert_eq!(syncio::zxio::EADV, uapi::EADV);
-const_assert_eq!(syncio::zxio::ESRMNT, uapi::ESRMNT);
-const_assert_eq!(syncio::zxio::ECOMM, uapi::ECOMM);
-const_assert_eq!(syncio::zxio::EPROTO, uapi::EPROTO);
-const_assert_eq!(syncio::zxio::EMULTIHOP, uapi::EMULTIHOP);
-const_assert_eq!(syncio::zxio::EDOTDOT, uapi::EDOTDOT);
-const_assert_eq!(syncio::zxio::EBADMSG, uapi::EBADMSG);
-const_assert_eq!(syncio::zxio::EOVERFLOW, uapi::EOVERFLOW);
-const_assert_eq!(syncio::zxio::ENOTUNIQ, uapi::ENOTUNIQ);
-const_assert_eq!(syncio::zxio::EBADFD, uapi::EBADFD);
-const_assert_eq!(syncio::zxio::EREMCHG, uapi::EREMCHG);
-const_assert_eq!(syncio::zxio::ELIBACC, uapi::ELIBACC);
-const_assert_eq!(syncio::zxio::ELIBBAD, uapi::ELIBBAD);
-const_assert_eq!(syncio::zxio::ELIBSCN, uapi::ELIBSCN);
-const_assert_eq!(syncio::zxio::ELIBMAX, uapi::ELIBMAX);
-const_assert_eq!(syncio::zxio::ELIBEXEC, uapi::ELIBEXEC);
-const_assert_eq!(syncio::zxio::EILSEQ, uapi::EILSEQ);
-const_assert_eq!(syncio::zxio::ERESTART, uapi::ERESTART);
-const_assert_eq!(syncio::zxio::ESTRPIPE, uapi::ESTRPIPE);
-const_assert_eq!(syncio::zxio::EUSERS, uapi::EUSERS);
-const_assert_eq!(syncio::zxio::ENOTSOCK, uapi::ENOTSOCK);
-const_assert_eq!(syncio::zxio::EDESTADDRREQ, uapi::EDESTADDRREQ);
-const_assert_eq!(syncio::zxio::EMSGSIZE, uapi::EMSGSIZE);
-const_assert_eq!(syncio::zxio::EPROTOTYPE, uapi::EPROTOTYPE);
-const_assert_eq!(syncio::zxio::ENOPROTOOPT, uapi::ENOPROTOOPT);
-const_assert_eq!(syncio::zxio::EPROTONOSUPPORT, uapi::EPROTONOSUPPORT);
-const_assert_eq!(syncio::zxio::ESOCKTNOSUPPORT, uapi::ESOCKTNOSUPPORT);
-const_assert_eq!(syncio::zxio::EOPNOTSUPP, uapi::EOPNOTSUPP);
-const_assert_eq!(syncio::zxio::EPFNOSUPPORT, uapi::EPFNOSUPPORT);
-const_assert_eq!(syncio::zxio::EAFNOSUPPORT, uapi::EAFNOSUPPORT);
-const_assert_eq!(syncio::zxio::EADDRINUSE, uapi::EADDRINUSE);
-const_assert_eq!(syncio::zxio::EADDRNOTAVAIL, uapi::EADDRNOTAVAIL);
-const_assert_eq!(syncio::zxio::ENETDOWN, uapi::ENETDOWN);
-const_assert_eq!(syncio::zxio::ENETUNREACH, uapi::ENETUNREACH);
-const_assert_eq!(syncio::zxio::ENETRESET, uapi::ENETRESET);
-const_assert_eq!(syncio::zxio::ECONNABORTED, uapi::ECONNABORTED);
-const_assert_eq!(syncio::zxio::ECONNRESET, uapi::ECONNRESET);
-const_assert_eq!(syncio::zxio::ENOBUFS, uapi::ENOBUFS);
-const_assert_eq!(syncio::zxio::EISCONN, uapi::EISCONN);
-const_assert_eq!(syncio::zxio::ENOTCONN, uapi::ENOTCONN);
-const_assert_eq!(syncio::zxio::ESHUTDOWN, uapi::ESHUTDOWN);
-const_assert_eq!(syncio::zxio::ETOOMANYREFS, uapi::ETOOMANYREFS);
-const_assert_eq!(syncio::zxio::ETIMEDOUT, uapi::ETIMEDOUT);
-const_assert_eq!(syncio::zxio::ECONNREFUSED, uapi::ECONNREFUSED);
-const_assert_eq!(syncio::zxio::EHOSTDOWN, uapi::EHOSTDOWN);
-const_assert_eq!(syncio::zxio::EHOSTUNREACH, uapi::EHOSTUNREACH);
-const_assert_eq!(syncio::zxio::EALREADY, uapi::EALREADY);
-const_assert_eq!(syncio::zxio::EINPROGRESS, uapi::EINPROGRESS);
-const_assert_eq!(syncio::zxio::ESTALE, uapi::ESTALE);
-const_assert_eq!(syncio::zxio::EUCLEAN, uapi::EUCLEAN);
-const_assert_eq!(syncio::zxio::ENOTNAM, uapi::ENOTNAM);
-const_assert_eq!(syncio::zxio::ENAVAIL, uapi::ENAVAIL);
-const_assert_eq!(syncio::zxio::EISNAM, uapi::EISNAM);
-const_assert_eq!(syncio::zxio::EREMOTEIO, uapi::EREMOTEIO);
-const_assert_eq!(syncio::zxio::EDQUOT, uapi::EDQUOT);
-const_assert_eq!(syncio::zxio::ENOMEDIUM, uapi::ENOMEDIUM);
-const_assert_eq!(syncio::zxio::EMEDIUMTYPE, uapi::EMEDIUMTYPE);
-const_assert_eq!(syncio::zxio::ECANCELED, uapi::ECANCELED);
-const_assert_eq!(syncio::zxio::ENOKEY, uapi::ENOKEY);
-const_assert_eq!(syncio::zxio::EKEYEXPIRED, uapi::EKEYEXPIRED);
-const_assert_eq!(syncio::zxio::EKEYREVOKED, uapi::EKEYREVOKED);
-const_assert_eq!(syncio::zxio::EKEYREJECTED, uapi::EKEYREJECTED);
-const_assert_eq!(syncio::zxio::EOWNERDEAD, uapi::EOWNERDEAD);
-const_assert_eq!(syncio::zxio::ENOTRECOVERABLE, uapi::ENOTRECOVERABLE);
-const_assert_eq!(syncio::zxio::ERFKILL, uapi::ERFKILL);
-const_assert_eq!(syncio::zxio::EHWPOISON, uapi::EHWPOISON);
 
 // Public re-export of macros allows them to be used like regular rust items.
 pub use {errno, errno_from_code, errno_from_zxio_code, error, from_status_like_fdio};

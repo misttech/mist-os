@@ -54,7 +54,7 @@ mod test {
     fn name_with_namespace() {
         let name = VariableName::new("a::b".to_string());
         assert_eq!(name.original_name(), "a::b".to_string());
-        assert_eq!(name.includes_namespace(), true);
+        assert!(name.includes_namespace());
         assert_eq!(name.name_parts("c"), Some(("a", "b")));
     }
 
@@ -62,7 +62,7 @@ mod test {
     fn name_without_namespace() {
         let name = VariableName::new("b".to_string());
         assert_eq!(name.original_name(), "b".to_string());
-        assert_eq!(name.includes_namespace(), false);
+        assert!(!name.includes_namespace());
         assert_eq!(name.name_parts("c"), Some(("c", "b")));
     }
 
@@ -70,7 +70,7 @@ mod test {
     fn too_many_namespaces() {
         let name = VariableName::new("a::b::c".to_string());
         assert_eq!(name.original_name(), "a::b::c".to_string());
-        assert_eq!(name.includes_namespace(), true);
+        assert!(name.includes_namespace());
         assert_eq!(name.name_parts("d"), None);
     }
 }

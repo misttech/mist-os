@@ -17,16 +17,6 @@ class TestClock : public Clock {
   TestClock();
   ~TestClock() override;
 
-  // TODO(https://fxbug.dev/374177211): Remove after clients migrated to other functions.
-  template <zx_clock_t kClockId>
-  void Set(zx::basic_time<kClockId> time) {
-    const zx_time_t time_nanos = time.get();
-
-    current_utc_ = time_nanos;
-    current_monotonic_ = time_nanos;
-    current_boot_ = time_nanos;
-  }
-
   void SetUtc(time_utc time) { current_utc_ = time.get(); }
   void SetMonotonic(zx::time_monotonic time) { current_monotonic_ = time.get(); }
   void SetBoot(zx::time_boot time) { current_boot_ = time.get(); }

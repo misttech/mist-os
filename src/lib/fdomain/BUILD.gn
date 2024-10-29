@@ -12,5 +12,6 @@ group("tests") {
   public_deps = [
     "client:tests",
     "container:tests",
+    "example:fdomain-example",
   ]
 }

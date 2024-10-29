@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
-use fidl::encoding::ProxyChannelBox;
+use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -908,7 +908,6 @@ pub struct TestProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for TestProtocolMarker {
     type Proxy = TestProtocolProxy;
     type RequestStream = TestProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = TestProtocolSynchronousProxy;
 
@@ -927,7 +926,6 @@ pub trait TestProtocolProxyInterface: Send + Sync {
         &self,
     ) -> Self::FlexibleUnionHenceResponseMustBeHeapAllocatedResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct TestProtocolSynchronousProxy {
@@ -1007,13 +1005,13 @@ impl TestProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct TestProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for TestProtocolProxy {
     type Protocol = TestProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -1028,7 +1026,7 @@ impl fidl::endpoints::Proxy for TestProtocolProxy {
 
 impl TestProtocolProxy {
     /// Create a new Proxy for test.union/TestProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <TestProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -1044,25 +1042,33 @@ impl TestProtocolProxy {
 
     pub fn r#strict_union_hence_response_may_be_stack_allocated(
         &self,
-    ) -> fidl::client::QueryResponseFut<StrictBoundedUnion> {
+    ) -> fidl::client::QueryResponseFut<
+        StrictBoundedUnion,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         TestProtocolProxyInterface::r#strict_union_hence_response_may_be_stack_allocated(self)
     }
 
     pub fn r#flexible_union_hence_response_must_be_heap_allocated(
         &self,
-    ) -> fidl::client::QueryResponseFut<OlderSimpleUnion> {
+    ) -> fidl::client::QueryResponseFut<
+        OlderSimpleUnion,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         TestProtocolProxyInterface::r#flexible_union_hence_response_must_be_heap_allocated(self)
     }
 }
 
 impl TestProtocolProxyInterface for TestProtocolProxy {
-    type StrictUnionHenceResponseMayBeStackAllocatedResponseFut =
-        fidl::client::QueryResponseFut<StrictBoundedUnion>;
+    type StrictUnionHenceResponseMayBeStackAllocatedResponseFut = fidl::client::QueryResponseFut<
+        StrictBoundedUnion,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_union_hence_response_may_be_stack_allocated(
         &self,
     ) -> Self::StrictUnionHenceResponseMayBeStackAllocatedResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<StrictBoundedUnion, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
@@ -1079,13 +1085,15 @@ impl TestProtocolProxyInterface for TestProtocolProxy {
         )
     }
 
-    type FlexibleUnionHenceResponseMustBeHeapAllocatedResponseFut =
-        fidl::client::QueryResponseFut<OlderSimpleUnion>;
+    type FlexibleUnionHenceResponseMustBeHeapAllocatedResponseFut = fidl::client::QueryResponseFut<
+        OlderSimpleUnion,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#flexible_union_hence_response_must_be_heap_allocated(
         &self,
     ) -> Self::FlexibleUnionHenceResponseMustBeHeapAllocatedResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<OlderSimpleUnion, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
@@ -1104,7 +1112,7 @@ impl TestProtocolProxyInterface for TestProtocolProxy {
 }
 
 pub struct TestProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for TestProtocolEventStream {}
@@ -1137,7 +1145,9 @@ pub enum TestProtocolEvent {}
 
 impl TestProtocolEvent {
     /// Decodes a message buffer as a [`TestProtocolEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<TestProtocolEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<TestProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -1152,7 +1162,7 @@ impl TestProtocolEvent {
 
 /// A Stream of incoming requests for test.union/TestProtocol.
 pub struct TestProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -1168,7 +1178,7 @@ impl fidl::endpoints::RequestStream for TestProtocolRequestStream {
     type Protocol = TestProtocolMarker;
     type ControlHandle = TestProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -1176,11 +1186,17 @@ impl fidl::endpoints::RequestStream for TestProtocolRequestStream {
         TestProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -1316,14 +1332,13 @@ impl TestProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct TestProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for TestProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -1331,7 +1346,6 @@ impl fidl::endpoints::ControlHandle for TestProtocolControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 mod bus_collection_directory;
-mod cgroup;
 mod cpu_class_directory;
 mod device_directory;
 mod fs;

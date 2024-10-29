@@ -50,11 +50,13 @@ use from_enum::FromEnum;
 use itertools::Itertools;
 use moniker::{ChildName, ExtendedMoniker, Moniker, MonikerError};
 use router_error::Explain;
-use sandbox::{Capability, Data, Dict, Request, Routable};
+use sandbox::{
+    Capability, CapabilityBound, Connector, Data, Dict, Request, Routable, Router, RouterResponse,
+};
 use std::sync::Arc;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx_status as zx};
 
-pub use bedrock::dict_ext::DictExt;
+pub use bedrock::dict_ext::{DictExt, GenericRouterResponse};
 pub use bedrock::lazy_get::LazyGet;
 pub use bedrock::weak_instance_token_ext::{test_invalid_instance_token, WeakInstanceTokenExt};
 pub use bedrock::with_availability::WithAvailability;
@@ -324,7 +326,7 @@ where
             route_directory_from_expose(expose_directory_decl, target, mapper).await
         }
         RouteRequest::ExposeProtocol(expose_protocol_decl) => {
-            route_capability_inner(
+            route_capability_inner::<Connector, _>(
                 &target.component_sandbox().await?.component_output_dict,
                 &expose_protocol_decl.target_name,
                 protocol_metadata(expose_protocol_decl.availability),
@@ -336,7 +338,7 @@ where
             route_service_from_expose(expose_bundle, target, mapper).await
         }
         RouteRequest::ExposeRunner(expose_runner_decl) => {
-            route_capability_inner(
+            route_capability_inner::<Connector, _>(
                 &target.component_sandbox().await?.component_output_dict,
                 &expose_runner_decl.target_name,
                 runner_metadata(Availability::Required),
@@ -345,7 +347,7 @@ where
             .await
         }
         RouteRequest::ExposeResolver(expose_resolver_decl) => {
-            route_capability_inner(
+            route_capability_inner::<Connector, _>(
                 &target.component_sandbox().await?.component_output_dict,
                 &expose_resolver_decl.target_name,
                 resolver_metadata(Availability::Required),
@@ -372,7 +374,7 @@ where
                     child_sandbox.component_output_dict.clone()
                 }
             };
-            route_capability_inner(
+            route_capability_inner::<Connector, _>(
                 &source_dictionary,
                 &resolver_registration.resolver,
                 resolver_metadata(Availability::Required),
@@ -393,7 +395,7 @@ where
             route_event_stream(use_event_stream_decl, target, mapper).await
         }
         RouteRequest::UseProtocol(use_protocol_decl) => {
-            route_capability_inner(
+            route_capability_inner::<Connector, _>(
                 &target.component_sandbox().await?.program_input.namespace(),
                 &use_protocol_decl.target_path,
                 protocol_metadata(use_protocol_decl.availability),
@@ -410,7 +412,8 @@ where
         RouteRequest::UseRunner(_use_runner_decl) => {
             let router =
                 target.component_sandbox().await?.program_input.runner().expect("we have a use declaration for a runner but the program input dictionary has no runner, this should be impossible");
-            perform_route(router, runner_metadata(Availability::Required), target).await
+            perform_route::<Connector, _>(router, runner_metadata(Availability::Required), target)
+                .await
         }
         RouteRequest::UseConfig(use_config_decl) => {
             route_config(use_config_decl, target, mapper).await
@@ -427,7 +430,7 @@ where
                     Capability::Data(Data::Uint64(1)),
                 )
                 .unwrap();
-            route_capability_inner(
+            route_capability_inner::<Connector, _>(
                 &target_dictionary,
                 &offer_protocol_decl.target_name,
                 metadata,
@@ -457,7 +460,7 @@ where
                     Capability::Data(Data::Uint64(1)),
                 )
                 .unwrap();
-            route_capability_inner(
+            route_capability_inner::<Connector, _>(
                 &target_dictionary,
                 &offer_runner_decl.target_name,
                 metadata,
@@ -475,7 +478,7 @@ where
                     Capability::Data(Data::Uint64(1)),
                 )
                 .unwrap();
-            route_capability_inner(
+            route_capability_inner::<Connector, _>(
                 &target_dictionary,
                 &offer_resolver_decl.target_name,
                 metadata,
@@ -489,7 +492,7 @@ where
 
 pub enum Never {}
 
-async fn route_capability_inner<C>(
+async fn route_capability_inner<T, C>(
     dictionary: &Dict,
     path: &impl IterablePath,
     metadata: Dict,
@@ -497,26 +500,35 @@ async fn route_capability_inner<C>(
 ) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    T: CapabilityBound,
+    Router<T>: TryFrom<Capability>,
 {
-    let router =
-        dictionary.get_capability(path).ok_or(RoutingError::BedrockNotPresentInDictionary {
+    let router = dictionary
+        .get_capability(path)
+        .and_then(|c| Router::<T>::try_from(c).ok())
+        .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {
             moniker: target.moniker().clone().into(),
             name: path.iter_segments().join("/"),
         })?;
-    perform_route(router, metadata, target).await
+    perform_route::<T, C>(router, metadata, target).await
 }
 
-async fn perform_route<C>(
-    router: impl Routable,
+async fn perform_route<T, C>(
+    router: impl Routable<T>,
     metadata: Dict,
     target: &Arc<C>,
 ) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    T: CapabilityBound,
+    Router<T>: TryFrom<Capability>,
 {
     let request = Request { target: WeakComponentInstanceInterface::new(target).into(), metadata };
-    let capability = router.route(Some(request), true).await?;
-    Ok(RouteSource::new(capability.try_into().unwrap()))
+    let data = match router.route(Some(request), true).await? {
+        RouterResponse::<T>::Debug(d) => d,
+        _ => panic!("Debug route did not return a debug response"),
+    };
+    Ok(RouteSource::new(data.try_into().unwrap()))
 }
 
 async fn get_dictionary_for_offer_target<C, O>(
@@ -871,7 +883,7 @@ impl OfferVisitor for DirectoryState {
         match offer {
             cm_rust::OfferDecl::Directory(dir) => match dir.source {
                 OfferSource::Framework => self.finalize(
-                    RightsWalker::new(fio::RW_STAR_DIR, moniker.clone()),
+                    RightsWalker::new(fio::RX_STAR_DIR, moniker.clone()),
                     dir.subdir.clone(),
                 ),
                 _ => self.advance_with_offer(moniker, dir),
@@ -890,7 +902,7 @@ impl ExposeVisitor for DirectoryState {
         match expose {
             cm_rust::ExposeDecl::Directory(dir) => match dir.source {
                 ExposeSource::Framework => self.finalize(
-                    RightsWalker::new(fio::RW_STAR_DIR, moniker.clone()),
+                    RightsWalker::new(fio::RX_STAR_DIR, moniker.clone()),
                     dir.subdir.clone(),
                 ),
                 _ => self.advance_with_expose(moniker, dir),
@@ -948,7 +960,7 @@ where
             );
             if let UseSource::Framework = &use_decl.source {
                 state.finalize(
-                    RightsWalker::new(fio::RW_STAR_DIR, target.moniker().clone()),
+                    RightsWalker::new(fio::RX_STAR_DIR, target.moniker().clone()),
                     Default::default(),
                 )?;
             }

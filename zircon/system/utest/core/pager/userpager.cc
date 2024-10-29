@@ -195,6 +195,10 @@ UserPager::UserPager()
     : pager_thread_([this]() -> bool {
         this->PageFaultHandler();
         return true;
+      }),
+      timeout_thread_([this]() -> bool {
+        this->OvertimeHandler();
+        return true;
       }) {}
 
 UserPager::~UserPager() {
@@ -202,6 +206,10 @@ UserPager::~UserPager() {
   if (shutdown_event_) {
     shutdown_event_.signal(0, ZX_USER_SIGNAL_0);
     pager_thread_.Wait();
+  }
+  if (overtime_event_) {
+    overtime_event_.signal(0, ZX_USER_SIGNAL_0);
+    timeout_thread_.Wait();
   }
   while (!vmos_.is_empty()) {
     auto vmo = vmos_.pop_front();
@@ -219,7 +227,12 @@ bool UserPager::Init() {
     fprintf(stderr, "port create failed with %s\n", zx_status_get_string(status));
     return false;
   }
-  return true;
+  // Create a timeout event to report in the event we think we have become blocked.
+  status = zx::event::create(0, &overtime_event_);
+  if (status != ZX_OK) {
+    return false;
+  }
+  return timeout_thread_.Start();
 }
 
 bool UserPager::CreateVmo(uint64_t num_pages, Vmo** vmo_out) {
@@ -263,6 +276,7 @@ bool UserPager::CreateVmoInternal(uint64_t byte_size, uint32_t options, Vmo** vm
   next_key_ += (tracked_vmo_size / sizeof(uint64_t)) + 1;
 
   *vmo_out = paged_vmo.get();
+  std::lock_guard guard{pager_mutex_};
   vmos_.push_back(std::move(paged_vmo));
 
   return true;
@@ -289,6 +303,7 @@ void UserPager::ReleaseVmo(Vmo* vmo) {
     return;
   }
 
+  std::lock_guard guard{pager_mutex_};
   vmos_.erase(*vmo);
 }
 
@@ -367,10 +382,13 @@ bool UserPager::GetPageRequest(Vmo* vmo, uint16_t command, zx_time_t deadline, u
 
 bool UserPager::WaitForRequest(Vmo* vmo, fit::function<bool(const zx_port_packet_t& packet)> cmp_fn,
                                zx_time_t deadline) {
-  for (auto& iter : requests_) {
-    if (cmp_fn(iter.req)) {
-      requests_.erase(iter);
-      return true;
+  {
+    std::lock_guard guard{pager_mutex_};
+    for (auto& iter : requests_) {
+      if (cmp_fn(iter.req)) {
+        requests_.erase(iter);
+        return true;
+      }
     }
   }
 
@@ -401,6 +419,7 @@ bool UserPager::WaitForRequest(Vmo* vmo, fit::function<bool(const zx_port_packet
 
       auto req = std::make_unique<request>();
       req->req = actual_packet;
+      std::lock_guard guard{pager_mutex_};
       requests_.push_front(std::move(req));
     } else {
       // Don't advance now on success, to make sure we read any pending requests
@@ -682,6 +701,7 @@ void UserPager::PageFaultHandler() {
     }
     ZX_ASSERT(actual_packet.type == ZX_PKT_TYPE_PAGE_REQUEST);
     if (actual_packet.page_request.command == ZX_PAGER_VMO_READ) {
+      std::lock_guard guard{pager_mutex_};
       // Just brute force find matching VMO keys, no need for efficiency.
       for (auto& vmo : vmos_) {
         if (vmo.key() == actual_packet.key) {
@@ -698,6 +718,54 @@ void UserPager::PageFaultHandler() {
         }
       }
     }
+  }
+}
+
+void UserPager::DumpRequestsLocked() {
+  printf("UserPager has %zu unhandled requests:\n", requests_.size_slow());
+  for (auto& request : requests_) {
+    if (request.req.type == ZX_PKT_TYPE_PAGE_REQUEST) {
+      auto req = request.req.page_request;
+      printf("Key: %zu command: %d flags: %d offset: %zu length: %zu\n", request.req.key,
+             req.command, req.flags, req.offset, req.length);
+    } else {
+      printf("\tPacket not of type ZX_PKT_TYPE_PAGE_REQUEST\n");
+    }
+  }
+}
+
+void UserPager::DumpVmosLocked() {
+  printf("UserPager has %zu registered VMOs:\n", vmos_.size_slow());
+  for (auto& vmo : vmos_) {
+    zx_info_vmo_t info;
+    zx_status_t status = vmo.vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr);
+    if (status != ZX_OK) {
+      printf("\tFailed to retrieve info for vmo with key %zu: %d\n", vmo.key(), status);
+      return;
+    }
+    printf(
+        "\tKey: %zu size: %zu children: %zu mappings: %zu commited: %zu populated: %zu change events: %zu\n",
+        vmo.key(), info.size_bytes, info.num_children, info.num_mappings, info.committed_bytes,
+        info.populated_bytes, info.committed_change_events);
+  }
+}
+
+void UserPager::OvertimeHandler() {
+  // The timeout here is sized somewhat low since it's okay if we occasionally spuriously fire as we
+  // are just printing out information, not modifying any state.
+  constexpr int kOvertimeSeconds = 60;
+  while (true) {
+    zx_signals_t pending = 0;
+    zx_status_t status = overtime_event_.wait_one(
+        ZX_USER_SIGNAL_0, zx::deadline_after(zx::sec(kOvertimeSeconds)), &pending);
+    if (status == ZX_OK && (pending & ZX_USER_SIGNAL_0)) {
+      return;
+    }
+    printf("Suspected test hang, UserPager object has been active for over %d seconds\n",
+           kOvertimeSeconds);
+    std::lock_guard guard{pager_mutex_};
+    DumpRequestsLocked();
+    DumpVmosLocked();
   }
 }
 

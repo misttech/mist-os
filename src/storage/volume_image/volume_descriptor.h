@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 #include <unordered_set>
 #include <vector>
 
@@ -25,13 +26,13 @@ struct VolumeDescriptor {
 
   // On success returns the VolumeDescriptor with the deserialized contents of |serialized|.
   static fpromise::result<VolumeDescriptor, std::string> Deserialize(
-      cpp20::span<const uint8_t> serialized);
+      std::span<const uint8_t> serialized);
 
   // On success returns the VolumeDescriptor with the deserialized contents of |serialized|.
   static fpromise::result<VolumeDescriptor, std::string> Deserialize(
-      cpp20::span<const char> serialized) {
-    return Deserialize(cpp20::span<const uint8_t>(
-        reinterpret_cast<const uint8_t*>(serialized.data()), serialized.size() * sizeof(char)));
+      std::span<const char> serialized) {
+    return Deserialize(std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(serialized.data()),
+                                                serialized.size() * sizeof(char)));
   }
 
   std::string DebugString() const;

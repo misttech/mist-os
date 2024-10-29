@@ -123,7 +123,7 @@ pub enum ActionConfig {
 
 impl ConfigFileSchema {
     fn try_from_str_with_namespace(s: &str, namespace: &str) -> Result<Self, anyhow::Error> {
-        let schema = serde_json5::from_str::<ConfigFileSchema>(&s)
+        let schema = serde_json5::from_str::<ConfigFileSchema>(s)
             .map_err(|e| format_err!("Unable to deserialize config file {}", e))?;
         validate_config(&schema, namespace)?;
         Ok(schema)
@@ -141,7 +141,7 @@ impl TryFrom<String> for ConfigFileSchema {
 fn validate_config(config: &ConfigFileSchema, namespace: &str) -> Result<(), Error> {
     if let Some(ref actions_config) = config.file_actions {
         for (action_name, action_config) in actions_config.iter() {
-            validate_action(action_name, &action_config, namespace)?;
+            validate_action(action_name, action_config, namespace)?;
         }
     }
     Ok(())
@@ -168,7 +168,7 @@ impl DiagnosticData {
                 InspectFetcher::try_from(&*contents).context("Parsing inspect.json")?,
             ),
             Source::Syslog | Source::Klog | Source::Bootlog => {
-                DataFetcher::Text(TextFetcher::try_from(&*contents).context("Parsing plain text")?)
+                DataFetcher::Text(TextFetcher::from(&*contents))
             }
             Source::Annotations => DataFetcher::KeyValue(
                 KeyValueFetcher::try_from(&*contents).context("Parsing annotations")?,
@@ -206,7 +206,7 @@ impl ParseResult {
             let ConfigFileSchema { file_actions, file_selectors, file_evals, file_tests } =
                 file_config;
             // Other code assumes that each name will have an entry in all categories.
-            let file_actions_config = file_actions.unwrap_or_else(|| HashMap::new());
+            let file_actions_config = file_actions.unwrap_or_else(HashMap::new);
             let file_actions = file_actions_config
                 .into_iter()
                 .map(|(k, action_config)| {
@@ -214,10 +214,10 @@ impl ParseResult {
                         .map(|action| (k, action))
                 })
                 .collect::<Result<HashMap<_, _>, _>>()?;
-            let file_selectors = file_selectors.unwrap_or_else(|| HashMap::new());
-            let file_evals = file_evals.unwrap_or_else(|| HashMap::new());
-            let file_tests = file_tests.unwrap_or_else(|| HashMap::new());
-            let file_actions = filter_actions(file_actions, &action_tag_directive);
+            let file_selectors = file_selectors.unwrap_or_else(HashMap::new);
+            let file_evals = file_evals.unwrap_or_else(HashMap::new);
+            let file_tests = file_tests.unwrap_or_else(HashMap::new);
+            let file_actions = filter_actions(file_actions, action_tag_directive);
             let mut file_metrics = HashMap::new();
             for (key, value) in file_selectors.into_iter() {
                 let mut selectors = vec![];

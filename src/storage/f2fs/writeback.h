@@ -5,9 +5,18 @@
 #ifndef SRC_STORAGE_F2FS_WRITEBACK_H_
 #define SRC_STORAGE_F2FS_WRITEBACK_H_
 
+#include <lib/fpromise/sequencer.h>
+
+#include "src/storage/f2fs/common.h"
+#include "src/storage/f2fs/file_cache.h"
 #include "src/storage/lib/vfs/cpp/journal/background_executor.h"
+#include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
 
 namespace f2fs {
+
+class StorageBufferPool;
+class OwnedStorageBuffer;
+class BcacheMapper;
 
 // F2fs flushes dirty pages when the number of dirty pages >= |kMaxDirtyDataPages| if memorypressure
 // is unavailable.

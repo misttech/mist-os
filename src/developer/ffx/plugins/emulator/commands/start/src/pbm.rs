@@ -48,7 +48,7 @@ pub(crate) async fn make_configs(
     } else {
         let pb = product_bundle.ok_or_else(|| user_error!("Product bundle required for configuring the emulator instance."))?;
         // Apply the values from the manifest to an emulation configuration.
-        let mut emu_config = convert_bundle_to_configs(&pb, cmd.device().await?)
+        let mut emu_config = convert_bundle_to_configs(&pb, cmd.device()?)
             .await.context("problem with convert_bundle_to_configs")?;
         // Set OVMF references for non riscv guests (at this time we have no efi support for riscv).
         if emu_config.device.cpu.architecture != CpuArchitecture::Riscv64 {
@@ -106,8 +106,8 @@ async fn apply_command_line_options(
     emu_config.host.acceleration = cmd.accel.clone();
 
     // Process any values that are Options, have Auto values, or need any transformation.
-    emu_config.host.gpu = GpuType::from_str(&cmd.gpu().await?)?;
-    emu_config.host.networking = NetworkingMode::from_str(&cmd.net().await?)?;
+    emu_config.host.gpu = GpuType::from_str(&cmd.gpu()?)?;
+    emu_config.host.networking = NetworkingMode::from_str(&cmd.net()?)?;
 
     if let Some(log) = &cmd.log {
         // It'd be nice to canonicalize this path, to clean up relative bits like "..", but the
@@ -116,7 +116,7 @@ async fn apply_command_line_options(
         emu_config.host.log = PathBuf::from(env::current_dir()?).join(log);
     } else {
         // TODO(https://fxbug.dev/42067481): Move logs to ffx log dir so `ffx doctor` collects them.
-        let instance = emu_instances.get_instance_dir(&cmd.name().await?, false)?;
+        let instance = emu_instances.get_instance_dir(&cmd.name()?, false)?;
         emu_config.host.log = instance.join("emulator.log");
     }
 
@@ -202,10 +202,10 @@ async fn apply_command_line_options(
     // RuntimeConfig options, starting with simple copies.
     emu_config.runtime.debugger = cmd.debugger;
     emu_config.runtime.headless = cmd.headless;
-    emu_config.runtime.startup_timeout = Duration::from_secs(cmd.startup_timeout().await?);
+    emu_config.runtime.startup_timeout = Duration::from_secs(cmd.startup_timeout()?);
     emu_config.runtime.hidpi_scaling = cmd.hidpi_scaling;
     emu_config.runtime.addl_kernel_args = cmd.kernel_args.clone();
-    emu_config.runtime.name = cmd.name().await?;
+    emu_config.runtime.name = cmd.name()?;
     emu_config.runtime.instance_directory =
         emu_instances.get_instance_dir(&emu_config.runtime.name, true)?;
     emu_config.runtime.reuse = cmd.reuse;
@@ -235,7 +235,7 @@ async fn apply_command_line_options(
     }
 
     // Any generated values or values from ffx_config.
-    emu_config.runtime.mac_address = generate_mac_address(&cmd.name().await?);
+    emu_config.runtime.mac_address = generate_mac_address(&cmd.name()?);
     let upscript: String =
         ctx.get(EMU_UPSCRIPT_FILE).context("Getting upscript path from ffx config")?;
     if !upscript.is_empty() {
@@ -486,10 +486,10 @@ mod tests {
 
         let emu_instances = EmulatorInstances::new(PathBuf::new());
 
-        assert_eq!(cmd.device().await.unwrap(), Some(String::from("")));
-        assert_eq!(cmd.engine().await.unwrap(), "femu");
-        assert_eq!(cmd.gpu().await.unwrap(), "swiftshader_indirect");
-        assert_eq!(cmd.startup_timeout().await.unwrap(), 60);
+        assert_eq!(cmd.device().unwrap(), Some(String::from("")));
+        assert_eq!(cmd.engine().unwrap(), "femu");
+        assert_eq!(cmd.gpu().unwrap(), "swiftshader_indirect");
+        assert_eq!(cmd.startup_timeout().unwrap(), 60);
 
         let result =
             apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
@@ -515,10 +515,10 @@ mod tests {
             .await?;
         env.context.query(EMU_START_TIMEOUT).level(Some(ConfigLevel::User)).set(json!(120)).await?;
 
-        assert_eq!(cmd.device().await.unwrap(), Some(String::from("my_device")));
-        assert_eq!(cmd.engine().await.unwrap(), "qemu");
-        assert_eq!(cmd.gpu().await.unwrap(), "host");
-        assert_eq!(cmd.startup_timeout().await.unwrap(), 120);
+        assert_eq!(cmd.device().unwrap(), Some(String::from("my_device")));
+        assert_eq!(cmd.engine().unwrap(), "qemu");
+        assert_eq!(cmd.gpu().unwrap(), "host");
+        assert_eq!(cmd.startup_timeout().unwrap(), 120);
 
         let result =
             apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
@@ -529,7 +529,7 @@ mod tests {
 
         cmd.gpu = Some(String::from("swiftshader_indirect"));
 
-        assert_eq!(cmd.gpu().await.unwrap(), "swiftshader_indirect");
+        assert_eq!(cmd.gpu().unwrap(), "swiftshader_indirect");
         let result =
             apply_command_line_options(emu_config.clone(), &cmd, &emu_instances, &env.context)
                 .await;

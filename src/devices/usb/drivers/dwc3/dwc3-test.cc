@@ -4,36 +4,87 @@
 
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
-#include <lib/async-loop/default.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include "lib/driver/fake-platform-device/cpp/fake-pdev.h"
+#include "lib/driver/testing/cpp/driver_test.h"
 #include "src/devices/usb/drivers/dwc3/dwc3-regs.h"
 
 namespace dwc3 {
 
-struct IncomingNamespace {
-  fake_pdev::FakePDevFidl pdev_server;
-  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
-};
+namespace fpdev = fuchsia_hardware_platform_device;
 
-class TestFixture : public zxtest::Test {
+class Environment : public fdf_testing::Environment {
  public:
-  TestFixture();
-  void SetUp() override;
+  Environment() {
+    auto config = fdf_fake::FakePDev::Config{};
+    config.mmios[0] = reg_region_.GetMmioBuffer();
+    config.use_fake_bti = true;
+    config.use_fake_irq = true;
 
-  fdf::MmioBuffer mmio() { return reg_region_.GetMmioBuffer(); }
+    pdev_.SetConfig(std::move(config));
+  }
 
- protected:
+  zx::result<> Serve(fdf::OutgoingDirectory& directory) override {
+    auto result = directory.AddService<fpdev::Service>(
+        pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
+    EXPECT_TRUE(result.is_ok());
+
+    device_server_.Init(component::kDefaultInstance, "root");
+    return zx::make_result(
+        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &directory));
+  }
+
+  ddk_fake::FakeMmioRegRegion& reg_region() { return reg_region_; }
+
+ private:
   static constexpr size_t kRegSize = sizeof(uint32_t);
   static constexpr size_t kMmioRegionSize = 64 << 10;
   static constexpr size_t kRegCount = kMmioRegionSize / kRegSize;
 
+  fdf_fake::FakePDev pdev_;
+  compat::DeviceServer device_server_;
+  ddk_fake::FakeMmioRegRegion reg_region_{kRegSize, kRegCount};
+};
+
+class Config final {
+ public:
+  using DriverType = Dwc3;
+  using EnvironmentType = Environment;
+};
+
+// Test is templated on a parameter which, if true, will have the harness start and stop the driver.
+// Otherwise, it is the individual test(s) responsibility to start and stop the driver.
+template <bool manage_lifetime>
+class TestFixture : public testing::Test {
+ public:
+  void SetUp() override {
+    dut_.RunInEnvironmentTypeContext([&](Environment& env) {
+      auto& hwparams3 = env.reg_region()[GHWPARAMS3::Get().addr()];
+      auto& ver_reg = env.reg_region()[USB31_VER_NUMBER::Get().addr()];
+      auto& dctl_reg = env.reg_region()[DCTL::Get().addr()];
+
+      hwparams3.SetReadCallback([this]() -> uint64_t { return Read_GHWPARAMS3(); });
+      ver_reg.SetReadCallback([this]() -> uint64_t { return Read_USB31_VER_NUMBER(); });
+      dctl_reg.SetReadCallback([this]() -> uint64_t { return Read_DCTL(); });
+      dctl_reg.SetWriteCallback([this](uint64_t val) { return Write_DCTL(val); });
+    });
+
+    if (manage_lifetime) {
+      EXPECT_EQ(ZX_OK, dut_.StartDriver().status_value());
+    }
+  }
+
+  void TearDown() override {
+    if (manage_lifetime) {
+      EXPECT_EQ(ZX_OK, dut_.StopDriver().status_value());
+    }
+  }
+
+ protected:
   // Section 1.3.22 of the DWC3 Programmer's guide
   //
   // DWC_USB31_CACHE_TOTAL_XFER_RESOURCES : 32
@@ -43,7 +94,6 @@ class TestFixture : public zxtest::Test {
   // DWC_USB31_HSPHY_DWIDTH               : 2
   // DWC_USB31_HSPHY_INTERFACE            : 1
   // DWC_USB31_SSPHY_INTERFACE            : 2
-  //
   uint64_t Read_GHWPARAMS3() { return 0x10420086; }
 
   // Section 1.3.45 of the DWC3 Programmer's guide
@@ -67,79 +117,25 @@ class TestFixture : public zxtest::Test {
   uint32_t dctl_val_ = DCTL::Get().FromValue(0).set_LPM_NYET_thres(0xF).reg_value();
   bool stuck_reset_test_{false};
 
-  std::shared_ptr<MockDevice> mock_parent_{MockDevice::FakeRootParent()};
-  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
-                                                                   std::in_place};
-  ddk_fake::FakeMmioRegRegion reg_region_{kRegSize, kRegCount};
+  fdf_testing::ForegroundDriverTest<Config> dut_;
 };
 
-TestFixture::TestFixture() {
-  auto& hwparams3 = reg_region_[GHWPARAMS3::Get().addr()];
-  auto& ver_reg = reg_region_[USB31_VER_NUMBER::Get().addr()];
-  auto& dctl_reg = reg_region_[DCTL::Get().addr()];
+using ManagedTestFixture = TestFixture<true>;
+using UnmanagedTestFixture = TestFixture<false>;
 
-  hwparams3.SetReadCallback([this]() -> uint64_t { return Read_GHWPARAMS3(); });
-  ver_reg.SetReadCallback([this]() -> uint64_t { return Read_USB31_VER_NUMBER(); });
-  dctl_reg.SetReadCallback([this]() -> uint64_t { return Read_DCTL(); });
-  dctl_reg.SetWriteCallback([this](uint64_t val) { return Write_DCTL(val); });
-
-  fake_pdev::FakePDevFidl::Config config;
-  config.mmios[0] = mmio();
-  config.use_fake_bti = true;
-  config.irqs[0] = {};
-  ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
-
-  auto outgoing_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-  incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints.server)](
-                         IncomingNamespace* infra) mutable {
-    infra->pdev_server.SetConfig(std::move(config));
-    ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-        infra->pdev_server.GetInstanceHandler()));
-
-    ASSERT_OK(infra->outgoing.Serve(std::move(server)));
-  });
-  ASSERT_NO_FATAL_FAILURE();
-  mock_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                               std::move(outgoing_endpoints.client), "pdev");
+TEST_F(ManagedTestFixture, Dfv2Lifecycle) {
+  dut_.RunInNodeContext(
+      [&](fdf_testing::TestNode& node) { EXPECT_EQ(1UL, node.children().size()); });
 }
 
-void TestFixture::SetUp() { stuck_reset_test_ = false; }
-
-TEST_F(TestFixture, DdkLifecycle) {
-  ASSERT_OK(Dwc3::Create(nullptr, mock_parent_.get()));
-
-  // make sure the child device is there
-  ASSERT_EQ(1, mock_parent_->child_count());
-  auto* child = mock_parent_->GetLatestChild();
-
-  child->InitOp();
-  EXPECT_TRUE(child->InitReplyCalled());
-  EXPECT_OK(child->InitReplyCallStatus());
-
-  child->UnbindOp();
-  EXPECT_TRUE(child->UnbindReplyCalled());
-
-  child->ReleaseOp();
-}
-
-TEST_F(TestFixture, DdkHwResetTimeout) {
+TEST_F(UnmanagedTestFixture, Dfv2HwResetTimeout) {
   stuck_reset_test_ = true;
-  ASSERT_OK(Dwc3::Create(nullptr, mock_parent_.get()));
+  EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_.StartDriver().status_value());
 
-  // make sure the child device is there
-  ASSERT_EQ(1, mock_parent_->child_count());
-  auto* child = mock_parent_->GetLatestChild();
+  dut_.RunInNodeContext(
+      [&](fdf_testing::TestNode& node) { EXPECT_EQ(0UL, node.children().size()); });
 
-  child->InitOp();
-  EXPECT_TRUE(child->InitReplyCalled());
-  EXPECT_STATUS(ZX_ERR_TIMED_OUT, child->InitReplyCallStatus());
-
-  child->UnbindOp();
-  EXPECT_TRUE(child->UnbindReplyCalled());
-
-  child->ReleaseOp();
+  // The dfv2 driver did not start, nothing to stop.
 }
 
 }  // namespace dwc3

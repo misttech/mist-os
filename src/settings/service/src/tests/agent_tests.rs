@@ -13,12 +13,12 @@ use crate::{service, EnvironmentBuilder};
 use core::fmt::{Debug, Formatter};
 use fuchsia_async as fasync;
 use futures::channel::mpsc::UnboundedSender;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use rand::Rng;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::rc::Rc;
 
 const ENV_NAME: &str = "settings_service_agent_test_environment";
 
@@ -64,7 +64,7 @@ impl TestAgent {
         lifespan_target: LifespanTarget,
         authority: &mut Authority,
         callback: CallbackSender,
-    ) -> Arc<Mutex<TestAgent>> {
+    ) -> Rc<Mutex<TestAgent>> {
         let (agent, generate) = Self::create(id, lifespan_target, callback);
 
         authority.register(generate).await;
@@ -76,21 +76,17 @@ impl TestAgent {
         id: u32,
         lifespan_target: LifespanTarget,
         callback: CallbackSender,
-    ) -> (Arc<Mutex<TestAgent>>, AgentCreator) {
-        let agent = Arc::new(Mutex::new(TestAgent {
-            id,
-            last_invocation: None,
-            lifespan_target,
-            callback,
-        }));
+    ) -> (Rc<Mutex<TestAgent>>, AgentCreator) {
+        let agent =
+            Rc::new(Mutex::new(TestAgent { id, last_invocation: None, lifespan_target, callback }));
 
         let agent_clone = agent.clone();
 
-        let creation_func = CreationFunc::Dynamic(Arc::new(
-            move |mut context: Context| -> BoxFuture<'static, ()> {
+        let creation_func = CreationFunc::Dynamic(Rc::new(
+            move |mut context: Context| -> LocalBoxFuture<'static, ()> {
                 let agent = agent_clone.clone();
                 Box::pin(async move {
-                    fasync::Task::spawn(async move {
+                    fasync::Task::local(async move {
                         let _ = &context;
                         while let Ok((Payload::Invocation(invocation), client)) =
                             context.receptor.next_of::<Payload>().await
@@ -156,7 +152,7 @@ async fn test_environment_startup() {
 
     {
         let service_agent = service_agent.clone();
-        fasync::Task::spawn(async move {
+        fasync::Task::local(async move {
             // Wait for the initialization agent to receive invocation
             if let Some((id, _, tx)) = startup_rx.next().await {
                 // Verify the correct agent was invoked.
@@ -169,7 +165,7 @@ async fn test_environment_startup() {
         .detach();
     }
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         // Wait for service agent to receive notification
         if let Some((id, _, tx)) = service_rx.next().await {
             // Verify the correct agent was invoked
@@ -183,7 +179,7 @@ async fn test_environment_startup() {
     let (_, agent_generate) =
         TestAgent::create(startup_agent_id, LifespanTarget::Initialization, startup_tx);
 
-    assert!(EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+    assert!(EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
         .agents(vec![service_agent_generate, agent_generate,])
         .spawn_nested(ENV_NAME)
         .await
@@ -200,13 +196,13 @@ async fn create_authority() -> Authority {
 async fn test_sequential() {
     let (tx, mut rx) = futures::channel::mpsc::unbounded::<(u32, Invocation, AckSender)>();
     let mut authority = create_authority().await;
-    let service_context = Arc::new(ServiceContext::new(None, None));
+    let service_context = Rc::new(ServiceContext::new(None, None));
 
     // Create a number of agents.
     let agent_ids =
         create_agents(12, LifespanTarget::Initialization, &mut authority, tx.clone()).await;
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         // Process the agent callbacks, making sure they are received in the right
         // order and acknowledging the acks. Note that this is a chain reaction.
         // Processing the first agent is necessary before the second can receive its
@@ -241,11 +237,11 @@ async fn test_sequential() {
 async fn test_simultaneous() {
     let (tx, mut rx) = futures::channel::mpsc::unbounded::<(u32, Invocation, AckSender)>();
     let mut authority = create_authority().await;
-    let service_context = Arc::new(ServiceContext::new(None, None));
+    let service_context = Rc::new(ServiceContext::new(None, None));
     let agent_ids =
         create_agents(12, LifespanTarget::Initialization, &mut authority, tx.clone()).await;
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         // Ensure that each agent has received the invocation. Note that we are not
         // acknowledging the invocations here. Each agent should be notified
         // regardless of order.
@@ -278,7 +274,7 @@ async fn test_simultaneous() {
 async fn test_err_handling() {
     let (tx, mut rx) = futures::channel::mpsc::unbounded::<(u32, Invocation, AckSender)>();
     let mut authority = create_authority().await;
-    let service_context = Arc::new(ServiceContext::new(None, None));
+    let service_context = Rc::new(ServiceContext::new(None, None));
     let mut rng = rand::thread_rng();
 
     let agent_1_id = TestAgent::create_and_register(
@@ -300,7 +296,7 @@ async fn test_err_handling() {
     )
     .await;
 
-    fasync::Task::spawn(async move {
+    fasync::Task::local(async move {
         // Ensure the first agent received an invocation, acknowledge with an error.
         if let Some((id, _, tx)) = rx.next().await {
             assert_eq!(agent_1_id, id);

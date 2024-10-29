@@ -4,8 +4,6 @@
 
 #include "src/storage/volume_image/utils/bounded_writer.h"
 
-#include <lib/stdcompat/array.h>
-
 #include <memory>
 #include <vector>
 
@@ -17,7 +15,7 @@ namespace {
 class FakeWriter final : public Writer {
  public:
   fpromise::result<void, std::string> Write(uint64_t offset,
-                                            cpp20::span<const uint8_t> buffer) final {
+                                            std::span<const uint8_t> buffer) final {
     if (offset + buffer.size() > data_.size()) {
       data_.resize(offset + buffer.size(), 0);
     }
@@ -31,7 +29,7 @@ class FakeWriter final : public Writer {
   std::vector<uint8_t> data_;
 };
 
-constexpr auto kData = cpp20::to_array<uint8_t>({1, 2, 3});
+constexpr auto kData = std::to_array<uint8_t>({1, 2, 3});
 
 TEST(BoundedWriterTest, WriteOutOfBoundsIsError) {
   std::unique_ptr<FakeWriter> writer = std::make_unique<FakeWriter>();

@@ -34,15 +34,15 @@ use starnix_sync::{
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
+use starnix_types::futex_address::FutexAddress;
+use starnix_types::ownership::{
+    release_on_error, OwnedRef, Releasable, ReleaseGuard, Share, TempRef, WeakRef,
+};
 use starnix_uapi::auth::{Credentials, UserAndOrGroupId, CAP_SYS_ADMIN};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
-use starnix_uapi::futex_address::FutexAddress;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::{
-    release_on_error, OwnedRef, Releasable, ReleaseGuard, Share, TempRef, WeakRef,
-};
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SIGTRAP};
 use starnix_uapi::user_address::{UserAddress, UserRef};
@@ -1045,8 +1045,7 @@ impl CurrentTask {
         let mut maybe_fd: Option<FdNumber> = None;
 
         if flags & SECCOMP_FILTER_FLAG_NEW_LISTENER != 0 {
-            let mut task_state = self.task.write();
-            maybe_fd = Some(task_state.seccomp_filters.create_listener(self)?);
+            maybe_fd = Some(SeccompFilterContainer::create_listener(self)?);
         }
 
         // We take the process lock here because we can't change any of the threads

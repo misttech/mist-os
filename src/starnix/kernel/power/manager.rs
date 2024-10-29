@@ -573,7 +573,6 @@ impl SuspendResumeManager {
                 });
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
-                    node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());
                 });
                 return error!(EINVAL);
             }

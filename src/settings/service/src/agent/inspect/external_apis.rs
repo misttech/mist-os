@@ -52,7 +52,7 @@ use fuchsia_inspect_derive::{IValue, Inspect, WithInspect};
 use futures::StreamExt;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 use settings_inspect_utils::managed_inspect_queue::ManagedInspectQueue;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// The key for the queue for completed calls per protocol.
 const COMPLETED_CALLS_KEY: &str = "completed_calls";
@@ -174,7 +174,7 @@ impl ExternalApiInspectAgent {
     async fn create_with_node(context: Context, node: Node) {
         let (_, message_rx) = context
             .delegate
-            .create(MessengerType::Broker(Arc::new(move |message| {
+            .create(MessengerType::Broker(Rc::new(move |message| {
                 // Only catch external api requests.
                 matches!(
                     message.payload(),
@@ -188,7 +188,7 @@ impl ExternalApiInspectAgent {
             api_calls: ManagedInspectMap::<ExternalApiCallsWrapper>::with_node(node),
         };
 
-        fasync::Task::spawn({
+        fasync::Task::local({
             async move {
                 let _ = &context;
                 let id = fuchsia_trace::Id::new();

@@ -5,6 +5,7 @@
 
 #include "src/ui/testing/util/portable_ui_test.h"
 
+#include <fidl/fuchsia.input.report/cpp/fidl.h>
 #include <fidl/fuchsia.input.virtualkeyboard/cpp/fidl.h>
 #include <fidl/fuchsia.logger/cpp/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
@@ -13,12 +14,15 @@
 #include <fidl/fuchsia.ui.app/cpp/fidl.h>
 #include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
 #include <fidl/fuchsia.ui.focus/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
 #include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
 #include <fidl/test.accessibility/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/syslog/cpp/macros.h>
+
+#include <utility>
 
 #include <src/ui/testing/util/fidl_cpp_helpers.h>
 
@@ -28,6 +32,7 @@ namespace {
 
 // Types imported for the realm_builder library.
 using component_testing::ConfigValue;
+using component_testing::Dictionary;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::RealmRoot;
@@ -57,6 +62,7 @@ void PortableUITest::SetUpRealmBase() {
   // Route base system services to flutter and the test UI stack.
   realm_builder_.AddRoute(Route{
       .capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_logger::LogSink>},
+                       Dictionary{"diagnostics"},
                        Protocol{fidl::DiscoverableProtocolName<fuchsia_scheduler::RoleManager>},
                        Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>},
                        Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>},
@@ -353,6 +359,15 @@ void PortableUITest::InjectSwipe(int start_x, int start_y, int end_x, int end_y,
   fake_touchscreen_->SimulateSwipe(swipe_request);
   touch_injection_request_count_++;
   FX_LOGS(INFO) << "*** Swipe injected";
+}
+
+void PortableUITest::InjectTouchEvent(fuchsia_input_report::TouchInputReport report) {
+  fuchsia_ui_test_input::TouchScreenSimulateTouchEventRequest request;
+  request.report() = std::move(report);
+
+  fake_touchscreen_->SimulateTouchEvent(request);
+  touch_injection_request_count_++;
+  FX_LOGS(INFO) << "*** Touch event injected";
 }
 
 void PortableUITest::RegisterMouse() {

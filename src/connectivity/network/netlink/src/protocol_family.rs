@@ -1404,7 +1404,7 @@ mod test {
     use crate::netlink_packet::errno::Errno;
     use crate::netlink_packet::{self};
     use crate::protocol_family::route::{NetlinkRoute, NetlinkRouteRequestHandler};
-    use crate::rules::{RuleRequest, RuleRequestArgs, RuleRequestHandler};
+    use crate::rules::{RuleRequest, RuleRequestArgs};
     use crate::{interfaces, routes};
 
     enum ExpectedResponse {
@@ -2951,12 +2951,11 @@ mod test {
                 ))),
             }
         }
-    }
 
-    impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> RuleRequestHandler<S>
-        for FakeRuleRequestHandler
-    {
-        fn handle_request(&mut self, actual_request: RuleRequest<S>) -> Result<(), Errno> {
+        fn handle_request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
+            &mut self,
+            actual_request: RuleRequest<S>,
+        ) -> Result<(), Errno> {
             let Self { requests_and_responses } = self;
             let FakeRuleRequestResponse { expected_request_args, expected_ip_version, response } =
                 requests_and_responses.lock().unwrap().pop_front().expect(

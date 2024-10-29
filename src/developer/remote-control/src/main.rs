@@ -9,13 +9,14 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc::unbounded;
 use futures::join;
 use futures::prelude::*;
-use remote_control::RemoteControlService;
+use remote_control::{ConnectionRequest, RemoteControlService};
 use remote_control_config::Config;
 use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, error, info};
 use {fidl_fuchsia_developer_remotecontrol as rcs, fuchsia_async as fasync};
 
+mod fdomain;
 mod usb;
 
 async fn exec_server(config: &Config) -> Result<(), Error> {
@@ -25,39 +26,45 @@ async fn exec_server(config: &Config) -> Result<(), Error> {
 
     let connector = {
         let router = Arc::clone(&router);
-        move |socket| {
-            let router = Arc::clone(&router);
-            fasync::Task::spawn(async move {
-                let socket = fidl::AsyncSocket::from_socket(socket);
-                let (mut rx, mut tx) = socket.split();
-                let (errors_sender, errors) = unbounded();
-                if let Err(e) = futures::future::join(
-                    circuit::multi_stream::multi_stream_node_connection_to_async(
-                        router.circuit_node(),
-                        &mut rx,
-                        &mut tx,
-                        true,
-                        circuit::Quality::NETWORK,
-                        errors_sender,
-                        "client".to_owned(),
-                    ),
-                    errors
-                        .map(|e| {
-                            tracing::warn!("A client circuit stream failed: {e:?}");
-                        })
-                        .collect::<()>(),
-                )
-                .map(|(result, ())| result)
-                .await
-                {
-                    if let circuit::Error::ConnectionClosed(msg) = e {
-                        debug!("Overnet link closed: {:?}", msg);
-                    } else {
-                        error!("Error handling Overnet link: {:?}", e);
+        move |request, weak_self| match request {
+            ConnectionRequest::Overnet(socket) => {
+                let router = Arc::clone(&router);
+                fasync::Task::spawn(async move {
+                    let socket = fidl::AsyncSocket::from_socket(socket);
+                    let (mut rx, mut tx) = socket.split();
+                    let (errors_sender, errors) = unbounded();
+                    if let Err(e) = futures::future::join(
+                        circuit::multi_stream::multi_stream_node_connection_to_async(
+                            router.circuit_node(),
+                            &mut rx,
+                            &mut tx,
+                            true,
+                            circuit::Quality::NETWORK,
+                            errors_sender,
+                            "client".to_owned(),
+                        ),
+                        errors
+                            .map(|e| {
+                                tracing::warn!("A client circuit stream failed: {e:?}");
+                            })
+                            .collect::<()>(),
+                    )
+                    .map(|(result, ())| result)
+                    .await
+                    {
+                        if let circuit::Error::ConnectionClosed(msg) = e {
+                            debug!("Overnet link closed: {:?}", msg);
+                        } else {
+                            error!("Error handling Overnet link: {:?}", e);
+                        }
                     }
-                }
-            })
-            .detach();
+                })
+                .detach();
+            }
+            ConnectionRequest::FDomain(socket) => {
+                let socket = fidl::AsyncSocket::from_socket(socket);
+                fasync::Task::local(fdomain::serve_fdomain_connection(weak_self, socket)).detach();
+            }
         }
     };
 

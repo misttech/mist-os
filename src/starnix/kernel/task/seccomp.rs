@@ -295,25 +295,28 @@ impl SeccompFilterContainer {
     }
 
     /// Creates a new listener for use by SECCOMP_RET_USER_NOTIF.  Returns its fd.
-    pub fn create_listener(&mut self, current_task: &CurrentTask) -> Result<FdNumber, Errno> {
-        if self.notifier.is_some() {
-            return Err(errno!(EBUSY));
-        }
-
+    pub fn create_listener(current_task: &CurrentTask) -> Result<FdNumber, Errno> {
+        // Create the `Anon` handle file before taking the write lock on the task, because
+        // `Anon::new_file()` needs to read the `current_task` SID to label the file object.
         let the_notifier = SeccompNotifier::new();
-
         let handle = Anon::new_file(
             current_task,
             Box::new(SeccompNotifierFileObject { notifier: the_notifier.clone() }),
             OpenFlags::RDWR,
         );
-        let fd = current_task.add_file(handle, FdFlags::CLOEXEC)?;
 
+        // Take the write lock to check for an existing notifier, and initialize and store the new
+        // notifier otherwise.
+        let filters = &mut current_task.write().seccomp_filters;
+        if filters.notifier.is_some() {
+            return Err(errno!(EBUSY));
+        }
+        let fd = current_task.add_file(handle, FdFlags::CLOEXEC)?;
         {
             let mut state = the_notifier.lock();
             state.add_thread();
         }
-        self.notifier = Some(the_notifier);
+        filters.notifier = Some(the_notifier);
         Ok(fd)
     }
 }

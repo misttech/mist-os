@@ -111,7 +111,7 @@ impl From<DisplayInfoV5> for DisplayInfo {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 pub(crate) trait BrightnessManager: Sized {
     async fn from_client(client: &ClientProxy) -> Result<Self, ControllerError>;
     async fn update_brightness(
@@ -124,7 +124,7 @@ pub(crate) trait BrightnessManager: Sized {
     ) -> SettingHandlerResult;
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl BrightnessManager for () {
     async fn from_client(_: &ClientProxy) -> Result<Self, ControllerError> {
         Ok(())
@@ -154,7 +154,7 @@ pub(crate) struct ExternalBrightnessControl {
     brightness_service: ExternalServiceProxy<BrightnessControlProxy>,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl BrightnessManager for ExternalBrightnessControl {
     async fn from_client(client: &ClientProxy) -> Result<Self, ControllerError> {
         client
@@ -220,7 +220,7 @@ where
     const STORAGE_KEY: &'static str = DisplayInfo::KEY;
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<T> data_controller::Create for DisplayController<T>
 where
     T: BrightnessManager,
@@ -231,10 +231,10 @@ where
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<T> controller::Handle for DisplayController<T>
 where
-    T: BrightnessManager + Send + Sync,
+    T: BrightnessManager,
 {
     async fn handle(&self, request: Request) -> Option<SettingHandlerResult> {
         match request {

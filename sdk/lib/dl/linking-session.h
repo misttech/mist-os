@@ -169,19 +169,14 @@ class LinkingSession {
 
   // Perform relocations on all pending modules to be loaded. Return a boolean
   // if relocations succeeded on all modules.
-  bool Relocate(Diagnostics& diag, const ModuleRefList& resolution_list) {
+  bool Relocate(Diagnostics& diag, const auto& resolution_list) {
     // TODO(https://fxbug.dev/324136831): Include global modules.
-    // Relocate() expects a container of references.
-    auto resolution_list_view = std::views::transform(
-        resolution_list, [](const RuntimeModule* m) -> const RuntimeModule& { return *m; });
-
     auto relocate_and_relro = [&](SessionModule& session_module) -> bool {
       // TODO(https://fxbug.dev/339662473): this doesn't use the root module's
       // name in the scoped diagnostics. Add test for missing transitive symbol
       // and make sure the correct name is used in the error message.
       ld::ScopedModuleDiagnostics root_module_diag{diag, session_module.name().str()};
-      return session_module.Relocate(diag, resolution_list_view) &&
-             session_module.ProtectRelro(diag);
+      return session_module.Relocate(diag, resolution_list) && session_module.ProtectRelro(diag);
     };
     return std::all_of(std::begin(session_modules_), std::end(session_modules_),
                        relocate_and_relro);

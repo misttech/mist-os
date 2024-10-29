@@ -13,6 +13,13 @@
             from: "self",
         },
     ],
+    use: [
+        {
+            directory: "props",
+            rights: [ "r*" ],
+            path: "/properties",
+        },
+    ],
     expose: [
         {
             protocol: "fuchsia.tee.Application",

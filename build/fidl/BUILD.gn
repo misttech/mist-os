@@ -12,9 +12,13 @@ basic_toolchain("fidling") {
   expected_label = fidl_toolchain
 }
 
-# A generated file that lists fidl sdk files
+# A generated file that lists the IR files for all FIDL libraries in the IDK
+# (and "partner_internal" SDK category).
 generated_file("sdk_fidl") {
+  # Ensure that the `..._sdk` target for all relevant FIDL libraries have been
+  # built since that is how `sdk_fidl_json_data` is populated.
   deps = [ "//sdk/fidl" ]
+
   outputs = [ "$root_build_dir/sdk_fidl_json.json" ]
   data_keys = [ "sdk_fidl_json_data" ]
   output_conversion = "json"

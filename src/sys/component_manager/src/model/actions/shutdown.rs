@@ -16,10 +16,15 @@ use cm_rust::{
 };
 use cm_types::{IterablePath, Name};
 use errors::ActionError;
+use fuchsia_async as fasync;
 use futures::future::select_all;
+use futures::prelude::*;
+use futures::select;
 use moniker::ChildName;
 use std::collections::{HashMap, HashSet};
+use std::pin::pin;
 use std::sync::Arc;
+use std::time::Duration;
 use std::{fmt, iter};
 use tracing::*;
 
@@ -258,10 +263,13 @@ pub async fn do_shutdown(
     component: &Arc<ComponentInstance>,
     shutdown_type: ShutdownType,
 ) -> Result<(), ActionError> {
+    const WATCHDOG_TIMEOUT_SECS: u64 = 15;
+
     // Keep logs short to preserve as much as possible in the crash report
     // NS: Shutdown of {moniker} was no-op
     // RS: Beginning shutdown of resolved component {moniker}
     // US: Beginning shutdown of unresolved component {moniker}
+    // PS: Pending shutdown of component {moniker} has taken more than WATCHDOG_TIMEOUT_SECS
     // FS: Finished shutdown of {moniker}
     // ES: Errored shutdown of {moniker}
     {
@@ -298,10 +306,24 @@ pub async fn do_shutdown(
     if let ShutdownType::System = shutdown_type {
         info!("=US {}", component.moniker);
     }
-    component.stop_instance_internal(true).await.map_err(|err| {
-        warn!("=ES {}", component.moniker);
-        err
-    })?;
+
+    let watchdog_fut = pin!(async {
+        fasync::Timer::new(Duration::from_secs(WATCHDOG_TIMEOUT_SECS)).await;
+        info!("=PS {}", component.moniker);
+        std::future::pending::<()>().await;
+    });
+    let mut watchdog_fut = watchdog_fut.fuse();
+    let shutdown_fut = pin!(component.stop_instance_internal(true));
+    let mut shutdown_fut = shutdown_fut.fuse();
+    select! {
+        res = shutdown_fut => {
+            res.map_err(|err| {
+                warn!("=ES {}", component.moniker);
+                err
+            })?;
+        },
+        () = watchdog_fut => unreachable!("watchdog never exits"),
+    };
     if matches!(shutdown_type, ShutdownType::System) {
         info!("=FS {}", component.moniker);
     }

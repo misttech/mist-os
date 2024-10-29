@@ -456,8 +456,8 @@ TEST_F(ParseJournalTest, EntryModifiedHeaderDropped) {
 
   // Before we replay, flip some bits in the header.
   storage::BlockBufferView buffer_view(journal_buffer(), 0, kEntryLength);
-  JournalHeaderView raw_block(cpp20::span<uint8_t>(reinterpret_cast<uint8_t*>(buffer_view.Data(0)),
-                                                   buffer_view.BlockSize()));
+  JournalHeaderView raw_block(
+      std::span<uint8_t>(reinterpret_cast<uint8_t*>(buffer_view.Data(0)), buffer_view.BlockSize()));
   raw_block.SetTargetBlock(16, ~(raw_block.TargetBlock(16)));
 
   // As a result, there are no entries identified as replayable.
@@ -676,13 +676,12 @@ class ReplayJournalTest : public ParseJournalTestFixture {
 
   // Take the contents of the pre-registered journal buffer and transfer it into the requested
   // vmoid.
-  void TransferEntryTo(vmoid_t vmoid, size_t offset, uint64_t length) {
-    char entry_buf[kBlockSize * length];
-    EXPECT_EQ(
-        registry()->GetVmo(kJournalVmoid).read(entry_buf, offset * kBlockSize, sizeof(entry_buf)),
-        ZX_OK);
-    EXPECT_EQ(registry()->GetVmo(vmoid).write(entry_buf, offset * kBlockSize, sizeof(entry_buf)),
+  void TransferEntryTo(vmoid_t vmoid, size_t offset, uint64_t block_count) {
+    const size_t len = kBlockSize * block_count;
+    auto entry_buf = std::make_unique<char[]>(len);
+    EXPECT_EQ(registry()->GetVmo(kJournalVmoid).read(entry_buf.get(), offset * kBlockSize, len),
               ZX_OK);
+    EXPECT_EQ(registry()->GetVmo(vmoid).write(entry_buf.get(), offset * kBlockSize, len), ZX_OK);
   }
 };
 

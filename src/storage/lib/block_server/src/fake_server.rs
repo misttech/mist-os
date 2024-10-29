@@ -152,7 +152,7 @@ struct Data {
 impl Interface for Data {
     async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
         Ok(Cow::Owned(PartitionInfo {
-            block_count: self.block_count,
+            block_range: Some(0..self.block_count),
             type_guid: TYPE_GUID.clone(),
             instance_guid: INSTANCE_GUID.clone(),
             name: Some(PARTITION_NAME.to_string()),

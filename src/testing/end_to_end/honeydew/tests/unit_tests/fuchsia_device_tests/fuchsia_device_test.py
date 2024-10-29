@@ -17,9 +17,18 @@ import fidl.fuchsia_hardware_power_statecontrol as fhp_statecontrol
 import fidl.fuchsia_hwinfo as f_hwinfo
 import fidl.fuchsia_io as f_io
 import fuchsia_controller_py as fuchsia_controller
+from fuchsia_controller_py import ZxStatus
 from parameterized import param, parameterized
 
 from honeydew import errors
+from honeydew.affordances.connectivity.wlan.wlan import (
+    wlan_using_fc,
+    wlan_using_sl4f,
+)
+from honeydew.affordances.connectivity.wlan.wlan_policy import (
+    wlan_policy_using_fc,
+    wlan_policy_using_sl4f,
+)
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.affordances.ffx.ui import screenshot as screenshot_ffx
 from honeydew.affordances.fuchsia_controller import rtc as rtc_fc
@@ -29,10 +38,6 @@ from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
 )
 from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
-)
-from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
-from honeydew.affordances.fuchsia_controller.wlan import (
-    wlan_policy as wlan_policy_fc,
 )
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
@@ -44,8 +49,6 @@ from honeydew.affordances.sl4f.bluetooth.profiles import (
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_gap as bluetooth_gap_sl4f,
 )
-from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
-from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.fuchsia_device import fuchsia_device
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
@@ -123,11 +126,9 @@ def _file_read_result(data: f_io.Transfer) -> f_io.ReadableReadResult:
     return ret
 
 
-def _file_attr_resp(
-    status: fuchsia_controller.ZxStatus, size: int
-) -> f_io.NodeGetAttrResponse:
+def _file_attr_resp(status: ZxStatus, size: int) -> f_io.NodeGetAttrResponse:
     return f_io.NodeGetAttrResponse(
-        s=status,
+        s=status.raw(),
         attributes=f_io.NodeAttributes(
             content_size=size,
             # The args below are arbitrary.
@@ -484,18 +485,18 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
     @mock.patch.object(
         ffx_transport.FFX,
         "run",
-        return_value="".join(wlan_policy_fc._REQUIRED_CAPABILITIES),
+        return_value="".join(wlan_policy_using_fc._REQUIRED_CAPABILITIES),
         autospec=True,
     )
     @mock.patch.object(
-        wlan_policy_fc.WlanPolicy,
+        wlan_policy_using_fc.WlanPolicy,
         "__init__",
         autospec=True,
         return_value=None,
     )
-    def test_wlan_policy_fc(
+    def test_wlan_policy_using_fc(
         self,
-        wlan_policy_fc_init: mock.Mock,
+        wlan_policy_using_fc_init: mock.Mock,
         # pylint: disable-next=unused-argument
         mock_ffx_run: mock.Mock,
     ) -> None:
@@ -503,9 +504,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         affordance."""
         self.assertIsInstance(
             self.fd_fc_obj.wlan_policy,
-            wlan_policy_fc.WlanPolicy,
+            wlan_policy_using_fc.WlanPolicy,
         )
-        wlan_policy_fc_init.assert_called_once_with(
+        wlan_policy_using_fc_init.assert_called_once_with(
             self.fd_fc_obj.wlan_policy,
             device_name=self.fd_fc_obj._device_info.name,
             ffx=self.fd_fc_obj.ffx,
@@ -514,29 +515,29 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_device_close=self.fd_fc_obj,
         )
 
-    def test_wlan_policy_sl4f(self) -> None:
+    def test_wlan_policy_using_sl4f(self) -> None:
         """Test case to make sure fuchsia_device supports SL4F based wlan_policy
         affordance."""
         self.assertIsInstance(
             self.fd_sl4f_obj.wlan_policy,
-            wlan_policy_sl4f.WlanPolicy,
+            wlan_policy_using_sl4f.WlanPolicy,
         )
 
     @mock.patch.object(
         ffx_transport.FFX,
         "run",
-        return_value="".join(wlan_fc._REQUIRED_CAPABILITIES),
+        return_value="".join(wlan_using_fc._REQUIRED_CAPABILITIES),
         autospec=True,
     )
     @mock.patch.object(
-        wlan_fc.Wlan,
+        wlan_using_fc.Wlan,
         "__init__",
         autospec=True,
         return_value=None,
     )
-    def test_wlan_fc(
+    def test_wlan_using_fc(
         self,
-        wlan_fc_init: mock.Mock,
+        wlan_using_fc_init: mock.Mock,
         # pylint: disable-next=unused-argument
         mock_ffx_run: mock.Mock,
     ) -> None:
@@ -544,9 +545,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         affordance."""
         self.assertIsInstance(
             self.fd_fc_obj.wlan,
-            wlan_fc.Wlan,
+            wlan_using_fc.Wlan,
         )
-        wlan_fc_init.assert_called_once_with(
+        wlan_using_fc_init.assert_called_once_with(
             self.fd_fc_obj.wlan,
             device_name=self.fd_fc_obj._device_info.name,
             ffx=self.fd_fc_obj.ffx,
@@ -555,11 +556,11 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_device_close=self.fd_fc_obj,
         )
 
-    def test_wlan_sl4f(self) -> None:
+    def test_wlan_using_sl4f(self) -> None:
         """Test case to make sure fuchsia_device supports SL4F based wlan affordance."""
         self.assertIsInstance(
             self.fd_sl4f_obj.wlan,
-            wlan_sl4f.Wlan,
+            wlan_using_sl4f.Wlan,
         )
 
     # List all the tests related to static properties
@@ -1163,8 +1164,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._build_info property when the get_info
         FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
-        mock_buildinfo_provider.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
+        mock_buildinfo_provider.side_effect = ZxStatus(
+            ZxStatus.ZX_ERR_INVALID_ARGS
         )
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
@@ -1221,9 +1222,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._device_info property when the get_info
         FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
-        mock_hwinfo_device.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        )
+        mock_hwinfo_device.side_effect = ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS)
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
             _: dict[str, Any] = self.fd_fc_obj._device_info_from_fidl
@@ -1279,9 +1278,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._product_info property when the get_info
         FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
-        mock_hwinfo_product.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        )
+        mock_hwinfo_product.side_effect = ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS)
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
             _ = self.fd_fc_obj._product_info
@@ -1349,8 +1346,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         self.fd_fc_obj.fuchsia_controller.ctx = mock.Mock()
 
-        mock_rcs_log_message.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
+        mock_rcs_log_message.side_effect = ZxStatus(
+            ZxStatus.ZX_ERR_INVALID_ARGS
         )
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
@@ -1398,9 +1395,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._send_reboot_command() when the reboot
         FIDL call raises a non-ZX_ERR_PEER_CLOSED error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
-        mock_admin_reboot.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        )
+        mock_admin_reboot.side_effect = ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS)
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
             self.fd_fc_obj._send_reboot_command()
@@ -1426,9 +1421,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._send_reboot_command() when the reboot
         FIDL call raises a ZX_ERR_PEER_CLOSED error.  This error should not
         result in `FuchsiaControllerError` being raised."""
-        mock_admin_reboot.side_effect = fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_PEER_CLOSED
-        )
+        mock_admin_reboot.side_effect = ZxStatus(ZxStatus.ZX_ERR_PEER_CLOSED)
         # pylint: disable=protected-access
         self.fd_fc_obj._send_reboot_command()
 
@@ -1444,7 +1437,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         f_io.File.Client,
         "get_attr",
         new_callable=mock.AsyncMock,
-        return_value=_file_attr_resp(fuchsia_controller.ZxStatus.ZX_OK, 15),
+        return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
     @mock.patch.object(
         f_io.File.Client,
@@ -1495,9 +1488,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "get_snapshot",
         new_callable=mock.AsyncMock,
         # Raise arbitrary failure.
-        side_effect=fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        ),
+        side_effect=ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS),
     )
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -1542,9 +1533,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "get_attr",
         new_callable=mock.AsyncMock,
         # Raise arbitrary failure.
-        side_effect=fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        ),
+        side_effect=ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS),
     )
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -1588,9 +1577,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         f_io.File.Client,
         "get_attr",
         new_callable=mock.AsyncMock,
-        return_value=_file_attr_resp(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS, 0
-        ),
+        return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS), 0),
     )
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -1634,15 +1621,13 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         f_io.File.Client,
         "get_attr",
         new_callable=mock.AsyncMock,
-        return_value=_file_attr_resp(fuchsia_controller.ZxStatus.ZX_OK, 15),
+        return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
     @mock.patch.object(
         f_io.File.Client,
         "read",
         new_callable=mock.AsyncMock,
-        side_effect=fuchsia_controller.ZxStatus(
-            fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
-        ),
+        side_effect=ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS),
     )
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaController,
@@ -1687,7 +1672,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "get_attr",
         new_callable=mock.AsyncMock,
         # File reports size of 15 bytes.
-        return_value=_file_attr_resp(fuchsia_controller.ZxStatus.ZX_OK, 15),
+        return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
     @mock.patch.object(
         f_io.File.Client,

@@ -4,7 +4,7 @@
 
 #include <safemath/checked_math.h>
 
-#include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/dir.h"
 #include "src/storage/f2fs/third_party/ext2_hash/hash.h"
 
 namespace f2fs {

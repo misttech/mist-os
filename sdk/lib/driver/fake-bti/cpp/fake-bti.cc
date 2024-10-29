@@ -4,9 +4,7 @@
 
 #include <lib/driver/fake-bti/cpp/fake-bti.h>
 #include <lib/driver/fake-object/cpp/fake-object.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zircon-internal/thread_annotations.h>
-#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
@@ -19,6 +17,8 @@
 
 // Normally just defined in the kernel:
 #define PAGE_SIZE_SHIFT 12
+
+namespace fake_bti {
 
 namespace {
 class FakeBti final : public fdf_fake_object::FakeObject {
@@ -188,91 +188,81 @@ zx_status_t FakeBti::get_info(zx_handle_t handle, uint32_t topic, void* buffer, 
   ZX_ASSERT_MSG(false, "fake object_get_info: Unsupported PMT topic %u\n", topic);
 }
 
-zx_status_t fake_bti_create(zx_handle_t* out) {
-  return fake_bti_create_with_paddrs(nullptr, 0, out);
-}
+zx::result<zx::bti> CreateFakeBti() { return CreateFakeBtiWithPaddrs({}); }
 
-zx_status_t fake_bti_create_with_paddrs(const zx_paddr_t* paddrs, size_t paddr_count,
-                                        zx_handle_t* out) {
+zx::result<zx::bti> CreateFakeBtiWithPaddrs(cpp20::span<const zx_paddr_t> paddrs) {
   std::shared_ptr<fdf_fake_object::FakeObject> new_bti;
-  zx_status_t status = FakeBti::Create(cpp20::span(paddrs, paddr_count), &new_bti);
+  zx_status_t status = FakeBti::Create(paddrs, &new_bti);
   if (status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
-  zx::result add_status = fdf_fake_object::FakeHandleTable().Add(std::move(new_bti));
-  if (add_status.is_ok()) {
-    *out = add_status.value();
-  }
-
-  return add_status.status_value();
+  return fdf_fake_object::FakeHandleTable().Add(std::move(new_bti));
 }
 
-zx_status_t fake_bti_get_pinned_vmos(zx_handle_t bti, fake_bti_pinned_vmo_info_t* out_vmo_info,
-                                     size_t out_num_vmos, size_t* actual_num_vmos) {
+zx::result<std::vector<FakeBtiPinnedVmoInfo>> GetPinnedVmo(zx_handle_t bti) {
   // Make sure this is a valid fake bti:
-  zx::result get_status = fdf_fake_object::FakeHandleTable().Get(bti);
-  ZX_ASSERT_MSG(get_status.is_ok() && get_status.value()->type() == ZX_OBJ_TYPE_BTI,
+  zx::result result = fdf_fake_object::FakeHandleTable().Get(bti);
+  ZX_ASSERT_MSG(result.is_ok() && result.value()->type() == ZX_OBJ_TYPE_BTI,
                 "fake_bti_get_pinned_vmos: Bad handle %u\n", bti);
-  std::shared_ptr<FakeBti> bti_obj = std::static_pointer_cast<FakeBti>(get_status.value());
 
-  const auto& vmos = bti_obj->pinned_vmos();
-  if (actual_num_vmos != nullptr) {
-    *actual_num_vmos = vmos.size();
+  if (result.is_error()) {
+    return result.take_error();
   }
 
-  for (size_t i = 0; i < vmos.size() && i < out_num_vmos; i++) {
-    const auto& vmo_info = vmos[i];
+  std::shared_ptr<FakeBti> bti_obj = std::static_pointer_cast<FakeBti>(result.value());
+  std::vector<FakeBtiPinnedVmoInfo> info_list;
+  info_list.reserve(bti_obj->pinned_vmos().size());
+
+  for (const auto& vmo_info : bti_obj->pinned_vmos()) {
     zx::vmo vmo_dup;
     zx_status_t status = vmo_info.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_dup);
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
-
-    *(out_vmo_info++) = {
+    info_list.emplace_back(FakeBtiPinnedVmoInfo{
         .vmo = vmo_dup.release(),
         .size = vmo_info.size,
         .offset = vmo_info.offset,
-    };
+    });
   }
-  return ZX_OK;
+  return zx::ok(std::move(info_list));
 }
 
-zx_status_t fake_bti_get_phys_from_pinned_vmo(zx_handle_t bti, fake_bti_pinned_vmo_info_t vmo_info,
-                                              zx_paddr_t* out_paddrs, size_t out_num_paddrs,
-                                              size_t* actual_num_paddrs) {
-  if (actual_num_paddrs == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
+zx::result<std::vector<zx_paddr_t>> GetVmoPhysAddress(zx_handle_t bti,
+                                                      FakeBtiPinnedVmoInfo vmo_info) {
   // Make sure this is a valid fake bti:
-  zx::result get_status = fdf_fake_object::FakeHandleTable().Get(bti);
-  ZX_ASSERT_MSG(get_status.is_ok() && get_status.value()->type() == ZX_OBJ_TYPE_BTI,
+  zx::result obj_result = fdf_fake_object::FakeHandleTable().Get(bti);
+  ZX_ASSERT_MSG(obj_result.is_ok() && obj_result.value()->type() == ZX_OBJ_TYPE_BTI,
                 "fake_bti_get_phys_from_pinned_vmo: Bad handle %u\n", bti);
-  auto* bti_obj = static_cast<FakeBti*>(get_status.value().get());
+  if (obj_result.is_error()) {
+    return obj_result.take_error();
+  }
+  auto* bti_obj = static_cast<FakeBti*>(obj_result.value().get());
 
   zx_info_handle_basic_t target_info;
   if (zx_status_t status = zx_object_get_info(vmo_info.vmo, ZX_INFO_HANDLE_BASIC, &target_info,
                                               sizeof(target_info), nullptr, nullptr);
       status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
 
   const auto& vmos = bti_obj->pinned_vmos();
   for (const auto& pinned_vmo : vmos) {
     if (pinned_vmo.size == vmo_info.size && pinned_vmo.offset == vmo_info.offset &&
         pinned_vmo.koid == target_info.koid) {
-      *actual_num_paddrs = pinned_vmo.paddrs.size();
-
-      if (out_paddrs != nullptr) {
-        size_t num_copy = std::min(out_num_paddrs, pinned_vmo.paddrs.size());
-        std::memcpy(out_paddrs, pinned_vmo.paddrs.data(), num_copy * sizeof(zx_paddr_t));
+      std::vector<zx_paddr_t> paddr_list;
+      paddr_list.reserve(pinned_vmo.paddrs.size());
+      for (auto& paddr : pinned_vmo.paddrs) {
+        paddr_list.emplace_back(paddr);
       }
-      return ZX_OK;
+      return zx::ok(std::move(paddr_list));
     }
   }
-  return ZX_ERR_NOT_FOUND;
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
+
+}  // namespace fake_bti
 
 // Fake syscall implementations
 __EXPORT
@@ -281,7 +271,8 @@ zx_status_t zx_bti_pin(zx_handle_t bti_handle, uint32_t options, zx_handle_t vmo
   zx::result get_status = fdf_fake_object::FakeHandleTable().Get(bti_handle);
   ZX_ASSERT_MSG(get_status.is_ok() && get_status.value()->type() == ZX_OBJ_TYPE_BTI,
                 "fake bti_pin: Bad handle %u\n", bti_handle);
-  std::shared_ptr<FakeBti> bti_obj = std::static_pointer_cast<FakeBti>(get_status.value());
+  std::shared_ptr<fake_bti::FakeBti> bti_obj =
+      std::static_pointer_cast<fake_bti::FakeBti>(get_status.value());
 
   zx::vmo vmo_clone;
   zx_status_t vmo_status = zx::unowned_vmo(vmo)->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_clone);
@@ -361,7 +352,8 @@ zx_status_t zx_bti_pin(zx_handle_t bti_handle, uint32_t options, zx_handle_t vmo
   }
 
   std::shared_ptr<fdf_fake_object::FakeObject> new_pmt;
-  zx_status_t pmt_status = FakePmt::Create(std::move(vmo_clone), offset, size, bti_obj, &new_pmt);
+  zx_status_t pmt_status =
+      fake_bti::FakePmt::Create(std::move(vmo_clone), offset, size, bti_obj, &new_pmt);
   if (pmt_status != ZX_OK) {
     return pmt_status;
   }
@@ -392,7 +384,8 @@ zx_status_t zx_pmt_unpin(zx_handle_t handle) {
   zx::result get_status = fdf_fake_object::FakeHandleTable().Get(handle);
   ZX_ASSERT_MSG(get_status.is_ok() && get_status.value()->type() == ZX_OBJ_TYPE_PMT,
                 "fake pmt_unpin: Bad handle %u\n", handle);
-  std::shared_ptr<FakePmt> pmt = std::static_pointer_cast<FakePmt>(get_status.value());
+  std::shared_ptr<fake_bti::FakePmt> pmt =
+      std::static_pointer_cast<fake_bti::FakePmt>(get_status.value());
   pmt->Unpin();
   --pmt->bti().pmo_count();
   zx::result remove_status = fdf_fake_object::FakeHandleTable().Remove(handle);

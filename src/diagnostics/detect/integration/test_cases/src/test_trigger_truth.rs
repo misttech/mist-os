@@ -72,22 +72,22 @@ pub(crate) fn test() -> TestData {
         .set_program_config("{enable_filing: true}")
         .add_triage_config(TRIAGE_CONFIG)
         .expect_events(vec![
-            TestEvent::OnCrashReportingProductRegistration {
+            TestEvent::CrashReportingProductRegistration {
                 product_name: "FuchsiaDetect".to_string(),
                 program_name: "triage_detect".to_string(),
             },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnCrashReport {
+            TestEvent::DiagnosticFetch,
+            TestEvent::CrashReport {
                 crash_signature: "fuchsia-detect-widgets-over-two".to_string(),
                 crash_program_name: "triage_detect".to_string(),
             },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnCrashReport {
+            TestEvent::DiagnosticFetch,
+            TestEvent::DiagnosticFetch,
+            TestEvent::CrashReport {
                 crash_signature: "fuchsia-detect-widgets-over-two".to_string(),
                 crash_program_name: "triage_detect".to_string(),
             },
-            TestEvent::OnDiagnosticFetch,
-            TestEvent::OnDone,
+            TestEvent::DiagnosticFetch,
+            TestEvent::Done,
         ])
 }
