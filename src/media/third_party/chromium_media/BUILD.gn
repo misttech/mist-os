@@ -63,6 +63,10 @@ source_set("chromium_media") {
     "//src/media/lib/codec_impl",
     "//zircon/system/ulib/fbl",
     "//zircon/third_party/ulib/safemath",
+
+    # TODO(https://fxbug.dev/300157652): Remove use of syslog backend in this
+    # driver and delete this dependency.
+    "//sdk/lib/syslog/cpp",
   ]
   public_configs = [ ":chromium_media_headers" ]
 }
