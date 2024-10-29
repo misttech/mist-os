@@ -2,19 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/sdk/sdk_component_manifests.gni")
-import("//build/sdk/sdk_molecule.gni")
 import("//tools/cmc/build/expect_includes.gni")
-
-sdk_component_manifests("syslog") {
-  name = "syslog_internal"
-  manifests = [
-    "client.shard.cml",
-    "use.shard.cml",
-    "offer.shard.cml",
-  ]
-  category = "internal"
-}
 
 # Require dependent components to include logsink capabilities in their
 # component manifests.

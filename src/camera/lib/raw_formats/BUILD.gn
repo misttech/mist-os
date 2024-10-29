@@ -32,7 +32,6 @@ source_set("base") {
     "raw_packing.h",
   ]
   deps = [
-    "//sdk/lib/syslog",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zx",
   ]
@@ -94,7 +93,6 @@ cc_test_executable("raw_unittests_bin") {
   deps = [
     ":format_collection",
     ":lookups",
-    "//sdk/lib/syslog",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
