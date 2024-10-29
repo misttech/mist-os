@@ -134,7 +134,7 @@ impl std::fmt::Display for PackageDestination {
                 Self::SensorConfig => "sensor-config",
                 Self::Base => "system_image",
                 Self::ConfigData => "config-data",
-                Self::ShellCommands => "shell-commands",
+                Self::ShellCommands => "pkg-shell-commands",
                 Self::NetcfgConfig => "netcfg-config",
                 Self::SystemRecoveryConfig => "system-recovery-config",
                 Self::ForTest => "for-test",
@@ -155,6 +155,8 @@ pub enum BootfsPackageDestination {
     SysmemConfig,
     /// The ta-manager configuration.
     TaManagerConfig,
+    /// The shell commands package.
+    ShellCommands,
     /// Variant specifically for making tests easier.
     ForTest,
     /// Any package that came from an AIB.
@@ -181,6 +183,7 @@ impl std::fmt::Display for BootfsPackageDestination {
                 Self::Config => "config",
                 Self::SysmemConfig => "sysmem-config",
                 Self::TaManagerConfig => "ta-manager-config",
+                Self::ShellCommands => "boot-shell-commands",
                 Self::ForTest => "for-test",
             }
         )

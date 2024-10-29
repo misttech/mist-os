@@ -5,6 +5,7 @@ asix-88179
 asix-88772b
 ?blobfs
 block-core
+?boot-shell-commands
 ?bootstrap
 bt-transport-usb
 ?bus-pci

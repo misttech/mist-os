@@ -617,7 +617,7 @@ async fn resolve_with_context_component() {
 
 #[fuchsia::test]
 async fn shell_commands_bin_dir() {
-    let shell_commands = fuchsia_pkg_testing::PackageBuilder::new("shell-commands")
+    let shell_commands = fuchsia_pkg_testing::PackageBuilder::new("pkg-shell-commands")
         .add_resource_at("bin/a-file", &b"the-content"[..])
         .build()
         .await

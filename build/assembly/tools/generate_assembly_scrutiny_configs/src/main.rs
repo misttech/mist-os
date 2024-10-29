@@ -139,6 +139,10 @@ fn get_bootfs_packages_allowlist(build_type: BuildType) -> Vec<String> {
         // This script only returns assembly-generated files.
         // Files from AIBs are collected and merged in a separate process.
         .filter(AssemblyGenerated::assembly_generated)
+        .filter(|v| {
+            // Shell commands are not included on user builds
+            *v != BootfsPackageDestination::ShellCommands || build_type != BuildType::User
+        })
         .map(|v| v.to_string())
         .collect();
     let mut compiled_packages: Vec<String> = BootfsCompiledPackageDestination::iter()

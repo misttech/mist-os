@@ -234,6 +234,7 @@ raw_assembly_input_bundle_json = """{
     }
   ],
   "boot_drivers": [],
+  "bootfs_shell_commands": {},
   "shell_commands": {
     "package1": [
       "path/to/binary1",

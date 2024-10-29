@@ -72,6 +72,7 @@ forensics
 ?omaha-client
 ?overnet-usb
 pkg-resolver
+?pkg-shell-commands
 ?pkgctl
 ?process-resolver
 ?radar-proxy-with-injector
@@ -87,7 +88,6 @@ pkg-resolver
 ?sensors
 ?session_manager
 ?setui_service
-?shell-commands
 ?sl4f
 ?snapshot
 ?sockscripter
