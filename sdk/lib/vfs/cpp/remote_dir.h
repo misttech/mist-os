@@ -5,7 +5,7 @@
 #ifndef LIB_VFS_CPP_REMOTE_DIR_H_
 #define LIB_VFS_CPP_REMOTE_DIR_H_
 
-#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/interface_handle.h>
@@ -33,8 +33,6 @@ class RemoteDir final : public Node {
   // Binds to a remotely hosted directory using the specified `directory`. The handle must be valid.
   explicit RemoteDir(fidl::ClientEnd<fuchsia_io::Directory> directory)
       : RemoteDir(directory.TakeChannel()) {}
-
-  using Node::Serve;
 
   // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
   // Deprecated HLCPP Signatures

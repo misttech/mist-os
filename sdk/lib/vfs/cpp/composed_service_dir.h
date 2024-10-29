@@ -5,7 +5,7 @@
 #ifndef LIB_VFS_CPP_COMPOSED_SERVICE_DIR_H_
 #define LIB_VFS_CPP_COMPOSED_SERVICE_DIR_H_
 
-#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/vfs/cpp/node.h>
@@ -24,6 +24,22 @@ class ComposedServiceDir final : public Node {
  public:
   ComposedServiceDir() : Node(MakeComposedServiceDir()) {}
 
+  // Serve a new connection to this directory on `server_end` using specified `flags`.
+  //
+  // This method must only be used with a single-threaded asynchronous dispatcher. If `dispatcher`
+  // is `nullptr`, the current thread's default dispatcher will be used via
+  // `async_get_default_dispatcher`. The same `dispatcher` must be used if multiple connections are
+  // served for the same node, otherwise `ZX_ERR_INVALID_ARGS` will be returned.
+  zx_status_t Serve(fuchsia_io::Flags flags, fidl::ServerEnd<fuchsia_io::Directory> server_end,
+                    async_dispatcher_t* dispatcher = nullptr) const {
+    if (flags & (fuchsia_io::wire::kMaskKnownProtocols ^ fuchsia_io::Flags::kProtocolDirectory)) {
+      return ZX_ERR_INVALID_ARGS;  // Only the directory protocol is allowed with this signature.
+    }
+    return ServeInternal(flags | fuchsia_io::Flags::kProtocolDirectory, server_end.TakeChannel(),
+                         dispatcher);
+  }
+
+  // TODO(https://fxbug.dev/336617685): This version of `Serve` is deprecated and should be removed.
   using Node::Serve;
 
   // Sets the fallback directory for services. Services in this directory can be connected to, but

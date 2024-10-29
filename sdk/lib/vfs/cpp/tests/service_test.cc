@@ -6,6 +6,7 @@
 // //src/storage/lib/vfs/cpp and //src/storage/conformance.
 
 #include <fcntl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/test.placeholders/cpp/test_base.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -26,12 +27,12 @@ class ServiceTest : public ::gtest::RealLoopFixture {
  protected:
   void SetUp() override {
     root_ = std::make_unique<vfs::PseudoDir>();
-    zx::channel root_server;
-    ASSERT_EQ(zx::channel::create(0, &root_client_, &root_server), ZX_OK);
-    ASSERT_EQ(root_->Serve(fuchsia_io::OpenFlags::kRightReadable, std::move(root_server)), ZX_OK);
+    auto [root_client, root_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(root_->Serve(fuchsia_io::kPermReadable, std::move(root_server)), ZX_OK);
+    root_client_ = std::move(root_client);
   }
 
-  const zx::channel& root_client() { return root_client_; }
+  const fidl::ClientEnd<fuchsia_io::Directory>& root_client() { return root_client_; }
 
   void AddService(std::unique_ptr<vfs::Service> service, std::string_view path) {
     EXPECT_EQ(root_->AddEntry(std::string(path), std::move(service)), ZX_OK);
@@ -39,8 +40,8 @@ class ServiceTest : public ::gtest::RealLoopFixture {
 
  private:
   std::unique_ptr<vfs::PseudoDir> root_;
-  zx::channel root_client_;
   std::vector<zx::channel> channels_;
+  fidl::ClientEnd<fuchsia_io::Directory> root_client_;
 };
 
 TEST_F(ServiceTest, Lambda) {
@@ -55,7 +56,8 @@ TEST_F(ServiceTest, Lambda) {
     for (size_t i = 0; i < kConnectionAttempts; ++i) {
       zx::channel client, server;
       ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
-      ASSERT_EQ(fdio_service_connect_at(root_client().get(), "lambda", server.release()), ZX_OK);
+      ASSERT_EQ(fdio_service_connect_at(root_client().channel().get(), "lambda", server.release()),
+                ZX_OK);
     }
   });
   RunLoopUntilIdle();

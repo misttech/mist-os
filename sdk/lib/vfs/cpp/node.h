@@ -42,21 +42,21 @@ class Node {
   friend class vfs::LazyDir;
   friend class vfs::PseudoDir;
 
-  // Establishes a connection for `request` using the given `flags`. This method must only be used
-  // with a single-threaded asynchronous dispatcher. If `dispatcher` is `nullptr`, the current
-  // thread's default dispatcher will be used via `async_get_default_dispatcher`.
+  // Establishes a connection for `request` using the given `flags`.
   //
-  // The same `dispatcher` must be used if multiple connections are served for the same node,
-  // otherwise `ZX_ERR_INVALID_ARGS` will be returned.
+  // This method must only be used with a single-threaded asynchronous dispatcher. If `dispatcher`
+  // is `nullptr`, the current thread's default dispatcher will be used via
+  // `async_get_default_dispatcher`. The same `dispatcher` must be used if multiple connections are
+  // served for the same node, otherwise `ZX_ERR_INVALID_ARGS` will be returned.
   //
-  // *WARNING*: Not all node types support `Serve()` due to lifetime restrictions (e.g. `LazyDir`).
-  zx_status_t Serve(fuchsia_io::OpenFlags flags, zx::channel request,
-                    async_dispatcher_t* dispatcher = nullptr) {
+  // *WARNING*: Not all nodes can be served due to lifetime restrictions (e.g. `LazyDir`).
+  zx_status_t ServeInternal(fuchsia_io::Flags flags, zx::channel request,
+                            async_dispatcher_t* dispatcher = nullptr) const {
     if (!dispatcher) {
       dispatcher = async_get_default_dispatcher();
     }
-    return vfs_internal_node_serve(handle_, dispatcher, request.release(),
-                                   static_cast<uint32_t>(flags));
+    return vfs_internal_node_serve3(handle_, dispatcher, request.release(),
+                                    static_cast<uint64_t>(flags));
   }
 
   // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -74,6 +74,8 @@ class Node {
   // otherwise `ZX_ERR_INVALID_ARGS` will be returned.
   //
   // *WARNING*: Not all node types support `Serve()` due to lifetime restrictions (e.g. `LazyDir`).
+  // TODO(https://fxbug.dev/336617685): Annotate this function with `ZX_DEPRECATED_SINCE` when all
+  // in-tree usages have been migrated to the new typed signatures in each concrete node type.
   zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
                     async_dispatcher_t* dispatcher = nullptr) {
     if (!dispatcher) {

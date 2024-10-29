@@ -21,8 +21,6 @@
 #include <memory>
 #include <vector>
 
-#include "fidl/fuchsia.io/cpp/common_types.h"
-
 namespace fio = fuchsia_io;
 namespace fio_test = fuchsia_io_test;
 
@@ -66,7 +64,11 @@ class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
       AddEntry(std::move(*entry), *dir);
     }
 
-    ZX_ASSERT_MSG(dir->Serve(request.flags(), request.directory_request().TakeChannel()) == ZX_OK,
+    // TODO(https://fxbug.dev/324112857): Convert this to use the new Serve signature when the
+    // GetDirectory method is compatible with fuchsia.io/Flags.
+    fuchsia::io::OpenFlags deprecated_flags =
+        static_cast<fuchsia::io::OpenFlags>(static_cast<uint32_t>(request.flags()));
+    ZX_ASSERT_MSG(dir->Serve(deprecated_flags, request.directory_request().TakeChannel()) == ZX_OK,
                   "Failed to serve directory!");
     directories_.push_back(std::move(dir));
   }
@@ -83,7 +85,7 @@ class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
                           std::make_unique<vfs::Service>(std::move(handler))) == ZX_OK);
     // Serve it and reply to the request with the client end.
     auto [client_end, server_end] = fidl::Endpoints<fio::Directory>::Create();
-    ZX_ASSERT(svc_dir->Serve(fio::OpenFlags::kRightReadable, server_end.TakeChannel()) == ZX_OK);
+    ZX_ASSERT(svc_dir->Serve(fio::wire::kPermReadable, std::move(server_end)) == ZX_OK);
     completer.Reply({std::move(client_end)});
     // Make sure we keep the pseudo-dir alive since it will close all connections when destroyed.
     directories_.push_back(std::move(svc_dir));

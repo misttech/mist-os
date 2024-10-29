@@ -206,13 +206,27 @@ __EXPORT zx_status_t vfs_internal_node_serve3(vfs_internal_node_t* vnode,
   if (!chan) {
     return ZX_ERR_BAD_HANDLE;
   }
+  using fuchsia_io::Flags;
+  Flags fio_flags = static_cast<fuchsia_io::Flags>(flags);
+  // Ensure FLAG_*_CREATE was not set. We cannot create an object without a path and type.
+  if (fio_flags & (Flags::kFlagMaybeCreate | Flags::kFlagMustCreate)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
   std::lock_guard guard(vnode->mutex);
   if (!vnode->vfs) {
     vnode->vfs = std::make_unique<intree_vfs::SynchronousVfs>(dispatcher);
   } else if (dispatcher != vnode->vfs->dispatcher()) {
     return ZX_ERR_INVALID_ARGS;
   }
-  return vnode->vfs->Serve(vnode->AsNode(), std::move(chan), static_cast<fuchsia_io::Flags>(flags));
+  // If the caller requested we truncate the node, handle that here. The `Serve` implementation
+  // below requires that no flags modify the node, so we must do that explicitly.
+  if (fio_flags & Flags::kFileTruncate) {
+    if (zx_status_t status = vnode->AsNode()->Truncate(0); status != ZX_OK) {
+      return status;
+    }
+    fio_flags ^= ~Flags::kFileTruncate;
+  }
+  return vnode->vfs->Serve(vnode->AsNode(), std::move(chan), fio_flags);
 }
 
 __EXPORT zx_status_t vfs_internal_node_shutdown(vfs_internal_node_t* vnode) {
