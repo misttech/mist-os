@@ -118,7 +118,6 @@ python_library("honeydew_no_testonly") {
     "typing/netstack.py",
     "typing/screenshot_image.py",
     "typing/ui.py",
-    "typing/wlan.py",
     "utils/__init__.py",
     "utils/common.py",
     "utils/decorators.py",
