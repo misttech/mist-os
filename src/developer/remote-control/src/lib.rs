@@ -119,23 +119,36 @@ impl RemoteControlService {
                 self.clone().identify_host(responder).await?;
                 Ok(())
             }
+            #[cfg(any(
+                fuchsia_api_level_less_than = "NEXT",
+                fuchsia_api_level_at_least = "PLATFORM"
+            ))]
             rcs::RemoteControlRequest::OpenCapability {
                 moniker,
                 capability_set,
                 capability_name,
                 server_channel,
-                flags,
+                flags: _,
                 responder,
             } => {
                 responder.send(
                     self.clone()
-                        .open_capability(
-                            moniker,
-                            capability_set,
-                            capability_name,
-                            flags,
-                            server_channel,
-                        )
+                        .open_capability(moniker, capability_set, capability_name, server_channel)
+                        .await,
+                )?;
+                Ok(())
+            }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            rcs::RemoteControlRequest::ConnectCapability {
+                moniker,
+                capability_set,
+                capability_name,
+                server_channel,
+                responder,
+            } => {
+                responder.send(
+                    self.clone()
+                        .open_capability(moniker, capability_set, capability_name, server_channel)
                         .await,
                 )?;
                 Ok(())
@@ -235,7 +248,6 @@ impl RemoteControlService {
         moniker: String,
         capability_set: fsys::OpenDirType,
         capability_name: String,
-        flags: io::OpenFlags,
         server_end: zx::Channel,
     ) -> Result<(), rcs::ConnectCapabilityError> {
         // Connect to the root LifecycleController protocol
@@ -263,7 +275,6 @@ impl RemoteControlService {
             capability_set,
             capability_name,
             server_end,
-            flags,
             lifecycle,
             query,
         )
@@ -339,7 +350,6 @@ async fn connect_to_capability_at_moniker(
     capability_set: fsys::OpenDirType,
     capability_name: String,
     server_end: zx::Channel,
-    flags: io::OpenFlags,
     lifecycle: fsys::LifecycleControllerProxy,
     query: fsys::RealmQueryProxy,
 ) -> Result<(), rcs::ConnectCapabilityError> {
@@ -363,7 +373,7 @@ async fn connect_to_capability_at_moniker(
         })
         .await?;
 
-    connect_to_capability_in_dir(&dir, &capability_name, server_end, flags).await?;
+    connect_to_capability_in_dir(&dir, &capability_name, server_end).await?;
     Ok(())
 }
 
@@ -371,17 +381,20 @@ async fn connect_to_capability_in_dir(
     dir: &io::DirectoryProxy,
     capability_name: &str,
     server_end: zx::Channel,
-    flags: io::OpenFlags,
 ) -> Result<(), rcs::ConnectCapabilityError> {
     check_entry_exists(dir, capability_name).await?;
 
     // Connect to the capability
-    dir.open(flags, io::ModeType::empty(), capability_name, ServerEnd::new(server_end)).map_err(
-        |err| {
-            error!(%err, "error opening capability from exposed dir");
-            rcs::ConnectCapabilityError::CapabilityConnectFailed
-        },
+    dir.open(
+        io::OpenFlags::empty(),
+        io::ModeType::empty(),
+        capability_name,
+        ServerEnd::new(server_end),
     )
+    .map_err(|err| {
+        error!(%err, "error opening capability from exposed dir");
+        rcs::ConnectCapabilityError::CapabilityConnectFailed
+    })
 }
 
 // Checks that the given directory contains an entry with the given name.
@@ -736,7 +749,6 @@ mod tests {
                 dir_type,
                 "fuchsia.hwinfo.Board".to_string(),
                 server,
-                io::OpenFlags::RIGHT_READABLE,
                 lifecycle,
                 query,
             )
@@ -761,7 +773,6 @@ mod tests {
                 dir_type,
                 "svc/fuchsia.hwinfo.Board".to_string(),
                 server,
-                io::OpenFlags::RIGHT_READABLE,
                 lifecycle,
                 query,
             )
@@ -786,7 +797,6 @@ mod tests {
                 dir_type,
                 "fuchsia.not.exposed".to_string(),
                 server,
-                io::OpenFlags::RIGHT_READABLE,
                 lifecycle,
                 query,
             )
@@ -812,7 +822,6 @@ mod tests {
                 dir_type,
                 "svc/fuchsia.not.exposed".to_string(),
                 server,
-                io::OpenFlags::RIGHT_READABLE,
                 lifecycle,
                 query,
             )
