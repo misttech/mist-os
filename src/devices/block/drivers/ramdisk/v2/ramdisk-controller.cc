@@ -97,6 +97,7 @@ void RamdiskController::Create(CreateRequestView request, CreateCompleter::Sync&
   }
 
   block_server::PartitionInfo partition_info = {
+      .start_block = 0,
       .block_count = block_count,
       .block_size = block_size,
   };

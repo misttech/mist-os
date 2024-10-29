@@ -1278,7 +1278,7 @@ mod tests {
         impl block_server::async_interface::Interface for Interface {
             async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
                 Ok(Cow::Owned(PartitionInfo {
-                    block_count: 1000,
+                    block_range: Some(0..1000),
                     type_guid: [0; 16],
                     instance_guid: [0; 16],
                     name: Some("foo".to_string()),

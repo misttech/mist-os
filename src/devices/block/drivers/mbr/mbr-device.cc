@@ -193,7 +193,19 @@ zx_status_t MbrDevice::BlockPartitionGetName(char* out_name, size_t capacity) {
   return ZX_OK;
 }
 
-zx_status_t MbrDevice::BlockPartitionGetFlags(uint64_t* out_flags) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t MbrDevice::BlockPartitionGetMetadata(partition_metadata_t* out_metadata) {
+  static_assert(sizeof(out_metadata->name) >= GPT_NAME_LEN);
+  strlcpy(out_metadata->name, name_.c_str(), sizeof(out_metadata->name));
+  if (zx_status_t status = BlockPartitionGetGuid(GUIDTYPE_TYPE, &out_metadata->type_guid);
+      status != ZX_OK) {
+    return status;
+  }
+  memset(&out_metadata->instance_guid, 0, sizeof(out_metadata->instance_guid));
+  out_metadata->start_block_offset = partition_.start_sector_lba;
+  out_metadata->num_blocks = info_.block_count;
+  out_metadata->flags = partition_.status;
+  return ZX_OK;
+}
 
 void MbrDevice::DdkRelease() { delete this; }
 

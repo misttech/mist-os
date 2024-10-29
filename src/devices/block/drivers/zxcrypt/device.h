@@ -70,7 +70,7 @@ class Device final : public DeviceType,
   // ddk::PartitionProtocol methods; see fuchsia/hardware/block/partition/cpp/banjo.h
   zx_status_t BlockPartitionGetGuid(guidtype_t guidtype, guid_t* out_guid);
   zx_status_t BlockPartitionGetName(char* out_name, size_t capacity);
-  zx_status_t BlockPartitionGetFlags(uint64_t* out_flags);
+  zx_status_t BlockPartitionGetMetadata(partition_metadata_t* out_metadata);
 
   // ddk:::VolumeProtocol methods; see fuchsia/hardware/block/volume/cpp/banjo.h
   zx_status_t BlockVolumeExtend(const slice_extent_t* extent);

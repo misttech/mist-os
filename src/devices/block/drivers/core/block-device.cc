@@ -4,7 +4,9 @@
 
 #include "src/devices/block/drivers/core/block-device.h"
 
+#include <fidl/fuchsia.hardware.block.partition/cpp/natural_types.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
+#include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/operation/block.h>
 #include <lib/zbi-format/partition.h>
 #include <lib/zx/profile.h>
@@ -257,17 +259,44 @@ void BlockDevice::GetName(GetNameCompleter::Sync& completer) {
                   status == ZX_OK ? fidl::StringView::FromExternal(name) : fidl::StringView{});
 }
 
-void BlockDevice::GetFlags(GetFlagsCompleter::Sync& completer) {
+void BlockDevice::GetMetadata(GetMetadataCompleter::Sync& completer) {
   if (!parent_partition_protocol_.is_valid()) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
-  uint64_t flags = 0;
-  if (zx_status_t status = parent_partition_protocol_.GetFlags(&flags); status != ZX_OK) {
+  partition_metadata_t metadata;
+  if (zx_status_t status = parent_partition_protocol_.GetMetadata(&metadata); status != ZX_OK) {
     completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess(flags);
+    return;
   }
+
+  static_assert(sizeof(fuchsia_hardware_block_partition::wire::Guid) == sizeof(guid_t));
+  fuchsia_hardware_block_partition::wire::Guid type_guid, instance_guid;
+  memcpy(type_guid.value.data(), &metadata.type_guid, sizeof(guid_t));
+  memcpy(instance_guid.value.data(), &metadata.instance_guid, sizeof(guid_t));
+  constexpr const fuchsia_hardware_block_partition::wire::Guid kNilGuid = {
+      .value = {0},
+  };
+
+  fidl::Arena arena;
+  auto response =
+      fuchsia_hardware_block_partition::wire::PartitionGetMetadataResponse::Builder(arena);
+  response.name(
+      fidl::StringView::FromExternal(metadata.name, strnlen(metadata.name, sizeof(metadata.name))));
+  if (type_guid.value != kNilGuid.value) {
+    response.type_guid(type_guid);
+  }
+  if (instance_guid.value != kNilGuid.value) {
+    response.instance_guid(instance_guid);
+  }
+  if (metadata.start_block_offset > 0) {
+    response.start_block_offset(metadata.start_block_offset);
+  }
+  if (metadata.num_blocks > 0) {
+    response.num_blocks(metadata.num_blocks);
+  }
+  response.flags(metadata.flags);
+  completer.ReplySuccess(response.Build());
 }
 
 void BlockDevice::QuerySlices(QuerySlicesRequestView request,

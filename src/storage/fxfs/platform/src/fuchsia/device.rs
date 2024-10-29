@@ -326,7 +326,7 @@ impl BlockServer {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
             // TODO(https://fxbug.dev/42171261)
-            VolumeRequest::GetFlags { responder } => {
+            VolumeRequest::GetMetadata { responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeRequest::QuerySlices { start_slices, responder } => {

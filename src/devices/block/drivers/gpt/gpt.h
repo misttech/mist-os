@@ -55,7 +55,7 @@ class PartitionDevice : public DeviceType,
   // Partition protocol implementation.
   zx_status_t BlockPartitionGetGuid(guidtype_t guid_type, guid_t* out_guid);
   zx_status_t BlockPartitionGetName(char* out_name, size_t capacity);
-  zx_status_t BlockPartitionGetFlags(uint64_t* out_flags);
+  zx_status_t BlockPartitionGetMetadata(partition_metadata_t* out_metadata);
 
  private:
   size_t block_op_size_ = 0;

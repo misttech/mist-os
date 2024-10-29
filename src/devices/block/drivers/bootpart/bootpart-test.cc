@@ -71,6 +71,11 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice> {
   bool flushed_ = true;
 };
 
+constexpr const char kLongName[32] = {
+    'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a',
+    'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a',
+};
+
 class BootPartitionTest : public zxtest::Test {
  public:
   void SetUp() override {
@@ -103,7 +108,7 @@ class BootPartitionTest : public zxtest::Test {
     partitions[1].last_block = 23;
     memset(partitions[1].type_guid, 'U', sizeof(partitions[1].type_guid));
     memset(partitions[1].uniq_guid, 'J', sizeof(partitions[1].uniq_guid));
-    strncpy(partitions[1].name, "This is partition1", sizeof(partitions[1].name));
+    memcpy(partitions[1].name, kLongName, sizeof(partitions[1].name));
 
     ASSERT_OK(device_add_metadata(parent_.get(), DEVICE_METADATA_PARTITION_MAP,
                                   partition_map_buffer.data(), partition_map_buffer.size()));
@@ -139,14 +144,22 @@ TEST_F(BootPartitionTest, BlockPartitionOps) {
 
     char name[MAX_PARTITION_NAME_LENGTH];
     EXPECT_OK(partition_client.GetName(name, sizeof(name)));
-    EXPECT_STREQ(name, partition_name);
+    EXPECT_EQ(strncmp(name, partition_name, 32), 0);
+
+    char name_short[33];
+    EXPECT_OK(partition_client.GetName(name_short, 33));
+    EXPECT_EQ(strncmp(name_short, partition_name, 32), 0);
+
+    EXPECT_NOT_OK(partition_client.GetName(name_short, 32));
   };
 
   auto child0 = parent_->children().front();
-  check_partition_info(child0->GetDeviceContext<BootPartition>(), 'T', 'I', "This is partition0");
+  ASSERT_NO_FATAL_FAILURE(check_partition_info(child0->GetDeviceContext<BootPartition>(), 'T', 'I',
+                                               "This is partition0"));
 
   auto child1 = parent_->children().back();
-  check_partition_info(child1->GetDeviceContext<BootPartition>(), 'U', 'J', "This is partition1");
+  ASSERT_NO_FATAL_FAILURE(
+      check_partition_info(child1->GetDeviceContext<BootPartition>(), 'U', 'J', kLongName));
 }
 
 TEST_F(BootPartitionTest, BlockImplOpsPassedThrough) {

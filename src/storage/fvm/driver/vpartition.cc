@@ -455,7 +455,24 @@ zx_status_t VPartition::BlockPartitionGetName(char* out_name, size_t capacity) {
   return ZX_OK;
 }
 
-zx_status_t VPartition::BlockPartitionGetFlags(uint64_t* out_flags) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t VPartition::BlockPartitionGetMetadata(partition_metadata_t* out_metadata) {
+  if (zx_status_t status = BlockPartitionGetName(out_metadata->name, sizeof(out_metadata->name));
+      status != ZX_OK) {
+    return status;
+  }
+  if (zx_status_t status = BlockPartitionGetGuid(GUIDTYPE_TYPE, &out_metadata->type_guid);
+      status != ZX_OK) {
+    return status;
+  }
+  if (zx_status_t status = BlockPartitionGetGuid(GUIDTYPE_INSTANCE, &out_metadata->instance_guid);
+      status != ZX_OK) {
+    return status;
+  }
+  out_metadata->start_block_offset = 0;
+  out_metadata->num_blocks = 0;
+  out_metadata->flags = 0;
+  return ZX_OK;
+}
 
 zx_status_t VPartition::BlockVolumeExtend(const slice_extent_t* extent) {
   if (zx_status_t status = BoundsCheckSliceExtent(*extent, mgr_->VSliceMax()); status != ZX_OK) {

@@ -69,7 +69,7 @@ class MbrDevice final : public DeviceType,
   // Partition protocol implementation.
   zx_status_t BlockPartitionGetGuid(guidtype_t guid_type, guid_t* out_guid);
   zx_status_t BlockPartitionGetName(char* out_name, size_t capacity);
-  zx_status_t BlockPartitionGetFlags(uint64_t* out_flags);
+  zx_status_t BlockPartitionGetMetadata(partition_metadata_t* out_metadata);
 
   static bool SupportsPartitionType(uint8_t type);
 

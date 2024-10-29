@@ -41,9 +41,18 @@ closed protocol Partition {
         name string:<NAME_LENGTH, optional>;
     });
 
-    /// Gets the flags of the partition.
-    /// If the partition has no flags, ZX_ERR_NOT_SUPPORTED is returned.
-    strict GetFlags() -> (struct {
-        flags uint64;
+    /// Gets the metadata for the partition.
+    ///
+    /// Fields may be absent if the partition doesn't have the given metadata.
+    strict GetMetadata() -> (table {
+        1: name string:<NAME_LENGTH>;
+        2: type_guid Guid;
+        3: instance_guid Guid;
+        /// start_block_offset will be absent if the partition is non-contiguous.
+        4: start_block_offset uint64;
+        /// num_blocks will be absent if the partition is a dynamic volume, in which case
+        /// fuchsia.hardware.block.volume.Volume/GetVolumeInfo should be called instead.
+        5: num_blocks uint64;
+        6: flags uint64;
     }) error zx.Status;
 };

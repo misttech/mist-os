@@ -20,6 +20,7 @@ using Operation = internal::Operation;
 using Request = internal::Request;
 
 struct PartitionInfo {
+  uint64_t start_block;
   uint64_t block_count;
   uint32_t block_size;
   uint8_t type_guid[16];

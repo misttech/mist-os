@@ -182,11 +182,11 @@ zx_status_t Device::BlockPartitionGetName(char* out_name, size_t capacity) {
   return info_.partition_protocol.GetName(out_name, capacity);
 }
 
-zx_status_t Device::BlockPartitionGetFlags(uint64_t* out_flags) {
+zx_status_t Device::BlockPartitionGetMetadata(partition_metadata_t* out_metadata) {
   if (!info_.partition_protocol.is_valid()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  return info_.partition_protocol.GetFlags(out_flags);
+  return info_.partition_protocol.GetMetadata(out_metadata);
 }
 
 ////////////////////////////////////////////////////////////////

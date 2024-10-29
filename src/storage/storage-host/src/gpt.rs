@@ -148,7 +148,7 @@ impl GptPartition {
 
 fn convert_partition_info(info: &gpt::PartitionInfo) -> block_server::PartitionInfo {
     block_server::PartitionInfo {
-        block_count: info.num_blocks,
+        block_range: Some(info.start_block..info.start_block + info.num_blocks),
         type_guid: info.type_guid.to_bytes(),
         instance_guid: info.instance_guid.to_bytes(),
         name: Some(info.label.clone()),

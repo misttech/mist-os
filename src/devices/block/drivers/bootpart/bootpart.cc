@@ -95,16 +95,27 @@ zx_status_t BootPartition::BlockPartitionGetGuid(guidtype_t guid_type, guid_t* o
 static_assert(ZBI_PARTITION_NAME_LEN <= MAX_PARTITION_NAME_LENGTH, "Name length mismatch");
 
 zx_status_t BootPartition::BlockPartitionGetName(char* out_name, size_t capacity) {
-  if (capacity < ZBI_PARTITION_NAME_LEN) {
+  if (capacity < ZBI_PARTITION_NAME_LEN + 1) {
     return ZX_ERR_BUFFER_TOO_SMALL;
   }
 
-  strlcpy(out_name, zbi_partition_.name, ZBI_PARTITION_NAME_LEN);
+  size_t len = strnlen(zbi_partition_.name, ZBI_PARTITION_NAME_LEN);
+  memcpy(out_name, zbi_partition_.name, len);
+  out_name[len] = '\0';
+
   return ZX_OK;
 }
 
-zx_status_t BootPartition::BlockPartitionGetFlags(uint64_t* out_flags) {
-  *out_flags = zbi_partition_.flags;
+zx_status_t BootPartition::BlockPartitionGetMetadata(partition_metadata_t* out_metadata) {
+  if (zx_status_t status = BlockPartitionGetName(out_metadata->name, sizeof(out_metadata->name));
+      status != ZX_OK) {
+    return status;
+  }
+  memcpy(&out_metadata->type_guid, zbi_partition_.type_guid, ZBI_PARTITION_GUID_LEN);
+  memcpy(&out_metadata->instance_guid, zbi_partition_.uniq_guid, ZBI_PARTITION_GUID_LEN);
+  out_metadata->start_block_offset = zbi_partition_.first_block;
+  out_metadata->num_blocks = zbi_partition_.last_block - zbi_partition_.first_block;
+  out_metadata->flags = zbi_partition_.flags;
   return ZX_OK;
 }
 

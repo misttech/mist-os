@@ -90,6 +90,7 @@ TEST(BlockServer, Basic) {
   TestInterface test_interface;
   BlockServer block_server(
       PartitionInfo{
+          .start_block = 0,
           .block_count = kBlocks,
           .block_size = kBlockSize,
           .type_guid = {1, 2, 3, 4},
@@ -145,6 +146,7 @@ TEST(BlockServer, Termination) {
   {
     BlockServer block_server(
         PartitionInfo{
+            .start_block = 0,
             .block_count = kBlocks,
             .block_size = kBlockSize,
             .type_guid = {1, 2, 3, 4},
@@ -174,6 +176,7 @@ TEST(BlockServer, AsyncTermination) {
 
   BlockServer block_server(
       PartitionInfo{
+          .start_block = 0,
           .block_count = kBlocks,
           .block_size = kBlockSize,
           .type_guid = {1, 2, 3, 4},
@@ -205,6 +208,7 @@ TEST(BlockServer, FullFifo) {
   TestInterface test_interface;
   BlockServer block_server(
       PartitionInfo{
+          .start_block = 0,
           .block_count = kBlocks,
           .block_size = kBlockSize,
           .type_guid = {1, 2, 3, 4},
@@ -272,6 +276,7 @@ TEST(BlockServer, Group) {
   TestInterface test_interface;
   BlockServer block_server(
       PartitionInfo{
+          .start_block = 0,
           .block_count = kBlocks,
           .block_size = kBlockSize,
           .type_guid = {1, 2, 3, 4},

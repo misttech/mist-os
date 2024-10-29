@@ -135,8 +135,17 @@ zx_status_t PartitionDevice::BlockPartitionGetName(char* out_name, size_t capaci
   return ZX_OK;
 }
 
-zx_status_t PartitionDevice::BlockPartitionGetFlags(uint64_t* out_flags) {
-  return ZX_ERR_NOT_SUPPORTED;
+zx_status_t PartitionDevice::BlockPartitionGetMetadata(partition_metadata_t* out_metadata) {
+  strlcpy(out_metadata->name, partition_name_.c_str(), sizeof(out_metadata->name));
+  if (zx_status_t status = BlockPartitionGetGuid(GUIDTYPE_TYPE, &out_metadata->type_guid);
+      status != ZX_OK) {
+    return status;
+  }
+  memset(&out_metadata->instance_guid, 0, sizeof(out_metadata->instance_guid));
+  out_metadata->start_block_offset = 0;
+  out_metadata->num_blocks = block_info_.block_count;
+  out_metadata->flags = 0;
+  return ZX_OK;
 }
 
 fdf::Logger& PartitionDevice::logger() { return sdmmc_parent_->logger(); }
