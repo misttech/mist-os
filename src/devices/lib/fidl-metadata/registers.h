@@ -9,6 +9,7 @@
 #include <lib/zx/result.h>
 #include <stdint.h>
 
+#include <string>
 #include <vector>
 
 namespace fidl_metadata::registers {

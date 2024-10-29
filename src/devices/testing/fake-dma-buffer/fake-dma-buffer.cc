@@ -5,6 +5,8 @@
 #include <lib/dma-buffer/buffer.h>
 #include <lib/zx/vmar.h>
 
+#include <string_view>
+
 #include <fake-dma-buffer/fake-dma-buffer.h>
 
 class ContiguousBufferImpl : public dma_buffer::ContiguousBuffer {

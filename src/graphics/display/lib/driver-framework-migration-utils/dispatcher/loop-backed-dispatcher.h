@@ -10,6 +10,8 @@
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
+#include <string_view>
+
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/lib/driver-framework-migration-utils/dispatcher/dispatcher.h"

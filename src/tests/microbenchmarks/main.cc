@@ -4,6 +4,8 @@
 
 #include "main.h"
 
+#include <cstdlib>
+
 #if defined(__Fuchsia__)
 #include <lib/scheduler/role.h>
 

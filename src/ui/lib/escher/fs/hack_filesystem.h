@@ -10,6 +10,7 @@
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
+#include <string>
 #include <vector>
 
 #include "src/lib/fxl/memory/ref_counted.h"

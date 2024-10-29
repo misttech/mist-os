@@ -6,6 +6,7 @@
 #define SRC_LIB_DRIVER_SYMBOLS_RESTRICTED_SYMBOLS_H_
 
 #include <set>
+#include <string>
 
 namespace driver_symbols {
 

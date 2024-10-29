@@ -11,6 +11,7 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <string>
 #include <vector>
 
 #define DECL_ADC_CHANNEL(channel) \
