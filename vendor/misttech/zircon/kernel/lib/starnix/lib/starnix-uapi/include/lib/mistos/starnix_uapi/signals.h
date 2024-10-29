@@ -118,6 +118,7 @@ struct SigSet {
 
   SigSet operator&(const SigSet& other) const { return SigSet(value_ & other.value_); }
   SigSet operator~() const { return SigSet(~value_); }
+  SigSet operator|(const SigSet& other) const { return SigSet(value_ | other.value_); }
 
   SigSet() = default;
 
