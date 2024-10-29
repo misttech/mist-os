@@ -6,6 +6,8 @@ library fuchsia.starnix.runner;
 
 using zx;
 
+const PROXY_NAME_LEN uint32 = 1024;
+
 @discoverable
 open protocol Manager {
     /// Suspends all the running Starnix kernels.
@@ -56,7 +58,7 @@ open protocol Manager {
         4: resume_event zx.Handle:EVENTPAIR;
 
         /// The name of the proxy, used for debugging purposes.
-        5: name string:zx.MAX_NAME_LEN;
+        5: name string:PROXY_NAME_LEN;
     });
 };
 

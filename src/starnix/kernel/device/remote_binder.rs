@@ -972,7 +972,10 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
 
         let (power_controller_server_end, power_controller_client_end) = zx::Channel::create();
         let (power_controller_server_end, power_controller_event) =
-            crate::power::create_proxy_for_wake_events(power_controller_server_end, format!("hal"));
+            crate::power::create_proxy_for_wake_events(
+                power_controller_server_end,
+                format!("hal: {}", service_name),
+            );
 
         remote_controller
             .start(fbinder::RemoteControllerStartRequest {
