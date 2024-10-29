@@ -12,7 +12,6 @@ dart_library("pm") {
   sources = [ "pm.dart" ]
 
   deps = [
-    "//sdk/testing/sl4f/client",
     "//src/tests/end_to_end/package_manager/util/net:net",
     "//src/tests/end_to_end/package_manager/util/pkg:pkg",
     "//third_party/dart-pkg/pub/async",

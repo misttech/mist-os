@@ -101,11 +101,22 @@ if (is_host) {
   }
 }
 
+group("host_tests") {
+  testonly = true
+
+  deps = [ ":gather_package_deps_test($host_toolchain)" ]
+}
+
+group("e2e_tests") {
+  testonly = true
+
+  deps = [ ":package_manager_test($host_toolchain)" ]
+}
 group("tests") {
   testonly = true
 
   deps = [
-    ":gather_package_deps_test($host_toolchain)",
-    ":package_manager_test($host_toolchain)",
+    ":e2e_tests",
+    ":host_tests",
   ]
 }

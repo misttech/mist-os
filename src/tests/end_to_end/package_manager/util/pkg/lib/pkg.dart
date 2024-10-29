@@ -9,7 +9,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:quiver/core.dart' show Optional;
-import 'package:sl4f/sl4f.dart' as sl4f;
 
 /// Make sure there's only one instance of the item in the input.
 ///
@@ -57,42 +56,4 @@ Optional<String> getCurrentRewriteRule(String ruleList) {
     return Optional.of(match.group(1));
   }
   return Optional.absent();
-}
-
-/// Returns the output of `pkgctl repo` as a set.
-///
-/// Each line in the output is a string in the set.
-Future<Set<String>> getCurrentRepos(sl4f.Sl4f sl4fDriver) async {
-  var listSrcsResponse = await sl4fDriver.ssh.run('pkgctl repo');
-  if (listSrcsResponse.exitCode != 0) {
-    return {};
-  }
-  return Set.from(LineSplitter().convert(listSrcsResponse.stdout.toString()));
-}
-
-/// Resets the pkgctl state to its default state.
-///
-/// Some tests add new package sources that override defaults. We can't
-/// trust that they will clean up after themselves, so this function
-/// will generically remove all non-original sources and enable the original
-/// rewrite rule.
-Future<bool> resetPkgctl(sl4f.Sl4f sl4fDriver, Set<String> originalRepos,
-    String originalRewriteRule) async {
-  var currentRepos = await getCurrentRepos(sl4fDriver);
-
-  // Remove all repos that were not originally existing.
-  currentRepos.removeAll(originalRepos);
-  for (final server in currentRepos) {
-    final rmSrcResponse = await sl4fDriver.ssh.run('pkgctl repo rm $server');
-    if (rmSrcResponse.exitCode != 0) {
-      return false;
-    }
-  }
-
-  final response = await sl4fDriver.ssh
-      .run('pkgctl rule replace json \'$originalRewriteRule\'');
-  if (response.exitCode != 0) {
-    return false;
-  }
-  return true;
 }

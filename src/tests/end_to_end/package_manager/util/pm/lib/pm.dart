@@ -17,11 +17,9 @@ import 'package:net/ports.dart';
 import 'package:path/path.dart' as path;
 import 'package:quiver/core.dart' show Optional;
 import 'package:retry/retry.dart';
-import 'package:sl4f/sl4f.dart' as sl4f;
 import 'package:test/test.dart';
 
 class PackageManagerRepo {
-  final sl4f.Sl4f _sl4fDriver;
   final String _ffxPath;
   final String _ffxIsolateDir;
   final String _repoPath;
@@ -31,18 +29,16 @@ class PackageManagerRepo {
   Optional<int> getServePort() => _servePort;
   String getRepoPath() => _repoPath;
 
-  PackageManagerRepo._create(this._sl4fDriver, this._ffxPath,
-      this._ffxIsolateDir, this._repoPath, this._log) {
+  PackageManagerRepo._create(
+      this._ffxPath, this._ffxIsolateDir, this._repoPath, this._log) {
     _servePort = Optional.absent();
   }
 
-  static Future<PackageManagerRepo> initRepo(
-      sl4f.Sl4f sl4fDriver, String ffxPath, Logger log) async {
+  static Future<PackageManagerRepo> initRepo(String ffxPath, Logger log) async {
     var repoPath = (await Directory.systemTemp.createTemp('repo')).path;
     var ffxIsolateDir =
         (await Directory.systemTemp.createTemp('ffx_isolate_dir')).path;
-    return PackageManagerRepo._create(
-        sl4fDriver, ffxPath, ffxIsolateDir, repoPath, log);
+    return PackageManagerRepo._create(ffxPath, ffxIsolateDir, repoPath, log);
   }
 
   /// Create new repo using `ffx repository create`.
@@ -94,18 +90,16 @@ class PackageManagerRepo {
   ///
   /// Returns `true` if serve startup was successful.
   Future<bool> tryServe(String repoName, int port) async {
-    await stopServer();
-    await ffx(
-        ['repository', 'add-from-pm', _repoPath, '--repository', repoName]);
-
-    final start_result = await Process.run(_ffxPath + "/ffx", [
-      '--config',
-      'ffx.subtool-search-paths=' + _ffxPath,
-      '--isolate-dir',
-      _ffxIsolateDir,
+    await stopServer(repoName);
+    final start_result = await ffxRun([
       'repository',
       'server',
       'start',
+      '--background',
+      '--repository',
+      repoName,
+      '--repo-path',
+      _repoPath,
       '--address',
       '[::]:$port'
     ]);
@@ -114,10 +108,14 @@ class PackageManagerRepo {
       return false;
     }
 
-    final status = await serverStatus();
-    expect(status['state'], 'running');
+    final status = await serverStatus(repoName);
+    _log.info('Server status after start is: $status');
+    expect(status['ok']['data'][0]['name'], repoName,
+        reason: 'Status did not return $repoName in $status');
 
-    _servePort = Optional.of(Uri.parse('http://' + status['address']).port);
+    // parse the port out of the address.
+    _servePort = Optional.of(
+        Uri.parse('http://' + status['ok']['data'][0]['address']).port);
 
     if (port != 0) {
       expect(_servePort.value, port);
@@ -139,8 +137,7 @@ class PackageManagerRepo {
   /// Does not return until the serve begins listening, or times out.
   ///
   /// Uses these commands:
-  /// `ffx repository add-from-pm <repo path> --repository <repo name>`
-  /// `ffx repository server start --address [::]:0`
+  /// `ffx repository server start --background --address [::]:0`
   Future<void> startServer(String repoName) async {
     _log.info('Server is starting.');
     final retryOptions = RetryOptions(maxAttempts: 5);
@@ -158,8 +155,7 @@ class PackageManagerRepo {
   /// Does not return until the serve begins listening, or times out.
   ///
   /// Uses these commands:
-  /// `ffx repository add-from-pm <repo path> --repository <repo name>`
-  /// `ffx repository server start --address [::]:<port number>`
+  /// `ffx repository server start --background --address [::]:<port number>`
   Future<void> startServerUnusedPort(String repoName) async {
     await getUnusedPort<bool>((unusedPort) async {
       _log.info('Serve is starting on port: $unusedPort');
@@ -172,32 +168,89 @@ class PackageManagerRepo {
     expect(_servePort.isPresent, isTrue);
   }
 
-  Future<dynamic> serverStatus() async {
-    return json.decode(
-        await ffx(['--machine', 'json', 'repository', 'server', 'status']));
+  Future<dynamic> serverStatus(String repoName) async {
+    return json.decode(await ffx([
+      '--machine',
+      'json',
+      'repository',
+      'server',
+      'list',
+      '--name',
+      repoName
+    ]));
   }
 
   /// Register the repo in target using `ffx target repository register`.
   ///
   /// Uses this command:
   /// `ffx target repository register`
-  Future<void> ffxTargetRepositoryRegister() async {
-    await ffx(['target', 'repository', 'register']);
+  Future<void> ffxTargetRepositoryRegister(String repoName) async {
+    await ffx(['target', 'repository', 'register', '--repository', repoName]);
   }
 
   Future<String> ffx(List<String> args) async {
+    final result = await ffxRun(args);
+    expect(result.exitCode, 0,
+        reason: '`ffx ${args.join(" ")}` failed: ' + result.stderr);
+    return result.stdout;
+  }
+
+  Future<ProcessResult> ffxRun(List<String> args) async {
+    var environment = Platform.environment;
+    final dev_addr = environment['FUCHSIA_DEVICE_ADDR'];
+    final port = environment['FUCHSIA_SSH_PORT'];
     final result = await Process.run(
         _ffxPath + "/ffx",
         [
+              '--target',
+              '$dev_addr:$port',
               '--config',
               'ffx.subtool-search-paths=' + _ffxPath,
               '--isolate-dir',
               _ffxIsolateDir
             ] +
             args);
-    expect(result.exitCode, 0,
-        reason: '`ffx ${args.join(" ")}` failed: ' + result.stderr);
-    return result.stdout;
+    return result;
+  }
+
+  /// Returns the output of `pkgctl repo` as a set.
+  ///
+  /// Each line in the output is a string in the set.
+  Future<Set<String>> getCurrentRepos() async {
+    var listSrcsResponse =
+        await _sshRun('Reading current registered repos', 'pkgctl repo', [], 0);
+    if (listSrcsResponse.exitCode != 0) {
+      return {};
+    }
+    return Set.from(LineSplitter().convert(listSrcsResponse.stdout.toString()));
+  }
+
+  /// Resets the pkgctl state to its default state.
+  ///
+  /// Some tests add new package sources that override defaults. We can't
+  /// trust that they will clean up after themselves, so this function
+  /// will generically remove all non-original sources and enable the original
+  /// rewrite rule.
+  Future<bool> resetPkgctl(
+      Set<String> originalRepos, String originalRewriteRule) async {
+    var currentRepos = await getCurrentRepos();
+
+    // Remove all repos that were not originally existing.
+    currentRepos.removeAll(originalRepos);
+    for (final server in currentRepos) {
+      final rmSrcResponse =
+          await _sshRun('Removing $server', 'pkgctl repo rm $server', [], 0);
+      if (rmSrcResponse.exitCode != 0) {
+        return false;
+      }
+    }
+
+    final response = await _sshRun('Resetting rewrite rules',
+        'pkgctl rule replace json \'$originalRewriteRule\'', [], 0);
+    if (response.exitCode != 0) {
+      return false;
+    }
+    return true;
   }
 
   /// Get the named component from the repo using `pkgctl resolve`.
@@ -206,7 +259,7 @@ class PackageManagerRepo {
   /// `pkgctl resolve <component URL>`
   Future<ProcessResult> pkgctlResolve(
       String msg, String url, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl resolve', [url], retCode);
+    return _sshRun(msg, 'pkgctl resolve', [url], retCode);
   }
 
   /// Get the named component from the repo using `pkgctl resolve --verbose`.
@@ -215,7 +268,7 @@ class PackageManagerRepo {
   /// `pkgctl resolve --verbose <component URL>`
   Future<ProcessResult> pkgctlResolveV(
       String msg, String url, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl resolve --verbose', [url], retCode);
+    return _sshRun(msg, 'pkgctl resolve --verbose', [url], retCode);
   }
 
   /// List repo sources using `pkgctl repo`.
@@ -223,7 +276,7 @@ class PackageManagerRepo {
   /// Uses this command:
   /// `pkgctl repo`
   Future<ProcessResult> pkgctlRepo(String msg, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl repo', [], retCode);
+    return _sshRun(msg, 'pkgctl repo', [], retCode);
   }
 
   /// Remove a repo source using `pkgctl repo rm`.
@@ -232,7 +285,7 @@ class PackageManagerRepo {
   /// `pkgctl repo rm <repo name>`
   Future<ProcessResult> pkgctlRepoRm(
       String msg, String repoName, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl repo', ['rm $repoName'], retCode);
+    return _sshRun(msg, 'pkgctl repo', ['rm $repoName'], retCode);
   }
 
   /// Replace dynamic rules using `pkgctl rule replace`.
@@ -241,7 +294,7 @@ class PackageManagerRepo {
   /// `pkgctl rule replace json <json>`
   Future<ProcessResult> pkgctlRuleReplace(
       String msg, String json, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl rule replace', ['json \'$json\''], retCode);
+    return _sshRun(msg, 'pkgctl rule replace', ['json \'$json\''], retCode);
   }
 
   /// List redirect rules using `pkgctl rule list`.
@@ -249,7 +302,7 @@ class PackageManagerRepo {
   /// Uses this command:
   /// `pkgctl rule list`
   Future<ProcessResult> pkgctlRuleList(String msg, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl rule list', [], retCode);
+    return _sshRun(msg, 'pkgctl rule list', [], retCode);
   }
 
   /// List redirect rules using `pkgctl rule dump-dynamic`.
@@ -257,7 +310,7 @@ class PackageManagerRepo {
   /// Uses this command:
   /// `pkgctl rule dump-dynamic`
   Future<ProcessResult> pkgctlRuleDumpdynamic(String msg, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl rule dump-dynamic', [], retCode);
+    return _sshRun(msg, 'pkgctl rule dump-dynamic', [], retCode);
   }
 
   /// Get a package hash `pkgctl get-hash`.
@@ -266,25 +319,24 @@ class PackageManagerRepo {
   /// `pkgctl get-hash <package name>`
   Future<ProcessResult> pkgctlGethash(
       String msg, String package, int retCode) async {
-    return _sl4fRun(msg, 'pkgctl', ['get-hash $package'], retCode);
+    return _sshRun(msg, 'pkgctl', ['get-hash $package'], retCode);
   }
 
-  Future<ProcessResult> _sl4fRun(
+  Future<ProcessResult> _sshRun(
       String msg, String cmd, List<String> params, int retCode,
       {bool randomize = false}) async {
     _log.info(msg);
     if (randomize) {
       params.shuffle();
     }
-    var cmdBuilder = StringBuffer()
-      ..write(cmd)
-      ..write(' ');
-    for (var param in params) {
-      cmdBuilder
-        ..write(param)
-        ..write(' ');
+    var ffxArgs = ['target', 'ssh', cmd] + params;
+    final response = await ffxRun(ffxArgs);
+    var stdout = response.stdout.toString();
+    var stderr = response.stderr.toString();
+    if (response.exitCode != 0) {
+      _log.info('Error running ffx ${ffxArgs}: $stdout $stderr');
     }
-    final response = await _sl4fDriver.ssh.run(cmdBuilder.toString());
+
     expect(response.exitCode, retCode);
     return response;
   }
@@ -311,10 +363,17 @@ class PackageManagerRepo {
     return true;
   }
 
-  Future<void> stopServer() async {
-    final status = await serverStatus();
-    if (status['state'] == 'running') {
-      await ffx(['repository', 'server', 'stop']);
+  Future<void> stopServer(String repoName) async {
+    final status = await serverStatus(repoName);
+    var info = {};
+    if (!status['ok']['data'].isEmpty) {
+      info = status['ok']['data'][0];
+    }
+    if (info['name'] == repoName) {
+      _log.info('Stopping server $repoName...');
+      await ffx(['repository', 'server', 'stop', repoName]);
+    } else {
+      _log.info('Server $repoName is not running: $status.');
     }
   }
 
