@@ -403,8 +403,16 @@ impl ToFileOptions for fio::Flags {
             return Err(Status::INVALID_ARGS);
         }
 
+        // Used to remove any non-file flags.
+        const ALLOWED_RIGHTS: fio::Operations = fio::Operations::empty()
+            .union(fio::Operations::GET_ATTRIBUTES)
+            .union(fio::Operations::READ_BYTES)
+            .union(fio::Operations::WRITE_BYTES)
+            .union(fio::Operations::UPDATE_ATTRIBUTES)
+            .union(fio::Operations::EXECUTE);
+
         Ok(FileOptions {
-            rights: flags_to_rights(self),
+            rights: flags_to_rights(self).intersection(ALLOWED_RIGHTS),
             is_append: self.contains(fio::Flags::FILE_APPEND),
         })
     }
@@ -478,7 +486,9 @@ impl ToNodeOptions for fio::Flags {
             }
         }
 
-        Ok(NodeOptions { rights: fio::Operations::GET_ATTRIBUTES })
+        Ok(NodeOptions {
+            rights: flags_to_rights(self).intersection(fio::Operations::GET_ATTRIBUTES),
+        })
     }
 }
 

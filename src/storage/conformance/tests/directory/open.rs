@@ -896,3 +896,67 @@ async fn open3_open_existing_directory() {
         .await
         .expect("failed to open existing entry");
 }
+
+#[fuchsia::test]
+async fn open3_directory_as_node_reference() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let directory_proxy = test_dir
+        .open3_node::<fio::DirectoryMarker>(
+            "dir",
+            fio::Flags::PROTOCOL_DIRECTORY
+                | fio::Flags::PROTOCOL_NODE
+                | fio::Flags::PERM_GET_ATTRIBUTES,
+            None,
+        )
+        .await
+        .expect("open3 failed");
+
+    // We are allowed to call `get_attributes` on a node reference
+    directory_proxy
+        .get_attributes(fio::NodeAttributesQuery::empty())
+        .await
+        .unwrap()
+        .expect("get_attributes failed");
+
+    // Make sure that the directory protocol *was not* served by calling a directory-only method.
+    // It should fail with PEER_CLOSED as this method is unknown.
+    let err = directory_proxy
+        .read_dirents(1)
+        .await
+        .expect_err("calling a directory-specific method on a node reference is not be allowed");
+    assert!(err.is_closed());
+}
+
+#[fuchsia::test]
+async fn open3_file_as_node_reference() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![file(TEST_FILE, vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all_flags_deprecated());
+    let file_proxy = test_dir
+        .open3_node::<fio::FileMarker>(
+            TEST_FILE,
+            fio::Flags::PROTOCOL_FILE | fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
+            None,
+        )
+        .await
+        .expect("open3 failed");
+
+    // We are allowed to call `get_attributes` on a node reference
+    file_proxy
+        .get_attributes(fio::NodeAttributesQuery::empty())
+        .await
+        .unwrap()
+        .expect("get_attributes failed");
+
+    // Make sure that the directory protocol *was not* served by calling a file-only method.
+    // It should fail with PEER_CLOSED as this method is unknown.
+    let err = file_proxy
+        .read(0)
+        .await
+        .expect_err("calling a file-specific method on a node reference is not be allowed");
+    assert!(err.is_closed());
+}

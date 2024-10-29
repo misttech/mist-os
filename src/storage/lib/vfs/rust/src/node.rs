@@ -171,7 +171,7 @@ impl<N: Node> Connection<N> {
             }
             fio::NodeRequest::GetConnectionInfo { responder } => {
                 responder.send(fio::ConnectionInfo {
-                    rights: Some(fio::Operations::GET_ATTRIBUTES),
+                    rights: Some(self.options.rights),
                     ..Default::default()
                 })?;
             }
