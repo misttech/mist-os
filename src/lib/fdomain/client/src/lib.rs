@@ -273,7 +273,7 @@ pub trait FDomainTransport: StreamTrait<Item = Result<Box<[u8]>, std::io::Error>
 /// 2) Drops the transport on error, then returns the last observed error for
 ///    all future operations.
 enum Transport {
-    Transport(Pin<Box<dyn FDomainTransport>>, VecDeque<Box<[u8]>>, Waker),
+    Transport(Pin<Box<dyn FDomainTransport>>, VecDeque<Box<[u8]>>, Vec<Waker>),
     Error(InnerError),
 }
 
@@ -282,7 +282,7 @@ impl Transport {
     fn push_msg(&mut self, msg: Box<[u8]>) {
         if let Transport::Transport(_, v, w) = self {
             v.push_back(msg);
-            w.wake_by_ref();
+            w.drain(..).for_each(Waker::wake);
         }
     }
 
@@ -306,7 +306,7 @@ impl Transport {
                 }
 
                 if v.is_empty() {
-                    *w = ctx.waker().clone();
+                    w.push(ctx.waker().clone());
                 } else {
                     ctx.waker().wake_by_ref();
                 }
@@ -511,11 +511,7 @@ impl Client {
         transport: impl FDomainTransport + 'static,
     ) -> (Arc<Self>, impl Future<Output = ()> + Send + 'static) {
         let ret = Arc::new(Client(Mutex::new(ClientInner {
-            transport: Transport::Transport(
-                Box::pin(transport),
-                VecDeque::new(),
-                futures::task::noop_waker(),
-            ),
+            transport: Transport::Transport(Box::pin(transport), VecDeque::new(), Vec::new()),
             transactions: HashMap::new(),
             socket_read_subscriptions: HashMap::new(),
             channel_read_subscriptions: HashMap::new(),
