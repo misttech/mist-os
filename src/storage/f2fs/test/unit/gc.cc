@@ -54,7 +54,7 @@ class GcTest : public F2fsFakeDevTestFixture {
         file_vn->Writeback(true, true);
       }
       sync_completion_t completion;
-      fs_->ScheduleWriter(&completion);
+      fs_->GetWriter().ScheduleWriteBlocks(&completion);
       sync_completion_wait(&completion, ZX_TIME_INFINITE);
       if (sync) {
         fs_->SyncFs();

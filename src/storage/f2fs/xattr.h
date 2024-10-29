@@ -7,10 +7,11 @@
 
 #include <span>
 
-#include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/layout.h"
 
 namespace f2fs {
+class LockedPage;
 constexpr uint32_t kXattrMagic = 0xF2F52011;
 constexpr uint32_t kXattrMaxRefcount = 1024;
 

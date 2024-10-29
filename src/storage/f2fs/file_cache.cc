@@ -2,7 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/f2fs/vmo_manager.h"
+#include "src/storage/f2fs/vnode.h"
+#include "src/storage/f2fs/writeback.h"
 
 namespace f2fs {
 
@@ -555,7 +561,7 @@ void FileCache::EvictCleanPages() {
 void FileCache::WaitOnWriteback(Page &page) {
   fs::SharedLock lock(flag_lock_);
   if (page.IsWriteback()) {
-    fs()->ScheduleWriter();
+    fs()->GetWriter().ScheduleWriteBlocks();
   }
   flag_cvar_.wait(lock, [&]() { return !page.IsWriteback(); });
 }

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/component_runner.h"
+
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
@@ -12,7 +14,11 @@
 
 #include <gtest/gtest.h>
 
+#include "src/storage/f2fs/bcache.h"
+#include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/mkfs.h"
+#include "src/storage/f2fs/vnode.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 
 namespace f2fs {

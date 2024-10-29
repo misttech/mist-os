@@ -2,9 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/segment.h"
+
 #include <safemath/checked_math.h>
 
+#include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/f2fs/vnode.h"
 
 namespace f2fs {
 static CursegType GetSegmentType2(Page &page, PageType p_type) {

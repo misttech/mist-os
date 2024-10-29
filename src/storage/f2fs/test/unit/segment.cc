@@ -585,7 +585,7 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
 
   std::unique_ptr<F2fs> fs;
   MountOptions mount_options;
-  mount_options.SetValue(MountOption::kForceLfs, static_cast<size_t>(ModeType::kModeLfs));
+  mount_options.SetValue(MountOption::kForceLfs, true);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), mount_options, &bc, &fs);
   fbl::RefPtr<VnodeF2fs> root;

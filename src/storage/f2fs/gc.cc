@@ -2,7 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/node.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/segment.h"
+#include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/f2fs/vnode.h"
+#include "src/storage/f2fs/writeback.h"
 
 namespace f2fs {
 size_t SegmentManager::GetGcCost(uint32_t segno, const VictimSelPolicy &policy) const {
@@ -277,11 +284,8 @@ zx::result<std::pair<nid_t, block_t>> SegmentManager::CheckDnode(const Summary &
   fs_->GetNodeManager().CheckNidRange(dnode_info.ino);
 
   fbl::RefPtr<NodePage> node_page = fbl::RefPtr<NodePage>::Downcast(locked_page.CopyRefPtr());
-  LockedPage inode_page;
-  if (node_page->IsInode()) {
-    inode_page = std::move(locked_page);
-  }
-  zx::result vnode_or = fs_->GetVnode(dnode_info.ino, std::move(inode_page));
+  zx::result vnode_or =
+      fs_->GetVnode(dnode_info.ino, node_page->IsInode() ? &locked_page : nullptr);
   if (vnode_or.is_error()) {
     return vnode_or.take_error();
   }
@@ -363,7 +367,7 @@ zx_status_t SegmentManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned 
     }
   }
   if (!pages_to_disk.is_empty()) {
-    fs_->ScheduleWriter(nullptr, std::move(pages_to_disk));
+    fs_->GetWriter().ScheduleWriteBlocks(nullptr, std::move(pages_to_disk));
   }
 
   if (gc_type == GcType::kFgGc && !CompareValidBlocks(0, segno, false)) {

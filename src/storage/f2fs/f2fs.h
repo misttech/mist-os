@@ -5,86 +5,37 @@
 #ifndef SRC_STORAGE_F2FS_F2FS_H_
 #define SRC_STORAGE_F2FS_F2FS_H_
 
-// clang-format off
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/trace/event.h>
-#include <lib/zircon-internal/thread_annotations.h>
-#include <fidl/fuchsia.fs/cpp/wire.h>
-#include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
-#include <fbl/auto_lock.h>
-#include <fbl/condition_variable.h>
-#include <fbl/mutex.h>
-#include <fidl/fuchsia.fs.startup/cpp/wire.h>
-
-#include <fcntl.h>
-
-#include <zircon/assert.h>
-#include <zircon/compiler.h>
-#include <zircon/errors.h>
-#include <zircon/types.h>
-
-#include <lib/syslog/cpp/macros.h>
-#include <lib/fit/defer.h>
-#include <lib/fit/function.h>
-#include <lib/zx/result.h>
-
-#include <fbl/algorithm.h>
-#include <fbl/intrusive_double_list.h>
-#include <fbl/macros.h>
-#include <fbl/ref_ptr.h>
-#include <fbl/string_buffer.h>
-
-#include <atomic>
 #include <condition_variable>
-#include <memory>
-#include <mutex>
-#include <semaphore>
-
-#include "src/storage/lib/vfs/cpp/vfs.h"
-#include "src/storage/lib/vfs/cpp/vnode.h"
-#include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
-
-#include "src/storage/lib/vfs/cpp/paged_vfs.h"
-#include "src/storage/lib/vfs/cpp/paged_vnode.h"
-#include "src/storage/lib/vfs/cpp/watcher.h"
-#include "src/storage/lib/vfs/cpp/shared_mutex.h"
-#include "src/storage/lib/vfs/cpp/service.h"
-
-#include "lib/inspect/cpp/inspect.h"
-
-#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
-#include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 
 #include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/layout.h"
-#include "src/storage/f2fs/bcache.h"
-#include "src/storage/f2fs/mount.h"
-#include "src/storage/f2fs/superblock_info.h"
-#include "src/storage/f2fs/storage_buffer.h"
-#include "src/storage/f2fs/writeback.h"
-#include "src/storage/f2fs/reader.h"
-#include "src/storage/f2fs/extent_cache.h"
-#include "src/storage/f2fs/vnode.h"
-#include "src/storage/f2fs/vnode_cache.h"
-#include "src/storage/f2fs/dir.h"
-#include "src/storage/f2fs/file.h"
-#include "src/storage/f2fs/node.h"
-#include "src/storage/f2fs/segment.h"
-#include "src/storage/f2fs/mkfs.h"
-#include "src/storage/f2fs/fsck.h"
-#include "src/storage/f2fs/service/admin.h"
-#include "src/storage/f2fs/service/startup.h"
-#include "src/storage/f2fs/service/lifecycle.h"
-#include "src/storage/f2fs/component_runner.h"
-#include "src/storage/f2fs/inspect.h"
 #include "src/storage/f2fs/memory_watcher.h"
-#include "src/storage/f2fs/xattr.h"
-// clang-format on
+#include "src/storage/f2fs/mount.h"
 
 namespace f2fs {
 
+struct WritebackOperation;
+class SuperblockInfo;
+class NodeManager;
+class VnodeCache;
+class SegmentManager;
+class NodePage;
+class LockedPage;
+class VnodeCache;
+class Writer;
+class Reader;
+class VnodeF2fs;
+class BcacheMapper;
+class InspectTree;
 zx::result<std::unique_ptr<Superblock>> LoadSuperblock(BcacheMapper &bc);
+
+// Used to track orphans and modified dirs
+enum class VnodeSet {
+  kOrphan = 0,
+  kModifiedDir,
+  kMax,
+};
+
 class F2fs final {
  public:
   // Not copyable or moveable
@@ -103,11 +54,11 @@ class F2fs final {
   zx::result<fs::FilesystemInfo> GetFilesystemInfo();
   InspectTree &GetInspectTree() { return *inspect_tree_; }
 
-  zx::result<fbl::RefPtr<VnodeF2fs>> GetVnode(ino_t ino, LockedPage inode_page = {});
+  zx::result<fbl::RefPtr<VnodeF2fs>> GetVnode(ino_t ino, LockedPage *inode_page = nullptr);
   zx::result<fbl::RefPtr<VnodeF2fs>> CreateNewVnode(umode_t mode,
                                                     std::optional<gid_t> gid = std::nullopt);
 
-  VnodeCache &GetVCache() { return vnode_cache_; }
+  VnodeCache &GetVCache() { return *vnode_cache_; }
 
   zx::result<std::unique_ptr<f2fs::BcacheMapper>> TakeBc() {
     if (!bc_) {
@@ -132,6 +83,7 @@ class F2fs final {
     ZX_DEBUG_ASSERT(node_manager_ != nullptr);
     return *node_manager_;
   }
+  Writer &GetWriter() { return *writer_; }
   PlatformVfs *vfs() const { return vfs_; }
 
   zx_status_t LoadSuper(std::unique_ptr<Superblock> sb);
@@ -192,7 +144,7 @@ class F2fs final {
   zx::result<FsyncInodeList> FindFsyncDnodes();
   void CheckIndexInPrevNodes(block_t blkaddr);
   void DoRecoverData(VnodeF2fs &vnode, NodePage &page);
-  void RecoverData(FsyncInodeList &inode_list, CursegType type);
+  void RecoverData(FsyncInodeList &inode_list);
   void RecoverFsyncData();
 
   VnodeF2fs &GetNodeVnode() { return *node_vnode_; }
@@ -211,12 +163,6 @@ class F2fs final {
   zx::result<> MakeReadOperations(zx::vmo &vmo, std::vector<block_t> &addrs, PageType type,
                                   bool is_sync = true);
   zx_status_t MakeTrimOperation(block_t blk_addr, block_t nblocks) const;
-
-  void ScheduleWriter(sync_completion_t *completion = nullptr, PageList pages = {},
-                      bool flush = true) {
-    writer_->ScheduleWriteBlocks(completion, std::move(pages), flush);
-  }
-
   void ScheduleWritebackAndReclaimPages();
 
   zx::result<uint32_t> StartGc() __TA_REQUIRES(f2fs::GetGlobalLock());
@@ -283,7 +229,7 @@ class F2fs final {
   std::unique_ptr<VnodeF2fs> node_vnode_;
   fbl::RefPtr<VnodeF2fs> root_vnode_;
 
-  VnodeCache vnode_cache_;
+  std::unique_ptr<VnodeCache> vnode_cache_;
 
   bool on_recovery_ = false;  // recovery is doing or not
   // for inode number management

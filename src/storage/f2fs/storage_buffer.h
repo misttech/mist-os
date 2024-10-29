@@ -5,8 +5,15 @@
 #ifndef SRC_STORAGE_F2FS_STORAGE_BUFFER_H_
 #define SRC_STORAGE_F2FS_STORAGE_BUFFER_H_
 
+#include <condition_variable>
+
+#include <storage/buffer/vmo_buffer.h>
+
+#include "src/storage/f2fs/layout.h"
+
 namespace f2fs {
 
+class BcacheMapper;
 // StorageBuffer implements an allocator for vmo buffers attached to |bc|.
 class StorageBuffer {
  public:

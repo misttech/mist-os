@@ -5,8 +5,6 @@
 #ifndef SRC_STORAGE_F2FS_LAYOUT_H_
 #define SRC_STORAGE_F2FS_LAYOUT_H_
 
-#include <safemath/checked_math.h>
-
 #include "src/storage/f2fs/common.h"
 
 namespace f2fs {

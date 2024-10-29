@@ -11,17 +11,22 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <safemath/checked_math.h>
-#include <storage/buffer/block_buffer.h>
 
 #include "src/storage/f2fs/common.h"
-#include "src/storage/f2fs/vmo_manager.h"
 
 namespace f2fs {
 
 class F2fs;
+class Page;
 class VnodeF2fs;
 class FileCache;
 class LockedPage;
+class VmoManager;
+
+constexpr pgoff_t kPgOffMax = std::numeric_limits<pgoff_t>::max() / kBlockSize;
+using PageCallback = fit::function<zx_status_t(fbl::RefPtr<Page>)>;
+using PageTaggingCallback = fit::function<zx_status_t(fbl::RefPtr<Page>, bool is_last_page)>;
+using PageList = fbl::SizedDoublyLinkedList<fbl::RefPtr<Page>>;
 
 enum class PageFlag {
   kPageUptodate =

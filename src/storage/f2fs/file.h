@@ -5,6 +5,8 @@
 #ifndef SRC_STORAGE_F2FS_FILE_H_
 #define SRC_STORAGE_F2FS_FILE_H_
 
+#include "src/storage/f2fs/vnode.h"
+
 namespace f2fs {
 
 class FileTester;

@@ -8,6 +8,7 @@
 #include <fbl/recycler.h>
 
 #include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/layout.h"
 
 namespace f2fs {
 

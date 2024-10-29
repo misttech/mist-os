@@ -8,13 +8,6 @@
 #ifndef SRC_STORAGE_F2FS_BCACHE_H_
 #define SRC_STORAGE_F2FS_BCACHE_H_
 
-#include <lib/zx/vmo.h>
-#include <zircon/compiler.h>
-
-#include <fbl/algorithm.h>
-#include <fbl/array.h>
-#include <fbl/macros.h>
-#include <fbl/unique_fd.h>
 #include <storage/buffer/vmo_buffer.h>
 #include <storage/buffer/vmoid_registry.h>
 

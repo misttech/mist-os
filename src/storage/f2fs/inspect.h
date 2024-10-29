@@ -5,7 +5,11 @@
 #ifndef SRC_STORAGE_F2FS_INSPECT_H_
 #define SRC_STORAGE_F2FS_INSPECT_H_
 
+#include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
+
 namespace f2fs {
+
+class F2fs;
 
 class InspectTree final {
  public:

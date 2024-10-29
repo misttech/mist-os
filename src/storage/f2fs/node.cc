@@ -2,97 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/node.h"
+
 #include <safemath/checked_math.h>
 
+#include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/inspect.h"
+#include "src/storage/f2fs/node.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/segment.h"
+#include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/f2fs/vnode.h"
 
 namespace f2fs {
-
-bool IsSameDnode(NodePath &path, uint32_t node_offset) {
-  if (node_offset == kInvalidNodeOffset) {
-    return false;
-  }
-  return path.node_offset[path.depth] == node_offset;
-}
-
-size_t GetOfsInDnode(NodePath &path) { return path.offset_in_node[path.depth]; }
-
-// The maximum depth is four.
-// Offset[0] indicates inode offset.
-zx::result<NodePath> GetNodePath(VnodeF2fs &vnode, pgoff_t block) {
-  const pgoff_t direct_index = vnode.GetAddrsPerInode();
-  const pgoff_t direct_blks = kAddrsPerBlock;
-  const pgoff_t dptrs_per_blk = kNidsPerBlock;
-  const pgoff_t indirect_blks =
-      safemath::CheckMul(safemath::checked_cast<pgoff_t>(kAddrsPerBlock), kNidsPerBlock)
-          .ValueOrDie();
-  const pgoff_t dindirect_blks = indirect_blks * kNidsPerBlock;
-  NodePath path;
-  size_t &level = path.depth;
-  auto &offset = path.offset_in_node;
-  auto &noffset = path.node_offset;
-  size_t n = 0;
-  path.ino = vnode.Ino();
-
-  noffset[0] = 0;
-  if (block < direct_index) {
-    offset[n++] = static_cast<int>(block);
-    level = 0;
-    return zx::ok(path);
-  }
-  block -= direct_index;
-  if (block < direct_blks) {
-    offset[n++] = kNodeDir1Block;
-    noffset[n] = 1;
-    offset[n++] = static_cast<int>(block);
-    level = 1;
-    return zx::ok(path);
-  }
-  block -= direct_blks;
-  if (block < direct_blks) {
-    offset[n++] = kNodeDir2Block;
-    noffset[n] = 2;
-    offset[n++] = static_cast<int>(block);
-    level = 1;
-    return zx::ok(path);
-  }
-  block -= direct_blks;
-  if (block < indirect_blks) {
-    offset[n++] = kNodeInd1Block;
-    noffset[n] = 3;
-    offset[n++] = static_cast<int>(block / direct_blks);
-    noffset[n] = 4 + offset[n - 1];
-    offset[n++] = safemath::checked_cast<int32_t>(
-        safemath::CheckMod<pgoff_t>(block, direct_blks).ValueOrDie());
-    level = 2;
-    return zx::ok(path);
-  }
-  block -= indirect_blks;
-  if (block < indirect_blks) {
-    offset[n++] = kNodeInd2Block;
-    noffset[n] = 4 + dptrs_per_blk;
-    offset[n++] = safemath::checked_cast<int32_t>(block / direct_blks);
-    noffset[n] = 5 + dptrs_per_blk + offset[n - 1];
-    offset[n++] = safemath::checked_cast<int32_t>(
-        safemath::CheckMod<pgoff_t>(block, direct_blks).ValueOrDie());
-    level = 2;
-    return zx::ok(path);
-  }
-  block -= indirect_blks;
-  if (block < dindirect_blks) {
-    offset[n++] = kNodeDIndBlock;
-    noffset[n] = 5 + (dptrs_per_blk * 2);
-    offset[n++] = static_cast<int>(block / indirect_blks);
-    noffset[n] = 6 + (dptrs_per_blk * 2) + offset[n - 1] * (dptrs_per_blk + 1);
-    offset[n++] = safemath::checked_cast<int32_t>((block / direct_blks) % dptrs_per_blk);
-    noffset[n] = 7 + (dptrs_per_blk * 2) + offset[n - 2] * (dptrs_per_blk + 1) + offset[n - 1];
-    offset[n++] = safemath::checked_cast<int32_t>(
-        safemath::CheckMod<pgoff_t>(block, direct_blks).ValueOrDie());
-    level = 3;
-    return zx::ok(path);
-  }
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
 
 NodeManager::NodeManager(F2fs *fs) : fs_(fs), superblock_info_(fs_->GetSuperblockInfo()) {}
 

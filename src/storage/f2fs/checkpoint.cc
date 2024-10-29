@@ -2,7 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/inspect.h"
+#include "src/storage/f2fs/node.h"
+#include "src/storage/f2fs/segment.h"
+#include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/f2fs/vnode.h"
+#include "src/storage/f2fs/vnode_cache.h"
+#include "src/storage/f2fs/writeback.h"
 
 namespace f2fs {
 
@@ -352,7 +360,7 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
     FlushDirtyMetaPages(false);
   }
 
-  ScheduleWriter();
+  GetWriter().ScheduleWriteBlocks();
 
   auto &ckpt_block = superblock_info.GetCheckpointBlock();
   if (auto last_nid_or = GetNodeManager().GetNextFreeNid(); last_nid_or.is_ok()) {

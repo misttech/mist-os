@@ -9,13 +9,15 @@
 #include <fbl/intrusive_wavl_tree.h>
 
 #include "src/storage/f2fs/bitmap.h"
+#include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/layout.h"
-#include "src/storage/f2fs/node_page.h"
-#include "src/storage/f2fs/superblock_info.h"
-
-class F2fs;
 
 namespace f2fs {
+
+class F2fs;
+class SuperblockInfo;
+class NodePage;
+class LockedPage;
 
 // start node id of a node block dedicated to the given node id
 inline uint32_t StartNid(uint32_t nid) { return (nid / kNatEntryPerBlock) * kNatEntryPerBlock; }
@@ -69,9 +71,7 @@ struct NodePath {
   };
 };
 
-bool IsSameDnode(NodePath &path, uint32_t node_offset);
-zx::result<NodePath> GetNodePath(VnodeF2fs &vnode, pgoff_t block);
-size_t GetOfsInDnode(NodePath &path);
+inline size_t GetOfsInDnode(NodePath &path) { return path.offset_in_node[path.depth]; }
 
 class NatEntry : public fbl::WAVLTreeContainable<std::unique_ptr<NatEntry>>,
                  public fbl::DoublyLinkedListable<NatEntry *> {

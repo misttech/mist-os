@@ -2,8 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/writeback.h"
+
+#include "src/storage/f2fs/bcache.h"
+#include "src/storage/f2fs/common.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/node_page.h"
 #include "src/storage/f2fs/storage_buffer.h"
+#include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/f2fs/vnode.h"
 
 namespace f2fs {
 
@@ -20,9 +28,9 @@ Writer::~Writer() {
 
 void Writer::Sync() {
   sync_completion_t completion;
-  ScheduleWriteBlocks(&completion);
+  ScheduleWriteBlocks(&completion, {}, true);
   ZX_ASSERT_MSG(sync_completion_wait(&completion, zx::sec(kWriteTimeOut).get()) == ZX_OK,
-                "FlushDirtyMetaPages() timeout");
+                "Writer::Sync() timeout");
 }
 
 zx::result<storage::Operation> Writer::PageToOperation(OwnedStorageBuffer &buffer, Page &page,

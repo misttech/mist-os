@@ -5,6 +5,11 @@
 #ifndef SRC_STORAGE_F2FS_SERVICE_LIFECYCLE_H_
 #define SRC_STORAGE_F2FS_SERVICE_LIFECYCLE_H_
 
+#include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
+
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/service.h"
+
 namespace f2fs {
 
 class LifecycleServer final : public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {

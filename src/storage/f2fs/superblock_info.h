@@ -7,12 +7,10 @@
 
 #include "src/storage/f2fs/bitmap.h"
 #include "src/storage/f2fs/common.h"
+#include "src/storage/f2fs/layout.h"
 #include "src/storage/f2fs/mount.h"
-#include "src/storage/f2fs/node_page.h"
 
 namespace f2fs {
-
-class VnodeF2fs;
 
 inline int NatsInCursum(const SummaryBlock &sum) { return LeToCpu(sum.n_nats); }
 inline int SitsInCursum(const SummaryBlock &sum) { return LeToCpu(sum.n_sits); }
@@ -32,23 +30,6 @@ inline void SetSegnoInJournal(SummaryBlock &sum, int i, uint32_t segno) {
   sum.sit_j.entries[i].segno = segno;
 }
 
-// For INODE and NODE manager
-constexpr int kXattrNodeOffset = -1;
-// store xattrs to one node block per
-// file keeping -1 as its node offset to
-// distinguish from index node blocks.
-constexpr int kLinkMax = 32000;  // maximum link count per file
-
-// For page offset in File
-constexpr pgoff_t kInvalidPageOffset = std::numeric_limits<pgoff_t>::max();
-
-// For node offset
-constexpr block_t kInvalidNodeOffset = std::numeric_limits<block_t>::max();
-
-// For readahead
-constexpr block_t kMaxReadaheadSize = 128;
-constexpr block_t kDefaultNodeReadSize = 16;
-
 // CountType for monitoring
 //
 // f2fs monitors the number of several block types such as on-writeback,
@@ -60,32 +41,6 @@ enum class CountType {
   kDirtyMeta,
   kDirtyData,
   kNrCountType,
-};
-
-// The below are the page types.
-// The available types are:
-// kData         User data pages. It operates as async mode.
-// kNode         Node pages. It operates as async mode.
-// kMeta         FS metadata pages such as SIT, NAT, CP.
-// kNrPageType   The number of page types.
-// kMetaFlush    Make sure the previous pages are written
-//               with waiting the bio's completion
-// ...           Only can be used with META.
-enum class PageType {
-  kData = 0,
-  kNode,
-  kMeta,
-  kNrPageType,
-  kMetaFlush,
-};
-
-// Block allocation mode.
-// Available types are:
-// kModeAdaptive    use both lfs/ssr allocation
-// kModeLfs         use lfs allocation only
-enum class ModeType {
-  kModeAdaptive,
-  kModeLfs,
 };
 
 class SuperblockInfo {

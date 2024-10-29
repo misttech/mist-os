@@ -2,7 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/f2fs/bcache.h"
+#include "src/storage/f2fs/dir.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/node.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/segment.h"
+#include "src/storage/f2fs/vnode.h"
 
 namespace f2fs {
 
@@ -199,7 +205,7 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
     end = start + kAddrsPerBlock;
   }
 
-  auto path_or = GetNodePath(vnode, start);
+  auto path_or = vnode.GetNodePath(start);
   if (path_or.is_error()) {
     return;
   }
@@ -249,8 +255,8 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
   dnode_page.SetDirty();
 }
 
-void F2fs::RecoverData(FsyncInodeList &inode_list, CursegType type) {
-  block_t blkaddr = segment_manager_->NextFreeBlkAddr(type);
+void F2fs::RecoverData(FsyncInodeList &inode_list) {
+  block_t blkaddr = segment_manager_->NextFreeBlkAddr(CursegType::kCursegWarmNode);
 
   while (true) {
     LockedPage page;
@@ -294,7 +300,7 @@ void F2fs::RecoverFsyncData() {
       ZX_ASSERT(vnode.InitFileCache(entry.GetSize()) == ZX_OK);
       vnode.SetDirty();
     }
-    RecoverData(inode_list, CursegType::kCursegWarmNode);
+    RecoverData(inode_list);
     ZX_DEBUG_ASSERT(inode_list.is_empty());
     GetMetaVnode().InvalidatePages(GetSegmentManager().GetMainAreaStartBlock());
     SyncFs(false);

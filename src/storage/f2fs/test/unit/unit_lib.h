@@ -5,11 +5,29 @@
 #ifndef SRC_STORAGE_F2FS_TEST_UNIT_UNIT_LIB_H_
 #define SRC_STORAGE_F2FS_TEST_UNIT_UNIT_LIB_H_
 
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+
 #include <unordered_set>
 
 #include <gtest/gtest.h>
 
+#include "src/storage/f2fs/common.h"
+#include "src/storage/f2fs/component_runner.h"
+#include "src/storage/f2fs/dir.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/file.h"
+#include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/fsck.h"
+#include "src/storage/f2fs/inspect.h"
+#include "src/storage/f2fs/mkfs.h"
+#include "src/storage/f2fs/mount.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/reader.h"
+#include "src/storage/f2fs/storage_buffer.h"
+#include "src/storage/f2fs/superblock_info.h"
+#include "src/storage/f2fs/vnode_cache.h"
+#include "src/storage/f2fs/writeback.h"
 
 namespace f2fs {
 

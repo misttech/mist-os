@@ -4,9 +4,23 @@
 
 #include <numeric>
 
+#include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/inspect.h"
+#include "src/storage/f2fs/node.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/segment.h"
+#include "src/storage/f2fs/vnode.h"
 
 namespace f2fs {
+
+static constexpr block_t kInvalidNodeOffset = std::numeric_limits<block_t>::max();
+static bool IsSameDnode(NodePath &path, uint32_t node_offset) {
+  if (node_offset == kInvalidNodeOffset) {
+    return false;
+  }
+  return path.node_offset[path.depth] == node_offset;
+}
 
 zx_status_t VnodeF2fs::ReserveNewBlock(LockedPage &node_page, size_t ofs_in_node) {
   if (TestFlag(InodeInfoFlag::kNoAlloc)) {
@@ -58,7 +72,7 @@ zx::result<block_t> VnodeF2fs::LookupExtentCacheBlock(pgoff_t file_offset) {
 zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out) {
   block_t data_blkaddr;
   {
-    auto path_or = GetNodePath(*this, index);
+    auto path_or = GetNodePath(index);
     if (path_or.is_error()) {
       return path_or.status_value();
     }
@@ -207,7 +221,7 @@ block_t VnodeF2fs::GetBlockAddrOnDataSegment(LockedPage &page) {
       return kNullAddr;
     }
   }
-  auto path_or = GetNodePath(*this, page->GetIndex());
+  auto path_or = GetNodePath(page->GetIndex());
   if (path_or.is_error()) {
     return kNullAddr;
   }
@@ -295,7 +309,7 @@ zx::result<std::vector<block_t>> VnodeF2fs::GetDataBlockAddresses(
       continue;
     }
 
-    auto path_or = GetNodePath(*this, indices[iter]);
+    auto path_or = GetNodePath(indices[iter]);
     if (path_or.is_error()) {
       return path_or.take_error();
     }

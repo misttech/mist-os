@@ -4,7 +4,13 @@
 
 #include <dirent.h>
 
+#include "src/storage/f2fs/bcache.h"
+#include "src/storage/f2fs/dir.h"
 #include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/file.h"
+#include "src/storage/f2fs/node.h"
+#include "src/storage/f2fs/node_page.h"
+#include "src/storage/f2fs/superblock_info.h"
 
 namespace f2fs {
 
@@ -142,7 +148,7 @@ zx_status_t Dir::ConvertInlineDir() {
     return ret;
   }
 
-  auto path_or = GetNodePath(*this, 0);
+  auto path_or = GetNodePath(0);
   if (path_or.is_error()) {
     return path_or.error_value();
   }
@@ -364,7 +370,7 @@ zx_status_t File::ConvertInlineData() {
     }
   }
 
-  auto path_or = GetNodePath(*this, 0);
+  auto path_or = GetNodePath(0);
   if (path_or.is_error()) {
     return path_or.error_value();
   }

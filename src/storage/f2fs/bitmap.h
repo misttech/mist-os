@@ -7,12 +7,9 @@
 
 #include <limits.h>
 #include <stddef.h>
-#include <zircon/types.h>
 
 #include <bitmap/raw-bitmap.h>
 #include <bitmap/storage.h>
-#include <fbl/macros.h>
-#include <fbl/ref_ptr.h>
 #include <safemath/checked_math.h>
 
 #include "src/storage/f2fs/common.h"
