@@ -47,9 +47,10 @@
         // Directories in shell namespace
         {
             directory: [
-                "bin",
+                "base-bin",
                 "blob",
                 "boot",
+                "boot-bin",
                 "build-info",
                 "dev-topological",
                 "pkgfs",

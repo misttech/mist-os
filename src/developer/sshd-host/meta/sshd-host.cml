@@ -48,9 +48,10 @@
     offer: [
         {
             directory: [
-                "bin",
+                "base-bin",
                 "blob",
                 "boot",
+                "boot-bin",
                 "build-info",
                 "config-data",
                 "data",

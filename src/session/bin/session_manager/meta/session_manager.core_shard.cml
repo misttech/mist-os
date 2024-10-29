@@ -443,8 +443,9 @@
             subdir: "packages",
         },
         {
-            directory: "bin",
+            directory: "base-bin",
             from: "parent",
+            as: "bin",
             to: "#session-manager",
         },
         {

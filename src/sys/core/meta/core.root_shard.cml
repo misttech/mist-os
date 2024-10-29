@@ -124,8 +124,9 @@
         // ...and the rest of these are capabilities provided by components for each other
         {
             directory: [
-                "bin",
+                "base-bin",
                 "blob",
+                "boot-bin",
                 "build-info",
                 "config-data",
                 "data",

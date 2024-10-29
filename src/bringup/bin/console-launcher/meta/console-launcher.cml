@@ -20,9 +20,9 @@
             default: false,
         },
         {
-            directory: "bin",
+            directory: "boot-bin",
             rights: [ "rx*" ],
-            path: "/bin",
+            path: "/boot-bin",
         },
         {
             directory: "boot",
@@ -53,6 +53,11 @@
             directory: "pkgfs",
             rights: [ "rx*" ],
             path: "/pkgfs",
+        },
+        {
+            directory: "base-bin",
+            rights: [ "rx*" ],
+            path: "/bin",
         },
         {
             directory: "system",

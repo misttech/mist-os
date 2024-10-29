@@ -6,7 +6,7 @@
 #define LIB_ZIRCON_INTERNAL_PATHS_H_
 
 #define ZX_SHELL_DEFAULT "/boot/bin/sh"
-#define ZX_SHELL_ENV_PATH_VALUE "/bin:/boot/bin"
+#define ZX_SHELL_ENV_PATH_VALUE "/bin:/boot/bin:/boot-bin"
 #define ZX_SHELL_ENV_PATH "PATH=" ZX_SHELL_ENV_PATH_VALUE
 
 #endif  // LIB_ZIRCON_INTERNAL_PATHS_H_
