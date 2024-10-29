@@ -14,7 +14,7 @@ use futures::lock::Mutex;
 use futures::Future;
 use std::any::Any;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub trait DefaultLoader {
     type Result;
@@ -46,7 +46,7 @@ pub trait StorageFactory {
         L: DefaultLoader<Result = T::Data> + 'static;
 
     /// Retrieve the store singleton instance.
-    fn get_store(&self) -> impl Future<Output = Arc<Self::Storage>>;
+    fn get_store(&self) -> impl Future<Output = Rc<Self::Storage>>;
 }
 
 /// A trait for describing which storages an item needs access to.
@@ -91,7 +91,7 @@ pub enum InitializationState<T, U = ()> {
     Partial,
     /// This represents the initialized state. When this is active, it is no longer
     /// possible to add new storage keys to [`DeviceStorage`].
-    Initialized(Arc<T>),
+    Initialized(Rc<T>),
 }
 
 impl<T> InitializationState<T, ()> {
@@ -121,14 +121,14 @@ impl<T> InitializationState<T, DirectoryProxy> {
 pub struct StashDeviceStorageFactory {
     store: StoreProxy,
     device_storage_cache: Mutex<InitializationState<DeviceStorage>>,
-    inspect_handle: Arc<Mutex<StashInspectLogger>>,
+    inspect_handle: Rc<Mutex<StashInspectLogger>>,
 }
 
 impl StashDeviceStorageFactory {
     /// Construct a new instance of `StashDeviceStorageFactory`.
     pub fn new(
         store: StoreProxy,
-        inspect_handle: Arc<Mutex<StashInspectLogger>>,
+        inspect_handle: Rc<Mutex<StashInspectLogger>>,
     ) -> StashDeviceStorageFactory {
         StashDeviceStorageFactory {
             store,
@@ -188,11 +188,11 @@ impl StorageFactory for StashDeviceStorageFactory {
         self.initialize_storage_with_loader(T::STORAGE_KEY, Box::new(loader) as Box<dyn Any>).await
     }
 
-    async fn get_store(&self) -> Arc<DeviceStorage> {
+    async fn get_store(&self) -> Rc<DeviceStorage> {
         let initialization = &mut *self.device_storage_cache.lock().await;
         match initialization {
             InitializationState::Initializing(initial_keys, ()) => {
-                let device_storage = Arc::new(DeviceStorage::with_stash_proxy(
+                let device_storage = Rc::new(DeviceStorage::with_stash_proxy(
                     initial_keys.drain(),
                     || {
                         let (accessor_proxy, server_end) =
@@ -202,12 +202,12 @@ impl StorageFactory for StashDeviceStorageFactory {
                             .expect("failed to create accessor for stash");
                         accessor_proxy
                     },
-                    Arc::clone(&self.inspect_handle),
+                    Rc::clone(&self.inspect_handle),
                 ));
-                *initialization = InitializationState::Initialized(Arc::clone(&device_storage));
+                *initialization = InitializationState::Initialized(Rc::clone(&device_storage));
                 device_storage
             }
-            InitializationState::Initialized(device_storage) => Arc::clone(device_storage),
+            InitializationState::Initialized(device_storage) => Rc::clone(device_storage),
             _ => unreachable!(),
         }
     }
@@ -279,7 +279,7 @@ impl StorageFactory for FidlStorageFactory {
         self.initialize_storage_with_loader(T::STORAGE_KEY, Box::new(loader) as Box<dyn Any>).await
     }
 
-    async fn get_store(&self) -> Arc<FidlStorage> {
+    async fn get_store(&self) -> Rc<FidlStorage> {
         let initialization = &mut *self.device_storage_cache.lock().await;
         match initialization {
             InitializationState::Initializing(..) => {
@@ -303,11 +303,11 @@ impl StorageFactory for FidlStorageFactory {
                     task.detach();
                 }
 
-                let device_storage = Arc::new(device_storage);
-                *initialization = InitializationState::Initialized(Arc::clone(&device_storage));
+                let device_storage = Rc::new(device_storage);
+                *initialization = InitializationState::Initialized(Rc::clone(&device_storage));
                 device_storage
             }
-            InitializationState::Initialized(device_storage) => Arc::clone(device_storage),
+            InitializationState::Initialized(device_storage) => Rc::clone(device_storage),
             _ => unreachable!(),
         }
     }

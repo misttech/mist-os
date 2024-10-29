@@ -270,7 +270,7 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::channel::oneshot::Sender;
     use futures::lock::Mutex;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     struct TestResponder {
         sender: Sender<Result<SettingInfo, Error>>,
@@ -291,7 +291,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_watch_basic_functionality() {
         // Create store for job.
-        let store_handle = Arc::new(Mutex::new(HashMap::new()));
+        let store_handle = Rc::new(Mutex::new(HashMap::new()));
 
         let get_info = SettingInfo::Unknown(UnknownInfo(true));
         let listen_info = SettingInfo::Unknown(UnknownInfo(false));
@@ -394,7 +394,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_custom_change_function() {
         // Create store for job.
-        let store_handle = Arc::new(Mutex::new(HashMap::new()));
+        let store_handle = Rc::new(Mutex::new(HashMap::new()));
 
         // Pre-fill the storage with the value so that the initial get will not trigger a response.
         let unchanged_info = SettingInfo::Unknown(UnknownInfo(true));
@@ -443,7 +443,7 @@ mod tests {
         // Execute work on async task.
         fasync::Task::local(async move {
             let _ =
-                work.execute(work_messenger, Arc::new(Mutex::new(HashMap::new())), 0.into()).await;
+                work.execute(work_messenger, Rc::new(Mutex::new(HashMap::new())), 0.into()).await;
         })
         .detach();
 

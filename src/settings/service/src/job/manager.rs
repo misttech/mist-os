@@ -295,7 +295,7 @@ mod tests {
     use futures::channel::mpsc;
     use futures::channel::oneshot::{self, Receiver, Sender};
     use futures::lock::Mutex;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     // Validates that multiple messages can be handled from a single source
     #[fuchsia::test(allow_stalls = false)]
@@ -335,7 +335,7 @@ mod tests {
         }
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
+            Payload::Source(Rc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -403,7 +403,7 @@ mod tests {
             .expect("Should be able to queue requests");
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
+            Payload::Source(Rc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -457,7 +457,7 @@ mod tests {
             .expect("Should be able to queue requests");
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
+            Payload::Source(Rc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -541,7 +541,7 @@ mod tests {
             .expect("Should be able to queue requests");
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
+            Payload::Source(Rc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -606,7 +606,7 @@ mod tests {
             ))))
             .expect("Should be able to send queue");
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
+            Payload::Source(Rc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -630,7 +630,7 @@ mod tests {
             .expect("Should be able to send queue");
 
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
+            Payload::Source(Rc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 
@@ -670,7 +670,7 @@ mod tests {
             )))
             .expect("Should be able to send queue");
         let _ = messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
+            Payload::Source(Rc::new(Mutex::new(Some(requests_rx.boxed_local())))).into(),
             Audience::Messenger(manager_signature),
         );
 

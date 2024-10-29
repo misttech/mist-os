@@ -8,7 +8,7 @@ use crate::service::test::Payload;
 use async_trait::async_trait;
 use fuchsia_trace as ftrace;
 use futures::future::LocalBoxFuture;
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub(crate) mod channel {
     use crate::job;
@@ -105,12 +105,12 @@ impl job::work::Sequential for Workload {
 /// Payload to a given target.
 pub(crate) struct Sequential<T: Fn(Messenger, data::StoreHandle) -> LocalBoxFuture<'static, ()>> {
     /// The payload to be delivered.
-    callback: Arc<T>,
+    callback: Rc<T>,
 }
 
 impl<T: Fn(Messenger, data::StoreHandle) -> LocalBoxFuture<'static, ()>> Sequential<T> {
     pub(crate) fn boxed(callback: T) -> Box<Self> {
-        Box::new(Self { callback: Arc::new(callback) })
+        Box::new(Self { callback: Rc::new(callback) })
     }
 }
 

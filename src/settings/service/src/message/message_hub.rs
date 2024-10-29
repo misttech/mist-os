@@ -16,7 +16,7 @@ use anyhow::format_err;
 use futures::StreamExt;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::rc::Rc;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 /// Type definition for exit message sender.
@@ -453,7 +453,7 @@ impl MessageHub {
 
                 self.next_id += 1;
                 let (beacon, receptor) =
-                    BeaconBuilder::new(messenger.clone()).add_fuse(Arc::clone(&fuse)).build();
+                    BeaconBuilder::new(messenger.clone()).add_fuse(Rc::clone(&fuse)).build();
                 let _ = self.beacons.insert(id, beacon);
 
                 match messenger_descriptor.messenger_type {

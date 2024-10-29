@@ -19,7 +19,7 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::pin::pin;
-use std::sync::Arc;
+use std::rc::Rc;
 
 const SETTINGS_PREFIX: &str = "settings";
 
@@ -44,7 +44,7 @@ pub struct DeviceStorage {
     debounce_writes: bool,
 
     /// Handle used to write stash failures to inspect.
-    inspect_handle: Arc<Mutex<StashInspectLogger>>,
+    inspect_handle: Rc<Mutex<StashInspectLogger>>,
 }
 
 /// A wrapper for managing all communication and caching for one particular type of data being
@@ -187,7 +187,7 @@ impl DeviceStorage {
     pub fn with_stash_proxy<I, G>(
         iter: I,
         stash_generator: G,
-        inspect_handle: Arc<Mutex<StashInspectLogger>>,
+        inspect_handle: Rc<Mutex<StashInspectLogger>>,
     ) -> Self
     where
         I: IntoIterator<Item = (&'static str, Option<Box<TypeErasedLoader>>)>,
@@ -197,7 +197,7 @@ impl DeviceStorage {
         let typed_storage_map = iter
             .into_iter()
             .map({
-                let inspect_handle = Arc::clone(&inspect_handle);
+                let inspect_handle = Rc::clone(&inspect_handle);
                 let typed_loader_map = &mut typed_loader_map;
                 move |(key, loader)| {
                     if let Some(loader) = loader {
@@ -215,7 +215,7 @@ impl DeviceStorage {
                         }),
                     };
 
-                    let inspect_handle = Arc::clone(&inspect_handle);
+                    let inspect_handle = Rc::clone(&inspect_handle);
                     // Each key has an independent flush queue.
                     Task::local(async move {
                         let mut next_allowed_flush = MonotonicInstant::now();
@@ -234,7 +234,7 @@ impl DeviceStorage {
                                     if let Some(()) = o {
                                         DeviceStorage::stash_flush(
                                             &stash_proxy,
-                                            Arc::clone(&inspect_handle),
+                                            Rc::clone(&inspect_handle),
                                             key.to_string()).await;
                                         next_allowed_flush = MonotonicInstant::now() + MIN_FLUSH_INTERVAL;
                                     }
@@ -270,7 +270,7 @@ impl DeviceStorage {
     /// Triggers a flush on the given stash proxy.
     async fn stash_flush(
         stash_proxy: &StoreAccessorProxy,
-        inspect_handle: Arc<Mutex<StashInspectLogger>>,
+        inspect_handle: Rc<Mutex<StashInspectLogger>>,
         setting_key: String,
     ) {
         let flush_result = stash_proxy.flush().await;
@@ -286,7 +286,7 @@ impl DeviceStorage {
     }
 
     async fn handle_flush_failure(
-        inspect_handle: Arc<Mutex<StashInspectLogger>>,
+        inspect_handle: Rc<Mutex<StashInspectLogger>>,
         setting_key: String,
         err: String,
     ) {
@@ -340,7 +340,7 @@ impl DeviceStorage {
                 // Not debouncing writes for testing, just flush immediately.
                 DeviceStorage::stash_flush(
                     &cached_storage.stash_proxy,
-                    Arc::clone(&self.inspect_handle),
+                    Rc::clone(&self.inspect_handle),
                     key,
                 )
                 .await;
@@ -614,7 +614,7 @@ mod tests {
         let storage = DeviceStorage::with_stash_proxy(
             vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
-            Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
         let result = storage.get::<TestStruct>().await;
 
@@ -643,7 +643,7 @@ mod tests {
         let storage = DeviceStorage::with_stash_proxy(
             vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
-            Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
         let result = storage.get::<TestStruct>().await;
 
@@ -674,7 +674,7 @@ mod tests {
         let storage = DeviceStorage::with_stash_proxy(
             vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
-            Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
 
         let result = storage.get::<TestStruct>().await;
@@ -692,7 +692,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
 
         let inspector = component::inspector();
-        let logger_handle = Arc::new(Mutex::new(StashInspectLogger::new(inspector.root())));
+        let logger_handle = Rc::new(Mutex::new(StashInspectLogger::new(inspector.root())));
         let storage = DeviceStorage::with_stash_proxy(
             vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
@@ -771,7 +771,7 @@ mod tests {
         let storage = DeviceStorage::with_stash_proxy(
             vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
-            Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
 
         // Write to device storage.
@@ -845,7 +845,7 @@ mod tests {
         let storage = DeviceStorage::with_stash_proxy(
             vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
-            Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
 
         // Write successfully to storage once.
@@ -877,7 +877,7 @@ mod tests {
         let storage = DeviceStorage::with_stash_proxy(
             vec![(TestStruct::KEY, None)],
             move || stash_proxy.clone(),
-            Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
 
         let first_value = VALUE1;
@@ -1060,7 +1060,7 @@ mod tests {
         let storage = DeviceStorage::with_stash_proxy(
             vec![(test_device_compatible_migration::Current::KEY, None)],
             move || stash_proxy.clone(),
-            Arc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(StashInspectLogger::new(component::inspector().root()))),
         );
         let current = storage.get::<test_device_compatible_migration::Current>().await;
 

@@ -83,7 +83,7 @@ pub(crate) mod testing {
     };
     use std::any::Any;
     use std::collections::HashMap;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     #[derive(PartialEq)]
     pub(crate) enum StashAction {
@@ -110,7 +110,7 @@ pub(crate) mod testing {
     pub(crate) struct InMemoryStorageFactory {
         initial_data: HashMap<&'static str, String>,
         device_storage_cache: Mutex<InitializationState<DeviceStorage>>,
-        inspect_handle: Arc<Mutex<StashInspectLogger>>,
+        inspect_handle: Rc<Mutex<StashInspectLogger>>,
     }
 
     impl Default for InMemoryStorageFactory {
@@ -132,7 +132,7 @@ pub(crate) mod testing {
             InMemoryStorageFactory {
                 initial_data: HashMap::new(),
                 device_storage_cache: Mutex::new(InitializationState::new()),
-                inspect_handle: Arc::new(Mutex::new(StashInspectLogger::new(
+                inspect_handle: Rc::new(Mutex::new(StashInspectLogger::new(
                     component::inspector().root(),
                 ))),
             }
@@ -149,7 +149,7 @@ pub(crate) mod testing {
             InMemoryStorageFactory {
                 initial_data: map,
                 device_storage_cache: Mutex::new(InitializationState::new()),
-                inspect_handle: Arc::new(Mutex::new(StashInspectLogger::new(
+                inspect_handle: Rc::new(Mutex::new(StashInspectLogger::new(
                     component::inspector().root(),
                 ))),
             }
@@ -188,7 +188,7 @@ pub(crate) mod testing {
         }
 
         /// Retrieve the [`DeviceStorage`] singleton.
-        pub(crate) async fn get_device_storage(&self) -> Arc<DeviceStorage> {
+        pub(crate) async fn get_device_storage(&self) -> Rc<DeviceStorage> {
             let initialization = &mut *self.device_storage_cache.lock().await;
             match initialization {
                 InitializationState::Initializing(initial_keys, _) => {
@@ -198,7 +198,7 @@ pub(crate) mod testing {
                             let (stash_proxy, _) = spawn_stash_proxy();
                             stash_proxy
                         },
-                        Arc::clone(&self.inspect_handle),
+                        Rc::clone(&self.inspect_handle),
                     );
                     device_storage.set_caching_enabled(false);
                     device_storage.set_debounce_writes(false);
@@ -211,11 +211,11 @@ pub(crate) mod testing {
                             .expect("Failed to write initial data");
                     }
 
-                    let device_storage = Arc::new(device_storage);
-                    *initialization = InitializationState::Initialized(Arc::clone(&device_storage));
+                    let device_storage = Rc::new(device_storage);
+                    *initialization = InitializationState::Initialized(Rc::clone(&device_storage));
                     device_storage
                 }
-                InitializationState::Initialized(device_storage) => Arc::clone(device_storage),
+                InitializationState::Initialized(device_storage) => Rc::clone(device_storage),
                 _ => unreachable!(),
             }
         }
@@ -245,15 +245,15 @@ pub(crate) mod testing {
             Ok(())
         }
 
-        async fn get_store(&self) -> Arc<DeviceStorage> {
+        async fn get_store(&self) -> Rc<DeviceStorage> {
             self.get_device_storage().await
         }
     }
 
-    fn spawn_stash_proxy() -> (StoreAccessorProxy, Arc<Mutex<StashStats>>) {
+    fn spawn_stash_proxy() -> (StoreAccessorProxy, Rc<Mutex<StashStats>>) {
         let (stash_proxy, mut stash_stream) =
             fidl::endpoints::create_proxy_and_stream::<StoreAccessorMarker>().unwrap();
-        let stats = Arc::new(Mutex::new(StashStats::new()));
+        let stats = Rc::new(Mutex::new(StashStats::new()));
         let stats_clone = stats.clone();
         fasync::Task::local(async move {
             let mut stored_value: Option<Value> = None;
@@ -342,8 +342,8 @@ pub(crate) mod testing {
     }
 
     async fn test_write_propagation(
-        store_1: Arc<DeviceStorage>,
-        store_2: Arc<DeviceStorage>,
+        store_1: Rc<DeviceStorage>,
+        store_2: Rc<DeviceStorage>,
         data: TestStruct,
     ) {
         assert!(store_1.write(&data).await.is_ok());

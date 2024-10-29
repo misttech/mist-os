@@ -16,7 +16,7 @@ use futures::lock::Mutex;
 use settings_storage::storage_factory::StorageFactory as StorageFactoryTrait;
 use std::borrow::Cow;
 use std::marker::PhantomData;
-use std::sync::Arc;
+use std::rc::Rc;
 use thiserror::Error;
 
 pub type ExitResult = Result<(), ControllerError>;
@@ -143,7 +143,7 @@ pub(crate) type BoxedController = Box<dyn controller::Handle>;
 pub(crate) type BoxedControllerResult = Result<BoxedController, ControllerError>;
 
 pub(crate) type GenerateController =
-    Box<dyn Fn(Arc<ClientImpl>) -> LocalBoxFuture<'static, BoxedControllerResult>>;
+    Box<dyn Fn(Rc<ClientImpl>) -> LocalBoxFuture<'static, BoxedControllerResult>>;
 
 pub(crate) mod controller {
     use super::*;
@@ -151,7 +151,7 @@ pub(crate) mod controller {
     #[async_trait(?Send)]
     #[cfg(test)]
     pub(crate) trait Create: Sized {
-        async fn create(client: Arc<ClientImpl>) -> Result<Self, ControllerError>;
+        async fn create(client: Rc<ClientImpl>) -> Result<Self, ControllerError>;
     }
 
     #[async_trait(?Send)]
@@ -168,10 +168,11 @@ pub(crate) mod controller {
 }
 
 pub struct ClientImpl {
+    // TODO(https://fxbug.dev/42166874): Use AtomicBool or Cell.
     notify: Mutex<bool>,
     messenger: Messenger,
     notifier_signature: Signature,
-    service_context: Arc<ServiceContext>,
+    service_context: Rc<ServiceContext>,
     setting_type: SettingType,
 }
 
@@ -182,7 +183,7 @@ impl ClientImpl {
             setting_type: context.setting_type,
             notifier_signature: context.notifier_signature,
             notify: Mutex::new(false),
-            service_context: Arc::clone(&context.environment.service_context),
+            service_context: Rc::clone(&context.environment.service_context),
         }
     }
 
@@ -192,7 +193,7 @@ impl ClientImpl {
         notify: Mutex<bool>,
         messenger: Messenger,
         notifier_signature: Signature,
-        service_context: Arc<ServiceContext>,
+        service_context: Rc<ServiceContext>,
         setting_type: SettingType,
     ) -> Self {
         Self { notify, messenger, notifier_signature, service_context, setting_type }
@@ -214,9 +215,9 @@ impl ClientImpl {
         mut context: Context,
         generate_controller: GenerateController,
     ) -> ControllerGenerateResult {
-        let client = Arc::new(Self::new(&context));
+        let client = Rc::new(Self::new(&context));
 
-        let mut controller = generate_controller(Arc::clone(&client)).await?;
+        let mut controller = generate_controller(Rc::clone(&client)).await?;
 
         // Process MessageHub requests
         fasync::Task::local(async move {
@@ -303,8 +304,8 @@ impl ClientImpl {
         Ok(())
     }
 
-    pub(crate) fn get_service_context(&self) -> Arc<ServiceContext> {
-        Arc::clone(&self.service_context)
+    pub(crate) fn get_service_context(&self) -> Rc<ServiceContext> {
+        Rc::clone(&self.service_context)
     }
 
     pub(crate) async fn notify(&self, event: Event) {
@@ -380,22 +381,22 @@ pub mod persist {
     }
 
     pub struct ClientProxy {
-        base: Arc<BaseProxy>,
+        base: Rc<BaseProxy>,
         setting_type: SettingType,
     }
 
     impl Clone for ClientProxy {
         fn clone(&self) -> Self {
-            Self { base: Arc::clone(&self.base), setting_type: self.setting_type }
+            Self { base: Rc::clone(&self.base), setting_type: self.setting_type }
         }
     }
 
     impl ClientProxy {
-        pub(crate) async fn new(base_proxy: Arc<BaseProxy>, setting_type: SettingType) -> Self {
+        pub(crate) async fn new(base_proxy: Rc<BaseProxy>, setting_type: SettingType) -> Self {
             Self { base: base_proxy, setting_type }
         }
 
-        pub(crate) fn get_service_context(&self) -> Arc<ServiceContext> {
+        pub(crate) fn get_service_context(&self) -> Rc<ServiceContext> {
             self.base.get_service_context()
         }
 

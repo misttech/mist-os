@@ -11,7 +11,7 @@ use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use std::pin::pin;
-use std::sync::Arc;
+use std::rc::Rc;
 use std::task::Poll;
 
 type TestPayload = crate::service::test::Payload;
@@ -48,7 +48,7 @@ mod test {
 }
 
 fn no_filter() -> Filter {
-    Arc::new(|&_| true)
+    Rc::new(|&_| true)
 }
 
 // Tests message client creation results in unique ids.
@@ -224,7 +224,7 @@ async fn test_observe_addressable() {
     let mut reply_receptor =
         messenger_client_1.message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(3)));
 
-    let observe_receptor = Arc::new(Mutex::new(None));
+    let observe_receptor = Rc::new(Mutex::new(None));
     verify_payload(ORIGINAL.clone(), &mut receptor_2, {
         let observe_receptor = observe_receptor.clone();
         Some(Box::new(move |mut client| -> LocalBoxFuture<'_, ()> {
@@ -437,7 +437,7 @@ async fn verify_messenger_behavior(messenger_type: MessengerType) {
     let mut reply_receptor =
         test_client.message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(1)));
 
-    let captured_signature = Arc::new(Mutex::new(None));
+    let captured_signature = Rc::new(Mutex::new(None));
 
     // Verify target messenger received message and capture Signature.
     verify_payload(ORIGINAL.clone(), &mut target_receptor, {
@@ -575,7 +575,7 @@ async fn test_reply_propagation() {
 
     // Create broker to propagate a derived message.
     let (_, mut broker) = delegate
-        .create(MessengerType::Broker(Arc::new(move |message| *message.payload() == *REPLY)))
+        .create(MessengerType::Broker(Rc::new(move |message| *message.payload() == *REPLY)))
         .await
         .expect("broker should be created");
 
@@ -703,7 +703,7 @@ async fn test_broker_filter_custom() {
         .await
         .expect("broadcast messenger should be created");
     // Filter to target only the ORIGINAL message.
-    let filter: Filter = Arc::new(|message| *message.payload() == *ORIGINAL);
+    let filter: Filter = Rc::new(|message| *message.payload() == *ORIGINAL);
     // Broker that should only target ORIGINAL messages.
     let (_, mut broker_receptor) =
         delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");
@@ -732,7 +732,7 @@ async fn test_broker_filter_caputring_closure() {
         .expect("broadcast messenger should be created");
     // Filter to target only the Foo message.
     let expected_payload = &test_message::FOO;
-    let filter: Filter = Arc::new(move |message| *message.payload() == *expected_payload);
+    let filter: Filter = Rc::new(move |message| *message.payload() == *expected_payload);
     // Broker that should only target Foo messages.
     let (_, mut broker_receptor) =
         delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");

@@ -24,7 +24,7 @@ use fuchsia_trace as ftrace;
 use futures::future::LocalBoxFuture;
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub type ControllerGenerateResult = Result<(), anyhow::Error>;
 
@@ -287,7 +287,7 @@ pub(crate) trait SettingHandlerFactory {
 
 pub struct Environment {
     pub settings: HashSet<SettingType>,
-    pub service_context: Arc<ServiceContext>,
+    pub service_context: Rc<ServiceContext>,
 }
 
 impl Clone for Environment {
@@ -299,7 +299,7 @@ impl Clone for Environment {
 impl Environment {
     pub(crate) fn new(
         settings: HashSet<SettingType>,
-        service_context: Arc<ServiceContext>,
+        service_context: Rc<ServiceContext>,
     ) -> Environment {
         Environment { settings, service_context }
     }
@@ -335,7 +335,7 @@ impl Context {
 pub(crate) struct ContextBuilder {
     setting_type: SettingType,
     settings: HashSet<SettingType>,
-    service_context: Option<Arc<ServiceContext>>,
+    service_context: Option<Rc<ServiceContext>>,
     messenger: Messenger,
     receptor: Receptor,
     notifier_signature: Signature,
@@ -365,7 +365,7 @@ impl ContextBuilder {
     /// Generates the Context.
     pub(crate) fn build(self) -> Context {
         let service_context =
-            self.service_context.unwrap_or_else(|| Arc::new(ServiceContext::new(None, None)));
+            self.service_context.unwrap_or_else(|| Rc::new(ServiceContext::new(None, None)));
         let environment = Environment::new(self.settings, service_context);
 
         // Note: ContextBuilder should use the same context id system as the SettingHandlerFactoryImpl.

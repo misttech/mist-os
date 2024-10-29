@@ -7,7 +7,7 @@ use anyhow::Error;
 use fuchsia_async as fasync;
 use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Trait for providing a service.
 pub(crate) trait Service {
@@ -24,7 +24,7 @@ pub(crate) trait Service {
 pub(crate) fn create_setting_handler(
     request_handler: Box<dyn Fn(Request) -> LocalBoxFuture<'static, SettingHandlerResult>>,
 ) -> GenerateHandler {
-    let shared_handler = Arc::new(Mutex::new(request_handler));
+    let shared_handler = Rc::new(Mutex::new(request_handler));
     Box::new(move |mut context| {
         let handler = shared_handler.clone();
         fasync::Task::local(async move {

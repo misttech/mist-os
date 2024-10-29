@@ -30,7 +30,7 @@ use futures::stream::Stream;
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::future::Future;
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub mod manager;
 pub mod source;
@@ -43,7 +43,7 @@ payload_convert!(Job, Payload);
 /// [Jobs]: Job
 pub(super) type StoreHandleMapping = HashMap<Signature, data::StoreHandle>;
 type PinStream<T> = Pin<Box<dyn Stream<Item = T>>>;
-type SourceStreamHandle = Arc<Mutex<Option<PinStream<Result<Job, source::Error>>>>>;
+type SourceStreamHandle = Rc<Mutex<Option<PinStream<Result<Job, source::Error>>>>>;
 
 /// The data payload that can be sent to the [Job Manager](crate::job::manager::Manager).
 #[derive(Clone)]
@@ -72,10 +72,10 @@ pub mod data {
     use crate::base::SettingInfo;
     use futures::lock::Mutex;
     use std::collections::HashMap;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
     /// A shared handle to the [Data] mapping.
-    pub type StoreHandle = Arc<Mutex<HashMap<Key, Data>>>;
+    pub type StoreHandle = Rc<Mutex<HashMap<Key, Data>>>;
 
     #[derive(Clone, PartialEq, Eq, Hash)]
     pub enum Key {
@@ -523,7 +523,7 @@ mod tests {
 
         let _ = job
             .workload
-            .execute(messenger, Some(Arc::new(Mutex::new(HashMap::new()))), 0.into())
+            .execute(messenger, Some(Rc::new(Mutex::new(HashMap::new()))), 0.into())
             .await;
 
         // Confirm received value matches the value sent from workload.

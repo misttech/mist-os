@@ -6,7 +6,7 @@
 //! storage for the settings service.
 
 use std::borrow::Borrow;
-use std::sync::Arc;
+use std::rc::Rc;
 
 use fidl::Persistable;
 use futures::stream::{FuturesUnordered, StreamFuture};
@@ -40,8 +40,8 @@ use settings_storage::storage_factory::StorageFactory;
 use settings_storage::UpdateState;
 
 pub(crate) fn create_registrar<T, F>(
-    device_storage_factory: Arc<T>,
-    fidl_storage_factory: Arc<F>,
+    device_storage_factory: Rc<T>,
+    fidl_storage_factory: Rc<F>,
 ) -> AgentCreator
 where
     T: StorageFactory<Storage = DeviceStorage> + 'static,
@@ -49,7 +49,7 @@ where
 {
     AgentCreator {
         debug_id: "StorageAgent",
-        create: CreationFunc::Dynamic(Arc::new(move |context| {
+        create: CreationFunc::Dynamic(Rc::new(move |context| {
             let device_storage_factory = device_storage_factory.clone();
             let fidl_storage_factory = fidl_storage_factory.clone();
             Box::pin(async move {
@@ -66,8 +66,8 @@ where
 {
     /// The factory for creating a messenger to receive messages.
     delegate: service::message::Delegate,
-    device_storage_factory: Arc<T>,
-    fidl_storage_factory: Arc<F>,
+    device_storage_factory: Rc<T>,
+    fidl_storage_factory: Rc<F>,
 }
 
 impl<T, F> StorageAgent<T, F>
@@ -75,11 +75,7 @@ where
     T: StorageFactory<Storage = DeviceStorage> + 'static,
     F: StorageFactory<Storage = FidlStorage> + 'static,
 {
-    async fn create(
-        context: Context,
-        device_storage_factory: Arc<T>,
-        fidl_storage_factory: Arc<F>,
-    ) {
+    async fn create(context: Context, device_storage_factory: Rc<T>, fidl_storage_factory: Rc<F>) {
         let mut storage_agent = StorageAgent {
             delegate: context.delegate,
             device_storage_factory,
@@ -102,8 +98,8 @@ where
         mut unordered: FuturesUnordered<StreamFuture<Receptor>>,
     ) {
         let storage_management = StorageManagement {
-            device_storage_factory: Arc::clone(&self.device_storage_factory),
-            fidl_storage_factory: Arc::clone(&self.fidl_storage_factory),
+            device_storage_factory: Rc::clone(&self.device_storage_factory),
+            fidl_storage_factory: Rc::clone(&self.fidl_storage_factory),
         };
         while let Some((event, stream)) = unordered.next().await {
             let event = if let Some(event) = event {
@@ -181,8 +177,8 @@ where
     T: StorageFactory<Storage = DeviceStorage>,
     F: StorageFactory<Storage = FidlStorage>,
 {
-    device_storage_factory: Arc<T>,
-    fidl_storage_factory: Arc<F>,
+    device_storage_factory: Rc<T>,
+    fidl_storage_factory: Rc<F>,
 }
 
 impl<T, F> StorageManagement<T, F>

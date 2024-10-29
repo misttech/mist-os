@@ -6,7 +6,7 @@ use crate::base::SettingType;
 use crate::message::base::Audience;
 use crate::service_context::ExternalServiceEvent;
 use crate::{config, payload_convert, service};
-use std::sync::Arc;
+use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Payload {
@@ -168,7 +168,7 @@ pub(crate) mod subscriber {
     use super::*;
     use futures::future::LocalBoxFuture;
 
-    pub type BlueprintHandle = Arc<dyn Blueprint>;
+    pub type BlueprintHandle = Rc<dyn Blueprint>;
 
     /// The Subscriber Blueprint is used for spawning new subscribers on demand
     /// in the environment.

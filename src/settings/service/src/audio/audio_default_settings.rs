@@ -8,7 +8,8 @@ use crate::config::default_settings::DefaultSetting;
 use crate::inspect::config_logger::InspectConfigLogger;
 use settings_storage::storage_factory::DefaultLoader;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
+use std::sync::Mutex;
 
 const DEFAULT_VOLUME_LEVEL: f32 = 0.5;
 const DEFAULT_VOLUME_MUTED: bool = false;
@@ -51,7 +52,7 @@ pub(crate) const fn create_default_audio_stream(stream_type: AudioStreamType) ->
 }
 
 pub fn build_audio_default_settings(
-    config_logger: Arc<Mutex<InspectConfigLogger>>,
+    config_logger: Rc<Mutex<InspectConfigLogger>>,
 ) -> DefaultSetting<AudioInfo, &'static str> {
     DefaultSetting::new(
         Some(DEFAULT_AUDIO_INFO),
@@ -67,12 +68,12 @@ pub fn build_audio_default_settings(
 /// [`DEFAULT_AUDIO_INFO`]: static@DEFAULT_AUDIO_INFO
 #[derive(Clone)]
 pub struct AudioInfoLoader {
-    audio_default_settings: Arc<Mutex<DefaultSetting<AudioInfo, &'static str>>>,
+    audio_default_settings: Rc<Mutex<DefaultSetting<AudioInfo, &'static str>>>,
 }
 
 impl AudioInfoLoader {
     pub(crate) fn new(audio_default_settings: DefaultSetting<AudioInfo, &'static str>) -> Self {
-        Self { audio_default_settings: Arc::new(Mutex::new(audio_default_settings)) }
+        Self { audio_default_settings: Rc::new(Mutex::new(audio_default_settings)) }
     }
 }
 
@@ -146,7 +147,7 @@ mod tests {
     /// Construct default audio settings and its dependencies.
     fn make_default_settings() -> DefaultSetting<AudioInfo, &'static str> {
         let config_logger =
-            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+            Rc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root())));
         build_audio_default_settings(config_logger)
     }
 

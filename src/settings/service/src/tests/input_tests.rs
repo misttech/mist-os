@@ -35,7 +35,7 @@ use futures::pin_mut;
 use futures::stream::StreamExt;
 use futures::task::Poll;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::Status;
 
 use super::input_test_environment::default_settings;
@@ -141,7 +141,7 @@ fn default_mic_cam_config_cam_sw_disabled() -> InputConfiguration {
 
 // Creates an environment that will fail on a get request.
 async fn create_input_test_env_with_failures(
-    storage_factory: Arc<InMemoryStorageFactory>,
+    storage_factory: Rc<InMemoryStorageFactory>,
 ) -> InputProxy {
     create_test_env_with_failures_and_config(
         storage_factory,
@@ -752,7 +752,7 @@ async fn test_persisted_values_applied_at_start() {
 #[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let input_proxy =
-        create_input_test_env_with_failures(Arc::new(InMemoryStorageFactory::new())).await;
+        create_input_test_env_with_failures(Rc::new(InMemoryStorageFactory::new())).await;
     let result = input_proxy.watch().await;
     assert_matches!(result, Err(ClientChannelClosed { status: Status::UNAVAILABLE, .. }));
 }
@@ -760,7 +760,7 @@ async fn test_channel_failure_watch() {
 #[fuchsia::test(allow_stalls = false)]
 async fn test_media_buttons() {
     let service_registry = ServiceRegistry::create();
-    let input_device_registry_service = Arc::new(Mutex::new(InputDeviceRegistryService::new()));
+    let input_device_registry_service = Rc::new(Mutex::new(InputDeviceRegistryService::new()));
 
     let initial_event = MediaButtonsEventBuilder::new().set_mic_mute(true).build();
     input_device_registry_service.lock().await.send_media_button_event(initial_event.clone()).await;
@@ -768,7 +768,7 @@ async fn test_media_buttons() {
     service_registry.lock().await.register_service(input_device_registry_service.clone());
 
     let service_context =
-        Arc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry.clone())), None));
+        Rc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry.clone())), None));
 
     let (input_tx, mut input_rx) = futures::channel::mpsc::unbounded::<MediaButtonsEvent>();
     assert!(monitor_media_buttons(service_context, input_tx).await.is_ok());
@@ -791,7 +791,7 @@ async fn test_media_buttons() {
 #[fuchsia::test(allow_stalls = false)]
 async fn test_device_listener_failure() {
     let service_registry = ServiceRegistry::create();
-    let input_device_registry_service = Arc::new(Mutex::new(InputDeviceRegistryService::new()));
+    let input_device_registry_service = Rc::new(Mutex::new(InputDeviceRegistryService::new()));
     input_device_registry_service.lock().await.set_fail(true);
 
     let initial_event = MediaButtonsEventBuilder::new().set_mic_mute(true).build();
@@ -801,7 +801,7 @@ async fn test_device_listener_failure() {
     service_registry.lock().await.register_service(input_device_registry_service.clone());
 
     let service_context =
-        Arc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry.clone())), None));
+        Rc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry.clone())), None));
 
     let (input_tx, _input_rx) = futures::channel::mpsc::unbounded::<MediaButtonsEvent>();
     #[allow(clippy::bool_assert_comparison)]

@@ -16,19 +16,19 @@ use crate::tests::scaffold::event::subscriber::Blueprint;
 use crate::{service, EnvironmentBuilder};
 use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 
 const ENV_NAME: &str = "restore_agent_test_environment";
 
 // Create an environment that includes Event handling.
-async fn create_event_environment() -> Arc<Mutex<Option<Receptor>>> {
-    let event_receptor: Arc<Mutex<Option<Receptor>>> = Arc::new(Mutex::new(None));
+async fn create_event_environment() -> Rc<Mutex<Option<Receptor>>> {
+    let event_receptor: Rc<Mutex<Option<Receptor>>> = Rc::new(Mutex::new(None));
 
     // Upon environment initialization, the subscriber will capture the event receptor.
-    let create_subscriber = Arc::new({
-        let event_receptor = Arc::clone(&event_receptor);
+    let create_subscriber = Rc::new({
+        let event_receptor = Rc::clone(&event_receptor);
         move |delegate: service::message::Delegate| -> LocalBoxFuture<'static, ()> {
-            let event_receptor = Arc::clone(&event_receptor);
+            let event_receptor = Rc::clone(&event_receptor);
             Box::pin(async move {
                 let mut event_receptor = event_receptor.lock().await;
                 *event_receptor = Some(service::build_event_listener(&delegate).await);
@@ -36,7 +36,7 @@ async fn create_event_environment() -> Arc<Mutex<Option<Receptor>>> {
         }
     });
 
-    let _env = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+    let _env = EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
         .service(ServiceRegistry::serve(ServiceRegistry::create()))
         .event_subscribers(&[Blueprint::create(create_subscriber)])
         .fidl_interfaces(&[Interface::Setup])
@@ -54,12 +54,12 @@ async fn verify_restore_handling(
     response_generate: Box<dyn Fn() -> SettingHandlerResult>,
     success: bool,
 ) {
-    let counter: Arc<Mutex<u64>> = Arc::new(Mutex::new(0));
+    let counter: Rc<Mutex<u64>> = Rc::new(Mutex::new(0));
 
     let counter_clone = counter.clone();
     assert_eq!(
         success,
-        EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+        EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
             .handler(
                 SettingType::Unknown,
                 create_setting_handler(Box::new(move |request| {

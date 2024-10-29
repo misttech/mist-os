@@ -27,7 +27,7 @@ use fuchsia_inspect::{self as inspect, component, NumericProperty};
 use fuchsia_inspect_derive::{IValue, Inspect};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// The maximum number of pending requests to store in inspect per setting. There should generally
 /// be fairly few of these unless a setting is changing rapidly, so a slightly larger size allows us
@@ -197,7 +197,7 @@ impl SettingProxyInspectAgent {
     ) {
         let (_, message_rx) = context
             .delegate
-            .create(MessengerType::Broker(Arc::new(move |message| {
+            .create(MessengerType::Broker(Rc::new(move |message| {
                 // Only catch setting handler requests.
                 matches!(message.payload(), service::Payload::Setting(HandlerPayload::Request(_)))
             })))

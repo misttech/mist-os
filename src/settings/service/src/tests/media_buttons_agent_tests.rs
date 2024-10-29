@@ -14,18 +14,18 @@ use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use futures::lock::Mutex;
 use media_buttons::MediaButtonsAgent;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::rc::Rc;
 
 struct FakeServices {
-    input_device_registry: Arc<Mutex<InputDeviceRegistryService>>,
+    input_device_registry: Rc<Mutex<InputDeviceRegistryService>>,
 }
 
 // Returns a registry and input related services with which it is populated.
-async fn create_services() -> (Arc<Mutex<ServiceRegistry>>, FakeServices) {
+async fn create_services() -> (Rc<Mutex<ServiceRegistry>>, FakeServices) {
     let service_registry = ServiceRegistry::create();
 
     let input_device_registry_service_handle =
-        Arc::new(Mutex::new(InputDeviceRegistryService::new()));
+        Rc::new(Mutex::new(InputDeviceRegistryService::new()));
     service_registry.lock().await.register_service(input_device_registry_service_handle.clone());
 
     (service_registry, FakeServices { input_device_registry: input_device_registry_service_handle })
@@ -55,7 +55,7 @@ async fn test_media_buttons_proxied() {
     // Setup the fake services.
     let (service_registry, fake_services) = create_services().await;
     let service_context =
-        Arc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None));
+        Rc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None));
 
     // Create and send the invocation with faked services.
     let invocation = Invocation { lifespan: Lifespan::Service, service_context };

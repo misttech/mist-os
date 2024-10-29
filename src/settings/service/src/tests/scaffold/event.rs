@@ -5,9 +5,9 @@
 pub(crate) mod subscriber {
     use crate::{event, service};
     use futures::future::LocalBoxFuture;
-    use std::sync::Arc;
+    use std::rc::Rc;
 
-    type Generate = Arc<dyn Fn(service::message::Delegate) -> LocalBoxFuture<'static, ()>>;
+    type Generate = Rc<dyn Fn(service::message::Delegate) -> LocalBoxFuture<'static, ()>>;
 
     /// This blueprint provides a way for tests to specify an asynchronous
     /// closure as the create function for an event subscriber.
@@ -17,7 +17,7 @@ pub(crate) mod subscriber {
 
     impl Blueprint {
         pub(crate) fn create(generate: Generate) -> event::subscriber::BlueprintHandle {
-            Arc::new(Self { generate })
+            Rc::new(Self { generate })
         }
     }
 

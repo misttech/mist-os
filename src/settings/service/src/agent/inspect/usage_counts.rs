@@ -21,7 +21,7 @@ use futures::StreamExt;
 use inspect::NumericProperty;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Information about a setting type usage count to be written to inspect.
 struct SettingTypeUsageInspectInfo {
@@ -70,7 +70,7 @@ impl SettingTypeUsageInspectAgent {
     async fn create_with_node(context: Context, node: inspect::Node) {
         let (_, message_rx) = context
             .delegate
-            .create(MessengerType::Broker(Arc::new(move |message| {
+            .create(MessengerType::Broker(Rc::new(move |message| {
                 // Only catch setting handler requests.
                 matches!(message.payload(), service::Payload::Setting(HandlerPayload::Request(_)))
             })))

@@ -26,7 +26,7 @@ use crate::{Environment, EnvironmentBuilder};
 use fidl_fuchsia_settings::{InputMarker, InputProxy};
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 
 const ENV_NAME: &str = "settings_service_input_test_environment";
 
@@ -35,10 +35,10 @@ pub(crate) struct TestInputEnvironment {
     pub(crate) input_service: InputProxy,
 
     /// For sending media buttons changes.
-    pub(crate) input_button_service: Arc<Mutex<InputDeviceRegistryService>>,
+    pub(crate) input_button_service: Rc<Mutex<InputDeviceRegistryService>>,
 
     /// For watching, connecting to, and making requests on the camera device.
-    pub(crate) camera3_service: Arc<Mutex<Camera3Service>>,
+    pub(crate) camera3_service: Rc<Mutex<Camera3Service>>,
 
     /// For listening on service messages, particularly media buttons events.
     pub(crate) delegate: Delegate,
@@ -82,21 +82,21 @@ impl TestInputEnvironmentBuilder {
 
     pub(crate) async fn build(self) -> TestInputEnvironment {
         let service_registry = ServiceRegistry::create();
-        let storage_factory = Arc::new(if let Some(info) = self.starting_input_info_sources {
+        let storage_factory = Rc::new(if let Some(info) = self.starting_input_info_sources {
             InMemoryStorageFactory::with_initial_data(&info)
         } else {
             InMemoryStorageFactory::new()
         });
 
         // Register fake input device registry service.
-        let input_button_service_handle = Arc::new(Mutex::new(InputDeviceRegistryService::new()));
+        let input_button_service_handle = Rc::new(Mutex::new(InputDeviceRegistryService::new()));
         service_registry.lock().await.register_service(input_button_service_handle.clone());
 
         // Register fake camera3 service.
-        let camera3_service_handle = Arc::new(Mutex::new(Camera3Service::new(true)));
+        let camera3_service_handle = Rc::new(Mutex::new(Camera3Service::new(true)));
         service_registry.lock().await.register_service(camera3_service_handle.clone());
 
-        let mut environment_builder = EnvironmentBuilder::new(Arc::clone(&storage_factory))
+        let mut environment_builder = EnvironmentBuilder::new(Rc::clone(&storage_factory))
             .input_configuration(default_settings())
             .service(Box::new(ServiceRegistry::serve(service_registry)))
             .agents(self.agents.into_iter().map(AgentCreator::from).collect::<Vec<_>>())
@@ -151,6 +151,6 @@ impl TestInputEnvironmentBuilder {
 
 pub(super) fn default_settings() -> DefaultSetting<InputConfiguration, &'static str> {
     let config_logger =
-        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+        Rc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
     build_input_default_settings(config_logger)
 }

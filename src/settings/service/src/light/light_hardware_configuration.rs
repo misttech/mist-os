@@ -6,7 +6,8 @@ use crate::config::default_settings::DefaultSetting;
 use crate::inspect::config_logger::InspectConfigLogger;
 use crate::light::types::LightType;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
+use std::sync::Mutex;
 
 #[derive(PartialEq, Debug, Clone, Deserialize)]
 pub struct LightHardwareConfiguration {
@@ -51,7 +52,7 @@ pub enum DisableConditions {
 }
 
 pub fn build_light_default_settings(
-    config_logger: Arc<Mutex<InspectConfigLogger>>,
+    config_logger: Rc<Mutex<InspectConfigLogger>>,
 ) -> DefaultSetting<LightHardwareConfiguration, &'static str> {
     DefaultSetting::new(None, "/config/data/light_hardware_config.json", config_logger)
 }

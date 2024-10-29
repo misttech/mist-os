@@ -8,7 +8,8 @@ use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
+use std::sync::Mutex;
 
 use crate::config;
 use crate::config::base::ConfigLoadInfo;
@@ -22,7 +23,7 @@ where
     default_value: Option<T>,
     config_file_path: P,
     cached_value: Option<Option<T>>,
-    config_logger: Arc<Mutex<InspectConfigLogger>>,
+    config_logger: Rc<Mutex<InspectConfigLogger>>,
 }
 
 impl<T, P> DefaultSetting<T, P>
@@ -33,7 +34,7 @@ where
     pub fn new(
         default_value: Option<T>,
         config_file_path: P,
-        config_logger: Arc<Mutex<InspectConfigLogger>>,
+        config_logger: Rc<Mutex<InspectConfigLogger>>,
     ) -> Self {
         DefaultSetting { default_value, config_file_path, cached_value: None, config_logger }
     }
@@ -143,7 +144,7 @@ pub(crate) mod testing {
         let mut setting = DefaultSetting::new(
             Some(TestConfigData { value: 3 }),
             "/config/data/fake_config_data.json",
-            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
         );
 
         assert_eq!(
@@ -157,7 +158,7 @@ pub(crate) mod testing {
         let mut setting = DefaultSetting::new(
             Some(TestConfigData { value: 3 }),
             "/config/data/fake_invalid_config_data.json",
-            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
         );
         assert!(setting.load_default_value().is_err());
     }
@@ -167,7 +168,7 @@ pub(crate) mod testing {
         let mut setting = DefaultSetting::new(
             Some(TestConfigData { value: 3 }),
             "nuthatch",
-            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
         );
 
         assert_eq!(
@@ -181,7 +182,7 @@ pub(crate) mod testing {
         let mut setting = DefaultSetting::<TestConfigData, &str>::new(
             None,
             "nuthatch",
-            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
         );
 
         assert!(setting.load_default_value().expect("Failed to get default value").is_none());
@@ -192,7 +193,7 @@ pub(crate) mod testing {
         let mut setting = DefaultSetting::<TestConfigData, &str>::new(
             None,
             "nuthatch",
-            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
+            Rc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root()))),
         );
 
         assert!(setting.load_default_value().expect("Failed to get default value").is_none());
@@ -208,7 +209,7 @@ pub(crate) mod testing {
         let mut setting = DefaultSetting::new(
             Some(TestConfigData { value: 3 }),
             "nuthatch",
-            Arc::new(Mutex::new(InspectConfigLogger::new(inspector.root()))),
+            Rc::new(Mutex::new(InspectConfigLogger::new(inspector.root()))),
         );
         let load_result = move_executor_forward_and_get(
             &mut executor,

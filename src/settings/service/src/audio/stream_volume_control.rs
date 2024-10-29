@@ -14,7 +14,7 @@ use fidl_fuchsia_media::{AudioRenderUsage, Usage};
 use fidl_fuchsia_media_audio::VolumeControlProxy;
 use futures::channel::oneshot::Sender;
 use futures::TryStreamExt;
-use std::sync::Arc;
+use std::rc::Rc;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 const PUBLISHER_EVENT_NAME: &str = "volume_control_events";
@@ -22,7 +22,7 @@ const CONTROLLER_ERROR_DEPENDENCY: &str = "fuchsia.media.audio";
 const UNKNOWN_INSPECT_STRING: &str = "unknown";
 
 /// Closure definition for an action that can be triggered by ActionFuse.
-pub(crate) type ExitAction = Arc<dyn Fn()>;
+pub(crate) type ExitAction = Rc<dyn Fn()>;
 
 // Stores an AudioStream and a VolumeControl proxy bound to the AudioCore
 // service for |stored_stream|'s stream type. |proxy| is set to None if it

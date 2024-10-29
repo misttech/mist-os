@@ -14,7 +14,7 @@ use crate::service_context::ServiceContext;
 use crate::{service, trace, trace_guard};
 use fuchsia_async as fasync;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// Setting types that the camera watcher agent will send updates to, if they're
 /// available on the device.
@@ -72,7 +72,7 @@ impl CameraWatcherAgent {
 
     async fn handle_service_lifespan(
         &mut self,
-        service_context: Arc<ServiceContext>,
+        service_context: Rc<ServiceContext>,
     ) -> InvocationResult {
         match connect_to_camera(service_context).await {
             Ok(camera_device_client) => {
@@ -166,7 +166,7 @@ mod tests {
         let result = agent
             .handle(Invocation {
                 lifespan: Lifespan::Initialization,
-                service_context: Arc::new(ServiceContext::new(None, None)),
+                service_context: Rc::new(ServiceContext::new(None, None)),
             })
             .await;
 
@@ -183,7 +183,7 @@ mod tests {
         let mut agent =
             CameraWatcherAgent { publisher, messenger, recipient_settings: HashSet::new() };
 
-        let service_context = Arc::new(ServiceContext::new(
+        let service_context = Rc::new(ServiceContext::new(
             // Create a service registry without a camera3 service interface.
             Some(ServiceRegistry::serve(ServiceRegistry::create())),
             None,

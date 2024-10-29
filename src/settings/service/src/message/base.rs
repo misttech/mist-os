@@ -11,7 +11,7 @@ use futures::channel::mpsc::UnboundedSender;
 use futures::channel::oneshot::Sender;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
-use std::sync::Arc;
+use std::rc::Rc;
 use thiserror::Error;
 
 /// Trait alias for types of data that can be used as the payload in a
@@ -26,7 +26,7 @@ impl<T: Copy + Debug + Eq + Hash + Unpin> Address for T {}
 
 /// `Filter` is used by the `MessageHub` to determine whether an incoming
 /// message should be directed to associated broker.
-pub type Filter = Arc<dyn Fn(&Message) -> bool>;
+pub type Filter = Rc<dyn Fn(&Message) -> bool>;
 
 /// A mod for housing common definitions for messengers. Messengers are
 /// MessageHub participants, which are capable of sending and receiving

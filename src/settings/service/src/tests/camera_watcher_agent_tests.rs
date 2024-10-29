@@ -15,10 +15,10 @@ use crate::tests::helpers::{move_executor_forward, move_executor_forward_and_get
 use fuchsia_async::{MonotonicInstant, TestExecutor};
 use futures::lock::Mutex;
 use std::collections::HashSet;
-use std::sync::Arc;
+use std::rc::Rc;
 
 struct FakeServices {
-    camera3_service: Arc<Mutex<Camera3Service>>,
+    camera3_service: Rc<Mutex<Camera3Service>>,
 }
 
 // Returns a registry and input related services with which it is populated. If delay_camera_device
@@ -28,10 +28,10 @@ struct FakeServices {
 async fn create_services(
     has_camera_device: bool,
     delay_camera_device: bool,
-) -> (Arc<Mutex<ServiceRegistry>>, FakeServices) {
+) -> (Rc<Mutex<ServiceRegistry>>, FakeServices) {
     let service_registry = ServiceRegistry::create();
 
-    let camera3_service_handle = Arc::new(Mutex::new(if delay_camera_device {
+    let camera3_service_handle = Rc::new(Mutex::new(if delay_camera_device {
         Camera3Service::new_delayed_devices(delay_camera_device)
     } else {
         Camera3Service::new(has_camera_device)
@@ -70,7 +70,7 @@ async fn test_camera_agent_proxy() {
     CameraWatcherAgent::create(context).await;
 
     let service_context =
-        Arc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None));
+        Rc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None));
 
     // Create and send the invocation with faked services.
     let invocation = Invocation { lifespan: Lifespan::Service, service_context };
@@ -164,7 +164,7 @@ fn test_camera_devices_watcher_timeout() {
     );
 
     let service_context =
-        Arc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None));
+        Rc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None));
 
     // Create and send the invocation with faked services.
     let invocation = Invocation { lifespan: Lifespan::Service, service_context };
@@ -218,7 +218,7 @@ async fn test_camera_agent_delayed_devices() {
     CameraWatcherAgent::create(context).await;
 
     let service_context =
-        Arc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None));
+        Rc::new(ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None));
 
     // Create and send the invocation with faked services.
     let invocation = Invocation { lifespan: Lifespan::Service, service_context };

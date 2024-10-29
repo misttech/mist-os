@@ -7,22 +7,22 @@ use anyhow::{format_err, Error};
 
 use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 
-pub(crate) type ServiceRegistryHandle = Arc<Mutex<ServiceRegistry>>;
+pub(crate) type ServiceRegistryHandle = Rc<Mutex<ServiceRegistry>>;
 
 /// A helper class that gathers services through registration and directs
 /// the appropriate channels to them.
 pub(crate) struct ServiceRegistry {
-    services: Vec<Arc<Mutex<dyn Service>>>,
+    services: Vec<Rc<Mutex<dyn Service>>>,
 }
 
 impl ServiceRegistry {
     pub(crate) fn create() -> ServiceRegistryHandle {
-        Arc::new(Mutex::new(ServiceRegistry { services: Vec::new() }))
+        Rc::new(Mutex::new(ServiceRegistry { services: Vec::new() }))
     }
 
-    pub(crate) fn register_service(&mut self, service: Arc<Mutex<dyn Service>>) {
+    pub(crate) fn register_service(&mut self, service: Rc<Mutex<dyn Service>>) {
         self.services.push(service);
     }
 

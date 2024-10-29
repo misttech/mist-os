@@ -14,7 +14,7 @@ use crate::EnvironmentBuilder;
 use assert_matches::assert_matches;
 use fidl_fuchsia_settings::FactoryResetMarker;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 
 const ENV_NAME: &str = "settings_service_factory_test_environment";
 
@@ -27,10 +27,10 @@ async fn test_error_propagation() {
     service_registry
         .lock()
         .await
-        .register_service(Arc::new(Mutex::new(recovery_policy_service_handler.clone())));
+        .register_service(Rc::new(Mutex::new(recovery_policy_service_handler.clone())));
 
     // Bring up environment with restore agent and factory reset.
-    let env = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+    let env = EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
         .service(Box::new(ServiceRegistry::serve(service_registry)))
         .handler(
             SettingType::FactoryReset,

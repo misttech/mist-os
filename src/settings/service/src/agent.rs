@@ -11,7 +11,7 @@ use crate::{event, payload_convert, service};
 use futures::future::LocalBoxFuture;
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::rc::Rc;
 use thiserror::Error;
 
 /// Agent for watching the camera3 status.
@@ -58,7 +58,7 @@ pub(crate) enum Lifespan {
 #[derive(Clone)]
 pub struct Invocation {
     pub(crate) lifespan: Lifespan,
-    pub(crate) service_context: Arc<ServiceContext>,
+    pub(crate) service_context: Rc<ServiceContext>,
 }
 
 impl Debug for Invocation {
@@ -89,15 +89,15 @@ pub enum CreationFunc {
     ///
     /// Example usage:
     /// ```no_run
-    /// let shared = Arc::new(Mutex::new(0u));
-    /// let f = CreationFunc::Dynamic(Arc::new(move |c| -> AgentFuture {
-    ///     let shared = shared.clone();
+    /// let shared = Rc::new(Mutex::new(0u));
+    /// let f = CreationFunc::Dynamic(Rc::new(move |c| -> AgentFuture {
+    ///     let shared = Rc::clone(&shared);
     ///     Box::pin(async move {
     ///         *shared.lock().await = 42;
     ///     })
     /// }));
     /// ```
-    Dynamic(Arc<dyn Fn(Context) -> AgentFuture>),
+    Dynamic(Rc<dyn Fn(Context) -> AgentFuture>),
 }
 
 /// AgentCreator provides a simple wrapper for an async Agent creation function.

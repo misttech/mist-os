@@ -15,22 +15,22 @@ use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::rc::Rc;
 
 /// The Earcons Agent is responsible for watching updates to relevant sources that need to play
 /// sounds.
 pub(crate) struct Agent {
     publisher: Publisher,
-    sound_player_connection: Arc<Mutex<Option<ExternalServiceProxy<PlayerProxy>>>>,
+    sound_player_connection: Rc<Mutex<Option<ExternalServiceProxy<PlayerProxy>>>>,
     messenger: service::message::Messenger,
 }
 
 /// Params that are common to handlers of the earcons agent.
 #[derive(Clone)]
 pub(super) struct CommonEarconsParams {
-    pub(super) service_context: Arc<ServiceContext>,
-    pub(super) sound_player_added_files: Arc<Mutex<HashSet<&'static str>>>,
-    pub(super) sound_player_connection: Arc<Mutex<Option<ExternalServiceProxy<PlayerProxy>>>>,
+    pub(super) service_context: Rc<ServiceContext>,
+    pub(super) sound_player_added_files: Rc<Mutex<HashSet<&'static str>>>,
+    pub(super) sound_player_connection: Rc<Mutex<Option<ExternalServiceProxy<PlayerProxy>>>>,
 }
 
 impl Debug for CommonEarconsParams {
@@ -46,7 +46,7 @@ impl Agent {
     pub(crate) async fn create(mut context: AgentContext) {
         let mut agent = Agent {
             publisher: context.get_publisher(),
-            sound_player_connection: Arc::new(Mutex::new(None)),
+            sound_player_connection: Rc::new(Mutex::new(None)),
             messenger: context.create_messenger().await.expect("messenger should be created"),
         };
 
@@ -71,7 +71,7 @@ impl Agent {
 
         let common_earcons_params = CommonEarconsParams {
             service_context: invocation.service_context,
-            sound_player_added_files: Arc::new(Mutex::new(HashSet::new())),
+            sound_player_added_files: Rc::new(Mutex::new(HashSet::new())),
             sound_player_connection: self.sound_player_connection.clone(),
         };
 

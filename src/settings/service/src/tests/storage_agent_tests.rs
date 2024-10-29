@@ -12,7 +12,7 @@ use assert_matches::assert_matches;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::{StorageAccess, StorageFactory};
 use settings_storage::UpdateState;
-use std::sync::Arc;
+use std::rc::Rc;
 
 const ENV_NAME: &str = "storage_agent_test_environment";
 const ORIGINAL_VALUE: bool = true;
@@ -23,14 +23,14 @@ impl StorageAccess for TestAccess {
     const STORAGE_KEY: &'static str = UnknownInfo::KEY;
 }
 
-async fn create_test_environment() -> (service::message::Delegate, Arc<DeviceStorage>) {
-    let storage_factory = Arc::new(InMemoryStorageFactory::new());
+async fn create_test_environment() -> (service::message::Delegate, Rc<DeviceStorage>) {
+    let storage_factory = Rc::new(InMemoryStorageFactory::new());
     storage_factory
         .initialize::<TestAccess>()
         .await
         .expect("Should be able to initialize unknown info");
     let env =
-        EnvironmentBuilder::new(Arc::clone(&storage_factory)).spawn_nested(ENV_NAME).await.unwrap();
+        EnvironmentBuilder::new(Rc::clone(&storage_factory)).spawn_nested(ENV_NAME).await.unwrap();
     let store = storage_factory.get_store().await;
     let _ = store.write(&UnknownInfo(ORIGINAL_VALUE)).await.expect("Write should succeed");
     (env.delegate, store)

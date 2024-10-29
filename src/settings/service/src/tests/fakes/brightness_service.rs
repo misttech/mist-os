@@ -9,29 +9,29 @@ use fidl::prelude::*;
 use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::TryStreamExt;
-use std::sync::Arc;
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub(crate) struct BrightnessService {
-    manual_brightness: Arc<Mutex<Option<f32>>>,
-    auto_brightness: Arc<Mutex<Option<bool>>>,
-    num_changes: Arc<Mutex<u32>>,
+    manual_brightness: Rc<Mutex<Option<f32>>>,
+    auto_brightness: Rc<Mutex<Option<bool>>>,
+    num_changes: Rc<Mutex<u32>>,
 }
 
 impl BrightnessService {
     pub(crate) fn create() -> Self {
         BrightnessService {
-            manual_brightness: Arc::new(Mutex::new(None)),
-            auto_brightness: Arc::new(Mutex::new(None)),
-            num_changes: Arc::new(Mutex::new(0)),
+            manual_brightness: Rc::new(Mutex::new(None)),
+            auto_brightness: Rc::new(Mutex::new(None)),
+            num_changes: Rc::new(Mutex::new(0)),
         }
     }
 
-    pub(crate) fn get_manual_brightness(&self) -> Arc<Mutex<Option<f32>>> {
+    pub(crate) fn get_manual_brightness(&self) -> Rc<Mutex<Option<f32>>> {
         self.manual_brightness.clone()
     }
 
-    pub(crate) fn get_auto_brightness(&self) -> Arc<Mutex<Option<bool>>> {
+    pub(crate) fn get_auto_brightness(&self) -> Rc<Mutex<Option<bool>>> {
         self.auto_brightness.clone()
     }
 }

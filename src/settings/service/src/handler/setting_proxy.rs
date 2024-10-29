@@ -22,7 +22,7 @@ use futures::channel::mpsc::UnboundedSender;
 use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
 use std::collections::VecDeque;
-use std::sync::Arc;
+use std::rc::Rc;
 use zx::MonotonicDuration;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
@@ -72,7 +72,7 @@ impl RequestInfo {
 
 #[derive(Clone, Debug)]
 struct ActiveRequest {
-    request: Arc<RequestInfo>,
+    request: Rc<RequestInfo>,
     // The number of attempts that have been made on this request.
     attempts: u64,
     last_result: Option<SettingHandlerResult>,
@@ -83,7 +83,7 @@ impl ActiveRequest {
         self.request.setting_request.clone()
     }
 
-    pub(crate) fn get_info(&mut self) -> &mut Arc<RequestInfo> {
+    pub(crate) fn get_info(&mut self) -> &mut Rc<RequestInfo> {
         &mut self.request
     }
 }
@@ -123,11 +123,11 @@ pub(crate) struct SettingProxy {
     client_signature: Option<service::message::Signature>,
     active_request: Option<ActiveRequest>,
     pending_requests: VecDeque<Box<RequestInfo>>,
-    listen_requests: Vec<Arc<RequestInfo>>,
+    listen_requests: Vec<Rc<RequestInfo>>,
     next_request_id: usize,
 
     /// Factory for generating a new controller to service requests.
-    handler_factory: Arc<Mutex<dyn SettingHandlerFactory>>,
+    handler_factory: Rc<Mutex<dyn SettingHandlerFactory>>,
     /// Messenger factory for communication with service components.
     delegate: service::message::Delegate,
     /// Messenger to send messages to controllers.
@@ -150,7 +150,7 @@ pub(crate) struct SettingProxy {
     error_count: usize,
 
     /// Inspect logger for active listener counts.
-    listener_logger: Arc<Mutex<ListenerInspectLogger>>,
+    listener_logger: Rc<Mutex<ListenerInspectLogger>>,
 }
 
 struct NodeError {
@@ -172,14 +172,14 @@ impl SettingProxy {
     #[allow(clippy::too_many_arguments)]
     pub(crate) async fn create(
         setting_type: SettingType,
-        handler_factory: Arc<Mutex<dyn SettingHandlerFactory>>,
+        handler_factory: Rc<Mutex<dyn SettingHandlerFactory>>,
         delegate: service::message::Delegate,
         max_attempts: u64,
         teardown_timeout: MonotonicDuration,
         request_timeout: Option<MonotonicDuration>,
         retry_on_timeout: bool,
         node: fuchsia_inspect::Node,
-        listener_logger: Arc<Mutex<ListenerInspectLogger>>,
+        listener_logger: Rc<Mutex<ListenerInspectLogger>>,
     ) -> Result<service::message::Signature, Error> {
         let (messenger, receptor) = delegate
             .create(MessengerType::Addressable(service::Address::Handler(setting_type)))
@@ -618,7 +618,7 @@ impl SettingProxy {
 
             // Add the request to the queue of requests to process.
             self.active_request =
-                Some(ActiveRequest { request: Arc::from(pending), attempts: 0, last_result: None });
+                Some(ActiveRequest { request: Rc::from(pending), attempts: 0, last_result: None });
         }
 
         // Recreating signature is always honored, even if the request is not.

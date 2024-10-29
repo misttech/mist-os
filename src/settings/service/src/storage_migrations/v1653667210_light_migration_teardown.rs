@@ -44,8 +44,8 @@ mod tests {
     use fidl_fuchsia_stash::{StoreAccessorRequest, StoreMarker, StoreRequest, Value};
     use fuchsia_async as fasync;
     use futures::StreamExt;
+    use std::rc::Rc;
     use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Arc;
 
     // Ensure the teardown deletes and commits the deletion of data from stash.
     #[fuchsia::test]
@@ -53,9 +53,9 @@ mod tests {
         let (store_proxy, server_end) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");
         let mut request_stream = server_end.into_stream().expect("Should be able to get stream");
-        let commit_called = Arc::new(AtomicBool::new(false));
+        let commit_called = Rc::new(AtomicBool::new(false));
         let task = fasync::Task::local({
-            let commit_called = Arc::clone(&commit_called);
+            let commit_called = Rc::clone(&commit_called);
             async move {
                 let mut tasks = vec![];
                 while let Some(Ok(request)) = request_stream.next().await {
@@ -63,7 +63,7 @@ mod tests {
                         let mut request_stream =
                             accessor_request.into_stream().expect("should be able to get stream");
                         tasks.push(fasync::Task::local({
-                            let commit_called = Arc::clone(&commit_called);
+                            let commit_called = Rc::clone(&commit_called);
                             async move {
                                 while let Some(Ok(request)) = request_stream.next().await {
                                     match request {

@@ -10,15 +10,15 @@ use assert_matches::assert_matches;
 use fuchsia_async as fasync;
 use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
-use std::sync::Arc;
+use std::rc::Rc;
 
 const ENV_NAME: &str = "settings_service_event_test_environment";
 
 // Exercises the event publishing path from agents.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_agent_event_propagation() {
-    let agent_publisher: Arc<Mutex<Option<event::Publisher>>> = Arc::new(Mutex::new(None));
-    let delegate: Arc<Mutex<Option<service::message::Delegate>>> = Arc::new(Mutex::new(None));
+    let agent_publisher: Rc<Mutex<Option<event::Publisher>>> = Rc::new(Mutex::new(None));
+    let delegate: Rc<Mutex<Option<service::message::Delegate>>> = Rc::new(Mutex::new(None));
 
     // Capturing the context allows retrieving the publisher meant for the
     // agent.
@@ -29,7 +29,7 @@ async fn test_agent_event_propagation() {
 
     // Upon instantiation, the subscriber will capture the event message
     // delegate.
-    let create_subscriber = Arc::new(
+    let create_subscriber = Rc::new(
         move |captured_delegate: service::message::Delegate| -> LocalBoxFuture<'static, ()> {
             let delegate = cloned_delegate.clone();
             Box::pin(async move {
@@ -41,7 +41,7 @@ async fn test_agent_event_propagation() {
     // This agent simply captures the context and returns unhandled for all
     // subsequent invocations (allowing the authority to progress).
 
-    let f = Arc::new(move |mut context: Context| -> LocalBoxFuture<'static, ()> {
+    let f = Rc::new(move |mut context: Context| -> LocalBoxFuture<'static, ()> {
         let publisher_capture = publisher_capture.clone();
 
         Box::pin(async move {
@@ -62,7 +62,7 @@ async fn test_agent_event_propagation() {
 
     let create_agent = AgentCreator { debug_id: "TestAgent", create: CreationFunc::Dynamic(f) };
 
-    let _ = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
+    let _ = EnvironmentBuilder::new(Rc::new(InMemoryStorageFactory::new()))
         .event_subscribers(&[scaffold::event::subscriber::Blueprint::create(create_subscriber)])
         .agents(vec![create_agent])
         .spawn_and_get_protocol_connector(ENV_NAME)

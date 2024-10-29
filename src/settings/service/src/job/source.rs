@@ -25,7 +25,7 @@ use futures::lock::Mutex;
 use futures::{Stream, StreamExt};
 use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
-use std::sync::Arc;
+use std::rc::Rc;
 use thiserror::Error as ThisError;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
@@ -73,7 +73,7 @@ impl Seeder {
 
         // Send the source stream to the manager.
         let _ = self.messenger.message(
-            Payload::Source(Arc::new(Mutex::new(Some(mapped_stream)))).into(),
+            Payload::Source(Rc::new(Mutex::new(Some(mapped_stream)))).into(),
             Audience::Messenger(self.manager_signature),
         );
     }

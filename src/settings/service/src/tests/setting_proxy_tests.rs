@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 use std::pin::pin;
-use std::sync::Arc;
+use std::rc::Rc;
 use std::task::Poll;
 
 use diagnostics_assertions::assert_data_tree;
@@ -111,8 +111,8 @@ impl SettingHandler {
         setting_type: SettingType,
         state_tx: UnboundedSender<State>,
         done_tx: Option<oneshot::Sender<()>>,
-    ) -> Arc<Mutex<Self>> {
-        let handler = Arc::new(Mutex::new(Self {
+    ) -> Rc<Mutex<Self>> {
+        let handler = Rc::new(Mutex::new(Self {
             messenger,
             setting_type,
             state_tx,
@@ -235,11 +235,11 @@ impl TestEnvironmentBuilder {
     async fn build(self) -> TestEnvironment {
         let delegate = service::MessageHub::create_hub();
 
-        let handler_factory = Arc::new(Mutex::new(FakeFactory::new(delegate.clone())));
+        let handler_factory = Rc::new(Mutex::new(FakeFactory::new(delegate.clone())));
 
         let inspector = Inspector::default();
         let listener_logger =
-            Arc::new(Mutex::new(ListenerInspectLogger::with_inspector(&inspector)));
+            Rc::new(Mutex::new(ListenerInspectLogger::with_inspector(&inspector)));
         let proxy_handler_signature = SettingProxy::create(
             self.setting_type,
             handler_factory.clone(),
@@ -284,9 +284,9 @@ impl TestEnvironmentBuilder {
 struct TestEnvironment {
     proxy_handler_signature: service::message::Signature,
     service_client: service::message::Messenger,
-    handler_factory: Arc<Mutex<FakeFactory>>,
+    handler_factory: Rc<Mutex<FakeFactory>>,
     setting_handler_rx: UnboundedReceiver<State>,
-    setting_handler: Arc<Mutex<SettingHandler>>,
+    setting_handler: Rc<Mutex<SettingHandler>>,
     setting_type: SettingType,
     delegate: service::message::Delegate,
     inspector: Inspector,
@@ -326,7 +326,7 @@ async fn init_listen_env() -> (TestEnvironment, ListenReceptor) {
 }
 
 // Executes a Listen request.
-async fn run_listen(env: Arc<Mutex<TestEnvironment>>) {
+async fn run_listen(env: Rc<Mutex<TestEnvironment>>) {
     let mut environment = env.lock().await;
     environment.setting_handler.lock().await.notify();
 
@@ -338,7 +338,7 @@ async fn run_listen(env: Arc<Mutex<TestEnvironment>>) {
 }
 
 // Executes an EndListen request.
-async fn run_end_listen(env: Arc<Mutex<TestEnvironment>>, listen_receptor: ListenReceptor) {
+async fn run_end_listen(env: Rc<Mutex<TestEnvironment>>, listen_receptor: ListenReceptor) {
     let mut environment = env.lock().await;
     // Drop the listener so the service transitions into teardown.
     drop(listen_receptor);
@@ -376,7 +376,7 @@ fn test_notify() {
             panic!("environment creation stalled");
         };
 
-    let env_handle = Arc::new(Mutex::new(environment));
+    let env_handle = Rc::new(Mutex::new(environment));
 
     let listen_fut = run_listen(env_handle.clone());
     futures::pin_mut!(listen_fut);
@@ -528,7 +528,7 @@ async fn inspect_catches_errors() {
 
     let delegate = service::MessageHub::create_hub();
     let (service_client, _) = delegate.create(MessengerType::Unbound).await.unwrap();
-    let handler_factory = Arc::new(Mutex::new(ErrorFactory));
+    let handler_factory = Rc::new(Mutex::new(ErrorFactory));
     let inspector = Inspector::default();
     let _proxy_handler_signature = SettingProxy::create(
         SETTING_TYPE,
@@ -539,7 +539,7 @@ async fn inspect_catches_errors() {
         None,
         false,
         inspector.root().create_child("test"),
-        Arc::new(Mutex::new(ListenerInspectLogger::with_inspector(&inspector))),
+        Rc::new(Mutex::new(ListenerInspectLogger::with_inspector(&inspector))),
     )
     .await
     .expect("proxy creation should succeed");
@@ -572,7 +572,7 @@ async fn inspect_catches_errors() {
 #[fasync::run_until_stalled(test)]
 async fn test_active_listener_inspect() {
     let (env, receptor) = init_listen_env().await;
-    let env_handle = Arc::new(Mutex::new(env));
+    let env_handle = Rc::new(Mutex::new(env));
     run_listen(env_handle.clone()).await;
 
     // Logger handle must be locally scoped so the lock doesn't deadlock with the code under test.
@@ -614,7 +614,7 @@ async fn inspect_errors_roll_after_limit() {
 
     let delegate = service::MessageHub::create_hub();
     let (service_client, _) = delegate.create(MessengerType::Unbound).await.unwrap();
-    let handler_factory = Arc::new(Mutex::new(ErrorFactory));
+    let handler_factory = Rc::new(Mutex::new(ErrorFactory));
     let inspector = Inspector::default();
     let _proxy_handler_signature = SettingProxy::create(
         SETTING_TYPE,
@@ -625,7 +625,7 @@ async fn inspect_errors_roll_after_limit() {
         None,
         false,
         inspector.root().create_child("test"),
-        Arc::new(Mutex::new(ListenerInspectLogger::with_inspector(&inspector))),
+        Rc::new(Mutex::new(ListenerInspectLogger::with_inspector(&inspector))),
     )
     .await
     .expect("proxy creation should succeed");

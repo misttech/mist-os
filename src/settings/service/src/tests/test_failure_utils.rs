@@ -9,10 +9,10 @@ use crate::ingress::fidl::Interface;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::fakes::base::create_setting_handler;
 use crate::EnvironmentBuilder;
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub(crate) async fn create_test_env_with_failures(
-    storage_factory: Arc<InMemoryStorageFactory>,
+    storage_factory: Rc<InMemoryStorageFactory>,
     env_name: &'static str,
     interface: Interface,
     setting_type: SettingType,
@@ -36,7 +36,7 @@ pub(crate) async fn create_test_env_with_failures(
 }
 
 pub(crate) async fn create_test_env_with_failures_and_config(
-    storage_factory: Arc<InMemoryStorageFactory>,
+    storage_factory: Rc<InMemoryStorageFactory>,
     env_name: &'static str,
     interface: Interface,
     setting_type: SettingType,

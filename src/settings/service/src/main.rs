@@ -27,7 +27,7 @@ use settings::{
 use settings_storage::stash_logger::StashInspectLogger;
 use settings_storage::storage_factory::StashDeviceStorageFactory;
 use std::path::Path;
-use std::sync::Arc;
+use std::rc::Rc;
 
 const STASH_IDENTITY: &str = "settings_service";
 
@@ -50,15 +50,15 @@ fn main() -> Result<(), Error> {
     let default_enabled_interfaces_configuration =
         EnabledInterfacesConfiguration::with_interfaces(get_default_interfaces());
 
-    let config_logger = Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(inspector.root())));
+    let config_logger = Rc::new(std::sync::Mutex::new(InspectConfigLogger::new(inspector.root())));
 
-    let input_configuration = build_input_default_settings(Arc::clone(&config_logger));
-    let light_configuration = build_light_default_settings(Arc::clone(&config_logger));
+    let input_configuration = build_input_default_settings(Rc::clone(&config_logger));
+    let light_configuration = build_light_default_settings(Rc::clone(&config_logger));
 
     let enabled_interface_configuration = DefaultSetting::new(
         Some(default_enabled_interfaces_configuration),
         "/config/data/interface_configuration.json",
-        Arc::clone(&config_logger),
+        Rc::clone(&config_logger),
     )
     .load_default_value()
     .expect("invalid default enabled interface configuration")
@@ -67,14 +67,14 @@ fn main() -> Result<(), Error> {
     let flags = DefaultSetting::new(
         Some(ServiceFlags::default()),
         "/config/data/service_flags.json",
-        Arc::clone(&config_logger),
+        Rc::clone(&config_logger),
     )
     .load_default_value()
     .expect("invalid service flag configuration")
     .expect("no default service flags");
 
-    let display_configuration = build_display_default_settings(Arc::clone(&config_logger));
-    let audio_configuration = build_audio_default_settings(Arc::clone(&config_logger));
+    let display_configuration = build_display_default_settings(Rc::clone(&config_logger));
+    let audio_configuration = build_audio_default_settings(Rc::clone(&config_logger));
 
     // Temporary solution for FEMU to have an agent config without camera agent.
     let agent_config = "/config/data/agent_configuration.json";
@@ -98,7 +98,7 @@ fn main() -> Result<(), Error> {
     store_proxy.identify(STASH_IDENTITY).expect("should identify");
     let storage_factory = StashDeviceStorageFactory::new(
         store_proxy.clone(),
-        Arc::new(Mutex::new(stash_inspect_logger)),
+        Rc::new(Mutex::new(stash_inspect_logger)),
     );
 
     let storage_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
@@ -112,7 +112,7 @@ fn main() -> Result<(), Error> {
 
     let fs = ServiceFs::new_local();
 
-    EnvironmentBuilder::new(Arc::new(storage_factory))
+    EnvironmentBuilder::new(Rc::new(storage_factory))
         .configuration(configuration)
         .display_configuration(display_configuration)
         .audio_configuration(audio_configuration)
@@ -120,7 +120,7 @@ fn main() -> Result<(), Error> {
         .light_configuration(light_configuration)
         .setting_proxy_inspect_info(
             setting_proxy_inspect_info.node(),
-            Arc::new(Mutex::new(listener_inspect_logger)),
+            Rc::new(Mutex::new(listener_inspect_logger)),
         )
         .storage_dir(storage_dir)
         .store_proxy(store_proxy)
