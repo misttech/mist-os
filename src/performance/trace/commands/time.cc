@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 //
 // This command exists to support integrating Zedmon power readings into
-// traceutil. The problem to be solved is mapping Zedmon to Fuchsia time domains
+// trace data. The problem to be solved is mapping Zedmon to Fuchsia time domains
 // so that trace data from Zedmon can be merged with trace data from the Fuchsia
 // device. Data is captured on the devhost, so what we need to do is map devhost
 // times to Fuchsia times. This command provides an interactive tool to obtain
