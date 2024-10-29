@@ -7,16 +7,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include <memory>
-#include <sstream>
-#include <string>
-
-#include "lib/fidl/cpp/binding.h"
-#include "lib/fidl/cpp/synchronous_interface_ptr.h"
 #include "src/cobalt/bin/testapp/cobalt_testapp_logger.h"
-#include "src/lib/fxl/command_line.h"
-#include "src/lib/fxl/log_settings_command_line.h"
-#include "src/lib/fxl/macros.h"
 #include "third_party/cobalt/src/public/lib/clock_interfaces.h"
 
 namespace cobalt {

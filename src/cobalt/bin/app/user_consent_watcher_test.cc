@@ -15,6 +15,7 @@
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace cobalt {
+namespace {
 
 using fuchsia::settings::Error;
 using fuchsia::settings::PrivacySettings;
@@ -23,7 +24,6 @@ using inspect::testing::IntIs;
 using inspect::testing::NameMatches;
 using inspect::testing::NodeMatches;
 using inspect::testing::PropertyList;
-using inspect::testing::StringIs;
 using ::testing::UnorderedElementsAre;
 
 PrivacySettings MakePrivacySettings(const std::optional<bool> user_data_sharing_consent) {
@@ -151,12 +151,11 @@ std::string PrettyPrintConsentStates(const testing::TestParamInfo<std::optional<
   if (info.param.has_value()) {
     if (info.param.value()) {
       return "UserConsented";
-    } else {
-      return "UserDidNotConsent";
     }
-  } else {
-    return "NoConsentState";
+    return "UserDidNotConsent";
   }
+
+  return "NoConsentState";
 }
 
 INSTANTIATE_TEST_SUITE_P(WithVariousConsentStates, UserConsentWatcherTest,
@@ -334,4 +333,5 @@ TEST_P(UserConsentWatcherTest, ContinuesWatching) {
   }
 }
 
+}  // namespace
 }  // namespace cobalt

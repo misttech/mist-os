@@ -27,6 +27,7 @@
 #include "third_party/cobalt/src/public/testing/fake_cobalt_service.h"
 
 namespace cobalt {
+namespace {
 
 const char kTestDir[] = "/tmp/cobalt_app_test";
 
@@ -35,10 +36,11 @@ bool WriteFile(const std::string& file, const std::string& to_write) {
                           to_write.length());
 }
 
+}  // namespace
+
 class CreateCobaltConfigTest : public gtest::TestLoopFixture {
  public:
-  CreateCobaltConfigTest()
-      : ::gtest::TestLoopFixture(), context_provider_(), clock_(dispatcher(), inspect::Node()) {}
+  CreateCobaltConfigTest() : ::gtest::TestLoopFixture(), clock_(dispatcher(), inspect::Node()) {}
 
  protected:
   void SetUp() override {
@@ -165,7 +167,6 @@ class CobaltAppTest : public gtest::TestLoopFixture {
  public:
   CobaltAppTest()
       : ::gtest::TestLoopFixture(),
-        context_provider_(),
         clock_(new FakeFuchsiaSystemClock(dispatcher())),
         fake_service_(new testing::FakeCobaltService()),
         cobalt_app_(

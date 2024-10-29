@@ -13,6 +13,7 @@
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/sys/cpp/component_context.h>
 
 #include <chrono>
 #include <memory>
@@ -20,7 +21,6 @@
 
 #include "src/cobalt/bin/system-metrics/activity_listener.h"
 #include "src/cobalt/bin/system-metrics/cpu_stats_fetcher.h"
-#include "src/cobalt/bin/utils/clock.h"
 #include "third_party/cobalt/src/lib/client/cpp/buckets_config.h"
 #include "third_party/cobalt/src/public/lib/clock_interfaces.h"
 

@@ -62,11 +62,6 @@ constexpr char kShufflerDevelTinkPublicKeyPath[] = "/pkg/data/keys/shuffler_deve
 constexpr char kAnalyzerProdTinkPublicKeyPath[] = "/pkg/data/keys/analyzer_prod_public";
 constexpr char kShufflerProdTinkPublicKeyPath[] = "/pkg/data/keys/shuffler_prod_public";
 
-}  // namespace
-
-JSONHelper::JSONHelper(const std::string& path)
-    : config_file_contents_(json_parser_.ParseFromFile(path)) {}
-
 template <typename T>
 StatusOr<T> MakeBadTypeError(const std::string& key, const std::string& expected,
                              rapidjson::Type actual) {
@@ -78,6 +73,11 @@ StatusOr<T> MakeBadTypeError(const std::string& key, const std::string& expected
                 fxl::Concatenate({"Key ", key, " is expected to be a ", expected,
                                   ", but was instead a ", std::string(kTypeNames[actual])}));
 }
+
+}  // namespace
+
+JSONHelper::JSONHelper(const std::string& path)
+    : config_file_contents_(json_parser_.ParseFromFile(path)) {}
 
 StatusOr<std::string> JSONHelper::GetString(const std::string& key) const {
   CB_RETURN_IF_ERROR(EnsureKey(key));

@@ -9,6 +9,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/utc.h>
 
+#include <iomanip>
+
 namespace cobalt {
 
 FuchsiaSystemClock::FuchsiaSystemClock(async_dispatcher_t* dispatcher, inspect::Node node)

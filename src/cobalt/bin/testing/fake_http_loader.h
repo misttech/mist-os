@@ -5,8 +5,10 @@
 #ifndef SRC_COBALT_BIN_TESTING_FAKE_HTTP_LOADER_H_
 #define SRC_COBALT_BIN_TESTING_FAKE_HTTP_LOADER_H_
 
+#include <fuchsia/net/http/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
+#include <lib/fidl/cpp/binding_set.h>
 #include <lib/zx/time.h>
 
 #include "src/lib/callback/scoped_task_runner.h"

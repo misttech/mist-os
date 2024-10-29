@@ -37,7 +37,7 @@ class FakeService : public testing::FakeCobaltService {
   bool status_codes_cleared() { return status_codes_.empty(); }
 
  private:
-  std::vector<cobalt::StatusCode> status_codes_ = {};
+  std::vector<cobalt::StatusCode> status_codes_;
 };
 
 class FakeMetricEventLoggerFactoryImpl : public MetricEventLoggerFactoryImpl {

@@ -16,12 +16,10 @@
 #include "src/cobalt/bin/testapp/prober_metrics_registry.cb.h"
 #include "src/cobalt/bin/testapp/test_constants.h"
 #include "src/cobalt/bin/testapp/testapp_metrics_registry.cb.h"
-#include "src/cobalt/bin/utils/base64.h"
 #include "third_party/cobalt/src/lib/util/datetime_util.h"
 
 namespace cobalt::testapp {
 
-using fidl::VectorPtr;
 using util::SystemClockInterface;
 using util::TimeToDayIndex;
 using LoggerMethod = cobalt_internal_registry::LoggerCallsMadeMigratedMetricDimensionLoggerMethod;
@@ -40,7 +38,6 @@ bool SendAndCheckSuccess(const std::string& test_name, CobaltTestAppLogger* logg
   FX_LOGS(INFO) << test_name << ": PASS";
   return true;
 }
-}  // namespace
 
 ////////////////////// Tests using local aggregation ///////////////////////
 
@@ -141,6 +138,8 @@ bool CheckInspectData(CobaltTestAppLogger* logger, uint32_t project_id, LoggerMe
 
   return true;
 }
+
+}  // namespace
 
 // INTEGER metrics for update_duration_new, streaming_time_new and application_memory_new.
 bool TestLogInteger(CobaltTestAppLogger* logger, SystemClockInterface* clock,
@@ -250,17 +249,16 @@ bool TestLogInteger(CobaltTestAppLogger* logger, SystemClockInterface* clock,
     FX_LOGS(INFO) << "TestLogInteger : FAIL";
     return false;
   }
-  if (!CheckInspectData(logger, project_id, LoggerMethod::LogInteger,
-                        std::size(kUpdateDurationNewErrorNameIndices) *
-                                std::size(kUpdateDurationNewStageIndices) *
-                                std::size(kUpdateDurationNewValues) +
-                            std::size(kStreamingTimeNewTypeIndices) *
-                                std::size(kStreamingTimeNewModuleNameIndices) *
-                                std::size(kStreamingTimeNewValues) +
-                            std::size(kApplicationMemoryNewMemoryTypeIndices) *
-                                std::size(kApplicationMemoryNewApplicationNameIndices) *
-                                std::size(kApplicationMemoryNewValues),
-                        expected_num_obs)) {
+  if (!CheckInspectData(
+          logger, project_id, LoggerMethod::LogInteger,
+          (std::size(kUpdateDurationNewErrorNameIndices) *
+           std::size(kUpdateDurationNewStageIndices) * std::size(kUpdateDurationNewValues)) +
+              (std::size(kStreamingTimeNewTypeIndices) *
+               std::size(kStreamingTimeNewModuleNameIndices) * std::size(kStreamingTimeNewValues)) +
+              (std::size(kApplicationMemoryNewMemoryTypeIndices) *
+               std::size(kApplicationMemoryNewApplicationNameIndices) *
+               std::size(kApplicationMemoryNewValues)),
+          expected_num_obs)) {
     FX_LOGS(INFO) << "TestLogInteger : FAIL";
     return false;
   }
@@ -399,14 +397,14 @@ bool TestLogOccurrence(CobaltTestAppLogger* logger, SystemClockInterface* clock,
   }
   if (!CheckInspectData(
           logger, project_id, LoggerMethod::LogOccurrence,
-          std::size(kFeaturesActiveNewSkillIndices) * std::size(kFeaturesActiveNewCounts) +
-              std::size(kFileSystemCacheMissesNewEncryptionStateIndices) *
-                  std::size(kFileSystemCacheMissesNewFileSystemTypeIndices) *
-                  std::size(kFileSystemCacheMissesNewCounts) +
-              std::size(kConnectionAttemptsNewStatusIndices) *
-                  std::size(kConnectionAttemptsNewHostNameIndices) *
-                  std::size(kConnectionAttemptsNewCounts) +
-              std::size(kErrorOccurredNewIndicesToUse) * std::size(kErrorOccurredNewCounts),
+          (std::size(kFeaturesActiveNewSkillIndices) * std::size(kFeaturesActiveNewCounts)) +
+              (std::size(kFileSystemCacheMissesNewEncryptionStateIndices) *
+               std::size(kFileSystemCacheMissesNewFileSystemTypeIndices) *
+               std::size(kFileSystemCacheMissesNewCounts)) +
+              (std::size(kConnectionAttemptsNewStatusIndices) *
+               std::size(kConnectionAttemptsNewHostNameIndices) *
+               std::size(kConnectionAttemptsNewCounts)) +
+              (std::size(kErrorOccurredNewIndicesToUse) * std::size(kErrorOccurredNewCounts)),
           expected_num_obs)) {
     FX_LOGS(INFO) << "TestLogOccurrence : FAIL";
     return false;
@@ -499,10 +497,10 @@ bool TestLogIntegerHistogram(CobaltTestAppLogger* logger, SystemClockInterface* 
     return false;
   }
   if (!CheckInspectData(logger, project_id, LoggerMethod::LogIntegerHistogram,
-                        std::size(kPowerUsageNewApplicationStateIndices) *
-                                std::size(kPowerUsageNewApplicationNameIndices) +
-                            std::size(kBandwidthUsageNewApplicationStateIndices) *
-                                std::size(kBandwidthUsageNewApplicationNameIndices),
+                        (std::size(kPowerUsageNewApplicationStateIndices) *
+                         std::size(kPowerUsageNewApplicationNameIndices)) +
+                            (std::size(kBandwidthUsageNewApplicationStateIndices) *
+                             std::size(kBandwidthUsageNewApplicationNameIndices)),
                         expected_num_obs)) {
     FX_LOGS(INFO) << "TestLogIntegerHistogram : FAIL";
     return false;
@@ -510,7 +508,6 @@ bool TestLogIntegerHistogram(CobaltTestAppLogger* logger, SystemClockInterface* 
   return SendAndCheckSuccess("TestLogIntegerHistogram", logger);
 }
 
-bool CheckInspectData(uint32_t id, std::map<uint32_t, uint32_t> map, int i, size_t i_1);
 // error_occurred_components using STRING metric.
 //
 // For each of the three event_codes, log each of the five application components.
@@ -530,7 +527,7 @@ bool TestLogString(CobaltTestAppLogger* logger, SystemClockInterface* clock,
 
   uint32_t day_index = CurrentDayIndex(clock);
   for (uint32_t status_index : kErrorOccurredComponentsStatusIndices) {
-    for (std::string component : kApplicationComponentNames) {
+    for (const std::string& component : kApplicationComponentNames) {
       if (!logger->LogString(cobalt_registry::kErrorOccurredComponentsMetricId, {status_index},
                              component)) {
         FX_LOGS(INFO) << "LogString(" << cobalt_registry::kErrorOccurredComponentsMetricId

@@ -7,8 +7,6 @@
 
 #include <string>
 
-#include "src/cobalt/bin/testapp/testapp_metrics_registry.cb.h"
-
 namespace cobalt::testapp {
 
 // Common metric constants.

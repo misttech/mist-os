@@ -18,7 +18,6 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/lib/testing/predicates/status.h"
 
 namespace cobalt {
 namespace {

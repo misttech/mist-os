@@ -15,6 +15,7 @@
 #include <sys/statvfs.h>
 #include <zircon/status.h>
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <memory>
@@ -446,9 +447,7 @@ void SystemMetricsDaemon::StoreCpuData(double cpu_percentage) {
   }
 
   cpu_usage_accumulator_ += cpu_percentage;
-  if (cpu_percentage > cpu_usage_max_) {
-    cpu_usage_max_ = cpu_percentage;
-  }
+  cpu_usage_max_ = std::max(cpu_percentage, cpu_usage_max_);
   // Every 10 (kInspectSamplePeriod) seconds, write to inspect
   const size_t kInspectSamplePeriod = 10;
   if (cpu_data_stored_ % kInspectSamplePeriod == 0) {

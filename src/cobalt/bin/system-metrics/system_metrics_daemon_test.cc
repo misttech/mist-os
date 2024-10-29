@@ -13,6 +13,7 @@
 
 #include <fstream>
 #include <future>
+#include <utility>
 
 #include <gtest/gtest.h>
 
@@ -21,7 +22,6 @@
 #include "src/cobalt/bin/testing/fake_clock.h"
 #include "src/cobalt/bin/testing/log_metric_method.h"
 #include "src/cobalt/bin/testing/stub_metric_event_logger.h"
-#include "src/cobalt/bin/utils/clock.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 using cobalt::FakeCpuStatsFetcher;
@@ -39,9 +39,9 @@ using std::chrono::seconds;
 
 namespace {
 typedef FuchsiaUptimeMigratedMetricDimensionUptimeRange UptimeRange;
-static constexpr int kHour = 3600;
-static constexpr int kDay = 24 * kHour;
-static constexpr int kWeek = 7 * kDay;
+constexpr int kHour = 3600;
+constexpr int kDay = 24 * kHour;
+constexpr int kWeek = 7 * kDay;
 }  // namespace
 
 class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
@@ -50,13 +50,12 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
   // give ownership of the pointer to daemon_.
   SystemMetricsDaemonTest()
       : executor_(dispatcher()),
-        context_provider_(),
         fake_clock_(new FakeSteadyClock()),
         daemon_(new SystemMetricsDaemon(
             dispatcher(), context_provider_.context(), &stub_logger_,
             std::unique_ptr<cobalt::util::SteadyClockInterface>(fake_clock_),
             std::unique_ptr<cobalt::CpuStatsFetcher>(new FakeCpuStatsFetcher()), nullptr, "tmp/")) {
-    daemon_->cpu_bucket_config_ = daemon_->InitializeLinearBucketConfig(
+    daemon_->cpu_bucket_config_ = SystemMetricsDaemon::InitializeLinearBucketConfig(
         fuchsia_system_metrics::kCpuPercentageMigratedIntBucketsFloor,
         fuchsia_system_metrics::kCpuPercentageMigratedIntBucketsNumBuckets,
         fuchsia_system_metrics::kCpuPercentageMigratedIntBucketsStepSize);
@@ -100,17 +99,17 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
 
   seconds LogFuchsiaUptime() { return daemon_->LogFuchsiaUptime(); }
 
-  void RepeatedlyLogUpPing() { return daemon_->RepeatedlyLogUpPing(); }
+  void RepeatedlyLogUpPing() { daemon_->RepeatedlyLogUpPing(); }
 
-  void LogLifetimeEvents() { return daemon_->LogLifetimeEvents(); }
+  void LogLifetimeEvents() { daemon_->LogLifetimeEvents(); }
 
-  void LogLifetimeEventBoot() { return daemon_->LogLifetimeEventBoot(); }
+  void LogLifetimeEventBoot() { daemon_->LogLifetimeEventBoot(); }
 
-  void LogLifetimeEventActivation() { return daemon_->LogLifetimeEventActivation(); }
+  void LogLifetimeEventActivation() { daemon_->LogLifetimeEventActivation(); }
 
-  void RepeatedlyLogUptime() { return daemon_->RepeatedlyLogUptime(); }
+  void RepeatedlyLogUptime() { daemon_->RepeatedlyLogUptime(); }
 
-  void RepeatedlyLogActiveTime() { return daemon_->RepeatedlyLogActiveTime(); }
+  void RepeatedlyLogActiveTime() { daemon_->RepeatedlyLogActiveTime(); }
 
   seconds LogCpuUsage() { return daemon_->LogCpuUsage(); }
 
@@ -181,7 +180,7 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
     expected_log_method_invoked = (expected_call_count == 0 ? cobalt::LogMetricMethod::kDefault
                                                             : expected_log_method_invoked);
     CheckValues(expected_log_method_invoked, expected_call_count, expected_metric_id,
-                expected_last_event_codes);
+                std::move(expected_last_event_codes));
     stub_logger_.reset();
   }
 
@@ -196,7 +195,8 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
     fake_clock_->Increment(advance_time_seconds);
     EXPECT_EQ(expected_activity, RunLoopFor(zx::sec(advance_time_seconds.count())));
     if (expected_activity) {
-      CheckUptimeValues(expected_call_count, expected_last_event_codes, expected_last_up_hours);
+      CheckUptimeValues(expected_call_count, std::move(expected_last_event_codes),
+                        expected_last_up_hours);
     }
     stub_logger_.reset();
   }
@@ -257,12 +257,12 @@ TEST_F(SystemMetricsDaemonTest, LogFuchsiaUptime) {
   DoFuchsiaUptimeTest(seconds(kHour - 1), seconds(1), UptimeRange::LessThanTwoWeeks, 0);
   DoFuchsiaUptimeTest(seconds(5), seconds(kHour - 5), UptimeRange::LessThanTwoWeeks, 0);
   DoFuchsiaUptimeTest(seconds(kDay), seconds(kHour), UptimeRange::LessThanTwoWeeks, 24);
-  DoFuchsiaUptimeTest(seconds(kDay + 6 * kHour + 10), seconds(kHour - 10),
+  DoFuchsiaUptimeTest(seconds(kDay + (6 * kHour) + 10), seconds(kHour - 10),
                       UptimeRange::LessThanTwoWeeks, 30);
   DoFuchsiaUptimeTest(seconds(kWeek), seconds(kHour), UptimeRange::LessThanTwoWeeks, 168);
   DoFuchsiaUptimeTest(seconds(kWeek), seconds(kHour), UptimeRange::LessThanTwoWeeks, 168);
   DoFuchsiaUptimeTest(seconds(2 * kWeek), seconds(kHour), UptimeRange::TwoWeeksOrMore, 336);
-  DoFuchsiaUptimeTest(seconds(2 * kWeek + 6 * kDay + 10), seconds(kHour - 10),
+  DoFuchsiaUptimeTest(seconds((2 * kWeek) + (6 * kDay) + 10), seconds(kHour - 10),
                       UptimeRange::TwoWeeksOrMore, 480);
 }
 
@@ -685,8 +685,8 @@ class MockLogger : public ::fuchsia::metrics::testing::MetricEventLogger_TestBas
   void NotImplemented_(const std::string& name) override {
     ASSERT_TRUE(false) << name << " is not implemented";
   }
-  int num_calls() { return num_calls_; }
-  int num_events() { return num_events_; }
+  int num_calls() const { return num_calls_; }
+  int num_events() const { return num_events_; }
 
  private:
   int num_calls_ = 0;
@@ -696,7 +696,7 @@ class MockLogger : public ::fuchsia::metrics::testing::MetricEventLogger_TestBas
 class MockLoggerFactory : public ::fuchsia::metrics::testing::MetricEventLoggerFactory_TestBase {
  public:
   MockLogger* logger() { return logger_.get(); }
-  uint32_t received_project_id() { return received_project_id_; }
+  uint32_t received_project_id() const { return received_project_id_; }
 
   void CreateMetricEventLogger(fuchsia::metrics::ProjectSpec project,
                                ::fidl::InterfaceRequest<fuchsia::metrics::MetricEventLogger> logger,
