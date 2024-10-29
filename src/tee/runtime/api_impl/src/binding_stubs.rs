@@ -626,7 +626,7 @@ extern "C" fn TEE_InitRefAttribute(
 ) {
     assert!(!attr.is_null());
     let id = AttributeId::from_u32(attributeID).unwrap();
-    let buffer = slice_from_raw_parts(buffer, length);
+    let buffer = slice_from_raw_parts_mut(buffer, length);
     let attribute = storage::init_ref_attribute(id, buffer);
     // SAFETY: `attr` nullity checked above.
     unsafe { *attr = *attribute.to_binding() };

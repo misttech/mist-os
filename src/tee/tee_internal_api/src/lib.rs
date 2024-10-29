@@ -213,6 +213,32 @@ pub struct MemRef {
     pub size: usize,
 }
 
+impl MemRef {
+    pub fn from_mut_slice(slice: &mut [u8]) -> Self {
+        MemRef { buffer: slice.as_mut_ptr(), size: slice.len() }
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        self.assert_as_slice_preconditions();
+        // SAFETY: preconditions asserted above.
+        unsafe { std::slice::from_raw_parts(self.buffer, self.size) }
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
+        self.assert_as_slice_preconditions();
+        // SAFETY: preconditions asserted above.
+        unsafe { std::slice::from_raw_parts_mut(self.buffer, self.size) }
+    }
+
+    // Asserts that the preconditions to std::slice::from_raw_parts(_mut)? are
+    // met.
+    fn assert_as_slice_preconditions(&self) {
+        assert!(!self.buffer.is_null());
+        assert!(self.buffer.is_aligned());
+        assert!(self.size * size_of::<u8>() < isize::MAX.try_into().unwrap());
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union BufferOrValue {
@@ -328,8 +354,7 @@ handle!(SessionContext, usize);
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Attribute {
-    pub attribute_id: AttributeId,
-    pub padding: u32,
+    pub id: AttributeId,
     pub content: BufferOrValue,
 }
 
@@ -345,12 +370,20 @@ impl Attribute {
         unsafe { Some(&*((attr as *const binding::TEE_Attribute) as *const Self)) }
     }
 
-    pub fn is_value(&self) -> bool {
-        (self.attribute_id as u32) & binding::TEE_ATTR_FLAG_VALUE != 0
+    // Whether the attribute is public (i.e., can be extracted from an object
+    // regardless of its defined usage).
+    pub fn is_public(&self) -> bool {
+        self.id.public()
     }
 
-    pub fn is_public(&self) -> bool {
-        (self.attribute_id as u32) & binding::TEE_ATTR_FLAG_PUBLIC != 0
+    // Whether the attribute is given by value fields.
+    pub fn is_value(&self) -> bool {
+        self.id.value()
+    }
+
+    // Whether the attribute is given by a memory reference.
+    pub fn is_memory_reference(&self) -> bool {
+        self.id.memory_reference()
     }
 }
 
@@ -364,7 +397,6 @@ pub struct ObjectInfo {
     pub data_size: usize,
     pub data_position: usize,
     pub handle_flags: HandleFlags,
-    pub padding: u32,
 }
 
 output_parameter!(ObjectInfo, binding::TEE_ObjectInfo);
@@ -705,6 +737,24 @@ pub enum AttributeId {
     KdfKeySize = binding::TEE_ATTR_KDF_KEY_SIZE,
 }
 
+impl AttributeId {
+    // Whether the ID represents an attribute that is public (i.e., can be
+    // extracted from an object regardless of its defined usage).
+    pub fn public(self) -> bool {
+        (self as u32) & binding::TEE_ATTR_FLAG_PUBLIC != 0
+    }
+
+    // Whether the ID represents a value attribute.
+    pub fn value(self) -> bool {
+        (self as u32) & binding::TEE_ATTR_FLAG_VALUE != 0
+    }
+
+    // Whether the ID represents a memory reference attribute.
+    pub fn memory_reference(self) -> bool {
+        !self.value()
+    }
+}
+
 //
 // Time data types
 //
@@ -949,8 +999,7 @@ pub mod tests {
         assert_eq!(align_of::<Attribute>(), align_of::<TEE_Attribute>());
 
         let new = Attribute {
-            attribute_id: AttributeId::SecretValue,
-            padding: 0,
+            id: AttributeId::SecretValue,
             content: BufferOrValue { value: ValueFields { a: 0, b: 0 } },
         };
         let old = TEE_Attribute {
@@ -961,13 +1010,9 @@ pub mod tests {
             },
         };
 
-        assert_eq!(offset_of!(Attribute, attribute_id), offset_of!(TEE_Attribute, attributeID));
-        assert_eq!(size_of_val(&new.attribute_id), size_of_val(&old.attributeID));
-        assert_eq!(align_of_val(&new.attribute_id), align_of_val(&old.attributeID));
-
-        assert_eq!(offset_of!(Attribute, padding), offset_of!(TEE_Attribute, __bindgen_padding_0));
-        assert!(size_of_val(&new.padding) >= size_of_val(&old.__bindgen_padding_0));
-        assert!(align_of_val(&new.padding) >= align_of_val(&old.__bindgen_padding_0));
+        assert_eq!(offset_of!(Attribute, id), offset_of!(TEE_Attribute, attributeID));
+        assert_eq!(size_of_val(&new.id), size_of_val(&old.attributeID));
+        assert_eq!(align_of_val(&new.id), align_of_val(&old.attributeID));
 
         assert_eq!(offset_of!(Attribute, content), offset_of!(TEE_Attribute, content));
         assert_eq!(size_of_val(&new.content), size_of_val(&old.content));
@@ -1030,7 +1075,6 @@ pub mod tests {
             data_size: 0,
             data_position: 0,
             handle_flags: HandleFlags::empty(),
-            padding: 0,
         };
         let old = TEE_ObjectInfo {
             objectType: 0,
@@ -1073,13 +1117,6 @@ pub mod tests {
         assert_eq!(offset_of!(ObjectInfo, handle_flags), offset_of!(TEE_ObjectInfo, handleFlags));
         assert_eq!(size_of_val(&new.handle_flags), size_of_val(&old.handleFlags));
         assert_eq!(align_of_val(&new.handle_flags), align_of_val(&old.handleFlags));
-
-        assert_eq!(
-            offset_of!(ObjectInfo, padding),
-            offset_of!(TEE_ObjectInfo, __bindgen_padding_0)
-        );
-        assert!(size_of_val(&new.padding) == size_of_val(&old.__bindgen_padding_0));
-        assert!(align_of_val(&new.padding) >= align_of_val(&old.__bindgen_padding_0));
 
         // Verify zero-copy translation.
         assert_eq!(addr_of!(*ObjectInfo::to_binding(&new)) as usize, addr_of!(new) as usize);

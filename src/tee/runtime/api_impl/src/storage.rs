@@ -9,8 +9,8 @@
 use std::unimplemented;
 
 use tee_internal::{
-    Attribute, AttributeId, HandleFlags, ObjectEnumHandle, ObjectHandle, ObjectInfo,
-    Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
+    Attribute, AttributeId, BufferOrValue, HandleFlags, MemRef, ObjectEnumHandle, ObjectHandle,
+    ObjectInfo, Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
 };
 
 pub(crate) fn on_entrypoint_creation() {
@@ -66,12 +66,14 @@ pub fn populate_transient_object(object: ObjectHandle, attrs: &[Attribute]) -> T
     unimplemented!()
 }
 
-pub fn init_ref_attribute(attribute_id: AttributeId, buffer: &[u8]) -> Attribute {
-    unimplemented!()
+pub fn init_ref_attribute(id: AttributeId, buffer: &mut [u8]) -> Attribute {
+    assert!(id.memory_reference(), "Attribute ID {id:?} does not represent a memory reference");
+    Attribute { id, content: BufferOrValue { memref: MemRef::from_mut_slice(buffer) } }
 }
 
-pub fn init_value_attribute(attribute_id: AttributeId, value: ValueFields) -> Attribute {
-    unimplemented!()
+pub fn init_value_attribute(id: AttributeId, value: ValueFields) -> Attribute {
+    assert!(id.value(), "Attribute ID {id:?} does not represent value fields");
+    Attribute { id, content: BufferOrValue { value } }
 }
 
 pub fn copy_object_attributes1(src: ObjectHandle, dest: ObjectHandle) -> TeeResult {
