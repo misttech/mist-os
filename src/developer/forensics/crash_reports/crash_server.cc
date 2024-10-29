@@ -128,7 +128,7 @@ void CrashServer::MakeRequest(const Report& report, const Snapshot& snapshot,
 
   // Append the product and version parameters to the URL.
   const std::map<std::string, std::string> annotations =
-      PrepareAnnotations(report, snapshot, annotation_manager_, clock_->MonotonicNow());
+      PrepareAnnotations(report, snapshot, annotation_manager_, clock_->BootNow());
   FX_CHECK(annotations.count("product") != 0);
   FX_CHECK(annotations.count("version") != 0);
   const std::string url = fxl::Substitute("$0?product=$1&version=$2", url_,
@@ -233,7 +233,7 @@ void CrashServer::MakeRequest(const Report& report, const Snapshot& snapshot,
 
 std::map<std::string, std::string> CrashServer::PrepareAnnotations(
     const Report& report, const Snapshot& snapshot,
-    const feedback::AnnotationManager* annotation_manager, const zx::time uptime) {
+    const feedback::AnnotationManager* annotation_manager, const zx::time_boot uptime) {
   // Start with annotations from |report| and only add "presence" annotations.
   //
   // If |snapshot| is a MissingSnapshot, they contain potentially new information about why the
@@ -248,6 +248,9 @@ std::map<std::string, std::string> CrashServer::PrepareAnnotations(
   // The crash server is responsible for adding the following annotations because adding the
   // annotations to the crash report earlier in the crash reporting flow could result in the values
   // being incorrect if the upload doesn't succeed until a later time.
+  //
+  // The report upload uptime should be a boot time because it's potentially used to determine the
+  // UTC time if the UTC time wasn't available when the report was generated.
   std::optional<std::string> formatted_uptime = FormatDuration(zx::duration(uptime.get()));
   annotations.Set(feedback::kDebugReportUploadUptime, formatted_uptime.has_value()
                                                           ? ErrorOrString(*formatted_uptime)

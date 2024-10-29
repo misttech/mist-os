@@ -55,7 +55,7 @@ class CrashServer {
   //   immediately available).
   static std::map<std::string, std::string> PrepareAnnotations(
       const Report& report, const Snapshot& snapshot,
-      const feedback::AnnotationManager* annotation_manager, zx::time uptime);
+      const feedback::AnnotationManager* annotation_manager, zx::time_boot uptime);
 
  private:
   async_dispatcher_t* dispatcher_;
