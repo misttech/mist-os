@@ -6,8 +6,9 @@
 
 use std::fmt::Debug;
 
-use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, ServerEnd};
 use futures::future::Either;
+use futures::TryStream;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
 use thiserror::Error;
 use {
@@ -42,13 +43,16 @@ pub enum RouteTableCreationError {
 /// Admin extension for the `fuchsia.net.routes.admin` FIDL API.
 pub trait FidlRouteAdminIpExt: Ip {
     /// The "route table" protocol to use for this IP version.
-    type RouteTableMarker: DiscoverableProtocolMarker<RequestStream = Self::RouteTableRequestStream>;
+    type RouteTableMarker: DiscoverableProtocolMarker<
+        RequestStream = Self::RouteTableRequestStream,
+        Proxy: Clone,
+    >;
     /// The "root set" protocol to use for this IP version.
     type GlobalRouteTableMarker: DiscoverableProtocolMarker;
     /// The "route set" protocol to use for this IP version.
     type RouteSetMarker: ProtocolMarker<RequestStream = Self::RouteSetRequestStream>;
     /// The "route table provider" protocol to use for this IP version.
-    type RouteTableProviderMarker: DiscoverableProtocolMarker;
+    type RouteTableProviderMarker: DiscoverableProtocolMarker<Proxy: Clone>;
     /// The request stream for the route set protocol.
     type RouteSetRequestStream: fidl::endpoints::RequestStream<Ok: Send, ControlHandle: Send>;
     /// The request stream for the route table protocol.
@@ -72,7 +76,7 @@ pub trait FidlRouteAdminIpExt: Ip {
         Payload = fnet_routes_admin::GrantForRouteTableAuthorization,
     >;
     /// The control handle for RouteTable protocols.
-    type RouteTableControlHandle: fidl::endpoints::ControlHandle;
+    type RouteTableControlHandle: fidl::endpoints::ControlHandle + Debug;
 
     /// Turns a FIDL route set request into the extension type.
     fn into_route_set_request(
@@ -83,6 +87,16 @@ pub trait FidlRouteAdminIpExt: Ip {
     fn into_route_table_request(
         request: fidl::endpoints::Request<Self::RouteTableMarker>,
     ) -> RouteTableRequest<Self>;
+
+    /// Turns a FIDL route set request stream item into a Result of the extension type.
+    fn into_route_set_request_result(
+        request: <Self::RouteSetRequestStream as futures::Stream>::Item,
+    ) -> Result<RouteSetRequest<Self>, fidl::Error>;
+
+    /// Turns a FIDL route table request stream item into a Result of the extension type.
+    fn into_route_table_request_result(
+        request: <Self::RouteTableRequestStream as futures::Stream>::Item,
+    ) -> Result<RouteTableRequest<Self>, fidl::Error>;
 }
 
 impl FidlRouteAdminIpExt for Ipv4 {
@@ -113,6 +127,18 @@ impl FidlRouteAdminIpExt for Ipv4 {
     ) -> RouteTableRequest<Self> {
         RouteTableRequest::from(request)
     }
+
+    fn into_route_set_request_result(
+        request: <Self::RouteSetRequestStream as futures::Stream>::Item,
+    ) -> Result<RouteSetRequest<Self>, fidl::Error> {
+        request.map(RouteSetRequest::from)
+    }
+
+    fn into_route_table_request_result(
+        request: <Self::RouteTableRequestStream as futures::Stream>::Item,
+    ) -> Result<RouteTableRequest<Self>, fidl::Error> {
+        request.map(RouteTableRequest::from)
+    }
 }
 
 impl FidlRouteAdminIpExt for Ipv6 {
@@ -142,6 +168,18 @@ impl FidlRouteAdminIpExt for Ipv6 {
         request: fidl::endpoints::Request<Self::RouteTableMarker>,
     ) -> RouteTableRequest<Self> {
         RouteTableRequest::from(request)
+    }
+
+    fn into_route_set_request_result(
+        request: <Self::RouteSetRequestStream as futures::Stream>::Item,
+    ) -> Result<RouteSetRequest<Self>, fidl::Error> {
+        request.map(RouteSetRequest::from)
+    }
+
+    fn into_route_table_request_result(
+        request: <Self::RouteTableRequestStream as futures::Stream>::Item,
+    ) -> Result<RouteTableRequest<Self>, fidl::Error> {
+        request.map(RouteTableRequest::from)
     }
 }
 
@@ -187,6 +225,64 @@ impl_responder!(
     fnet_routes_admin::RouteTableV6GetAuthorizationForRouteTableResponder,
     fnet_routes_admin::GrantForRouteTableAuthorization,
 );
+
+/// The compiler often fails to infer that an item in the RouteTableProvider request stream is a
+/// Result. This function helps force it to understand this so that the Result can be unwrapped
+/// to get the actual RouteTableProvider request inside.
+pub fn concretize_route_table_provider_request<I: Ip + FidlRouteAdminIpExt>(
+    item: <<<I as FidlRouteAdminIpExt>::RouteTableProviderMarker as ProtocolMarker>::RequestStream as futures::Stream>::Item,
+) -> Result<(ServerEnd<I::RouteTableMarker>, Option<String>), fidl::Error> {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct In<I: FidlRouteAdminIpExt>(<<<I as FidlRouteAdminIpExt>::RouteTableProviderMarker as ProtocolMarker>::RequestStream as futures::Stream>::Item);
+
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct Out<I: FidlRouteAdminIpExt>(
+        Result<(ServerEnd<I::RouteTableMarker>, Option<String>), fidl::Error>,
+    );
+
+    let Out(result) = net_types::map_ip_twice!(I, In(item), |In(item)| Out(
+        item.map(unpack_route_table_provider_request::<I>)
+    ));
+    result
+}
+
+/// Unpacks the `[ServerEnd]` and debug name from a request for a new route table.
+pub fn unpack_route_table_provider_request<I: Ip + FidlRouteAdminIpExt>(
+    request: <<I::RouteTableProviderMarker as ProtocolMarker>::RequestStream as TryStream>::Ok,
+) -> (ServerEnd<I::RouteTableMarker>, Option<String>) {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct Request<I: FidlRouteAdminIpExt>(
+        <<I::RouteTableProviderMarker as ProtocolMarker>::RequestStream as TryStream>::Ok,
+    );
+
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct Contents<I: FidlRouteAdminIpExt>((ServerEnd<I::RouteTableMarker>, Option<String>));
+
+    let Contents(contents) = I::map_ip(
+        Request(request),
+        |Request(request)| {
+            let fnet_routes_admin::RouteTableProviderV4Request::NewRouteTable {
+                provider,
+                options: fnet_routes_admin::RouteTableOptionsV4 { name, __source_breaking },
+                control_handle: _,
+            } = request;
+            Contents((provider, name))
+        },
+        |Request(request)| {
+            let fnet_routes_admin::RouteTableProviderV6Request::NewRouteTable {
+                provider,
+                options: fnet_routes_admin::RouteTableOptionsV6 { name, __source_breaking },
+                control_handle: _,
+            } = request;
+            Contents((provider, name))
+        },
+    );
+    contents
+}
 
 /// Dispatches `new_route_table` on either the `RouteTableProviderV4`
 /// or `RouteTableProviderV6` proxy.
@@ -485,7 +581,8 @@ impl From<fnet_routes_admin::RouteSetV6Request> for RouteSetRequest<Ipv6> {
 }
 
 /// GenericOverIp version of RouteTableV{4, 6}Request.
-#[derive(GenericOverIp, Debug)]
+#[derive(GenericOverIp, derivative::Derivative)]
+#[derivative(Debug(bound = ""))]
 #[generic_over_ip(I, Ip)]
 pub enum RouteTableRequest<I: FidlRouteAdminIpExt> {
     /// Gets the table ID for the table

@@ -14,8 +14,8 @@ use fidl_fuchsia_net_routes as fnet_routes;
 use futures::{Future, Stream, StreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 
-// Responds to the given `Watch` request with the given batch of events.
-fn handle_watch<I: FidlRouteIpExt>(
+/// Responds to the given `Watch` request with the given batch of events.
+pub fn handle_watch<I: FidlRouteIpExt>(
     request: <<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::RequestStream as Stream>::Item,
     event_batch: Vec<I::WatchEvent>,
 ) {
@@ -139,10 +139,10 @@ pub fn empty_watch_event_stream<'a, I: FidlRouteIpExt>(
 pub mod admin {
     use fidl::endpoints::ProtocolMarker;
     use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
-    use futures::{Stream, StreamExt as _};
+    use futures::{Stream, StreamExt as _, TryStreamExt as _};
     use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 
-    use crate::admin::{FidlRouteAdminIpExt, RouteSetRequest};
+    use crate::admin::{FidlRouteAdminIpExt, RouteSetRequest, RouteTableRequest};
     use crate::Responder;
 
     /// Provides a RouteTable implementation that provides one RouteSet and
@@ -208,8 +208,9 @@ pub mod admin {
     /// Provides a RouteTable implementation that consolidates all RouteSets into
     /// a single RouteSet stream. Returns a request stream that vends items as
     /// they arrive in any RouteSet.
-    pub fn serve_all_route_sets<I: FidlRouteAdminIpExt>(
+    pub fn serve_all_route_sets_with_table_id<I: FidlRouteAdminIpExt>(
         server_end: fidl::endpoints::ServerEnd<I::RouteTableMarker>,
+        table_id: Option<crate::TableId>,
     ) -> impl Stream<
             Item = <
                     <<I as FidlRouteAdminIpExt>::RouteSetMarker as ProtocolMarker>
@@ -225,72 +226,89 @@ pub mod admin {
         );
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
-        struct Out<I: FidlRouteAdminIpExt>(fidl::endpoints::ServerEnd<I::RouteSetMarker>);
+        struct Out<I: FidlRouteAdminIpExt>(Option<fidl::endpoints::ServerEnd<I::RouteSetMarker>>);
 
         let stream = server_end.into_stream().expect("into stream");
         stream
-            .map(|item| {
+            .map(move |item| {
                 let Out(route_set_server_end) = I::map_ip(
                     In(item),
                     |In(item)| match item.expect("set provider FIDL error") {
                         fnet_routes_admin::RouteTableV4Request::NewRouteSet {
                             route_set,
                             control_handle: _,
-                        } => Out(route_set),
+                        } => Out(Some(route_set)),
+                        fnet_routes_admin::RouteTableV4Request::GetTableId { responder } => {
+                            responder
+                                .send(
+                                    table_id
+                                        .unwrap_or_else(|| panic!("GetTableId not supported"))
+                                        .get(),
+                                )
+                                .expect("error responding to GetTableId");
+                            Out(None)
+                        }
                         req => unreachable!("unexpected request: {:?}", req),
                     },
                     |In(item)| match item.expect("set provider FIDL error") {
                         fnet_routes_admin::RouteTableV6Request::NewRouteSet {
                             route_set,
                             control_handle: _,
-                        } => Out(route_set),
+                        } => Out(Some(route_set)),
+                        fnet_routes_admin::RouteTableV6Request::GetTableId { responder } => {
+                            responder
+                                .send(
+                                    table_id
+                                        .unwrap_or_else(|| panic!("GetTableId not supported"))
+                                        .get(),
+                                )
+                                .expect("error responding to GetTableId");
+                            Out(None)
+                        }
                         req => unreachable!("unexpected request: {:?}", req),
                     },
                 );
-                route_set_server_end.into_stream().expect("into stream")
+                match route_set_server_end {
+                    None => futures::stream::empty().left_stream(),
+                    Some(route_set_server_end) => {
+                        route_set_server_end.into_stream().expect("into stream").right_stream()
+                    }
+                }
             })
             .fuse()
             .flatten_unordered(None)
+    }
+
+    /// Provides a RouteTable implementation that serves no-op RouteSets and identifies itself
+    /// with the given ID.
+    pub async fn serve_noop_route_sets_with_table_id<I: FidlRouteAdminIpExt>(
+        server_end: fidl::endpoints::ServerEnd<I::RouteTableMarker>,
+        table_id: crate::TableId,
+    ) {
+        let stream = server_end.into_stream().expect("into stream");
+        stream
+            .try_for_each_concurrent(None, |item| async move {
+                let request = I::into_route_table_request(item);
+                match request {
+                    RouteTableRequest::NewRouteSet { route_set, control_handle: _ } => {
+                        serve_noop_route_set::<I>(route_set).await
+                    }
+                    RouteTableRequest::GetTableId { responder } => {
+                        responder.send(table_id.get()).expect("responding should succeed");
+                    }
+                    request => panic!("unexpected request: {request:?}"),
+                }
+                Ok(())
+            })
+            .await
+            .expect("serving no-op route sets should succeed");
     }
 
     /// Provides a RouteTable implementation that serves no-op RouteSets.
     pub async fn serve_noop_route_sets<I: FidlRouteAdminIpExt>(
         server_end: fidl::endpoints::ServerEnd<I::RouteTableMarker>,
     ) {
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct In<I: FidlRouteAdminIpExt>(
-            <<<I as FidlRouteAdminIpExt>::RouteTableMarker as ProtocolMarker>
-                ::RequestStream as Stream
-            >::Item,
-        );
-        #[derive(GenericOverIp)]
-        #[generic_over_ip(I, Ip)]
-        struct Out<I: FidlRouteAdminIpExt>(fidl::endpoints::ServerEnd<I::RouteSetMarker>);
-
-        let stream = server_end.into_stream().expect("into stream");
-        stream
-            .for_each_concurrent(None, |item| async move {
-                let Out(route_set_server_end) = I::map_ip(
-                    In(item),
-                    |In(item)| match item.expect("set provider FIDL error") {
-                        fnet_routes_admin::RouteTableV4Request::NewRouteSet {
-                            route_set,
-                            control_handle: _,
-                        } => Out(route_set),
-                        req => unreachable!("unexpected request: {:?}", req),
-                    },
-                    |In(item)| match item.expect("set provider FIDL error") {
-                        fnet_routes_admin::RouteTableV6Request::NewRouteSet {
-                            route_set,
-                            control_handle: _,
-                        } => Out(route_set),
-                        req => unreachable!("unexpected request: {:?}", req),
-                    },
-                );
-                serve_noop_route_set::<I>(route_set_server_end).await;
-            })
-            .await;
+        serve_noop_route_sets_with_table_id::<I>(server_end, crate::TableId::new(0)).await
     }
 
     /// Serves a RouteSet that returns OK for everything and does nothing.

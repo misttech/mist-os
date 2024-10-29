@@ -184,6 +184,17 @@ pub struct RouteProperties {
     pub specified_properties: SpecifiedRouteProperties,
 }
 
+impl RouteProperties {
+    /// Constructs a [`RouteProperties`] from a specified metric.
+    pub fn from_explicit_metric(metric: u32) -> Self {
+        Self {
+            specified_properties: SpecifiedRouteProperties {
+                metric: fnet_routes::SpecifiedMetric::ExplicitMetric(metric),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum RoutePropertiesRequiredFields {
