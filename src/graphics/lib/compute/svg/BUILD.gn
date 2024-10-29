@@ -33,6 +33,7 @@ config("svg_config") {
 }
 
 source_set("svg") {
+  testonly = true
   sources = [
     "svg.c",
     "svg.h",

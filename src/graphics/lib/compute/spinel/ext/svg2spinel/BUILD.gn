@@ -11,6 +11,7 @@ config("svg2spinel_config") {
 }
 
 source_set("svg2spinel") {
+  testonly = true
   public = [ "${_spinel_includes}/spinel/ext/svg2spinel/svg2spinel.h" ]
 
   sources = [
