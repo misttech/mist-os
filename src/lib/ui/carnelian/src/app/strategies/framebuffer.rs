@@ -22,7 +22,6 @@ use fidl_fuchsia_hardware_display::{
 };
 use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync};
-use fuchsia_fs::{directory as vfs_watcher, OpenFlags};
 use futures::channel::mpsc::UnboundedSender;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use keymaps::Keymap;
@@ -37,15 +36,16 @@ async fn watch_directory_async(
     dir: PathBuf,
     app_sender: UnboundedSender<MessageInternal>,
 ) -> Result<(), Error> {
-    let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+    let dir_proxy = fuchsia_fs::directory::open_in_namespace(
         dir.to_str().expect("to_str"),
-        OpenFlags::empty(),
+        fuchsia_fs::Flags::empty(),
     )?;
-    let mut watcher = vfs_watcher::Watcher::new(&dir_proxy).await?;
+    let mut watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy).await?;
     fasync::Task::local(async move {
         while let Some(msg) = (watcher.try_next()).await.expect("msg") {
             match msg.event {
-                vfs_watcher::WatchEvent::ADD_FILE | vfs_watcher::WatchEvent::EXISTING => {
+                fuchsia_fs::directory::WatchEvent::ADD_FILE
+                | fuchsia_fs::directory::WatchEvent::EXISTING => {
                     if msg.filename == Path::new(".") {
                         continue;
                     }

@@ -10,7 +10,6 @@ use crate::shutdown_request::ShutdownRequest;
 use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_input::{ControllerMarker, DeviceMarker, DeviceProxy};
-use fuchsia_fs::{directory as vfs, OpenFlags};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
@@ -290,16 +289,17 @@ impl Node for LidShutdown {
 async fn find_lid_sensor() -> Result<DeviceProxy, Error> {
     info!("Trying to find lid device");
 
-    let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+    let dir_proxy = fuchsia_fs::directory::open_in_namespace(
         INPUT_DEVICES_DIRECTORY,
-        OpenFlags::RIGHT_READABLE,
+        fuchsia_fs::PERM_READABLE,
     )?;
 
-    let mut watcher = vfs::Watcher::new(&dir_proxy).await?;
+    let mut watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy).await?;
 
     while let Some(msg) = watcher.try_next().await? {
         match msg.event {
-            vfs::WatchEvent::EXISTING | vfs::WatchEvent::ADD_FILE => {
+            fuchsia_fs::directory::WatchEvent::EXISTING
+            | fuchsia_fs::directory::WatchEvent::ADD_FILE => {
                 // Skip directory since we are looking for a device.
                 if msg.filename == PathBuf::from(".") {
                     continue;

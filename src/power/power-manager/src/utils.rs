@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use fidl_fuchsia_hardware_temperature as ftemperature;
 use fuchsia_async::{DurationExt, TimeoutExt};
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use zx::MonotonicDuration;
-use {fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_io as fio};
 
 /// Logs an error message if the provided `cond` evaluates to false. Also passes the same expression
 /// and message into `debug_assert!`, which will panic if debug assertions are enabled.
@@ -149,10 +149,7 @@ async fn get_temperature_driver_proxy_from_dir(
     dir_path: &str,
     required_sensor_name: &str,
 ) -> Result<ftemperature::DeviceProxy, Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        dir_path,
-        fio::OpenFlags::RIGHT_READABLE,
-    )?;
+    let dir = fuchsia_fs::directory::open_in_namespace(dir_path, fuchsia_fs::PERM_READABLE)?;
 
     let mut watcher = fuchsia_fs::directory::Watcher::new(&dir).await.map_err(|e| {
         anyhow::anyhow!("Failed to create watcher for directory {:?}: {:?}", dir_path, e)

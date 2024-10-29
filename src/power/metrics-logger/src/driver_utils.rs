@@ -78,10 +78,7 @@ async fn get_driver_topological_path(path: &str) -> Result<String> {
 }
 
 pub async fn list_drivers(path: &str) -> Vec<String> {
-    let dir = match fuchsia_fs::directory::open_in_namespace_deprecated(
-        path,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    ) {
+    let dir = match fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::PERM_READABLE) {
         Ok(s) => s,
         Err(err) => {
             info!(%path, %err, "Service directory doesn't exist or NodeProxy failed with error");
