@@ -24,9 +24,9 @@ use std::sync::Arc;
 #[derive(Default)]
 pub struct TimerRemaining {
     /// Remaining time until the next expiration.
-    pub remainder: zx::MonotonicDuration,
+    pub remainder: zx::SyntheticDuration,
     /// Interval for periodic timer.
-    pub interval: zx::MonotonicDuration,
+    pub interval: zx::SyntheticDuration,
 }
 
 impl From<TimerRemaining> for itimerspec {
@@ -62,7 +62,7 @@ struct IntervalTimerMutableState {
     /// Time of the next expiration on the requested timeline.
     target_time: TargetTime,
     /// Interval for periodic timer.
-    interval: zx::MonotonicDuration,
+    interval: zx::SyntheticDuration,
     /// Number of timer expirations that have occurred since the last time a signal was sent.
     ///
     /// Timer expiration is not counted as overrun under `SignalEventNotify::None`.
@@ -164,7 +164,7 @@ impl IntervalTimer {
                 let mut guard = self.state.lock();
                 // If the `interval` is zero, the timer expires just once, at the time
                 // specified by `target_time`.
-                if guard.interval == zx::MonotonicDuration::ZERO {
+                if guard.interval == zx::SyntheticDuration::ZERO {
                     guard.overrun_cur = 1;
                 } else {
                     let exp =
@@ -214,7 +214,7 @@ impl IntervalTimer {
             // If the `interval` is zero, the timer expires just once, at the time
             // specified by `target_time`.
             let mut guard = self.state.lock();
-            if guard.interval != zx::MonotonicDuration::default() {
+            if guard.interval != zx::SyntheticDuration::default() {
                 guard.target_time = self.timeline.now() + GenericDuration::from(guard.interval);
             } else {
                 guard.disarm();
@@ -248,7 +248,7 @@ impl IntervalTimer {
         let interval = duration_from_timespec(new_value.it_interval)?;
 
         if let Some(hr_timer) = &self.hr_timer {
-            *hr_timer.is_interval.lock() = guard.interval != zx::MonotonicDuration::default();
+            *hr_timer.is_interval.lock() = guard.interval != zx::SyntheticDuration::default();
         }
 
         // Stop the current running task;
@@ -307,12 +307,8 @@ impl IntervalTimer {
 
         TimerRemaining {
             remainder: std::cmp::max(
-                fuchsia_async::MonotonicDuration::ZERO,
-                guard
-                    .target_time
-                    .delta(&self.timeline.now())
-                    .expect("timelines must match")
-                    .into_mono(),
+                zx::SyntheticDuration::ZERO,
+                *guard.target_time.delta(&self.timeline.now()).expect("timelines must match"),
             ),
             interval: guard.interval,
         }

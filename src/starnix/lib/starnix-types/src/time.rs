@@ -24,7 +24,7 @@ pub fn timeval_from_time<T: zx::Timeline>(time: zx::Instant<T>) -> timeval {
     timeval { tv_sec: nanos / NANOS_PER_SECOND, tv_usec: (nanos % NANOS_PER_SECOND) / 1000 }
 }
 
-pub fn timeval_from_duration(duration: zx::MonotonicDuration) -> timeval {
+pub fn timeval_from_duration<T: zx::Timeline>(duration: zx::Duration<T>) -> timeval {
     let nanos = duration.into_nanos();
     timeval { tv_sec: nanos / NANOS_PER_SECOND, tv_usec: (nanos % NANOS_PER_SECOND) / 1000 }
 }
