@@ -142,11 +142,11 @@ zx::result<zx_koid_t> ReadElfJobId(const fidl::SyncClient<fuchsia_io::Directory>
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
-  fit::result<fidl::OneWayStatus> res = directory->Open(
-      {{.flags = fuchsia_io::OpenFlags::kRightReadable,
-        .mode = {},
-        .path = "elf/job_id",
-        .object = fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel())}});
+  fit::result<fidl::OneWayStatus> res =
+      directory->Open3({{.path = "elf/job_id",
+                         .flags = fuchsia_io::kPermReadable,
+                         .options = {},
+                         .object = endpoints->server.TakeChannel()}});
   if (res.is_error()) {
     return zx::error(ZX_ERR_IO);
   }
@@ -176,23 +176,17 @@ zx::result<zx_koid_t> MonikerToJobId(const std::string& moniker) {
     FX_LOGS(WARNING) << "Unable to connect to RealmQuery. Attaching by moniker isn't supported!";
     return client_end.take_error();
   }
-  zx::result<fidl::Endpoints<fuchsia_io::Directory>> directory_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (directory_endpoints.is_error()) {
-    FX_LOGS(WARNING) << "Unable to create directory endpoints";
-    return directory_endpoints.take_error();
-  }
-  fidl::SyncClient<fuchsia_io::Directory> directory_client{std::move(directory_endpoints->client)};
+  auto [directory_client_endpoint, directory_server] =
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
+  fidl::SyncClient<fuchsia_io::Directory> directory_client{std::move(directory_client_endpoint)};
   fidl::SyncClient realm_query_client{std::move(*client_end)};
 
-  fidl::Result<fuchsia_sys2::RealmQuery::Open> open_result = realm_query_client->Open({{
-      .moniker = moniker,
-      .dir_type = fuchsia_sys2::OpenDirType::kRuntimeDir,
-      .flags = fuchsia_io::OpenFlags::kRightReadable,
-      .mode = {},
-      .path = ".",
-      .object = fidl::ServerEnd<fuchsia_io::Node>{directory_endpoints->server.TakeChannel()},
-  }});
+  fidl::Result<fuchsia_sys2::RealmQuery::OpenDirectory> open_result =
+      realm_query_client->OpenDirectory({{
+          .moniker = moniker,
+          .dir_type = fuchsia_sys2::OpenDirType::kRuntimeDir,
+          .object = std::move(directory_server),
+      }});
   if (open_result.is_error()) {
     FX_LOGS(WARNING) << "Unable to open the runtime directory of " << moniker << ": "
                      << open_result.error_value();

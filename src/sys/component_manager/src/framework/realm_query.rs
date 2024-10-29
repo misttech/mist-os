@@ -103,6 +103,10 @@ impl RealmQuery {
                     let result = construct_namespace(&model, &scope_moniker, &moniker).await;
                     responder.send(result)
                 }
+                #[cfg(any(
+                    fuchsia_api_level_less_than = "NEXT",
+                    fuchsia_api_level_at_least = "PLATFORM"
+                ))]
                 fsys::RealmQueryRequest::Open {
                     moniker,
                     dir_type,
@@ -112,7 +116,7 @@ impl RealmQuery {
                     object,
                     responder,
                 } => {
-                    let result = open(
+                    let result = open_deprecated(
                         &model,
                         &scope_moniker,
                         &moniker,
@@ -123,6 +127,12 @@ impl RealmQuery {
                         object,
                     )
                     .await;
+                    responder.send(result)
+                }
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                fsys::RealmQueryRequest::OpenDirectory { moniker, dir_type, object, responder } => {
+                    let result =
+                        open_directory(&model, &scope_moniker, &moniker, dir_type, object).await;
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::ConnectToStorageAdmin {
@@ -409,7 +419,8 @@ async fn construct_namespace(
     Ok(ns.into())
 }
 
-async fn open(
+#[cfg(any(fuchsia_api_level_less_than = "NEXT", fuchsia_api_level_at_least = "PLATFORM"))]
+async fn open_deprecated(
     model: &Arc<Model>,
     scope_moniker: &Moniker,
     moniker_str: &str,
@@ -503,6 +514,82 @@ async fn open(
             );
 
             Ok(())
+        }
+        _ => Err(fsys::OpenError::BadDirType),
+    }
+}
+
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
+async fn open_directory(
+    model: &Arc<Model>,
+    scope_moniker: &Moniker,
+    moniker_str: &str,
+    dir_type: fsys::OpenDirType,
+    object: ServerEnd<fio::DirectoryMarker>,
+) -> Result<(), fsys::OpenError> {
+    // Construct the complete moniker using the scope moniker and the moniker string.
+    let moniker = Moniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
+    let moniker = scope_moniker.concat(&moniker);
+
+    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
+    let instance = model.root().find(&moniker).await.ok_or(fsys::OpenError::InstanceNotFound)?;
+
+    // The intention is that this is only used for component introspection, so we only request
+    // readable/executable rights when creating a connection to the desired directory.
+    const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::Flags::PERM_INHERIT_EXECUTE);
+    let mut request = FLAGS.to_object_request(object);
+    let path = vfs::path::Path::dot();
+
+    match dir_type {
+        fsys::OpenDirType::OutgoingDir => {
+            let scope: package_directory::ExecutionScope = instance.execution_scope.clone();
+            instance
+                .open_outgoing(OpenRequest::new(scope, FLAGS, path, &mut request))
+                .await
+                .map_err(|e| {
+                    request.shutdown(e.as_zx_status());
+                    e.into()
+                })
+        }
+        fsys::OpenDirType::RuntimeDir => {
+            let state = instance.lock_state().await;
+            let runtime_dir = state
+                .get_started_state()
+                .ok_or(fsys::OpenError::InstanceNotRunning)?
+                .runtime_dir()
+                .ok_or(fsys::OpenError::NoSuchDir)?;
+            runtime_dir
+                .open3(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
+                .map_err(|_| fsys::OpenError::FidlError)
+        }
+        fsys::OpenDirType::PackageDir => {
+            let state = instance.lock_state().await;
+            let resolved =
+                state.get_resolved_state().ok_or(fsys::OpenError::InstanceNotResolved)?;
+            let package_dir = &resolved.package().ok_or(fsys::OpenError::NoSuchDir)?.package_dir;
+            package_dir
+                .open3(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
+                .map_err(|_| fsys::OpenError::FidlError)
+        }
+        fsys::OpenDirType::ExposedDir => {
+            let scope: package_directory::ExecutionScope = instance.execution_scope.clone();
+            instance.open_exposed(OpenRequest::new(scope, FLAGS, path, &mut request)).await.map_err(
+                |e| {
+                    request.shutdown(e.as_zx_status());
+                    e.into()
+                },
+            )
+        }
+        fsys::OpenDirType::NamespaceDir => {
+            let state = instance.lock_state().await;
+            let resolved =
+                state.get_resolved_state().ok_or(fsys::OpenError::InstanceNotResolved)?;
+            let namespace_dir =
+                resolved.namespace_dir().await.map_err(|_| fsys::OpenError::NoSuchDir)?;
+            let scope: package_directory::ExecutionScope = instance.execution_scope.clone();
+            namespace_dir
+                .open3(scope, path, FLAGS, &mut request)
+                .map_err(|_| fsys::OpenError::FidlError)
         }
         _ => Err(fsys::OpenError::BadDirType),
     }

@@ -53,21 +53,21 @@ pub async fn start_policy_test(
     // Get to the Realm protocol
     let realm_query =
         instance.root.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
-    let (realm, server_end) = create_proxy::<fcomponent::RealmMarker>().unwrap();
-    let server_end = server_end.into_channel().into();
+    let (exposed_dir, server_end) = create_proxy().unwrap();
     realm_query
-        .open(
-            "./root",
-            fsys::OpenDirType::ExposedDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            fcomponent::RealmMarker::DEBUG_NAME,
-            server_end,
-        )
+        .open_directory("./root", fsys::OpenDirType::ExposedDir, server_end)
         .await
         .unwrap()
         .unwrap();
-
+    let (realm, server_end) = create_proxy::<fcomponent::RealmMarker>().unwrap();
+    exposed_dir
+        .open3(
+            fcomponent::RealmMarker::DEBUG_NAME,
+            fio::Flags::PROTOCOL_SERVICE,
+            &Default::default(),
+            server_end.into_channel(),
+        )
+        .unwrap();
     Ok((instance, realm, event_stream))
 }
 

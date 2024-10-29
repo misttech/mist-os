@@ -224,18 +224,17 @@ TEST_F(VulkanLoader, DebugFilesystems) {
   auto client_end = realm().component().Connect<fuchsia_sys2::RealmQuery>();
   ASSERT_TRUE(client_end.is_ok()) << client_end.status_string();
 
-  auto endpoints = fidl::Endpoints<fuchsia_io::Node>::Create();
+  auto [outgoing_client, outgoing_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   auto response = fidl::WireCall(*client_end)
-                      ->Open("./vulkan_loader", fuchsia_sys2::OpenDirType::kOutgoingDir,
-                             fuchsia_io::OpenFlags::kRightReadable, /*mode=*/{}, /*path=*/".",
-                             std::move(endpoints.server));
+                      ->OpenDirectory("./vulkan_loader", fuchsia_sys2::OpenDirType::kOutgoingDir,
+                                      std::move(outgoing_server));
   ASSERT_TRUE(response.ok()) << response;
   ASSERT_TRUE(response->is_ok()) << static_cast<uint32_t>(response->error_value());
 
   fdio_ns_t* ns;
   EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));
-  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, "/loader_out", endpoints.client.TakeChannel().release()));
+  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, "/loader_out", outgoing_client.TakeChannel().release()));
   auto cleanup_binding = fit::defer([&]() { fdio_ns_unbind(ns, "/loader_out"); });
 
   const std::string debug_path("/loader_out/debug/");

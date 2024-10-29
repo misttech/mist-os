@@ -102,24 +102,21 @@ __attribute__((constructor)) void init_packet_socket_provider() {
       zx::result realm_query = component::Connect<fuchsia_sys2::RealmQuery>(kRealmQueryPath);
       ZX_ASSERT_MSG(realm_query.is_ok(), "Failed to connect to %s: %s", kRealmQueryPath,
                     realm_query.status_string());
-      zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-      ZX_ASSERT_MSG(endpoints.is_ok(), "Failed to create endpoints: %s", endpoints.status_string());
+      auto [exposed_client, exposed_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
       fidl::WireResult open_dir =
           fidl::WireCall(realm_query.value())
-              ->Open(kNetstackMoniker, fuchsia_sys2::OpenDirType::kExposedDir,
-                     fuchsia_io::OpenFlags::kRightReadable, fuchsia_io::ModeType(), ".",
-                     std::move(endpoints->server));
+              ->OpenDirectory(kNetstackMoniker, fuchsia_sys2::OpenDirType::kExposedDir,
+                              std::move(exposed_server));
       ZX_ASSERT_MSG(open_dir.ok(), "Failed to open %s: %s", kNetstackMoniker,
                     open_dir.status_string());
 
       composed_svc_dir.AddService(
           kPacketSocketProviderName,
           std::make_unique<vfs::Service>(
-              [netstack_exposed_dir =
-                   fidl::ClientEnd<fuchsia_io::Directory>(endpoints->client.TakeChannel())](
-                  zx::channel request, async_dispatcher_t* dispatcher) mutable {
+              [exposed_client = std::move(exposed_client)](zx::channel request,
+                                                           async_dispatcher_t* dispatcher) mutable {
                 zx::result result = component::ConnectAt(
-                    netstack_exposed_dir.borrow(),
+                    exposed_client.borrow(),
                     fidl::ServerEnd<fuchsia_posix_socket_packet::Provider>(std::move(request)));
                 ZX_ASSERT_MSG(result.is_ok(), "Failed to connect to packet socker provider: %s",
                               result.status_string());

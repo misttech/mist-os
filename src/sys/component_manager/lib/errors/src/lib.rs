@@ -199,6 +199,16 @@ impl Explain for OpenExposedDirError {
     }
 }
 
+impl From<OpenExposedDirError> for fsys::OpenError {
+    fn from(value: OpenExposedDirError) -> Self {
+        match value {
+            OpenExposedDirError::InstanceNotResolved => fsys::OpenError::InstanceNotResolved,
+            OpenExposedDirError::InstanceDestroyed => fsys::OpenError::InstanceDestroyed,
+            OpenExposedDirError::Open(_) => fsys::OpenError::FidlError,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Error)]
 pub enum OpenOutgoingDirError {
     #[error("instance is not resolved")]

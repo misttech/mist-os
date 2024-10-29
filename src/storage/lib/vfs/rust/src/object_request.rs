@@ -333,6 +333,12 @@ impl ToObjectRequest for fio::OpenFlags {
     }
 }
 
+impl ToObjectRequest for fio::Flags {
+    fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest {
+        ObjectRequest::new3(*self, &Default::default(), object_request.into().into())
+    }
+}
+
 fn send_on_open(
     control_handle: &fio::NodeControlHandle,
     node_info: fio::NodeInfoDeprecated,

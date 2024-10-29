@@ -119,12 +119,17 @@ type OpenError = flexible enum {
     BAD_DIR_TYPE = 7;
 
     /// The given path could not be parsed by component manager.
+    @available(removed=NEXT)
     BAD_PATH = 8;
 
     /// Serving the requested directory requires starting the instance, but the
     /// instance failed to start.
-    @available(added=19)
+    @available(added=19, removed=NEXT)
     INSTANCE_FAILED_TO_START = 9;
+
+    /// Instance matching moniker was destroyed.
+    @available(added=NEXT)
+    INSTANCE_DESTROYED = 10;
 };
 
 /// Errors that can be returned by the ConstructNamespace call.
@@ -299,7 +304,7 @@ closed protocol RealmQuery {
     }) error ConstructNamespaceError;
 
     /// Makes an fuchsia.io.Directory/Open call on a directory in an instance.
-    @available(added=11)
+    @available(added=11, removed=NEXT)
     strict Open(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         dir_type OpenDirType;
@@ -307,6 +312,14 @@ closed protocol RealmQuery {
         mode fuchsia.io.ModeType;
         path string:fuchsia.io.MAX_PATH_LENGTH;
         object server_end:fuchsia.io.Node;
+    }) -> () error OpenError;
+
+    /// Opens the specified directory in an instance.
+    @available(added=NEXT)
+    strict OpenDirectory(resource struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        dir_type OpenDirType;
+        object server_end:fuchsia.io.Directory;
     }) -> () error OpenError;
 
     /// Connects to the StorageAdmin protocol of a storage declared by an instance.

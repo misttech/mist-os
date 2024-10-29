@@ -677,18 +677,13 @@
     },
     {
         "kind": "enum/member",
-        "name": "fuchsia.sys2/OpenError.BAD_PATH",
-        "value": "8"
-    },
-    {
-        "kind": "enum/member",
         "name": "fuchsia.sys2/OpenError.FIDL_ERROR",
         "value": "5"
     },
     {
         "kind": "enum/member",
-        "name": "fuchsia.sys2/OpenError.INSTANCE_FAILED_TO_START",
-        "value": "9"
+        "name": "fuchsia.sys2/OpenError.INSTANCE_DESTROYED",
+        "value": "10"
     },
     {
         "kind": "enum/member",
@@ -783,12 +778,12 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.sys2/RealmQuery.Open",
+        "name": "fuchsia.sys2/RealmQuery.OpenDirectory",
         "strictness": "strict",
-        "ordinal": "300145885525636112",
+        "ordinal": "3692222657550150789",
         "direction": "two_way",
-        "request": "fuchsia.sys2/RealmQueryOpenRequest",
-        "response": "fuchsia.sys2/RealmQuery_Open_Response",
+        "request": "fuchsia.sys2/RealmQueryOpenDirectoryRequest",
+        "response": "fuchsia.sys2/RealmQuery_OpenDirectory_Response",
         "error": "fuchsia.sys2/OpenError"
     },
     {
@@ -888,43 +883,25 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.sys2/RealmQueryOpenRequest.dir_type",
+        "name": "fuchsia.sys2/RealmQueryOpenDirectoryRequest.dir_type",
         "ordinal": "2",
         "type": "fuchsia.sys2/OpenDirType"
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.sys2/RealmQueryOpenRequest.flags",
-        "ordinal": "3",
-        "type": "fuchsia.io/OpenFlags"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sys2/RealmQueryOpenRequest.mode",
-        "ordinal": "4",
-        "type": "fuchsia.io/ModeType"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sys2/RealmQueryOpenRequest.moniker",
+        "name": "fuchsia.sys2/RealmQueryOpenDirectoryRequest.moniker",
         "ordinal": "1",
         "type": "string:4096"
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.sys2/RealmQueryOpenRequest.object",
-        "ordinal": "6",
-        "type": "server_end:fuchsia.io/Node"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sys2/RealmQueryOpenRequest.path",
-        "ordinal": "5",
-        "type": "string:4095"
+        "name": "fuchsia.sys2/RealmQueryOpenDirectoryRequest.object",
+        "ordinal": "3",
+        "type": "server_end:fuchsia.io/Directory"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.sys2/RealmQueryOpenRequest",
+        "name": "fuchsia.sys2/RealmQueryOpenDirectoryRequest",
         "resourceness": "resource"
     },
     {
