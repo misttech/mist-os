@@ -87,32 +87,3 @@ zx_status_t zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node> node,
   }
   return zxio_create_with_representation(std::move(node), representation, nullptr, storage);
 }
-
-zx_status_t zxio_create_with_allocator_deprecated(fidl::ClientEnd<fuchsia_io::Node> node,
-                                                  fuchsia_io::wire::NodeInfoDeprecated& info,
-                                                  zxio_storage_alloc allocator,
-                                                  void** out_context) {
-  zxio_storage_t* storage = nullptr;
-  zxio_object_type_t type = ZXIO_OBJECT_TYPE_NONE;
-  switch (info.Which()) {
-    case fio::wire::NodeInfoDeprecated::Tag::kDirectory:
-      type = ZXIO_OBJECT_TYPE_DIR;
-      break;
-    case fio::wire::NodeInfoDeprecated::Tag::kFile:
-      type = ZXIO_OBJECT_TYPE_FILE;
-      break;
-    case fio::wire::NodeInfoDeprecated::Tag::kService:
-      type = ZXIO_OBJECT_TYPE_SERVICE;
-      break;
-#if FUCHSIA_API_LEVEL_AT_LEAST(18)
-    case fio::wire::NodeInfoDeprecated::Tag::kSymlink:
-      type = ZXIO_OBJECT_TYPE_SYMLINK;
-      break;
-#endif
-  }
-  zx_status_t status = allocator(type, &storage, out_context);
-  if (status != ZX_OK || storage == nullptr) {
-    return ZX_ERR_NO_MEMORY;
-  }
-  return zxio_create_with_nodeinfo_deprecated(std::move(node), info, storage);
-}
