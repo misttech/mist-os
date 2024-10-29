@@ -58,8 +58,6 @@ async fn socket() {
 }
 
 #[fuchsia::test]
-// TODO: https://fxbug.dev/372974069 - Fix leak and re-enable
-#[cfg_attr(feature = "variant_asan", ignore)]
 async fn channel() {
     let client = LocalFDomain::new_client();
 

@@ -270,9 +270,10 @@ impl Handle {
 
     /// Get a proto::Hid with the ID of this handle, then destroy this object
     /// without sending a request to close the handlel.
-    pub(crate) fn take_proto(self) -> proto::Hid {
+    pub(crate) fn take_proto(mut self) -> proto::Hid {
         let ret = self.proto();
-        std::mem::forget(self);
+        // Detach from the client so we don't close the handle when we drop self.
+        self.client = Weak::new();
         ret
     }
 
