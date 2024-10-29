@@ -10,7 +10,9 @@
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/testing/unittest.h>
+#include <lib/mistos/util/weak_wrapper.h>
 #include <lib/unittest/unittest.h>
+#include <zircon/assert.h>
 
 #include <memory>
 
@@ -77,7 +79,7 @@ bool test_no_error_when_zombie() {
   auto child = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
 
   auto expected_result = WaitResult{
-      .pid = (*child)->id(),
+      .pid = (*child)->id_,
       .uid = 0,
       .exit_info =
           ProcessExitInfo{
@@ -106,54 +108,53 @@ bool test_no_error_when_zombie() {
 }
 
 struct thread_args {
-  starnix::CurrentTask* current_task;
-  starnix::TaskBuilder* child_task;
+  util::WeakPtr<starnix::Task> task;
+  starnix::TaskBuilder task_builder;
 };
 
 bool test_waiting_for_child() {
   BEGIN_TEST;
-  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto [kernel, task] = create_kernel_task_and_unlocked();
 
-  auto child = (*current_task)
-                   .clone_task(0, starnix_uapi::kSIGCHLD, mtl::DefaultConstruct<UserRef<pid_t>>(),
-                               mtl::DefaultConstruct<UserRef<pid_t>>());
+  auto child =
+      (*task).clone_task(0, starnix_uapi::kSIGCHLD, mtl::DefaultConstruct<UserRef<pid_t>>(),
+                         mtl::DefaultConstruct<UserRef<pid_t>>());
   ASSERT_TRUE(child.is_ok(), "clone_task");
 
   auto child_task = ktl::move(child.value());
 
   // No child is currently terminated.
-  auto result = friend_wait_on_pid(*current_task, ProcessSelector::AnyProcess(),
+  auto result = friend_wait_on_pid(*task, ProcessSelector::AnyProcess(),
                                    WaitingOptions::new_for_wait4(WNOHANG, 0).value());
   ASSERT_TRUE(result.is_ok());
   ASSERT_FALSE(result.value().has_value());
 
-  thread_args args = {.current_task = &*current_task, .child_task = &child_task};
+  thread_args args = {.task = task->weak_task(), .task_builder = ktl::move(child_task)};
   Thread* thread = Thread::Create(
       "",
       [](void* arg) -> int {
         thread_args* args = reinterpret_cast<thread_args*>(arg);
-        auto& [lcurrent_task, lchild_task] = *args;
+        auto tsk = args->task.Lock();
+        ZX_ASSERT_MSG(tsk, "task must be alive");
+
+        AutoReleasableTask chld = AutoReleasableTask::From(ktl::move(args->task_builder));
 
         // Wait for the main thread to be blocked on waiting for a child.
-        printf("Sleep\n");
-        while (!(*lcurrent_task)->Read()->is_blocked()) {
+        while (!tsk->Read()->is_blocked()) {
           Thread::Current::SleepRelative(ZX_MSEC(10));
         }
-        printf("Wake\n");
-        (*lchild_task)->thread_group()->exit(ExitStatus::Exit(0), ktl::nullopt);
-        return (*lchild_task)->id();
+        (*chld)->thread_group()->exit(ExitStatus::Exit(0), ktl::nullopt);
+        return (*chld)->id_;
       },
       &args, DEFAULT_PRIORITY);
 
   thread->Resume();
 
-  printf("Wait\n");
   // Block until child is terminated.
-  result = friend_wait_on_pid(*current_task, ProcessSelector::AnyProcess(),
+  result = friend_wait_on_pid(*task, ProcessSelector::AnyProcess(),
                               WaitingOptions::new_for_wait4(0, 0).value());
   ASSERT_TRUE(result.is_ok());
   ASSERT_TRUE(result.value().has_value());
-
   auto waited_child = result.value().value();
 
   // Child is deleted, the thread must be able to terminate.
@@ -169,12 +170,12 @@ bool test_wait4_by_pgid() {
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
   auto child1 = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
-  auto child1_pid = (*child1)->id();
+  auto child1_pid = (*child1)->id_;
   (*child1)->thread_group()->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
   child1.~AutoReleasableTask();
   auto child2 = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
   ASSERT_TRUE((*child2)->thread_group()->setsid().is_ok(), "setsid");
-  auto child2_pid = (*child2)->id();
+  auto child2_pid = (*child2)->id_;
   (*child2)->thread_group()->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
   child2.~AutoReleasableTask();
 

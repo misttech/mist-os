@@ -25,11 +25,9 @@ bool test_tid_allocation() {
   auto [kernel, current_task] = create_kernel_and_task();
 
   ASSERT_EQ(1, (*current_task)->get_tid());
-
   auto another_current = create_task(kernel, "another-task");
   pid_t another_tid = (*another_current)->get_tid();
-
-  ASSERT_GE(2, another_tid);
+  ASSERT_TRUE(another_tid >= 2);
 
   auto pids = kernel->pids.Read();
   ASSERT_EQ(1, pids->get_task(1).Lock()->get_tid());

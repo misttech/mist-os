@@ -11,6 +11,7 @@
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
 #include <lib/mistos/starnix/kernel/signals/types.h>
 #include <lib/mistos/starnix/kernel/task/exit_status.h>
+#include <lib/mistos/starnix/kernel/task/thread_state.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_table.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/util/bitflags.h>
@@ -75,10 +76,11 @@ class AtomicTaskFlags {
 };
 
 class TaskMutableState {
- private:
+ public:
   // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
   UserRef<pid_t> clear_child_tid_;
 
+ private:
   /// Signal handler related state. This is grouped together for when atomicity is needed during
   /// signal sending and delivery.
   SignalState signals_;
@@ -136,7 +138,13 @@ class TaskMutableState {
 
   /// Information that a tracer needs to communicate with this process, if it
   /// is being traced.
-  // ktl::optional<PtraceState> ptrace_;
+  ktl::optional<PtraceState> ptrace_;
+
+  /// Information that a tracer needs to inspect this process.
+  ktl::optional<CapturedThreadState> captured_thread_state_;
+
+  /// The Linux Security Modules state for this thread group.
+  //  pub security_state: security::TaskState,
 
   /// impl TaskMutableState
   bool no_new_privs() const { return no_new_privs_; }
@@ -158,26 +166,28 @@ class TaskMutableState {
     }
   }
 
-  bool is_ptraced() { return false; }
+  bool is_ptraced() const { return false; }
 
-  bool is_ptrace_listening() { return false; }
+  bool is_ptrace_listening() const { return false; }
+
+  void copy_state_from(const CurrentTask& current_task);
 
   /// Returns the task's currently active signal mask.
-  SigSet signal_mask() const { return signals_.mask_; }
+  SigSet signal_mask() const { return signals_.mask(); }
 
   /// Returns true if `signal` is currently blocked by this task's signal mask.
-  bool is_signal_masked(Signal signal) const { return signals_.mask_.has_signal(signal); }
+  bool is_signal_masked(Signal signal) const { return signals_.mask().has_signal(signal); }
 
   /// Returns true if `signal` is blocked by the saved signal mask.
   ///
   /// Note that the current signal mask may still not be blocking the signal.
   bool is_signal_masked_by_saved_mask(Signal signal) const {
-    auto saved_mask = signals_.saved_mask_;
+    auto saved_mask = signals_.saved_mask();
     return saved_mask.has_value() && saved_mask->has_signal(signal);
   }
 
   /// Enqueues a signal at the back of the task's signal queue.
-  // void enqueue_signal(const SignalInfo& signal) { signals_.enqueue(signal); }
+  void enqueue_signal(SignalInfo signal) { signals_.enqueue(signal); }
 
   /// Enqueues the signal, allowing the signal to skip straight to the front of the task's queue.
   ///
@@ -185,27 +195,27 @@ class TaskMutableState {
   ///
   /// Note that this will not guarantee that the signal is dequeued before any process-directed
   /// signals.
-  // void enqueue_signal_front(const SignalInfo& signal) { signals_.enqueue_front(signal); }
+  void enqueue_signal_front(SignalInfo signal) { signals_.enqueue(signal); }
 
   /// Sets the current signal mask of the task.
-  void set_signal_mask(const SigSet& mask) { signals_.set_mask(mask); }
+  void set_signal_mask(SigSet mask) { signals_.set_mask(mask); }
 
   /// Sets a temporary signal mask for the task.
   ///
   /// This mask should be removed by a matching call to `restore_signal_mask`.
-  void set_temporary_signal_mask(const SigSet& mask) { signals_.set_temporary_mask(mask); }
+  void set_temporary_signal_mask(SigSet mask) { signals_.set_temporary_mask(mask); }
 
   /// Removes the currently active, temporary, signal mask and restores the
   /// previously active signal mask.
   void restore_signal_mask() { signals_.restore_mask(); }
 
   /// Returns true if the task's current `RunState` is blocked.
-  bool is_blocked() const { return signals_.run_state_.is_blocked(); }
+  bool is_blocked() const;
 
   /// Sets the task's `RunState` to `run_state`.
-  void set_run_state(RunState run_state) { signals_.run_state_ = run_state; }
+  void set_run_state(RunState run_state);
 
-  RunState run_state() const { return signals_.run_state_; }
+  const RunState& run_state() const { return signals_.run_state_; }
 
   /*bool on_signal_stack(uint64_t stack_pointer_register) const {
     if (signals_.alt_stack().has_value()) {
@@ -221,6 +231,18 @@ class TaskMutableState {
 
   // impl TaskMutableState<Base = Task>
 
+  void set_stopped(StopState stopped, ktl::optional<SignalInfo> siginfo,
+                   ktl::optional<std::reference_wrapper<const CurrentTask>> current_task,
+                   ktl::optional<PtraceEventData> event);
+
+  fit::result<Errno> set_ptrace(ktl::optional<PtraceState> tracer);
+
+  bool can_accept_ptrace_commands();
+
+ private:
+  void store_stopped(StopState state);
+
+ public:
   void update_flags(TaskFlags clear, TaskFlags set);
 
   void set_flags(TaskFlags flag, bool v) {
@@ -242,9 +264,50 @@ class TaskMutableState {
     }
   }
 
-  /// Returns whether or not a signal is pending for this task, taking the current
-  /// signal mask into account.
+  /// Returns the number of pending signals for this task, without considering the signal mask.
+  size_t pending_signal_count() const;
+
+  /// Returns true if `signal` is pending for this task, without considering the signal mask.
+  bool has_signal_pending(Signal signal) const;
+
+  /// The set of pending signals for the task, including the signals pending for the thread group.
+  SigSet pending_signals() const;
+
+  /// The set of pending signals for the task specifically, not including the signals pending for
+  /// the thread group.
+  SigSet task_specific_pending_signals() const;
+
+  /// Returns true if any currently pending signal is allowed by `mask`.
+  bool is_any_signal_allowed_by_mask(SigSet mask) const;
+
+  /// Returns whether or not a signal is pending for this task, taking the current signal mask into
+  /// account.
   bool is_any_signal_pending() const;
+
+ private:
+  /// Returns the next pending signal that passes `predicate`.
+  template <typename F>
+  ktl::optional<SignalInfo> take_next_signal_where(F&& predicate);
+
+ public:
+  /// Removes and returns the next pending `signal` for this task.
+  ///
+  /// Returns `None` if `siginfo` is a blocked signal, or no such signal is pending.
+  ktl::optional<SignalInfo> take_specific_signal(const SignalInfo& siginfo);
+
+  /// Removes and returns a pending signal that is unblocked by the current signal mask.
+  ///
+  /// Returns `None` if there are no unblocked signals pending.
+  ktl::optional<SignalInfo> take_any_signal();
+
+  /// Removes and returns a pending signal that is unblocked by `signal_mask`.
+  ///
+  /// Returns `None` if there are no signals pending that are unblocked by `signal_mask`.
+  ktl::optional<SignalInfo> take_signal_with_mask(SigSet signal_mask);
+
+#ifdef CONFIG_STARNIX_TEST
+  size_t queued_signal_count(Signal signal) const;
+#endif
 
  private:
   friend class Task;
@@ -355,7 +418,7 @@ class ThreadGroup;
 /// executing.
 
 class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
- private:
+ public:
   // A unique identifier for this task.
   //
   // This value can be read in userspace using `gettid(2)`. In general, this value
@@ -380,18 +443,21 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   // This table can be share by many tasks.
   FdTable files_;
 
+ private:
   // The memory manager for this task.
   ktl::optional<fbl::RefPtr<MemoryManager>> mm_;
 
   // The file system for this task.
   ktl::optional<starnix_sync::RwLock<fbl::RefPtr<FsContext>>> fs_;
 
+ public:
   /// The namespace for abstract AF_UNIX sockets for this task.
   // pub abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
 
   /// The namespace for AF_VSOCK for this task.
   // pub abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
+ private:
   /// The stop state of the task, distinct from the stop state of the thread group.
   ///
   /// Must only be set when the `mutable_state` write lock is held.
@@ -405,6 +471,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   // The mutable state of the Task.
   mutable starnix_sync::RwLock<TaskMutableState> mutable_state_;
 
+ public:
   // The information of the task that needs to be available to the `ThreadGroup` while computing
   // which process a wait can target.
   // Contains the command line, the task credentials and the exit signal.
@@ -472,11 +539,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   Credentials creds() const { return (persistent_info_->Lock())->creds(); }
 
-  /*
-    pub fn exit_signal(&self) -> Option<Signal> {
-        self.persistent_info.lock().exit_signal
-    }
-  */
+  ktl::optional<Signal> exit_signal() const { return persistent_info_->Lock()->exit_signal(); }
 
   fbl::RefPtr<FsContext> fs() const;
 
@@ -486,7 +549,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   pid_t get_pid() const;
 
-  pid_t get_tid() const { return id(); }
+  pid_t get_tid() const { return id_; }
 
   bool is_leader() const { return get_pid() == get_tid(); }
 
@@ -494,7 +557,15 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   FsCred as_fscred() const { return creds().as_fscred(); }
 
+  /// Interrupts the current task.
+  ///
+  /// This will interrupt any blocking syscalls if the task is blocked on one.
+  /// The signal_state of the task must not be locked.
+  void interrupt() const;
+
   ktl::string_view command() const { return persistent_info_->Lock()->command(); }
+
+  struct sigaction get_signal_action(Signal signal) const;
 
   /// impl Releasable for Task
   void release(ThreadState context);
@@ -526,14 +597,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
     return mutable_state_.Write();
   }
 
-  pid_t id() const { return id_; }
-
   const fbl::RefPtr<ThreadGroup>& thread_group() const { return thread_group_; }
-
-  const starnix_sync::RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>>& thread() const {
-    return thread_;
-  }
-  starnix_sync::RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>>& thread() { return thread_; }
 
   const FdTable& files() const { return files_; }
   FdTable& files() { return files_; }

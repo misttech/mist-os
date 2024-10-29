@@ -8,20 +8,26 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/util/num.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <trace.h>
 
 #include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
+#include <ktl/numeric.h>
+
+#include "../kernel_priv.h"
 
 #include <ktl/enforce.h>
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
 using starnix_sync::NotifyKind;
 using starnix_sync::PortWaitResult;
 
-void EventHandler::Handle(FdEvents events) const {
+void EventHandler::handle(FdEvents events) const {
   auto enqueue_event_handler = ktl::visit(
       EventHandler::overloaded{
           [](const ktl::monostate&) -> ktl::optional<EnqueueEventHandler> { return {}; },
@@ -49,7 +55,8 @@ void EventHandler::Handle(FdEvents events) const {
   ZX_ASSERT(ac.check());
 }
 
-void SignalHandler::Handle(zx_signals_t signals) const {
+void SignalHandler::handle(zx_signals_t signals) const {
+  LTRACE_ENTRY_OBJ;
   auto [inner, event_handler] = *this;
   auto events = ktl::visit(SignalHandlerInner::overloaded{
                                [&](const ZxioSignalHandler& h) -> ktl::optional<FdEvents> {
@@ -68,17 +75,56 @@ void SignalHandler::Handle(zx_signals_t signals) const {
                            inner.inner_);
 
   if (events) {
-    event_handler.Handle(events.value());
+    event_handler.handle(events.value());
   }
+  LTRACE_EXIT_OBJ;
 }
 
-void WaiterRef::WillRemoveFromWaitQueue(WaitKey key) {}
+bool WaitEvents::intercept(const WaitEvents& other) const {
+  LTRACE;
+  return ktl::visit(
+      WaitEvents::overloaded{[](const ktl::monostate&, const ktl::monostate&) { return true; },
+                             [](const ktl::monostate&, const FdEvents&) { return true; },
+                             [](const ktl::monostate&, const uint64_t&) { return true; },
+                             [](const FdEvents&, const ktl::monostate&) { return true; },
+                             [](const uint64_t&, const ktl::monostate&) { return true; },
+                             [](const FdEvents& self, const FdEvents& other) {
+                               return (self.bits() & other.bits()) != 0;
+                             },
+                             [](uint64_t self, uint64_t other) { return self == other; },
+                             [](const auto&, const auto&) { return false; }},
+      data_, other.data_);
+}
 
-bool WaiterRef::Notify(WaitKey key, WaitEvents events) {
+void WaiterRef::interrupt() const {
+  LTRACE_ENTRY_OBJ;
+  ktl::visit(WaiterKind::overloaded{[](const util::WeakPtr<PortWaiter>& waiter) {
+                                      if (auto strong = waiter.Lock()) {
+                                        strong->interrupt();
+                                      }
+                                    },
+                                    [](const util::WeakPtr<InterruptibleEvent>& event) {
+                                      if (auto strong = event.Lock()) {
+                                        // strong->Interrupt();
+                                      }
+                                    },
+                                    [](const util::WeakPtr<AbortHandle>& handle) {
+                                      if (auto strong = handle.Lock()) {
+                                        // strong->Abort();
+                                      }
+                                    }},
+             waiter_kind_.waiter_);
+  LTRACE_EXIT_OBJ;
+}
+
+void WaiterRef::will_remove_from_wait_queue(WaitKey key) { LTRACE; }
+
+bool WaiterRef::notify(WaitKey key, WaitEvents events) {
+  LTRACE;
   return ktl::visit(
       WaiterKind::overloaded{[&](const util::WeakPtr<PortWaiter>& waiter) -> bool {
                                if (auto strong = waiter.Lock()) {
-                                 strong->QueueEvents(key, events);
+                                 strong->queue_events(key, events);
                                  return true;
                                }
                                return false;
@@ -101,64 +147,88 @@ bool WaiterRef::Notify(WaitKey key, WaitEvents events) {
 }
 
 WaitQueue::WaitQueue() {
+  LTRACE_ENTRY_OBJ;
   fbl::AllocChecker ac;
   inner_ = fbl::MakeRefCountedChecked<starnix_sync::StarnixMutex<WaitQueueImpl>>(&ac);
   ZX_ASSERT(ac.check());
 }
 
-WaitEntryId WaitQueue::AddWaiter(WaitEntry entry) const {
+WaitEntryId WaitQueue::add_waiter(WaitEntry entry) const {
+  LTRACE_ENTRY_OBJ;
   auto wait_queue = this->inner_->Lock();
   auto optional_id = mtl::checked_add(wait_queue->next_wait_entry_id, 1ul);
   ZX_ASSERT_MSG(optional_id.has_value(), "all possible wait entry ID values exhausted");
   auto id = optional_id.value();
   wait_queue->next_wait_entry_id = id;
-  auto [iter, inserted] =
-      wait_queue->waiters.emplace(id, WaitEntryWithId{.entry = entry, .id = id});
-  ZX_ASSERT_MSG(inserted, "wait entry ID collision");
+  ZX_ASSERT_MSG(wait_queue->waiters.emplace(id, WaitEntryWithId{.entry = entry, .id = id}).second,
+                "wait entry ID collision");
   return {.key = id, .id = id};
 }
 
-WaitCanceler WaitQueue::WaitAsyncEntry(const Waiter& waiter, WaitEntry entry) const {
+WaitCanceler WaitQueue::wait_async_entry(const Waiter& waiter, WaitEntry entry) const {
+  LTRACE_ENTRY_OBJ;
   // profile_duration!("WaitAsyncEntry");
   auto wait_key = entry.key;
-  auto waiter_id = this->AddWaiter(entry);
+  auto waiter_id = this->add_waiter(entry);
   auto wait_queue = util::WeakPtr(this->inner_.get());
-  auto [iter, inserted] = waiter.inner_->wait_queues().Lock()->emplace(wait_key, wait_queue);
+  auto [_, inserted] = waiter.inner_->wait_queues_.Lock()->emplace(wait_key, wait_queue);
   ZX_ASSERT_MSG(inserted, "wait key collision");
-  return WaitCanceler::NewInner(
-      WaitCancelerInner::Queue(wait_queue, waiter.weak(), wait_key, waiter_id));
+  return WaitCanceler::new_inner(
+      WaitCancelerInner::Queue(WaitCancelerQueue{.wait_queue = wait_queue,
+                                                 .waiter = waiter.weak(),
+                                                 .wait_key = wait_key,
+                                                 .waiter_id = waiter_id}));
 }
 
-WaitCanceler WaitQueue::WaitAsync(const Waiter& waiter) const {
-  return WaitAsyncEntry(waiter, waiter.CreateWaitEntry(WaitEvents::All()));
+WaitCanceler WaitQueue::wait_async(const Waiter& waiter) const {
+  LTRACE_ENTRY_OBJ;
+  return wait_async_entry(waiter, waiter.create_wait_entry(WaitEvents::All()));
 }
 
-size_t WaitQueue::NotifyEventsCount(WaitEvents events, size_t limit) const {
+size_t WaitQueue::notify_events_count(WaitEvents events, size_t limit) const {
+  LTRACE_ENTRY_OBJ;
   // profile_duration!("NotifyEventsCount");
   size_t woken = 0;
   auto wait_queue = this->inner_->Lock();
   wait_queue->waiters.key_ordered_retain([&](WaitEntryWithId& entry_with_id) {
-    if (limit > 0 && entry_with_id.entry.filter.Intercept(events)) {
-      if (entry_with_id.entry.waiter.Notify(entry_with_id.entry.key, events)) {
+    LTRACEF("entry id %lu\n", entry_with_id.id);
+    auto& [entry, _] = entry_with_id;
+    if (limit > 0 && entry.filter.intercept(events)) {
+      if (entry.waiter.notify(entry_with_id.entry.key, events)) {
         limit--;
         woken++;
       }
 
-      entry_with_id.entry.waiter.WillRemoveFromWaitQueue(entry_with_id.entry.key);
+      entry.waiter.will_remove_from_wait_queue(entry_with_id.entry.key);
       return false;
-    } else {
-      return true;
     }
+    return true;
   });
 
+  LTRACEF("woken %zu\n", woken);
   return woken;
+}
+
+void WaitQueue::notify_value(uint64_t value) const {
+  notify_events_count(WaitEvents::All(), ktl::numeric_limits<size_t>::max());
+}
+
+void WaitQueue::notify_unordered_count(size_t limit) const {
+  notify_events_count(WaitEvents::All(), limit);
+}
+
+void WaitQueue::notify_all() const { notify_unordered_count(ktl::numeric_limits<size_t>::max()); }
+
+bool WaitQueue::is_empty() const { return inner_->Lock()->waiters.empty(); }
+
+WaiterKind::~WaiterKind() {  // LTRACE_ENTRY_OBJ;
 }
 
 Waiter Waiter::New() { return Waiter(PortWaiter::New(false)); }
 
-Waiter Waiter::NewIgnoringSignals() { return Waiter(PortWaiter::New(true)); }
+Waiter Waiter::new_ignoring_signals() { return Waiter(PortWaiter::New(true)); }
 
-WaiterRef Waiter::weak() const { return WaiterRef::FromPort(inner_); }
+WaiterRef Waiter::weak() const { return WaiterRef::from_port(inner_); }
 
 fbl::RefPtr<PortWaiter> PortWaiter::New(bool ignore_signals) {
   fbl::AllocChecker ac;
@@ -170,7 +240,8 @@ fbl::RefPtr<PortWaiter> PortWaiter::New(bool ignore_signals) {
   return waiter;
 }
 
-fit::result<Errno> PortWaiter::WaitInternal(zx_instant_mono_t deadline) {
+fit::result<Errno> PortWaiter::wait_internal(zx_instant_mono_t deadline) {
+  LTRACE_ENTRY_OBJ;
   // This method can block arbitrarily long, possibly waiting for another process. The
   // current thread should not own any local ref that might delay the release of a resource
   // while doing so.
@@ -188,11 +259,11 @@ fit::result<Errno> PortWaiter::WaitInternal(zx_instant_mono_t deadline) {
             return fit::error(errno(EINTR));
           },
           [&](const PortWaitResult::Signal& s) -> fit::result<Errno> {
-            if (auto callback = this->RemoveCallback(WaitKey{s.key})) {
+            if (auto callback = this->remove_callback(WaitKey{s.key})) {
               ktl::visit(WaitCallback::overloaded{
-                             [&](const SignalHandler& h) { h.Handle(s.observed); },
+                             [&](const SignalHandler& h) { h.handle(s.observed); },
                              [](const EventHandler&) { ZX_PANIC("wrong type of handler called"); }},
-                         callback->callback());
+                         callback->callback_);
             }
             return fit::ok();
           },
@@ -202,8 +273,9 @@ fit::result<Errno> PortWaiter::WaitInternal(zx_instant_mono_t deadline) {
       result.result());
 }
 
-fit::result<Errno> PortWaiter::WaitUntil(const CurrentTask& current_task,
-                                         zx_instant_mono_t deadline) {
+fit::result<Errno> PortWaiter::wait_until(const CurrentTask& current_task,
+                                          zx_instant_mono_t deadline) {
+  LTRACE_ENTRY_OBJ;
   auto is_waiting = zx_nsec_from_duration(deadline) > 0;
 
   auto callback = [&]() -> fit::result<Errno> {
@@ -218,7 +290,7 @@ fit::result<Errno> PortWaiter::WaitUntil(const CurrentTask& current_task,
     // current_task.signals.run_state when there's a nonzero timeout, and that waiter reference
     // is what is used to signal the interrupt().
     do {
-      auto wait_result = this->WaitInternal(deadline);
+      auto wait_result = this->wait_internal(deadline);
       if (wait_result.is_error()) {
         if (wait_result.error_value() == errno(EINTR) && !is_waiting) {
           continue;  // Spurious wakeup.
@@ -233,29 +305,48 @@ fit::result<Errno> PortWaiter::WaitUntil(const CurrentTask& current_task,
 
   if (is_waiting) {
     return current_task.run_in_state(
-        RunState::Waiter(WaiterRef::FromPort(fbl::RefPtr<PortWaiter>(this))), callback);
+        RunState::Waiter(WaiterRef::from_port(fbl::RefPtr<PortWaiter>(this))), callback);
   }
   return callback();
 }
 
-ktl::optional<WaitCallback> PortWaiter::RemoveCallback(const WaitKey& key) const {
-  auto iter = callbacks_.find(key);
-  if (iter == callbacks_.end()) {
+WaitKey PortWaiter::register_callback(WaitCallback callback) const {
+  LTRACE_ENTRY_OBJ;
+  WaitKey key = next_key();
+  ZX_ASSERT_MSG(callbacks_.Lock()->insert({key, ktl::move(callback)}).second,
+                "unexpected callback already present for key %lu", key.id);
+  return key;
+}
+
+ktl::optional<WaitCallback> PortWaiter::remove_callback(const WaitKey& key) const {
+  LTRACE_ENTRY_OBJ;
+  auto callbacks = callbacks_.Lock();
+  auto iter = callbacks->find(key);
+  if (iter == callbacks->end()) {
     return ktl::nullopt;
   }
-  auto callback = iter->second;
-  callbacks_.erase(iter);
+  auto callback = ktl::move(iter->second);
+  callbacks->erase(iter);
   return callback;
 }
 
-void PortWaiter::Interrupt() const {
+void PortWaiter::interrupt() const {
+  LTRACE_ENTRY_OBJ;
   if (ignore_signals_) {
     return;
   }
   port_->Notify(NotifyKind::Interrupt);
 }
 
-void PortWaiter::QueueEvents(const WaitKey& key, WaitEvents events) const {
+void PortWaiter::wake_immediately(FdEvents events, EventHandler handler) const {
+  LTRACE_ENTRY_OBJ;
+  auto callback = WaitCallback::EventHandlerCallback(ktl::move(handler));
+  auto key = register_callback(ktl::move(callback));
+  queue_events(key, WaitEvents::Fd(events));
+}
+
+void PortWaiter::queue_events(const WaitKey& key, WaitEvents events) const {
+  LTRACE_ENTRY_OBJ;
   // profile_duration!("PortWaiterHandleEvent");
 
   // Defer notification
@@ -272,7 +363,7 @@ void PortWaiter::QueueEvents(const WaitKey& key, WaitEvents events) const {
   //
   // TODO(https://fxbug.dev/42084319): If we can read a batch of packets
   // from the `zx::Port`, maybe we can keep the ordering?
-  auto callback = RemoveCallback(key);
+  auto callback = remove_callback(key);
   if (!callback.has_value()) {
     return;
   }
@@ -285,37 +376,75 @@ void PortWaiter::QueueEvents(const WaitKey& key, WaitEvents events) const {
                     [&](const ktl::monostate&) -> FdEvents { return FdEvents::all(); },
                     [&](const FdEvents& e) -> FdEvents { return e; },
                     [&](const uint64_t&) -> FdEvents { ZX_PANIC("wrong type of handler called"); }},
-                events.data());
-            handler.Handle(fd_events);
+                events.data_);
+            handler.handle(fd_events);
           },
           [&](const SignalHandler&) { ZX_PANIC("wrong type of handler called"); }},
-      callback->callback());
+      callback->callback_);
 }
 
 PortWaiter::PortWaiter(fbl::RefPtr<PortEvent> port, bool ignore_signals)
     : port_(ktl::move(port)),
       next_key_(AtomicCounter<uint64_t>::New(1)),
-      ignore_signals_(ignore_signals) {}
+      ignore_signals_(ignore_signals) {
+  LTRACE_ENTRY_OBJ;
+}
+
+PortWaiter::~PortWaiter() { LTRACE_ENTRY_OBJ; }
 
 Waiter::Waiter(fbl::RefPtr<PortWaiter> waiter) : inner_(ktl::move(waiter)) {}
 
-Waiter::~Waiter() = default;
-
-fit::result<Errno> Waiter::Wait(const CurrentTask& current_task) const {
-  return inner_->WaitUntil(current_task, ZX_TIME_INFINITE);
+Waiter::~Waiter() {
+  LTRACE_ENTRY_OBJ;
+  // Delete ourselves from each wait queue we know we're on to prevent Weak references to
+  // ourself from sticking around forever.
+  auto wait_queues = ktl::move(*inner_->wait_queues_.Lock());
+  for (auto& [_, wait_queue] : wait_queues) {
+    if (auto upgraded = wait_queue.Lock()) {
+      auto waiters = upgraded->Lock();
+      waiters->waiters.key_ordered_retain(
+          [this](const WaitEntryWithId& entry) { return entry.entry.waiter != this->weak(); });
+    }
+  }
 }
 
-fit::result<Errno> Waiter::WaitUntil(const CurrentTask& current_task,
-                                     zx_instant_mono_t deadline) const {
-  return inner_->WaitUntil(current_task, deadline);
+fit::result<Errno> Waiter::wait(const CurrentTask& current_task) const {
+  return inner_->wait_until(current_task, ZX_TIME_INFINITE);
 }
 
-WaitEntry Waiter::CreateWaitEntry(WaitEvents filter) const {
+fit::result<Errno> Waiter::wait_until(const CurrentTask& current_task,
+                                      zx_instant_mono_t deadline) const {
+  return inner_->wait_until(current_task, deadline);
+}
+
+WaitEntry Waiter::create_wait_entry(WaitEvents filter) const {
   return WaitEntry{
       .waiter = this->weak(),
       .filter = filter,
-      .key = inner_->NextKey(),
+      .key = inner_->next_key(),
   };
 }
+
+WaitEntry Waiter::create_wait_entry_with_handler(WaitEvents filter, EventHandler handler) const {
+  WaitKey key = inner_->register_callback(WaitCallback::EventHandlerCallback(ktl::move(handler)));
+  return WaitEntry{
+      .waiter = this->weak(),
+      .filter = filter,
+      .key = key,
+  };
+}
+
+void Waiter::wake_immediately(FdEvents events, EventHandler handler) const {
+  inner_->wake_immediately(events, handler);
+}
+
+fit::result<zx_status_t, HandleWaitCanceler> Waiter::wake_on_zircon_signals(
+    const Handle& handle, zx_signals_t zx_signals, SignalHandler handler) const {
+  return inner_->wake_on_zircon_signals(handle, zx_signals, handler);
+}
+
+WaitCanceler Waiter::fake_wait() const { return WaitCanceler::new_noop(); }
+
+void Waiter::interrupt() const { inner_->interrupt(); }
 
 }  // namespace starnix

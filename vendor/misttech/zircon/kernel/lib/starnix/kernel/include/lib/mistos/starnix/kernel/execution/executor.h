@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/starnix/kernel/signals/types.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
@@ -48,7 +49,8 @@ struct TaskInfo {
 fit::result<Errno, TaskInfo> create_zircon_process(
     fbl::RefPtr<Kernel> kernel,
     ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
-    pid_t pid, fbl::RefPtr<ProcessGroup> process_group, const ktl::string_view& name);
+    pid_t pid, fbl::RefPtr<ProcessGroup> process_group, fbl::RefPtr<SignalActions> signal_actions,
+    const ktl::string_view& name);
 
 fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> create_process(
     fbl::RefPtr<JobDispatcher> job, uint32_t options, const ktl::string_view& name);
@@ -66,7 +68,7 @@ void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
   auto ref_task = weak_task.Lock();
 
   // Hold a lock on the task's thread slot until we have a chance to initialize it.
-  auto task_thread_guard = ref_task->thread().Write();
+  auto task_thread_guard = ref_task->thread_.Write();
 
   auto user_thread =
       create_thread(ref_task->thread_group()->process().dispatcher(), ref_task->command());

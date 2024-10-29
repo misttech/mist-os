@@ -8,8 +8,10 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
+#include <lib/mistos/starnix/kernel/signals/types.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/exit_status.h>
+#include <lib/mistos/starnix/kernel/task/internal/tag.h>
 #include <lib/mistos/starnix/kernel/task/waiter.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
@@ -36,13 +38,6 @@ class ProcessGroup;
 class ThreadGroup;
 class Task;
 class WaitingOptions;
-
-namespace internal {
-// ProcessGroupMutableState
-struct ProcessGroupTag {};
-// ThreadGroupMutableState
-struct ThreadGroupTag {};
-}  // namespace internal
 
 // Represents the exit information of a process
 struct ProcessExitInfo {
@@ -247,13 +242,13 @@ class ThreadGroupMutableState {
   using BTreeMapThreadGroup =
       fbl::TaggedWAVLTree<pid_t, util::WeakPtr<ThreadGroup>, internal::ThreadGroupTag>;
 
- private:
   // The parent thread group.
   //
   // The value needs to be writable so that it can be re-parent to the correct subreaper if the
   // parent ends before the child.
   ktl::optional<ThreadGroupParent> parent_;
 
+ private:
   // The tasks in the thread group.
   //
   // The references to Task is weak to prevent cycles as Task have a Arc reference to their
@@ -262,6 +257,7 @@ class ThreadGroupMutableState {
   // themselves before they are deleted.
   BTreeMapTaskContainer tasks_;
 
+ public:
   // The children of this thread group.
   //
   // The references to ThreadGroup is weak to prevent cycles as ThreadGroup have a Arc reference
@@ -298,7 +294,7 @@ class ThreadGroupMutableState {
   bool did_exec_ = false;
 
   /// Wait queue for updates to `stopped`.
-  // pub stopped_waiters: WaitQueue,
+  WaitQueue stopped_waiters_;
 
   /// A signal that indicates whether the process is going to become waitable
   /// via waitid and waitpid for either WSTOPPED or WCONTINUED, depending on
@@ -367,25 +363,40 @@ class ThreadGroupMutableState {
   WaitableChildResult get_waitable_child(ProcessSelector selector, const WaitingOptions& options,
                                          PidTable& pids);
 
+  /// Returns a task in the current thread group.
+  fit::result<Errno, fbl::RefPtr<Task>> get_live_task() const;
+
+  /// Set the stop status of the process.  If you pass |siginfo| of |None|,
+  /// does not update the signal.  If |finalize_only| is set, will check that
+  /// the set will be a finalize (Stopping -> Stopped or Stopped -> Stopped)
+  /// before executing it.
+  ///
+  /// Returns the latest stop state after any changes.
+  StopState set_stopped(StopState new_stopped, ktl::optional<SignalInfo> siginfo,
+                        bool finalize_only);
+
+  void store_stopped(StopState state);
+
+  /// Sends the signal `signal_info` to this thread group.
+  // #[allow(unused_mut)]
+  void send_signal(SignalInfo signal_info);
+
   // C++
-  const fbl::Vector<fbl::RefPtr<ZombieProcess>>& get_zombie_children() const {
+  const fbl::Vector<fbl::RefPtr<ZombieProcess>>& zombie_children() const {
     return zombie_children_;
   }
+  fbl::Vector<fbl::RefPtr<ZombieProcess>>& zombie_children() { return zombie_children_; }
 
   BTreeMapThreadGroup& get_children() { return children_; }
 
   const ktl::optional<ThreadGroupParent>& parent() const { return parent_; }
   ktl::optional<ThreadGroupParent>& parent() { return parent_; }
 
-  const fbl::RefPtr<ProcessGroup>& process_group() const { return process_group_; }
-
   const bool& did_exec() const { return did_exec_; }
   bool& did_exec() { return did_exec_; }
 
   const bool& terminating() const { return terminating_; }
   bool& terminating() { return terminating_; }
-
-  WaitQueue& child_status_waiters() { return child_status_waiters_; }
 
   ThreadGroupMutableState();
   ThreadGroupMutableState(ThreadGroup* base, ktl::optional<ThreadGroupParent> parent,
@@ -450,7 +461,7 @@ class ThreadGroup
   pid_t leader_;
 
   /// The signal actions that are registered for this process.
-  // pub signal_actions: Arc<SignalActions>,
+  fbl::RefPtr<SignalActions> signal_actions_;
 
   /// A mechanism to be notified when this `ThreadGroup` is destroyed.
   // pub drop_notifier: DropNotifier,
@@ -494,7 +505,14 @@ class ThreadGroup
   static fbl::RefPtr<ThreadGroup> New(
       fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
       ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
-      pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
+      pid_t leader, fbl::RefPtr<ProcessGroup> process_group,
+      fbl::RefPtr<SignalActions> signal_actions);
+
+  fit::result<Errno> add(fbl::RefPtr<Task> task) const;
+
+  void remove(fbl::RefPtr<Task> task) const;
+
+  void do_zombie_notifications(fbl::RefPtr<ZombieProcess> zombie) const;
 
   StopState load_stopped() const { return stop_state_.load(std::memory_order_relaxed); }
 
@@ -504,16 +522,43 @@ class ThreadGroup
   // callers should use CurrentTask::thread_group_exit instead.
   void exit(ExitStatus exit_status, ktl::optional<CurrentTask> current_task);
 
-  uint64_t get_rlimit(starnix_uapi::Resource resource) const;
-
-  fit::result<Errno> add(fbl::RefPtr<Task> task) const;
-
-  void remove(fbl::RefPtr<Task> task) const;
-
-  void do_zombie_notifications(fbl::RefPtr<ZombieProcess> zombie) const;
-
   // Sets the session ID for this thread group
   fit::result<Errno> setsid() const;
+
+  /// Check whether the stop state is compatible with `new_stopped`. If it is return it,
+  /// otherwise, return None.
+  ktl::optional<StopState> check_stopped_state(StopState new_stopped, bool finalize_only) const {
+    StopState stopped = load_stopped();
+    if (finalize_only && !StopStateHelper::is_stopping_or_stopped(stopped)) {
+      return stopped;
+    }
+
+    if (StopStateHelper::is_illegal_transition(stopped, new_stopped)) {
+      return stopped;
+    }
+
+    return ktl::nullopt;
+  }
+
+  /// Set the stop status of the process.  If you pass |siginfo| of |None|,
+  /// does not update the signal.  If |finalize_only| is set, will check that
+  /// the set will be a finalize (Stopping -> Stopped or Stopped -> Stopped)
+  /// before executing it.
+  ///
+  /// Returns the latest stop state after any changes.
+  StopState set_stopped(StopState new_stopped, ktl::optional<SignalInfo> siginfo,
+                        bool finalize_only) const {
+    // Perform an early return check to see if we can avoid taking the lock.
+    if (auto stopped = check_stopped_state(new_stopped, finalize_only)) {
+      return *stopped;
+    }
+
+    return Write()->set_stopped(new_stopped, siginfo, finalize_only);
+  }
+
+  void check_orphans();
+
+  uint64_t get_rlimit(starnix_uapi::Resource resource) const;
 
   /// state_accessor!(ThreadGroup, mutable_state, Arc<ThreadGroup>);
   starnix_sync::RwLock<ThreadGroupMutableState>::RwLockReadGuard Read() const {
@@ -536,12 +581,16 @@ class ThreadGroup
   const KernelHandle<ProcessDispatcher>& process() const { return process_; }
   pid_t leader() const { return leader_; }
 
+  const fbl::RefPtr<SignalActions>& signal_actions() const { return signal_actions_; }
+  fbl::RefPtr<SignalActions>& signal_actions() { return signal_actions_; }
+
   // WAVL-tree Index
   pid_t GetKey() const { return leader_; }
 
   ~ThreadGroup();
 
  private:
+  friend class ThreadGroupMutableState;
   class ProcessSignalObserver final : public SignalObserver {
    public:
     ProcessSignalObserver(util::WeakPtr<ThreadGroup> tg) : SignalObserver(), tg_(ktl::move(tg)) {}
@@ -560,7 +609,8 @@ class ThreadGroup
   ThreadGroup(
       fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
       ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard>& parent,
-      pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
+      pid_t leader, fbl::RefPtr<ProcessGroup> process_group,
+      fbl::RefPtr<SignalActions> signal_actions);
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(ThreadGroup);
 

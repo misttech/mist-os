@@ -113,7 +113,7 @@ util::WeakPtr<Task> PidTable::get_task(pid_t pid) const {
 }
 
 void PidTable::add_task(const fbl::RefPtr<Task>& task) {
-  auto& entry = get_entry_mut(task->id());
+  auto& entry = get_entry_mut(task->id_);
   ASSERT(!entry.task_.has_value());
   entry.task_ = util::WeakPtr<Task>(task.get());
 }
@@ -157,7 +157,7 @@ void PidTable::remove_zombie(pid_t pid) {
 }
 
 void PidTable::add_process_group(const fbl::RefPtr<ProcessGroup>& process_group) {
-  auto& entry = get_entry_mut(process_group->leader());
+  auto& entry = get_entry_mut(process_group->leader_);
   ASSERT(!entry.process_group_.has_value());
   entry.process_group_ = util::WeakPtr<ProcessGroup>(process_group.get());
 }

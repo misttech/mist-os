@@ -43,6 +43,66 @@ TaskPersistentInfo TaskPersistentInfoState::New(pid_t tid, pid_t pid,
   return info;
 }
 
+void TaskMutableState::copy_state_from(const CurrentTask& current_task) {
+  captured_thread_state_ = ktl::optional<CapturedThreadState>(CapturedThreadState{
+      .thread_state = current_task.thread_state().extended_snapshot(), .dirty = false});
+}
+
+void TaskMutableState::store_stopped(StopState state) {
+  // We don't actually use the guard but we require it to enforce that the
+  // caller holds the thread group's mutable state lock (identified by
+  // mutable access to the thread group's mutable state).
+
+  base_->stop_state_.store(state, std::memory_order_relaxed);
+}
+
+bool TaskMutableState::is_blocked() const {
+  LTRACE_ENTRY_OBJ;
+  LTRACEF("task %p\n", base_);
+  return signals_.run_state_.is_blocked();
+}
+
+void TaskMutableState::set_run_state(RunState run_state) {
+  LTRACE_ENTRY_OBJ;
+  LTRACEF("task %p\n", base_);
+  signals_.run_state_ = ktl::move(run_state);
+}
+
+void TaskMutableState::set_stopped(
+    StopState stopped, ktl::optional<SignalInfo> siginfo,
+    ktl::optional<std::reference_wrapper<const CurrentTask>> current_task,
+    ktl::optional<PtraceEventData> event) {
+  if (StopStateHelper::ptrace_only(stopped) && !ptrace_) {
+    return;
+  }
+
+  if (StopStateHelper::is_illegal_transition(base_->load_stopped(), stopped)) {
+    return;
+  }
+
+  // TODO(https://fxbug.dev/306438676): When task can be
+  // stopped inside user code, task will need to be either restarted or
+  // stopped here.
+  store_stopped(stopped);
+  if (StopStateHelper::is_stopped(stopped)) {
+    if (current_task.has_value()) {
+      copy_state_from(current_task.value());
+    }
+  }
+
+  if (ptrace_) {
+    // ptrace_->set_last_signal(siginfo);
+    // ptrace_->set_last_event(event);
+  }
+
+  if (stopped == StopState::Waking || stopped == StopState::ForceWaking) {
+    // notify_ptracees();
+  }
+  if (!StopStateHelper::is_in_progress(stopped)) {
+    // notify_ptracers();
+  }
+}
+
 void TaskMutableState::update_flags(TaskFlags clear, TaskFlags set) {
   // We don't actually use the guard but we require it to enforce that the
   // caller holds the task's mutable state lock (identified by mutable
@@ -52,6 +112,28 @@ void TaskMutableState::update_flags(TaskFlags clear, TaskFlags set) {
   TaskFlags observed = base_->flags();
   TaskFlags swapped = base_->flags_.swap((observed | set) & ~clear, std::memory_order_relaxed);
   DEBUG_ASSERT(swapped == observed);
+  LTRACEF_LEVEL(2, "pid:%d flags:0x%x\n", base_->id_, base_->flags().bits());
+}
+
+/// Returns the number of pending signals for this task, without considering the signal mask.
+size_t TaskMutableState::pending_signal_count() const {
+  return signals_.num_queued() + base_->thread_group()->pending_signals_.Lock()->num_queued();
+}
+
+bool TaskMutableState::has_signal_pending(Signal signal) const {
+  return signals_.has_queued(signal) ||
+         base_->thread_group()->pending_signals_.Lock()->has_queued(signal);
+}
+
+SigSet TaskMutableState::pending_signals() const {
+  return signals_.pending() | base_->thread_group()->pending_signals_.Lock()->pending();
+}
+
+SigSet TaskMutableState::task_specific_pending_signals() const { return signals_.pending(); }
+
+bool TaskMutableState::is_any_signal_allowed_by_mask(SigSet mask) const {
+  return signals_.is_any_allowed_by_mask(mask) ||
+         base_->thread_group()->pending_signals_.Lock()->is_any_allowed_by_mask(mask);
 }
 
 bool TaskMutableState::is_any_signal_pending() const {
@@ -59,6 +141,53 @@ bool TaskMutableState::is_any_signal_pending() const {
   return signals_.is_any_pending() ||
          base_->thread_group()->pending_signals_.Lock()->is_any_allowed_by_mask(mask);
 }
+
+template <typename F>
+ktl::optional<SignalInfo> TaskMutableState::take_next_signal_where(F&& predicate) {
+  auto thread_group_signal =
+      base_->thread_group()->pending_signals_.Lock()->take_next_where(predicate);
+  if (thread_group_signal.has_value()) {
+    return thread_group_signal;
+  }
+  return signals_.take_next_where(predicate);
+}
+
+/// Removes and returns the next pending `signal` for this task.
+///
+/// Returns `None` if `siginfo` is a blocked signal, or no such signal is pending.
+ktl::optional<SignalInfo> TaskMutableState::take_specific_signal(const SignalInfo& siginfo) {
+  SigSet signal_mask = signals_.mask();
+  if (signal_mask.has_signal(siginfo.signal)) {
+    return ktl::nullopt;
+  }
+
+  auto predicate = [&siginfo](const SignalInfo& s) { return s.signal == siginfo.signal; };
+  return take_next_signal_where(predicate);
+}
+
+/// Removes and returns a pending signal that is unblocked by the current signal mask.
+///
+/// Returns `None` if there are no unblocked signals pending.
+ktl::optional<SignalInfo> TaskMutableState::take_any_signal() {
+  return take_signal_with_mask(signals_.mask());
+}
+
+/// Removes and returns a pending signal that is unblocked by `signal_mask`.
+///
+/// Returns `None` if there are no signals pending that are unblocked by `signal_mask`.
+ktl::optional<SignalInfo> TaskMutableState::take_signal_with_mask(SigSet signal_mask) {
+  auto predicate = [&signal_mask](const SignalInfo& s) {
+    return !signal_mask.has_signal(s.signal) || s.force;
+  };
+  return take_next_signal_where(predicate);
+}
+
+#ifdef CONFIG_STARNIX_TEST
+size_t TaskMutableState::queued_signal_count(Signal signal) const {
+  return signals_.queued_count(signal) +
+         thread_group_->pending_signals().lock().queued_count(signal);
+}
+#endif
 
 fbl::RefPtr<Task> Task::New(pid_t id, const ktl::string_view& command,
                             fbl::RefPtr<ThreadGroup> thread_group,
@@ -151,6 +280,20 @@ util::WeakPtr<Task> Task::get_task(pid_t pid) const { return kernel()->pids.Read
 
 pid_t Task::get_pid() const { return thread_group_->leader(); }
 
+void Task::interrupt() const {
+  LTRACE_ENTRY_OBJ;
+  Read()->signals_.run_state_.wake();
+
+  if (auto ts = thread_.Read(); ts->has_value()) {
+    // TODO (Herrera)
+    // crate::execution::interrupt_thread(thread);
+  }
+}
+
+struct sigaction Task::get_signal_action(Signal signal) const {
+  return thread_group_->signal_actions()->Get(signal);
+}
+
 fit::result<Errno, ktl::span<uint8_t>> Task::read_memory(UserAddress addr,
                                                          ktl::span<uint8_t>& bytes) const {
   return (*mm_)->syscall_read_memory(addr, bytes);
@@ -187,7 +330,7 @@ void Task::ThreadSignalObserver::OnMatch(zx_signals_t signals) {
   auto task = task_.Lock();
   if (task) {
     // Set the current TaskWrapper to null to force CurrentTask to release.
-    task->thread().Write()->value()->SetTask(nullptr);
+    task->thread_.Write()->value()->SetTask(nullptr);
   }
 }
 void Task::ThreadSignalObserver::OnCancel(zx_signals_t signals) {

@@ -101,7 +101,7 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
             }
             break;
         }
-        thread_group->child_status_waiters().WaitAsync(waiter);
+        thread_group->child_status_waiters_.wait_async(waiter);
       }
     }
 
@@ -109,7 +109,7 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
       return fit::ok(ktl::nullopt);
     }
 
-    _EP(map_eintr(waiter.Wait(current_task), errno(EINTR)));
+    _EP(map_eintr(waiter.wait(current_task), errno(ERESTARTSYS)));
   } while (true);
 }
 
@@ -122,7 +122,7 @@ fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_s
   auto selector = [&]() -> fit::result<Errno, ProcessSelector> {
     if (raw_selector == 0) {
       return fit::ok(ProcessSelector::ProcessGroup(
-          current_task->thread_group()->Read()->process_group()->leader()));
+          current_task->thread_group()->Read()->process_group_->leader_));
     } else if (raw_selector == -1) {
       return fit::ok(ProcessSelector::AnyProcess());
     } else if (raw_selector > 0) {

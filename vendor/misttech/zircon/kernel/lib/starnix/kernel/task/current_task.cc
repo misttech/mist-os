@@ -9,6 +9,7 @@
 #include <lib/mistos/starnix/kernel/execution/executor.h>
 #include <lib/mistos/starnix/kernel/loader.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
+#include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/session.h>
@@ -38,6 +39,7 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <memory>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
@@ -52,7 +54,7 @@
 
 #include "../kernel_priv.h"
 
-#include <ktl/enforce.h>
+// #include <ktl/enforce.h>
 
 #include <linux/resource.h>
 #include <linux/sched.h>
@@ -132,7 +134,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(
 
   auto task_info_factory = [kernel, initial_name](pid_t pid,
                                                   fbl::RefPtr<ProcessGroup> process_group) {
-    return create_zircon_process(kernel, {}, pid, process_group, initial_name);
+    return create_zircon_process(kernel, {}, pid, process_group, SignalActions::Default(),
+                                 initial_name);
   };
 
   return create_task_with_pid(kernel, pids, pid, initial_name, fs, task_info_factory,
@@ -146,7 +149,8 @@ fit::result<Errno, CurrentTask> CurrentTask::create_system_task(const fbl::RefPt
       [kernel](pid_t pid, fbl::RefPtr<ProcessGroup> process_group) -> fit::result<Errno, TaskInfo> {
         KernelHandle<ProcessDispatcher> process;
         auto memory_manager = fbl::RefPtr(MemoryManager::new_empty());
-        auto thread_group = ThreadGroup::New(kernel, ktl::move(process), {}, pid, process_group);
+        auto thread_group = ThreadGroup::New(kernel, ktl::move(process), {}, pid, process_group,
+                                             SignalActions::Default());
 
         return fit::ok(
             TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = memory_manager});
@@ -166,7 +170,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
 
   auto task_info_factory = [kernel, initial_name](pid_t pid,
                                                   fbl::RefPtr<ProcessGroup> process_group) {
-    return create_zircon_process(kernel, {}, pid, process_group, initial_name);
+    return create_zircon_process(kernel, {}, pid, process_group, SignalActions::Default(),
+                                 initial_name);
   };
 
   auto task =
@@ -250,8 +255,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   LTRACE;
   const uint64_t IMPLEMENTED_FLAGS =
       (CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD | CLONE_SYSVSEM |
-       CLONE_SETTLS | CLONE_PARENT_SETTID | CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID |
-       CLONE_VFORK | CLONE_PTRACE);
+       CLONE_SETTLS | CLONE_PARENT | CLONE_PARENT_SETTID | CLONE_CHILD_CLEARTID |
+       CLONE_CHILD_SETTID | CLONE_VFORK | CLONE_NEWUTS | CLONE_PTRACE);
 
   // A mask with all valid flags set, because we want to return a different error code for an
   // invalid flag vs an unimplemented flag. Subtracting 1 from the largest valid flag gives a
@@ -271,8 +276,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   auto clone_vm = (flags & CLONE_VM) != 0;
   auto clone_sighand = (flags & CLONE_SIGHAND) != 0;
   auto clone_vfork = (flags & CLONE_VFORK) != 0;
-
-  // auto new_uts = (flags & CLONE_NEWUTS) != 0;
+  auto new_uts = (flags & CLONE_NEWUTS) != 0;
 
   if (clone_ptrace) {
     // track_stub !(TODO("https://fxbug.dev/322874630"), "CLONE_PTRACE");
@@ -318,10 +322,10 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     return fit::error(errno(ENOSYS));
   }
 
-  auto fs = clone_fs ? (*this)->fs() : (*this)->fs()->fork();
-  auto files = clone_files ? (*this)->files() : (*this)->files().fork();
+  auto fs = clone_fs ? task_->fs() : task_->fs()->fork();
+  auto files = clone_files ? task_->files() : task_->files().fork();
 
-  auto kernel = (*this)->kernel();
+  auto kernel = task_->kernel();
   auto pids = kernel->pids.Write();
 
   pid_t pid;
@@ -344,26 +348,22 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     fbl::RefPtr<ThreadGroup> original_parent;
 
     // Make sure to drop these locks ASAP to avoid inversion
-    // auto self = (*this);
     auto thread_group_state = [&]()
         -> fit::result<Errno, starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> {
-      auto tgs = task_->thread_group()->Write();
+      auto thread_group_state_inner = task_->thread_group()->Write();
       if (clone_parent) {
         // With the CLONE_PARENT flag, the parent of the new task is our parent
         // instead of ourselves.
-        if (!tgs->parent().has_value()) {
+        if (!thread_group_state_inner->parent().has_value()) {
           return fit::error(errno(EINVAL));
         }
-        weak_original_parent = *tgs->parent();
+        weak_original_parent = *thread_group_state_inner->parent();
+        std::destroy_at(std::addressof(thread_group_state_inner));
         original_parent = weak_original_parent.upgrade();
         return fit::ok(ktl::move(original_parent->Write()));
       }
-      return fit::ok(ktl::move(tgs));
-    }();
-
-    if (thread_group_state.is_error()) {
-      return thread_group_state.take_error();
-    }
+      return fit::ok(ktl::move(thread_group_state_inner));
+    }() _EP(thread_group_state);
 
     auto state = task_->Read();
 
@@ -379,20 +379,20 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     // scheduler_policy = state.scheduler_policy.fork();
     timerslack_ns = (*state).timerslack_ns_;
 
-    /*
-    uts_ns = if new_uts {
-        if !self.creds().has_capability(CAP_SYS_ADMIN) {
-            return error!(EPERM);
-        }
+    if (new_uts) {
+      /*if !self.creds().has_capability(CAP_SYS_ADMIN) {
+          return error!(EPERM);
+      }
 
-        // Fork the UTS namespace of the existing task.
-        let new_uts_ns = state.uts_ns.read().clone();
-        Arc::new(RwLock::new(new_uts_ns))
+      // Fork the UTS namespace of the existing task.
+      let new_uts_ns = state.uts_ns.read().clone();
+      Arc::new(RwLock::new(new_uts_ns))*/
     } else {
-        // Inherit the UTS of the existing task.
-        state.uts_ns.clone()
-    };
-    */
+      /*
+      // Inherit the UTS of the existing task.
+      state.uts_ns.clone()
+      */
+    }
 
     if (clone_thread) {
       auto thread_group = task_->thread_group();
@@ -403,17 +403,17 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       // Drop the lock on this task before entering `create_zircon_process`, because it will
       // take a lock on the new thread group, and locks on thread groups have a higher
       // priority than locks on the task in the thread group.
-      state.~RwLockGuard();
-      /*
-      let signal_actions = if clone_sighand {
-          self.thread_group.signal_actions.clone()
-      } else {
-          self.thread_group.signal_actions.fork()
-      };
-      */
-      auto process_group = thread_group_state->process_group();
+      std::destroy_at(std::addressof(state));
+      auto signal_actions = [&]() -> fbl::RefPtr<SignalActions> {
+        if (clone_sighand) {
+          return task_->thread_group()->signal_actions();
+        } else {
+          return task_->thread_group()->signal_actions()->Fork();
+        }
+      }();
+      auto process_group = thread_group_state->process_group_;
       return create_zircon_process(kernel, ktl::move(*thread_group_state), pid, process_group,
-                                   command);
+                                   signal_actions, command);
     }
   }() _EP(task_info);
 
@@ -436,7 +436,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     if (!clone_thread) {
       pids->add_thread_group(child->thread_group());
     }
-    pids.~RwLockGuard();
+    std::destroy_at(std::addressof(pids));
 
     // Child lock must be taken before this lock. Drop the lock on the task, take a writable
     // lock on the child and take the current state back.
@@ -465,8 +465,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       // placement of this logic here, we might need to move it.
       auto child_state = child->Write();
       auto state = task_->Read();
-      // child_state.signals.alt_stack = state.signals.alt_stack;
-      // child_state.signals.set_mask(state.signals.mask());
+      // child_state->set_sigaltstack(state->sigaltstack());
+      child_state->set_signal_mask(state->signal_mask());
     }
 
     if (!clone_vm) {
@@ -477,15 +477,15 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     }
 
     if (clone_parent_settid) {
-      _EP(this->write_object(user_parent_tid, child->id()));
+      _EP(this->write_object(user_parent_tid, child->id_));
     }
 
     if (clone_child_cleartid) {
-      // child.write().clear_child_tid = user_child_tid;
+      child->Write()->clear_child_tid_ = user_child_tid;
     }
 
     if (clone_child_settid) {
-      _EP(child->write_object(user_child_tid, child->id()));
+      _EP(child->write_object(user_child_tid, child->id_));
     }
 
     // TODO(https://fxbug.dev/42066087): We do not support running different processes with
@@ -506,6 +506,22 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     auto _l2 = child->Read();
   }
   return fit::ok(ktl::move(child));
+}
+
+void CurrentTask::set_stopped_and_notify(StopState stopped,
+                                         ktl::optional<SignalInfo> siginfo) const {
+  {
+    auto state = task_->Write();
+    // state->copy_state_from(this);
+    state->set_stopped(stopped, siginfo, *this, ktl::nullopt);
+  }
+
+  if (!StopStateHelper::is_in_progress(stopped)) {
+    auto parent = task_->thread_group()->Read()->parent();
+    if (parent) {
+      parent->upgrade()->Write()->child_status_waiters_.notify_all();
+    }
+  }
 }
 
 void CurrentTask::thread_group_exit(ExitStatus exit_status) {
@@ -698,7 +714,6 @@ fit::result<Errno, T> CurrentTask::wait_with_temporary_mask(SigSet signal_mask, 
   }
   return wait_function(this);
 }
-
 
 /*fit::result<Errno> CurrentTask::block_until(EventWaitGuard& guard, zx::MonotonicInstant deadline)
 { return run_in_state(RunState::Event(guard.event()), [&]() -> fit::result<Errno> { auto result =

@@ -108,11 +108,11 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
     RegisterState::print_regs(stdout, &*new_task.thread_state().registers);
   }
 
-  auto tid = new_task.task()->id();
+  auto tid = new_task.task()->id_;
   execute_task(
       ktl::move(new_task),
       [](CurrentTask& current_task) -> fit::result<Errno> {
-        auto maybe_thread = current_task->thread().Write();
+        auto maybe_thread = current_task->thread_.Write();
         if (maybe_thread->has_value()) {
           auto thread = maybe_thread->value();
 
@@ -341,7 +341,7 @@ fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid)
   util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
   auto task = Task::from_weak(weak) _EP(task);
   // security::check_task_getsid(current_task, &target_task)?;
-  auto sid = task->thread_group()->Read()->process_group()->session()->leader();
+  auto sid = task->thread_group()->Read()->process_group_->session_->leader_;
   return fit::ok(sid);
 }
 
@@ -349,7 +349,7 @@ fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid
   util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
   auto task = Task::from_weak(weak) _EP(task);
   // selinux_hooks::check_getpgid_access(current_task, &task)?;
-  auto pgid = task->thread_group()->Read()->process_group()->leader();
+  auto pgid = task->thread_group()->Read()->process_group_->leader_;
   return fit::ok(pgid);
 }
 

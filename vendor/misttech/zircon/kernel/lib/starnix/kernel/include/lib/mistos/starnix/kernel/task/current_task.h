@@ -7,6 +7,7 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_CURRENT_TASK_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/arch/x64/lib.h>
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/loader.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
@@ -14,6 +15,7 @@
 #include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/task/pid_table.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/starnix/kernel/task/thread_state.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/starnix/kernel/vfs/mount.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
@@ -44,29 +46,6 @@ class AutoReleasableTask;
 
 class Task;
 class FsContext;
-
-// The thread related information of a `CurrentTask`. The information should never be used outside
-// of the thread owning the `CurrentTask`.
-struct ThreadState {
-  // A copy of the registers associated with the Zircon thread. Up-to-date values can be read
-  // from `self.handle.read_state_general_regs()`. To write these values back to the thread, call
-  // `self.handle.write_state_general_regs(self.thread_state.registers.into())`.
-  RegisterState registers;
-
-  /// Copy of the current extended processor state including floating point and vector registers.
-  // pub extended_pstate: ExtendedPstateState,
-
-  /// A custom function to resume a syscall that has been interrupted by SIGSTOP.
-  /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
-  /// will eventually call it.
-  // pub syscall_restart_func: Option<Box<SyscallRestartFunc>>,
-
- public:
-  /// impl ThreadState
-
-  /// Returns a new `ThreadState` with the same `registers` as this one.
-  ThreadState snapshot() const { return ThreadState{RegisterState::From(*this->registers)}; }
-};
 
 class TaskBuilder {
  private:
@@ -156,8 +135,6 @@ class CurrentTask : public TaskMemoryAccessor {
   ///
   /// This function can only be called in the `RunState::Running` state and cannot set the
   /// run state to `RunState::Running`. For this reason, this function cannot be reentered.
-  // template <typename T, typename F>
-  // fit::result<Errno, T> run_in_state(RunState run_state, F&& callback);
   template <typename F, typename... ResultArgs>
   auto run_in_state(RunState run_state, F&& callback) const -> fit::result<Errno, ResultArgs...> {
     ASSERT(run_state != RunState::Running());
@@ -169,7 +146,7 @@ class CurrentTask : public TaskMemoryAccessor {
       if (state->is_any_signal_pending() && !state->is_ptrace_listening()) {
         return fit::error(errno(EINTR));
       }
-      state->set_run_state(run_state);
+      state->set_run_state(ktl::move(run_state));
     }
 
     auto result = ktl::forward<F>(callback)();
@@ -178,9 +155,8 @@ class CurrentTask : public TaskMemoryAccessor {
       auto state = task_->Write();
       ZX_ASSERT_MSG(state->run_state() == run_state,
                     "SignalState run state changed while waiting!");
-      state->set_run_state(RunState::Running());
+      state->set_run_state(ktl::move(RunState::Running()));
     }
-
     return result;
   }
 
@@ -364,6 +340,10 @@ class CurrentTask : public TaskMemoryAccessor {
                                              ktl::optional<Signal> child_exit_signal,
                                              UserRef<pid_t> user_parent_tid,
                                              UserRef<pid_t> user_child_tid) const;
+
+  /// Sets the stop state (per set_stopped), and also notifies all listeners,
+  /// including the parent process if appropriate.
+  void set_stopped_and_notify(StopState stopped, ktl::optional<SignalInfo> siginfo) const;
 
   void thread_group_exit(ExitStatus exit_status);
 

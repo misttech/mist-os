@@ -161,6 +161,8 @@ enum class StopState : uint8_t {
   SyscallExitStopped,
 };
 
+struct EmptyError {};
+
 class StopStateHelper {
  public:
   // This means a stop is either in progress or we've stopped.
@@ -193,6 +195,102 @@ class StopStateHelper {
         return true;
       default:
         return false;
+    }
+  }
+
+  // Returns the "ed" version of this StopState, if it is "ing".
+  static fit::result<EmptyError, StopState> finalize(StopState state) {
+    switch (state) {
+      case StopState::GroupStopping:
+        return fit::ok(StopState::GroupStopped);
+      case StopState::SignalDeliveryStopping:
+        return fit::ok(StopState::SignalDeliveryStopped);
+      case StopState::PtraceEventStopping:
+        return fit::ok(StopState::PtraceEventStopped);
+      case StopState::Waking:
+        return fit::ok(StopState::Awake);
+      case StopState::ForceWaking:
+        return fit::ok(StopState::ForceAwake);
+      case StopState::SyscallEnterStopping:
+        return fit::ok(StopState::SyscallEnterStopped);
+      case StopState::SyscallExitStopping:
+        return fit::ok(StopState::SyscallExitStopped);
+      default:
+        return fit::error(EmptyError{});
+    }
+  }
+
+  static bool is_downgrade(StopState current, StopState new_state) {
+    switch (current) {
+      case StopState::GroupStopped:
+        return new_state == StopState::GroupStopping;
+      case StopState::SignalDeliveryStopped:
+        return new_state == StopState::SignalDeliveryStopping;
+      case StopState::PtraceEventStopped:
+        return new_state == StopState::PtraceEventStopping;
+      case StopState::SyscallEnterStopped:
+        return new_state == StopState::SyscallEnterStopping;
+      case StopState::SyscallExitStopped:
+        return new_state == StopState::SyscallExitStopping;
+      case StopState::Awake:
+        return new_state == StopState::Waking;
+      default:
+        return false;
+    }
+  }
+
+  // This means the task is either waking up or already awake.
+  static bool is_waking_or_awake(StopState state) {
+    return state == StopState::Waking || state == StopState::Awake ||
+           state == StopState::ForceWaking || state == StopState::ForceAwake;
+  }
+
+  // Indicate if the transition to the stopped / awake state is not finished.
+  // This function is typically used to determine when it is time to notify waiters.
+  static bool is_in_progress(StopState state) {
+    return state == StopState::Waking || state == StopState::ForceWaking ||
+           state == StopState::GroupStopping || state == StopState::SignalDeliveryStopping ||
+           state == StopState::PtraceEventStopping || state == StopState::SyscallEnterStopping ||
+           state == StopState::SyscallExitStopping;
+  }
+
+  static bool ptrace_only(StopState state) {
+    return !is_waking_or_awake(state) && state != StopState::GroupStopped &&
+           state != StopState::GroupStopping;
+  }
+
+  static bool is_illegal_transition(StopState current, StopState new_state) {
+    return current == StopState::ForceAwake ||
+           (current == StopState::ForceWaking && new_state != StopState::ForceAwake) ||
+           new_state == current ||
+           // Downgrades are generally a sign that something is screwed up, but
+           // a SIGCONT can result in a downgrade from Awake to Waking, so we
+           // allowlist it.
+           (is_downgrade(current, new_state) && current != StopState::Awake);
+  }
+
+  static bool is_force(StopState state) {
+    return state == StopState::ForceAwake || state == StopState::ForceWaking;
+  }
+
+  static fit::success<StopState> as_in_progress(StopState state) {
+    switch (state) {
+      case StopState::GroupStopped:
+        return fit::ok(StopState::GroupStopping);
+      case StopState::SignalDeliveryStopped:
+        return fit::ok(StopState::SignalDeliveryStopping);
+      case StopState::PtraceEventStopped:
+        return fit::ok(StopState::PtraceEventStopping);
+      case StopState::Awake:
+        return fit::ok(StopState::Waking);
+      case StopState::ForceAwake:
+        return fit::ok(StopState::ForceWaking);
+      case StopState::SyscallEnterStopped:
+        return fit::ok(StopState::SyscallEnterStopping);
+      case StopState::SyscallExitStopped:
+        return fit::ok(StopState::SyscallExitStopping);
+      default:
+        return fit::ok(state);
     }
   }
 };

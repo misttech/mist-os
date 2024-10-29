@@ -11,10 +11,15 @@
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/starnix_sync/interruptible_event.h>
+#include <trace.h>
+#include <zircon/assert.h>
 #include <zircon/types.h>
 
+#include <algorithm>
+#include <deque>
 #include <utility>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/array.h>
 #include <ktl/variant.h>
@@ -24,6 +29,7 @@
 namespace starnix {
 
 using starnix_sync::InterruptibleEvent;
+using starnix_uapi::Signal;
 using starnix_uapi::SigSet;
 
 struct SignalInfoHeader {
@@ -135,6 +141,55 @@ struct SignalInfo {
 #endif
 };
 
+// SignalActions contains a sigaction for each valid signal.
+class SignalActions : public fbl::RefCounted<SignalActions> {
+ public:
+  static fbl::RefPtr<SignalActions> Default() {
+    fbl::AllocChecker ac;
+    auto tmp = fbl::AdoptRef(new (&ac) SignalActions());
+    ZX_ASSERT(ac.check());
+    return tmp;
+  }
+
+  // Returns the sigaction that is currently set for signal.
+  sigaction Get(Signal signal) const { return actions_.Lock()->at(signal.number()); }
+
+  // Update the action for signal. Returns the previously configured action.
+  sigaction Set(Signal signal, sigaction new_action) {
+    auto actions = actions_.Lock();
+    sigaction old_action = actions->at(signal.number());
+    actions->at(signal.number()) = new_action;
+    return old_action;
+  }
+
+  fbl::RefPtr<SignalActions> Fork() const {
+    fbl::AllocChecker ac;
+    auto tmp = fbl::AdoptRef(new (&ac) SignalActions());
+    ZX_ASSERT(ac.check());
+    *tmp->actions_.Lock() = *this->actions_.Lock();
+    return tmp;
+  }
+
+  void ResetForExec() {
+    auto actions = actions_.Lock();
+    for (auto& action : *actions) {
+      if (action.sa_handler != SIG_DFL && action.sa_handler != SIG_IGN) {
+        action.sa_handler = SIG_DFL;
+      }
+    }
+  }
+
+ private:
+  SignalActions() {
+    auto actions = actions_.Lock();
+    actions->fill(sigaction{});
+  }
+
+  DISALLOW_COPY_ASSIGN_AND_MOVE(SignalActions);
+
+  mutable starnix_sync::StarnixMutex<ktl::array<sigaction, Signal::NUM_SIGNALS + 1>> actions_;
+};
+
 // Whether, and how, this task is blocked. This enum can be extended with new
 // variants to optimize different kinds of waiting.
 class RunState {
@@ -147,24 +202,24 @@ class RunState {
   static RunState Running() { return RunState({}); }
 
   /// This thread is blocked in a `Waiter`.
-  static RunState Waiter(WaiterRef ref) { return RunState(ktl::move(ref)); }
+  static RunState Waiter(WaiterRef ref) { return RunState(ref); }
 
   /// This thread is blocked in an `InterruptibleEvent`.
   static RunState Event(fbl::RefPtr<InterruptibleEvent> event) { return RunState(event); }
 
   bool is_blocked() const {
     return ktl::visit(overloaded{[](const ktl::monostate&) { return false; },
-                                 [](const WaiterRef& ref) { return ref.IsValid(); },
+                                 [](const WaiterRef& ref) { return ref.is_valid(); },
                                  [](const fbl::RefPtr<InterruptibleEvent>&) { return true; }},
                       variant_);
   }
 
-  void wake() {
-    ktl::visit(overloaded{[](ktl::monostate&) {
+  void wake() const {
+    ktl::visit(overloaded{[](const ktl::monostate&) {
                             // Do nothing for Running state
                           },
-                          [](WaiterRef& waiter) { waiter.Interrupt(); },
-                          [](fbl::RefPtr<InterruptibleEvent>& event) {
+                          [](const WaiterRef& waiter) { waiter.interrupt(); },
+                          [](const fbl::RefPtr<InterruptibleEvent>& event) {
                             // event->Interrupt();
                           }},
                variant_);
@@ -182,6 +237,16 @@ class RunState {
 
   bool operator!=(const RunState& other) const { return !(*this == other); }
 
+  RunState(RunState&& other) { variant_ = ktl::move(other.variant_); }
+  RunState(const RunState& other) { variant_ = other.variant_; }
+
+  RunState& operator=(RunState&& other) {
+    variant_ = ktl::move(other.variant_);
+    return *this;
+  }
+
+  RunState& operator=(const RunState& other) = default;
+
  private:
   template <class... Ts>
   struct overloaded : Ts... {
@@ -197,9 +262,104 @@ class RunState {
 };
 
 class QueuedSignals {
+ private:
+  using SignalQueue = std::deque<SignalInfo, util::Allocator<SignalInfo>>;
+
+  /// The queue of standard signals for the task.
+  SignalQueue queue_;
+
+  // Real-time signals queued for the task. Unlike standard signals there may be more than one
+  /// instance of the same real-time signal in the queue. POSIX requires real-time signals
+  /// with lower values to be delivered first. `enqueue()` ensures proper ordering when adding
+  /// new elements. There are no ordering requirements for standard signals. We always dequeue
+  /// standard signals first. This matches Linux behavior.
+  SignalQueue rt_queue_;
+
+  /// impl QueuedSignals
  public:
+  void enqueue(const SignalInfo& siginfo) {
+    if (siginfo.signal.is_real_time()) {
+      // Real-time signals are stored in `rt_queue` in the order they will be delivered,
+      // i.e. they sorted by the signal number. Signals with the same number must be
+      // delivered in the order they were queued. Use binary search to find the right
+      // position to insert the signal. Note that the comparator return `Less` when the
+      // signal is the same.
+      auto pos = std::ranges::lower_bound(rt_queue_, siginfo,
+                                          [](const SignalInfo& a, const SignalInfo& b) {
+                                            return a.signal.number() < b.signal.number();
+                                          });
+      rt_queue_.insert(pos, siginfo);
+    } else {
+      // Don't queue duplicate standard signals.
+      if (std::ranges::find_if(queue_, [&](const SignalInfo& info) {
+            return info.signal == siginfo.signal;
+          }) == queue_.end()) {
+        queue_.push_back(siginfo);
+      }
+    }
+  }
+
+  /// Used by ptrace to provide a replacement for the signal that might have been
+  /// delivered when the task entered signal-delivery-stop.
+  void jump_queue(const SignalInfo& siginfo) { queue_.push_front(siginfo); }
+
+  /// Finds the next queued signal where the given function returns true, removes it from the
+  /// queue, and returns it.
+  template <typename F>
+  ktl::optional<SignalInfo> take_next_where(F&& predicate) {
+    // Find the first signal passing `predicate`, prioritizing standard signals.
+    if (auto it = std::ranges::find_if(queue_, predicate); it != queue_.end()) {
+      SignalInfo info = *it;
+      queue_.erase(it);
+      return info;
+    }
+    if (auto it = std::ranges::find_if(rt_queue_, predicate); it != rt_queue_.end()) {
+      SignalInfo info = *it;
+      rt_queue_.erase(it);
+      return info;
+    }
+    return ktl::nullopt;
+  }
+
+  bool is_empty() const { return queue_.empty() && rt_queue_.empty(); }
+
   /// Returns whether any signals are queued and not blocked by the given mask.
-  bool is_any_allowed_by_mask(SigSet mask) { return false; }
+  bool is_any_allowed_by_mask(SigSet mask) const { return false; }
+
+#if 0
+  /// Returns an iterator over all the pending signals.
+  auto iter() const {
+    //return util::chain(queue, rt_queue);
+  }
+
+  /// Iterates over queued signals with the given number.
+  auto iter_queued_by_number(starnix_uapi::Signal signal) const {
+    return util::filter(iter(), [signal](const SignalInfo& info) {
+      return info.signal == signal;
+    })
+  }
+#endif
+
+  /// Returns the set of currently pending signals, both standard and real time.
+  starnix_uapi::SigSet pending() const {
+    starnix_uapi::SigSet pending;
+    // for (const auto& signal : iter()) {
+    //   pending |= signal.signal;
+    // }
+    return pending;
+  }
+
+  /// Tests whether a signal with the given number is in the queue.
+  bool has_queued(starnix_uapi::Signal signal) const {
+    // return iter_queued_by_number(signal).begin() != iter_queued_by_number(signal).end();
+    return false;
+  }
+
+  size_t num_queued() const { return queue_.size() + rt_queue_.size(); }
+
+#ifdef MISTOS_STARNIX_TEST
+  size_t queued_count(starnix_uapi::Signal signal) const { return 0u; }
+#endif
 };
 
 class SignalState {
@@ -213,6 +373,7 @@ class SignalState {
   /// A handle for interrupting this task, if any.
   RunState run_state_;
 
+ private:
   /// The signal mask of the task.
   ///
   /// It is the set of signals whose delivery is currently blocked for the caller.
@@ -229,10 +390,10 @@ class SignalState {
   ktl::optional<starnix_uapi::SigSet> saved_mask_;
 
   /// The queue of signals for the task.
-  // QueuedSignals queue_;
+  QueuedSignals queue_;
 
   /// impl SignalState
-
+ public:
   static SignalState with_mask(starnix_uapi::SigSet mask) { return SignalState(mask); }
 
   /// Sets the signal mask of the state, and returns the old signal mask.
@@ -264,34 +425,46 @@ class SignalState {
 
   ktl::optional<starnix_uapi::SigSet> saved_mask() const { return saved_mask_; }
 
-  // void enqueue(SignalInfo siginfo) { queue_.enqueue(siginfo); signal_wait_.notify_all(); }
-
-  // void jump_queue(SignalInfo siginfo) { queue_.jump_queue(siginfo); signal_wait_.notify_all(); }
-
-  // bool is_empty() const { return queue_.is_empty(); }
-
-  // ktl::optional<SignalInfo> take_next_where(ktl::function<bool(const SignalInfo&)> predicate) {
-  //   return queue_.take_next_where(predicate);
-  // }
-
-  bool is_any_pending() const {
-    // return queue_.is_any_allowed_by_mask(mask_);
-    return false;  // Placeholder until queue_ is implemented
+  void enqueue(SignalInfo siginfo) {
+    queue_.enqueue(siginfo);
+    signal_wait_.notify_all();
   }
 
-  // bool is_any_allowed_by_mask(starnix_uapi::SigSet mask) const {
-  //   return queue_.is_any_allowed_by_mask(mask);
-  // }
+  // Used by ptrace to provide a replacement for the signal that might have been
+  /// delivered when the task entered signal-delivery-stop.
+  void jump_queue(SignalInfo siginfo) {
+    queue_.jump_queue(siginfo);
+    signal_wait_.notify_all();
+  }
 
-  // starnix_uapi::SigSet pending() const { return queue_.pending(); }
+  bool is_empty() const { return queue_.is_empty(); }
 
-  // bool has_queued(starnix_uapi::Signal signal) const { return queue_.has_queued(signal); }
+  /// Finds the next queued signal where the given function returns true, removes it from the
+  /// queue, and returns it.
+  template <typename F>
+  ktl::optional<SignalInfo> take_next_where(F&& predicate) {
+    // static asseet // using SignalInfoPredicate = bool (*)(const SignalInfo&);
+    return queue_.take_next_where(predicate);
+  }
 
-  // size_t num_queued() const { return queue_.num_queued(); }
+  /// Returns whether any signals are pending (queued and not blocked).
+  bool is_any_pending() const { return queue_.is_any_allowed_by_mask(mask_); }
 
-  // #ifdef __Fuchsia_CONFIG_STARNIX_TEST
-  // size_t queued_count(starnix_uapi::Signal signal) const { return queue_.queued_count(signal); }
-  // #endif
+  /// Returns whether any signals are queued and not blocked by the given mask.
+  bool is_any_allowed_by_mask(starnix_uapi::SigSet mask) const {
+    return queue_.is_any_allowed_by_mask(mask);
+  }
+
+  SigSet pending() const { return queue_.pending(); }
+
+  /// Tests whether a signal with the given number is in the queue.
+  bool has_queued(starnix_uapi::Signal signal) const { return queue_.has_queued(signal); }
+
+  size_t num_queued() const { return queue_.num_queued(); }
+
+#ifdef MISTOS_STARNIX_TEST
+  size_t queued_count(starnix_uapi::Signal signal) const { return queue_.queued_count(signal); }
+#endif
 
  private:
   explicit SignalState(starnix_uapi::SigSet mask) : run_state_(RunState::Running()), mask_(mask) {}

@@ -118,6 +118,14 @@ AutoReleasableTask create_task(fbl::RefPtr<Kernel>& kernel, const ktl::string_vi
   auto task = CurrentTask::create_init_child_process(kernel, task_name);
   ZX_ASSERT_MSG(task.is_ok(), "failed to create second task");
   task->mm()->initialize_mmap_layout_for_test();
+
+  // Take the lock on thread group and task in the correct order to ensure any wrong ordering
+  // will trigger the tracing-mutex at the right call site.
+  {
+    auto _l1 = task->thread_group()->Read();
+    auto _l2 = task->Read();
+  }
+
   return ktl::move(testing::AutoReleasableTask::From(ktl::move(task.value())));
 }
 

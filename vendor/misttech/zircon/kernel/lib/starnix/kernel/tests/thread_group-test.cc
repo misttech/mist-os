@@ -24,7 +24,7 @@ bool test_setsid() {
   BEGIN_TEST;
 
   auto get_process_group = [](const Task& task) -> fbl::RefPtr<ProcessGroup> {
-    return task.thread_group()->Read()->process_group();
+    return task.thread_group()->Read()->process_group_;
   };
 
   auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
@@ -35,9 +35,9 @@ bool test_setsid() {
   ASSERT_TRUE(get_process_group(*(*child_task).task()) ==
               get_process_group(*(*current_task).task()));
 
-  auto old_process_group = (*child_task)->thread_group()->Read()->process_group();
+  auto old_process_group = (*child_task)->thread_group()->Read()->process_group_;
   ASSERT_TRUE((*child_task)->thread_group()->setsid().is_ok());
-  ASSERT_EQ((*child_task)->thread_group()->Read()->process_group()->session()->leader(),
+  ASSERT_EQ((*child_task)->thread_group()->Read()->process_group_->session_->leader_,
             (*child_task)->get_pid());
 
   auto tgs = old_process_group->Read()->thread_groups();
@@ -58,7 +58,7 @@ bool test_exit_status() {
   ASSERT_EQ((*current_task)
                 ->thread_group()
                 ->Read()
-                ->get_zombie_children()[0]
+                ->zombie_children()[0]
                 ->exit_info.status.signal_info_status(),
             starnix::ExitStatus::Exit(42).signal_info_status());
 

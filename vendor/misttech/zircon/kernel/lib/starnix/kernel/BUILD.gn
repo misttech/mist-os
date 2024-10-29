@@ -23,6 +23,7 @@ zx_library("starnix_core") {
     "mm/memory_accessor.cc",
     "mm/memory_manager.cc",
     "mm/syscalls.cc",
+    "signal/signal_handling.cc",
     "signal/syscalls.cc",
     "starnix-loader.cc",
     "syscalls/misc.cc",
