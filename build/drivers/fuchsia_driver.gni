@@ -59,8 +59,6 @@ template("_fuchsia_driver") {
     # Save the target name as forward_variables_from below might override it.
     _target_name = target_name
 
-    assert_no_deps = []
-
     if (invoker.target_type == "rustc_cdylib") {
       is_loadable_module = true
     }
@@ -133,6 +131,9 @@ template("_fuchsia_driver") {
 
     # If no syslog backend is found, ensure we have not included the syslog frontend.
     if (!has_syslog_backend) {
+      if (!defined(assert_no_deps)) {
+        assert_no_deps = []
+      }
       assert_no_deps += [ "//sdk/lib/syslog/cpp" ]
     }
 
