@@ -11,7 +11,7 @@
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
-extern struct PyModuleDef fidl_codec_mod;
+extern struct PyModuleDef libfidl_codec;
 
 namespace {
 
@@ -36,8 +36,8 @@ int FidlCodecModule_clear(PyObject *m) {
   return 0;
 }
 
-PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fidl_codec() {
-  auto m = py::Object(PyModule_Create(&fidl_codec_mod));
+PyMODINIT_FUNC PyInit_libfidl_codec() {
+  auto m = py::Object(PyModule_Create(&libfidl_codec));
   if (m == nullptr) {
     return nullptr;
   }
@@ -48,7 +48,7 @@ PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fidl_codec() {
 
 }  // namespace
 
-DES_MIX struct PyModuleDef fidl_codec_mod = {
+DES_MIX struct PyModuleDef libfidl_codec = {
     PyModuleDef_HEAD_INIT,
     .m_name = "fidl_codec",
     .m_doc = nullptr,

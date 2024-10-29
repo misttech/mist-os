@@ -5,12 +5,12 @@
 #include "mod.h"
 
 // Defined in fuchsia_controller_py.cc
-extern struct PyModuleDef fidl_codec_mod;
+extern struct PyModuleDef libfidl_codec;
 
 namespace mod {
 
 FidlCodecState *get_module_state() {
-  auto mod = PyState_FindModule(&fidl_codec_mod);
+  auto mod = PyState_FindModule(&libfidl_codec);
   return reinterpret_cast<FidlCodecState *>(PyModule_GetState(mod));
 }
 

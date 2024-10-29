@@ -46,10 +46,9 @@ import("//build/python/python_library.gni")
 template("python_c_extension") {
   assert(is_host, "python C extensions can only be built on the host")
 
-  shlib_target_name = "${target_name}_shlib"
   main_target_name = target_name
+  shlib_target_name = "lib${target_name}"
   python_c_extension_shared_lib(shlib_target_name) {
-    library_name = main_target_name
     forward_variables_from(invoker,
                            [
                              "sources",
@@ -66,10 +65,10 @@ template("python_c_extension") {
     stub_target_names = []
     stub_outputs = []
     foreach(stub, invoker.stubs) {
-      stub_target_name = "${target_name}_stubs__${stub}"
+      stub_target_name = "${main_target_name}_stubs__${stub}"
       stub_target_names += [ stub_target_name ]
       stub = "${invoker.stubs_root}/${stub}"
-      stub_output = "${target_gen_dir}/${target_name}_wrapper/" +
+      stub_output = "${target_gen_dir}/${main_target_name}/" +
                     rebase_path(stub, invoker.stubs_root)
       stub_outputs += [ stub_output ]
       copy(stub_target_name) {
@@ -79,7 +78,7 @@ template("python_c_extension") {
     }
   }
 
-  action("${target_name}_wrapper") {
+  action("${main_target_name}_wrapper") {
     forward_variables_from(invoker,
                            [
                              "testonly",
@@ -88,20 +87,15 @@ template("python_c_extension") {
     deps = [ ":${shlib_target_name}" ]
 
     script = "//build/python/create_c_extension_import_hook.py"
-    depfile = "${target_out_dir}/${target_name}.d"
-    _output = "${target_gen_dir}/${target_name}/__init__.py"
-    outputs = [ _output ]
+    outputs = [ "${target_gen_dir}/${main_target_name}/__init__.py" ]
     args = [
       "--target_name",
-      target_name,
-      "--shlib_source",
-      rebase_path(main_target_name, root_build_dir, root_out_dir),
+      main_target_name,
+      "--shlib",
+      rebase_path(get_label_info(":${shlib_target_name}", "root_out_dir"),
+                  root_build_dir) + "/${shlib_target_name}",
       "--gen_dir",
       rebase_path(target_gen_dir, root_build_dir),
-      "--output",
-      rebase_path(_output, root_build_dir),
-      "--depfile",
-      rebase_path(depfile, root_build_dir),
     ]
   }
 
@@ -111,8 +105,8 @@ template("python_c_extension") {
                              "testonly",
                              "visibility",
                            ])
-    deps = [ ":${target_name}_wrapper" ]
-    source_root = "${target_gen_dir}/${target_name}_wrapper"
+    deps = [ ":${main_target_name}_wrapper" ]
+    source_root = "${target_gen_dir}/${main_target_name}"
     sources = [ "__init__.py" ]
     if (defined(invoker.stubs)) {
       foreach(stub_target_name, stub_target_names) {

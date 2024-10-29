@@ -14,14 +14,14 @@ host_test_data("fuchsia_controller_host_test_data") {
     get_label_info("//build/fidl:all_fidl_json($default_toolchain)",
                    "root_out_dir") + "/all_fidl_json.txt",
     get_label_info("//src/developer/ffx/lib/fuchsia-controller",
-                   "root_out_dir") + "/fuchsia_controller_internal.so",
+                   "root_out_dir") + "/libfuchsia_controller_internal.so",
     get_label_info("//src/developer/ffx/lib/fuchsia-controller",
-                   "root_out_dir") + "/fidl_codec.so",
+                   "root_out_dir") + "/libfidl_codec.so",
   ]
   deps = [
-    "//src/developer/ffx/lib/fuchsia-controller:fidl_codec",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
     "//src/developer/ffx/lib/fuchsia-controller:lib",
+    "//src/developer/ffx/lib/fuchsia-controller:libfidl_codec",
   ]
 }
 
@@ -79,7 +79,7 @@ python_host_test("fuchsia_controller_importing_test") {
   enable_mypy = false
   main_source = "importing.py"
   libraries = [
-    "//src/developer/ffx/lib/fuchsia-controller:fidl_codec",
+    "//src/developer/ffx/lib/fuchsia-controller:libfidl_codec",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
   ]
   test_data_deps = [

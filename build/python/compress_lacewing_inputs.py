@@ -10,7 +10,7 @@ dir/
 ├── <py_runtime>
 ├── <py_stdlibs>
 ├── <lacewing_test_pyz>
-├── <share_lib>'s
+├── <shared library tree>
 └── fidling
     └── gen
         └── ir_root
@@ -51,8 +51,8 @@ parser.add_argument(
     required=True,
 )
 parser.add_argument(
-    "--c-extension-libs",
-    help="List of C extension shared libraries",
+    "--c-extension-library-tree",
+    help="List of C extension shared libraries relative to build directory",
     nargs="*",
     required=True,
 )
@@ -112,14 +112,16 @@ def main() -> int:
         # Lacewing test PYZ.
         shutil.copy2(args.test_pyz, Path(td) / LACEWING_PYZ_NAME)
 
-        # Shared libraries.
-        for c_extension in args.c_extension_libs:
-            shutil.copy2(c_extension, td)
-
         # Record `src` in `ins` for depfile before copying.
         def copy_and_record(src: str, dst: str) -> None:
             ins.append(src)
             shutil.copy2(src, dst)
+
+        # Shared libraries.
+        for c_extension in args.c_extension_library_tree:
+            destination = Path(td) / os.path.dirname(c_extension)
+            os.makedirs(destination, exist_ok=True)
+            shutil.copy2(c_extension, destination)
 
         # Python standard libraries.
         shutil.copytree(
