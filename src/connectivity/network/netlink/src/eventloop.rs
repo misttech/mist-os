@@ -24,8 +24,7 @@ use crate::messaging::Sender;
 use crate::netlink_packet::errno::Errno;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
-use crate::rules::{self, RuleRequestHandler as _};
-use crate::{interfaces, routes};
+use crate::{interfaces, routes, rules};
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
