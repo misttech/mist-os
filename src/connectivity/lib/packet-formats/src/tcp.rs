@@ -1139,10 +1139,10 @@ pub mod options {
         const NOP: Option<u8> = Some(1);
     }
 
-    impl<'a> OptionsImpl<'a> for TcpOptionsImpl {
-        type Option = TcpOption<'a>;
+    impl OptionsImpl for TcpOptionsImpl {
+        type Option<'a> = TcpOption<'a>;
 
-        fn parse(kind: u8, data: &'a [u8]) -> Result<Option<TcpOption<'a>>, OptionParseErr> {
+        fn parse<'a>(kind: u8, data: &'a [u8]) -> Result<Option<TcpOption<'a>>, OptionParseErr> {
             match kind {
                 self::OPTION_KIND_EOL | self::OPTION_KIND_NOP => {
                     unreachable!("records::options::Options promises to handle EOL and NOP")

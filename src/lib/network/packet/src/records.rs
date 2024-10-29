@@ -196,7 +196,7 @@ impl<B: Deref<Target = [u8]>, R: RecordsImplLayout> RecordsRaw<B, R> {
 
 /// An iterator over the records contained inside a [`Records`] instance.
 #[derive(Copy, Clone, Debug)]
-pub struct RecordsIter<'a, R: RecordsImpl<'a>> {
+pub struct RecordsIter<'a, R: RecordsImpl> {
     bytes: &'a [u8],
     records_left: usize,
     context: R::Context,
@@ -375,7 +375,7 @@ pub trait RecordsImplLayout {
 ///
 /// `RecordsImpl` provides functions to parse sequential records. It is required
 ///  in order to construct a [`Records`] or [`RecordsIter`].
-pub trait RecordsImpl<'a>: RecordsImplLayout {
+pub trait RecordsImpl: RecordsImplLayout {
     /// The type of a single record; the output from the [`parse_with_context`]
     /// function.
     ///
@@ -386,7 +386,7 @@ pub trait RecordsImpl<'a>: RecordsImplLayout {
     /// lifetime parameter to this trait.
     ///
     /// [`parse_with_context`]: RecordsImpl::parse_with_context
-    type Record;
+    type Record<'a>;
 
     /// Parses a record with some context.
     ///
@@ -407,10 +407,10 @@ pub trait RecordsImpl<'a>: RecordsImplLayout {
     /// `parse_with_context` must be deterministic, or else
     /// [`Records::parse_with_context`] cannot guarantee that future iterations
     /// will not produce errors (and thus panic).
-    fn parse_with_context<BV: BufferView<&'a [u8]>>(
+    fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
         data: &mut BV,
         context: &mut Self::Context,
-    ) -> RecordParseResult<Self::Record, Self::Error>;
+    ) -> RecordParseResult<Self::Record<'a>, Self::Error>;
 }
 
 /// An implementation of a raw records parser.
@@ -665,7 +665,7 @@ fn align_up_to(offset: usize, x: usize, y: usize) -> usize {
 impl<B, R> Records<B, R>
 where
     B: SplitByteSlice,
-    R: for<'a> RecordsImpl<'a>,
+    R: RecordsImpl,
 {
     /// Parses a sequence of records with a context.
     ///
@@ -716,7 +716,7 @@ where
 impl<B, R> Records<B, R>
 where
     B: SplitByteSlice,
-    R: for<'a> RecordsImpl<'a, Context = ()>,
+    R: RecordsImpl<Context = ()>,
 {
     /// Parses a sequence of records.
     ///
@@ -730,7 +730,7 @@ where
 
 impl<B, R> FromRaw<RecordsRaw<B, R>, ()> for Records<B, R>
 where
-    for<'a> R: RecordsImpl<'a>,
+    R: RecordsImpl,
     B: SplitByteSlice,
 {
     type Error = R::Error;
@@ -742,7 +742,7 @@ where
 
 impl<B: Deref<Target = [u8]>, R> Records<B, R>
 where
-    R: for<'a> RecordsImpl<'a>,
+    R: RecordsImpl,
 {
     /// Gets the underlying bytes.
     ///
@@ -755,7 +755,7 @@ where
 impl<'a, B, R> Records<B, R>
 where
     B: 'a + SplitByteSlice,
-    R: RecordsImpl<'a>,
+    R: RecordsImpl,
 {
     /// Iterates over options.
     ///
@@ -775,7 +775,7 @@ where
 
 impl<'a, R> RecordsIter<'a, R>
 where
-    R: RecordsImpl<'a>,
+    R: RecordsImpl,
 {
     /// Gets a reference to the context.
     pub fn context(&self) -> &R::Context {
@@ -785,11 +785,11 @@ where
 
 impl<'a, R> Iterator for RecordsIter<'a, R>
 where
-    R: RecordsImpl<'a>,
+    R: RecordsImpl,
 {
-    type Item = R::Record;
+    type Item = R::Record<'a>;
 
-    fn next(&mut self) -> Option<R::Record> {
+    fn next(&mut self) -> Option<R::Record<'a>> {
         let mut bytes = LongLivedBuff::new(self.bytes);
         // use match rather than expect because expect requires that Err: Debug
         #[allow(clippy::match_wild_err_arm)]
@@ -811,7 +811,7 @@ where
 
 impl<'a, R> ExactSizeIterator for RecordsIter<'a, R>
 where
-    R: RecordsImpl<'a>,
+    R: RecordsImpl,
 {
     fn len(&self) -> usize {
         self.records_left
@@ -822,9 +822,12 @@ where
 ///
 /// On return, `bytes` will be pointing to the start of where a next record
 /// would be.
-fn next<'a, BV, R>(bytes: &mut BV, context: &mut R::Context) -> Result<Option<R::Record>, R::Error>
+fn next<'a, BV, R>(
+    bytes: &mut BV,
+    context: &mut R::Context,
+) -> Result<Option<R::Record<'a>>, R::Error>
 where
-    R: RecordsImpl<'a>,
+    R: RecordsImpl,
     BV: BufferView<&'a [u8]>,
 {
     loop {
@@ -974,13 +977,13 @@ mod tests {
         type Error = DummyRecordErr;
     }
 
-    impl<'a> RecordsImpl<'a> for ContextlessRecordImpl {
-        type Record = Ref<&'a [u8], DummyRecord>;
+    impl RecordsImpl for ContextlessRecordImpl {
+        type Record<'a> = Ref<&'a [u8], DummyRecord>;
 
-        fn parse_with_context<BV: BufferView<&'a [u8]>>(
+        fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
             data: &mut BV,
             _context: &mut Self::Context,
-        ) -> RecordParseResult<Self::Record, Self::Error> {
+        ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
             parse_dummy_rec(data)
         }
     }
@@ -997,13 +1000,13 @@ mod tests {
         type Error = DummyRecordErr;
     }
 
-    impl<'a> RecordsImpl<'a> for LimitContextRecordImpl {
-        type Record = Ref<&'a [u8], DummyRecord>;
+    impl RecordsImpl for LimitContextRecordImpl {
+        type Record<'a> = Ref<&'a [u8], DummyRecord>;
 
-        fn parse_with_context<BV: BufferView<&'a [u8]>>(
+        fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
             data: &mut BV,
             _context: &mut usize,
-        ) -> RecordParseResult<Self::Record, Self::Error> {
+        ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
             parse_dummy_rec(data)
         }
     }
@@ -1038,13 +1041,13 @@ mod tests {
         }
     }
 
-    impl<'a> RecordsImpl<'a> for FilterContextRecordImpl {
-        type Record = Ref<&'a [u8], DummyRecord>;
+    impl RecordsImpl for FilterContextRecordImpl {
+        type Record<'a> = Ref<&'a [u8], DummyRecord>;
 
-        fn parse_with_context<BV: BufferView<&'a [u8]>>(
+        fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
             bytes: &mut BV,
             context: &mut Self::Context,
-        ) -> RecordParseResult<Self::Record, Self::Error> {
+        ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
             if bytes.len() < core::mem::size_of::<DummyRecord>() {
                 Ok(ParsedRecord::Done)
             } else if bytes.as_ref()[0..core::mem::size_of::<DummyRecord>()]
@@ -1103,13 +1106,13 @@ mod tests {
         }
     }
 
-    impl<'a> RecordsImpl<'a> for StatefulContextRecordImpl {
-        type Record = Ref<&'a [u8], DummyRecord>;
+    impl RecordsImpl for StatefulContextRecordImpl {
+        type Record<'a> = Ref<&'a [u8], DummyRecord>;
 
-        fn parse_with_context<BV: BufferView<&'a [u8]>>(
+        fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
             data: &mut BV,
             context: &mut Self::Context,
-        ) -> RecordParseResult<Self::Record, Self::Error> {
+        ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
             if !context.iter {
                 context.pre_parse_counter += 1;
             }
@@ -1382,18 +1385,18 @@ pub mod options {
     /// `AlignedOptionSequenceBuilder` implements [`InnerPacketBuilder`].
     pub type AlignedOptionSequenceBuilder<R, I> = AlignedRecordSequenceBuilder<R, I>;
 
-    impl<'a, O: OptionsImpl<'a>> RecordsImplLayout for O {
+    impl<O: OptionsImpl> RecordsImplLayout for O {
         type Context = ();
         type Error = O::Error;
     }
 
-    impl<'a, O: OptionsImpl<'a>> RecordsImpl<'a> for O {
-        type Record = O::Option;
+    impl<O: OptionsImpl> RecordsImpl for O {
+        type Record<'a> = O::Option<'a>;
 
-        fn parse_with_context<BV: BufferView<&'a [u8]>>(
+        fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
             data: &mut BV,
             _context: &mut Self::Context,
-        ) -> RecordParseResult<Self::Record, Self::Error> {
+        ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
             next::<_, O>(data)
         }
     }
@@ -1659,7 +1662,7 @@ pub mod options {
     ///
     /// `OptionsImpl` provides functions to parse fixed- and variable-length
     /// options. It is required in order to construct an [`Options`].
-    pub trait OptionsImpl<'a>: OptionParseLayout {
+    pub trait OptionsImpl: OptionParseLayout {
         /// The type of an option; the output from the [`parse`] function.
         ///
         /// For long or variable-length data, implementers are advised to make
@@ -1669,7 +1672,7 @@ pub mod options {
         /// parameter to this trait.
         ///
         /// [`parse`]: crate::records::options::OptionsImpl::parse
-        type Option;
+        type Option<'a>;
 
         /// Parses an option.
         ///
@@ -1690,10 +1693,10 @@ pub mod options {
         /// panic).
         ///
         /// [`Options::parse`]: crate::records::Records::parse
-        fn parse(
+        fn parse<'a>(
             kind: Self::KindLenField,
             data: &'a [u8],
-        ) -> Result<Option<Self::Option>, Self::Error>;
+        ) -> Result<Option<Self::Option<'a>>, Self::Error>;
     }
 
     /// A builder capable of serializing an option.
@@ -1757,10 +1760,10 @@ pub mod options {
         fn serialize_padding(buf: &mut [u8], length: usize);
     }
 
-    fn next<'a, BV, O>(bytes: &mut BV) -> RecordParseResult<O::Option, O::Error>
+    fn next<'a, BV, O>(bytes: &mut BV) -> RecordParseResult<O::Option<'a>, O::Error>
     where
         BV: BufferView<&'a [u8]>,
-        O: OptionsImpl<'a>,
+        O: OptionsImpl,
     {
         // For an explanation of this format, see the "Options" section of
         // https://en.wikipedia.org/wiki/Transmission_Control_Protocol#TCP_segment_structure
@@ -1829,10 +1832,13 @@ pub mod options {
             const NOP: Option<u8> = Some(1);
         }
 
-        impl<'a> OptionsImpl<'a> for DummyOptionsImpl {
-            type Option = DummyOption;
+        impl OptionsImpl for DummyOptionsImpl {
+            type Option<'a> = DummyOption;
 
-            fn parse(kind: u8, data: &'a [u8]) -> Result<Option<Self::Option>, OptionParseErr> {
+            fn parse<'a>(
+                kind: u8,
+                data: &'a [u8],
+            ) -> Result<Option<Self::Option<'a>>, OptionParseErr> {
                 let mut v = Vec::new();
                 v.extend_from_slice(data);
                 Ok(Some(DummyOption { kind, data: v }))
@@ -1910,10 +1916,10 @@ pub mod options {
             const NOP: Option<u8> = Some(1);
         }
 
-        impl<'a> OptionsImpl<'a> for AlwaysErrOptionsImpl {
-            type Option = ();
+        impl OptionsImpl for AlwaysErrOptionsImpl {
+            type Option<'a> = ();
 
-            fn parse(_kind: u8, _data: &'a [u8]) -> Result<Option<()>, AlwaysErrorErr> {
+            fn parse<'a>(_kind: u8, _data: &'a [u8]) -> Result<Option<()>, AlwaysErrorErr> {
                 Err(AlwaysErrorErr::Option)
             }
         }
@@ -1951,10 +1957,13 @@ pub mod options {
             const NOP: Option<u8> = None;
         }
 
-        impl<'a> OptionsImpl<'a> for DummyNdpOptionsImpl {
-            type Option = NdpOption;
+        impl OptionsImpl for DummyNdpOptionsImpl {
+            type Option<'a> = NdpOption;
 
-            fn parse(kind: u8, data: &'a [u8]) -> Result<Option<Self::Option>, OptionParseErr> {
+            fn parse<'a>(
+                kind: u8,
+                data: &'a [u8],
+            ) -> Result<Option<Self::Option<'a>>, OptionParseErr> {
                 let mut v = Vec::with_capacity(data.len());
                 v.extend_from_slice(data);
                 Ok(Some(NdpOption { kind, data: v }))
@@ -2003,10 +2012,13 @@ pub mod options {
             const NOP: Option<U16> = None;
         }
 
-        impl<'a> OptionsImpl<'a> for DummyMultiByteKindOptionsImpl {
-            type Option = MultiByteOption;
+        impl OptionsImpl for DummyMultiByteKindOptionsImpl {
+            type Option<'a> = MultiByteOption;
 
-            fn parse(kind: U16, data: &'a [u8]) -> Result<Option<Self::Option>, OptionParseErr> {
+            fn parse<'a>(
+                kind: U16,
+                data: &'a [u8],
+            ) -> Result<Option<Self::Option<'a>>, OptionParseErr> {
                 let mut v = Vec::with_capacity(data.len());
                 v.extend_from_slice(data);
                 Ok(Some(MultiByteOption { kind, data: v }))
@@ -2212,13 +2224,13 @@ pub mod options {
                         const NOP: Option<u8> = Some(1);
                     }
 
-                    impl<'a> OptionsImpl<'a> for $impl {
-                        type Option = $opt;
+                    impl OptionsImpl for $impl {
+                        type Option<'a> = $opt;
 
-                        fn parse(
+                        fn parse<'a>(
                             kind: u8,
                             data: &'a [u8],
-                        ) -> Result<Option<Self::Option>, OptionParseErr> {
+                        ) -> Result<Option<Self::Option<'a>>, OptionParseErr> {
                             let mut v = Vec::new();
                             v.extend_from_slice(data);
                             Ok(Some($opt { kind, data: v }))
@@ -2320,7 +2332,7 @@ pub mod options {
 
                 fn test_serialize_parse_inner<
                     O: OptionBuilder + Debug + PartialEq + for<'a> From<&'a (u8, Vec<u8>)>,
-                    I: for<'a> OptionsImpl<'a, Error = OptionParseErr, Option = O> + std::fmt::Debug,
+                    I: for<'a> OptionsImpl<Error = OptionParseErr, Option<'a> = O> + std::fmt::Debug,
                 >(
                     opts: &[(u8, Vec<u8>)],
                     expect: &[(u8, Vec<u8>)],

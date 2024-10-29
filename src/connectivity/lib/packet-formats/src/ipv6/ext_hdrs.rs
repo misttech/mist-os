@@ -368,13 +368,13 @@ impl RecordsImplLayout for Ipv6ExtensionHeaderImpl {
     type Error = Ipv6ExtensionHeaderParsingError;
 }
 
-impl<'a> RecordsImpl<'a> for Ipv6ExtensionHeaderImpl {
-    type Record = Ipv6ExtensionHeader<'a>;
+impl RecordsImpl for Ipv6ExtensionHeaderImpl {
+    type Record<'a> = Ipv6ExtensionHeader<'a>;
 
-    fn parse_with_context<BV: BufferView<&'a [u8]>>(
+    fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
         data: &mut BV,
         context: &mut Self::Context,
-    ) -> RecordParseResult<Self::Record, Self::Error> {
+    ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
         let expected_hdr = context.next_header;
 
         match Ipv6ExtHdrType::from(expected_hdr) {
@@ -539,15 +539,15 @@ impl ExtensionHeaderOptionDataImplLayout for HopByHopOptionDataImpl {
     type Context = ();
 }
 
-impl<'a> ExtensionHeaderOptionDataImpl<'a> for HopByHopOptionDataImpl {
-    type OptionData = HopByHopOptionData<'a>;
+impl ExtensionHeaderOptionDataImpl for HopByHopOptionDataImpl {
+    type OptionData<'a> = HopByHopOptionData<'a>;
 
-    fn parse_option(
+    fn parse_option<'a>(
         kind: u8,
         data: &'a [u8],
         _context: &mut Self::Context,
         allow_unrecognized: bool,
-    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData> {
+    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData<'a>> {
         match kind {
             HBH_OPTION_KIND_RTRALRT => {
                 if data.len() == HBH_OPTION_RTRALRT_LEN {
@@ -745,15 +745,15 @@ impl ExtensionHeaderOptionDataImplLayout for DestinationOptionDataImpl {
     type Context = ();
 }
 
-impl<'a> ExtensionHeaderOptionDataImpl<'a> for DestinationOptionDataImpl {
-    type OptionData = DestinationOptionData<'a>;
+impl ExtensionHeaderOptionDataImpl for DestinationOptionDataImpl {
+    type OptionData<'a> = DestinationOptionData<'a>;
 
-    fn parse_option(
+    fn parse_option<'a>(
         kind: u8,
         data: &'a [u8],
         _context: &mut Self::Context,
         allow_unrecognized: bool,
-    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData> {
+    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData<'a>> {
         if allow_unrecognized {
             ExtensionHeaderOptionDataParseResult::Ok(DestinationOptionData::Unrecognized {
                 kind,
@@ -826,15 +826,13 @@ pub enum ExtensionHeaderOptionDataParseResult<D> {
 }
 
 /// An implementation of an extension header specific option data parser.
-pub(super) trait ExtensionHeaderOptionDataImpl<'a>:
-    ExtensionHeaderOptionDataImplLayout
-{
+pub(super) trait ExtensionHeaderOptionDataImpl: ExtensionHeaderOptionDataImplLayout {
     /// Extension header specific option data.
     ///
     /// Note, `OptionData` does not need to hold general option data as defined by
     /// RFC 8200 section 4.2. It should only hold extension header specific option
     /// data.
-    type OptionData: Sized;
+    type OptionData<'a>: Sized;
 
     /// Parse an option of a given `kind` from `data`.
     ///
@@ -846,12 +844,12 @@ pub(super) trait ExtensionHeaderOptionDataImpl<'a>:
     /// that was passed to `parse_option`). A recognized option `kind` with incorrect
     /// `data` must return `ErrorAt(offset)`, where the offset indicates where the
     /// erroneous field is within the option data buffer.
-    fn parse_option(
+    fn parse_option<'a>(
         kind: u8,
         data: &'a [u8],
         context: &mut Self::Context,
         allow_unrecognized: bool,
-    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData>;
+    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData<'a>>;
 }
 
 /// Generic implementation of extension header options parsing.
@@ -876,16 +874,16 @@ where
     type Context = ExtensionHeaderOptionContext<O::Context>;
 }
 
-impl<'a, O> RecordsImpl<'a> for ExtensionHeaderOptionImpl<O>
+impl<O> RecordsImpl for ExtensionHeaderOptionImpl<O>
 where
-    O: ExtensionHeaderOptionDataImpl<'a>,
+    O: ExtensionHeaderOptionDataImpl,
 {
-    type Record = ExtensionHeaderOption<O::OptionData>;
+    type Record<'a> = ExtensionHeaderOption<O::OptionData<'a>>;
 
-    fn parse_with_context<BV: BufferView<&'a [u8]>>(
+    fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
         data: &mut BV,
         context: &mut Self::Context,
-    ) -> RecordParseResult<Self::Record, Self::Error> {
+    ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
         // If we have no more bytes left, we are done.
         let kind = match data.take_byte_front() {
             None => return Ok(ParsedRecord::Done),

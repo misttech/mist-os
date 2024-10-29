@@ -1013,10 +1013,13 @@ pub mod options {
         const NOP: Option<u8> = None;
     }
 
-    impl<'a> OptionsImpl<'a> for NdpOptionsImpl {
-        type Option = NdpOption<'a>;
+    impl OptionsImpl for NdpOptionsImpl {
+        type Option<'a> = NdpOption<'a>;
 
-        fn parse(kind: u8, mut data: &'a [u8]) -> Result<Option<NdpOption<'a>>, OptionParseErr> {
+        fn parse<'a>(
+            kind: u8,
+            mut data: &'a [u8],
+        ) -> Result<Option<NdpOption<'a>>, OptionParseErr> {
             let kind = if let Ok(k) = NdpOptionType::try_from(kind) {
                 k
             } else {

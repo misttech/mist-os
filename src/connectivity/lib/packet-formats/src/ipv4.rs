@@ -1112,10 +1112,10 @@ pub mod options {
         const NOP: Option<u8> = Some(1);
     }
 
-    impl<'a> OptionsImpl<'a> for Ipv4OptionsImpl {
-        type Option = Ipv4Option<'a>;
+    impl OptionsImpl for Ipv4OptionsImpl {
+        type Option<'a> = Ipv4Option<'a>;
 
-        fn parse(kind: u8, data: &'a [u8]) -> Result<Option<Ipv4Option<'a>>, OptionParseErr> {
+        fn parse<'a>(kind: u8, data: &'a [u8]) -> Result<Option<Ipv4Option<'a>>, OptionParseErr> {
             let copied = kind & (1 << 7) > 0;
             match kind {
                 self::OPTION_KIND_EOL | self::OPTION_KIND_NOP => {
