@@ -95,6 +95,12 @@ function gcloud_auth() {
 
 function reclient_auth() {
   echo  # blank line
+  # Coerce the working directory to match the exec-root ($FUCHSIA_DIR), so the
+  # remote environment does not try to run in a nonexistent subdir.
+  # Normally subdirs are created automatically based on remote inputs and
+  # outputs, but this test command (echo) has neither inputs nor outputs.
+  # b/376105913 is an example of failing to execute remotely for this reason.
+  cd "$FUCHSIA_DIR"
   until "${reclient_auth_test_cmd[@]}"
   do
     # gcert only works in environments that get unrestricted LOAS credentials
