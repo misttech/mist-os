@@ -242,13 +242,11 @@ async fn do_start(
                         err: StructuredConfigError::ConfigValuesMissing,
                     });
                 };
-                if has_config_capabilities(decl) {
-                    update_config_with_capabilities(&mut config, decl, &component)
-                        .with(&abortable_scope)
-                        .await
-                        .map_err(abort_error)??;
-                    update_component_config(&component, config.clone()).await?;
-                }
+                update_config_fields(&mut config, decl, &component)
+                    .with(&abortable_scope)
+                    .await
+                    .map_err(abort_error)??;
+                update_component_config(&component, config.clone()).await?;
                 Some(encode_config(config, &component.moniker).await?)
             }
             cm_rust::ConfigValueSource::Capabilities(_) => {
@@ -513,6 +511,7 @@ async fn create_config_with_capabilities(
         return Ok(None);
     };
     let mut fields = ConfigFields { fields: Vec::new(), checksum: config_decl.checksum.clone() };
+    let mut overrides = component.context.get_config_developer_overrides(component.moniker()).await;
     for field in &config_decl.fields {
         let Some(use_config) = routing::config::get_use_config_from_key(&field.key, decl) else {
             return Err(StartActionError::StructuredConfigError {
@@ -535,6 +534,9 @@ async fn create_config_with_capabilities(
                 })
             }
         };
+        // If developer overrides have been set for this field, use the override value.
+        let value = if let Some(v) = overrides.remove(&field.key) { v } else { value };
+
         fields.fields.push(config_encoder::ConfigField {
             key: field.key.clone(),
             value: value,
@@ -545,29 +547,44 @@ async fn create_config_with_capabilities(
 }
 
 /// Update config fields with the values received through configuration
-/// capabilities.  This will perform routing on each of the configuration `use`
-/// decls to get the values. Updating the fields is fine because configuration
-/// capabilities take precedence over both the CVF value and "mutability: parent".
-async fn update_config_with_capabilities(
+/// capabilities or developer overrides.  If there is no developer override
+/// present for a field, this will perform routing on each of the configuration
+/// `use` decls to get the values. Updating the fields is fine because developer
+/// overrides and configuration capabilities take precedence over both the CVF
+/// value and "mutability: parent".
+async fn update_config_fields(
     config: &mut ConfigFields,
     decl: &cm_rust::ComponentDecl,
     component: &Arc<ComponentInstance>,
 ) -> Result<(), StartActionError> {
+    let mut overrides = component.context.get_config_developer_overrides(component.moniker()).await;
+    let has_config_caps = has_config_capabilities(decl);
     for field in config.fields.iter_mut() {
-        let Some(use_config) = routing::config::get_use_config_from_key(&field.key, decl) else {
-            continue;
+        // If developer overrides have been set for this field, use the override
+        // value. Otherwise attempt to route the configuration capability.
+        let value = if let Some(v) = overrides.remove(&field.key) {
+            v
+        } else {
+            if !has_config_caps {
+                continue;
+            }
+            let Some(use_config) = routing::config::get_use_config_from_key(&field.key, decl)
+            else {
+                continue;
+            };
+            let value =
+                routing::config::route_config_value(use_config, component).await.map_err(|e| {
+                    StartActionError::StructuredConfigError {
+                        moniker: component.moniker.clone(),
+                        err: e.into(),
+                    }
+                })?;
+            let Some(value) = value else {
+                continue;
+            };
+            value
         };
-        let value =
-            routing::config::route_config_value(use_config, component).await.map_err(|e| {
-                StartActionError::StructuredConfigError {
-                    moniker: component.moniker.clone(),
-                    err: e.into(),
-                }
-            })?;
 
-        let Some(value) = value else {
-            continue;
-        };
         if !field.value.matches_type(&value) {
             return Err(StartActionError::StructuredConfigError {
                 moniker: component.moniker.clone(),

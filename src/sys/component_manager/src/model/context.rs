@@ -11,6 +11,8 @@ use ::routing::policy::GlobalPolicyChecker;
 use cm_config::{AbiRevisionPolicy, RuntimeConfig};
 use errors::ModelError;
 use futures::lock::Mutex;
+use moniker::Moniker;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// The ModelContext provides the API boundary between the Model and Realms. It
@@ -23,6 +25,7 @@ pub struct ModelContext {
     builtin_capabilities: Mutex<Option<Vec<Box<dyn BuiltinCapability>>>>,
     framework_capabilities: Mutex<Option<Vec<Box<dyn FrameworkCapability>>>>,
     instance_registry: Arc<InstanceRegistry>,
+    config_developer_overrides: Mutex<HashMap<Moniker, HashMap<String, cm_rust::ConfigValue>>>,
 }
 
 impl ModelContext {
@@ -41,6 +44,7 @@ impl ModelContext {
             builtin_capabilities: Mutex::new(None),
             framework_capabilities: Mutex::new(None),
             instance_registry,
+            config_developer_overrides: Mutex::new(HashMap::new()),
         })
     }
 
@@ -95,6 +99,69 @@ impl ModelContext {
         // same metadata.
         let mut framework_capabilities = self.framework_capabilities.lock().await;
         framework_capabilities.as_mut().unwrap().insert(0, c);
+    }
+
+    /// Adds a configuration override for the component identified by moniker.
+    /// This override will take effect the next time the component is started.
+    pub async fn add_config_developer_override(
+        &self,
+        moniker: Moniker,
+        config_override: cm_rust::ConfigOverride,
+    ) {
+        self.config_developer_overrides
+            .lock()
+            .await
+            .entry(moniker)
+            .or_default()
+            .insert(config_override.key, config_override.value);
+    }
+
+    /// Retrieves a map of any configuration overrides for the component
+    /// identified by moniker.
+    pub async fn get_config_developer_overrides(
+        &self,
+        moniker: &Moniker,
+    ) -> HashMap<String, cm_rust::ConfigValue> {
+        self.config_developer_overrides
+            .lock()
+            .await
+            .get(&moniker)
+            .cloned()
+            .unwrap_or(HashMap::new())
+    }
+
+    /// Removes the configuration overrides for the component identified by
+    /// moniker. Returns an error if no overrides have been defined for the
+    /// component.
+    pub async fn remove_config_developer_override(
+        &self,
+        moniker: &Moniker,
+    ) -> Result<(), ModelError> {
+        match self.config_developer_overrides.lock().await.remove(moniker) {
+            Some(_) => Ok(()),
+            None => Err(ModelError::instance_not_found(moniker.clone())),
+        }
+    }
+
+    /// Removes configuration overrides defined for any component in the realm
+    /// defined by scope_moniker.
+    pub async fn clear_config_developer_override(&self, scope_moniker: &Moniker) {
+        let scoped_components = self
+            .config_developer_overrides
+            .lock()
+            .await
+            .keys()
+            .filter(|k| k.has_prefix(scope_moniker))
+            .cloned()
+            .collect::<Vec<_>>();
+        for scoped_component in scoped_components {
+            match self.remove_config_developer_override(&scoped_component).await {
+                Ok(()) => (),
+                Err(e) => tracing::warn!(
+                    "config overrides not found for component {scoped_component}: {e}"
+                ),
+            }
+        }
     }
 
     pub async fn find_internal_provider(

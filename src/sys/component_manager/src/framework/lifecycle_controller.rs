@@ -314,23 +314,11 @@ fn join_monikers(scope_moniker: &Moniker, moniker_str: &str) -> Result<Moniker, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::capability;
     use crate::model::actions::test_utils::{is_discovered, is_resolved, is_shutdown};
-    use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
+    use crate::model::testing::test_helpers::{lifecycle_controller, TestEnvironmentBuilder};
     use cm_rust_testing::*;
-    use fidl::endpoints;
     use fidl_fuchsia_component_decl::{ChildRef, CollectionRef};
     use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl};
-
-    async fn lifecycle_controller(test: &TestModelResult) -> fsys::LifecycleControllerProxy {
-        let host = {
-            let env = test.builtin_environment.lock().await;
-            env.lifecycle_controller.clone().unwrap()
-        };
-        let (proxy, server) = endpoints::create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
-        capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
-        proxy
-    }
 
     #[fuchsia::test]
     async fn lifecycle_controller_test() {

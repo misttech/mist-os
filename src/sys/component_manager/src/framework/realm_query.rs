@@ -704,7 +704,10 @@ mod tests {
     use super::*;
     use crate::capability;
     use crate::model::component::StartReason;
-    use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
+    use crate::model::start::Start;
+    use crate::model::testing::test_helpers::{
+        config_override, new_config_decl, TestEnvironmentBuilder, TestModelResult,
+    };
     use assert_matches::assert_matches;
     use cm_rust::*;
     use cm_rust_testing::*;
@@ -830,28 +833,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn structured_config_test() {
-        let checksum = ConfigChecksum::Sha256([
-            0x07, 0xA8, 0xE6, 0x85, 0xC8, 0x79, 0xA9, 0x79, 0xC3, 0x26, 0x17, 0xDC, 0x4E, 0x74,
-            0x65, 0x7F, 0xF1, 0xF7, 0x73, 0xE7, 0x12, 0xEE, 0x51, 0xFD, 0xF6, 0x57, 0x43, 0x07,
-            0xA7, 0xAF, 0x2E, 0x64,
-        ]);
-
-        let config = ConfigDecl {
-            fields: vec![ConfigField {
-                key: "my_field".to_string(),
-                type_: ConfigValueType::Bool,
-                mutability: Default::default(),
-            }],
-            checksum: checksum.clone(),
-            value_source: ConfigValueSource::PackagePath("meta/root.cvf".into()),
-        };
-
-        let config_values = ConfigValuesData {
-            values: vec![ConfigValueSpec {
-                value: ConfigValue::Single(ConfigSingleValue::Bool(true)),
-            }],
-            checksum: checksum.clone(),
-        };
+        let (config, config_values, checksum) = new_config_decl();
 
         let components = vec![("root", ComponentDeclBuilder::new().config(config).build())];
 
@@ -873,6 +855,65 @@ mod tests {
         assert_matches!(
             field.value,
             fcdecl::ConfigValue::Single(fcdecl::ConfigSingleValue::Bool(true))
+        );
+        assert_eq!(config.checksum, checksum.native_into_fidl());
+    }
+
+    #[fuchsia::test]
+    async fn override_structured_config_test() {
+        let (config, config_values, checksum) = new_config_decl();
+
+        let components = vec![("root", ComponentDeclBuilder::new().config(config).build())];
+
+        let test = TestEnvironmentBuilder::new()
+            .set_components(components)
+            .set_config_values(vec![("meta/root.cvf", config_values)])
+            .build()
+            .await;
+        let (query, _host) = realm_query(&test).await;
+        let config_override_proxy = config_override(&test).await;
+
+        test.model.start().await;
+
+        let config = query.get_structured_config("./").await.unwrap().unwrap();
+
+        // Component should have one config field with right value
+        assert_eq!(config.fields.len(), 1);
+        let field = &config.fields[0];
+        assert_eq!(field.key, "my_field");
+        assert_matches!(
+            field.value,
+            fcdecl::ConfigValue::Single(fcdecl::ConfigSingleValue::Bool(true))
+        );
+        assert_eq!(config.checksum, checksum.clone().native_into_fidl());
+
+        // Override the config field value
+        config_override_proxy
+            .set_structured_config(
+                "./",
+                &[fcdecl::ConfigOverride {
+                    key: Some("my_field".to_string()),
+                    value: Some(fcdecl::ConfigValue::Single(fcdecl::ConfigSingleValue::Bool(
+                        false,
+                    ))),
+                    ..Default::default()
+                }],
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        // Unresolve and restart the component so that the configuration override will take effect.
+        test.model.root().unresolve().await.unwrap();
+        test.model.root().ensure_started(&StartReason::Root).await.unwrap();
+        let config = query.get_structured_config("./").await.unwrap().unwrap();
+
+        // Component should have one config field with the override value
+        assert_eq!(config.fields.len(), 1);
+        let field = &config.fields[0];
+        assert_eq!(field.key, "my_field");
+        assert_matches!(
+            field.value,
+            fcdecl::ConfigValue::Single(fcdecl::ConfigSingleValue::Bool(false))
         );
         assert_eq!(config.checksum, checksum.native_into_fidl());
     }

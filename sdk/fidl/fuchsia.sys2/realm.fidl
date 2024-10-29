@@ -66,6 +66,25 @@ type GetStructuredConfigError = flexible enum {
     NO_CONFIG = 4;
 };
 
+/// Errors that can be returned by the ConfigOverride protocol.
+@available(added=HEAD)
+type ConfigOverrideError = flexible enum {
+    /// Could not find an instance matching the given moniker.
+    INSTANCE_NOT_FOUND = 1;
+
+    /// The given moniker could not be parsed.
+    BAD_MONIKER = 2;
+
+    /// The given moniker matches an instance, but the instance is not resolved.
+    INSTANCE_NOT_RESOLVED = 3;
+
+    /// There is no structured configuration associated with this instance.
+    NO_CONFIG = 4;
+
+    /// Could not find a structured configuration field with the given key.
+    KEY_NOT_FOUND = 5;
+};
+
 /// Errors that can be returned by the GetAllInstances call.
 type GetAllInstancesError = flexible enum {
     /// Could not find the scope root instance.
@@ -297,6 +316,33 @@ closed protocol RealmQuery {
         storage_name fuchsia.component.decl.name;
         server_end server_end:StorageAdmin;
     }) -> () error ConnectToStorageAdminError;
+};
+
+/// Manages structured configuration override values for components.
+@available(added=HEAD)
+@discoverable
+open protocol ConfigOverride {
+    /// Sets structured configuration fields with override values for the
+    /// component instance identified by moniker.
+    @available(added=HEAD)
+    flexible SetStructuredConfig(struct {
+        /// The moniker of the component that should use the structured config
+        /// override.  This moniker is relative to the realm that uses this
+        /// protocol.
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        fields vector<fuchsia.component.decl.ConfigOverride>:MAX;
+    }) -> () error ConfigOverrideError;
+
+    /// Unsets structured configuration overrides for the component instance
+    /// identified by moniker.  If an empty moniker is supplied, then all
+    /// structured configuration overrides will be cleared.
+    @available(added=HEAD)
+    flexible UnsetStructuredConfig(struct {
+        /// The moniker of the component that should use the structured config
+        /// override.  This moniker is relative to the realm that uses this
+        /// protocol.
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> () error ConfigOverrideError;
 };
 
 /// An iterator over all instances in the realm

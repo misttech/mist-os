@@ -167,6 +167,7 @@ rustc_binary("bin") {
     "src/constants.rs",
     "src/framework/binder.rs",
     "src/framework/capability_store.rs",
+    "src/framework/config_override.rs",
     "src/framework/controller.rs",
     "src/framework/introspector.rs",
     "src/framework/lifecycle_controller.rs",
