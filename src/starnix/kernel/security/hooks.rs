@@ -1141,7 +1141,10 @@ mod tests {
                     XattrOp::Set,
                 )
                 .expect("set_xattr(security.selinux) failed");
-                assert_ne!(None, selinux_hooks::get_cached_sid(node));
+                assert_ne!(
+                    Some(SecurityId::initial(InitialSid::Unlabeled)),
+                    selinux_hooks::get_cached_sid(node)
+                );
 
                 fs_node_setsecurity(
                     current_task,
@@ -1152,7 +1155,10 @@ mod tests {
                 )
                 .expect("set_xattr(security.selinux) failed");
 
-                assert_eq!(None, selinux_hooks::get_cached_sid(node));
+                assert_eq!(
+                    Some(SecurityId::initial(InitialSid::Unlabeled)),
+                    selinux_hooks::get_cached_sid(node)
+                );
             },
         )
     }
@@ -1258,20 +1264,16 @@ mod tests {
             |locked, current_task, _security_server| {
                 let node = &create_test_file(locked, current_task).entry.node;
 
-                // Set an value in `node`'s "security.seliux" attribute.
+                // Set an invalid value in `node`'s "security.seliux" attribute.
                 const TEST_VALUE: &str = "Something Random";
-                node.ops()
-                    .set_xattr(
-                        node,
-                        current_task,
-                        XATTR_NAME_SELINUX.to_bytes().into(),
-                        TEST_VALUE.into(),
-                        XattrOp::Set,
-                    )
-                    .expect("set_xattr(security.selinux) failed");
-
-                // Ensure that there is no SID cached on the node.
-                selinux_hooks::clear_cached_sid(&node);
+                fs_node_setsecurity(
+                    current_task,
+                    node,
+                    XATTR_NAME_SELINUX.to_bytes().into(),
+                    TEST_VALUE.into(),
+                    XattrOp::Set,
+                )
+                .expect("set_xattr(security.selinux) failed");
 
                 // Reading the security attribute should pass-through to read the value from the file system.
                 let result = fs_node_getsecurity(

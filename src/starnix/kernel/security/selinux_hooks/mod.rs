@@ -611,12 +611,12 @@ pub(super) fn fs_node_setsecurity(
 ) -> Result<(), Errno> {
     fs_node.ops().set_xattr(fs_node, current_task, name, value, op)?;
     if name == FsStr::new(XATTR_NAME_SELINUX.to_bytes()) {
-        // Update or remove the SID from `fs_node`, dependent whether the new value
-        // represents a valid Security Context.
-        match security_server.security_context_to_sid(value.into()) {
-            Ok(sid) => set_cached_sid(fs_node, sid),
-            Err(_) => clear_cached_sid(fs_node),
-        }
+        // If the new value is a valid Security Context then label the node with the corresponding
+        // SID, otherwise use the policy's "unlabeled" SID.
+        let sid = security_server
+            .security_context_to_sid(value.into())
+            .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+        set_cached_sid(fs_node, sid)
     }
     Ok(())
 }
@@ -951,13 +951,6 @@ pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>)
         .update_info(|info| info.security_state.label = FsNodeLabel::FromTask { weak_task: task });
 }
 
-/// Clears the cached security id on `fs_node`. Clearing the security id will cause the security id
-/// to be be recomputed by the SELinux LSM when determining the effective security id of this
-/// [`FsNode`].
-pub(super) fn clear_cached_sid(fs_node: &FsNode) {
-    fs_node.update_info(|info| info.security_state.label = FsNodeLabel::Uninitialized);
-}
-
 /// Returns the security id currently stored in `fs_node`, if any. This API should only be used
 /// by code that is responsible for controlling the cached security id; e.g., to check its
 /// current value before engaging logic that may compute a new value. Access control enforcement
@@ -981,6 +974,11 @@ mod tests {
     use testing::{spawn_kernel_with_selinux_hooks_test_policy_and_run, TEST_FILE_NAME};
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
+
+    /// Clears the cached security id on `fs_node`.
+    fn clear_cached_sid(fs_node: &FsNode) {
+        fs_node.update_info(|info| info.security_state.label = FsNodeLabel::Uninitialized);
+    }
 
     #[fuchsia::test]
     async fn fs_node_resolved_and_effective_sids_for_missing_xattr() {
