@@ -27,11 +27,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/42179751)
-                "MapGrowsdownTest.MprotectAfterGrow",
-                "MapGrowsdownTest.MprotectMixGrowsdownAndRegular",
-                "MapGrowsdownTest.MprotectOnAdjacentGrowsdownMapping",
-
                 // TODO(https://fxbug.dev/351037863)
                 "AshmemTest.SetNameOverflow",
 

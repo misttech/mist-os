@@ -202,7 +202,7 @@ impl ProtectionFlags {
         }
     }
 
-    pub fn to_access_prot_flags(&self) -> Self {
+    pub fn access_flags(&self) -> Self {
         *self & Self::ACCESS_FLAGS
     }
 }
@@ -243,14 +243,14 @@ const_assert_eq!(MappingFlags::DONT_SPLIT.bits(), MappingOptions::DONT_SPLIT.bit
 const_assert_eq!(MappingFlags::DONT_EXPAND.bits(), MappingOptions::DONT_EXPAND.bits() << 3);
 
 impl MappingFlags {
-    fn prot_flags(&self) -> ProtectionFlags {
+    fn access_flags(&self) -> ProtectionFlags {
         ProtectionFlags::from_bits_truncate(self.bits() & ProtectionFlags::ACCESS_FLAGS.bits())
     }
 
-    fn with_prot_flags(&self, prot_flags: ProtectionFlags) -> Self {
+    fn with_access_flags(&self, prot_flags: ProtectionFlags) -> Self {
         let mapping_flags =
             *self & (MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXEC).complement();
-        mapping_flags | Self::from_bits_truncate(prot_flags.to_access_prot_flags().bits())
+        mapping_flags | Self::from_bits_truncate(prot_flags.access_flags().bits())
     }
 
     #[cfg(feature = "alternate_anon_allocs")]
@@ -258,8 +258,8 @@ impl MappingFlags {
         MappingOptions::from_bits_truncate(self.bits() << 3)
     }
 
-    fn from_prot_flags_and_options(prot_flags: ProtectionFlags, options: MappingOptions) -> Self {
-        Self::from_bits_truncate(prot_flags.to_access_prot_flags().bits())
+    fn from_access_flags_and_options(prot_flags: ProtectionFlags, options: MappingOptions) -> Self {
+        Self::from_bits_truncate(prot_flags.access_flags().bits())
             | Self::from_bits_truncate(options.bits() << 3)
     }
 }
@@ -693,7 +693,7 @@ fn map_in_vmar(
     } else {
         zx::VmarFlags::empty()
     };
-    let vmar_flags = flags.prot_flags().to_vmar_flags()
+    let vmar_flags = flags.access_flags().to_vmar_flags()
         | zx::VmarFlags::ALLOW_FAULTS
         | vmar_extra_flags
         | vmar_maybe_map_range;
@@ -941,10 +941,6 @@ impl MemoryManagerState {
         mapping.name = name;
         self.mappings.insert(mapped_addr..end, mapping);
 
-        if flags.contains(MappingFlags::GROWSDOWN) {
-            track_stub!(TODO("https://fxbug.dev/297373369"), "GROWSDOWN guard region");
-        }
-
         Ok(mapped_addr)
     }
 
@@ -991,10 +987,6 @@ impl MemoryManagerState {
         let mapping = Mapping::new_private_anonymous(flags, name);
         self.mappings.insert(mapped_addr..end, mapping);
 
-        if flags.contains(MappingFlags::GROWSDOWN) {
-            track_stub!(TODO("https://fxbug.dev/297373369"), "GROWSDOWN guard region");
-        }
-
         Ok(mapped_addr)
     }
 
@@ -1021,7 +1013,7 @@ impl MemoryManagerState {
             );
         }
         let memory = create_anonymous_mapping_memory(length as u64)?;
-        let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
+        let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
         self.map_memory(
             mm,
             addr,
@@ -1587,8 +1579,8 @@ impl MemoryManagerState {
     ) -> Result<(), Errno> {
         profile_duration!("Protect");
         let vmar_flags = prot_flags.to_vmar_flags();
-
-        let end = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?.round_up(*PAGE_SIZE)?;
+        let page_size = *PAGE_SIZE;
+        let end = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?.round_up(page_size)?;
 
         if self.check_has_unauthorized_splits(addr, length) {
             return error!(EINVAL);
@@ -1596,22 +1588,31 @@ impl MemoryManagerState {
 
         let prot_range = if prot_flags.contains(ProtectionFlags::GROWSDOWN) {
             let mut start = addr;
-            for (range, mapping) in self.mappings.intersection(addr..end) {
-                // Ensure that all the mappings in the effected range have GROWSDOWN if
-                // PROT_GROWSDOWN was specified.
-                if !mapping.flags.contains(MappingFlags::GROWSDOWN) {
-                    return error!(EINVAL);
+            let Some((range, mapping)) = self.mappings.get(&start) else {
+                return error!(EINVAL);
+            };
+            // Ensure that the mapping has GROWSDOWN if PROT_GROWSDOWN was specified.
+            if !mapping.flags.contains(MappingFlags::GROWSDOWN) {
+                return error!(EINVAL);
+            }
+            let access_flags = mapping.flags.access_flags();
+            // From <https://man7.org/linux/man-pages/man2/mprotect.2.html>:
+            //
+            //   PROT_GROWSDOWN
+            //     Apply the protection mode down to the beginning of a
+            //     mapping that grows downward (which should be a stack
+            //     segment or a segment mapped with the MAP_GROWSDOWN flag
+            //     set).
+            start = range.start;
+            while let Some((range, mapping)) =
+                self.mappings.get(&start.saturating_sub(page_size as usize))
+            {
+                if !mapping.flags.contains(MappingFlags::GROWSDOWN)
+                    || mapping.flags.access_flags() != access_flags
+                {
+                    break;
                 }
-                // From <https://man7.org/linux/man-pages/man2/mprotect.2.html>:
-                //
-                //   PROT_GROWSDOWN
-                //     Apply the protection mode down to the beginning of a
-                //     mapping that grows downward (which should be a stack
-                //     segment or a segment mapped with the MAP_GROWSDOWN flag
-                //     set).
-                if range.start < start {
-                    start = range.start;
-                }
+                start = range.start;
             }
             start..end
         } else {
@@ -1641,7 +1642,7 @@ impl MemoryManagerState {
         for (range, mapping) in self.mappings.intersection(prot_range.clone()) {
             let range = range.intersect(&prot_range);
             let mut mapping = mapping.clone();
-            mapping.flags = mapping.flags.with_prot_flags(prot_flags);
+            mapping.flags = mapping.flags.with_access_flags(prot_flags);
             updates.push((range, mapping));
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
@@ -1920,7 +1921,7 @@ impl MemoryManagerState {
                 _ => anyhow!("Unexpected error creating VMO: {s}"),
             })?));
         let vmar_flags =
-            mapping_to_grow.flags.prot_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
+            mapping_to_grow.flags.access_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
         let mapping = Mapping::new(
             low_addr,
             memory.clone(),
@@ -3462,7 +3463,7 @@ impl MemoryManager {
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
     ) -> Result<UserAddress, Errno> {
-        let flags = MappingFlags::from_prot_flags_and_options(prot_flags, options);
+        let flags = MappingFlags::from_access_flags_and_options(prot_flags, options);
 
         // Unmapped mappings must be released after the state is unlocked.
         let mut released_mappings = vec![];
@@ -3825,7 +3826,7 @@ impl MemoryManager {
     ) -> Result<(Arc<MemoryObject>, u64), Errno> {
         let state = self.state.read();
         let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
-        if !mapping.flags.prot_flags().contains(perms) {
+        if !mapping.flags.access_flags().contains(perms) {
             return error!(EACCES);
         }
         match &mapping.backing {
