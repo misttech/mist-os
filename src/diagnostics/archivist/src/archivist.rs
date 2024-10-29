@@ -31,7 +31,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_diagnostics_host as fhost, fuchsia_async as fasync};
+use {fidl_fuchsia_diagnostics_host as fhost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Responsible for initializing an `Archivist` instance. Supports multiple configurations by
 /// either calling or not calling methods on the builder like `serve_test_controller_protocol`.
@@ -159,10 +159,9 @@ impl Archivist {
         }
 
         // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
-        if let Ok(dir) = fuchsia_fs::directory::open_in_namespace_deprecated(
-            "/netstack-diagnostics",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        ) {
+        if let Ok(dir) =
+            fuchsia_fs::directory::open_in_namespace("/netstack-diagnostics", fio::PERM_READABLE)
+        {
             inspect_repo.add_inspect_handle(
                 Arc::new(ComponentIdentity::new(
                     ExtendedMoniker::parse_str("core/network/netstack").unwrap(),

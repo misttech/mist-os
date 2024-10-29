@@ -61,9 +61,9 @@ pub(crate) async fn create_cache_server(builder: &RealmBuilder) -> Result<ChildR
         .add_local_child(
             "cache-server",
             move |handles| {
-                let cache_dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+                let cache_dir_proxy = fuchsia_fs::directory::open_in_namespace(
                     "/tmp/cache",
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                    fio::PERM_READABLE | fio::PERM_WRITABLE,
                 )
                 .unwrap();
                 async move {
