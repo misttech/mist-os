@@ -1,37 +1,39 @@
 # Commit message style guide
 
-The
-[Git project provides general guidelines](https://git-scm.com/book/en/v2/Distributed-Git-Contributing-to-a-Project),
-including how to compose commit messages. When writing a commit message, follow
-these guidelines:
+The Git project provides [general guidelines][general-guidelines]{:.external}
+which include how to compose commit messages. When writing a commit message,
+follow these guidelines:
 
-+   [General guidelines](#general-guidelines)
-+   [Add a required tag and optional subtag(s).](#add-required-tag)
-+   [Add a paragraph.](#add-paragraph)
-+   [Add an associated bug.](#add-bug)
-+   [Optionally indicate multiple steps.](#indicate-multiple-steps)
-+   [Add tests and run them automatically multiple times.](#add-tests)
-+   [Add a buffer line before the Change-Id.](#add-buffer)
-+   [Use Change-Id to refer to related changes](#use-change-id)
+* [General guidelines](#general-guidelines)
+* [Add a required tag and optional subtag(s)](#add-required-tag)
+* [Add a paragraph](#add-paragraph)
+* [Add an associated bug](#add-bug)
+* [Optionally indicate multiple steps](#indicate-multiple-steps)
+* [Add tests and run them automatically multiple times](#add-tests)
+* [Add a buffer line before the Change-Id](#add-buffer)
+* [Use Change-Id to refer to related changes](#use-change-id)
 
 ## General guidelines {#general-guidelines}
 
-*   Add an empty line between the capitalized first line (summary of the commit)
-    and [the additional detailed description](#add-paragraph).
-*   If possible, limit the first line to 50 characters and
-    [the detailed description](#add-paragraph) to 72 characters per line.
-    *   The detailed description is recommended but can be omitted if the change
-        is well explained by the first line.
-    *   The 50 characters limit is not a hard limit. Especially when using
-        multiple [tags](#add-required-tag) it can be hard to formulate a
-        meaningful summary in 50 characters.
-*   Make use of [issue tracker integration](#add-bug), but not the in first
-    line.
-*   Use the [imperative mood](https://en.wikipedia.org/wiki/Imperative_mood) to
-    summarize the commit, e.g. "Fix memory leak in file.cc", not "I fixed a
-    memory leak the file.cc".
-*   Do not reference relative points in time, private URLs, individuals, private
-    API keys, passwords, user names, etc.
+* Add an empty line between the capitalized first line (summary of the commit)
+  and the additional [detailed description](#add-paragraph).
+
+* If possible, limit the first line to 50 characters and the
+  [detailed description](#add-paragraph) to 72 characters per line.
+
+  * The detailed description is recommended but can be omitted if the change
+    is well explained by the first line.
+  * The 50 characters limit is not a hard limit. Especially when using
+    multiple [tags](#add-required-tag) it can be hard to formulate a
+    meaningful summary in 50 characters.
+
+* Make use of [issue tracker integration](#add-bug), but not the in first line.
+* Use the [imperative mood](https://en.wikipedia.org/wiki/Imperative_mood) to
+  summarize the commit. For example, "Fix memory leak in file.cc", not "I fixed
+  a memory leak the file.cc".
+
+* Do not reference relative points in time, private URLs, individuals, private
+  API keys, passwords, user names, etc.
 
 ## Add required tag {#add-required-tag}
 
@@ -55,8 +57,8 @@ Test: Added test X.
 You can view the commit history of the files you've edited to check for the tags
 used previously. See these examples:
 
-*   [https://fuchsia-review.googlesource.com/c/fuchsia/+/441776](https://fuchsia-review.googlesource.com/c/fuchsia/+/441776){:.external}
-*   [https://fuchsia-review.googlesource.com/c/topaz/+/114013](https://fuchsia-review.googlesource.com/c/topaz/+/114013){:.external}
+* [https://fuchsia-review.googlesource.com/c/fuchsia/+/441776](https://fuchsia-review.googlesource.com/c/fuchsia/+/441776){:.external}
+* [https://fuchsia-review.googlesource.com/c/topaz/+/114013](https://fuchsia-review.googlesource.com/c/topaz/+/114013){:.external}
 
 Commit message tags are required. If the subject of a commit message doesn't
 include tags, Gerrit flags your change with `Needs Label:
@@ -193,6 +195,10 @@ sufficient tests. See
 for more information on how to introduce testable and tested code in the Fuchsia
 project.
 
+For more commit message options, see the
+[Commit message options](/docs/development/source_code/commit_message_options.md)
+guide.
+
 ## Add a buffer line before Change-Id {#add-buffer}
 
 The Change-Id gets added automatically when you commit your changes. You may
@@ -225,4 +231,8 @@ For instance, to refer to the change that added
 [RFC-0042](/docs/contribute/governance/rfcs/0042_non_nullable_types.md), use
 `I32b966810d21a249647887fa45b61720ad01714c`, and not the git SHA
 `5d40ee8c42d1b0e4d8b690786da12a0a947c1aaa` or the link to the change,
-https://fuchsia-review.googlesource.com/c/fuchsia/+/284569.
+<https://fuchsia-review.googlesource.com/c/fuchsia/+/284569>.
+
+<!-- Reference links -->
+
+[general-guidelines]:https://git-scm.com/book/en/v2/Distributed-Git-Contributing-to-a-Project
