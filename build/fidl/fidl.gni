@@ -509,7 +509,7 @@ template("fidl") {
           if (is_allowed_for_ffx) {
             marker_category = "allowed-for-ffx-subtool"
           }
-          deps += [ "//sdk:marker-${marker_category}" ]
+          deps += [ "//sdk:marker-${marker_category}(${default_toolchain})" ]
           fidl_gen_dir += "/rust"
         }
       }
