@@ -103,7 +103,7 @@ function shell_subprocesses() {
 function subprocess_pid() {
   tool_basename="$1"
   # ps displays only the first 15 characters of the executable.
-  shell_subprocesses | grep -w "${tool_basename:0:15}" | cut -d\  -f 1
+  shell_subprocesses | grep -w "${tool_basename:0:15}" | awk '{print $1;}'
 }
 
 function run_self_test() {
