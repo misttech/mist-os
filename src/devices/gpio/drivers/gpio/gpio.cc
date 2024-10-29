@@ -12,6 +12,7 @@
 #include <lib/fit/defer.h>
 #include <zircon/types.h>
 
+#include <algorithm>
 #include <memory>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -73,27 +74,46 @@ void GpioDevice::GpioInstance::SetBufferMode(SetBufferModeRequestView request,
 
 void GpioDevice::GpioInstance::GetInterrupt(GetInterruptRequestView request,
                                             GetInterruptCompleter::Sync& completer) {
+  if (has_interrupt()) {
+    return completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
+  }
+  if (parent_->gpio_instance_has_interrupt()) {
+    return completer.ReplyError(ZX_ERR_ACCESS_DENIED);
+  }
+
+  interrupt_state_ = InterruptState::kGettingInterrupt;
+
   fdf::Arena arena('GPIO');
   pinimpl_.buffer(arena)
       ->GetInterrupt(pin_, request->options)
       .ThenExactlyOnce(
-          fit::inline_callback<
-              void(fdf::WireUnownedResult<fuchsia_hardware_pinimpl::PinImpl::GetInterrupt>&),
-              sizeof(GetInterruptCompleter::Async)>(
-              [completer = completer.ToAsync()](auto& result) mutable {
-                if (!result.ok()) {
-                  completer.ReplyError(result.status());
-                } else if (result->is_error()) {
-                  completer.ReplyError(result->error_value());
-                } else {
-                  completer.ReplySuccess(std::move(result->value()->interrupt));
-                }
-              }));
+          [instance = fbl::RefPtr(this), completer = completer.ToAsync()](auto& result) mutable {
+            // Clear ownership of the interrupt if the call failed.
+            if (!result.ok()) {
+              instance->interrupt_state_ = InterruptState::kNoInterrupt;
+              completer.ReplyError(result.status());
+            } else if (result->is_error()) {
+              instance->interrupt_state_ = InterruptState::kNoInterrupt;
+              completer.ReplyError(result->error_value());
+            } else {
+              instance->interrupt_state_ = InterruptState::kHasInterrupt;
+              completer.ReplySuccess(std::move(result->value()->interrupt));
+            }
+
+            if (instance->release_instance_after_call_completes_) {
+              instance->ReleaseInstance();
+            }
+          });
 }
 
 void GpioDevice::GpioInstance::ConfigureInterrupt(
     fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
     ConfigureInterruptCompleter::Sync& completer) {
+  if (parent_->gpio_instance_has_interrupt() && !has_interrupt()) {
+    // Allow the interrupt to be configured if we own it, or if no instance has one.
+    return completer.ReplyError(ZX_ERR_ACCESS_DENIED);
+  }
+
   fdf::Arena arena('GPIO');
   pinimpl_.buffer(arena)
       ->ConfigureInterrupt(pin_, request->config)
@@ -111,18 +131,31 @@ void GpioDevice::GpioInstance::ConfigureInterrupt(
 }
 
 void GpioDevice::GpioInstance::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
+  if (parent_->gpio_instance_has_interrupt() && !has_interrupt()) {
+    return completer.ReplyError(ZX_ERR_ACCESS_DENIED);
+  }
+  if (interrupt_state_ != InterruptState::kHasInterrupt) {
+    // We might be in the process of getting the interrupt now, but we haven't returned it to the
+    // client yet.
+    return completer.ReplyError(ZX_ERR_NOT_FOUND);
+  }
+
+  interrupt_state_ = InterruptState::kReleasingInterrupt;
+
   fdf::Arena arena('GPIO');
   pinimpl_.buffer(arena)->ReleaseInterrupt(pin_).ThenExactlyOnce(
-      fit::inline_callback<
-          void(fdf::WireUnownedResult<fuchsia_hardware_pinimpl::PinImpl::ReleaseInterrupt>&),
-          sizeof(ReleaseInterruptCompleter::Async)>(
-          [completer = completer.ToAsync()](auto& result) mutable {
-            if (result.ok()) {
-              completer.Reply(*result);
-            } else {
-              completer.ReplyError(result.status());
-            }
-          }));
+      [instance = fbl::RefPtr(this), completer = completer.ToAsync()](auto& result) mutable {
+        if (result.ok()) {
+          completer.Reply(*result);
+        } else {
+          completer.ReplyError(result.status());
+        }
+
+        instance->interrupt_state_ = InterruptState::kNoInterrupt;
+        if (instance->release_instance_after_call_completes_) {
+          instance->ReleaseInstance();
+        }
+      });
 }
 
 void GpioDevice::GpioInstance::handle_unknown_method(
@@ -131,7 +164,41 @@ void GpioDevice::GpioInstance::handle_unknown_method(
   FDF_LOG(ERROR, "Unknown Gpio method ordinal 0x%016lx", metadata.method_ordinal);
 }
 
-void GpioDevice::GpioInstance::OnUnbound(fidl::UnbindInfo info) { RemoveFromContainer(); }
+void GpioDevice::GpioInstance::OnUnbound(fidl::UnbindInfo info) {
+  if (interrupt_state_ == InterruptState::kHasInterrupt ||
+      interrupt_state_ == InterruptState::kNoInterrupt) {
+    // There are no calls pending, so release the interrupt if there is one, then tell the parent to
+    // release us.
+    ReleaseInstance();
+  } else {
+    // A call is pending -- set release_instance_after_call_completes_ and wait for the call to
+    // complete.
+    release_instance_after_call_completes_ = true;
+  }
+}
+
+void GpioDevice::GpioInstance::ReleaseInstance() {
+  release_instance_after_call_completes_ = false;
+  if (interrupt_state_ == InterruptState::kHasInterrupt) {
+    interrupt_state_ = InterruptState::kReleasingInterrupt;
+
+    fdf::Arena arena('GPIO');
+    pinimpl_.buffer(arena)->ReleaseInterrupt(pin_).Then(
+        [instance = fbl::RefPtr(this)](auto& result) {
+          instance->interrupt_state_ = InterruptState::kNoInterrupt;
+          instance->RemoveFromContainer();
+        });
+  } else if (interrupt_state_ == InterruptState::kNoInterrupt) {
+    RemoveFromContainer();
+  } else {
+    ZX_DEBUG_ASSERT_MSG(false, "ReleaseInstance called in an invalid state");
+  }
+}
+
+bool GpioDevice::gpio_instance_has_interrupt() const {
+  return std::any_of(gpio_instances_.cbegin(), gpio_instances_.cend(),
+                     [](const GpioInstance& instance) { return instance.has_interrupt(); });
+}
 
 void GpioDevice::Configure(fuchsia_hardware_pin::wire::PinConfigureRequest* request,
                            ConfigureCompleter::Sync& completer) {
@@ -188,7 +255,7 @@ void GpioDevice::handle_unknown_method(
 
 void GpioDevice::ConnectGpio(fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server) {
   gpio_instances_.push_front(fbl::MakeRefCounted<GpioInstance>(fidl_dispatcher_, std::move(server),
-                                                               pinimpl_.Clone(), pin_));
+                                                               pinimpl_.Clone(), pin_, this));
 }
 
 zx::result<> GpioDevice::AddServices(const std::shared_ptr<fdf::Namespace>& incoming,

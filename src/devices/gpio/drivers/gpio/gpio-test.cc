@@ -35,6 +35,7 @@ class MockPinImpl : public fdf::WireServer<fuchsia_hardware_pinimpl::PinImpl> {
     uint64_t alt_function = UINT64_MAX;
     uint64_t drive_strength = UINT64_MAX;
     fuchsia_hardware_gpio::InterruptMode interrupt_mode;
+    bool has_interrupt;
   };
 
   PinState pin_state(uint32_t index) { return pin_state_internal(index); }
@@ -97,7 +98,20 @@ class MockPinImpl : public fdf::WireServer<fuchsia_hardware_pinimpl::PinImpl> {
   }
 
   void GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRequest* request,
-                    fdf::Arena& arena, GetInterruptCompleter::Sync& completer) override {}
+                    fdf::Arena& arena, GetInterruptCompleter::Sync& completer) override {
+    if (pin_state_internal(request->pin).has_interrupt) {
+      FAIL() << "GetInterrupt() called with interrupt already outstanding";
+      completer.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
+    }
+
+    zx::interrupt ret;
+    ASSERT_OK(zx::interrupt::create({}, {}, ZX_INTERRUPT_VIRTUAL, &ret));
+
+    pin_state_internal(request->pin).has_interrupt = true;
+    completer.buffer(arena).ReplySuccess(std::move(ret));
+
+    pin_state_internal(request->pin).has_interrupt = true;
+  }
 
   void ConfigureInterrupt(fuchsia_hardware_pinimpl::wire::PinImplConfigureInterruptRequest* request,
                           fdf::Arena& arena,
@@ -111,7 +125,15 @@ class MockPinImpl : public fdf::WireServer<fuchsia_hardware_pinimpl::PinImpl> {
   }
 
   void ReleaseInterrupt(fuchsia_hardware_pinimpl::wire::PinImplReleaseInterruptRequest* request,
-                        fdf::Arena& arena, ReleaseInterruptCompleter::Sync& completer) override {}
+                        fdf::Arena& arena, ReleaseInterruptCompleter::Sync& completer) override {
+    if (pin_state_internal(request->pin).has_interrupt) {
+      pin_state_internal(request->pin).has_interrupt = false;
+      completer.buffer(arena).ReplySuccess();
+    } else {
+      FAIL() << "ReleaseInterrupt() called with no outstanding interrupt";
+      completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
+    }
+  }
 
   void Configure(fuchsia_hardware_pinimpl::wire::PinImplConfigureRequest* request,
                  fdf::Arena& arena, ConfigureCompleter::Sync& completer) override {
@@ -897,6 +919,318 @@ TEST_F(GpioTest, DebugDevfs) {
             driver_test().runtime().Quit();
           });
 
+  driver_test().runtime().Run();
+
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
+}
+
+TEST_F(GpioTest, MultipleClientsGetInterrupts) {
+  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
+    constexpr gpio_pin_t pins[] = {DECL_GPIO_PIN(1), DECL_GPIO_PIN(2)};
+    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
+                                       std::size(pins) * sizeof(gpio_pin_t)));
+  });
+
+  EXPECT_TRUE(driver_test().StartDriver().is_ok());
+
+  zx::result client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>("gpio-1");
+  EXPECT_TRUE(client_end.is_ok());
+
+  fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client1(
+      *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  gpio_client1->GetInterrupt({}).ThenExactlyOnce(
+      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_TRUE(result->value()->interrupt.is_valid());
+      });
+  driver_test().runtime().RunUntilIdle();
+
+  client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>("gpio-1");
+  EXPECT_TRUE(client_end.is_ok());
+
+  fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client2(
+      *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  // Attempting to get an interrupt from a second client should fail.
+  gpio_client2->GetInterrupt({}).ThenExactlyOnce(
+      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_error());
+        EXPECT_EQ(result->error_value(), ZX_ERR_ACCESS_DENIED);
+      });
+  driver_test().runtime().RunUntilIdle();
+
+  client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>("gpio-2");
+  EXPECT_TRUE(client_end.is_ok());
+
+  fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client3(
+      *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  // Interrupts for other pins should still be available.
+  gpio_client3->GetInterrupt({}).ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_TRUE(result->value()->interrupt.is_valid());
+        driver_test().runtime().Quit();
+      });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  // Release the interrupt from the first client. The second client should now be able to get the
+  // interrupt.
+  gpio_client1->ReleaseInterrupt().ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ReleaseInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        driver_test().runtime().Quit();
+      });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  gpio_client2->GetInterrupt({}).ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_TRUE(result->value()->interrupt.is_valid());
+        driver_test().runtime().Quit();
+      });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
+}
+
+TEST_F(GpioTest, UnbindingClientReleasesInterrupt) {
+  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
+    constexpr gpio_pin_t pins[] = {DECL_GPIO_PIN(1)};
+    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
+                                       std::size(pins) * sizeof(gpio_pin_t)));
+  });
+
+  EXPECT_TRUE(driver_test().StartDriver().is_ok());
+
+  EXPECT_FALSE(pin_state(1).has_interrupt);
+
+  zx::result client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>("gpio-1");
+  EXPECT_TRUE(client_end.is_ok());
+
+  {
+    fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client(
+        *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+    gpio_client->GetInterrupt({}).ThenExactlyOnce(
+        [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+          ASSERT_TRUE(result.ok());
+          ASSERT_TRUE(result->is_ok());
+          EXPECT_TRUE(result->value()->interrupt.is_valid());
+          driver_test().runtime().Quit();
+        });
+    driver_test().runtime().Run();
+    driver_test().runtime().ResetQuit();
+
+    EXPECT_TRUE(pin_state(1).has_interrupt);
+  }
+
+  // Allow the core driver to process the client unbinding.
+  driver_test().runtime().RunUntilIdle();
+
+  client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>("gpio-1");
+  EXPECT_TRUE(client_end.is_ok());
+
+  fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client(
+      *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  // Synchronize with the mock pinimpl driver so that we can check the interrupt state.
+  gpio_client->Read().ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Read>& result) {
+        EXPECT_TRUE(result.ok());
+        driver_test().runtime().Quit();
+      });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  // Verify that the core driver called ReleaseInterrupt() on the pinimpl driver.
+  EXPECT_FALSE(pin_state(1).has_interrupt);
+
+  // A new client should be able to get the interrupt again.
+  gpio_client->GetInterrupt({}).ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_TRUE(result->value()->interrupt.is_valid());
+        driver_test().runtime().Quit();
+      });
+  driver_test().runtime().Run();
+
+  EXPECT_TRUE(pin_state(1).has_interrupt);
+
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
+}
+
+TEST_F(GpioTest, OnlyClientWithInterruptCanConfigure) {
+  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
+    constexpr gpio_pin_t pins[] = {DECL_GPIO_PIN(1)};
+    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
+                                       std::size(pins) * sizeof(gpio_pin_t)));
+  });
+
+  EXPECT_TRUE(driver_test().StartDriver().is_ok());
+
+  EXPECT_FALSE(pin_state(1).has_interrupt);
+
+  zx::result client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>("gpio-1");
+  EXPECT_TRUE(client_end.is_ok());
+
+  fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client1(
+      *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>("gpio-1");
+  EXPECT_TRUE(client_end.is_ok());
+
+  fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client2(
+      *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  fidl::Arena arena;
+  auto interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                              .mode(fuchsia_hardware_gpio::InterruptMode::kLevelHigh)
+                              .Build();
+
+  // Both clients should be able to configure the interrupt initially.
+  gpio_client1->ConfigureInterrupt(interrupt_config)
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_TRUE(result.ok());
+            EXPECT_TRUE(result->is_ok());
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  gpio_client2->ConfigureInterrupt(interrupt_config)
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_TRUE(result.ok());
+            EXPECT_TRUE(result->is_ok());
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kLevelHigh);
+
+  gpio_client1->GetInterrupt({}).ThenExactlyOnce(
+      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_TRUE(result->value()->interrupt.is_valid());
+      });
+
+  // The first client has the interrupt and should be able to configure it.
+  interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                         .mode(fuchsia_hardware_gpio::InterruptMode::kLevelLow)
+                         .Build();
+  gpio_client1->ConfigureInterrupt(interrupt_config)
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_TRUE(result.ok());
+            EXPECT_TRUE(result->is_ok());
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kLevelLow);
+
+  // The second client shouldn't be able to configure the interrupt now.
+  interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                         .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeLow)
+                         .Build();
+  gpio_client2->ConfigureInterrupt(interrupt_config)
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_TRUE(result.ok());
+            ASSERT_TRUE(result->is_error());
+            EXPECT_EQ(result->error_value(), ZX_ERR_ACCESS_DENIED);
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kLevelLow);
+
+  // Release the interrupt from the first client. The second client should be able to configure the
+  // interrupt again.
+  gpio_client1->ReleaseInterrupt().ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ReleaseInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+        driver_test().runtime().Quit();
+      });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  gpio_client2->ConfigureInterrupt(interrupt_config)
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_TRUE(result.ok());
+            EXPECT_TRUE(result->is_ok());
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kEdgeLow);
+
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
+}
+
+TEST_F(GpioTest, DoubleGetInterruptAndRelease) {
+  driver_test().RunInEnvironmentTypeContext([](GpioTestEnvironment& env) {
+    constexpr gpio_pin_t pins[] = {DECL_GPIO_PIN(1)};
+    EXPECT_OK(env.compat().AddMetadata(DEVICE_METADATA_GPIO_PINS, pins,
+                                       std::size(pins) * sizeof(gpio_pin_t)));
+  });
+
+  EXPECT_TRUE(driver_test().StartDriver().is_ok());
+
+  EXPECT_FALSE(pin_state(1).has_interrupt);
+
+  zx::result client_end = driver_test().Connect<fuchsia_hardware_gpio::Service::Device>("gpio-1");
+  EXPECT_TRUE(client_end.is_ok());
+
+  fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client(
+      *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  gpio_client->GetInterrupt({}).ThenExactlyOnce(
+      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
+        EXPECT_TRUE(result->value()->interrupt.is_valid());
+      });
+  gpio_client->GetInterrupt({}).ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_error());
+        EXPECT_EQ(result->error_value(), ZX_ERR_ALREADY_EXISTS);
+        driver_test().runtime().Quit();
+      });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  gpio_client->ReleaseInterrupt().ThenExactlyOnce(
+      [](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ReleaseInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        EXPECT_TRUE(result->is_ok());
+      });
+  gpio_client->ReleaseInterrupt().ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ReleaseInterrupt>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_error());
+        EXPECT_EQ(result->error_value(), ZX_ERR_NOT_FOUND);
+        driver_test().runtime().Quit();
+      });
   driver_test().runtime().Run();
 
   EXPECT_TRUE(driver_test().StopDriver().is_ok());

@@ -51,13 +51,28 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_pin::Pin>,
    public:
     GpioInstance(async_dispatcher_t* dispatcher,
                  fidl::ServerEnd<fuchsia_hardware_gpio::Gpio> server_end,
-                 fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl, uint32_t pin)
+                 fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl, uint32_t pin,
+                 const GpioDevice* parent)
         : binding_(dispatcher, std::move(server_end), this,
                    fit::bind_member<&GpioInstance::OnUnbound>(this)),
           pinimpl_(std::move(pinimpl)),
-          pin_(pin) {}
+          pin_(pin),
+          parent_(parent) {}
+
+    // Returns true if this GPIO instance has an interrupt or a pending call to get or release one.
+    bool has_interrupt() const { return interrupt_state_ != InterruptState::kNoInterrupt; }
 
    private:
+    // These states are used to track the progress of async pinimpl interrupt calls, and to prevent
+    // simultaneous calls to the corresponding GPIO methods. They also determine the action to take
+    // when the GPIO client unbinds.
+    enum class InterruptState {
+      kNoInterrupt,         // This instance does not have an interrupt or any pending calls.
+      kGettingInterrupt,    // This instance has a pending call to GetInterrupt().
+      kHasInterrupt,        // This instance has an interrupt and no pending calls.
+      kReleasingInterrupt,  // This instance has a pending call to ReleaseInterrupt().
+    };
+
     void Read(ReadCompleter::Sync& completer) override;
     void SetBufferMode(SetBufferModeRequestView request,
                        SetBufferModeCompleter::Sync& completer) override;
@@ -72,10 +87,19 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_pin::Pin>,
 
     void OnUnbound(fidl::UnbindInfo info);
 
+    // Call into the parent to release the instance. ReleaseInterrupt() is called first if needed.
+    void ReleaseInstance();
+
     fidl::ServerBinding<fuchsia_hardware_gpio::Gpio> binding_;
     fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl_;
     const uint32_t pin_;
+    const GpioDevice* const parent_;
+    InterruptState interrupt_state_ = InterruptState::kNoInterrupt;
+    bool release_instance_after_call_completes_ = false;
   };
+
+  // Returns true if any GPIO instance has an interrupt or a pending call to get or release one.
+  bool gpio_instance_has_interrupt() const;
 
   void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_pin::Debug> server);
 
