@@ -70,6 +70,24 @@ $ ffx driver test-node remove my_node
 View the driver logs with `ffx log --filter simple_rust_driver` to see the
 execution order of the driver functions.
 
+## Testing
+
+Include the tests to your build by appending `--with //examples/drivers:tests` to your `fx
+set` command. For example:
+
+```bash
+$ fx set core.x64 --with //examples/drivers:drivers --with //examples:tests
+$ fx build
+```
+
+Run unit tests with the command:
+```bash
+$ fx test simple-rust-driver
+```
+
+The tests run the simple rust driver and then verify that a child was added with
+the correct properties.
+
 ## Source layout
 
 The core implementation is in  `src/lib.rs`

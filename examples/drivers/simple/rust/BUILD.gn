@@ -5,8 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
-import("//build/rust/rustc_cdylib.gni")
-import("//build/rust/rustc_staticlib.gni")
+import("//build/test.gni")
 
 driver_bind_rules("bind") {
   rules = "meta/rust-driver.bind"
@@ -43,4 +42,73 @@ fuchsia_driver_component("component") {
 fuchsia_driver_package("pkg") {
   package_name = "simple_rust_driver"
   driver_components = [ ":component" ]
+}
+
+# This is a unit test written in C++. This would mostly be useful to do when porting
+# an existing C++ driver to rust, or if there's significant code available in C++ for mocking
+# other components the driver depends on. Unlike a C++ unit test written against C++, you can't
+# directly access the driver object from these tests, so you will have to access the driver
+# through fidl connections.
+test("unit-test") {
+  output_name = "simple-rust-driver-test"
+  sources = [ "simple-driver-test.cc" ]
+  deps = [
+    ":driver-test-staticlib",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_unittest_package("unit-test-pkg") {
+  package_name = "simple-rust-driver-test"
+  deps = [ ":unit-test" ]
+}
+
+# This is a test written in rust that uses the driver test realm to load and run the driver,
+# which provides a similar level of interactivity with the driver as the C++ unit test driver
+# above but allows you to write the test and any supporting components in rust.
+rustc_test("realm-test") {
+  output_name = "simple-rust-driver-realm-test"
+  edition = "2021"
+  testonly = true
+  source_root = "realm_test.rs"
+  sources = [ "realm_test.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_rust",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
+    "//sdk/lib/driver_test_realm/realm_builder/rust",
+    "//src/devices/bind/fuchsia.test:fuchsia.test_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component-test",
+    "//third_party/rust_crates:anyhow",
+  ]
+}
+
+fuchsia_unittest_package("realm-test-pkg") {
+  package_name = "simple-rust-driver-realm-test"
+  deps = [
+    # Test component
+    ":realm-test",
+
+    # The driver
+    ":component",
+  ]
+
+  # There's expected error logs that happen due to races in driver enumeration.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+group("hermetic_tests") {
+  testonly = true
+  deps = [
+    ":realm-test-pkg",
+    ":unit-test-pkg",
+  ]
 }

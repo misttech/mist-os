@@ -4,6 +4,7 @@
 
 import("//build/drivers/verify_shared_libraries.gni")
 import("//build/rust/rustc_cdylib.gni")
+import("//build/rust/rustc_staticlib.gni")
 import("//build/zircon/c_utils.gni")
 
 # The inner implementation for `fuchsia_driver` and `fuchsia_rust_driver`.
@@ -252,9 +253,33 @@ set_defaults("fuchsia_driver") {
 # that is loaded at runtime.
 #
 # See `rustc_cdylib`'s parameters for more information on what can be passed in here.
+#
+# This template will also generate an extra target called `$target_name-test-staticlib` that
+# can be used to link the driver code into separate unit tests that depend on finding
+# the driver registration.
 template("fuchsia_rust_driver") {
   _fuchsia_driver(target_name) {
     target_type = "rustc_cdylib"
+
+    # Explicitly forward applicable_licenses and visibility, implicitly forward everything else.
+    # See comment in //build/config/BUILDCONFIG.gn for details on this pattern.
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "applicable_licenses",
+                             "test",
+                             "visibility",
+                           ])
+  }
+
+  rustc_staticlib("$target_name-test-staticlib") {
+    # This should only be used from unit tests.
+    testonly = true
 
     # Explicitly forward applicable_licenses and visibility, implicitly forward everything else.
     # See comment in //build/config/BUILDCONFIG.gn for details on this pattern.

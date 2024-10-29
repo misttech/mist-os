@@ -14,10 +14,12 @@ use zx::Status;
 mod context;
 mod incoming;
 pub mod macros;
+mod node;
 mod server;
 
 pub use context::*;
 pub use incoming::*;
+pub use node::*;
 
 /// Entry points into a driver for starting and stopping.
 ///
