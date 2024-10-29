@@ -179,6 +179,11 @@ if (toolchain_environment == "physmem" ||
     # Everything in this file runs too early to use the full ABI.  Per-function
     # attribute suppression of sanitizer modes doesn't work for C++ lambda.
     configs += [ "//build/config/sanitizers:no_sanitizers" ]
+
+    # Avoid generating coverage code since this may generate misaligned stores
+    # to the coverage array, which may trigger a misaligned exeception due to cache being
+    # disabled.
+    configs += [ "//build/config/profile:no-coverage" ]
   }
 
   source_set("tests") {
