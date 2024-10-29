@@ -643,20 +643,22 @@ std::vector<debug_ipc::ProcessThreadId> DebugAgent::ClientSuspendAll(zx_koid_t e
   return affected;
 }
 
-bool DebugAgent::IsAttachedToParentOrAncestorOf(const ProcessHandle* process) {
-  zx_koid_t parent_koid = system_interface().GetParentJobKoid(process->GetJobKoid());
-
-  while (parent_koid != root_job_->koid()) {
-    auto debugged_job = GetDebuggedJob(parent_koid);
+bool DebugAgent::IsAttachedToParentOrAncestorOf(zx_koid_t parent) {
+  while (parent != root_job_->koid()) {
+    auto debugged_job = GetDebuggedJob(parent);
     if (debugged_job && debugged_job->type() == JobExceptionChannelType::kException) {
       // We are already attached to a parent job between the process and the root job.
       return true;
     }
 
-    parent_koid = system_interface().GetParentJobKoid(parent_koid);
+    parent = system_interface().GetParentJobKoid(parent);
   }
 
   return false;
+}
+
+bool DebugAgent::IsAttachedToParentOrAncestorOf(const ProcessHandle* process) {
+  return IsAttachedToParentOrAncestorOf(process->GetJobKoid());
 }
 
 debug::Status DebugAgent::AddDebuggedJob(DebuggedJobCreateInfo&& create_info, DebuggedJob** added) {
@@ -758,11 +760,17 @@ void DebugAgent::OnAttach(const debug_ipc::AttachRequest& request, debug_ipc::At
   }
 
   if (request.config.target == debug_ipc::AttachConfig::Target::kJob) {
-    reply->status = AttachToExistingJob(request.koid, request.config, reply);
-    if (reply->status.ok())
-      return;
+    if (!IsAttachedToParentOrAncestorOf(request.koid)) {
+      reply->status = AttachToExistingJob(request.koid, request.config, reply);
+      if (reply->status.ok()) {
+        DEBUG_LOG(Agent) << "Could not attach to job: " << reply->status.message();
+      }
+    } else {
+      reply->status =
+          debug::Status(debug::Status::kAlreadyExists, "Already attached to ancestor job.");
+    }
 
-    DEBUG_LOG(Agent) << "Could not attach to job: " << reply->status.message();
+    return;
   }
 
   // Attempt to attach to an existing process. Sends the appropriate replies/notifications.

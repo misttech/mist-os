@@ -151,8 +151,10 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   debug::Status AddDebuggedProcess(DebuggedProcessCreateInfo&&, DebuggedProcess** added);
   debug::Status AddDebuggedJob(DebuggedJobCreateInfo&& create_info, DebuggedJob** added);
 
-  // Returns true if we're attached to the standard exception channel of any job between |process|
-  // and the root job.
+  // Returns true if we're attached to the standard exception channel of |parent| or any ancestor of
+  // |parent| under the root job. The variant that takes a ProcessHandle will start with the
+  // process's parent.
+  bool IsAttachedToParentOrAncestorOf(zx_koid_t parent);
   bool IsAttachedToParentOrAncestorOf(const ProcessHandle* process);
 
   // Attempts to attach to the given process and sends a AttachReply message

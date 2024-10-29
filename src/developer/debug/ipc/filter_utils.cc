@@ -26,6 +26,12 @@ bool MatchComponentUrl(std::string_view url, std::string_view pattern) {
   return url == pattern;
 }
 
+const Filter* GetFilterForId(const std::vector<Filter>& filters, uint32_t id) {
+  const auto& filter =
+      std::ranges::find_if(filters, [id](const Filter& filter) { return id == filter.id; });
+  return filter != filters.end() ? &*filter : nullptr;
+}
+
 }  // namespace
 
 bool FilterMatches(const Filter& filter, const std::string& process_name,
@@ -60,6 +66,47 @@ bool FilterDefersModules(const Filter* filter) {
   if (filter == nullptr)
     return false;
   return filter->config.weak || filter->config.job_only;
+}
+
+std::map<uint64_t, AttachConfig> GetAttachConfigsForFilterMatches(
+    const std::vector<FilterMatch>& matches, const std::vector<Filter>& installed_filters) {
+  std::map<uint64_t, debug_ipc::AttachConfig> pids_to_attach;
+
+  for (const auto& match : matches) {
+    auto matched_filter = GetFilterForId(installed_filters, match.id);
+
+    for (uint64_t matched_pid : match.matched_pids) {
+      debug_ipc::AttachConfig config;
+      if (matched_filter) {
+        config.weak = matched_filter->config.weak;
+      }
+
+      if (matched_filter) {
+        config.target = matched_filter->config.job_only ? debug_ipc::AttachConfig::Target::kJob
+                                                        : debug_ipc::AttachConfig::Target::kProcess;
+      }
+
+      auto inserted = pids_to_attach.insert({matched_pid, config});
+
+      // Make sure we double check the mode after the insertion. If the pid had already been
+      // added to the map by a weak filter and this is a strong filter that also matched, then we
+      // should strongly attach. Conversely, a strong filter should never be overruled by a weak
+      // filter. If the filter id for this match is invalid or isn't found, perform a strong
+      // attach.
+      //
+      // TODO(https://fxbug.dev/376247181): revisit how to merge this configuration for job-only
+      // filters.
+      if (!config.weak)
+        inserted.first->second.weak = false;
+
+      // If multiple filters match this pid, they should always have the same attach target. In
+      // other words, a job_only filter should only ever cause an attach to a job, and any other
+      // filter should always lead us to attach to a process.
+      FX_CHECK(inserted.first->second.target == config.target);
+    }
+  }
+
+  return pids_to_attach;
 }
 
 }  // namespace debug_ipc

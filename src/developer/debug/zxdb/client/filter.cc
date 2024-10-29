@@ -133,6 +133,17 @@ Err Filter::Settings::SetStorageValue(const std::string& key, SettingValue value
 
 Filter::Filter(Session* session) : ClientObject(session), settings_(this) {
   filter_.id = next_filter_id++;
+  // The DebugAgent FIDL server reserves the highest bit to differentiate filters that it installs
+  // from the ones a zxdb user installed. In general, these two systems are not being used in the
+  // same DebugAgent instance at the same time, and 2^31 is a lot of filters, so we really should
+  // never conflict.
+  //
+  // A more robust system would have the backend provision the ids and vend them back out to the
+  // clients so this problem doesn't exist, but that would require many changes to the UpdateFilters
+  // debug_ipc method that aren't necessary for this simple usecase.
+  FX_DCHECK((filter_.id & (1 << 31)) == 0)
+      << "Filter ID created in zxdb conflicts with FIDL filters. Please file a bug: "
+         "https://fxbug.dev/issues/new?component=1389559&template=1849567.";
 }
 
 void Filter::SetType(debug_ipc::Filter::Type type) {
@@ -165,9 +176,7 @@ void Filter::SetJobOnly(bool job_only) {
   Sync();
 }
 
-bool Filter::ShouldDeferModuleLoading() const {
-  return debug_ipc::FilterDefersModules(&filter_);
-}
+bool Filter::ShouldDeferModuleLoading() const { return debug_ipc::FilterDefersModules(&filter_); }
 
 void Filter::Sync() { session()->system().SyncFilters(); }
 

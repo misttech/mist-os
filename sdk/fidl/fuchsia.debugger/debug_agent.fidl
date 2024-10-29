@@ -96,6 +96,8 @@ type FilterError = flexible enum {
     NO_PATTERN = 1;
     /// FilterType was either unspecified or an otherwise unknown type to this agent.
     UNKNOWN_TYPE = 2;
+    /// The set of options given in FilterOptions was not valid.
+    INVALID_OPTIONS = 3;
 };
 
 @available(added=HEAD)
@@ -117,8 +119,19 @@ type FilterOptions = table {
     /// Whether or not to also match all child components in the matching
     /// component's realm. When true, the matching component's full moniker will
     /// be assumed to be the root of the realm, and all children components will
-    /// be launched within this realm.
+    /// be launched within this realm. This is mutually exclusive with
+    /// |job_only|. If both are specified, a FilterError will be returned.
     1: recursive bool;
+
+    /// Whether or not to attach directly to the parent job of the process
+    /// matching the filter. When true, the parent job's standard exception
+    /// channel will be bound, rather than the exception channel of the process.
+    /// See https://fuchsia.dev/fuchsia-src/concepts/kernel/exceptions#exception_channel_types
+    /// for more details. Note that this is *not* the same as the "Debugger"
+    /// exception channel, which only delivers process starting "exceptions" but
+    /// not architectural exceptions. Note that this is mutually exclusive with
+    /// |recursive|. If both are specified, a FilterError will be returned.
+    2: job_only bool;
 };
 
 /// A filter that will apply to processes and components running now and in the
@@ -206,7 +219,8 @@ open protocol DebugAgent {
     /// be detached when this agent is destroyed.
     ///
     /// |filter| will be inspected for validity, with corresponding errors
-    /// returned. If the filter is invalid, no attaches will occur.
+    /// returned. If the filter is invalid, no attaches will occur and the
+    /// filter will not be installed.
     ///
     /// |num_matches| will contain the number of matches that were found
     /// immediately upon filter installation if there was no error, that is, the
