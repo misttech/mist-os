@@ -1,4 +1,4 @@
-# Fuchsia API evolution guidelines
+# Fuchsia Platform API evolution guidelines
 
 This section contains guidelines for Fuchsia contributors making changes to
 Fuchsia Platform APIs. Before you begin, you should be familiarized with the
@@ -20,7 +20,7 @@ The following sections explain how to manage this lifecycle as an API developer.
 
 ### Adding FIDL APIs {#adding}
 
-Always annotate new FIDL APIs with an
+Always annotate new FIDL libraries and elements with an
 [`@available`](/docs/reference/fidl/language/versioning.md) attribute. Unstable
 APIs should be added at the `HEAD` API level. Note that partners using the SDK
 _can_ target the `HEAD` API level, but get no API/ABI compatibility guarantees
@@ -59,12 +59,13 @@ in that file along with a documentation comment describing the library. See
 [the FIDL style guide][fidl-library-style]
 for more information.
 
-Every API in the partner [SDK category](/docs/contribute/sdk/categories.md)
+Every API in the `"partner"` [SDK category](/docs/contribute/sdk/categories.md)
 is opted into static compatibility testing in CI/CQ. These tests fail when
-an API changes in backward incompatible ways. If your API is unstable, consider
-adding it to the internal or experimental SDK categories to prevent partners from
-depending on it and to opt out of static compatibility tests, allowing the API
-to change freely. Once the API is stable, add it to the partner category.
+an API changes in backward incompatible ways. New libraries do not specify an
+SDK category, preventing them from being exposed to partners, excluding them
+from compatibility tests, and allowing the API to change freely. Once the API is
+stable and the library has gone through API calibration, specify the `"partner"`
+category.
 
 ### Replacing FIDL APIs {#replacing}
 
@@ -81,6 +82,12 @@ const MAX_LENGTH uint32 = 32;
 ```
 
 ### Deprecating FIDL APIs {#deprecating}
+
+It is important that the Fuchsia platform provides smooth transitions for
+developers relying on the platform APIs. Part of that is providing ample warning
+that APIs will be removed in the future.
+[Deprecation](/docs/reference/fidl/language/versioning.md#deprecation) is one
+way the this is communicated to developers.
 
 You should always deprecate an API at an earlier level than you remove it. When
 an end developer targets a deprecated API, they see a warning at build time that
@@ -104,8 +111,7 @@ protocol Example {
 ```
 
 There must be at least one API level between an API's deprecation and removal.
-It is perfectly fine, however, to deprecate an API at the same level that it was
-added. For example:
+For example:
 
 ```fidl
 // These are OK.

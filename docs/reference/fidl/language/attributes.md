@@ -48,7 +48,8 @@ deprecated=`_version_`, removed=`_version_`, replaced=`_version_`,
 renamed="`_string_`", note="`_string_`")`
 
 **MEANING**:
-All arguments are optional, but at least one must be provided.
+All arguments are optional, but at least one of `added=`, `deprecated`,
+`removed`, or `replaced` must be provided.
 
 * `platform`: Only allowed when the attribute is on the `library` declaration.
   Must be a valid [library name element][identifiers]. If omitted, defaults to
@@ -60,20 +61,20 @@ All arguments are optional, but at least one must be provided.
       `added <= deprecated < replaced`.
 * `renamed`: Only allowed if `removed` or `replaced` is provided. Specifies the
   new name of the element after it is removed or replaced.
-* `note`: Only allowed if `deprecated` is provided. Should contain a brief
-  explanation indicating what to use instead, suitable to be included in
-  compiler error messages.
+* `note`: Must be provided if and only if `deprecated`, `removed`, or `replaced`
+  is provided. Should contain a brief explanation indicating what to use
+  instead that is suitable to be included in compiler warning or error messages.
 
 See [FIDL versioning](versioning.md) for more details.
 
 ## `@deprecated` {#deprecated}
 
+Note: Obsolete. Use [`@available`](#available).
+
 **USAGE**: `@deprecated`
 
 **MEANING**:
 See [RFC-0058].
-
-Note: Not implemented.
 
 ## `@discoverable` {#discoverable}
 

@@ -1,7 +1,7 @@
 # FIDL versioning
 
 This document describes FIDL's API versioning features. For guidance on how to
-evolve Fuchsia APIs, see [Fuchsia API evolution guidelines][api-evolution].
+evolve Fuchsia Platform APIs, see [Fuchsia API evolution guidelines][api-evolution].
 
 ## Summary
 
@@ -28,24 +28,7 @@ version. The `HEAD` version is used for the latest unstable changes.
 
 If a FIDL library doesn't have any `@available` attributes, it belongs to the
 `unversioned` platform. This platform only has one version, `HEAD`.
-
-## Command line
-
-The FIDL compiler accepts the `--available` flag to specify platform versions.
-For example, assuming `example.fidl` defines a library in the `fuchsia` platform
-with no dependencies, you can compile it at version 8 as follows:
-
-```posix-terminal
-fidlc --available fuchsia:8 --out example.json --files example.fidl
-```
-
-You can target multiple versions by separating them with commas, e.g.
-`--available fuchsia:7,8,9`.
-
-If a library `A` has a dependency on a library `B` from a different platform,
-you can specify versions for both platforms using the `--available` flag twice.
-However, `A` must be compatible across its entire version history with the fixed
-version chosen for `B`.
+FIDL libraries in `fuchsia.git` must specify an `@available` attribute.
 
 ## Target versions {#target-versions}
 
@@ -66,15 +49,15 @@ singleton sets.
 The `@available` attribute is allowed on any [FIDL element][element]. It takes
 the following arguments:
 
-| Argument     | Type      | Note                                                       |
-| ------------ | --------- | ---------------------------------------------------------- |
-| `platform`   | `string`  | Only allowed on `library`                                  |
-| `added`      | `uint64`  | Integer, `NEXT`, or `HEAD`                                 |
-| `deprecated` | `uint64`  | Integer, `NEXT`, or `HEAD`                                 |
-| `removed`    | `uint64`  | Integer, `NEXT`, or `HEAD`                                 |
-| `replaced`   | `uint64`  | Integer, `NEXT`, or `HEAD`                                 |
-| `note`       | `string`  | Goes with `deprecated`                                     |
-| `renamed`    | `string`  | Goes with `removed` or `replaced`; only allowed on members |
+| Argument     | Type      | Description                                                           |
+| ------------ | --------- | --------------------------------------------------------------------- |
+| `platform`   | `string`  | Library group name (see [Concepts](#concepts)); only allowed on `library`          |
+| `added`      | `uint64`  | Integer, `NEXT`, or `HEAD`                                            |
+| `deprecated` | `uint64`  | Integer, `NEXT`, or `HEAD`                                            |
+| `removed`    | `uint64`  | Integer, `NEXT`, or `HEAD`                                            |
+| `replaced`   | `uint64`  | Integer, `NEXT`, or `HEAD`                                            |
+| `note`       | `string`  | Provides context for `deprecated`, `removed`, and/or `replaced`       |
+| `renamed`    | `string`  | New name for `removed` or `replaced` element; only allowed on members |
 
 There are some restrictions on the arguments:
 
@@ -153,8 +136,8 @@ doc comment with a detailed explanation, and a `note` argument to the
 
 As of June 2024 deprecation has no impact in bindings. However, the FIDL team
 [plans][deprecation-bug] to make it emit deprecation annotations in target
-languages. For instance, the example above could produce `#[deprecated = "use
-Replacement"]` in the Rust bindings.
+languages. For instance, the example above could produce `#[deprecated = "Use
+`Replacement`."]` in the Rust bindings.
 
 ## Identity {#identity}
 
@@ -259,7 +242,7 @@ the name `Open` as long as we (1) use `@selector` to give the new method a
 different [ABI identity](#identity) and (2) use `renamed` on the old definition,
 allowing bindings for the version set {4, 5} to include both methods.
 
-## References {#references}
+## Referencing FIDL types {#references}
 
 There are a variety of ways one FIDL element can reference another. For example:
 
@@ -294,6 +277,25 @@ const A bool = B;
 @available(deprecated=1)
 const B bool = true;
 ```
+
+## `fidlc` command line
+
+The FIDL compiler accepts the `--available` flag to specify platform versions.
+For example, assuming `example.fidl` defines a library in the `fuchsia` platform
+with no dependencies, you can compile it at version 22 as follows:
+
+```posix-terminal
+fidlc --available fuchsia:22 --out example.json --files example.fidl
+```
+
+You can target multiple versions by separating them with commas, e.g.
+`--available fuchsia:19,22,23,NEXT,HEAD`.
+
+If a library `A` has a dependency on a library `B` from a different platform,
+you can specify versions for both platforms using the `--available` flag twice.
+However, `A` must be compatible across its entire version history with the fixed
+version chosen for `B`.
+
 
 [element]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md#terminology
 [overview]: /docs/development/languages/fidl/guides/style.md#library-overview
