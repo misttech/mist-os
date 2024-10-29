@@ -170,6 +170,17 @@ impl TestFixtureBuilder {
         builder
             .add_route(
                 Route::new()
+                    .capability(Capability::dictionary("diagnostics"))
+                    .from(Ref::parent())
+                    .to(&drivers)
+                    .to(&fshost),
+            )
+            .await
+            .unwrap();
+
+        builder
+            .add_route(
+                Route::new()
                     .capability(Capability::service::<framdisk::ServiceMarker>())
                     .from(&drivers)
                     .to(Ref::parent())
