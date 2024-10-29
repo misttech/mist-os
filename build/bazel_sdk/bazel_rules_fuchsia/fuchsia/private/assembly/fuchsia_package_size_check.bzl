@@ -6,7 +6,7 @@
 
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaSizeCheckerInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
@@ -42,9 +42,7 @@ def _fuchsia_package_size_check_impl(ctx):
     outputs = [size_report, verbose_output, ffx_isolate_dir]
 
     # Gather all the arguments to pass to ffx.
-    ffx_invocation = [
-        fuchsia_toolchain.ffx.path,
-        "--config \"assembly_enabled=true\"",
+    ffx_invocation = get_ffx_assembly_args(fuchsia_toolchain) + [
         "--isolate-dir",
         ffx_isolate_dir.path,
         "assembly",

@@ -6,7 +6,7 @@
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
@@ -15,8 +15,7 @@ _SIZE_CHECKER_RUNNER_SH = """
 set -e
 
 mkdir -p $FFX_ISOLATE_DIR
-$FFX \
-    --config "assembly_enabled=true" \
+{ffx_assembly_args} \
     "--isolate-dir" \
     $FFX_ISOLATE_DIR \
     assembly \
@@ -55,9 +54,10 @@ def _fuchsia_product_size_check_impl(ctx):
     ctx.actions.run_shell(
         inputs = ctx.files.product_image + get_ffx_assembly_inputs(fuchsia_toolchain),
         outputs = final_outputs + [ffx_isolate_dir],
-        command = _SIZE_CHECKER_RUNNER_SH,
+        command = _SIZE_CHECKER_RUNNER_SH.format(
+            ffx_assembly_args = " ".join(get_ffx_assembly_args(fuchsia_toolchain)),
+        ),
         env = {
-            "FFX": fuchsia_toolchain.ffx.path,
             "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
             "IMAGES_PATH": images_out.path + "/images.json",
             "SIZE_FILE": size_file.path,
