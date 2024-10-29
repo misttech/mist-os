@@ -79,11 +79,8 @@ where
     let out = match cmd {
         FactoryStoreCmd::List => list_files(&dir_proxy).await?,
         FactoryStoreCmd::Dump { name } => {
-            let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
-                &dir_proxy,
-                &name,
-                fio::OpenFlags::RIGHT_READABLE,
-            )?;
+            let file =
+                fuchsia_fs::directory::open_file_async(&dir_proxy, &name, fio::PERM_READABLE)?;
             let contents = fuchsia_fs::file::read(&file).await?;
 
             match std::str::from_utf8(&contents) {
