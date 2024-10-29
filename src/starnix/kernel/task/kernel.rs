@@ -35,6 +35,7 @@ use fidl::endpoints::{
 use fidl_fuchsia_feedback::CrashReporterProxy;
 use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use futures::FutureExt;
+use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
 use netlink::interfaces::InterfacesHandler;
 use netlink::{Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
@@ -48,7 +49,7 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, from_status_like_fdio};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU16, AtomicU8};
 use std::sync::{Arc, Weak};
 use zx::AsHandleRef;
@@ -73,6 +74,16 @@ pub struct KernelFeatures {
     ///
     /// TODO(https://fxbug.dev/297431387): Enabled by default once the feature is completed.
     pub io_uring: bool,
+}
+
+/// Contains an fscrypt wrapping key id.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct EncryptionKeyId([u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize]);
+
+impl From<[u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize]> for EncryptionKeyId {
+    fn from(buf: [u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize]) -> Self {
+        Self(buf)
+    }
 }
 
 /// The shared, mutable state for the entire Starnix kernel.
@@ -256,6 +267,12 @@ pub struct Kernel {
 
     /// Handler for crashing Linux processes.
     pub crash_reporter: CrashReporter,
+
+    /// Maps wrapping key ids to lists of users who have added those keys. If a user
+    /// adds a key and the key's associated users list is empty, Starnix will add that key to
+    /// CryptManagement. Similarly, if a user removes a key and that user was the last user in
+    /// that key's users list, Starnix will remove that wrapping key from CryptManagement.
+    pub encryption_keys: RwLock<HashMap<EncryptionKeyId, Vec<u32>>>,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -383,6 +400,7 @@ impl Kernel {
             hrtimer_manager,
             memory_attribution_manager: MemoryAttributionManager::new(kernel.clone()),
             crash_reporter,
+            encryption_keys: RwLock::new(HashMap::new()),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

@@ -144,10 +144,7 @@ impl ProcDirectory {
             ),
             "filesystems".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node(
-                    "/proc/filesystems",
-                    bug_ref!("https://fxbug.dev/309002087"),
-                ),
+                BytesFile::new_node(b"fxfs".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "misc".into() => fs.create_node(

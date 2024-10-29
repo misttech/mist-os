@@ -351,7 +351,6 @@
 
                 // inotify_test
                 "Inotify.UnmatchedEventsAreDiscarded",
-                "Inotify.KernfsBasic",
                 "Inotify.ExcludeUnlinkDirectory",
                 "Inotify.ExcludeUnlink",
                 "Inotify.IncludeUnlinkedFile",
@@ -617,7 +616,6 @@
                 "ProcSysVmMaxmapCount.HasNumericValue",
                 "ProcSysVmMmapMinAddr.HasNumericValue",
                 "ProcSysVmOvercommitMemory.HasNumericValue",
-                "ProcFilesystems.Bug65172365",
                 "Proc.GetdentsEnoent",
                 "Proc.PidReuse",
                 "Proc.PidTidIOAccounting",

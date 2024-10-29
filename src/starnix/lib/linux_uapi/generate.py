@@ -31,6 +31,7 @@ RAW_LINES = (
     + """
 
 use zerocopy::{IntoBytes, FromBytes, KnownLayout, Immutable};
+use crate::fscrypt_key_specifier;
 
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -236,6 +237,19 @@ NO_COPY_TYPES = [
     "StdAtomic.*",
 ]
 
+# Bindgen offers limited support for union types. The fscrypt_key_specifier__bindgen_ty_1 union has
+# three fields that bindgen defines to be three different sizes. As a result, the union is
+# prevented from implementing the IntoBytes trait which prevents the larger fscrypt_add_key_arg
+# struct from implementing IntoBytes. manual.rs adds the appropriate padding to the union fields
+# so that it and thus fscrypt_add_key_arg can implement the IntoBytes trait.
+TYPE_BLOCKLIST = [
+    "fscrypt_key_specifier",
+    "fscrypt_key_specifier__bindgen_ty_1",
+    "fscrypt_add_key_arg",
+    "fscrypt_descriptor",
+    "fscrypt_identifier",
+]
+
 
 class ArchInfo:
     def __init__(self, name, clang_target, include):
@@ -270,6 +284,7 @@ bindgen.std_derives = STD_DERIVES
 bindgen.set_auto_derive_traits(AUTO_DERIVE_TRAITS)
 bindgen.set_replacements(REPLACEMENTS)
 bindgen.ignore_functions = True
+bindgen.type_blocklist = TYPE_BLOCKLIST
 bindgen.no_debug_types = NO_DEBUG_TYPES
 bindgen.no_copy_types = NO_COPY_TYPES
 bindgen.enable_stdlib_include_dirs = False

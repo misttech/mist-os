@@ -6,7 +6,7 @@ use crate::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 use crate::fs::fuchsia::RemoteUnixDomainSocket;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, VMEX_RESOURCE};
-use crate::task::{CurrentTask, Kernel};
+use crate::task::{CurrentTask, EncryptionKeyId, Kernel};
 use crate::vfs::buffers::{with_iovec_segments, InputBuffer, OutputBuffer};
 use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::socket::{Socket, SocketFile, ZxioBackedSocket};
@@ -176,7 +176,7 @@ impl FileSystemOps for RemoteFs {
     fn rename(
         &self,
         _fs: &FileSystem,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
         old_name: &FsStr,
         new_parent: &FsNodeHandle,
@@ -184,6 +184,10 @@ impl FileSystemOps for RemoteFs {
         _renamed: &FsNodeHandle,
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
+        // Renames should fail if the src or target directory is encrypted and locked.
+        old_parent.fail_if_locked(current_task)?;
+        new_parent.fail_if_locked(current_task)?;
+
         let Some(old_parent) = old_parent.downcast_ops::<RemoteNode>() else {
             return error!(EXDEV);
         };
@@ -398,6 +402,7 @@ fn fetch_and_refresh_info_impl<'a>(
             modification_time: true,
             change_time: true,
             casefold: true,
+            wrapping_key_id: true,
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
@@ -427,6 +432,9 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
     if attrs.has.change_time {
         info.time_status_change =
             UtcInstant::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
+    }
+    if attrs.has.wrapping_key_id {
+        info.wrapping_key_id = Some(attrs.wrapping_key_id);
     }
 }
 
@@ -500,15 +508,30 @@ impl FsNodeOps for RemoteNode {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        if node.is_dir() {
-            // For directories we need to clone the connection because we rely on the seek offset.
-            return Ok(Box::new(RemoteDirectoryObject::new(
-                (*self.zxio).clone().map_err(|status| from_status_like_fdio!(status))?,
-            )));
+        {
+            let node_info = node.fetch_and_refresh_info(current_task)?;
+            if node_info.mode.is_dir() {
+                if let Some(wrapping_key_id) = node_info.wrapping_key_id {
+                    let encryption_keys = current_task.kernel().encryption_keys.read();
+                    // Locked encrypted directories cannot be opened with write access.
+                    if !encryption_keys.contains_key(&EncryptionKeyId::from(wrapping_key_id))
+                        && flags.can_write()
+                    {
+                        return error!(ENOKEY);
+                    }
+                }
+                // For directories we need to clone the connection because we rely on the seek offset.
+                return Ok(Box::new(RemoteDirectoryObject::new(
+                    (*self.zxio).clone().map_err(|status| from_status_like_fdio!(status))?,
+                )));
+            }
         }
+
+        // Locked encrypted files cannot be opened.
+        node.fail_if_locked(current_task)?;
 
         // fsverity files cannot be opened in write mode, including while building.
         if flags.can_write() {
@@ -530,6 +553,7 @@ impl FsNodeOps for RemoteNode {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
+        node.fail_if_locked(current_task)?;
         let name = get_name_str(name)?;
 
         let fs = node.fs();
@@ -604,6 +628,7 @@ impl FsNodeOps for RemoteNode {
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
+        node.fail_if_locked(current_task)?;
         let name = get_name_str(name)?;
 
         let fs = node.fs();
@@ -746,10 +771,11 @@ impl FsNodeOps for RemoteNode {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
+        node: &FsNode,
+        current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
+        node.fail_if_locked(current_task)?;
         self.zxio.truncate(length).map_err(|status| from_status_like_fdio!(status))
     }
 
@@ -765,9 +791,13 @@ impl FsNodeOps for RemoteNode {
     ) -> Result<(), Errno> {
         match mode {
             FallocMode::Allocate { keep_size: false } => {
+                node.fail_if_locked(current_task)?;
                 let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
-                let info = node.fetch_and_refresh_info(current_task)?;
-                if (info.size as u64) < allocate_size {
+                let info_size = {
+                    let info = node.fetch_and_refresh_info(current_task)?;
+                    info.size as u64
+                };
+                if info_size < allocate_size {
                     self.truncate(locked, guard, node, current_task, allocate_size)?;
                 }
                 Ok(())
@@ -797,7 +827,7 @@ impl FsNodeOps for RemoteNode {
         has: zxio_node_attr_has_t,
     ) -> Result<(), Errno> {
         // Omit updating creation_time. By definition, there shouldn't be a change in creation_time.
-        let mutable_node_attributes = zxio_node_attributes_t {
+        let mut mutable_node_attributes = zxio_node_attributes_t {
             modification_time: info.time_modify.into_nanos() as u64,
             access_time: info.time_access.into_nanos() as u64,
             mode: info.mode.bits(),
@@ -808,6 +838,9 @@ impl FsNodeOps for RemoteNode {
             has,
             ..Default::default()
         };
+        if let Some(id) = info.wrapping_key_id {
+            mutable_node_attributes.wrapping_key_id = id;
+        }
         self.zxio
             .attr_set(&mutable_node_attributes)
             .map_err(|status| from_status_like_fdio!(status))
@@ -839,6 +872,15 @@ impl FsNodeOps for RemoteNode {
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
+        // TODO(https://fxbug.dev/360171961): Add symlink support for fscrypt.
+        // Fail if user tries to create a symlink inside an encrypted directory.
+        {
+            let node_info = node.fetch_and_refresh_info(current_task)?;
+            if node_info.wrapping_key_id.is_some() {
+                return error!(ENOTSUP);
+            }
+        }
+
         let name = get_name_str(name)?;
         let zxio = Arc::new(
             self.zxio
@@ -867,6 +909,10 @@ impl FsNodeOps for RemoteNode {
             },
         );
         Ok(symlink)
+    }
+
+    fn get_attr(&self, has: zxio_node_attr_has_t) -> Result<zxio_node_attributes_t, Errno> {
+        self.zxio.attr_get(has).map_err(|status| from_status_like_fdio!(status))
     }
 
     fn link(

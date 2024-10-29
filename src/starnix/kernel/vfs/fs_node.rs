@@ -6,7 +6,7 @@ use crate::device::DeviceMode;
 use crate::mm::PAGE_SIZE;
 use crate::security;
 use crate::signals::{send_standard_signal, SignalInfo};
-use crate::task::{CurrentTask, Kernel, WaitQueue, Waiter};
+use crate::task::{CurrentTask, EncryptionKeyId, Kernel, WaitQueue, Waiter};
 use crate::time::utc;
 use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::pipe::{Pipe, PipeHandle};
@@ -52,7 +52,7 @@ use starnix_uapi::{
 };
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
-use syncio::zxio_node_attr_has_t;
+use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FsNodeLinkBehavior {
@@ -201,6 +201,9 @@ pub struct FsNodeInfo {
     pub time_modify: UtcInstant,
     pub security_state: security::FsNodeState,
     pub casefold: bool,
+    // If this node is fscrypt encrypted, stores the id of the user wrapping key used to encrypt
+    // it.
+    pub wrapping_key_id: Option<[u8; 16]>,
 }
 
 impl FsNodeInfo {
@@ -782,6 +785,11 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         Ok(())
     }
 
+    /// Get node attributes
+    fn get_attr(&self, _has: zxio_node_attr_has_t) -> Result<zxio_node_attributes_t, Errno> {
+        error!(ENOTSUP)
+    }
+
     /// Get an extended attribute on the node.
     ///
     /// An implementation can systematically return a value. Otherwise, if `max_size` is 0, it can
@@ -1246,6 +1254,19 @@ impl FsNode {
 
     pub fn ops(&self) -> &dyn FsNodeOps {
         self.ops.as_ref()
+    }
+
+    /// Returns an error if this node is encrypted and locked.
+    pub fn fail_if_locked(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        let node_info = self.fetch_and_refresh_info(current_task)?;
+        if let Some(wrapping_key_id) = node_info.wrapping_key_id {
+            let encryption_keys = current_task.kernel().encryption_keys.read();
+            // Fail if the user tries to create a child in a locked encrypted directory.
+            if !encryption_keys.contains_key(&EncryptionKeyId::from(wrapping_key_id)) {
+                return error!(ENOKEY);
+            }
+        }
+        Ok(())
     }
 
     /// Returns the `FsNode`'s `FsNodeOps` as a `&T`, or `None` if the downcast fails.

@@ -9,6 +9,7 @@ rustc_library("linux_uapi") {
 
   sources = [
     "src/lib.rs",
+    "src/manual.rs",
     "src/types.rs",
   ]
   if (current_cpu == "x64") {
