@@ -8,7 +8,6 @@
 
 #include <lib/fit/function.h>
 #include <lib/fxt/interned_string.h>
-#include <lib/power-management/controller-dpc.h>
 #include <lib/power-management/energy-model.h>
 #include <lib/power-management/power-state.h>
 #include <lib/relaxed_atomic.h>
@@ -24,12 +23,14 @@
 #include <fbl/wavl_tree_best_node_observer.h>
 #include <ffl/fixed.h>
 #include <kernel/auto_lock.h>
+#include <kernel/dpc.h>
 #include <kernel/mp.h>
 #include <kernel/owned_wait_queue.h>
 #include <kernel/scheduler_state.h>
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <kernel/wait.h>
+#include <ktl/optional.h>
 
 // Forward declarations.
 struct percpu;
@@ -392,14 +393,38 @@ class Scheduler {
   static cpu_mask_t PeekIdleMask() { return idle_schedulers_.load(ktl::memory_order_relaxed); }
   static bool PeekIsIdle(cpu_num_t cpu) { return (PeekIdleMask() & cpu_num_to_mask(cpu)) != 0; }
 
-  void SetPowerDomain(fbl::RefPtr<power_management::PowerDomain> domain) TA_EXCL(queue_lock_) {
-    Guard<MonitoredSpinLock, IrqSave> g(&queue_lock_, SOURCE_TAG);
-    power_state_.SetOrUpdateDomain(std::move(domain));
+  using PowerDomain = power_management::PowerDomain;
+
+  // Sets the power domain for this scheduler instance, returning the previous domain. Called by
+  // kernel tests and sys_system_set_processor_power_domain.
+  fbl::RefPtr<PowerDomain> ExchangePowerDomain(fbl::RefPtr<PowerDomain> domain)
+      TA_EXCL(queue_lock_) {
+    Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
+    return power_level_control_.ExchangePowerDomain(ktl::move(domain));
   }
 
-  zx::result<> SetPowerLevel(size_t power_level) TA_EXCL(queue_lock_) {
-    Guard<MonitoredSpinLock, IrqSave> g(&queue_lock_, SOURCE_TAG);
-    return power_state_.UpdatePowerLevel(power_level);
+  // Updates the current power level for this CPU with the value reported by the power level
+  // controller. Called by kernel tests and sys_system_set_processor_power_state.
+  zx::result<> SetPowerLevel(uint8_t power_level) TA_EXCL(queue_lock_) {
+    Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
+    return power_level_control_.UpdatePowerLevel(power_level);
+  }
+
+  // Returns the current active power level, if any.
+  ktl::optional<uint8_t> GetPowerLevel() const TA_EXCL(queue_lock_) {
+    Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
+    return power_level_control_.GetPowerLevel();
+  }
+
+  // Sends a power level request through this scheduler's power level controller for testing. This
+  // method is called from thread and IRQ context to ensure that the underlying machinery can be
+  // safely called within Block, Unblock, and other scheduling operations.
+  void RequestPowerLevelForTesting(uint8_t power_level) TA_EXCL(queue_lock_);
+
+  // Returns the current power domain for this scheduler instance.
+  fbl::RefPtr<PowerDomain> GetPowerDomainForTesting() TA_EXCL(queue_lock_) {
+    Guard<MonitoredSpinLock, IrqSave> guard{&queue_lock_, SOURCE_TAG};
+    return power_level_control_.GetPowerDomain();
   }
 
  private:
@@ -894,16 +919,6 @@ class Scheduler {
     }();
   }
 
-  power_management::ControllerDpc::TransitionDetails GetPowerLevelTransitionDetails() {
-    // This method will be called from the DPC thread, to obtain the data required for the
-    // transition.
-    Guard<MonitoredSpinLock, IrqSave> guard(&queue_lock_, SOURCE_TAG);
-    power_management::ControllerDpc::TransitionDetails details = {
-        .domain = power_state_.domain(), .request = pending_power_level_transition_};
-    pending_power_level_transition_.reset();
-    return details;
-  }
-
   // Add a couple of small no-op helpers which inform the static analyzer of
   // some properties which are very difficult to apply to the lambdas used in
   // the functional programming patterns below.  Neither of these methods
@@ -1112,17 +1127,59 @@ class Scheduler {
   // context switch operation has fully completed.
   Thread* previous_thread_{nullptr};
 
-  // Contains the power domain, energy model and controller for this scheduler's CPU.
-  TA_GUARDED(queue_lock_) power_management::PowerState power_state_;
+  // PowerLevelControl encapsulates the CPU energy model and power level control interface for
+  // energy aware scheduling.
+  //
+  // Instances of PowerLevelControl are protected by Scheduler::queue_lock_.
+  class PowerLevelControl {
+   public:
+    explicit PowerLevelControl(Scheduler* scheduler) : request_dpc_{DpcHandler, scheduler} {}
 
-  // Wraps a `Timer` and `Dpc` object. The only method provided in this object is meant to be
-  // called from the scheduler context. It will arm the underlying Timer. When the DPC Task executes
-  // it will clear the stored pending transition.
-  TA_GUARDED(queue_lock_)
-  power_management::ControllerDpc power_level_controller_dpc_{
-      [this]() { return GetPowerLevelTransitionDetails(); }};
-  TA_GUARDED(queue_lock_)
-  ktl::optional<power_management::PowerLevelUpdateRequest> pending_power_level_transition_;
+    // Gets the power domain associated with this scheduler.
+    const fbl::RefPtr<PowerDomain>& GetPowerDomain() const { return power_state_.domain(); }
+
+    // Sets the power domain associated with this scheduler.
+    fbl::RefPtr<PowerDomain> ExchangePowerDomain(fbl::RefPtr<PowerDomain> domain) {
+      return power_state_.SetOrUpdateDomain(ktl::move(domain));
+    }
+
+    // Returns the current active power level.
+    ktl::optional<uint8_t> GetPowerLevel() const { return power_state_.active_power_level(); }
+
+    // Called by power level controller server (e.g. the userspace component servicing the kernel
+    // power level control interface) for the domain associated with this scheduler to acknowledge
+    // that a power level request has been completed.
+    zx::result<> UpdatePowerLevel(uint8_t power_level) {
+      return power_state_.UpdatePowerLevel(power_level);
+    }
+
+    // Called by the scheduler to request a power level change for the domain associated with this
+    // scheduler.
+    [[nodiscard("A reschedule is required when true")]] bool RequestPowerLevel(uint8_t power_level);
+
+    // Called by RescheduleCommon to send any pending request to the registered power level
+    // controller.
+    void SendPendingPowerLevelRequest() {
+      if (power_state_.is_serving() && pending_update_request_.has_value()) {
+        request_timer_.Cancel();
+        request_timer_.Set(Deadline::infinite_past(), TimerHandler, this);
+      }
+    }
+
+   private:
+    Scheduler& scheduler() { return *request_dpc_.arg<Scheduler>(); }
+    cpu_num_t cpu() { return scheduler().this_cpu(); }
+
+    static void TimerHandler(Timer* timer, zx_time_t now, void* arg);
+    static void DpcHandler(Dpc* dpc);
+
+    power_management::PowerState power_state_;
+    ktl::optional<power_management::PowerLevelUpdateRequest> pending_update_request_;
+    Timer request_timer_;
+    Dpc request_dpc_;
+  };
+
+  TA_GUARDED(queue_lock_) PowerLevelControl power_level_control_ { this };
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_H_

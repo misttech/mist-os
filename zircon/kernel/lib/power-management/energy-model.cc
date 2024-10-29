@@ -254,8 +254,8 @@ zx::result<> PowerDomainRegistry::RemoveFromRegistry(
   return zx::ok();
 }
 
-std::optional<size_t> PowerModel::FindPowerLevel(ControlInterface interface_id,
-                                                 uint64_t control_argument) const {
+std::optional<uint8_t> PowerModel::FindPowerLevel(ControlInterface interface_id,
+                                                  uint64_t control_argument) const {
   auto it = std::lower_bound(control_lookup_.begin(), control_lookup_.end(),
                              zx_processor_power_level_t{
                                  .control_interface = cpp23::to_underlying(interface_id),

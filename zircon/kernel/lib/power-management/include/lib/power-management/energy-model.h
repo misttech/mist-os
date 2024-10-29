@@ -274,8 +274,8 @@ class PowerModel {
     return TransitionMatrix(transitions_, power_levels_.size());
   }
 
-  std::optional<size_t> FindPowerLevel(ControlInterface interface_id,
-                                       uint64_t control_argument) const;
+  std::optional<uint8_t> FindPowerLevel(ControlInterface interface_id,
+                                        uint64_t control_argument) const;
 
  private:
   PowerModel(fbl::Vector<PowerLevel> levels, fbl::Vector<PowerLevelTransition> transitions,
@@ -296,6 +296,8 @@ class PowerModel {
 // `cpus_`.
 // A `PowerDomain` ID represents a link between a set of cpus and a power model.
 // A `PowerDomain` is considered active if at least once CPU is part of the domain.
+//
+// Instances of PowerDomain are safe for concurrent use.
 class PowerDomain : public fbl::RefCounted<PowerDomain>,
                     public fbl::SinglyLinkedListable<fbl::RefPtr<PowerDomain>> {
  public:
@@ -322,6 +324,17 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
   // Handler for transitions where the target level's control interface is not kernel handled.
   const fbl::RefPtr<PowerLevelController>& controller() const { return controller_; }
 
+  // Returns whether the kernel scheduler should send power level update requests to the controller.
+  // This does not prevent the kernel from exercising the control interface in tests, however, only
+  // whether the scheduler will interact with the control interface to handle utilization changes.
+  bool scheduler_control_enabled() const {
+    return scheduler_control_enabled_.load(std::memory_order_relaxed);
+  }
+
+  void SetSchedulerControlEnabled(bool enabled) {
+    scheduler_control_enabled_.store(enabled, std::memory_order_relaxed);
+  }
+
  private:
   friend class PowerState;
 
@@ -331,6 +344,8 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
 
   std::atomic<uint64_t> total_normalized_utilization_{0};
   const fbl::RefPtr<PowerLevelController> controller_ = nullptr;
+
+  std::atomic<bool> scheduler_control_enabled_ = false;
 };
 
 // `PowerDomainRegistry` provides a starting point for looking at any

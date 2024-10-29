@@ -55,6 +55,11 @@ struct PowerLevelUpdateRequest {
   uint32_t options;
 };
 
+// PowerState encapsulates the current power level, power domain, and energy model for an individual
+// processor.
+//
+// Instances of PowerState are not safe for concurrent use and must be protected by an external lock
+// associated with the owning processor.
 class PowerState {
  public:
   PowerState() = default;
@@ -71,17 +76,21 @@ class PowerState {
   // Domain the PowerState is being modeled after.
   const fbl::RefPtr<PowerDomain>& domain() const { return domain_; }
 
+  // Returns whether the domain's controller is serving requests. Returns false if there is no
+  // domain.
+  bool is_serving() const { return domain() && domain()->controller()->is_serving(); }
+
   // Active power level when device is idle.
-  constexpr bool IsIdle() const { return !!idle_power_level_; }
+  constexpr bool is_idle() const { return !!idle_power_level_; }
   constexpr std::optional<uint8_t> idle_power_level() const { return idle_power_level_; }
 
   // Active power level when device is not idle.
-  constexpr bool IsActive() const { return !IsIdle() && !!active_power_level_; }
+  constexpr bool is_active() const { return !is_idle() && !!active_power_level_; }
   constexpr std::optional<uint8_t> active_power_level() const { return active_power_level_; }
 
   // Returns the power-level currently affecting the devices power state.
   constexpr std::optional<uint8_t> power_level() const {
-    return IsIdle() ? idle_power_level_ : active_power_level_;
+    return is_idle() ? idle_power_level_ : active_power_level_;
   }
 
   // Power level the device needs to be transitioned to.
@@ -108,7 +117,7 @@ class PowerState {
   zx::result<> UpdatePowerLevel(ControlInterface control, uint64_t control_argument);
 
   // Sets the underlying power level.
-  zx::result<> UpdatePowerLevel(size_t level);
+  zx::result<> UpdatePowerLevel(uint8_t level);
 
   // When a device transitions from an idle state into an active state, this is reflected as
   // clearing the idle power level.
