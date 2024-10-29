@@ -1140,6 +1140,9 @@ class Scheduler {
 
     // Sets the power domain associated with this scheduler.
     fbl::RefPtr<PowerDomain> ExchangePowerDomain(fbl::RefPtr<PowerDomain> domain) {
+      // Clear the request to ensure that a DPC racing with a domain change cannot latch a pending
+      // request intended for the previous domain and the new domain ref pointer together.
+      pending_update_request_.reset();
       return power_state_.SetOrUpdateDomain(ktl::move(domain));
     }
 
