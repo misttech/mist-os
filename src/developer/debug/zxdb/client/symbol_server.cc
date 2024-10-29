@@ -10,6 +10,7 @@
 #include <rapidjson/document.h>
 #include <rapidjson/istreamwrapper.h>
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/client/symbol_server_impl.h"
 
@@ -21,6 +22,26 @@ constexpr char kClientId[] =
     "446450136466-2hr92jrq8e6i4tnsa56b52vacp7t3936"
     ".apps.googleusercontent.com";
 constexpr char kClientSecret[] = "uBfbay2KCy9t4QveJ-dOqHtp";
+
+std::optional<std::filesystem::path> GetGcloudCredentialsFile() {
+  std::string config_dir;
+  if (auto cloudsdk_config = std::getenv("CLOUDSDK_CONFIG")) {
+    config_dir = cloudsdk_config;
+  } else if (auto home = std::getenv("HOME")) {
+    config_dir = std::string(home) + "/.config/gcloud";
+  }
+
+  if (!std::filesystem::is_directory(config_dir)) {
+    return std::nullopt;
+  }
+
+  std::filesystem::path credentials = config_dir + "/application_default_credentials.json";
+  if (!std::filesystem::exists(credentials) || !std::filesystem::is_regular_file(credentials)) {
+    return std::nullopt;
+  }
+
+  return credentials;
+}
 
 }  // namespace
 
@@ -62,6 +83,13 @@ void SymbolServer::DoInit() {
     AuthRefresh();
   } else {
     ChangeState(SymbolServer::State::kAuth);
+    if (!GetGcloudCredentialsFile()) {
+      LOGS(Warn)
+          << name_ << " failed to authenticate: "
+          << "Gcloud credentials file not found. You may need to install the gcloud command line"
+             " tool: https://cloud.google.com/sdk/docs/install and run"
+             " `gcloud auth application-default login`.";
+    }
   }
 }
 
@@ -72,7 +100,19 @@ void SymbolServer::AuthRefresh() {
   post_data["client_secret"] = client_secret_;
   post_data["grant_type"] = "refresh_token";
 
-  DoAuthenticate(post_data, [](const Err& err) {});
+  DoAuthenticate(post_data, [this](const Err& err) {
+    if (err.has_error()) {
+      LOGS(Warn) << "Server " << name_ << " failed authentication: " << err.msg() << ".";
+      if (client_secret_.empty() && !GetGcloudCredentialsFile()) {
+        LOGS(Warn) << "Could not load gcloud auth token. You may need to run "
+                      "`gcloud auth application-default login`";
+      } else if (auto credentials_file = GetGcloudCredentialsFile()) {
+        LOGS(Warn) << "gcloud application-default credentials exist in "
+                   << *GetGcloudCredentialsFile()
+                   << ". Check file permissions and your account permissions.";
+      }
+    }
+  });
 }
 
 FILE* SymbolServer::GetGoogleApiAuthCache(const char* mode) {
@@ -114,16 +154,12 @@ bool SymbolServer::LoadCachedAuth() {
 }
 
 bool SymbolServer::LoadGCloudAuth() {
-  std::string gcloud_config;
-  if (auto cloudsdk_config = std::getenv("CLOUDSDK_CONFIG")) {
-    gcloud_config = cloudsdk_config;
-  } else if (auto home = std::getenv("HOME")) {
-    gcloud_config = std::string(home) + "/.config/gcloud";
-  } else {
+  std::optional<std::string> gcloud_credentials = GetGcloudCredentialsFile();
+  if (!gcloud_credentials) {
     return false;
   }
 
-  std::ifstream credential_file(gcloud_config + "/application_default_credentials.json");
+  std::ifstream credential_file(*gcloud_credentials);
   if (!credential_file) {
     return false;
   }
