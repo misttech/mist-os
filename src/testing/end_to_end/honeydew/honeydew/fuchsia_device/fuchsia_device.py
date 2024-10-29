@@ -193,7 +193,7 @@ class FuchsiaDevice(
         # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
         config: dict[str, Any] | None = None,
     ) -> None:
-        _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
+        _LOGGER.debug("Initializing FuchsiaDevice")
 
         self._device_info: custom_types.DeviceInfo = device_info
 
@@ -206,7 +206,7 @@ class FuchsiaDevice(
 
         self.health_check()
 
-        _LOGGER.debug("Initialized Fuchsia-Controller based FuchsiaDevice")
+        _LOGGER.debug("Initialized FuchsiaDevice")
 
     # List all the persistent properties
     @properties.PersistentProperty
