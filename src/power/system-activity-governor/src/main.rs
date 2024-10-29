@@ -84,7 +84,7 @@ where
         .add_fidl_service(IncomingService::ActivityGovernor)
         .add_fidl_service(IncomingService::Stats)
         .add_fidl_service(IncomingService::CpuElementManager)
-        .add_unified_service_instance(
+        .add_fidl_service_instance(
             "system_activity_governor",
             IncomingService::ElementInfoProviderService,
         );

@@ -33,7 +33,7 @@ enum IncomingService {
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new_local();
-    fs.dir("svc").add_unified_service(IncomingService::Svc);
+    fs.dir("svc").add_fidl_service_instance("default", IncomingService::Svc);
     fs.take_and_serve_directory_handle()?;
 
     const MAX_CONCURRENT: usize = 10_000;

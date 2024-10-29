@@ -31,7 +31,7 @@ async fn main() {
     let account = Arc::new(Mutex::new(Account { name, balance }));
 
     let mut fs = ServiceFs::new();
-    fs.dir("svc").add_unified_service(|req: fexamples::BankAccountRequest| req);
+    fs.dir("svc").add_fidl_service_instance("default", |req: fexamples::BankAccountRequest| req);
     fs.take_and_serve_directory_handle().expect("failed to serve outgoing namespace");
     fs.for_each_concurrent(None, move |request| {
         let account = account.clone();

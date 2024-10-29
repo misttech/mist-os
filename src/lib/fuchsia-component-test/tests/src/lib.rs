@@ -1589,7 +1589,10 @@ async fn route_service() -> Result<(), Error> {
                 async move {
                     let _ = &handles;
                     let mut fs = fserver::ServiceFs::new();
-                    fs.dir("svc").add_unified_service(|req: fex_services::BankAccountRequest| req);
+                    fs.dir("svc").add_fidl_service_instance(
+                        "default",
+                        |req: fex_services::BankAccountRequest| req,
+                    );
                     fs.serve_connection(handles.outgoing_dir)?;
                     fs.for_each_concurrent(None, move |request| async move {
                         match request {
