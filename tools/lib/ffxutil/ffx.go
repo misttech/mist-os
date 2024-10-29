@@ -196,10 +196,8 @@ func NewFFXInstance(
 			}
 		}
 	}
-	ffxCmds := [][]string{}
 	if deviceAddr := os.Getenv(botanistconstants.DeviceAddrEnvKey); deviceAddr != "" {
 		globalConfigSettings["discovery.mdns.enabled"] = false
-		ffxCmds = append(ffxCmds, []string{"target", "add", deviceAddr, "--nowait"})
 	}
 	if err := writeConfigFile(globalConfigFilepath, globalConfigSettings); err != nil {
 		return nil, fmt.Errorf("failed to write ffx global config at %s: %w", globalConfigFilepath, err)
@@ -209,14 +207,6 @@ func NewFFXInstance(
 	}
 	if err := writeConfigFile(ffxEnvFilepath, ffxEnvSettings); err != nil {
 		return nil, fmt.Errorf("failed to write ffx env file at %s: %w", ffxEnvFilepath, err)
-	}
-	for _, args := range ffxCmds {
-		if err := ffx.Run(ctx, args...); err != nil {
-			if stopErr := ffx.Stop(); stopErr != nil {
-				logger.Debugf(ctx, "failed to stop daemon: %s", stopErr)
-			}
-			return nil, fmt.Errorf("failed to run ffx cmd: %v: %w", args, err)
-		}
 	}
 	return ffx, nil
 }

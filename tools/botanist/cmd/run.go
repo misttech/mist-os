@@ -379,10 +379,6 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 					return err
 				}
 				t.GetFFX().SetTarget(addr.String())
-				// Add the target address in order to skip MDNS discovery.
-				if err := t.GetFFX().Run(ctx, "target", "add", addr.String()); err != nil {
-					return err
-				}
 				if r.syslogDir != "" {
 					if _, err := os.Stat(r.syslogDir); errors.Is(err, os.ErrNotExist) {
 						if err := os.Mkdir(r.syslogDir, os.ModePerm); err != nil {
