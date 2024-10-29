@@ -18,6 +18,7 @@ constexpr std::string_view kRootOpt = "userboot.root";
 constexpr std::string_view kNextOpt = "userboot.next";
 constexpr std::string_view kTestRootOpt = "userboot.test.root";
 constexpr std::string_view kTestNextOpt = "userboot.test.next";
+constexpr std::string_view kNextIsTestOpt = "userboot.next-is-test";
 
 // TODO(joshuaseaton): This should really be defined as a default value of
 // `Options::next` and expressed as a std::string_view; however, that can
@@ -61,6 +62,11 @@ constexpr bool ParseOption(std::string_view key, std::string_view value, Options
 
   if (key == kTestRootOpt) {
     opts.test.root = NormalizePath(value);
+    return true;
+  }
+
+  if (key == kNextIsTestOpt) {
+    opts.next_is_test = (value == "true");
     return true;
   }
 

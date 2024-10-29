@@ -45,6 +45,7 @@ if (is_fuchsia) {
 
     # This test needs to run as a 'boot' program, such that it is handed the SvcStash handle.
     userboot_entry_type = "boot"
+    userboot_next_is_test = true
   }
 
   # Verify that the '/svc' and svc stash handle work correctly.
@@ -60,6 +61,7 @@ if (is_fuchsia) {
 
     # This test needs to run as a 'boot' program, such that it is handed the SvcStash handle.
     userboot_entry_type = "boot"
+    userboot_next_is_test = true
   }
 }
 
