@@ -3397,7 +3397,7 @@
   issue: ['328306129']
   gerrit_change_id: ['1066674']
   status: 'Accepted'
-  reviewers: ['adamperry@google.com', 'andresoportus@google.com', 'fmil@google.com', 'gkalsi@google.com', 'harshanv@google.com', 'johngro@google.com', 'maniscalco@google.com', 'mcgrathr@google.com', 'miguelfrde@google.com', 'tgales@google.com', 'tmandry@google.com']
+  reviewers: ['adamperry@google.com', 'andresoportus@google.com', 'cja@google.com', 'fmil@google.com', 'gkalsi@google.com', 'harshanv@google.com', 'johngro@google.com', 'maniscalco@google.com', 'mcgrathr@google.com', 'miguelfrde@google.com', 'surajmalhotra@google.com', 'tgales@google.com', 'tmandry@google.com']
   submitted: '2024-06-14'
   reviewed: '2024-09-25'
 
