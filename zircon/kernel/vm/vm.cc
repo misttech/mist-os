@@ -83,23 +83,8 @@ namespace {
 // used to roughly sketch out and reserve portions of the kernel's aspace before we have the heap.
 lazy_init::LazyInit<VmAddressRegion> kernel_physmap_vmar;
 lazy_init::LazyInit<VmAddressRegion> kernel_image_vmar;
-#if !DISABLE_KASLR
-lazy_init::LazyInit<VmAddressRegion> kernel_random_padding_vmar;
-#endif
-lazy_init::LazyInit<VmAddressRegion> kernel_heap_vmar;
 
 }  // namespace
-
-// Request the heap dimensions.
-vaddr_t vm_get_kernel_heap_base() {
-  ASSERT(VIRTUAL_HEAP);
-  return kernel_heap_vmar->base();
-}
-
-size_t vm_get_kernel_heap_size() {
-  ASSERT(VIRTUAL_HEAP);
-  return kernel_heap_vmar->size();
-}
 
 // Initializes the statically known initial kernel region vmars. It needs to be global so that
 // VmAddressRegion can friend it.
@@ -141,51 +126,6 @@ void vm_init_preheap_vmars() {
     Guard<CriticalMutex> guard(kernel_image_vmar->lock());
     kernel_image_vmar->Activate();
   }
-
-#if !DISABLE_KASLR  // Disable random memory padding for KASLR
-  // Reserve random padding of up to 64GB after first mapping. It will make
-  // the adjacent memory mappings (kstack_vmar, arena:handles and others) at
-  // non-static virtual addresses.
-  size_t size_entropy;
-  crypto::global_prng::GetInstance()->Draw(&size_entropy, sizeof(size_entropy));
-
-  const size_t random_size = PAGE_ALIGN(size_entropy % (64ULL * GB));
-  vmar = fbl::AdoptRef<VmAddressRegion>(
-      &kernel_random_padding_vmar.Initialize(*root_vmar, PHYSMAP_BASE + PHYSMAP_SIZE, random_size,
-                                             kKernelVmarFlags, "random padding vmar"));
-  {
-    Guard<CriticalMutex> guard(kernel_random_padding_vmar->lock());
-    kernel_random_padding_vmar->Activate();
-  }
-  LTRACEF("VM: aspace random padding size: %#" PRIxPTR "\n", random_size);
-#endif
-
-  if constexpr (VIRTUAL_HEAP) {
-    // Reserve the range for the heap.
-    const size_t heap_bytes =
-        ROUNDUP(gBootOptions->heap_max_size_mb * MB, size_t(1) << ARCH_HEAP_ALIGN_BITS);
-    vaddr_t kernel_heap_base = 0;
-    {
-      Guard<CriticalMutex> guard(root_vmar->lock());
-      zx_status_t status = root_vmar->AllocSpotLocked(
-          heap_bytes, ARCH_HEAP_ALIGN_BITS, ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-          &kernel_heap_base);
-      ASSERT_MSG(status == ZX_OK, "Failed to allocate VMAR for heap");
-    }
-
-    // The heap has nothing to initialize later and we can create this from the beginning with only
-    // read and write and no execute.
-    vmar = fbl::AdoptRef<VmAddressRegion>(&kernel_heap_vmar.Initialize(
-        *root_vmar, kernel_heap_base, heap_bytes,
-        VMAR_FLAG_CAN_MAP_SPECIFIC | VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE,
-        "kernel heap"));
-    {
-      Guard<CriticalMutex> guard(kernel_heap_vmar->lock());
-      kernel_heap_vmar->Activate();
-    }
-    dprintf(INFO, "VM: kernel heap placed in range [%#" PRIxPTR ", %#" PRIxPTR ")\n",
-            kernel_heap_vmar->base(), kernel_heap_vmar->base() + kernel_heap_vmar->size());
-  }
 }
 
 void vm_init_preheap() {
@@ -197,22 +137,6 @@ void vm_init_preheap() {
   vm_init_preheap_vmars();
 
   zx_status_t status;
-
-#if !DISABLE_KASLR  // Disable random memory padding for KASLR
-  // Reserve up to 15 pages as a random padding in the kernel physical mapping
-  unsigned char entropy;
-  crypto::global_prng::GetInstance()->Draw(&entropy, sizeof(entropy));
-  struct list_node list;
-  list_initialize(&list);
-  size_t page_count = entropy % 16;
-  status = pmm_alloc_pages(page_count, 0, &list);
-  DEBUG_ASSERT(status == ZX_OK);
-  vm_page_t* page;
-  list_for_every_entry (&list, page, vm_page, queue_node) {
-    page->set_state(vm_page_state::WIRED);
-  }
-  LTRACEF("physical mapping padding page count %#" PRIxPTR "\n", page_count);
-#endif
 
   // grab a page and mark it as the zero page
   status = pmm_alloc_page(0, &zero_page, &zero_page_paddr);
@@ -263,12 +187,6 @@ void vm_init() {
   zx_status_t status = kernel_physmap_vmar->ReserveSpace(
       "physmap", PHYSMAP_BASE, PHYSMAP_SIZE, ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE);
   ASSERT(status == ZX_OK);
-
-#if !DISABLE_KASLR
-  status = kernel_random_padding_vmar->ReserveSpace(
-      "random_padding", kernel_random_padding_vmar->base(), kernel_random_padding_vmar->size(), 0);
-  ASSERT(status == ZX_OK);
-#endif
 
   cmpct_set_fill_on_alloc_threshold(gBootOptions->alloc_fill_threshold);
 }

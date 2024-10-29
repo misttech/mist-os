@@ -167,23 +167,7 @@ inline bool is_size_in_range(size_t size) { return size > 0 && size <= kHeapMaxA
 
 }  // namespace
 
-void heap_init() {
-  if constexpr (VIRTUAL_HEAP) {
-    virtual_alloc.Initialize(vm_page_state::HEAP);
-    zx_status_t status = virtual_alloc->Init(vm_get_kernel_heap_base(), vm_get_kernel_heap_size(),
-                                             1, ARCH_HEAP_ALIGN_BITS);
-    if (status != ZX_OK) {
-      panic("Failed to initialized heap backing allocator: %d", status);
-    }
-
-    printf("Kernel heap [%" PRIxPTR ", %" PRIxPTR
-           ") using %zu pages (%zu KiB) for tracking bitmap\n",
-           vm_get_kernel_heap_base(), vm_get_kernel_heap_base() + vm_get_kernel_heap_size(),
-           virtual_alloc->DebugBitmapPages(), virtual_alloc->DebugBitmapPages() * PAGE_SIZE / 1024);
-  }
-
-  cmpct_init();
-}
+void heap_init() { cmpct_init(); }
 
 void* malloc(size_t size) {
   DEBUG_ASSERT(!arch_blocking_disallowed());
@@ -282,44 +266,28 @@ static void heap_test() { cmpct_test(); }
 void* heap_page_alloc(size_t pages) {
   DEBUG_ASSERT(pages > 0);
 
-  if constexpr (VIRTUAL_HEAP) {
-    zx::result<vaddr_t> result = virtual_alloc->AllocPages(pages);
-    if (result.is_error()) {
-      printf("Failed to allocate %zu pages for heap: %d\n", pages, result.error_value());
-      return nullptr;
-    }
+  list_node list = LIST_INITIAL_VALUE(list);
 
-#if __has_feature(address_sanitizer)
-    asan_poison_shadow(*result, pages * PAGE_SIZE, kAsanInternalHeapMagic);
-#endif  // __has_feature(address_sanitizer)
-
-    void* ret = reinterpret_cast<void*>(*result);
-    LTRACEF("pages %zu: va %p\n", pages, ret);
-    return ret;
-  } else {
-    list_node list = LIST_INITIAL_VALUE(list);
-
-    paddr_t pa;
-    zx_status_t status = pmm_alloc_contiguous(pages, 0, PAGE_SIZE_SHIFT, &pa, &list);
-    if (status != ZX_OK) {
-      return nullptr;
-    }
-
-    // mark all of the allocated page as HEAP
-    vm_page_t *p, *temp;
-    list_for_every_entry_safe (&list, p, temp, vm_page_t, queue_node) {
-      list_delete(&p->queue_node);
-      p->set_state(vm_page_state::HEAP);
-#if __has_feature(address_sanitizer)
-      void* const vaddr = paddr_to_physmap(p->paddr());
-      asan_poison_shadow(reinterpret_cast<uintptr_t>(vaddr), PAGE_SIZE, kAsanInternalHeapMagic);
-#endif  // __has_feature(address_sanitizer)
-    }
-
-    LTRACEF("pages %zu: pa %#lx, va %p\n", pages, pa, paddr_to_physmap(pa));
-
-    return paddr_to_physmap(pa);
+  paddr_t pa;
+  zx_status_t status = pmm_alloc_contiguous(pages, 0, PAGE_SIZE_SHIFT, &pa, &list);
+  if (status != ZX_OK) {
+    return nullptr;
   }
+
+  // mark all of the allocated page as HEAP
+  vm_page_t *p, *temp;
+  list_for_every_entry_safe (&list, p, temp, vm_page_t, queue_node) {
+    list_delete(&p->queue_node);
+    p->set_state(vm_page_state::HEAP);
+#if __has_feature(address_sanitizer)
+    void* const vaddr = paddr_to_physmap(p->paddr());
+    asan_poison_shadow(reinterpret_cast<uintptr_t>(vaddr), PAGE_SIZE, kAsanInternalHeapMagic);
+#endif  // __has_feature(address_sanitizer)
+  }
+
+  LTRACEF("pages %zu: pa %#lx, va %p\n", pages, pa, paddr_to_physmap(pa));
+
+  return paddr_to_physmap(pa);
 }
 
 void heap_page_free(void* _ptr, size_t pages) {
@@ -327,31 +295,25 @@ void heap_page_free(void* _ptr, size_t pages) {
   DEBUG_ASSERT(pages > 0);
 
   LTRACEF("ptr %p, pages %zu\n", _ptr, pages);
+  uint8_t* ptr = (uint8_t*)_ptr;
 
-  if constexpr (VIRTUAL_HEAP) {
-    vaddr_t ptr = reinterpret_cast<vaddr_t>(_ptr);
-    virtual_alloc->FreePages(ptr, pages);
-  } else {
-    uint8_t* ptr = (uint8_t*)_ptr;
+  list_node list;
+  list_initialize(&list);
 
-    list_node list;
-    list_initialize(&list);
+  while (pages > 0) {
+    vm_page_t* p = paddr_to_vm_page(vaddr_to_paddr(ptr));
+    if (p) {
+      DEBUG_ASSERT(p->state() == vm_page_state::HEAP);
+      DEBUG_ASSERT(!list_in_list(&p->queue_node));
 
-    while (pages > 0) {
-      vm_page_t* p = paddr_to_vm_page(vaddr_to_paddr(ptr));
-      if (p) {
-        DEBUG_ASSERT(p->state() == vm_page_state::HEAP);
-        DEBUG_ASSERT(!list_in_list(&p->queue_node));
-
-        list_add_tail(&list, &p->queue_node);
-      }
-
-      ptr += PAGE_SIZE;
-      pages--;
+      list_add_tail(&list, &p->queue_node);
     }
 
-    pmm_free(&list);
+    ptr += PAGE_SIZE;
+    pages--;
   }
+
+  pmm_free(&list);
 }
 
 void heap_report_alloc_failure() { pmm_report_alloc_failure(); }
