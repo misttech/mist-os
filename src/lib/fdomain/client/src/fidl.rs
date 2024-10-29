@@ -336,7 +336,7 @@ impl ::fidl::encoding::EncodableAsHandle for crate::Event {
     type Dialect = FDomainResourceDialect;
 }
 
-impl ::fidl::encoding::EncodableAsHandle for crate::Eventpair {
+impl ::fidl::encoding::EncodableAsHandle for crate::EventPair {
     type Dialect = FDomainResourceDialect;
 }
 

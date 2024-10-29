@@ -35,14 +35,26 @@ pub use channel::{
     AnyHandle, Channel, ChannelMessage, ChannelMessageStream, ChannelWriter, HandleInfo,
 };
 pub use event::Event;
-pub use event_pair::Eventpair;
+pub use event_pair::Eventpair as EventPair;
 pub use handle::{AsHandleRef, Handle, HandleBased, HandleRef, OnFDomainSignals, Peered};
 pub use proto::{Error as FDomainError, ObjType, WriteChannelError, WriteSocketError};
 pub use socket::{Socket, SocketDisposition, SocketReadStream, SocketWriter};
 
 // Unsupported handle types.
 #[rustfmt::skip]
+pub use Handle as Fifo;
+#[rustfmt::skip]
+pub use Handle as Job;
+#[rustfmt::skip]
+pub use Handle as Process;
+#[rustfmt::skip]
+pub use Handle as Resource;
+#[rustfmt::skip]
 pub use Handle as Stream;
+#[rustfmt::skip]
+pub use Handle as Thread;
+#[rustfmt::skip]
+pub use Handle as Vmar;
 #[rustfmt::skip]
 pub use Handle as Vmo;
 
@@ -605,7 +617,7 @@ impl Client {
     }
 
     /// Create a new event pair in the connected FDomain.
-    pub async fn create_event_pair(self: &Arc<Self>) -> Result<(Eventpair, Eventpair), Error> {
+    pub async fn create_event_pair(self: &Arc<Self>) -> Result<(EventPair, EventPair), Error> {
         let id_a = self.new_hid();
         let id_b = self.new_hid();
         self.transaction(
@@ -615,8 +627,8 @@ impl Client {
         )
         .await?;
         Ok((
-            Eventpair(Handle { id: id_a.id, client: Arc::downgrade(self) }),
-            Eventpair(Handle { id: id_b.id, client: Arc::downgrade(self) }),
+            EventPair(Handle { id: id_a.id, client: Arc::downgrade(self) }),
+            EventPair(Handle { id: id_b.id, client: Arc::downgrade(self) }),
         ))
     }
 

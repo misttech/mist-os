@@ -4,7 +4,7 @@
 
 use crate::handle::handle_type;
 use crate::responder::Responder;
-use crate::{ordinals, Error, Event, Eventpair, Handle, OnFDomainSignals, Socket};
+use crate::{ordinals, Error, Event, EventPair, Handle, OnFDomainSignals, Socket};
 use fidl_fuchsia_fdomain as proto;
 use fidl_fuchsia_fdomain_ext::{AsFDomainObjectType, AsFDomainRights};
 use futures::channel::mpsc::UnboundedReceiver;
@@ -63,7 +63,7 @@ pub enum AnyHandle {
     Channel(Channel),
     Socket(Socket),
     Event(Event),
-    EventPair(Eventpair),
+    EventPair(EventPair),
     Unknown(Handle, fidl::ObjectType),
 }
 
@@ -74,7 +74,7 @@ impl AnyHandle {
             proto::ObjType::Channel => AnyHandle::Channel(Channel(handle)),
             proto::ObjType::Socket => AnyHandle::Socket(Socket(handle)),
             proto::ObjType::Event => AnyHandle::Event(Event(handle)),
-            proto::ObjType::Eventpair => AnyHandle::EventPair(Eventpair(handle)),
+            proto::ObjType::Eventpair => AnyHandle::EventPair(EventPair(handle)),
             _ => AnyHandle::Unknown(handle, convert_object_type(ty)),
         }
     }
