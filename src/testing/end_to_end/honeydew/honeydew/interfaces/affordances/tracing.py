@@ -29,6 +29,10 @@ class Tracing(abc.ABC):
                 to acknowledge that they've started tracing. NB: trace providers
                 that don't ACK by this deadline may still emit tracing events
                 starting at some later point.
+
+        Raises:
+            TracingStateError: When trace session is already initialized.
+            TracingError: On FIDL communication failure.
         """
 
     @abc.abstractmethod
@@ -49,11 +53,23 @@ class Tracing(abc.ABC):
 
     @abc.abstractmethod
     def start(self) -> None:
-        """Starts tracing."""
+        """Starts tracing.
+
+        Raises:
+           TracingStateError: When trace session is not initialized or
+               already started.
+           TracingError: On FIDL communication failure.
+        """
 
     @abc.abstractmethod
     def stop(self) -> None:
-        """Stops the current trace."""
+        """Stops the current trace.
+
+        Raises:
+           TracingStateError: When trace session is not initialized or
+               not started.
+           TracingError: On FIDL communication failure.
+        """
 
     @abc.abstractmethod
     def terminate(self) -> None:
@@ -77,6 +93,10 @@ class Tracing(abc.ABC):
 
         Returns:
             The path to the trace file.
+
+         Raises:
+            TracingStateError: When trace session is not initialized or
+                already started.
         """
 
     @contextmanager
