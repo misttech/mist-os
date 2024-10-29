@@ -18,6 +18,7 @@ source_set("tests") {
     "path-test.cc",
     "pid_table-test.cc",
     "signal/syscalls-test.cc",
+    "signal/types-test.cc",
     "task-test.cc",
     "task/syscalls-test.cc",
     "thread_group-test.cc",

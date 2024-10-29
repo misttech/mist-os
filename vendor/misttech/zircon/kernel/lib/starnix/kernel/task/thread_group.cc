@@ -6,7 +6,9 @@
 #include "lib/mistos/starnix/kernel/task/thread_group.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/signals/signal_handling.h>
 #include <lib/mistos/starnix/kernel/signals/syscalls.h>
+#include <lib/mistos/starnix/kernel/signals/types.h>
 #include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -19,7 +21,11 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
+#include <limits>
+#include <memory>
+
 #include <fbl/alloc_checker.h>
+#include <fbl/intrusive_hash_table.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 #include <kernel/mutex.h>
@@ -41,16 +47,18 @@ fbl::RefPtr<ZombieProcess> ZombieProcess::New(const ThreadGroupMutableState& thr
   // Note: TaskTimeStats addition is commented out as it's not implemented in the C++ version
   fbl::AllocChecker ac;
   auto zp = fbl::AdoptRef(new (&ac) ZombieProcess(thread_group.base_->leader(),
-                                                  thread_group.process_group_->leader(),
+                                                  thread_group.process_group_->leader_,
                                                   credentials.uid, ktl::move(exit_info), true));
   ZX_ASSERT(ac.check());
   return zp;
 }
 
 void ZombieProcess::release(PidTable& pids) {
+  LTRACE_ENTRY_OBJ;
   if (is_canonical) {
     pids.remove_zombie(pid);
   }
+  LTRACE_EXIT_OBJ;
 }
 
 ThreadGroupMutableState::ThreadGroupMutableState() = default;
@@ -132,15 +140,14 @@ void ThreadGroupMutableState::set_process_group(fbl::RefPtr<ProcessGroup> proces
 void ThreadGroupMutableState::leave_process_group(PidTable& pids) {
   LTRACE_ENTRY_OBJ;
   if (process_group_->remove(fbl::RefPtr<ThreadGroup>(base_))) {
-    process_group_->session()->Write()->remove(process_group_->leader());
-    pids.remove_process_group(process_group_->leader());
+    process_group_->session_->Write()->remove(process_group_->leader_);
+    pids.remove_process_group(process_group_->leader_);
   }
   LTRACE_EXIT_OBJ;
 }
 
 bool ThreadGroupMutableState::is_waitable() const {
-  // return last_signal.has_value() && base_->load_stopped() != StopState::InProgress;
-  return false;
+  return last_signal_.has_value() && !StopStateHelper::is_in_progress(base_->load_stopped());
 }
 
 ktl::optional<WaitResult> ThreadGroupMutableState::get_waitable_zombie(
@@ -203,7 +210,7 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
                           [&](ProcessSelector::Pid pid) { return child->leader() == pid.value; },
                           [&](ProcessSelector::Pgid pgid) {
                             return pids.get_process_group(pgid.value) ==
-                                   child->Read()->process_group();
+                                   child->Read()->process_group_;
                           }},
                       selector.selector());
   };
@@ -241,11 +248,12 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
   // children.
   fbl::Vector<fbl::RefPtr<ThreadGroup>> selected_children;
   for (auto it = children_.begin(); it != children_.end(); ++it) {
-    auto t = it.CopyPointer().Lock();
-    if (t && filter_children_by_pid_selector(t) && filter_children_by_waiting_options(t)) {
-      LTRACEF("Found child pid: %d\n", t->leader());
+    auto thread_group = it.CopyPointer().Lock();
+    if (thread_group && filter_children_by_pid_selector(thread_group) &&
+        filter_children_by_waiting_options(thread_group)) {
+      LTRACEF("Found child pid: %d\n", thread_group->leader());
       fbl::AllocChecker ac;
-      selected_children.push_back(t, &ac);
+      selected_children.push_back(thread_group, &ac);
       ZX_ASSERT(ac.check());
     }
   }
@@ -328,13 +336,136 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_child(ProcessSelector 
   return get_waitable_running_children(selector, options, pids);
 }
 
+fit::result<Errno, fbl::RefPtr<Task>> ThreadGroupMutableState::get_live_task() const {
+  ktl::optional<fbl::RefPtr<Task>> task;
+  auto it = tasks_.find(leader());
+  if (it != tasks_.end()) {
+    task = it->upgrade();
+  }
+
+  if (task.has_value()) {
+    return fit::ok(task.value());
+  }
+  // TODO (Herrera)
+  // convert => .or_else(|| self.tasks().next())
+
+  return fit::error(errno(ESRCH));
+}
+
+StopState ThreadGroupMutableState::set_stopped(StopState new_stopped,
+                                               ktl::optional<SignalInfo> siginfo,
+                                               bool finalize_only) {
+  ktl::optional<StopState> stopped = base_->check_stopped_state(new_stopped, finalize_only);
+  if (stopped.has_value()) {
+    return stopped.value();
+  }
+
+  // Thread groups don't transition to group stop if they are waking, because waking
+  // means something told it to wake up (like a SIGCONT) but hasn't finished yet.
+  if (base_->load_stopped() == StopState::Waking &&
+      (new_stopped == StopState::GroupStopping || new_stopped == StopState::GroupStopped)) {
+    return base_->load_stopped();
+  }
+
+  // TODO(https://g-issues.fuchsia.dev/issues/306438676): When thread
+  // group can be stopped inside user code, tasks/thread groups will
+  // need to be either restarted or stopped here.
+  store_stopped(new_stopped);
+  if (siginfo.has_value()) {
+    // We don't want waiters to think the process was unstopped
+    // because of a sigkill. They will get woken when the
+    // process dies.
+    if (siginfo.value().signal != kSIGKILL) {
+      last_signal_ = siginfo;
+    }
+  }
+  if (new_stopped == StopState::Waking || new_stopped == StopState::ForceWaking) {
+    stopped_waiters_.notify_all();
+  }
+
+  ktl::optional<ThreadGroupParent> parent_opt;
+  if (!StopStateHelper::is_in_progress(new_stopped)) {
+    parent_opt = parent_;
+  }
+
+  // Drop the lock before locking the parent.
+  // TODO (Herrera) ??? std::destroy_at(std::addressof(this));
+  if (parent_opt.has_value()) {
+    auto parent = parent_opt.value().upgrade();
+    if (parent) {
+      parent->Write()->child_status_waiters_.notify_all();
+    }
+  }
+
+  return new_stopped;
+}
+
+void ThreadGroupMutableState::store_stopped(StopState state) {
+  // We don't actually use the guard but we require it to enforce that the
+  // caller holds the thread group's mutable state lock (identified by
+  // mutable access to the thread group's mutable state).
+
+  base_->stop_state_.store(state, std::memory_order_relaxed);
+}
+
+void ThreadGroupMutableState::send_signal(SignalInfo signal_info) {
+  auto sigaction = base_->signal_actions_->Get(signal_info.signal);
+  auto action = action_for_signal(signal_info, sigaction);
+
+  base_->pending_signals_.Lock()->enqueue(signal_info);
+  fbl::Vector<util::WeakPtr<Task>> tasks;
+  for (auto& t : tasks_) {
+    fbl::AllocChecker ac;
+    tasks.push_back(t.weak_clone(), &ac);
+    ZX_ASSERT(ac.check());
+  }
+
+  // Set state to waking before interrupting any tasks.
+  if (signal_info.signal == kSIGKILL) {
+    set_stopped(StopState::ForceWaking, signal_info, false);
+  } else if (signal_info.signal == kSIGCONT) {
+    set_stopped(StopState::Waking, signal_info, false);
+  }
+
+  bool has_interrupted_task = false;
+  for (auto tc : tasks) {
+    auto task = tc.Lock();
+    auto task_state = task->Write();
+
+    if (signal_info.signal == kSIGKILL) {
+      task_state->set_stopped(StopState::ForceWaking, {}, {}, {});
+    } else if (signal_info.signal == kSIGCONT) {
+      task_state->set_stopped(StopState::Waking, {}, {}, {});
+    }
+
+    auto is_masked = task_state->is_signal_masked(signal_info.signal);
+    auto was_masked = task_state->is_signal_masked_by_saved_mask(signal_info.signal);
+
+    auto is_queued =
+        action != DeliveryAction::Ignore || is_masked || was_masked || task_state->is_ptraced();
+
+    if (is_queued) {
+      // task_state->notify_signal_waiters();
+      task_state->set_flags(TaskFlags(TaskFlagsEnum::SIGNALS_AVAILABLE), true);
+
+      if (!is_masked && action.must_interrupt(sigaction) && !has_interrupted_task) {
+        // Only interrupt one task, and only interrupt if the signal was actually queued
+        // and the action must interrupt.
+        task->interrupt();
+        has_interrupted_task = true;
+      }
+    }
+  }
+}
+
 fbl::RefPtr<ThreadGroup> ThreadGroup::New(
     fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
     ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
-    pid_t leader, fbl::RefPtr<ProcessGroup> process_group) {
+    pid_t leader, fbl::RefPtr<ProcessGroup> process_group,
+    fbl::RefPtr<SignalActions> signal_actions) {
   fbl::AllocChecker ac;
-  fbl::RefPtr<ThreadGroup> thread_group = fbl::AdoptRef(
-      new (&ac) ThreadGroup(ktl::move(kernel), ktl::move(process), parent, leader, process_group));
+  fbl::RefPtr<ThreadGroup> thread_group = fbl::AdoptRef(new (&ac) ThreadGroup(
+      ktl::move(kernel), ktl::move(process), parent, leader, process_group, signal_actions));
   ASSERT(ac.check());
 
   if (parent.has_value()) {
@@ -350,11 +481,13 @@ fbl::RefPtr<ThreadGroup> ThreadGroup::New(
 ThreadGroup::ThreadGroup(
     fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
     ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard>& parent,
-    pid_t leader, fbl::RefPtr<ProcessGroup> process_group)
+    pid_t leader, fbl::RefPtr<ProcessGroup> process_group,
+    fbl::RefPtr<SignalActions> signal_actions)
     : weak_thread_group_(util::WeakPtr<ThreadGroup>(this)),
       kernel_(ktl::move(kernel)),
       process_(ktl::move(process)),
       leader_(leader),
+      signal_actions_(ktl::move(signal_actions)),
       stop_state_(AtomicStopState(StopState::Awake)),
       observer_(util::WeakPtr(this)) {
   LTRACE_ENTRY_OBJ;
@@ -371,9 +504,6 @@ ThreadGroup::ThreadGroup(
 
   *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, tgp, process_group));
 
-  if (process_.dispatcher()) {
-    // process_.dispatcher()->AddObserver(&observer_, this, ZX_PROCESS_TERMINATED);
-  }
   LTRACE_EXIT_OBJ;
 }
 
@@ -410,7 +540,7 @@ void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> curren
   // SAFETY: tasks is kept on the stack. The static is required to ensure the lock on
   // ThreadGroup can be dropped.
   auto tasks = state->tasks();
-  state.~RwLockGuard();
+  std::destroy_at(std::addressof(state));
 
   // Detach from any ptraced tasks.
   // let tracees = self.ptracees.lock().keys().cloned().collect::<Vec<_>>();
@@ -421,7 +551,7 @@ void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> curren
   //}
   for (auto task : tasks) {
     task->Write()->set_exit_status(exit_status);
-    //send_standard_signal(&task, SignalInfo::default(SIGKILL));
+    send_standard_signal(task, SignalInfo::Default(kSIGKILL));
   }
   LTRACE_EXIT_OBJ;
 }
@@ -444,12 +574,12 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
   auto pids = kernel_->pids.Write();
 
   // task->set_ptrace_zombie(pids.get());
-  pids->remove_task(task->id());
+  pids->remove_task(task->id_);
 
   auto state = Write();
 
   TaskPersistentInfo persistent_info;
-  auto it = state->tasks_.find(task->id());
+  auto it = state->tasks_.find(task->id_);
   if (it != state->tasks_.end()) {
     persistent_info = it->into();
     state->tasks_.erase(it);
@@ -460,8 +590,9 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
     return;
   }
 
-  if (task->id() == leader_) {
-    ExitStatus exit_status = task->exit_status().value_or(ExitStatus::Exit(255));
+  if (task->id_ == leader_) {
+    ExitStatus exit_status =
+        task->exit_status().value_or(ExitStatus::Exit(std::numeric_limits<uint8_t>::max()));
     state->leader_exit_info_ = ProcessExitInfo{
         .status = exit_status,
         .exit_signal = persistent_info->Lock()->exit_signal(),
@@ -488,7 +619,7 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
     // containers that only lock the data they contain, but see
     // https://docs.google.com/document/d/1YHrhBqNhU1WcrsYgGAu3JwwlVmFXPlwWHTJLAbwRebY/edit
     // for an idea.
-    state.~RwLockGuard();
+    std::destroy_at(std::addressof(state));
 
     // We will need the immediate parent and the reaper. Once we have them, we can make
     // sure to take the locks in the right order: parent before child.
@@ -528,11 +659,10 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
 
     // Once the last zircon thread stops, the zircon process will also stop executing.
 
-    /*if let
-      Some(parent) = parent {
-        let parent = parent.upgrade();
-        parent.check_orphans(locked);
-      }*/
+    if (parent.has_value()) {
+      auto strong_parent = parent->upgrade();
+      strong_parent->check_orphans();
+    }
   }
 }
 
@@ -554,12 +684,12 @@ void ThreadGroup::do_zombie_notifications(fbl::RefPtr<ZombieProcess> zombie) con
   fbl::AllocChecker ac;
   state->zombie_children_.push_back(ktl::move(zombie), &ac);
   ZX_ASSERT(ac.check());
-  state->child_status_waiters_.NotifyAll();
+  state->child_status_waiters_.notify_all();
 
   // Send signals
   if (exit_signal.has_value()) {
     signal_info.signal = exit_signal.value();
-    //  state->send_signal(signal_info);
+    state->send_signal(signal_info);
   }
 }
 
@@ -577,7 +707,45 @@ fit::result<Errno> ThreadGroup::setsid() const {
   return fit::ok();
 }
 
-void ThreadGroup::release() {}
+void ThreadGroup::check_orphans() {
+  fbl::AllocChecker ac;
+  fbl::Vector<fbl::RefPtr<ThreadGroup>> thread_groups;
+
+  auto state = Read();
+  for (const auto& child : state->children()) {
+    thread_groups.push_back(child, &ac);
+    ZX_ASSERT(ac.check());
+  }
+
+  auto thiz = weak_thread_group_.Lock();
+  thread_groups.push_back(ktl::move(thiz), &ac);
+  ZX_ASSERT(ac.check());
+
+  // Get unique process groups
+  fbl::TaggedHashTable<pid_t, fbl::RefPtr<ProcessGroup>, internal::ThreadGroupTag> process_groups;
+  for (const auto& tg : thread_groups) {
+    process_groups.insert(tg->Read()->process_group_);
+  }
+
+  // Check each process group
+  for (auto& process_group : process_groups) {
+    process_group.check_orphaned();
+  }
+}
+
+void ThreadGroup::release() {
+  LTRACE_ENTRY_OBJ;
+  auto pids = kernel_->pids.Write();
+  auto state = Write();
+
+  for (auto& zombie : state->zombie_children()) {
+    zombie->release(*pids);
+  }
+  state->zombie_children().reset();
+
+  // state->zombie_ptracees().release(*pids);
+  LTRACE_EXIT_OBJ;
+}
 
 bool ProcessSelector::DoMatch(pid_t pid, const PidTable& pid_table) const {
   return ktl::visit(ProcessSelector::overloaded{
@@ -587,7 +755,7 @@ bool ProcessSelector::DoMatch(pid_t pid, const PidTable& pid_table) const {
                           if (task_ref) {
                             if (auto group = pid_table.get_process_group(pg.value)) {
                               if (group.has_value()) {
-                                return group == task_ref->thread_group()->Read()->process_group();
+                                return group == task_ref->thread_group()->Read()->process_group_;
                               }
                             }
                           }

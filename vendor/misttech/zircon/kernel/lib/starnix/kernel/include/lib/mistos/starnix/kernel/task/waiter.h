@@ -103,7 +103,7 @@ class EventHandler {
   overloaded(Ts...) -> overloaded<Ts...>;
 
   // impl EventHandler
-  void Handle(FdEvents events) const;
+  void handle(FdEvents events) const;
 
  private:
   explicit EventHandler(Variant handler) : handler_(ktl::move(handler)) {}
@@ -128,13 +128,11 @@ class SignalHandlerInner {
  public:
   using Variant = ktl::variant<ZxioSignalHandler, ZxHandleSignalHandler, ManyZxHandleSignalHandler>;
 
-  static SignalHandlerInner FromZxioSignalHandler(ZxioSignalHandler e) {
+  static SignalHandlerInner Zxio(ZxioSignalHandler e) { return SignalHandlerInner(ktl::move(e)); }
+  static SignalHandlerInner ZxHandle(ZxHandleSignalHandler e) {
     return SignalHandlerInner(ktl::move(e));
   }
-  static SignalHandlerInner FromZxHandleSignalHandler(ZxHandleSignalHandler e) {
-    return SignalHandlerInner(ktl::move(e));
-  }
-  static SignalHandlerInner ManyZxHandleSignalHandler(ManyZxHandleSignalHandler e) {
+  static SignalHandlerInner ManyZxHandle(ManyZxHandleSignalHandler e) {
     return SignalHandlerInner(ktl::move(e));
   }
 
@@ -158,25 +156,30 @@ class SignalHandlerInner {
 
 class SignalHandler {
  public:
+  SignalHandlerInner inner_;
+  EventHandler event_handler_;
+
+  // impl SignalHandler
+ private:
+  void handle(zx_signals_t signals) const;
+
+  // C++
+ public:
   explicit SignalHandler(SignalHandlerInner inner, EventHandler event_handler)
       : inner_(ktl::move(inner)), event_handler_(ktl::move(event_handler)) {}
 
-  // impl SignalHandler
-  void Handle(zx_signals_t signals) const;
-
  private:
-  SignalHandlerInner inner_;
-  EventHandler event_handler_;
+  friend class PortWaiter;
 };
 
 class WaitCallback {
  public:
   using Variant = ktl::variant<EventHandler, SignalHandler>;
 
-  static WaitCallback EventHandlerCallback(EventHandler e) { return WaitCallback(ktl::move(e)); }
   static WaitCallback SignalHandlerCallback(SignalHandler e) { return WaitCallback(ktl::move(e)); }
+  static WaitCallback EventHandlerCallback(EventHandler e) { return WaitCallback(ktl::move(e)); }
 
-  const Variant& callback() const { return callback_; }
+  static EventHandler none() { return EventHandler::None(); }
 
   // Helpers from the reference documentation for ktl::visit<>, to allow
   // visit-by-overload of the ktl::variant<> returned by GetLastReference():
@@ -189,6 +192,7 @@ class WaitCallback {
   overloaded(Ts...) -> overloaded<Ts...>;
 
  private:
+  friend class PortWaiter;
   explicit WaitCallback(Variant callback) : callback_(ktl::move(callback)) {}
 
   Variant callback_;
@@ -216,21 +220,9 @@ class WaitEvents {
   /// impl WaitEvents
 
   ///  Returns whether a wait on `self` should be woken up by `other`.
-  bool Intercept(const WaitEvents& other) const {
-    return ktl::visit(WaitEvents::overloaded{
-                          [](const ktl::monostate&, const Variant&) { return true; },
-                          [](const Variant&, const ktl::monostate&) { return true; },
-                          [](const FdEvents& self, const FdEvents& other) {
-                            return (self.bits() & other.bits()) != 0;
-                          },
-                          [](const uint64_t& self, const uint64_t& other) { return self == other; },
-                          [](const auto&, const auto&) { return false; }},
-                      data_, other.data_);
-  }
+  bool intercept(const WaitEvents& other) const;
 
-  // C++
-  const Variant& data() const { return data_; }
-
+ private:
   template <class... Ts>
   struct overloaded : Ts... {
     using Ts::operator()...;
@@ -239,7 +231,8 @@ class WaitEvents {
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
 
- private:
+  friend class PortWaiter;
+
   explicit WaitEvents(Variant data) : data_(ktl::move(data)) {}
 
   Variant data_;
@@ -254,16 +247,12 @@ struct WaitQueueImpl;
 /// and a Waiter should have a single owner. So the Arc is hidden inside Waiter.
 class PortWaiter : public fbl::RefCountedUpgradeable<PortWaiter> {
  private:
+  fbl::RefPtr<PortEvent> port_;
+
   using CallbackMap = std::map<WaitKey, WaitCallback, std::less<>,
                                util::Allocator<std::pair<const WaitKey, WaitCallback>>>;
-
-  using WaitQueueMap =
-      std::map<WaitKey, util::WeakPtr<starnix_sync::StarnixMutex<WaitQueueImpl>>, std::less<>,
-               util::Allocator<std::pair<
-                   const WaitKey, util::WeakPtr<starnix_sync::StarnixMutex<WaitQueueImpl>>>>>;
-
-  fbl::RefPtr<PortEvent> port_;
-  mutable CallbackMap callbacks_;  // the key 0 is reserved for 'no handler'
+  mutable starnix_sync::StarnixMutex<CallbackMap>
+      callbacks_;  // the key 0 is reserved for 'no handler'
   AtomicCounter<uint64_t> next_key_;
   bool ignore_signals_;
 
@@ -271,51 +260,60 @@ class PortWaiter : public fbl::RefCountedUpgradeable<PortWaiter> {
   /// can remove itself from the queues.
   ///
   /// This lock is nested inside the WaitQueue.waiters lock.
+  using WaitQueueMap =
+      std::map<WaitKey, util::WeakPtr<starnix_sync::StarnixMutex<WaitQueueImpl>>, std::less<>,
+               util::Allocator<std::pair<
+                   const WaitKey, util::WeakPtr<starnix_sync::StarnixMutex<WaitQueueImpl>>>>>;
+
   starnix_sync::StarnixMutex<WaitQueueMap> wait_queues_;
 
   /// impl PortWaiter
- public:
+ private:
   /// Internal constructor.
   static fbl::RefPtr<PortWaiter> New(bool ignore_signals);
 
   /// Waits until the given deadline has passed or the waiter is woken up. See wait_until().
-  fit::result<Errno> WaitInternal(zx_instant_mono_t deadline);
+  fit::result<Errno> wait_internal(zx_instant_mono_t deadline);
 
-  fit::result<Errno> WaitUntil(const CurrentTask& current_task, zx_instant_mono_t deadline);
+  fit::result<Errno> wait_until(const CurrentTask& current_task, zx_instant_mono_t deadline);
 
-  WaitKey NextKey() const {
+  WaitKey next_key() const {
     uint64_t key = next_key_.next();
     // TODO - find a better reaction to wraparound
     ZX_ASSERT_MSG(key != 0, "bad key from u64 wraparound");
     return WaitKey{.id = key};
   }
 
-  WaitKey RegisterCallback(WaitCallback callback) const;
+  WaitKey register_callback(WaitCallback callback) const;
 
-  ktl::optional<WaitCallback> RemoveCallback(const WaitKey& key) const;
+  ktl::optional<WaitCallback> remove_callback(const WaitKey& key) const;
 
-  void WakeImmediately(WaitEvents events, EventHandler handler) const;
+  void wake_immediately(FdEvents events, EventHandler handler) const;
 
   /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
   /// confused with POSIX signals), optionally running a FnOnce.
   ///
   /// Returns a `HandleWaitCanceler` that can be used to cancel the wait.
-  fit::result<zx_status_t, HandleWaitCanceler> WakeOnZirconSignals(const Handle& handle,
-                                                                   zx_signals_t zx_signals,
-                                                                   SignalHandler handler) const;
+  fit::result<zx_status_t, HandleWaitCanceler> wake_on_zircon_signals(const Handle& handle,
+                                                                      zx_signals_t zx_signals,
+                                                                      SignalHandler handler) const;
 
-  void QueueEvents(const WaitKey& key, WaitEvents events) const;
+  void queue_events(const WaitKey& key, WaitEvents events) const;
 
-  void Interrupt() const;
+  void interrupt() const;
 
-  auto& wait_queues() { return wait_queues_; }
-  // const auto& wait_queues() const { return wait_queues_; }
-
-  auto& callbacks() { return callbacks_; }
-  const auto& callbacks() const { return callbacks_; }
+  // C++
+ public:
+  ~PortWaiter();
 
  private:
+  friend class Waiter;
+  friend class WaitQueue;
+  friend class WaiterRef;
+
   explicit PortWaiter(fbl::RefPtr<PortEvent> port, bool ignore_signals);
+
+  DISALLOW_COPY_ASSIGN_AND_MOVE(PortWaiter);
 };
 
 class AbortHandle : public fbl::RefCountedUpgradeable<AbortHandle> {};
@@ -336,6 +334,10 @@ class WaiterKind {
     return WaiterKind(ktl::move(waiter));
   }
 
+  // C++
+  ~WaiterKind();
+
+ private:
   template <class... Ts>
   struct overloaded : Ts... {
     using Ts::operator()...;
@@ -344,7 +346,6 @@ class WaiterKind {
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
 
- private:
   friend class WaiterRef;
   explicit WaiterKind(Variant waiter) : waiter_(ktl::move(waiter)) {}
 
@@ -357,13 +358,13 @@ class Waiter;
 /// calling queue_events later.
 class WaiterRef {
  public:
-  static WaiterRef FromPort(fbl::RefPtr<PortWaiter> waiter) {
+  static WaiterRef from_port(fbl::RefPtr<PortWaiter> waiter) {
     return WaiterRef(WaiterKind::PortWaiter(util::WeakPtr(waiter.get())));
   }
-  static WaiterRef FromEvent(fbl::RefPtr<InterruptibleEvent> waiter);
-  static WaiterRef FromAbortHandle(fbl::RefPtr<AbortHandle> waiter);
+  static WaiterRef from_event(fbl::RefPtr<InterruptibleEvent> waiter);
+  static WaiterRef from_abort_handle(fbl::RefPtr<AbortHandle> waiter);
 
-  bool IsValid() const {
+  bool is_valid() const {
     return ktl::visit(
         WaiterKind::overloaded{
             [](const util::WeakPtr<PortWaiter>& waiter) { return waiter.Lock() != nullptr; },
@@ -372,15 +373,15 @@ class WaiterRef {
         waiter_kind_.waiter_);
   }
 
-  void Interrupt();
+  void interrupt() const;
 
-  void RemoveCallback(WaitKey key);
+  void remove_callback(WaitKey key);
 
   /// Called by the WaitQueue when this waiter is about to be removed from the queue.
   ///
   /// TODO(abarth): This function does not appear to be called when the WaitQueue is dropped,
   /// which appears to be a leak.
-  void WillRemoveFromWaitQueue(WaitKey key);
+  void will_remove_from_wait_queue(WaitKey key);
 
   /// Notify the waiter that the `events` have occurred.
   ///
@@ -388,8 +389,9 @@ class WaiterRef {
   /// which events occurred.
   ///
   /// If the client is using an `AbortHandle`, `AbortHandle::abort()` will be called.
-  bool Notify(WaitKey key, WaitEvents events);
+  bool notify(WaitKey key, WaitEvents events);
 
+  // C++
   bool operator==(const Waiter& other) const;
   bool operator==(const fbl::RefPtr<InterruptibleEvent>& other) const;
 
@@ -407,6 +409,7 @@ class WaiterRef {
 
  private:
   explicit WaiterRef(WaiterKind waiter) : waiter_kind_(ktl::move(waiter)) {}
+
   WaiterKind waiter_kind_;
 };
 
@@ -452,31 +455,51 @@ struct WaitQueueImpl {
 };
 
 class PortWaiter;
-class HandleWaitCanceler {
- public:
-  void Cancel(Handle* handle);
 
+/// Return values for wait_async methods that monitor the state of a handle.
+///
+/// Calling `cancel` will cancel any running wait.
+///
+/// Does not implement `Clone` or `Copy` so that only a single canceler exists
+/// per wait.
+class HandleWaitCanceler {
  private:
   util::WeakPtr<PortWaiter> waiter_;
 
   WaitKey key_;
+
+  // impl HandleWaitCanceler
+ public:
+  /// Cancel the pending wait.
+  ///
+  /// Takes `self` by value since a wait can only be canceled once.
+  void cancel(Handle* handle);
 };
 
+class WaitCanceler;
 class Waiter {
+ private:
+  // TODO(https://g-issues.fuchsia.dev/issues/303068424): Avoid `PortWaiter`
+  // when operating purely over FDs backed by starnix.
+  fbl::RefPtr<PortWaiter> inner_;
+
+  /// impl Waiter
  public:
   /// Create a new waiter.
   static Waiter New();
 
   /// Create a new waiter that doesn't wake up when a signal is received.
-  static Waiter NewIgnoringSignals();
+  static Waiter new_ignoring_signals();
 
+ private:
   /// Create a weak reference to this waiter.
   WaiterRef weak() const;
 
+ public:
   /// Wait until the waiter is woken up.
   ///
   /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns EINTR.
-  fit::result<Errno> Wait(const CurrentTask& current_task) const;
+  fit::result<Errno> wait(const CurrentTask& current_task) const;
 
   /// Wait until the given deadline has passed or the waiter is woken up.
   ///
@@ -500,33 +523,35 @@ class Waiter {
   /// the [`EventHandler`] used to handle an event iff the waiter observes the side-effects of
   /// the handler (e.g. reading the ready list modified by [`EventHandler::Enqueue`] or
   /// [`EventHandler::EnqueueOnce`]).
-  fit::result<Errno> WaitUntil(const CurrentTask& current_task, zx_instant_mono_t deadline) const;
+  fit::result<Errno> wait_until(const CurrentTask& current_task, zx_instant_mono_t deadline) const;
 
-  WaitEntry CreateWaitEntry(WaitEvents filter) const;
+ private:
+  WaitEntry create_wait_entry(WaitEvents filter) const;
 
-  WaiterRef CreateWaitEntryWithHandler(WaitEvents filter, EventHandler handler) const;
+  WaitEntry create_wait_entry_with_handler(WaitEvents filter, EventHandler handler) const;
 
-  void WakeImmediately(WaitEvents events, EventHandler handler) const;
+ public:
+  void wake_immediately(FdEvents events, EventHandler handler) const;
 
   /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
   /// confused with POSIX signals), optionally running a FnOnce.
   ///
   /// Returns a `HandleWaitCanceler` that can be used to cancel the wait.
-  fit::result<zx_status_t, HandleWaitCanceler> WakeOnZirconSignals(const Handle& handle,
-                                                                   zx_signals_t zx_signals,
-                                                                   SignalHandler handler) const;
+  fit::result<zx_status_t, HandleWaitCanceler> wake_on_zircon_signals(const Handle& handle,
+                                                                      zx_signals_t zx_signals,
+                                                                      SignalHandler handler) const;
 
   /// Return a WaitCanceler representing a wait that will never complete. Useful for stub
   /// implementations that should block forever even though a real implementation would wake up
   /// eventually.
-  WaiterRef FakeWait() const;
+  WaitCanceler fake_wait() const;
 
   /// Interrupt the waiter to deliver a signal. The wait operation will return EINTR, and a
   /// typical caller should then unwind to the syscall dispatch loop to let the signal be
   /// processed. See wait_until() for more details.
   ///
   /// Ignored if the waiter was created with new_ignoring_signals().
-  void Interrupt() const;
+  void interrupt() const;
 
   // C++
   ~Waiter();
@@ -536,10 +561,8 @@ class Waiter {
 
   explicit Waiter(fbl::RefPtr<PortWaiter> waiter);
 
-  fbl::RefPtr<PortWaiter> inner_;
+  DISALLOW_COPY_ASSIGN_AND_MOVE(Waiter);
 };
-
-class WaitCanceler;
 
 /// A list of waiters waiting for some event.
 ///
@@ -548,10 +571,12 @@ class WaitCanceler;
 /// has occurred. The waiters will then wake up on their own thread to handle
 /// the event.
 class WaitQueue {
- public:
-  WaitQueue();
+ private:
+  fbl::RefPtr<starnix_sync::StarnixMutex<WaitQueueImpl>> inner_;
 
-  WaitEntryId AddWaiter(WaitEntry entry) const;
+  // impl WaitQueue
+ public:
+  WaitEntryId add_waiter(WaitEntry entry) const;
 
   /// Establish a wait for the given entry.
   ///
@@ -561,7 +586,7 @@ class WaitQueue {
   /// call the [`Waiter::wait`] function on the waiter.
   ///
   /// Returns a `WaitCanceler` that can be used to cancel the wait.
-  WaitCanceler WaitAsyncEntry(const Waiter& waiter, WaitEntry entry) const;
+  WaitCanceler wait_async_entry(const Waiter& waiter, WaitEntry entry) const;
 
   /// Establish a wait for the given value event.
   ///
@@ -571,7 +596,7 @@ class WaitQueue {
   /// call the [`Waiter::wait`] function on the waiter.
   ///
   /// Returns a `WaitCanceler` that can be used to cancel the wait.
-  WaitCanceler WaitAsyncValue(const Waiter& waiter, uint64_t value) const;
+  WaitCanceler wait_async_value(const Waiter& waiter, uint64_t value) const;
 
   /// Establish a wait for the given FdEvents.
   ///
@@ -581,7 +606,8 @@ class WaitQueue {
   /// call the [`Waiter::wait`] function on the waiter.
   ///
   /// Returns a `WaitCanceler` that can be used to cancel the wait.
-  WaitCanceler WaitAsyncFdEvents(const Waiter& waiter, FdEvents events, EventHandler handler) const;
+  WaitCanceler wait_async_fd_events(const Waiter& waiter, FdEvents events,
+                                    EventHandler handler) const;
 
   /// Establish a wait for any event.
   ///
@@ -591,26 +617,27 @@ class WaitQueue {
   /// call the [`Waiter::wait`] function on the waiter.
   ///
   /// Returns a `WaitCanceler` that can be used to cancel the wait.
-  WaitCanceler WaitAsync(const Waiter& waiter) const;
+  WaitCanceler wait_async(const Waiter& waiter) const;
 
-  void WaitAsyncSimple(Waiter& waiter) const;
-
-  size_t NotifyEventsCount(WaitEvents events, size_t limit) const;
-
-  void NotifyFdEvents(FdEvents events) const;
-
-  void NotifyValue(uint64_t value) const {
-    NotifyEventsCount(WaitEvents::All(), std::numeric_limits<size_t>::max());
-  }
-
-  void NotifyUnorderedCount(size_t limit) const { NotifyEventsCount(WaitEvents::All(), limit); }
-
-  void NotifyAll() const { NotifyUnorderedCount(std::numeric_limits<size_t>::max()); }
-
-  bool IsEmpty() const { return inner_->Lock()->waiters.empty(); }
+  void wait_async_simple(Waiter& waiter) const;
 
  private:
-  fbl::RefPtr<starnix_sync::StarnixMutex<WaitQueueImpl>> inner_;
+  size_t notify_events_count(WaitEvents events, size_t limit) const;
+
+ public:
+  void notify_fd_events(FdEvents events) const;
+
+  void notify_value(uint64_t value) const;
+
+  void notify_unordered_count(size_t limit) const;
+
+  void notify_all() const;
+
+  /// Returns whether there is no active waiters waiting on this `WaitQueue`.
+  bool is_empty() const;
+
+  // C++
+  WaitQueue();
 };
 
 struct WaitCancelerQueue {
@@ -652,16 +679,8 @@ class WaitCancelerInner {
                    WaitCancelerEventPair, WaitCancelerTimer, WaitCancelerVmo>;
 
   static WaitCancelerInner Zxio(HandleWaitCanceler inner);
-  static WaitCancelerInner Queue(
-      util::WeakPtr<starnix_sync::StarnixMutex<WaitQueueImpl>> wait_queue, WaiterRef waiter,
-      WaitKey wait_key, WaitEntryId waiter_id) {
-    return WaitCancelerInner(WaitCancelerQueue{
-        .wait_queue = wait_queue,
-        .waiter = waiter,
-        .wait_key = wait_key,
-        .waiter_id = waiter_id,
-    });
-  }
+  static WaitCancelerInner Queue(WaitCancelerQueue inner) { return WaitCancelerInner(inner); }
+
   static WaitCancelerInner Event(HandleWaitCanceler inner);
   static WaitCancelerInner EventPair(HandleWaitCanceler inner);
   static WaitCancelerInner Timer(HandleWaitCanceler inner);
@@ -685,41 +704,41 @@ constexpr size_t WAIT_CANCELER_COMMON_SIZE = 2;
 /// per wait.
 class WaitCanceler {
  public:
-  static WaitCanceler NewInner(WaitCancelerInner inner) {
+  static WaitCanceler new_inner(WaitCancelerInner inner) {
     util::SmallVector<WaitCancelerInner, WAIT_CANCELER_COMMON_SIZE> cancellers;
     cancellers.push_back(ktl::move(inner));
     return WaitCanceler(ktl::move(cancellers));
   }
 
-  static WaitCanceler NewNoop(); /*{
+  static WaitCanceler new_noop(); /*{
     fbl::Vector<WaitCancelerInner> empty;
     return WaitCanceler(
         ktl::move(util::SmallVector<WaitCancelerInner, WAIT_CANCELER_COMMON_SIZE>::from_vec(
             ktl::move(empty))));
   }*/
 
-  static WaitCanceler NewZxio(HandleWaitCanceler inner);
+  static WaitCanceler new_zxio(HandleWaitCanceler inner);
 
-  static WaitCanceler NewQueue(util::WeakPtr<WaitQueue> wait_queue, WaiterRef waiter,
-                               WaitKey wait_key, WaitEntryId waiter_id);
+  static WaitCanceler new_event(util::WeakPtr<WaitQueue> wait_queue, WaiterRef waiter,
+                                WaitKey wait_key, WaitEntryId waiter_id);
 
-  static WaitCanceler NewEvent(HandleWaitCanceler inner);
+  static WaitCanceler new_event(HandleWaitCanceler inner);
 
-  static WaitCanceler NewEventPair(HandleWaitCanceler inner);
+  static WaitCanceler new_event_pair(HandleWaitCanceler inner);
 
-  static WaitCanceler NewTimer(HandleWaitCanceler inner);
+  static WaitCanceler new_timer(HandleWaitCanceler inner);
 
-  static WaitCanceler NewVmo(HandleWaitCanceler inner);
+  static WaitCanceler new_vmo(HandleWaitCanceler inner);
 
   /// Equivalent to `merge_unbounded`, except that it enforces that the resulting vector of
   /// cancellers is small enough to avoid being separately allocated on the heap.
   ///
   /// If possible, use this function instead of `merge_unbounded`, because it gives us better
   /// tools to keep this code path optimized.
-  WaitCanceler Merge(WaitCanceler other);
+  WaitCanceler merge(WaitCanceler other);
 
   /// Creates a new `WaitCanceler` that is equivalent to canceling both its arguments.
-  WaitCanceler MergeUnbounded(WaitCanceler other);
+  WaitCanceler merge_unbounded(WaitCanceler other);
 
   /// Cancel the pending wait.
   ///

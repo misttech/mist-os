@@ -8,6 +8,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
+#include <lib/mistos/starnix/kernel/signals/types.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -42,7 +43,8 @@ namespace starnix {
 fit::result<Errno, TaskInfo> create_zircon_process(
     fbl::RefPtr<Kernel> kernel,
     ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent, pid_t pid,
-    fbl::RefPtr<ProcessGroup> process_group, const ktl::string_view& name) {
+    fbl::RefPtr<ProcessGroup> process_group, fbl::RefPtr<SignalActions> signal_actions,
+    const ktl::string_view& name) {
   LTRACE;
   auto process_dispatcher =
       create_process(GetRootJobDispatcher(), 0, name).map_error([](auto status) {
@@ -55,8 +57,8 @@ fit::result<Errno, TaskInfo> create_zircon_process(
     return errno(from_status_like_fdio(status));
   }) _EP(mm);
 
-  auto thread_group =
-      ThreadGroup::New(kernel, ktl::move(process), ktl::move(parent), pid, process_group);
+  auto thread_group = ThreadGroup::New(kernel, ktl::move(process), ktl::move(parent), pid,
+                                       process_group, signal_actions);
 
   return fit::ok(TaskInfo{.thread = {},
                           .thread_group = ktl::move(thread_group),
@@ -98,7 +100,7 @@ fit::result<zx_status_t, KernelHandle<ThreadDispatcher>> create_thread(
 }
 
 fit::result<zx_status_t> run_task(CurrentTask current_task) {
-  auto thread_lock = current_task->thread().Read();
+  auto thread_lock = current_task->thread_.Read();
   if (thread_lock->has_value()) {
     auto thread = thread_lock->value();
     auto task = current_task.weak_task().Lock();

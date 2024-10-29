@@ -65,7 +65,7 @@ fit::result<Errno, Container> create_container(const Config& config) {
                            .value();
     // The system task gives pid 2. This value is less critical than giving
     // pid 1 to init, but this value matches what is supposed to happen.
-    DEBUG_ASSERT(system_task->id() == 2);
+    DEBUG_ASSERT(system_task->id_ == 2);
 
     _EP(kernel->kthreads().Init(ktl::move(system_task)));
   }
