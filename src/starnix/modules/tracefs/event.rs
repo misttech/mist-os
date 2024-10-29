@@ -7,7 +7,7 @@ use starnix_core::vfs::OutputBuffer;
 use starnix_sync::Mutex;
 use starnix_types::PAGE_SIZE;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{errno, error};
+use starnix_uapi::{errno, error, from_status_like_fdio};
 use zerocopy::{Immutable, IntoBytes};
 
 // The default ring buffer size (2MB).
@@ -147,8 +147,8 @@ struct TraceEventQueueMetadata {
     /// was created.
     prev_timestamp: zx::MonotonicInstant,
 
-    // If true, atrace events written to /sys/kernel/tracing/trace_marker will be stored as
-    // TraceEvents in `ring_buffer`.
+    /// If true, atrace events written to /sys/kernel/tracing/trace_marker will be stored as
+    /// TraceEvents in `ring_buffer`.
     tracing_enabled: bool,
 
     /// If true, the queue doesn't have a full page of events to read.
@@ -277,7 +277,7 @@ pub struct TraceEventQueue {
     /// Each page in this VMO consists of:
     ///   A page header:
     ///     // The timestamp of the last event in the previous page. If this is the first page, then
-    ///     // the timestamp this ring buffer was created. This is used with time_delta in each
+    ///     // the timestamp tracing was enabled. This is used with time_delta in each
     ///     // event header to calculate an event's timestamp.
     ///     timestamp: u64
     ///
@@ -293,10 +293,9 @@ pub struct TraceEventQueue {
 impl<'a> TraceEventQueue {
     pub fn new() -> Result<Self, Errno> {
         let metadata = TraceEventQueueMetadata::new();
-        let ring_buffer: MemoryObject = zx::Vmo::create(DEFAULT_RING_BUFFER_SIZE_BYTES as u64)
+        let ring_buffer: MemoryObject = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0)
             .map_err(|_| errno!(ENOMEM))?
             .into();
-        Self::initialize_page(&ring_buffer, 0, metadata.prev_timestamp)?;
         Ok(Self { metadata: Mutex::new(metadata), ring_buffer })
     }
 
@@ -304,14 +303,22 @@ impl<'a> TraceEventQueue {
         self.metadata.lock().tracing_enabled
     }
 
-    pub fn enable(&self) {
+    pub fn enable(&self) -> Result<(), Errno> {
         let mut metadata = self.metadata.lock();
         metadata.tracing_enabled = true;
+        metadata.prev_timestamp = zx::MonotonicInstant::get();
+        self.ring_buffer
+            .set_size(DEFAULT_RING_BUFFER_SIZE_BYTES)
+            .map_err(|e| from_status_like_fdio!(e))?;
+        self.initialize_page(0, metadata.prev_timestamp)?;
+        Ok(())
     }
 
-    pub fn disable(&self) {
+    pub fn disable(&self) -> Result<(), Errno> {
         let mut metadata = self.metadata.lock();
-        metadata.tracing_enabled = false;
+        *metadata = TraceEventQueueMetadata::new();
+        self.ring_buffer.set_size(0).map_err(|e| from_status_like_fdio!(e))?;
+        Ok(())
     }
 
     /// Reads a page worth of events. Currently only reads pages that are full.
@@ -345,11 +352,11 @@ impl<'a> TraceEventQueue {
         // Clear old events and reset the page header if we've moved to the next page.
         let new_tail_page = metadata.tail_page_offset();
         if new_tail_page != old_tail_page {
-            Self::initialize_page(&self.ring_buffer, new_tail_page, metadata.prev_timestamp)?;
+            self.initialize_page(new_tail_page, metadata.prev_timestamp)?;
         }
 
         // Write the event and update the commit offset.
-        self.ring_buffer.write(&event.as_bytes(), offset).map_err(|_| errno!(EFAULT))?;
+        self.ring_buffer.write(&event.as_bytes(), offset).map_err(|e| from_status_like_fdio!(e))?;
         metadata.commit(event.size() as u64);
 
         // Update the page header's `commit` field with the new size of committed data on the page.
@@ -358,7 +365,7 @@ impl<'a> TraceEventQueue {
                 &((metadata.commit % *PAGE_SIZE) - PAGE_HEADER_SIZE).to_le_bytes(),
                 metadata.commit_field_offset(),
             )
-            .map_err(|_| errno!(EFAULT))?;
+            .map_err(|e| from_status_like_fdio!(e))?;
         metadata.prev_timestamp = timestamp;
 
         Ok(())
@@ -372,16 +379,17 @@ impl<'a> TraceEventQueue {
     /// Initializes a new page by setting the header's timestamp and clearing the rest of the page
     /// with 0's.
     fn initialize_page(
-        ring_buffer: &MemoryObject,
+        &self,
         offset: u64,
         prev_timestamp: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
-        ring_buffer
+        self.ring_buffer
             .write(&prev_timestamp.into_nanos().to_le_bytes(), offset)
-            .map_err(|_| errno!(EFAULT))?;
-        ring_buffer
-            .write(&[0u8; 4088], offset + std::mem::size_of::<zx::MonotonicInstant>() as u64)
-            .map_err(|_| errno!(EFAULT))?;
+            .map_err(|e| from_status_like_fdio!(e))?;
+        let timestamp_size = std::mem::size_of::<zx::MonotonicInstant>() as u64;
+        self.ring_buffer
+            .op_range(zx::VmoOp::ZERO, offset + timestamp_size, *PAGE_SIZE - timestamp_size)
+            .map_err(|e| from_status_like_fdio!(e))?;
         Ok(())
     }
 }
@@ -486,14 +494,42 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn enable_disable_queue() {
+        let queue = TraceEventQueue::new().expect("create queue");
+        assert_eq!(queue.ring_buffer.get_size(), 0);
+
+        // Enable tracing and check the queue's state.
+        let time_before_enable = zx::MonotonicInstant::get();
+        assert!(queue.enable().is_ok());
+        assert_eq!(queue.ring_buffer.get_size(), DEFAULT_RING_BUFFER_SIZE_BYTES);
+        assert!(queue.prev_timestamp() > time_before_enable);
+
+        // Confirm we can push an event.
+        let timestamp = zx::MonotonicInstant::get();
+        let event = TraceEvent::new(
+            queue.prev_timestamp(),
+            zx::MonotonicInstant::get(),
+            1234,
+            b"B|1234|slice_name",
+        );
+        let event_size = event.size() as u64;
+        assert!(queue.push_event(event, timestamp).is_ok());
+        assert_eq!(queue.metadata.lock().commit, PAGE_HEADER_SIZE + event_size);
+
+        // Disable tracing and check that the queue's state has been reset.
+        assert!(queue.disable().is_ok());
+        assert_eq!(queue.ring_buffer.get_size(), 0);
+        assert_eq!(queue.metadata.lock().commit, PAGE_HEADER_SIZE);
+    }
+
+    #[fuchsia::test]
     fn create_trace_event() {
         let prev_timestamp = zx::MonotonicInstant::get();
         let timestamp = zx::MonotonicInstant::get();
-        let pid = 1234;
-        let data = b"B|1234|slice_name";
 
         // Create an event.
-        let event = TraceEvent::new(prev_timestamp, timestamp, pid, data);
+        let event: TraceEvent<'_> =
+            TraceEvent::new(prev_timestamp, timestamp, 1234, b"B|1234|slice_name");
         let event_size = event.size();
         assert_eq!(event_size, 42);
     }
@@ -502,13 +538,12 @@ mod tests {
     #[fuchsia::test]
     fn single_trace_event_fails_read() {
         let queue = TraceEventQueue::new().expect("create queue");
+        queue.enable().expect("enable queue");
         let queue_start_timestamp = queue.prev_timestamp();
 
         // Create an event.
         let timestamp = zx::MonotonicInstant::get();
-        let pid = 1234;
-        let data = b"B|1234|slice_name";
-        let event = TraceEvent::new(queue_start_timestamp, timestamp, pid, data);
+        let event = TraceEvent::new(queue_start_timestamp, timestamp, 1234, b"B|1234|slice_name");
 
         // Push the event into the queue.
         assert!(queue.push_event(event, timestamp).is_ok());
@@ -520,6 +555,7 @@ mod tests {
     #[fuchsia::test]
     fn page_overflow() {
         let queue = TraceEventQueue::new().expect("create queue");
+        queue.enable().expect("enable queue");
         let queue_start_timestamp = queue.prev_timestamp();
         let timestamp = zx::MonotonicInstant::get();
         let pid = 1234;

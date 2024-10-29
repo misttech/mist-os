@@ -280,8 +280,8 @@ impl BytesFileOps for TracingOnFile {
         let state_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
         let clean_state_str = state_str.split('\n').next().unwrap_or("");
         match clean_state_str {
-            "0" => Ok(self.queue.disable()),
-            "1" => Ok(self.queue.enable()),
+            "0" => self.queue.disable(),
+            "1" => self.queue.enable(),
             _ => error!(EINVAL),
         }
     }
