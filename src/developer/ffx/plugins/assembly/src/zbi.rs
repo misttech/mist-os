@@ -6,7 +6,7 @@ use crate::base_package::BasePackage;
 
 use anyhow::{anyhow, Context, Result};
 use assembly_config_schema::ImageAssemblyConfig;
-use assembly_images_config::{Zbi, ZbiCompression};
+use assembly_images_config::Zbi;
 use assembly_manifest::{AssemblyManifest, Image};
 use assembly_package_list::{PackageList, WritablePackageList};
 use assembly_tool::Tool;
@@ -119,11 +119,7 @@ pub fn construct_zbi(
     }
 
     // Set the zbi compression to use.
-    zbi_builder.set_compression(match zbi_config.compression {
-        ZbiCompression::ZStd => "zstd",
-        ZbiCompression::ZStdMax => "zstd.max",
-        ZbiCompression::None => "none",
-    });
+    zbi_builder.set_compression(zbi_config.compression);
 
     // Create an output manifest that describes the contents of the built ZBI.
     zbi_builder.set_output_manifest(gendir.as_ref().join("zbi.json"));

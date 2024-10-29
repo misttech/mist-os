@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::anyhow;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
@@ -56,21 +57,66 @@ pub struct Zbi {
 }
 
 /// The compression format for the ZBI.
-#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
-#[serde(deny_unknown_fields)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, Copy, PartialEq)]
+#[serde(try_from = "String", into = "String")]
 pub enum ZbiCompression {
-    /// zstd compression.
-    #[serde(rename = "zstd")]
+    /// zstd default compression.
     #[default]
     ZStd,
 
+    /// zstd compression at a specific level (4 <= level <= 21)
+    ZStdLevel(u8),
+
     /// zstd.max compression.
-    #[serde(rename = "zstd.max")]
     ZStdMax,
 
     /// no compression.
-    #[serde(rename = "none")]
     None,
+}
+
+impl TryFrom<String> for ZbiCompression {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl TryFrom<&str> for ZbiCompression {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let level = match value {
+            "none" => Some(Self::None),
+            "zstd" => Some(Self::ZStd),
+            "zstd.max" => Some(Self::ZStdMax),
+            _ => value.strip_prefix("zstd.").and_then(|v| v.parse::<u8>().ok()).and_then(|level| {
+                if level >= 4 && level <= 21 {
+                    Some(Self::ZStdLevel(level))
+                } else {
+                    None
+                }
+            }),
+        };
+        level.ok_or_else(||  anyhow!("Not a valid zstd compression level, must be 'none', 'zstd', 'zstd.max', or 'zstd.<N> where 4 <= N <= 21: {}", value))
+    }
+}
+
+impl std::fmt::Display for ZbiCompression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ZbiCompression::ZStd => f.write_str("zstd"),
+            ZbiCompression::ZStdLevel(level) => f.write_fmt(format_args!("zstd.{}", level)),
+            ZbiCompression::ZStdMax => f.write_str("zstd.max"),
+            ZbiCompression::None => f.write_str("none"),
+        }
+    }
+}
+
+impl From<ZbiCompression> for String {
+    fn from(value: ZbiCompression) -> Self {
+        value.to_string()
+    }
 }
 
 /// A script to process the ZBI after it is constructed.
@@ -283,4 +329,59 @@ pub struct FastbootFvmConfig {
     /// Truncate the file to this length.
     #[serde(default)]
     pub truncate_to_length: Option<u64>,
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_zbi_compression_to_string() {
+        assert_eq!(ZbiCompression::None.to_string(), "none");
+        assert_eq!(&ZbiCompression::ZStd.to_string(), "zstd");
+        assert_eq!(&ZbiCompression::ZStdMax.to_string(), "zstd.max");
+        assert_eq!(&ZbiCompression::ZStdLevel(12).to_string(), "zstd.12");
+    }
+
+    #[test]
+    fn test_zbi_compression_from_string() {
+        assert_eq!(ZbiCompression::try_from("none").unwrap(), ZbiCompression::None);
+        assert_eq!(ZbiCompression::try_from("zstd").unwrap(), ZbiCompression::ZStd);
+        assert_eq!(ZbiCompression::try_from("zstd.max").unwrap(), ZbiCompression::ZStdMax);
+        assert_eq!(ZbiCompression::try_from("zstd.12").unwrap(), ZbiCompression::ZStdLevel(12));
+    }
+
+    #[test]
+    fn test_zbi_compression_from_string_out_of_range() {
+        // Invalid levels (too low)
+        assert!(ZbiCompression::try_from("zstd.0").is_err());
+        assert!(ZbiCompression::try_from("zstd.1").is_err());
+        assert!(ZbiCompression::try_from("zstd.3").is_err());
+
+        // Invalid levels (too high)
+        assert!(ZbiCompression::try_from("zstd.22").is_err());
+        assert!(ZbiCompression::try_from("zstd.23").is_err());
+        assert!(ZbiCompression::try_from("zstd.346204345").is_err());
+
+        // Invalid level (negagive)
+        assert!(ZbiCompression::try_from("zstd.-1").is_err());
+
+        // Invalid level (junk)
+        assert!(ZbiCompression::try_from("zstd.sdflkajsdfasl;dfj").is_err());
+        assert!(ZbiCompression::try_from("sdafasdflkajsdfasl;dfj").is_err());
+    }
+
+    // This checks that the deserialization for serde is wired up correctly, as the TryFrom<String>
+    // implementation is necessary for this to work.  Using '&str' and telling serde to deserialize
+    // using TryFrom<&str> compiles, but fails this test.  If this test is written using the
+    // serde_json::from_str() function, it would (falsely) pass the test, but uses in-tree of
+    // serd_json::from_value() would fail.
+    #[test]
+    fn test_zbi_compression_deserialization_from_value() {
+        assert_eq!(
+            serde_json::from_value::<ZbiCompression>(serde_json::json!("none")).unwrap(),
+            ZbiCompression::None
+        );
+    }
 }
