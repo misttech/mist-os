@@ -371,9 +371,9 @@ impl InputPipeline {
             // Watches the input device directory for new input devices. Creates new InputDeviceBindings
             // that send InputEvents to `input_event_receiver`.
             match async {
-                let dir_proxy = fuchsia_fs::directory::open_in_namespace(
+                let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
                     input_device::INPUT_REPORT_PATH,
-                    fuchsia_fs::PERM_READABLE,
+                    fio::OpenFlags::empty(),
                 )
                 .with_context(|| format!("failed to open {}", input_device::INPUT_REPORT_PATH))?;
                 let device_watcher =

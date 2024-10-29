@@ -345,9 +345,9 @@ impl FactoryResetHandler {
         tracing::debug!("Getting sound");
         // Get sound
         let (sound_endpoint, server_end) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
-        let () = fuchsia_fs::file::open_channel_in_namespace(
+        let () = fuchsia_fs::file::open_channel_in_namespace_deprecated(
             FACTORY_RESET_SOUND_PATH,
-            fuchsia_fs::Flags::PERM_READ,
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
             server_end,
         )
         .context("Failed to open factory reset sound file")?;
