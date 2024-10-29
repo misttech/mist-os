@@ -3426,3 +3426,16 @@
   reviewers: ['maniscalco@google.com', 'mcgrathr@google.com']
   submitted: '2024-08-28'
   reviewed: '2024-10-02'
+
+- name: 'RFC-0263'
+  title: 'Migrate driver communication to services'
+  short_description: 'Migrate drivers and clients from connecting with devfs to using services.'
+  authors: ['garratt@google.com']
+  file: '0263_migrate_driver_communication_to_services.md'
+  area: ['Driver SDK']
+  issue: ['330574820']
+  gerrit_change_id: ['1107074']
+  status: 'Accepted'
+  reviewers: ['cja@google.comm', 'csuter@google.com', 'geb@google.comm', 'surajmalhotra@google.com', 'eep@google.com', 'dgilhooley@google.com']
+  submitted: '2024-08-25'
+  reviewed: '2024-10-28'
