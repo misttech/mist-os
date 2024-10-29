@@ -17,7 +17,6 @@ python_library("trace_processing") {
     "metrics/agg_cpu_breakdown.py",
     "metrics/app_render.py",
     "metrics/cpu.py",
-    "metrics/cpu_breakdown.py",
     "metrics/fps.py",
     "metrics/input_latency.py",
     "metrics/memory.py",

@@ -2,14 +2,14 @@
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for cpu_breakdown.py."""
+"""Unit tests for agg_cpu_breakdown.py."""
 
 import unittest
 from typing import List
 
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
-from trace_processing.metrics import agg_cpu_breakdown, cpu_breakdown
+from trace_processing.metrics import agg_cpu_breakdown, cpu
 
 
 class AggCpuBreakdownTest(unittest.TestCase):
@@ -249,7 +249,7 @@ class AggCpuBreakdownTest(unittest.TestCase):
         self.assertEqual(model.processes[1].name, "small_process")
         self.assertEqual(len(model.processes[1].threads), 1)
 
-        processor = cpu_breakdown.CpuBreakdownMetricsProcessor()
+        processor = cpu.CpuMetricsProcessor()
         breakdown, total_time = processor.process_metrics_and_get_total_time(
             model
         )
