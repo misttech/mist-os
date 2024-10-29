@@ -233,7 +233,7 @@ impl<
                         let (worker, map, stream) = routes::RoutesWorker::<Ipv4>::create(
                             v4_main_route_table.get_ref(),
                             v4_routes_state.get_ref(),
-                            v4_route_table_provider.get_ref(),
+                            v4_route_table_provider.get(),
                         )
                         .await
                         .context("create v4 routes worker")?;
@@ -256,7 +256,7 @@ impl<
                         let (worker, map, stream) = routes::RoutesWorker::<Ipv6>::create(
                             v6_main_route_table.get_ref(),
                             v6_routes_state.get_ref(),
-                            v6_route_table_provider.get_ref(),
+                            v6_route_table_provider.get(),
                         )
                         .await
                         .context("create v6 routes worker")?;

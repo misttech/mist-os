@@ -157,6 +157,8 @@ pub(crate) struct RouteTableMap<
 > {
     route_tables: HashMap<ManagedNetlinkRouteTableIndex, RouteTable<I>>,
     fidl_table_ids: HashMap<fnet_routes_ext::TableId, ManagedNetlinkRouteTableIndex>,
+
+    route_table_provider: <I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
     main_route_table_proxy: <I::RouteTableMarker as ProtocolMarker>::Proxy,
     unmanaged_route_set_proxy: <I::RouteSetMarker as ProtocolMarker>::Proxy,
 
@@ -170,6 +172,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         main_route_table_proxy: <I::RouteTableMarker as ProtocolMarker>::Proxy,
         main_route_table_id: fnet_routes_ext::TableId,
         unmanaged_route_set_proxy: <I::RouteSetMarker as ProtocolMarker>::Proxy,
+        route_table_provider: <I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
     ) -> Self {
         Self {
             route_tables: HashMap::new(),
@@ -177,6 +180,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             main_route_table_proxy,
             main_route_table_id,
             unmanaged_route_set_proxy,
+            route_table_provider,
         }
     }
 
@@ -257,30 +261,25 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
     pub(crate) async fn create_route_table_if_managed_and_not_present(
         &mut self,
         key: NetlinkRouteTableIndex,
-        route_table_provider: &<I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
     ) {
         match RouteTableKey::from(key) {
             RouteTableKey::Unmanaged => {}
             RouteTableKey::NetlinkManaged { table_id } => {
-                self.create_route_table_if_not_present(table_id, route_table_provider).await;
+                self.create_route_table_if_not_present(table_id).await;
             }
         }
     }
 
     /// If a table corresponding to `key` is not already being tracked, initializes a new
     /// [`RouteTable`] entry for this key.
-    async fn create_route_table_if_not_present(
-        &mut self,
-        key: ManagedNetlinkRouteTableIndex,
-        route_table_provider: &<I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
-    ) {
+    async fn create_route_table_if_not_present(&mut self, key: ManagedNetlinkRouteTableIndex) {
         let should_insert = self.route_tables.get(&key).is_none();
 
         // There's nothing graceful we can do if any of these operations fail, so we might as well
         // panic.
         if should_insert {
             let route_table_proxy = fnet_routes_ext::admin::new_route_table::<I>(
-                route_table_provider,
+                &self.route_table_provider,
                 Some(format!("netlink:{}", key.get().get())),
             )
             .expect("error creating new route table");
@@ -629,6 +628,10 @@ mod test {
             let (unmanaged_route_set_proxy, _unmanaged_route_set_server_end) =
                 fidl::endpoints::create_proxy::<<Ipv6 as FidlRouteAdminIpExt>::RouteSetMarker>()
                     .unwrap();
+            let (route_table_provider, _server_end) = fidl::endpoints::create_proxy::<
+                <Ipv6 as FidlRouteAdminIpExt>::RouteTableProviderMarker,
+            >()
+            .unwrap();
 
             let mut route_table_map = RouteTableMap::<Ipv6>::new(
                 main_route_table_proxy,
@@ -637,6 +640,7 @@ mod test {
                     6,
                 ),
                 unmanaged_route_set_proxy,
+                route_table_provider,
             );
 
             let choose_unused_fidl_id = move |map: &RouteTableMap<Ipv6>| {
@@ -701,11 +705,10 @@ mod test {
                         <Ipv6 as FidlRouteAdminIpExt>::RouteTableMarker,
                     >()
                     .unwrap();
-                    let (route_set_proxy, _server_end) =
-                        fidl::endpoints::create_proxy::<
-                            <Ipv6 as FidlRouteAdminIpExt>::RouteSetMarker,
-                        >()
-                        .unwrap();
+                    let (route_set_proxy, _server_end) = fidl::endpoints::create_proxy::<
+                        <Ipv6 as FidlRouteAdminIpExt>::RouteSetMarker,
+                    >()
+                    .unwrap();
                     let (route_set_from_main_table_proxy, _server_end) =
                         fidl::endpoints::create_proxy::<
                             <Ipv6 as FidlRouteAdminIpExt>::RouteSetMarker,
@@ -748,14 +751,16 @@ mod test {
                 // After each op, check the invariant that the mapping between netlink IDs
                 // and FIDL IDs is bidirectional.
                 let by_route_table: Vec<(ManagedNetlinkRouteTableIndex, fnet_routes_ext::TableId)> =
-                    route_table_map.route_tables
+                    route_table_map
+                        .route_tables
                         .iter()
                         .map(|(netlink_id, table)| (*netlink_id, table.fidl_table_id))
                         .sorted()
                         .collect::<Vec<_>>();
 
                 let by_fidl_id: Vec<(ManagedNetlinkRouteTableIndex, fnet_routes_ext::TableId)> =
-                    route_table_map.fidl_table_ids
+                    route_table_map
+                        .fidl_table_ids
                         .iter()
                         .map(|(fidl_table_id, netlink_id)| (*netlink_id, *fidl_table_id))
                         .sorted()
@@ -803,35 +808,23 @@ mod test {
                         }
 
                         // The route should register as installed.
-                        prop_assert!(
-                            fidl_route_map.route_is_installed_in_tables(
-                                &route,
-                                std::iter::once(&table),
-                            )
-                        );
-                        prop_assert!(
-                            !fidl_route_map.route_is_uninstalled_in_tables(
-                                &route,
-                                std::iter::once(&table),
-                            )
-                        );
+                        prop_assert!(fidl_route_map
+                            .route_is_installed_in_tables(&route, std::iter::once(&table)));
+                        prop_assert!(!fidl_route_map
+                            .route_is_uninstalled_in_tables(&route, std::iter::once(&table)));
 
                         // But still not register as installed in a table that doesn't exist.
-                        prop_assert!(
-                            !fidl_route_map.route_is_installed_in_tables(
-                                &route,
-                                [&table, &NEVER_GENERATED_TABLE_ID]
-                            )
-                        );
+                        prop_assert!(!fidl_route_map.route_is_installed_in_tables(
+                            &route,
+                            [&table, &NEVER_GENERATED_TABLE_ID]
+                        ));
 
                         // But we still fail the "uninstalled" check even if there's another
                         // table it's not installed in.
-                        prop_assert!(
-                            !fidl_route_map.route_is_uninstalled_in_tables(
-                                &route,
-                                [&table, &NEVER_GENERATED_TABLE_ID],
-                            )
-                        );
+                        prop_assert!(!fidl_route_map.route_is_uninstalled_in_tables(
+                            &route,
+                            [&table, &NEVER_GENERATED_TABLE_ID],
+                        ));
                     }
                     FidlRouteMapOp::Remove(TestRoute(route), table) => {
                         let table = fnet_routes_ext::TableId::from(table);
@@ -873,40 +866,38 @@ mod test {
                         }
 
                         // The route should register as uninstalled.
-                        prop_assert!(
-                            !fidl_route_map.route_is_installed_in_tables(
-                                &route,
-                                std::iter::once(&table),
-                            )
-                        );
-                        prop_assert!(
-                            fidl_route_map.route_is_uninstalled_in_tables(
-                                &route,
-                                std::iter::once(&table),
-                            )
-                        );
-                        prop_assert!(
-                            !fidl_route_map.route_is_installed_in_tables(
-                                &route,
-                                [&table, &NEVER_GENERATED_TABLE_ID]
-                            )
-                        );
-                        prop_assert!(
-                            fidl_route_map.route_is_uninstalled_in_tables(
-                                &route,
-                                [&table, &NEVER_GENERATED_TABLE_ID]
-                            )
-                        );
+                        prop_assert!(!fidl_route_map
+                            .route_is_installed_in_tables(&route, std::iter::once(&table)));
+                        prop_assert!(fidl_route_map
+                            .route_is_uninstalled_in_tables(&route, std::iter::once(&table)));
+                        prop_assert!(!fidl_route_map.route_is_installed_in_tables(
+                            &route,
+                            [&table, &NEVER_GENERATED_TABLE_ID]
+                        ));
+                        prop_assert!(fidl_route_map.route_is_uninstalled_in_tables(
+                            &route,
+                            [&table, &NEVER_GENERATED_TABLE_ID]
+                        ));
                     }
                 }
 
                 // After each op, check that the map is consistent.
-                let by_routes = fidl_route_map.routes.iter().flat_map(|(route, tables)| {
-                    tables.iter().map(|(table, props)| (*route, *table, *props))
-                }).sorted().collect::<Vec<_>>();
-                let by_tables = fidl_route_map.by_tables.iter().flat_map(|(table, routes)| {
-                    routes.iter().map(|(route, props)| (*route, *table, *props))
-                }).sorted().collect::<Vec<_>>();
+                let by_routes = fidl_route_map
+                    .routes
+                    .iter()
+                    .flat_map(|(route, tables)| {
+                        tables.iter().map(|(table, props)| (*route, *table, *props))
+                    })
+                    .sorted()
+                    .collect::<Vec<_>>();
+                let by_tables = fidl_route_map
+                    .by_tables
+                    .iter()
+                    .flat_map(|(table, routes)| {
+                        routes.iter().map(|(route, props)| (*route, *table, *props))
+                    })
+                    .sorted()
+                    .collect::<Vec<_>>();
                 prop_assert_eq!(by_routes, by_tables);
             }
         }

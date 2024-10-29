@@ -233,7 +233,6 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessa
 pub(crate) struct RoutesWorker<
     I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 > {
-    route_table_provider: <I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
     fidl_route_map: FidlRouteMap<I>,
 }
 
@@ -299,7 +298,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
     pub(crate) async fn create(
         main_route_table: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
         routes_state_proxy: &<I::StateMarker as ProtocolMarker>::Proxy,
-        route_table_provider: &<I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
+        route_table_provider: <I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
     ) -> Result<
         (
             Self,
@@ -351,12 +350,9 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             main_route_table.clone(),
             main_route_table_id,
             unmanaged_route_set_proxy,
+            route_table_provider,
         );
-        Ok((
-            Self { route_table_provider: route_table_provider.clone(), fidl_route_map },
-            route_table_map,
-            route_event_stream,
-        ))
+        Ok((Self { fidl_route_map }, route_table_map, route_event_stream))
     }
 
     /// Handles events observed by the route watchers by adding/removing routes
@@ -458,9 +454,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         // Ideally we'd combine the two following operations with some form of
         // Entry API in order to avoid the panic, but this is difficult to pull
         // off with async.
-        route_tables
-            .create_route_table_if_managed_and_not_present(table, &self.route_table_provider)
-            .await;
+        route_tables.create_route_table_if_managed_and_not_present(table).await;
 
         let table_id = route_tables.get_fidl_table_id(&table).expect("should be populated");
 
@@ -1646,11 +1640,14 @@ mod tests {
             fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
         let (unmanaged_route_set_proxy, _server_end) =
             fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+        let (route_table_provider, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>().unwrap();
 
         let mut route_table = RouteTableMap::new(
             route_table_proxy.clone(),
             MAIN_FIDL_TABLE_ID,
             unmanaged_route_set_proxy,
+            route_table_provider,
         );
         let mut fidl_route_map = FidlRouteMap::<I>::default();
 
@@ -1874,11 +1871,14 @@ mod tests {
             fidl::endpoints::create_proxy::<I::RouteTableMarker>().unwrap();
         let (route_set_proxy, _server_end) =
             fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+        let (route_table_provider, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>().unwrap();
 
         let mut route_table = RouteTableMap::new(
             main_route_table_proxy,
             MAIN_FIDL_TABLE_ID,
             unmanaged_route_set_proxy,
+            route_table_provider,
         );
         route_table.insert(
             ManagedNetlinkRouteTableIndex::new(MANAGED_ROUTE_TABLE_INDEX).unwrap(),
@@ -4477,11 +4477,14 @@ mod tests {
             fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
         let (unmanaged_route_set_proxy, _unmanaged_route_set_server_end) =
             fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
+        let (route_table_provider, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>().unwrap();
 
         let mut route_table_map = RouteTableMap::<I>::new(
             main_route_table_proxy,
             MAIN_FIDL_TABLE_ID,
             unmanaged_route_set_proxy,
+            route_table_provider,
         );
 
         route_table_map.insert(
