@@ -37,10 +37,10 @@ macro_rules! open_and_get_vmo_benchmark {
                 let timer = OperationTimer::start();
                 let file = {
                     storage_trace::duration!(c"benchmark", c"open-file");
-                    fuchsia_fs::directory::open_file_deprecated(
+                    fuchsia_fs::directory::open_file(
                         pkgdir,
                         &self.resource_path,
-                        fio::OpenFlags::RIGHT_READABLE,
+                        fio::PERM_READABLE,
                     )
                     .await
                     .expect("failed to open blob")

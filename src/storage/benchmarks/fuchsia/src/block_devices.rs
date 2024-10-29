@@ -231,11 +231,8 @@ async fn connect_to_test_fvm() -> Option<VolumeManagerProxy> {
         .await
         .expect("FIDL error")
         .expect("get_topological_path failed");
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        &topo_path,
-        fuchsia_fs::OpenFlags::empty(),
-    )
-    .expect("failed to open device");
+    let dir = fuchsia_fs::directory::open_in_namespace(&topo_path, fio::Flags::empty())
+        .expect("failed to open device");
     fvm::format_for_fvm(&dir, BENCHMARK_FVM_SLICE_SIZE_BYTES).expect("Failed to format FVM");
     let fvm = fvm::start_fvm_driver(&fvm_controller, &dir).await.expect("Failed to start FVM");
     Some(fvm)
@@ -362,7 +359,7 @@ async fn set_up_fvm_volume(
         .expect("get_topological_path failed");
 
     // Open the device via its topological path.
-    fuchsia_fs::directory::open_in_namespace_deprecated(&topo_path, fuchsia_fs::OpenFlags::empty())
+    fuchsia_fs::directory::open_in_namespace(&topo_path, fuchsia_fs::Flags::empty())
         .expect("failed to open device")
 }
 

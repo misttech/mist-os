@@ -32,9 +32,9 @@ impl FilesystemConfig for Blobfs {
             /*as_blob=*/ false,
         )
         .await;
-        let root = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let root = fuchsia_fs::directory::open_in_namespace(
             blobfs.benchmark_dir().to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_WRITABLE | fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_WRITABLE | fuchsia_fs::PERM_READABLE,
         )
         .unwrap();
         BlobfsInstance { root, blobfs }
@@ -65,9 +65,9 @@ impl Filesystem for BlobfsInstance {
 impl CacheClearableFilesystem for BlobfsInstance {
     async fn clear_cache(&mut self) {
         let () = self.blobfs.clear_cache().await;
-        self.root = fuchsia_fs::directory::open_in_namespace_deprecated(
+        self.root = fuchsia_fs::directory::open_in_namespace(
             self.blobfs.benchmark_dir().to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_WRITABLE | fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_WRITABLE | fuchsia_fs::PERM_READABLE,
         )
         .unwrap();
     }
@@ -76,10 +76,10 @@ impl CacheClearableFilesystem for BlobfsInstance {
 #[async_trait]
 impl BlobFilesystem for BlobfsInstance {
     async fn get_vmo(&self, blob: &DeliveryBlob) -> zx::Vmo {
-        let blob = fuchsia_fs::directory::open_file_deprecated(
+        let blob = fuchsia_fs::directory::open_file(
             &self.root,
             &delivery_blob_path(blob.name),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .await
         .unwrap();
@@ -87,10 +87,10 @@ impl BlobFilesystem for BlobfsInstance {
     }
 
     async fn write_blob(&self, blob: &DeliveryBlob) {
-        let blob_proxy = fuchsia_fs::directory::open_file_deprecated(
+        let blob_proxy = fuchsia_fs::directory::open_file(
             &self.root,
             &delivery_blob_path(blob.name),
-            fuchsia_fs::OpenFlags::CREATE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
         )
         .await
         .unwrap();

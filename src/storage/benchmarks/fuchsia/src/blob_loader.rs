@@ -4,10 +4,9 @@
 
 use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::{
-    open_file_no_describe_deprecated, open_in_namespace_deprecated, readdir_recursive, DirEntry,
-    DirentKind,
+    open_file_async, open_in_namespace, readdir_recursive, DirEntry, DirentKind,
 };
-use fuchsia_fs::OpenFlags;
+use fuchsia_fs::PERM_READABLE;
 use futures::StreamExt as _;
 
 /// Pages in and retains all of the blobs in the pkg directory. This is done to avoid page faulting
@@ -31,9 +30,8 @@ impl Drop for BlobLoader {
 }
 
 async fn collect_pkg_vmos() -> Vec<(zx::Vmo, u64)> {
-    let dir =
-        open_in_namespace_deprecated("/pkg", OpenFlags::RIGHT_READABLE | OpenFlags::DIRECTORY)
-            .expect("Failed to open /pkg directory");
+    let dir = open_in_namespace("/pkg", PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY)
+        .expect("Failed to open /pkg directory");
     let mut vmos = Vec::new();
     let mut entries = readdir_recursive(&dir, None);
     while let Some(entry) = entries.next().await {
@@ -41,8 +39,7 @@ async fn collect_pkg_vmos() -> Vec<(zx::Vmo, u64)> {
         if kind != DirentKind::File {
             continue;
         }
-        let file =
-            open_file_no_describe_deprecated(&dir, &name, OpenFlags::RIGHT_READABLE).unwrap();
+        let file = open_file_async(&dir, &name, PERM_READABLE).unwrap();
         let vmo =
             file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().map_err(zx::ok).unwrap();
         let size = vmo.get_size().unwrap();
