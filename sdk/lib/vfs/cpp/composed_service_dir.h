@@ -20,8 +20,6 @@ namespace vfs {
 // be used to connect to services in `fallback_dir`, but will not enumerate them.
 //
 // This class is thread-safe.
-//
-// TODO(https://fxbug.dev/309685624): Remove when all callers have migrated.
 class ComposedServiceDir final : public Node {
  public:
   ComposedServiceDir() : Node(MakeComposedServiceDir()) {}

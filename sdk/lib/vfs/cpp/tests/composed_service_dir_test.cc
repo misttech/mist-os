@@ -29,9 +29,6 @@ constexpr size_t kFallbackServiceConnections = 2;
 // Fixture sets up a composed service directory containing "service_a" and "service_b" which is
 // backed by a fallback directory containing "service_b" and "service_c".
 class ComposedServiceDirTest : public ::gtest::RealLoopFixture {
-// vfs::ComposedServiceDir is deprecated. See https://fxbug.dev/309685624 for details.
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
  protected:
   void SetUp() override {
     root_ = std::make_unique<vfs::ComposedServiceDir>();
@@ -53,7 +50,7 @@ class ComposedServiceDirTest : public ::gtest::RealLoopFixture {
                   fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
                   std::move(fallback_server)),
               ZX_OK);
-    root_->set_fallback(fidl::InterfaceHandle<fuchsia::io::Directory>{std::move(fallback_client)});
+    root_->SetFallback(fidl::ClientEnd<fuchsia_io::Directory>{std::move(fallback_client)});
 
     zx::channel root_server;
     ASSERT_EQ(zx::channel::create(0, &root_client_, &root_server), ZX_OK);
@@ -85,7 +82,6 @@ class ComposedServiceDirTest : public ::gtest::RealLoopFixture {
   zx::channel root_client_;
   std::map<std::string_view, size_t, std::less<>> connection_attempts_;
   std::map<std::string_view, size_t, std::less<>> fallback_attempts_;
-#pragma clang diagnostic pop
 };
 
 TEST_F(ComposedServiceDirTest, Connect) {

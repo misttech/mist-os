@@ -24,8 +24,6 @@ namespace vfs {
 // Due to lifetime restrictions, implementations of `LazyDir` cannot call `Serve()`. However, the
 // `LazyDir` node can be added as a child entry of a `vfs::PseudoDir` which will ensure the lifetime
 // requirements.
-//
-// TODO(https://fxbug.dev/309685624): Remove LazyDir once all out-of-tree users have been migrated.
 class LazyDir : public vfs::Node {
  public:
   LazyDir() : Node(MakeLazyDir(this)) {}

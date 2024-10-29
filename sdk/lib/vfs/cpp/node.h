@@ -34,6 +34,14 @@ class Node {
  protected:
   explicit Node(vfs_internal_node_t* handle) : handle_(handle) { ZX_DEBUG_ASSERT(handle); }
 
+  const vfs_internal_node_t* handle() const { return handle_; }
+  vfs_internal_node_t* handle() { return handle_; }
+
+  // Types that require access to `handle()` for operating on child entries.
+  friend class vfs::ComposedServiceDir;
+  friend class vfs::LazyDir;
+  friend class vfs::PseudoDir;
+
   // Establishes a connection for `request` using the given `flags`. This method must only be used
   // with a single-threaded asynchronous dispatcher. If `dispatcher` is `nullptr`, the current
   // thread's default dispatcher will be used via `async_get_default_dispatcher`.
@@ -41,7 +49,7 @@ class Node {
   // The same `dispatcher` must be used if multiple connections are served for the same node,
   // otherwise `ZX_ERR_INVALID_ARGS` will be returned.
   //
-  // Not all node types support `Serve()` due to lifetime restrictions.
+  // *WARNING*: Not all node types support `Serve()` due to lifetime restrictions (e.g. `LazyDir`).
   zx_status_t Serve(fuchsia_io::OpenFlags flags, zx::channel request,
                     async_dispatcher_t* dispatcher = nullptr) {
     if (!dispatcher) {
@@ -51,18 +59,6 @@ class Node {
                                    static_cast<uint32_t>(flags));
   }
 
-  // Types that require access to `handle()` for operating on child entries.
-  friend class vfs::ComposedServiceDir;
-  friend class vfs::LazyDir;
-  friend class vfs::PseudoDir;
-
-  const vfs_internal_node_t* handle() const { return handle_; }
-  vfs_internal_node_t* handle() { return handle_; }
-
- private:
-  vfs_internal_node_t* const handle_;
-
- public:
   // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
   // Deprecated HLCPP Signatures
   // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -77,7 +73,7 @@ class Node {
   // The same `dispatcher` must be used if multiple connections are served for the same node,
   // otherwise `ZX_ERR_INVALID_ARGS` will be returned.
   //
-  // Not all node types support `Serve()` due to lifetime restrictions.
+  // *WARNING*: Not all node types support `Serve()` due to lifetime restrictions (e.g. `LazyDir`).
   zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
                     async_dispatcher_t* dispatcher = nullptr) {
     if (!dispatcher) {
@@ -86,6 +82,9 @@ class Node {
     return vfs_internal_node_serve(handle_, dispatcher, request.release(),
                                    static_cast<uint32_t>(flags));
   }
+
+ private:
+  vfs_internal_node_t* const handle_;
 };
 
 namespace internal {
