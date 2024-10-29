@@ -23,7 +23,7 @@ use core::convert::Infallible as Never;
 use core::marker::PhantomData;
 use core::ops::Deref;
 
-use zerocopy::SplitByteSlice;
+use zerocopy::{IntoByteSlice, SplitByteSlice};
 
 use crate::serialize::InnerPacketBuilder;
 use crate::util::{FromRaw, MaybeParsed};
@@ -132,7 +132,7 @@ where
         context: &mut R::Context,
     ) -> MaybeParsed<Self, (B, R::Error)> {
         let c = context.clone();
-        let mut b = LongLivedBuff::new(bytes.as_ref());
+        let mut b = SplitSliceBufferView(bytes.as_ref());
         let r = loop {
             match R::parse_raw_with_context(&mut b, context) {
                 Ok(true) => {} // continue consuming from data
@@ -149,7 +149,7 @@ where
         // so we only take the amount of bytes we actually need from `bytes`,
         // leaving the rest alone for the caller to continue parsing with.
         let bytes_len = bytes.len();
-        let b_len = b.len();
+        let b_len = b.as_ref().len();
         let taken = bytes.take_front(bytes_len - b_len).unwrap();
 
         match r {
@@ -196,10 +196,11 @@ impl<B: Deref<Target = [u8]>, R: RecordsImplLayout> RecordsRaw<B, R> {
 
 /// An iterator over the records contained inside a [`Records`] instance.
 #[derive(Copy, Clone, Debug)]
-pub struct RecordsIter<'a, R: RecordsImpl> {
-    bytes: &'a [u8],
+pub struct RecordsIter<'a, B, R: RecordsImpl> {
+    bytes: B,
     records_left: usize,
     context: R::Context,
+    _marker: PhantomData<&'a ()>,
 }
 
 /// The error returned when fewer records were found than expected.
@@ -704,7 +705,7 @@ where
         // - B could return different bytes each time
         // - R::parse could be non-deterministic
         let c = context.clone();
-        let mut b = LongLivedBuff::new(bytes.deref());
+        let mut b = SplitSliceBufferView(bytes.as_ref());
         let mut record_count = 0;
         while next::<_, R>(&mut b, context)?.is_some() {
             record_count += 1;
@@ -764,16 +765,39 @@ where
     ///
     /// [`parse`]: Records::parse
     /// [`R::parse_with_context`]: RecordsImpl::parse_with_context
-    pub fn iter(&'a self) -> RecordsIter<'a, R> {
+    pub fn iter(&'a self) -> RecordsIter<'a, &'a [u8], R> {
         RecordsIter {
             bytes: &self.bytes,
             records_left: self.record_count,
             context: self.context.clone_for_iter(),
+            _marker: PhantomData,
         }
     }
 }
 
-impl<'a, R> RecordsIter<'a, R>
+impl<'a, B, R> Records<B, R>
+where
+    B: SplitByteSlice + IntoByteSlice<'a>,
+    R: RecordsImpl,
+{
+    /// Iterates over options.
+    ///
+    /// Since the records were validated in [`parse`], then so long as
+    /// [`R::parse_with_context`] is deterministic, the iterator is infallible.
+    ///
+    /// [`parse`]: Records::parse
+    /// [`R::parse_with_context`]: RecordsImpl::parse_with_context
+    pub fn into_iter(self) -> RecordsIter<'a, B, R> {
+        RecordsIter {
+            bytes: self.bytes,
+            records_left: self.record_count,
+            context: self.context,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, B, R> RecordsIter<'a, B, R>
 where
     R: RecordsImpl,
 {
@@ -783,25 +807,28 @@ where
     }
 }
 
-impl<'a, R> Iterator for RecordsIter<'a, R>
+impl<'a, B, R> Iterator for RecordsIter<'a, B, R>
 where
     R: RecordsImpl,
+    B: SplitByteSlice + IntoByteSlice<'a>,
 {
     type Item = R::Record<'a>;
 
     fn next(&mut self) -> Option<R::Record<'a>> {
-        let mut bytes = LongLivedBuff::new(self.bytes);
-        // use match rather than expect because expect requires that Err: Debug
-        #[allow(clippy::match_wild_err_arm)]
-        let result = match next::<_, R>(&mut bytes, &mut self.context) {
-            Ok(o) => o,
-            Err(_) => panic!("already-validated options should not fail to parse"),
-        };
-        if result.is_some() {
-            self.records_left -= 1;
-        }
-        self.bytes = bytes.into_rest();
-        result
+        replace_with::replace_with_and(&mut self.bytes, |bytes| {
+            let mut bytes = SplitSliceBufferView(bytes);
+            // use match rather than expect because expect requires that Err: Debug
+            #[allow(clippy::match_wild_err_arm)]
+            let result = match next::<_, R>(&mut bytes, &mut self.context) {
+                Ok(o) => o,
+                Err(_) => panic!("already-validated options should not fail to parse"),
+            };
+            if result.is_some() {
+                self.records_left -= 1;
+            }
+            let SplitSliceBufferView(bytes) = bytes;
+            (bytes, result)
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -809,9 +836,10 @@ where
     }
 }
 
-impl<'a, R> ExactSizeIterator for RecordsIter<'a, R>
+impl<'a, B, R> ExactSizeIterator for RecordsIter<'a, B, R>
 where
     R: RecordsImpl,
+    B: SplitByteSlice + IntoByteSlice<'a>,
 {
     fn len(&self) -> usize {
         self.records_left
@@ -853,55 +881,31 @@ where
     }
 }
 
-/// A wrapper around the implementation of `BufferView` for slices.
-///
-/// `LongLivedBuff` is a thin wrapper around `&[u8]` meant to provide an
-/// implementation of `BufferView` that returns slices tied to the same lifetime
-/// as the slice that `LongLivedBuff` was created with. This is in contrast to
-/// the more widely used `&'b mut &'a [u8]` `BufferView` implementer that
-/// returns slice references tied to lifetime `b`.
-struct LongLivedBuff<'a>(&'a [u8]);
+struct SplitSliceBufferView<B>(B);
 
-impl<'a> LongLivedBuff<'a> {
-    /// Creates a new `LongLivedBuff` around a slice reference with lifetime
-    /// `'a`.
-    ///
-    /// All slices returned by the `BufferView` impl of `LongLivedBuff` are
-    /// guaranteed to return slice references tied to the same lifetime `'a`.
-    fn new(data: &'a [u8]) -> LongLivedBuff<'a> {
-        LongLivedBuff::<'a>(data)
-    }
-}
-
-impl<'a> AsRef<[u8]> for LongLivedBuff<'a> {
+impl<B: SplitByteSlice> AsRef<[u8]> for SplitSliceBufferView<B> {
     fn as_ref(&self) -> &[u8] {
-        self.0
+        self.0.as_ref()
     }
 }
 
-impl<'a> BufferView<&'a [u8]> for LongLivedBuff<'a> {
+impl<'a, B: SplitByteSlice + IntoByteSlice<'a>> BufferView<&'a [u8]> for SplitSliceBufferView<B> {
     fn take_front(&mut self, n: usize) -> Option<&'a [u8]> {
-        if self.0.len() >= n {
-            let (prefix, rest) = core::mem::replace(&mut self.0, &[]).split_at(n);
-            self.0 = rest;
-            Some(prefix)
-        } else {
-            None
-        }
+        replace_with::replace_with_and(&mut self.0, |bytes| match bytes.split_at(n) {
+            Ok((prefix, suffix)) => (suffix, Some(prefix.into_byte_slice())),
+            Err(e) => (e, None),
+        })
     }
 
     fn take_back(&mut self, n: usize) -> Option<&'a [u8]> {
-        if self.0.len() >= n {
-            let (rest, suffix) = core::mem::replace(&mut self.0, &[]).split_at(n);
-            self.0 = rest;
-            Some(suffix)
-        } else {
-            None
-        }
+        replace_with::replace_with_and(&mut self.0, |bytes| match bytes.split_at(n) {
+            Ok((prefix, suffix)) => (prefix, Some(suffix.into_byte_slice())),
+            Err(e) => (e, None),
+        })
     }
 
     fn into_rest(self) -> &'a [u8] {
-        self.0
+        self.0.into_byte_slice()
     }
 }
 

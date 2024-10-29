@@ -13,6 +13,7 @@ rustc_library("packet") {
 
   deps = [
     "//src/lib/const-unwrap",
+    "//src/lib/replace-with",
     "//third_party/rust_crates:arrayvec",
     "//third_party/rust_crates:zerocopy",
   ]
