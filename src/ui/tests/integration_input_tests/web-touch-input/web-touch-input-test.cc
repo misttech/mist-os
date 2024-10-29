@@ -105,6 +105,7 @@ namespace {
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
 using component_testing::Config;
+using component_testing::Dictionary;
 using component_testing::Directory;
 using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
@@ -316,10 +317,8 @@ class WebEngineTest : public ui_testing::PortableUITest,
          .source = kTestUIStackRef,
          .targets = {target}},
         {
-            .capabilities =
-                {
-                    Protocol{fidl::DiscoverableProtocolName<fuchsia_logger::LogSink>},
-                },
+            .capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_logger::LogSink>},
+                             Dictionary{"diagnostics"}},
             .source = ParentRef(),
             .targets =
                 {

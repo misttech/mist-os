@@ -32,6 +32,7 @@ namespace {
 
 // Types imported for the realm_builder library.
 using component_testing::ConfigValue;
+using component_testing::Dictionary;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::RealmRoot;
@@ -61,6 +62,7 @@ void PortableUITest::SetUpRealmBase() {
   // Route base system services to flutter and the test UI stack.
   realm_builder_.AddRoute(Route{
       .capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_logger::LogSink>},
+                       Dictionary{"diagnostics"},
                        Protocol{fidl::DiscoverableProtocolName<fuchsia_scheduler::RoleManager>},
                        Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>},
                        Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>},

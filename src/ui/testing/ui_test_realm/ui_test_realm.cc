@@ -45,6 +45,7 @@ namespace {
 using component_testing::Capability;
 using component_testing::ChildRef;
 using component_testing::ConfigValue;
+using component_testing::Dictionary;
 using component_testing::Directory;
 using component_testing::ParentRef;
 using component_testing::Protocol;
@@ -204,6 +205,11 @@ void UITestRealm::ConfigureClientSubrealm() {
   // Route default system services to test subrealm.
   RouteServices(DefaultSystemServices(), /* source = */ ParentRef(),
                 /* targets = */ {ChildRef{kClientSubrealmName}});
+
+  // Route the diagnostics dictionary
+  realm_builder_.AddRoute(Route{.capabilities = {Dictionary{.name = "diagnostics"}},
+                                .source = ParentRef(),
+                                .targets = {ChildRef{kClientSubrealmName}}});
 
   // Route any passthrough capabilities to the client subrealm.
   if (!config_.passthrough_capabilities.empty()) {
