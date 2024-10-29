@@ -36,12 +36,49 @@ AmlHrtimerServer::AmlHrtimerServer(
   mmio_.emplace(std::move(mmio));
   dispatcher_ = dispatcher;
   wake_handling_lessor_ = std::move(lessor);
+
   lease_requests_ = inspect_node_.CreateUint("lease_requests", 0);
   lease_replies_ = inspect_node_.CreateUint("lease_replies", 0);
   update_requests_ = inspect_node_.CreateUint("update_requests", 0);
   update_replies_ = inspect_node_.CreateUint("update_replies", 0);
   irq_entries_ = inspect_node_.CreateUint("irq_entries", 0);
   irq_exits_ = inspect_node_.CreateUint("irq_exits", 0);
+  inspect_node_.RecordLazyValues("lazy_values", [&]() {
+    inspect::Inspector inspector;
+    auto all = inspector.GetRoot().CreateChild("events");
+    all.RecordUint("event_index", event_index_);
+
+    for (size_t i = 0; i < kMaxInspectEvents; ++i) {
+      if (events_[i].type == EventType::None) {
+        continue;
+      }
+      const char* type = nullptr;
+      switch (events_[i].type) {
+          // clang-format off
+        case EventType::None:            type = "";                break;
+        case EventType::Start:           type = "Start";           break;
+        case EventType::StartAndWait:    type = "StartAndWait";    break;
+        case EventType::StartAndWait2:   type = "StartAndWait2";   break;
+        case EventType::StartHardware:   type = "StartHardware";   break;
+        case EventType::RetriggerIrq:    type = "RetriggerIrq";    break;
+        case EventType::TriggerIrq:      type = "TriggerIrq";      break;
+        case EventType::TriggerIrqWait:  type = "TriggerIrqWait";  break;
+        case EventType::TriggerIrqWait2: type = "TriggerIrqWait2"; break;
+        case EventType::Stop:            type = "Stop";            break;
+        case EventType::StopWait:        type = "StopWait";        break;
+        case EventType::StopWait2:       type = "StopWait2";       break;
+          // clang-format on
+      }
+      all.RecordChild(std::to_string(i).c_str(), [&](inspect::Node& event) {
+        event.RecordInt("@time", events_[i].timestamp);
+        event.RecordUint("id", events_[i].id);
+        event.RecordString("type", type);
+        event.RecordUint("data", events_[i].data);
+      });
+    }
+    inspector.emplace(std::move(all));
+    return fpromise::make_ok_promise(std::move(inspector));
+  });
 
   timers_[0].irq_handler.set_object(irq_a.get());
   timers_[1].irq_handler.set_object(irq_b.get());
@@ -150,8 +187,10 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
   if (properties.extend_max_ticks && start_ticks_left > std::numeric_limits<uint16_t>::max()) {
     // Log re-triggering since it may wakeup the system.
     start_ticks_left -= std::numeric_limits<uint16_t>::max();
-    FDF_LOG(INFO, "Timer id: %zu IRQ re-trigger, new start ticks left: %lu", properties.id,
+    FDF_LOG(DEBUG, "Timer id: %zu IRQ re-trigger, new start ticks left: %lu", properties.id,
             start_ticks_left);
+    parent.RecordEvent(zx::clock::get_monotonic().get(), properties.id, EventType::RetriggerIrq,
+                       start_ticks_left);
     size_t timer_index = TimerIndexFromId(properties.id);
     auto start_result = parent.StartHardware(timer_index);
     if (start_result.is_error()) {
@@ -180,8 +219,10 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
   // event and ack the IRQ regardless.
   std::visit(
       overloaded{[&](StartAndWaitCompleter::Async& completer) {
-                   FDF_LOG(INFO, "Timer id: %zu IRQ w/wait triggered, last ticks: %lu",
+                   FDF_LOG(DEBUG, "Timer id: %zu IRQ w/wait triggered, last ticks: %lu",
                            properties.id, last_ticks);
+                   parent.RecordEvent(zx::clock::get_monotonic().get(), properties.id,
+                                      EventType::TriggerIrqWait, last_ticks);
                    parent.lease_requests_.Add(1);
                    auto lease_control = parent.LeaseWakeHandling();
                    parent.lease_replies_.Add(1);
@@ -193,8 +234,10 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
                    }
                  },
                  [&](StartAndWait2Completer::Async& completer) {
-                   FDF_LOG(INFO, "Timer id: %zu IRQ w/wait2 triggered, last ticks: %lu",
+                   FDF_LOG(DEBUG, "Timer id: %zu IRQ w/wait2 triggered, last ticks: %lu",
                            properties.id, last_ticks);
+                   parent.RecordEvent(zx::clock::get_monotonic().get(), properties.id,
+                                      EventType::TriggerIrqWait2, last_ticks);
                    parent.lease_requests_.Add(1);
                    auto wake_lease = parent.sag_->TakeWakeLease(std::string("aml-hrtimer"));
                    parent.lease_replies_.Add(1);
@@ -206,8 +249,10 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
                    }
                  },
                  [&](std::monostate& empty) {
-                   FDF_LOG(INFO, "Timer id: %zu IRQ triggered, last ticks: %lu", properties.id,
+                   FDF_LOG(DEBUG, "Timer id: %zu IRQ triggered, last ticks: %lu", properties.id,
                            last_ticks);
+                   parent.RecordEvent(zx::clock::get_monotonic().get(), properties.id,
+                                      EventType::TriggerIrq, last_ticks);
                  }},
       power_enabled_wait_completer);
   power_enabled_wait_completer = std::monostate();
@@ -422,23 +467,38 @@ void AmlHrtimerServer::Stop(StopRequest& request, StopCompleter::Sync& completer
       return;
   }
   std::visit(
-      overloaded{[&](StartAndWaitCompleter::Async& completer) {
-                   FDF_LOG(INFO, "Received Stop canceling wait for timer id: %zu", request.id());
-                   completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
-                 },
-                 [&](StartAndWait2Completer::Async& completer) {
-                   FDF_LOG(INFO, "Received Stop canceling wait2 for timer id: %zu", request.id());
-                   completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
-                 },
-                 [&](std::monostate& empty) {
-                   FDF_LOG(INFO, "Received Stop canceling timer id: %zu", request.id());
-                 }},
+      overloaded{
+          [&](StartAndWaitCompleter::Async& completer) {
+            FDF_LOG(DEBUG, "Received Stop canceling wait for timer id: %zu", request.id());
+            RecordEvent(zx::clock::get_monotonic().get(), request.id(), EventType::StopWait, 0);
+            completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
+          },
+          [&](StartAndWait2Completer::Async& completer) {
+            FDF_LOG(DEBUG, "Received Stop canceling wait2 for timer id: %zu", request.id());
+            RecordEvent(zx::clock::get_monotonic().get(), request.id(), EventType::StopWait2, 0);
+            completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kCanceled));
+          },
+          [&](std::monostate& empty) {
+            FDF_LOG(DEBUG, "Received Stop canceling timer id: %zu", request.id());
+            RecordEvent(zx::clock::get_monotonic().get(), request.id(), EventType::Stop, 0);
+          }},
       timers_[timer_index].power_enabled_wait_completer);
   timers_[timer_index].power_enabled_wait_completer = std::monostate();
   completer.Reply(zx::ok());
 }
+void AmlHrtimerServer::RecordEvent(int64_t now, uint64_t id, EventType type, uint64_t data) {
+  events_[event_index_].timestamp = now;
+  events_[event_index_].id = id;
+  events_[event_index_].type = type;
+  events_[event_index_].data = data;
+  if (++event_index_ >= kMaxInspectEvents) {
+    event_index_ = 0;
+  }
+}
 
 void AmlHrtimerServer::Start(StartRequest& request, StartCompleter::Sync& completer) {
+  FDF_LOG(DEBUG, "Timer id: %zu start, requested ticks: %lu", request.id(), request.ticks());
+  RecordEvent(zx::clock::get_monotonic().get(), request.id(), EventType::Start, request.ticks());
   size_t timer_index = TimerIndexFromId(request.id());
   if (timer_index >= kNumberOfTimers) {
     FDF_LOG(ERROR, "Invalid timer id: %lu", request.id());
@@ -462,6 +522,10 @@ void AmlHrtimerServer::Start(StartRequest& request, StartCompleter::Sync& comple
 
 void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
                                     StartAndWaitCompleter::Sync& completer) {
+  FDF_LOG(DEBUG, "Timer id: %zu start and wait, requested ticks: %lu", request.id(),
+          request.ticks());
+  RecordEvent(zx::clock::get_monotonic().get(), request.id(), EventType::StartAndWait,
+              request.ticks());
   size_t timer_index = TimerIndexFromId(request.id());
   if (timer_index >= kNumberOfTimers) {
     FDF_LOG(ERROR, "Invalid timer id: %lu", request.id());
@@ -507,6 +571,10 @@ void AmlHrtimerServer::StartAndWait(StartAndWaitRequest& request,
 
 void AmlHrtimerServer::StartAndWait2(StartAndWait2Request& request,
                                      StartAndWait2Completer::Sync& completer) {
+  FDF_LOG(DEBUG, "Timer id: %zu start and wait2, requested ticks: %lu", request.id(),
+          request.ticks());
+  RecordEvent(zx::clock::get_monotonic().get(), request.id(), EventType::StartAndWait2,
+              request.ticks());
   size_t timer_index = TimerIndexFromId(request.id());
   if (timer_index >= kNumberOfTimers) {
     FDF_LOG(ERROR, "Invalid timer id: %lu", request.id());
@@ -697,8 +765,10 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
       return fit::error(fuchsia_hardware_hrtimer::DriverError::kInternalError);
   }
   timers_[timer_index].last_ticks = current_ticks;
-  FDF_LOG(INFO, "Timer id: %zu started, start ticks left: %lu last ticks: %lu", id,
+  FDF_LOG(DEBUG, "Timer id: %zu started, start ticks left: %lu last ticks: %lu", id,
           timers_[timer_index].start_ticks_left, timers_[timer_index].last_ticks);
+  RecordEvent(zx::clock::get_monotonic().get(), id, EventType::StartHardware,
+              timers_[timer_index].last_ticks);
   return fit::success();
 }
 

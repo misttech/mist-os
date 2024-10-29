@@ -12,7 +12,10 @@
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fake-bti/bti.h>
+#include <lib/fpromise/result.h>
+#include <lib/fpromise/single_threaded_executor.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/inspect/cpp/reader.h>
 
 #include <gtest/gtest.h>
 
@@ -440,6 +443,30 @@ class DriverTest : public ::testing::Test {
         [](TestEnvironment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
   }
 
+  void CheckInspect(const char* path, const char* type, uint64_t id, uint64_t data) {
+    driver_test().RunInDriverContext([&](AmlHrtimer& driver) {
+      auto& inspector = driver.inspect();
+      fpromise::single_threaded_executor executor;
+      executor.schedule_task(inspect::ReadFromInspector(inspector).then(
+          [&](fpromise::result<inspect::Hierarchy>& hierarchy) {
+            ASSERT_TRUE(hierarchy.is_ok());
+            const inspect::Hierarchy* events =
+                hierarchy.value().GetByPath({"hrtimer-trace", "events"});
+            ASSERT_TRUE(events);
+            const auto* event = events->GetByPath({path});
+            auto local_id = event->node().get_property<inspect::UintPropertyValue>("id")->value();
+            auto local_type =
+                event->node().get_property<inspect::StringPropertyValue>("type")->value();
+            auto local_data =
+                event->node().get_property<inspect::UintPropertyValue>("data")->value();
+            ASSERT_EQ(local_type.compare(type), 0);
+            ASSERT_EQ(local_id, id);
+            ASSERT_EQ(local_data, data);
+          }));
+      executor.run();
+    });
+  }
+
   fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
 
   fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
@@ -586,6 +613,34 @@ TEST_F(DriverTest, StartStop) {
     // Timer E can't actually be stopped.
     ASSERT_EQ(env.platform_device().mmio()[0x3c64], 0x0000'0000UL);  // Timers F, G, H and I.
   });
+
+  CheckInspect("0", "Start", 0, 1);
+  CheckInspect("1", "StartHardware", 0, 1);
+  CheckInspect("2", "Start", 1, 1);
+  CheckInspect("3", "StartHardware", 1, 1);
+  CheckInspect("4", "Start", 2, 1);
+  CheckInspect("5", "StartHardware", 2, 1);
+  CheckInspect("6", "Start", 3, 1);
+  CheckInspect("7", "StartHardware", 3, 1);
+  CheckInspect("8", "Start", 4, 1);
+  CheckInspect("9", "StartHardware", 4, 0);  // Timer 4 does not set ticks in the HW.
+  CheckInspect("10", "Start", 5, 1);
+  CheckInspect("11", "StartHardware", 5, 1);
+  CheckInspect("12", "Start", 6, 1);
+  CheckInspect("13", "StartHardware", 6, 1);
+  CheckInspect("14", "Start", 7, 1);
+  CheckInspect("15", "StartHardware", 7, 1);
+  CheckInspect("16", "Start", 8, 1);
+  CheckInspect("17", "StartHardware", 8, 1);
+  CheckInspect("18", "Stop", 0, 0);
+  CheckInspect("19", "Stop", 1, 0);
+  CheckInspect("20", "Stop", 2, 0);
+  CheckInspect("21", "Stop", 3, 0);
+  CheckInspect("22", "Stop", 4, 0);
+  CheckInspect("23", "Stop", 5, 0);
+  CheckInspect("24", "Stop", 6, 0);
+  CheckInspect("25", "Stop", 7, 0);
+  CheckInspect("26", "Stop", 8, 0);
 }
 
 TEST_F(DriverTest, EventTriggering) {
@@ -862,6 +917,24 @@ TEST_F(DriverTest, StartAndWaitTriggering) {
   for (auto& thread : threads) {
     thread.join();
   }
+
+  CheckInspect("0", "StartAndWait", 0, 0);
+  CheckInspect("1", "StartHardware", 0, 0);
+  CheckInspect("2", "StartAndWait", 1, 0);
+  CheckInspect("3", "StartHardware", 1, 0);
+  CheckInspect("4", "StartAndWait", 2, 0);
+  CheckInspect("5", "StartHardware", 2, 0);
+  CheckInspect("6", "StartAndWait", 3, 0);
+  CheckInspect("7", "StartHardware", 3, 0);
+  CheckInspect("8", "StartAndWait", 5, 0);
+  CheckInspect("9", "StartHardware", 5, 0);
+  CheckInspect("10", "StartAndWait", 6, 0);
+  CheckInspect("11", "StartHardware", 6, 0);
+  CheckInspect("12", "StartAndWait", 7, 0);
+  CheckInspect("13", "StartHardware", 7, 0);
+  CheckInspect("14", "StartAndWait", 8, 0);
+  CheckInspect("15", "StartHardware", 8, 0);
+  // Not checking TriggerIrqWait since we are not ordering IRQ triggers.
 }
 
 TEST_F(DriverTest, StartAndWait2Triggering) {
@@ -893,6 +966,24 @@ TEST_F(DriverTest, StartAndWait2Triggering) {
   for (auto& thread : threads) {
     thread.join();
   }
+
+  CheckInspect("0", "StartAndWait2", 0, 0);
+  CheckInspect("1", "StartHardware", 0, 0);
+  CheckInspect("2", "StartAndWait2", 1, 0);
+  CheckInspect("3", "StartHardware", 1, 0);
+  CheckInspect("4", "StartAndWait2", 2, 0);
+  CheckInspect("5", "StartHardware", 2, 0);
+  CheckInspect("6", "StartAndWait2", 3, 0);
+  CheckInspect("7", "StartHardware", 3, 0);
+  CheckInspect("8", "StartAndWait2", 5, 0);
+  CheckInspect("9", "StartHardware", 5, 0);
+  CheckInspect("10", "StartAndWait2", 6, 0);
+  CheckInspect("11", "StartHardware", 6, 0);
+  CheckInspect("12", "StartAndWait2", 7, 0);
+  CheckInspect("13", "StartHardware", 7, 0);
+  CheckInspect("14", "StartAndWait2", 8, 0);
+  CheckInspect("15", "StartHardware", 8, 0);
+  // Not checking TriggerIrqWait2 since we are not ordering IRQ triggers.
 }
 
 TEST_F(DriverTest, RunningPowerElement) {
@@ -992,6 +1083,31 @@ TEST_F(DriverTest, StartAndWaitStop) {
     ASSERT_FALSE(result_start_stop.is_error());
     thread.join();
   }
+
+  CheckInspect("0", "StartAndWait", 0, 0);
+  CheckInspect("1", "StartHardware", 0, 0);
+  CheckInspect("2", "StopWait", 0, 0);
+  CheckInspect("3", "StartAndWait", 1, 0);
+  CheckInspect("4", "StartHardware", 1, 0);
+  CheckInspect("5", "StopWait", 1, 0);
+  CheckInspect("6", "StartAndWait", 2, 0);
+  CheckInspect("7", "StartHardware", 2, 0);
+  CheckInspect("8", "StopWait", 2, 0);
+  CheckInspect("9", "StartAndWait", 3, 0);
+  CheckInspect("10", "StartHardware", 3, 0);
+  CheckInspect("11", "StopWait", 3, 0);
+  CheckInspect("12", "StartAndWait", 5, 0);
+  CheckInspect("13", "StartHardware", 5, 0);
+  CheckInspect("14", "StopWait", 5, 0);
+  CheckInspect("15", "StartAndWait", 6, 0);
+  CheckInspect("16", "StartHardware", 6, 0);
+  CheckInspect("17", "StopWait", 6, 0);
+  CheckInspect("18", "StartAndWait", 7, 0);
+  CheckInspect("19", "StartHardware", 7, 0);
+  CheckInspect("20", "StopWait", 7, 0);
+  CheckInspect("21", "StartAndWait", 8, 0);
+  CheckInspect("22", "StartHardware", 8, 0);
+  CheckInspect("23", "StopWait", 8, 0);
 }
 
 TEST_F(DriverTest, StartAndWait2Stop) {
@@ -1021,6 +1137,31 @@ TEST_F(DriverTest, StartAndWait2Stop) {
     ASSERT_FALSE(result_start_stop.is_error());
     thread.join();
   }
+
+  CheckInspect("0", "StartAndWait2", 0, 0);
+  CheckInspect("1", "StartHardware", 0, 0);
+  CheckInspect("2", "StopWait2", 0, 0);
+  CheckInspect("3", "StartAndWait2", 1, 0);
+  CheckInspect("4", "StartHardware", 1, 0);
+  CheckInspect("5", "StopWait2", 1, 0);
+  CheckInspect("6", "StartAndWait2", 2, 0);
+  CheckInspect("7", "StartHardware", 2, 0);
+  CheckInspect("8", "StopWait2", 2, 0);
+  CheckInspect("9", "StartAndWait2", 3, 0);
+  CheckInspect("10", "StartHardware", 3, 0);
+  CheckInspect("11", "StopWait2", 3, 0);
+  CheckInspect("12", "StartAndWait2", 5, 0);
+  CheckInspect("13", "StartHardware", 5, 0);
+  CheckInspect("14", "StopWait2", 5, 0);
+  CheckInspect("15", "StartAndWait2", 6, 0);
+  CheckInspect("16", "StartHardware", 6, 0);
+  CheckInspect("17", "StopWait2", 6, 0);
+  CheckInspect("18", "StartAndWait2", 7, 0);
+  CheckInspect("19", "StartHardware", 7, 0);
+  CheckInspect("20", "StopWait2", 7, 0);
+  CheckInspect("21", "StartAndWait2", 8, 0);
+  CheckInspect("22", "StartHardware", 8, 0);
+  CheckInspect("23", "StopWait2", 8, 0);
 }
 
 class DriverTestNoAutoStop : public ::testing::Test {

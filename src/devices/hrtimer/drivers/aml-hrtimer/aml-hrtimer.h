@@ -34,6 +34,8 @@ class AmlHrtimer : public fdf::DriverBase {
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // For unit testing.
+  inspect::Inspector& inspect() { return inspector().inspector(); }
+
   std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>>& element_control() {
     return server_->element_control();
   }
