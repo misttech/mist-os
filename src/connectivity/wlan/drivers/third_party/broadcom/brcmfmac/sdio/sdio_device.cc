@@ -228,7 +228,7 @@ zx_status_t SdioDevice::DeviceGetMetadata(uint32_t type, void* buf, size_t bufle
         compat::GetMetadata<MacAddr>(incoming(), DEVICE_METADATA_MAC_ADDRESS, "pdev");
 
     if (decoded.is_error()) {
-      BRCMF_ERR("Unable to get mac address: %s", decoded.status_string());
+      BRCMF_WARN("Unable to get mac address: %s", decoded.status_string());
     } else {
       MacAddr* mac_addr = decoded.value().get();
       memcpy(buf, mac_addr->data(), sizeof(*mac_addr));

@@ -77,19 +77,31 @@ const FirmwareMapping* GetFirmwareMapping(brcmf_bus_type bus_type, CommonCoreId 
   return nullptr;
 }
 
-zx_status_t LoadBinaryFromFile(Device* device, std::string_view filename, std::string* binary_out) {
-  zx_status_t status = ZX_OK;
+// Create a convenience macro for logging with a severity determined at runtime. This is intended
+// for firmware files that are not mandatory for the driver to work (i.e. CLM files). We don't want
+// to log an error for something that is expected behavior on some devices (e.g. where CLM data is
+// part of the firmware file). By creating a macro we avoid duplicate log statements where the only
+// difference is the log level.
+#define FW_LOAD_LOG(failure_is_an_error, ...) \
+  ((failure_is_an_error) ? BRCMF_ERR(__VA_ARGS__) : BRCMF_WARN(__VA_ARGS__))
+
+zx_status_t LoadBinaryFromFile(Device* device, std::string_view filename, std::string* binary_out,
+                               bool failure_is_an_error = true) {
   zx_handle_t vmo_handle = ZX_HANDLE_INVALID;
   size_t vmo_size = 0;
   const auto filepath = std::string(kDefaultFirmwarePath).append(filename);
-  if ((status = device->LoadFirmware(filepath.c_str(), &vmo_handle, &vmo_size)) != ZX_OK) {
-    BRCMF_ERR("Failed to load filepath %s: %s", filepath.c_str(), zx_status_get_string(status));
+  if (zx_status_t status = device->LoadFirmware(filepath.c_str(), &vmo_handle, &vmo_size);
+      status != ZX_OK) {
+    FW_LOAD_LOG(failure_is_an_error, "Failed to load filepath %s: %s", filepath.c_str(),
+                zx_status_get_string(status));
     return status;
   }
 
   std::string binary_data(vmo_size, '\0');
-  if ((status = zx_vmo_read(vmo_handle, binary_data.data(), 0, binary_data.size())) != ZX_OK) {
-    BRCMF_ERR("Failed to read filepath %s: %s", filepath.c_str(), zx_status_get_string(status));
+  if (zx_status_t status = zx_vmo_read(vmo_handle, binary_data.data(), 0, binary_data.size());
+      status != ZX_OK) {
+    FW_LOAD_LOG(failure_is_an_error, "Failed to read filepath %s: %s", filepath.c_str(),
+                zx_status_get_string(status));
     return status;
   }
 
@@ -97,11 +109,13 @@ zx_status_t LoadBinaryFromFile(Device* device, std::string_view filename, std::s
   return ZX_OK;
 }
 
+#undef FW_LOAD_LOG
+
 }  // namespace
 
-zx_status_t GetFirmwareBinary(Device* device, brcmf_bus_type bus_type, CommonCoreId chipid,
-                              uint32_t chiprev, std::string* binary_out) {
-  const FirmwareMapping* firmware_mapping = GetFirmwareMapping(bus_type, chipid, chiprev);
+zx_status_t GetFirmwareBinary(Device* device, brcmf_bus_type bus_type, CommonCoreId chip_id,
+                              uint32_t chip_rev, std::string* binary_out) {
+  const FirmwareMapping* firmware_mapping = GetFirmwareMapping(bus_type, chip_id, chip_rev);
   if (firmware_mapping == nullptr) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -109,7 +123,7 @@ zx_status_t GetFirmwareBinary(Device* device, brcmf_bus_type bus_type, CommonCor
 }
 
 zx_status_t GetClmBinary(Device* device, brcmf_bus_type bus_type, CommonCoreId chip_id,
-                         uint32_t chip_rev, std::string* binary_out) {
+                         uint32_t chip_rev, std::string* binary_out, bool clm_needed) {
   const FirmwareMapping* firmware_mapping = GetFirmwareMapping(bus_type, chip_id, chip_rev);
   if (firmware_mapping == nullptr) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -118,7 +132,9 @@ zx_status_t GetClmBinary(Device* device, brcmf_bus_type bus_type, CommonCoreId c
   const std::string clm_name =
       std::string(firmware_name.substr(0, firmware_name.find_last_of('.'))).append(".clm_blob");
 
-  return LoadBinaryFromFile(device, clm_name, binary_out);
+  // Only issue an error for a missing CLM file if the file is needed. The CLM file is not strictly
+  // necessary on some platforms as indicated by the clm_needed parameter.
+  return LoadBinaryFromFile(device, clm_name, binary_out, clm_needed);
 }
 
 // Get the NVRAM binary for the given bus and chip.

@@ -22,7 +22,7 @@ zx_status_t GetFirmwareBinary(Device* device, brcmf_bus_type bus_type, CommonCor
 
 // Get the CLM binary blob for the given bus and chip, as a data string.
 zx_status_t GetClmBinary(Device* device, brcmf_bus_type bus_type, CommonCoreId chip_id,
-                         uint32_t chip_rev, std::string* binary_out);
+                         uint32_t chip_rev, std::string* binary_out, bool clm_needed);
 
 // Get the NVRAM binary for the given bus and chip, as a data string.  The returned binary has
 // already beedn parsed and is suitable for uploading to the device.
