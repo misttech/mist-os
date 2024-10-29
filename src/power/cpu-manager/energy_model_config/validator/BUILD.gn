@@ -26,7 +26,10 @@ if (is_host) {
   }
 
   host_test_data("valid_energy_model_test_configs") {
-    sources = [ "../test_configs/valid_test_config.json5" ]
+    sources = [
+      "../test_configs/valid_test_config.json5",
+      "../vim3.json5",
+    ]
     outputs = [
       "${root_out_dir}/valid_energy_model_test_configs/{{source_file_part}}",
     ]

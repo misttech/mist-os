@@ -1,0 +1,45 @@
+[
+    {
+        type: "SyscallHandler",
+        name: "syscall_handler",
+    },
+    {
+        type: "CpuDeviceHandler",
+        name: "big_cluster_handler",
+        config: {
+            total_domain_count: 2,
+            perf_rank: 0,
+        },
+    },
+    {
+        type: "CpuDeviceHandler",
+        name: "little_cluster_handler",
+        config: {
+            total_domain_count: 2,
+            perf_rank: 1,
+        },
+    },
+    {
+        type: "RppmHandler",
+        name: "rppm_handler",
+        config: {
+            power_domain_handlers: [
+                {
+                    domain_id: 0,
+                    handler: "big_cluster_handler",
+                },
+                {
+                    domain_id: 1,
+                    handler: "little_cluster_handler",
+                },
+            ],
+        },
+        dependencies: {
+            cpu_device_handlers: [
+                "big_cluster_handler",
+                "little_cluster_handler",
+            ],
+            syscall_handler: "syscall_handler",
+        },
+    },
+]
