@@ -37,18 +37,16 @@ rustc_binary("manager") {
   with_unit_tests = true
 }
 
-resource("tee-system-properties") {
-  sources = [ "config/system_properties.json5" ]
-  outputs = [ "data/properties/system_properties" ]
-}
-
 fuchsia_component("manager-component") {
   manifest = "meta/ta-manager.cml"
   component_name = "ta-manager"
-  deps = [
-    ":manager",
-    ":tee-system-properties",
-  ]
+  deps = [ ":manager" ]
+}
+
+# TODO(https://fxbug.dev/376122561): Add support for assembling prod system props.
+resource("test-tee-system-properties") {
+  sources = [ "config/test_system_properties.json5" ]
+  outputs = [ "data/properties/system_properties" ]
 }
 
 fuchsia_component("manager-realm-test-component") {
@@ -56,7 +54,7 @@ fuchsia_component("manager-realm-test-component") {
   component_name = "ta-manager"
   deps = [
     ":manager",
-    ":tee-system-properties",
+    ":test-tee-system-properties",
   ]
 }
 
@@ -71,7 +69,7 @@ fuchsia_package("ta-manager-realm-test") {
 fuchsia_unittest_component("manager-test-component") {
   deps = [
     ":manager_test",
-    ":tee-system-properties",
+    ":test-tee-system-properties",
   ]
   component_name = "ta-manager-test"
 }

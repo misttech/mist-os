@@ -4,6 +4,7 @@
 
 pub mod binding_stubs;
 pub mod mem;
+pub mod props;
 pub mod storage;
 
 // Must be called by the runtime as a prologue to TA_CreateEntryPoint() for

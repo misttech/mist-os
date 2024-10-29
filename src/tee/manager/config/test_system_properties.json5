@@ -59,13 +59,6 @@
         value: "xyz placeholder - override at build",
     },
     {
-        name: "gpd.tee.trustedos.implementation.binaryversion",
-        prop_type: "binary_block",
-
-        // To be overridden at build time.
-        value: "cGxhY2Vob2xkZXI=",
-    },
-    {
         name: "gpd.tee.trustedos.manufacturer",
         prop_type: "string",
         value: "Google",
@@ -75,6 +68,61 @@
         prop_type: "unsigned_int32",
 
         // TODO: Add support for TEE Event system.
+        value: "0",
+    },
+
+    // The values below exist here for testing purposes only.
+    // Real values should be provided specific to product and board, and added at assembly time.
+    {
+        name: "gpd.tee.deviceID",
+        prop_type: "uuid",
+
+        // Random meaningless UUID, to be replaced in product assembly flow.
+        value: "a32c6291-59dc-4806-b09b-dd42f296cb79",
+    },
+    {
+        name: "gpd.tee.systemTime.protectionLevel",
+        prop_type: "unsigned_int32",
+        value: "100",
+    },
+    {
+        name: "gpd.tee.TAPersistentTime.protectionLevel",
+        prop_type: "unsigned_int32",
+        value: "100",
+    },
+    {
+        name: "gpd.tee.arith.maxBigIntSize",
+        prop_type: "unsigned_int32",
+        value: "0",
+    },
+    {
+        name: "gpd.tee.trustedStorage.antiRollback.protectionLevel",
+        prop_type: "unsigned_int32",
+        value: "100",
+    },
+    {
+        name: "gpd.tee.trustedos.implementation.binaryversion",
+        prop_type: "unsigned_int64",
+        value: "12345",
+    },
+    {
+        name: "gpd.tee.firmware.implementation.version",
+        prop_type: "string",
+        value: "placeholder",
+    },
+    {
+        name: "gpd.tee.firmware.implementation.binaryversion",
+        prop_type: "unsigned_int64",
+        value: "12345",
+    },
+    {
+        name: "gpd.tee.firmware.manufacturer",
+        prop_type: "string",
+        value: "placeholder",
+    },
+    {
+        name: "gpd.tee.event.maxSources",
+        prop_type: "unsigned_int32",
         value: "0",
     },
 ]

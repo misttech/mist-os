@@ -21,4 +21,11 @@
             from: "framework",
         },
     ],
+    offer: [
+        {
+            directory: "props",
+            from: "self",
+            to: "#ta",
+        },
+    ],
 }

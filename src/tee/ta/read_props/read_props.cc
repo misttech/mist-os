@@ -11,8 +11,6 @@
 #define CMD_TEST_PROPS_EXIST 0
 
 TEE_Result test_properties_file_exists() {
-  std::filesystem::path pkg_path = "pkg";
-  std::filesystem::path prop_file_path = pkg_path / "data" / "ta_properties";
   if (!files::IsFile("/pkg/data/ta_properties")) {
     return TEE_ERROR_GENERIC;
   }

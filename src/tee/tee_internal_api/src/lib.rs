@@ -71,6 +71,10 @@ macro_rules! handle {
             pub fn from_value(value: u64) -> Self {
                 Self(value)
             }
+
+            pub fn is_null(&self) -> bool {
+                self.0 == binding::TEE_HANDLE_NULL.into()
+            }
         }
 
         inout_parameter!($name, $tee_name);
@@ -100,6 +104,11 @@ handle!(PropSetHandle, binding::TEE_PropSetHandle);
 handle!(ObjectHandle, binding::TEE_ObjectHandle);
 handle!(ObjectEnumHandle, binding::TEE_ObjectEnumHandle);
 handle!(OperationHandle, binding::TEE_OperationHandle);
+
+// Bindgen didn't carry these values into the generated Rust bindings.
+pub const TEE_PROPSET_TEE_IMPLEMENTATION: PropSetHandle = PropSetHandle(0xfffffffd);
+pub const TEE_PROPSET_CURRENT_CLIENT: PropSetHandle = PropSetHandle(0xfffffffe);
+pub const TEE_PROPSET_CURRENT_TA: PropSetHandle = PropSetHandle(0xffffffff);
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, FromPrimitive, PartialEq, thiserror::Error)]

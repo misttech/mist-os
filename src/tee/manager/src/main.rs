@@ -183,7 +183,7 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 pub mod tests {
     use std::path::Path;
-    use tee_properties::{PropEnumerator, PropSet, PropSetType, PropType};
+    use tee_properties::{PropEnumerator, PropSet, PropType};
 
     // This test validates the base platform-specified properties which are hosted in TA manager.
     #[test]
@@ -191,12 +191,11 @@ pub mod tests {
         let properties_file_path = Path::new("/pkg/data/properties/system_properties");
 
         let prop_set =
-            PropSet::from_config_file(&properties_file_path, PropSetType::TeeImplementation)
-                .expect("prop set loads successfully");
+            PropSet::from_config_file(&properties_file_path).expect("prop set loads successfully");
         let mut prop_enum = PropEnumerator::new();
-        prop_enum.start(prop_set);
+        prop_enum.start(std::sync::Arc::new(prop_set));
 
-        // Will report ItemNotFound error when it moves past the end of the property set.
+        // Will report ItemNotFound error if it has moved past the end of the property set.
         while prop_enum.get_property_name().is_ok() {
             let prop_type: PropType =
                 prop_enum.get_property_type().expect("get property type successfully");
@@ -214,7 +213,10 @@ pub mod tests {
                 "Bad value found, parsing expected to fail: {:?}",
                 prop_enum.get_property_name().expect("get name successfully")
             );
-            prop_enum.next().expect("advance to next successfully");
+            // next() returns item not found error when it reaches past the end as well.
+            if prop_enum.next().is_err() {
+                break;
+            }
         }
     }
 }
