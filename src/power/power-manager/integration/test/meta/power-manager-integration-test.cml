@@ -10,6 +10,7 @@
     ],
     program: {
         binary: "bin/power_manager_integration_test",
+        use_next_vdso: "true",
     },
     offer: [
         {

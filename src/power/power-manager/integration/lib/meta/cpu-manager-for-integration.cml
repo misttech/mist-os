@@ -9,5 +9,6 @@
     program: {
         runner: "elf",
         binary: "bin/cpu_manager_fake_time",
+        use_next_vdso: "true",
     },
 }

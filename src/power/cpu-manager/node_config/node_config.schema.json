@@ -149,6 +149,73 @@
             {
                 "properties": {
                     "type": {
+                        "pattern": "RppmHandler"
+                    },
+                    "config": {
+                        "type": "object",
+                        "properties": {
+                            "power_domain_handlers": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "domain_id": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                        },
+                                        "handler": {
+                                            "type": "string"
+                                        }
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "required": [
+                                    "domain_id",
+                                    "handler"
+                                ]
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "power_domain_handlers"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "dependencies": {
+                        "type": "object",
+                        "properties": {
+                            "cpu_device_handlers": {
+                                "type": "array",
+                                "minItems": 1
+                            },
+                            "syscall_handler": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false,
+                        "required": [
+                            "cpu_device_handlers",
+                            "syscall_handler"
+                        ]
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "type",
+                    "name",
+                    "config",
+                    "dependencies"
+                ]
+            },
+            {
+                "properties": {
+                    "type": {
                         "pattern": "CpuManagerMain"
                     },
                     "name": {
