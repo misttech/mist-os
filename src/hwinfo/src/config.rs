@@ -45,11 +45,7 @@ async fn read_factory_file(
 ) -> Result<String, Error> {
     let (dir_proxy, dir_server_end) = create_proxy::<fio::DirectoryMarker>()?;
     proxy_handle.get_factory_store(dir_server_end)?;
-    let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
-        &dir_proxy,
-        path,
-        fio::OpenFlags::RIGHT_READABLE,
-    )?;
+    let file_proxy = fuchsia_fs::directory::open_file_async(&dir_proxy, path, fio::PERM_READABLE)?;
     let result = fuchsia_fs::file::read_to_string(&file_proxy).await?.trim().to_owned();
     return Ok(result);
 }
