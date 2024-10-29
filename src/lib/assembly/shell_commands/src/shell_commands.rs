@@ -7,8 +7,10 @@ use assembly_config_schema::assembly_config::ShellCommands;
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_util::{BootfsPackageDestination, PackageDestination};
 use camino::{Utf8Path, Utf8PathBuf};
+use fidl::persist;
 use fuchsia_pkg::{PackageBuilder, RelativeTo};
 use std::collections::BTreeSet;
+use std::io::Write;
 
 type RefToPackage<'a> = (&'a String, &'a BTreeSet<PackageInternalPathBuf>);
 
@@ -78,6 +80,7 @@ impl ShellCommandsBuilder {
         package_builder.manifest_path(&manifest_path);
         package_builder.manifest_blobs_relative_to(RelativeTo::File);
         self.write_trampolines(&mut package_builder, &packages_dir)?;
+        self.write_component_manifest(&mut package_builder, &packages_dir)?;
         package_builder
             .build(&packages_dir, &packages_dir.join("meta.far"))
             .context("Building the package manifest")?;
@@ -127,6 +130,39 @@ impl ShellCommandsBuilder {
         }
         Ok(())
     }
+
+    fn write_component_manifest(
+        &self,
+        package_builder: &mut PackageBuilder,
+        out_dir: impl AsRef<Utf8Path>,
+    ) -> Result<()> {
+        let mut exposes = vec![];
+        let subdir = cml::RelativePath::new("bin").unwrap();
+        let name = cml::Name::new("bin").unwrap();
+        let rights = cml::Rights(vec![cml::Right::ReadExecuteAlias]);
+        exposes.push(cml::Expose {
+            // unwrap is safe, because try_new cannot fail with "pkg".
+            directory: Some(cml::OneOrMany::One(cml::Name::new("pkg").unwrap())),
+            r#as: Some(name),
+            subdir: Some(subdir),
+            rights: Some(rights),
+            ..cml::Expose::new_from(cml::OneOrMany::One(cml::ExposeFromRef::Framework))
+        });
+        let cml = cml::Document { expose: Some(exposes), ..Default::default() };
+        let out_data = cml::compile(&cml, cml::CompileOptions::default())
+            .context("compiling shell command routes")?;
+        let cm_name = "shell-commands.cm";
+        let cm_path = out_dir.as_ref().join(cm_name);
+        let mut cm_file = std::fs::File::create(&cm_path)
+            .with_context(|| format!("creating domain config routes: {cm_path}"))?;
+        cm_file
+            .write_all(&persist(&out_data)?)
+            .with_context(|| format!("writing domain config routes: {cm_path}"))?;
+        package_builder
+            .add_file_to_far(format!("meta/{cm_name}"), &cm_path)
+            .with_context(|| format!("adding file to domain config package: {cm_path}"))?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -164,16 +200,21 @@ mod tests {
                         _ => assert!(file_name.contains("meta")),
                     };
                 }
-                // Should contain 2 files, one named meta.far, one named package_manifest.json
+                // Should contain 3 files, one named meta.far, one named package_manifest.json, and
+                // another named shell-commands.cm
                 false => {
-                    assert!(file_name.contains(".far") || file_name.contains(".json"));
+                    assert!(
+                        file_name.contains(".far")
+                            || file_name.contains(".json")
+                            || file_name.contains(".cm")
+                    );
                     if file_name.contains(".json") {
                         test_unmarshalled_package_manifest()?
                     }
                 }
             };
         }
-        assert_eq!(count, 4);
+        assert_eq!(count, 5);
         Ok(())
     }
 
