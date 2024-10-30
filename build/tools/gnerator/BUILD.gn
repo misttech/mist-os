@@ -23,25 +23,31 @@
 
 import("//build/tools/gnerator/bazel_migration.gni")
 
-go_library("gnerator_lib") {
-  sources = [ "gnerator.go" ]
-  importpath = "go.fuchsia.dev/fuchsia/build/tools/gnerator"
-  deps = [ "//third_party/golibs:go.starlark.net/syntax" ]
+if (is_host) {
+  go_library("gnerator_lib") {
+    sources = [ "gnerator.go" ]
+    importpath = "go.fuchsia.dev/fuchsia/build/tools/gnerator"
+    deps = [ "//third_party/golibs:go.starlark.net/syntax" ]
+  }
 }
-go_binary("gnerator") {
-  sources = [ "cmd/main.go" ]
-  deps = [
-    ":gnerator_lib",
-    "//third_party/golibs:go.starlark.net/starlark",
-    "//third_party/golibs:go.starlark.net/syntax",
-  ]
+if (is_host) {
+  go_binary("gnerator") {
+    sources = [ "cmd/main.go" ]
+    deps = [
+      ":gnerator_lib",
+      "//third_party/golibs:go.starlark.net/starlark",
+      "//third_party/golibs:go.starlark.net/syntax",
+    ]
+  }
 }
-go_test("gnerator_tests") {
-  sources = [ "gnerator_test.go" ]
-  embed = [ ":gnerator_lib" ]
-  deps = [
-    "//third_party/golibs:github.com/google/go-cmp/cmp",
-    "//third_party/golibs:go.starlark.net/starlark",
-    "//third_party/golibs:go.starlark.net/syntax",
-  ]
+if (is_host) {
+  go_test("gnerator_tests") {
+    sources = [ "gnerator_test.go" ]
+    embed = [ ":gnerator_lib" ]
+    deps = [
+      "//third_party/golibs:github.com/google/go-cmp/cmp",
+      "//third_party/golibs:go.starlark.net/starlark",
+      "//third_party/golibs:go.starlark.net/syntax",
+    ]
+  }
 }

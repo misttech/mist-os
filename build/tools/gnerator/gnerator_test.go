@@ -5,6 +5,7 @@
 package gnerator_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,9 +17,9 @@ import (
 	"go.starlark.net/syntax"
 )
 
-// toSyntaxTree is a test helper that parses the input string (content of a
+// toSyntaxFile is a test helper that parses the input string (content of a
 // BUILD.bazel file) to a *syntax.File.
-func toSyntaxTree(t *testing.T, s string) *syntax.File {
+func toSyntaxFile(t *testing.T, s string) *syntax.File {
 	t.Helper()
 
 	p := filepath.Join(t.TempDir(), "BUILD.bazel.test")
@@ -34,20 +35,18 @@ func toSyntaxTree(t *testing.T, s string) *syntax.File {
 	return f
 }
 
-// bazelToGN is a test helper that converts a *syntax.File to content of a
-// BUILD.gn.
-func bazelToGN(t *testing.T, f *syntax.File) string {
-	t.Helper()
-
+// bazelToGN is a test helper that converts all statements in a *syntax.File to
+// content of a BUILD.gn.
+func bazelToGN(f *syntax.File) (string, error) {
 	var gotLines []string
 	for _, stmt := range f.Stmts {
 		lines, err := gnerator.StmtToGN(stmt)
 		if err != nil {
-			t.Fatalf("Failed to convert Bazel statement to GN: %v", err)
+			return "", fmt.Errorf("converting Bazel statement to GN: %v", err)
 		}
 		gotLines = append(gotLines, lines...)
 	}
-	return strings.Join(gotLines, "\n")
+	return strings.Join(gotLines, "\n"), nil
 }
 
 func TestStmtToGN(t *testing.T) {
@@ -66,10 +65,6 @@ go_library(
     "gnerator.go",
   ],
   importpath = "go.fuchsia.dev/fuchsia/build/tools/gnerator",
-  target_compatible_with = [
-    "@platforms//os:linux",
-    "@platforms//cpu:x86_64",
-  ],
   deps = [
     "//third_party/golibs:go.starlark.net/syntax",
   ],
@@ -79,10 +74,6 @@ go_binary(
   name = "cmd",
   srcs = [
     "cmd/main.go",
-  ],
-  target_compatible_with = [
-    "@platforms//os:linux",
-    "@platforms//cpu:x86_64",
   ],
   deps = [
     ":gnerator",
@@ -96,10 +87,6 @@ go_test(
   embed = [ ":gnerator" ],
   srcs = [
     "gnerator_test.go",
-  ],
-  target_compatible_with = [
-    "@platforms//os:linux",
-    "@platforms//cpu:x86_64",
   ],
   deps = [
     "//third_party/golibs:github.com/google/go-cmp/cmp",
@@ -142,10 +129,94 @@ go_test("gnerator_tests") {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			f := toSyntaxTree(t, tc.bazel)
-			gotGN := bazelToGN(t, f)
+			f := toSyntaxFile(t, tc.bazel)
+			gotGN, err := bazelToGN(f)
+			if err != nil {
+				t.Fatalf("Unexpected failure converting Bazel build targets: %v", err)
+			}
 			if diff := cmp.Diff(gotGN, tc.wantGN); diff != "" {
 				t.Errorf("Diff found after GN conversion (-got +want):\n%s\nBazel source:\n%s", diff, tc.bazel)
+			}
+		})
+	}
+}
+
+func TestTargetCompatibleWith(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		bazel  string
+		wantGN string
+	}{
+		{
+			name: "success",
+			bazel: `
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+
+go_binary(
+	name = "host_tool",
+	srcs = [
+	  "main.go",
+	],
+	target_compatible_with = HOST_CONSTRAINTS,
+)`,
+			wantGN: `if (is_host) {
+  go_binary("host_tool") {
+    sources = [
+      "main.go",
+    ]
+  }
+}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := toSyntaxFile(t, tc.bazel)
+			gotGN, err := bazelToGN(f)
+			if err != nil {
+				t.Fatalf("Unexpected failure converting Bazel build targets: %v", err)
+			}
+			if diff := cmp.Diff(gotGN, tc.wantGN); diff != "" {
+				t.Errorf("Diff found after GN conversion (-got +want):\n%s\nBazel source:\n%s", diff, tc.bazel)
+			}
+		})
+	}
+}
+
+func TestTargetCompatibleWithErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		bazel string
+	}{
+		{
+			name: "unexpected target_compatible_with variable",
+			bazel: `
+go_binary(
+	name = "host_tool",
+	srcs = [
+	  "main.go",
+	],
+	target_compatible_with = UNSUPPORTED_CONSTRAINTS,
+)`,
+		},
+		{
+			name: "list of constraints not supported yet",
+			bazel: `
+go_binary(
+	name = "host_tool",
+	srcs = [
+	  "main.go",
+	],
+  target_compatible_with = [
+    "@platforms//os:linux",
+    "@platforms//cpu:x86_64",
+  ],
+)`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := toSyntaxFile(t, tc.bazel)
+			_, err := bazelToGN(f)
+			if err == nil {
+				t.Fatal("Expecting failure converting Bazel targets, got nil")
 			}
 		})
 	}
@@ -219,8 +290,11 @@ func TestVisibility(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			f := toSyntaxTree(t, tc.bazel)
-			gotGN := bazelToGN(t, f)
+			f := toSyntaxFile(t, tc.bazel)
+			gotGN, err := bazelToGN(f)
+			if err != nil {
+				t.Fatalf("Unexpected failure converting Bazel build targets: %v", err)
+			}
 			if diff := cmp.Diff(gotGN, tc.wantGN); diff != "" {
 				t.Errorf("Diff found after GN conversion (-got +want):\n%s\nBazel source:\n%s", diff, tc.bazel)
 			}

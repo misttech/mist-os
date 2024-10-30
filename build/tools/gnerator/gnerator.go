@@ -37,11 +37,8 @@ var specialTokens = map[syntax.Token]string{
 	syntax.OR:  "||",
 }
 
-// TODO(jayzhuang): Empty this list.
-//
-// bazelAttrsToSkip contains Bazel rule attributes that are skipped during conversion.
-var bazelAttrsToSkip = map[string]bool{
-	"target_compatible_with": true,
+var bazelConstraintsToGNConditions = map[string]string{
+	"HOST_CONSTRAINTS": "is_host",
 }
 
 // indent indents input lines by input levels.
@@ -119,6 +116,19 @@ func identToGN(ident *syntax.Ident) ([]string, error) {
 	return []string{val}, nil
 }
 
+func targetCompatibleWithToGNConditions(expr syntax.Expr) ([]string, error) {
+	switch v := expr.(type) {
+	case *syntax.Ident:
+		gnCondition, ok := bazelConstraintsToGNConditions[v.Name]
+		if !ok {
+			return nil, fmt.Errorf("unsupported target_compatible_with variable: %v", v.Name)
+		}
+		return []string{gnCondition}, nil
+	default:
+		return nil, fmt.Errorf("unsupported type %T as value to target_compatible_with in Bazel, node details: %#v", expr, expr)
+	}
+}
+
 // bazelVisibilityToGN converts Bazel visibility values [0] to GN [1].
 //
 // NOTE: Bazel visibility is based on package groups [2], while GN visibility is
@@ -163,6 +173,7 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 	// GN target name is not a regular field like others.
 	var name string
 	var remainingArgs []*syntax.BinaryExpr
+	var wrappingConditions []string
 	for _, arg := range expr.Args {
 		binaryExpr, ok := arg.(*syntax.BinaryExpr)
 		if !ok || binaryExpr.Op != syntax.EQ {
@@ -180,7 +191,12 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 			name = strings.Join(lines, "\n")
 			continue
 		}
-		if bazelAttrsToSkip[ident.Name] {
+		if ident.Name == "target_compatible_with" {
+			var err error
+			wrappingConditions, err = targetCompatibleWithToGNConditions(binaryExpr.Y)
+			if err != nil {
+				return nil, fmt.Errorf("converting Bazel target_compatible_with to GN conditions: %v", err)
+			}
 			continue
 		}
 		remainingArgs = append(remainingArgs, binaryExpr)
@@ -201,6 +217,12 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 	}
 
 	ret = append(ret, "}")
+	if len(wrappingConditions) > 0 {
+		ret = append([]string{
+			fmt.Sprintf("if (%s) {", strings.Join(wrappingConditions, " && ")),
+		}, indent(ret, 1)...)
+		ret = append(ret, "}")
+	}
 	return ret, nil
 }
 
