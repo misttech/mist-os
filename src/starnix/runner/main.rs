@@ -43,10 +43,6 @@ async fn main() -> Result<(), Error> {
 
     let kernels = Kernels::new();
     let mut fs = ServiceFs::new_local();
-
-    let (sender, receiver) = async_channel::unbounded();
-    kernel_manager::run_proxy_thread(receiver);
-
     fs.dir("svc").add_fidl_service(Services::ComponentRunner);
     fs.dir("svc").add_fidl_service(Services::StarnixManager);
     fs.take_and_serve_directory_handle()?;
@@ -57,7 +53,7 @@ async fn main() -> Result<(), Error> {
                 .await
                 .expect("failed to start component runner"),
             Services::StarnixManager(stream) => {
-                serve_starnix_manager(stream, suspend_context.clone(), &kernels, &sender)
+                serve_starnix_manager(stream, suspend_context.clone(), &kernels)
                     .await
                     .expect("failed to serve starnix manager")
             }
