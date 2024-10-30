@@ -176,10 +176,20 @@ impl StarnixKernel {
     }
 }
 
+struct ResumeEvent {
+    event: zx::EventPair,
+    name: String,
+}
+
+#[derive(Default)]
+struct ResumeEvents {
+    events: std::collections::HashMap<zx::Koid, ResumeEvent>,
+}
+
 #[derive(Default)]
 pub struct SuspendContext {
     suspended_processes: Arc<Mutex<Vec<zx::Handle>>>,
-    resume_events: Arc<Mutex<Vec<zx::EventPair>>>,
+    resume_events: Arc<Mutex<ResumeEvents>>,
 }
 
 /// Generate a random name for the kernel.
@@ -269,9 +279,10 @@ async fn suspend_container(
 
     let resume_events = suspend_context.resume_events.lock();
     let mut wait_items: Vec<zx::WaitItem<'_>> = resume_events
+        .events
         .iter()
-        .map(|e: &zx::EventPair| zx::WaitItem {
-            handle: e.as_handle_ref(),
+        .map(|(_koid, event)| zx::WaitItem {
+            handle: event.event.as_handle_ref(),
             waitfor: RUNNER_SIGNAL,
             pending: zx::Signals::empty(),
         })
@@ -283,13 +294,21 @@ async fn suspend_container(
     {
         fuchsia_trace::duration!(c"power", c"starnix-runner:waiting-on-container-wake");
         match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
-            Ok(_) => {}
+            Ok(_) => (),
             Err(e) => {
                 warn!("error waiting for wake event {:?}", e);
             }
         };
     }
 
+    for wait_item in &wait_items {
+        if wait_item.pending.contains(RUNNER_SIGNAL) {
+            let koid = wait_item.handle.get_koid().unwrap();
+            if let Some(event) = resume_events.events.get(&koid) {
+                tracing::info!("Woke from sleep for: {}", event.name);
+            }
+        }
+    }
     kernels.acquire_wake_lease(&container_job).await?;
 
     Ok(Ok(fstarnixrunner::ManagerSuspendContainerResponse {
@@ -335,8 +354,15 @@ pub async fn serve_starnix_manager(
                 };
 
                 let proxy = ChannelProxy { container_channel, remote_channel, resume_event };
-                suspend_context.resume_events.lock().push(
-                    proxy.resume_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed"),
+                suspend_context.resume_events.lock().events.insert(
+                    proxy.resume_event.get_koid().unwrap(),
+                    ResumeEvent {
+                        event: proxy
+                            .resume_event
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("failed"),
+                        name: name.clone(),
+                    },
                 );
 
                 start_proxy(proxy, suspend_context.resume_events.clone(), name);
@@ -366,7 +392,7 @@ struct ChannelProxy {
 /// if `proxy.resume_event`'s peer is closed.
 ///
 /// When the proxy exits, `proxy.resume_event` will be removed from `resume_events`.
-fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>>, name: String) {
+fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<ResumeEvents>>, name: String) {
     let mut thread_name = format!("proxy:{:?}", name);
     thread_name.truncate(32);
 
@@ -439,7 +465,9 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
             }
         }
 
-        resume_events.lock().retain(|e| e.get_koid() != proxy.resume_event.get_koid());
+        if let Ok(koid) = proxy.resume_event.get_koid() {
+            resume_events.lock().events.remove(&koid);
+        }
     });
 }
 
