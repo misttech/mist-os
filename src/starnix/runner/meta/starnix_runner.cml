@@ -10,7 +10,6 @@
     program: {
         runner: "elf",
         binary: "bin/starnix_runner",
-        memory_attribution: "true",
     },
     collections: [
         {
@@ -31,7 +30,6 @@
         {
             protocol: [
                 "fuchsia.component.runner.ComponentRunner",
-                "fuchsia.memory.attribution.Provider",
                 "fuchsia.starnix.runner.Manager",
             ],
         },
@@ -144,10 +142,7 @@
             from: "self",
         },
         {
-            protocol: [
-                "fuchsia.memory.attribution.Provider",
-                "fuchsia.starnix.runner.Manager",
-            ],
+            protocol: [ "fuchsia.starnix.runner.Manager" ],
             from: "self",
         },
     ],

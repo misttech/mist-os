@@ -90,7 +90,7 @@ impl PluginOutput {
             populated_scaled: 0.0,
             populated_total: 0,
             attributor: principal
-                .attributor
+                .parent
                 .as_ref()
                 .map(|p| principals.get(p))
                 .flatten()
@@ -148,8 +148,14 @@ impl PluginOutput {
                     len: _,
                 }) = resource
                 {
-                    let process = resources.get(&process_mapped).unwrap().borrow();
-                    output.processes.push(format!("{} ({})", process.name.clone(), process.koid));
+                    if let Some(process_ref) = resources.get(&process_mapped) {
+                        let process = process_ref.borrow();
+                        output.processes.push(format!(
+                            "{} ({})",
+                            process.name.clone(),
+                            process.koid
+                        ));
+                    }
                 }
             }
         }

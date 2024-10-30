@@ -284,6 +284,8 @@ impl Stream for StreamState {
                 }
                 Poll::Ready(None) => {
                     this.hanging_get_update = None;
+                    // Return None to signal that this Principal is done.
+                    return Poll::Ready(None);
                 }
                 Poll::Pending => {}
             },

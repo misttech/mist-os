@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::Container;
 use anyhow::Error;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl::AsHandleRef;
@@ -350,11 +351,12 @@ pub async fn serve_graphical_presenter(
         .map_err(Error::from)
 }
 
-pub fn serve_memory_attribution_provider(
+/// Serves the memory attribution provider for the Kernel ELF component.
+pub fn serve_memory_attribution_provider_elfkernel(
     mut request_stream: fattribution::ProviderRequestStream,
-    kernel: &Kernel,
+    container: &Container,
 ) -> impl Future<Output = Result<(), Error>> {
-    let observer = kernel.new_memory_attribution_observer(request_stream.control_handle());
+    let observer = container.new_memory_attribution_observer(request_stream.control_handle());
     async move {
         while let Some(event) = request_stream.try_next().await? {
             match event {
@@ -370,5 +372,36 @@ pub fn serve_memory_attribution_provider(
             }
         }
         Ok(())
+    }
+}
+
+/// Serves the memory attribution provider for the Container component.
+pub fn serve_memory_attribution_provider_container(
+    mut request_stream: fattribution::ProviderRequestStream,
+    kernel: &Kernel,
+) -> impl Future<Output = ()> {
+    let observer = kernel.new_memory_attribution_observer(request_stream.control_handle());
+    async move {
+        while let Some(event) = request_stream
+            .try_next()
+            .await
+            .inspect_err(|err| {
+                tracing::warn!("Error while serving container memory attribution: {:?}", err)
+            })
+            .ok()
+            .flatten()
+        {
+            match event {
+                fattribution::ProviderRequest::Get { responder } => {
+                    observer.next(responder);
+                }
+                fattribution::ProviderRequest::_UnknownMethod {
+                    ordinal, control_handle, ..
+                } => {
+                    tracing::error!("Invalid request to AttributionProvider: {ordinal}");
+                    control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                }
+            }
+        }
     }
 }

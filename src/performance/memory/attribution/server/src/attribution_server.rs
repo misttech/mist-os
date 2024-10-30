@@ -12,6 +12,32 @@ use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
 
+mod key {
+    /// Identifier used for disambiguation;
+    #[derive(PartialEq, Eq, Clone, Copy)]
+    pub struct Key(u64);
+
+    /// Generates unique [Key] objects.
+    pub struct KeyGenerator {
+        next: Key,
+    }
+
+    impl Default for KeyGenerator {
+        fn default() -> Self {
+            Self { next: Key(0) }
+        }
+    }
+
+    impl KeyGenerator {
+        /// Generates the next [Key] object.
+        pub fn next(&mut self) -> Key {
+            let next_key = self.next;
+            self.next = Key(self.next.0.checked_add(1).expect("Key generator overflow"));
+            next_key
+        }
+    }
+}
+
 /// Function of this type returns a vector of attribution updates, and is used
 /// as the type of the callback in [AttributionServer::new].
 type GetAttributionFn = dyn Fn() -> Vec<fattribution::AttributionUpdate> + Send;
@@ -58,6 +84,7 @@ impl AttributionServerHandle {
 /// an `Observer` registers an observation.
 pub struct Observer {
     inner: Arc<Mutex<AttributionServer>>,
+    subscription_id: key::Key,
 }
 
 impl Observer {
@@ -75,7 +102,7 @@ impl Observer {
 
 impl Drop for Observer {
     fn drop(&mut self) {
-        self.inner.lock().unregister();
+        self.inner.lock().unregister(self.subscription_id);
     }
 }
 
@@ -98,6 +125,7 @@ impl Publisher {
 pub struct AttributionServer {
     state: Box<GetAttributionFn>,
     consumer: Option<AttributionConsumer>,
+    key_generator: key::KeyGenerator,
 }
 
 impl AttributionServer {
@@ -106,7 +134,11 @@ impl AttributionServer {
     /// `state` is a function returning the complete attribution state (not partial updates).
     pub fn new(state: Box<GetAttributionFn>) -> AttributionServerHandle {
         AttributionServerHandle {
-            inner: Arc::new(Mutex::new(AttributionServer { state, consumer: None })),
+            inner: Arc::new(Mutex::new(AttributionServer {
+                state,
+                consumer: None,
+                key_generator: Default::default(),
+            })),
         }
     }
 
@@ -128,19 +160,26 @@ impl AttributionServer {
     ) -> Observer {
         let mut locked_inner = inner.lock();
 
-        if let Some(consumer) = &locked_inner.consumer {
-            tracing::error!("Multiple connection requests to AttributionProvider");
-            consumer.observer_control_handle.shutdown_with_epitaph(zx::Status::CANCELED);
+        if locked_inner.consumer.is_some() {
+            tracing::warn!("Multiple connection requests to AttributionProvider");
+            // The shutdown of the observer will be done when the old [AttributionConsumer] is
+            // dropped.
         }
 
-        locked_inner.consumer = Some(AttributionConsumer::new(control_handle));
-        Observer { inner: inner.clone() }
+        let key = locked_inner.key_generator.next();
+
+        locked_inner.consumer = Some(AttributionConsumer::new(control_handle, key.clone()));
+        Observer { inner: inner.clone(), subscription_id: key }
     }
 
     /// Deregister the current observer. No observer can be registered as long
     /// as another observer is already registered.
-    pub fn unregister(&mut self) {
-        self.consumer = None;
+    pub fn unregister(&mut self, key: key::Key) {
+        if let Some(consumer) = &self.consumer {
+            if consumer.subscription_id == key {
+                self.consumer = None;
+            }
+        }
     }
 }
 
@@ -233,17 +272,30 @@ struct AttributionConsumer {
 
     /// FIDL responder for a pending hanging get call.
     responder: Option<fattribution::ProviderGetResponder>,
+
+    /// Matches an AttributionConsumer with an Observer.
+    subscription_id: key::Key,
+}
+
+impl Drop for AttributionConsumer {
+    fn drop(&mut self) {
+        self.observer_control_handle.shutdown_with_epitaph(zx::Status::CANCELED);
+    }
 }
 
 impl AttributionConsumer {
     /// Create a new [AttributionConsumer] without an `observer` and an initial `dirty`
     /// value of `true`.
-    pub fn new(observer_control_handle: fattribution::ProviderControlHandle) -> Self {
+    pub fn new(
+        observer_control_handle: fattribution::ProviderControlHandle,
+        key: key::Key,
+    ) -> Self {
         AttributionConsumer {
             first: true,
             pending: HashMap::new(),
             observer_control_handle: observer_control_handle,
             responder: None,
+            subscription_id: key,
         }
     }
 
@@ -438,19 +490,46 @@ mod tests {
     #[test]
     fn test_disconnect_on_new_connection() {
         let mut exec = fasync::TestExecutor::new();
-        let server = AttributionServer::new(Box::new(|| vec![]));
+        let server = AttributionServer::new(Box::new(|| {
+            vec![fattribution::AttributionUpdate::Add(fattribution::NewPrincipal {
+                identifier: Some(1),
+                description: Some(fattribution::Description::Part("part1".to_owned())),
+                principal_type: Some(fattribution::PrincipalType::Runnable),
+                detailed_attribution: None,
+                ..Default::default()
+            })]
+        }));
         let (snapshot_provider, snapshot_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
 
-        let _observer = server.new_observer(snapshot_request_stream.control_handle());
+        let observer = server.new_observer(snapshot_request_stream.control_handle());
 
-        let (_new_snapshot_provider, new_snapshot_request_stream) =
+        let (new_snapshot_provider, new_snapshot_request_stream) =
             fidl::endpoints::create_proxy_and_stream::<fattribution::ProviderMarker>().unwrap();
 
-        let _new_observer = server.new_observer(new_snapshot_request_stream.control_handle());
+        let new_observer = server.new_observer(new_snapshot_request_stream.control_handle());
+        fasync::Task::spawn(async move {
+            serve(new_observer, new_snapshot_request_stream).await.unwrap();
+        })
+        .detach();
 
+        drop(observer);
         let result = exec.run_singlethreaded(snapshot_provider.get());
         assert_matches!(result, Err(ClientChannelClosed { status: zx::Status::CANCELED, .. }));
+
+        let result = exec.run_singlethreaded(new_snapshot_provider.get());
+        assert!(result.is_ok());
+        server.new_publisher().on_update(vec![fattribution::AttributionUpdate::Add(
+            fattribution::NewPrincipal {
+                identifier: Some(2),
+                description: Some(fattribution::Description::Part("part2".to_owned())),
+                principal_type: Some(fattribution::PrincipalType::Runnable),
+                detailed_attribution: None,
+                ..Default::default()
+            },
+        )]);
+        let result = exec.run_singlethreaded(new_snapshot_provider.get());
+        assert!(result.is_ok());
     }
 
     /// Tests that a new [Provider::get] call while another call is still pending

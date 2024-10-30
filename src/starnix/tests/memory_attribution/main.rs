@@ -132,8 +132,8 @@ async fn mmap_anonymous() {
     let event = container_execution.take_event_stream().next().await.unwrap().unwrap();
     assert_matches!(event, fcomponent::ExecutionControllerEvent::OnStop { .. });
     loop {
-        tree = attribution.next().await.unwrap();
-        if tree.children.is_empty() {
+        let tree_opt = attribution.next().await;
+        if tree_opt.is_none() {
             break;
         }
     }
@@ -240,11 +240,30 @@ async fn init_attribution_test() -> AttributionTest {
         .unwrap()
         .expect("start debian container");
 
-    // Connect to the attribution protocol of the starnix runner.
-    let attribution_provider =
-        realm.root.connect_to_protocol_at_exposed_dir::<fattribution::ProviderMarker>().unwrap();
     let introspector =
         realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::IntrospectorMarker>().unwrap();
+
+    // Connect to the attribution protocol of the starnix kernel. We need to use a RealmQuery as the
+    // exact name of the starnix kernel moniker is random, so unknown to the test at this point.
+    let realm_query =
+        realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
+    std::thread::sleep(std::time::Duration::from_secs(10));
+    let starnix_kernel_moniker = find_starnix_kernel_moniker(&realm_query).await;
+    let (attribution_provider, server_end) =
+        fidl::endpoints::create_proxy::<fattribution::ProviderMarker>().unwrap();
+    realm_query
+        .open(
+            &starnix_kernel_moniker,
+            fsys2::OpenDirType::ExposedDir,
+            fio::OpenFlags::empty(),
+            fio::ModeType::empty(),
+            fattribution::ProviderMarker::PROTOCOL_NAME,
+            server_end.into_channel().into(),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
     let attribution = attribution_testing::attribute_memory(
         PrincipalIdentifier(1),
         "starnix_runner".to_string(),
