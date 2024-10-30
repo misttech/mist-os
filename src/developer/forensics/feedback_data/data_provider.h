@@ -34,8 +34,8 @@ namespace feedback_data {
 // Serves snapshot archive through a channel using |fuchsia.io.File|
 class ServedArchive {
  public:
-  explicit ServedArchive(fsl::SizedVmo data);
-  bool Serve(zx::channel server_end, async_dispatcher_t* dispatcher,
+  explicit ServedArchive(fsl::SizedVmo archive);
+  bool Serve(fidl::ServerEnd<fuchsia_io::File> file_server, async_dispatcher_t* dispatcher,
              std::function<void()> completed);
 
  private:
@@ -85,7 +85,7 @@ class DataProvider : public fuchsia::feedback::DataProvider, public DataProvider
   void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
                            fit::callback<void(feedback::Annotations, fsl::SizedVmo)> callback);
 
-  bool ServeArchive(fsl::SizedVmo archive, zx::channel server_end);
+  bool ServeArchive(fsl::SizedVmo archive, fidl::ServerEnd<fuchsia_io::File> file_server);
 
   async_dispatcher_t* dispatcher_;
   std::shared_ptr<sys::ServiceDirectory> services_;
