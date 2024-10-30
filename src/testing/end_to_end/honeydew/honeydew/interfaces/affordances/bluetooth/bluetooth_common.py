@@ -15,7 +15,11 @@ class BluetoothCommon(abc.ABC):
     # List all the public methods
     @abc.abstractmethod
     def sys_init(self) -> None:
-        """Initializes bluetooth stack."""
+        """Initializes bluetooth stack.
+
+        Raises:
+            BluetoothError: On failure.
+        """
 
     @abc.abstractmethod
     def accept_pairing(
@@ -26,11 +30,11 @@ class BluetoothCommon(abc.ABC):
         """Sets device to accept Bluetooth pairing.
 
         Args:
-            input: input mode of device
-            output: output mode of device
+            input: input mode of device.
+            output: output mode of device.
 
         Raises:
-            errors.FuchsiaDeviceError: On failure.
+            BluetoothError: On failure.
         """
 
     @abc.abstractmethod
@@ -43,7 +47,10 @@ class BluetoothCommon(abc.ABC):
 
         Args:
             identifier: the identifier of target remote device.
-            connection_type: type of bluetooth connection
+            connection_type: type of bluetooth connection.
+
+        Raises:
+            BluetoothError: On failure.
         """
 
     @abc.abstractmethod
@@ -52,6 +59,9 @@ class BluetoothCommon(abc.ABC):
 
         Args:
             identifier: the identifier of target remote device.
+
+        Raises:
+            BluetoothError: On failure.
         """
 
     @abc.abstractmethod
@@ -60,6 +70,9 @@ class BluetoothCommon(abc.ABC):
 
         Returns:
             The mac address of the active adapter.
+
+        Raises:
+            BluetoothError: On failure.
         """
 
     @abc.abstractmethod
@@ -68,6 +81,9 @@ class BluetoothCommon(abc.ABC):
 
         Returns:
             A list of all connected devices by identifier.
+
+        Raises:
+            BluetoothError: On failure.
         """
 
     @abc.abstractmethod
@@ -76,6 +92,9 @@ class BluetoothCommon(abc.ABC):
 
         Returns:
             A dict of all known remote devices.
+
+        Raises:
+            BluetoothError: On failure.
         """
 
     @abc.abstractmethod
@@ -88,7 +107,10 @@ class BluetoothCommon(abc.ABC):
 
         Args:
             identifier: the identifier of target remote device.
-            connection_type: type of bluetooth connection
+            connection_type: type of bluetooth connection.
+
+        Raises:
+            BluetoothError: On failure.
         """
 
     @abc.abstractmethod
@@ -97,6 +119,9 @@ class BluetoothCommon(abc.ABC):
 
         Args:
             discovery: True to start discovery, False to stop discovery.
+
+        Raises:
+            BluetoothError: On failure.
         """
 
     @abc.abstractmethod
@@ -110,4 +135,7 @@ class BluetoothCommon(abc.ABC):
         Args:
             discoverable: True to be discoverable by others, False to be not
                           discoverable by others.
+
+        Raises:
+            BluetoothError: On failure.
         """
