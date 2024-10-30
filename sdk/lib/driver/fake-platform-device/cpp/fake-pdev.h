@@ -79,7 +79,7 @@ class FakePDev final : public fidl::WireServer<fuchsia_hardware_platform_device:
     return ZX_OK;
   }
 
-  zx_status_t SetConfig(Config config) {
+  zx_status_t SetConfig(Config&& config) {
     config_ = std::move(config);
     return ZX_OK;
   }
