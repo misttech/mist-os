@@ -69,7 +69,7 @@ fit::result<Errno, FdNumber> sys_creat(const CurrentTask& current_task,
 }
 
 fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task) {
-  return fit::ok(current_task->thread_group()->Read()->process_group_->leader_);
+  return fit::ok(current_task->thread_group_->Read()->process_group_->leader_);
 }
 
 fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,

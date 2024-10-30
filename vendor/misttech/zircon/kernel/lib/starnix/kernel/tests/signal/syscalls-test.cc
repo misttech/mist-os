@@ -14,27 +14,26 @@
 #include <lib/unittest/unittest.h>
 #include <zircon/assert.h>
 
-#include <memory>
-
 #include <fbl/ref_ptr.h>
 #include <ktl/string_view.h>
 
 #include <linux/prctl.h>
 
-using namespace starnix::testing;
-
 namespace unit_testing {
+
+namespace {
 
 using starnix::ExitStatus;
 using starnix::ProcessExitInfo;
 using starnix::ProcessSelector;
 using starnix::WaitingOptions;
 using starnix::WaitResult;
+using starnix::testing::AutoReleasableTask;
 
 /// Wait4 does not support all options.
 bool test_wait4_options() {
   BEGIN_TEST;
-  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
   auto id = 1;
 
   ASSERT_EQ(sys_wait4(*current_task, id, mtl::DefaultConstruct<starnix_uapi::UserRef<int32_t>>(),
@@ -57,7 +56,7 @@ bool test_wait4_options() {
 
 bool test_echild_when_no_zombie() {
   BEGIN_TEST;
-  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
 
   // Send the signal to the task.
   ASSERT_TRUE(
@@ -75,7 +74,7 @@ bool test_echild_when_no_zombie() {
 
 bool test_no_error_when_zombie() {
   BEGIN_TEST;
-  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
   auto child = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
 
   auto expected_result = WaitResult{
@@ -89,7 +88,7 @@ bool test_no_error_when_zombie() {
       .time_stats = {},
   };
 
-  (*child)->thread_group()->exit(ExitStatus::Exit(1), ktl::nullopt);
+  (*child)->thread_group_->exit(ExitStatus::Exit(1), ktl::nullopt);
   child.~AutoReleasableTask();
 
   auto result = friend_wait_on_pid(*current_task, ProcessSelector::AnyProcess(),
@@ -114,7 +113,7 @@ struct thread_args {
 
 bool test_waiting_for_child() {
   BEGIN_TEST;
-  auto [kernel, task] = create_kernel_task_and_unlocked();
+  auto [kernel, task] = starnix::testing::create_kernel_task_and_unlocked();
 
   auto child =
       (*task).clone_task(0, starnix_uapi::kSIGCHLD, mtl::DefaultConstruct<UserRef<pid_t>>(),
@@ -143,7 +142,7 @@ bool test_waiting_for_child() {
         while (!tsk->Read()->is_blocked()) {
           Thread::Current::SleepRelative(ZX_MSEC(10));
         }
-        (*chld)->thread_group()->exit(ExitStatus::Exit(0), ktl::nullopt);
+        (*chld)->thread_group_->exit(ExitStatus::Exit(0), ktl::nullopt);
         return (*chld)->id_;
       },
       &args, DEFAULT_PRIORITY);
@@ -168,15 +167,15 @@ bool test_waiting_for_child() {
 bool test_wait4_by_pgid() {
   BEGIN_TEST;
 
-  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
   auto child1 = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
   auto child1_pid = (*child1)->id_;
-  (*child1)->thread_group()->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
+  (*child1)->thread_group_->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
   child1.~AutoReleasableTask();
   auto child2 = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
-  ASSERT_TRUE((*child2)->thread_group()->setsid().is_ok(), "setsid");
+  ASSERT_TRUE((*child2)->thread_group_->setsid().is_ok(), "setsid");
   auto child2_pid = (*child2)->id_;
-  (*child2)->thread_group()->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
+  (*child2)->thread_group_->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
   child2.~AutoReleasableTask();
 
   auto result = sys_wait4(*current_task, -child2_pid, mtl::DefaultConstruct<UserRef<int32_t>>(), 0,
@@ -190,11 +189,14 @@ bool test_wait4_by_pgid() {
   ASSERT_EQ(child1_pid, result.value());
   END_TEST;
 }
+
+}  // namespace
+
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_signal_syscalls)
 UNITTEST("test wait4 options", unit_testing::test_wait4_options)
-// UNITTEST("test echild when no zombie", unit_testing::test_echild_when_no_zombie)
+UNITTEST("test echild when no zombie", unit_testing::test_echild_when_no_zombie)
 UNITTEST("test no error when zombie", unit_testing::test_no_error_when_zombie)
 UNITTEST("test waiting for child", unit_testing::test_waiting_for_child)
 UNITTEST("test wait4 by pgid", unit_testing::test_wait4_by_pgid)

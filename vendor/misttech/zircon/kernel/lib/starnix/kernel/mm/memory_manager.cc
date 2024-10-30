@@ -1090,7 +1090,7 @@ MemoryManager::MemoryManager(Vmar root, Vmar user_vmar, zx_info_vmar_t user_vmar
 fit::result<Errno, UserAddress> MemoryManager::set_brk(const CurrentTask& current_task,
                                                        UserAddress addr) {
   uint64_t rlimit_data =
-      ktl::min(PROGRAM_BREAK_LIMIT, current_task->thread_group()->get_rlimit({ResourceEnum::DATA}));
+      ktl::min(PROGRAM_BREAK_LIMIT, current_task->thread_group_->get_rlimit({ResourceEnum::DATA}));
 
   fbl::Vector<Mapping> released_mappings;
   // Hold the lock throughout the operation to uphold memory manager's invariants.

@@ -75,15 +75,15 @@ FsNode* FsNode::new_internal(ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<Kerne
 
 FsNode::~FsNode() = default;
 
-FsNode::FsNode(WeakFsNodeHandle _weak_handle, util::WeakPtr<Kernel> kernel,
+FsNode::FsNode(WeakFsNodeHandle weak_handle, util::WeakPtr<Kernel> kernel,
                ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<FileSystem> fs, ino_t node_id,
-               ktl::optional<PipeHandle> _fifo, FsNodeInfo info)
-    : weak_handle(ktl::move(_weak_handle)),
+               ktl::optional<PipeHandle> fifo, FsNodeInfo info)
+    : weak_handle_(ktl::move(weak_handle)),
       ops_(ktl::move(ops)),
       kernel_(ktl::move(kernel)),
       fs_(ktl::move(fs)),
       node_id_(node_id),
-      fifo(ktl::move(_fifo)),
+      fifo_(ktl::move(fifo)),
       info_(ktl::move(info)) {}
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::create_file_ops(

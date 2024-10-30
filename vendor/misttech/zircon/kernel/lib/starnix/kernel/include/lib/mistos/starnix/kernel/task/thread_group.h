@@ -58,7 +58,7 @@ struct WaitResult {
   // impl WaitResult
 
   // According to wait(2) man page, SignalInfo.signal needs to always be set to SIGCHLD
-  SignalInfo AsSignalInfo() const {
+  SignalInfo as_signal_info() const {
     return SignalInfo::New(
         kSIGCHLD, exit_info.status.signal_info_code(),
         SIGCHLDDetail{.pid = pid, .uid = uid, .status = exit_info.status.signal_info_status()});
@@ -97,7 +97,7 @@ class ZombieProcess : public fbl::RefCountedUpgradeable<ZombieProcess> {
   static fbl::RefPtr<ZombieProcess> New(const ThreadGroupMutableState& thread_group,
                                         const Credentials& credentials, ProcessExitInfo exit_info);
 
-  WaitResult ToWaitResult() const {
+  WaitResult to_wait_result() const {
     return WaitResult{
         .pid = pid,
         .uid = pid_tuid,
@@ -122,20 +122,16 @@ class ZombieProcess : public fbl::RefCountedUpgradeable<ZombieProcess> {
  private:
   explicit ZombieProcess(pid_t pid, pid_t pgid, uid_t uid, ProcessExitInfo exit_info,
                          bool is_canonical)
-      : pid(pid),
-        pgid(pgid),
-        pid_tuid(uid),
-        exit_info(ktl::move(exit_info)),
-        is_canonical(is_canonical) {}
+      : pid(pid), pgid(pgid), pid_tuid(uid), exit_info(exit_info), is_canonical(is_canonical) {}
 };
 
 // Represents the result of checking for a waitable child
 class WaitableChildResult {
  public:
-  enum class Type { ReadyNow, ShouldWait, NoneFound };
+  enum class Type : uint8_t { ReadyNow, ShouldWait, NoneFound };
 
   static WaitableChildResult ReadyNow(WaitResult result) {
-    return WaitableChildResult(Type::ReadyNow, ktl::move(result));
+    return WaitableChildResult(Type::ReadyNow, result);
   }
 
   static WaitableChildResult ShouldWait() { return WaitableChildResult(Type::ShouldWait); }
@@ -150,8 +146,8 @@ class WaitableChildResult {
   }
 
  private:
-  WaitableChildResult(Type type) : type_(type) {}
-  WaitableChildResult(Type type, WaitResult result) : type_(type), result_(ktl::move(result)) {}
+  explicit WaitableChildResult(Type type) : type_(type) {}
+  WaitableChildResult(Type type, WaitResult result) : type_(type), result_(result) {}
 
   Type type_;
   ktl::optional<WaitResult> result_;
@@ -159,7 +155,7 @@ class WaitableChildResult {
 
 class ThreadGroupParent {
  public:
-  static ThreadGroupParent New(util::WeakPtr<ThreadGroup> t) {
+  static ThreadGroupParent New(const util::WeakPtr<ThreadGroup>& t) {
     DEBUG_ASSERT(t.Lock());
     return ThreadGroupParent(t);
   }
@@ -187,7 +183,7 @@ class ThreadGroupParent {
   ThreadGroupParent& operator=(const ThreadGroupParent&) = default;
 
  private:
-  explicit ThreadGroupParent(util::WeakPtr<ThreadGroup> t) : inner_(std::move(t)) {}
+  explicit ThreadGroupParent(util::WeakPtr<ThreadGroup> t) : inner_(ktl::move(t)) {}
 
   util::WeakPtr<ThreadGroup> inner_;
 };
@@ -211,14 +207,14 @@ class ProcessSelector {
 
   using Variant = ktl::variant<Any, Pid, Pgid>;
 
-  const Variant& selector() const { return selector_; }
-
   static ProcessSelector AnyProcess() { return ProcessSelector(Any{}); }
   static ProcessSelector SpecificPid(pid_t pid) { return ProcessSelector(Pid{pid}); }
   static ProcessSelector ProcessGroup(pid_t pgid) { return ProcessSelector(Pgid{pgid}); }
 
-  bool DoMatch(pid_t pid, const PidTable& pid_table) const;
+  // impl ProcessSelector
+  bool do_match(pid_t pid, const PidTable& pid_table) const;
 
+ private:
   // Helpers from the reference documentation for ktl::visit<>, to allow
   // visit-by-overload of the ktl::variant<> returned by GetLastReference():
   template <class... Ts>
@@ -229,8 +225,8 @@ class ProcessSelector {
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
 
- private:
-  explicit ProcessSelector(Variant selector) : selector_(ktl::move(selector)) {}
+  friend class ThreadGroupMutableState;
+  explicit ProcessSelector(Variant selector) : selector_(selector) {}
 
   Variant selector_;
 };
@@ -316,7 +312,6 @@ class ThreadGroupMutableState {
   /// Thread groups allowed to trace tasks in this this thread group.
   // pub allowed_ptracers: PtraceAllowedPtracers,
 
- public:
   /// impl ThreadGroupMutableState<Base = ThreadGroup>
   pid_t leader() const;
 
@@ -334,7 +329,7 @@ class ThreadGroupMutableState {
 
   pid_t get_ppid() const;
 
-  void set_process_group(fbl::RefPtr<ProcessGroup> new_process_group, PidTable& pids);
+  void set_process_group(const fbl::RefPtr<ProcessGroup>& new_process_group, PidTable& pids);
 
   // Removes this thread group from its current process group
   void leave_process_group(PidTable& pids);
@@ -382,22 +377,6 @@ class ThreadGroupMutableState {
   void send_signal(SignalInfo signal_info);
 
   // C++
-  const fbl::Vector<fbl::RefPtr<ZombieProcess>>& zombie_children() const {
-    return zombie_children_;
-  }
-  fbl::Vector<fbl::RefPtr<ZombieProcess>>& zombie_children() { return zombie_children_; }
-
-  BTreeMapThreadGroup& get_children() { return children_; }
-
-  const ktl::optional<ThreadGroupParent>& parent() const { return parent_; }
-  ktl::optional<ThreadGroupParent>& parent() { return parent_; }
-
-  const bool& did_exec() const { return did_exec_; }
-  bool& did_exec() { return did_exec_; }
-
-  const bool& terminating() const { return terminating_; }
-  bool& terminating() { return terminating_; }
-
   ThreadGroupMutableState();
   ThreadGroupMutableState(ThreadGroup* base, ktl::optional<ThreadGroupParent> parent,
                           fbl::RefPtr<ProcessGroup> process_group);
@@ -437,7 +416,7 @@ class ThreadGroup
       public fbl::ContainableBaseClasses<
           fbl::TaggedWAVLTreeContainable<util::WeakPtr<ThreadGroup>, internal::ProcessGroupTag>,
           fbl::TaggedWAVLTreeContainable<util::WeakPtr<ThreadGroup>, internal::ThreadGroupTag>> {
- private:
+ public:
   /// Weak reference to the `OwnedRef` of this `ThreadGroup`. This allows to retrieve the
   /// `TempRef` from a raw `ThreadGroup`.
   util::WeakPtr<ThreadGroup> weak_thread_group_;
@@ -466,12 +445,12 @@ class ThreadGroup
   /// A mechanism to be notified when this `ThreadGroup` is destroyed.
   // pub drop_notifier: DropNotifier,
 
+ private:
   /// Whether the process is currently stopped.
   ///
   /// Must only be set when the `mutable_state` write lock is held.
   AtomicStopState stop_state_;
 
- private:
   /// The mutable state of the ThreadGroup.
   mutable starnix_sync::RwLock<ThreadGroupMutableState> mutable_state_;
 
@@ -556,7 +535,7 @@ class ThreadGroup
     return Write()->set_stopped(new_stopped, siginfo, finalize_only);
   }
 
-  void check_orphans();
+  void check_orphans() const;
 
   uint64_t get_rlimit(starnix_uapi::Resource resource) const;
 
@@ -573,16 +552,7 @@ class ThreadGroup
   void release();
 
   // C++
-  const util::WeakPtr<ThreadGroup>& weak_thread_group() const { return weak_thread_group_; }
-
-  const fbl::RefPtr<Kernel>& kernel() const { return kernel_; }
-  fbl::RefPtr<Kernel>& kernel() { return kernel_; }
-
   const KernelHandle<ProcessDispatcher>& process() const { return process_; }
-  pid_t leader() const { return leader_; }
-
-  const fbl::RefPtr<SignalActions>& signal_actions() const { return signal_actions_; }
-  fbl::RefPtr<SignalActions>& signal_actions() { return signal_actions_; }
 
   // WAVL-tree Index
   pid_t GetKey() const { return leader_; }
@@ -593,7 +563,7 @@ class ThreadGroup
   friend class ThreadGroupMutableState;
   class ProcessSignalObserver final : public SignalObserver {
    public:
-    ProcessSignalObserver(util::WeakPtr<ThreadGroup> tg) : SignalObserver(), tg_(ktl::move(tg)) {}
+    explicit ProcessSignalObserver(util::WeakPtr<ThreadGroup> tg) : tg_(ktl::move(tg)) {}
     ~ProcessSignalObserver() final = default;
 
    private:

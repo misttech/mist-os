@@ -24,25 +24,25 @@ bool test_setsid() {
   BEGIN_TEST;
 
   auto get_process_group = [](const Task& task) -> fbl::RefPtr<ProcessGroup> {
-    return task.thread_group()->Read()->process_group_;
+    return task.thread_group_->Read()->process_group_;
   };
 
   auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
   ASSERT_EQ(errno(EPERM).error_code(),
-            (*current_task)->thread_group()->setsid().error_value().error_code());
+            (*current_task)->thread_group_->setsid().error_value().error_code());
 
   auto child_task = (*current_task).clone_task_for_test(0, {kSIGCHLD});
   ASSERT_TRUE(get_process_group(*(*child_task).task()) ==
               get_process_group(*(*current_task).task()));
 
-  auto old_process_group = (*child_task)->thread_group()->Read()->process_group_;
-  ASSERT_TRUE((*child_task)->thread_group()->setsid().is_ok());
-  ASSERT_EQ((*child_task)->thread_group()->Read()->process_group_->session_->leader_,
+  auto old_process_group = (*child_task)->thread_group_->Read()->process_group_;
+  ASSERT_TRUE((*child_task)->thread_group_->setsid().is_ok());
+  ASSERT_EQ((*child_task)->thread_group_->Read()->process_group_->session_->leader_,
             (*child_task)->get_pid());
 
   auto tgs = old_process_group->Read()->thread_groups();
-  auto result = std::ranges::find_if(
-      tgs, [&](const auto& tg) { return tg == (*child_task)->thread_group(); });
+  auto result =
+      std::ranges::find_if(tgs, [&](const auto& tg) { return tg == (*child_task)->thread_group_; });
   ASSERT_TRUE(result == tgs.end());
 
   END_TEST;
@@ -53,12 +53,11 @@ bool test_exit_status() {
   auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
   {
     auto child = (*current_task).clone_task_for_test(0, {kSIGCHLD});
-    (*child)->thread_group()->exit(starnix::ExitStatus::Exit(42), {});
+    (*child)->thread_group_->exit(starnix::ExitStatus::Exit(42), {});
   }
   ASSERT_EQ((*current_task)
-                ->thread_group()
-                ->Read()
-                ->zombie_children()[0]
+                ->thread_group_->Read()
+                ->zombie_children_[0]
                 ->exit_info.status.signal_info_status(),
             starnix::ExitStatus::Exit(42).signal_info_status());
 

@@ -117,35 +117,35 @@ void TaskMutableState::update_flags(TaskFlags clear, TaskFlags set) {
 
 /// Returns the number of pending signals for this task, without considering the signal mask.
 size_t TaskMutableState::pending_signal_count() const {
-  return signals_.num_queued() + base_->thread_group()->pending_signals_.Lock()->num_queued();
+  return signals_.num_queued() + base_->thread_group_->pending_signals_.Lock()->num_queued();
 }
 
 bool TaskMutableState::has_signal_pending(Signal signal) const {
   return signals_.has_queued(signal) ||
-         base_->thread_group()->pending_signals_.Lock()->has_queued(signal);
+         base_->thread_group_->pending_signals_.Lock()->has_queued(signal);
 }
 
 SigSet TaskMutableState::pending_signals() const {
-  return signals_.pending() | base_->thread_group()->pending_signals_.Lock()->pending();
+  return signals_.pending() | base_->thread_group_->pending_signals_.Lock()->pending();
 }
 
 SigSet TaskMutableState::task_specific_pending_signals() const { return signals_.pending(); }
 
 bool TaskMutableState::is_any_signal_allowed_by_mask(SigSet mask) const {
   return signals_.is_any_allowed_by_mask(mask) ||
-         base_->thread_group()->pending_signals_.Lock()->is_any_allowed_by_mask(mask);
+         base_->thread_group_->pending_signals_.Lock()->is_any_allowed_by_mask(mask);
 }
 
 bool TaskMutableState::is_any_signal_pending() const {
   starnix_uapi::SigSet mask = this->signal_mask();
   return signals_.is_any_pending() ||
-         base_->thread_group()->pending_signals_.Lock()->is_any_allowed_by_mask(mask);
+         base_->thread_group_->pending_signals_.Lock()->is_any_allowed_by_mask(mask);
 }
 
 template <typename F>
 ktl::optional<SignalInfo> TaskMutableState::take_next_signal_where(F&& predicate) {
   auto thread_group_signal =
-      base_->thread_group()->pending_signals_.Lock()->take_next_where(predicate);
+      base_->thread_group_->pending_signals_.Lock()->take_next_where(predicate);
   if (thread_group_signal.has_value()) {
     return thread_group_signal;
   }
@@ -201,7 +201,7 @@ fbl::RefPtr<Task> Task::New(pid_t id, const ktl::string_view& command,
                                    exit_signal, signal_mask, no_new_privs, timerslack_ns));
   ASSERT(ac.check());
 
-  pid_t pid = thread_group->leader();
+  pid_t pid = thread_group->leader_;
   task->persistent_info_ = TaskPersistentInfoState::New(id, pid, command, creds, exit_signal);
 
   return ktl::move(task);
@@ -274,11 +274,11 @@ const fbl::RefPtr<MemoryManager>& Task::mm() const {
   return mm_.value();
 }
 
-fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group_->kernel(); }
+fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group_->kernel_; }
 
 util::WeakPtr<Task> Task::get_task(pid_t pid) const { return kernel()->pids.Read()->get_task(pid); }
 
-pid_t Task::get_pid() const { return thread_group_->leader(); }
+pid_t Task::get_pid() const { return thread_group_->leader_; }
 
 void Task::interrupt() const {
   LTRACE_ENTRY_OBJ;
@@ -291,7 +291,7 @@ void Task::interrupt() const {
 }
 
 struct sigaction Task::get_signal_action(Signal signal) const {
-  return thread_group_->signal_actions()->Get(signal);
+  return thread_group_->signal_actions_->Get(signal);
 }
 
 fit::result<Errno, ktl::span<uint8_t>> Task::read_memory(UserAddress addr,

@@ -47,7 +47,7 @@ class FsNode final
  public:
   /// Weak reference to the `FsNodeHandle` of this `FsNode`. This allows to retrieve the
   /// `FsNodeHandle` from a `FsNode`.
-  WeakFsNodeHandle weak_handle;
+  WeakFsNodeHandle weak_handle_;
 
  private:
   /// The FsNodeOps for this FsNode.
@@ -72,7 +72,7 @@ class FsNode final
   ///
   /// Used if, and only if, the node has a mode of FileMode::IFIFO.
   // pub fifo: Option<PipeHandle>,
-  ktl::optional<PipeHandle> fifo;
+  ktl::optional<PipeHandle> fifo_;
 
  private:
   /// The socket located at this node, if any.
@@ -156,7 +156,7 @@ class FsNode final
 
   FsNodeHandle into_handle() {
     FsNodeHandle handle = fbl::AdoptRef(this);
-    weak_handle = util::WeakPtr<FsNode>(handle.get());
+    weak_handle_ = util::WeakPtr<FsNode>(handle.get());
     return std::move(handle);
   }
 

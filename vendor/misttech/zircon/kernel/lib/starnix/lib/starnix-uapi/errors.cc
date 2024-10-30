@@ -18,7 +18,6 @@ uint32_t from_status_like_fdio(zx_status_t status) {
     case ZX_ERR_NO_MEMORY:
       return ENOMEM;
     case ZX_ERR_INVALID_ARGS:
-      return EINVAL;
     case ZX_ERR_BUFFER_TOO_SMALL:
       return EINVAL;
     case ZX_ERR_TIMED_OUT:
@@ -28,7 +27,6 @@ uint32_t from_status_like_fdio(zx_status_t status) {
     case ZX_ERR_ALREADY_EXISTS:
       return EEXIST;
     case ZX_ERR_PEER_CLOSED:
-      return EPIPE;
     case ZX_ERR_BAD_STATE:
       return EPIPE;
     case ZX_ERR_BAD_PATH:
@@ -40,7 +38,6 @@ uint32_t from_status_like_fdio(zx_status_t status) {
     case ZX_ERR_NOT_DIR:
       return ENOTDIR;
     case ZX_ERR_NOT_SUPPORTED:
-      return EOPNOTSUPP;
     case ZX_ERR_WRONG_TYPE:
       return EOPNOTSUPP;
     case ZX_ERR_OUT_OF_RANGE:

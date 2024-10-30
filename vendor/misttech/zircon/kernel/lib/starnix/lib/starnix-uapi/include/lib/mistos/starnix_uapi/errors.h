@@ -81,13 +81,13 @@ const ErrnoCode ERESTARTNOHAND(514);
 /// implementation again.
 const ErrnoCode ERESTART_RESTARTBLOCK(516);
 
-fit::result<Errno> map_eintr(fit::result<Errno> result, Errno _errno);
+fit::result<Errno> map_eintr(fit::result<Errno> result, Errno err);
 
 template <typename T>
-fit::result<Errno, T> map_eintr(fit::result<Errno, T> result, Errno _errno) {
+fit::result<Errno, T> map_eintr(fit::result<Errno, T> result, Errno err) {
   if (result.is_error()) {
     if (result.error_value().error_code() == EINTR) {
-      return fit::error(_errno);
+      return fit::error(err);
     }
     return result.take_error();
   }

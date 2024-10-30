@@ -20,8 +20,6 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <trace.h>
 
-#include <utility>
-
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
 
@@ -34,16 +32,16 @@
 namespace starnix {
 
 bool NamespaceNode::operator==(const NamespaceNode& other) const {
-  return (mount.handle == other.mount.handle) && (entry == other.entry);
+  return (mount_.handle_ == other.mount_.handle_) && (entry_ == other.entry_);
 }
 
 NamespaceNode NamespaceNode::New(MountHandle mount, DirEntryHandle dir_entry) {
-  return NamespaceNode{.mount = MountInfo{mount}, .entry = dir_entry};
+  return NamespaceNode{.mount_ = MountInfo{mount}, .entry_ = dir_entry};
 }
 
 /// Create a namespace node that is not mounted in a namespace.
 NamespaceNode NamespaceNode::new_anonymous(DirEntryHandle dir_entry) {
-  return NamespaceNode{.mount = {}, .entry = dir_entry};
+  return NamespaceNode{.mount_ = {}, .entry_ = dir_entry};
 }
 
 /// Create a namespace node that is not mounted in a namespace and that refers to a node that
@@ -54,7 +52,7 @@ NamespaceNode NamespaceNode::new_anonymous_unrooted(FsNodeHandle node) {
 
 fit::result<Errno, FileHandle> NamespaceNode::open(const CurrentTask& current_task, OpenFlags flags,
                                                    bool check_access) const {
-  auto open = entry->node_->open(current_task, mount, flags, check_access) _EP(open);
+  auto open = entry_->node_->open(current_task, mount_, flags, check_access) _EP(open);
   return FileObject::New(ktl::move(open.value()), *this, flags);
 }
 
@@ -75,9 +73,9 @@ fit::result<Errno, NamespaceNode> NamespaceNode::open_create_node(const CurrentT
 
   auto entry_result = [&]() -> fit::result<Errno, DirEntryHandle> {
     if (flags.contains(OpenFlagsEnum::EXCL)) {
-      return entry->create_entry(current_task, mount, name, create_fn);
+      return entry_->create_entry(current_task, mount_, name, create_fn);
     } else {
-      return entry->get_or_create_entry(current_task, mount, name, create_fn);
+      return entry_->get_or_create_entry(current_task, mount_, name, create_fn);
     }
   }();
 
@@ -95,8 +93,8 @@ fit::result<Errno, NamespaceNode> NamespaceNode::create_node(const CurrentTask& 
 
   auto owner = current_task->as_fscred();
   auto _mode = current_task->fs()->apply_umask(mode);
-  auto result = entry->create_entry(
-      current_task, mount, name,
+  auto result = entry_->create_entry(
+      current_task, mount_, name,
       [&current_task, _mode, dev, owner](const FsNodeHandle& dir, const MountInfo& mount,
                                          const FsStr& name) -> fit::result<Errno, FsNodeHandle> {
         return dir->mknod(current_task, mount, name, _mode, dev, owner);
@@ -121,7 +119,7 @@ fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask&
                                                               const FsStr& basename) const {
   LTRACEF_LEVEL(2, "basename=[%.*s]\n", static_cast<int>(basename.length()), basename.data());
 
-  if (!entry->node_->is_dir()) {
+  if (!entry_->node_->is_dir()) {
     return fit::error(errno(ENOTDIR));
   }
 
@@ -153,16 +151,16 @@ fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask&
       // Make sure this can't escape a chroot.
       if (*this == root) {
         return fit::ok(root);
-      } else {
-        return fit::ok(parent().value_or(*this));
       }
+      return fit::ok(parent().value_or(*this));
+
     } else {
-      auto lookup_result = entry->component_lookup(current_task, this->mount, basename);
+      auto lookup_result = entry_->component_lookup(current_task, this->mount_, basename);
       if (lookup_result.is_error()) {
         return lookup_result.take_error();
       }
       auto child = with_new_entry(lookup_result.value());
-      while (child.entry->node_->is_lnk()) {
+      while (child.entry_->node_->is_lnk()) {
         switch (context.symlink_mode) {
           case NoFollow:
             break;
@@ -219,11 +217,11 @@ fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask&
   auto child = child_result.value();
 
   if (context.resolve_flags.contains(ResolveFlagsEnum::NO_XDEV) &&
-      child.mount.handle != mount.handle) {
+      child.mount_.handle_ != mount_.handle_) {
     return fit::error(errno(EXDEV));
   }
 
-  if (context.must_be_directory && !child.entry->node_->is_dir()) {
+  if (context.must_be_directory && !child.entry_->node_->is_dir()) {
     return fit::error(errno(ENOTDIR));
   }
 
@@ -241,14 +239,14 @@ ktl::optional<NamespaceNode> NamespaceNode::parent() const { return ktl::nullopt
 /// is the root of a mount.
 ktl::optional<DirEntryHandle> NamespaceNode::parent_within_mount() const { return ktl::nullopt; }
 
-NamespaceNode NamespaceNode::with_new_entry(DirEntryHandle _entry) const {
-  return {.mount = this->mount, .entry = _entry};
+NamespaceNode NamespaceNode::with_new_entry(DirEntryHandle entry) const {
+  return {.mount_ = this->mount_, .entry_ = entry};
 }
 
 NamespaceNode NamespaceNode::enter_mount() const {
   // While the child is a mountpoint, replace child with the mount's root.
   auto enter_one_mount = [](const NamespaceNode& node) -> ktl::optional<NamespaceNode> {
-    if (auto mount_opt = node.mount.handle; mount_opt.has_value()) {
+    if (auto mount_opt = node.mount_.handle_; mount_opt.has_value()) {
       auto mount = mount_opt.value();
       // if (mount->)
     }
@@ -271,9 +269,9 @@ NamespaceNode NamespaceNode::escape_mount() const {
 }
 
 fit::result<Errno, MountHandle> NamespaceNode::mount_if_root() const {
-  if (auto _mount = (*mount); _mount.has_value()) {
-    if (entry == (*_mount)->root_) {
-      return fit::ok(_mount.value());
+  if (auto mount = (*this->mount_); mount.has_value()) {
+    if (entry_ == (*mount)->root_) {
+      return fit::ok(mount.value());
     }
   }
   return fit::error(errno(EINVAL));
@@ -293,8 +291,8 @@ FsString NamespaceNode::path(const Task& task) const {
 FsString NamespaceNode::path_escaping_chroot() const { return path_from_root({}).into_path(); }
 
 PathWithReachability NamespaceNode::path_from_root(ktl::optional<NamespaceNode> root) const {
-  if (auto _mount = (*mount); _mount.has_value()) {
-    return PathWithReachability(Reachable{entry->local_name()});
+  if (auto mount = (*this->mount_); mount.has_value()) {
+    return PathWithReachability(Reachable{entry_->local_name()});
   }
 
   auto path = PathBuilder::New();
@@ -304,7 +302,7 @@ PathWithReachability NamespaceNode::path_from_root(ktl::optional<NamespaceNode> 
     auto _root = root->escape_mount();
     while (current != _root) {
       if (auto parent = current.parent(); parent.has_value()) {
-        path.prepend_element(current.entry->local_name());
+        path.prepend_element(current.entry_->local_name());
         current = parent->escape_mount();
       } else {
         // This node hasn't intersected with the custom root and has reached the namespace root.
@@ -315,7 +313,7 @@ PathWithReachability NamespaceNode::path_from_root(ktl::optional<NamespaceNode> 
     // No custom root, so travel up the tree to the namespace root.
     auto parent = current.parent();
     while (parent.has_value()) {
-      path.prepend_element(current.entry->local_name());
+      path.prepend_element(current.entry_->local_name());
       parent = parent->escape_mount().parent();
     }
   }
@@ -324,7 +322,7 @@ PathWithReachability NamespaceNode::path_from_root(ktl::optional<NamespaceNode> 
 }
 
 fit::result<Errno, SymlinkTarget> NamespaceNode::readlink(const CurrentTask& current_task) const {
-  return entry->node_->readlink(current_task);
+  return entry_->node_->readlink(current_task);
 }
 
 fit::result<Errno> NamespaceNode::check_access(const CurrentTask& current_task,

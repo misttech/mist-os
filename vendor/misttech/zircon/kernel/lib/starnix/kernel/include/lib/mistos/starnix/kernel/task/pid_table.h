@@ -7,13 +7,14 @@
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PIDTABLE_H_
 
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/util/weak_wrapper.h>
-
-#include <utility>
 
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/intrusive_single_list.h>
 #include <fbl/ref_ptr.h>
+#include <fbl/vector.h>
 #include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/unique_ptr.h>
@@ -31,23 +32,37 @@ class ProcessEntry {
   using Variant =
       ktl::variant<ktl::monostate, util::WeakPtr<ThreadGroup>, util::WeakPtr<ZombieProcess>>;
 
-  ~ProcessEntry();
   static ProcessEntry None();
   static ProcessEntry ThreadGroupCtor(util::WeakPtr<ThreadGroup> thread_group);
-  static ProcessEntry ZombieProcessCtor(util::WeakPtr<ZombieProcess> thread_group);
+  static ProcessEntry ZombieProcessCtor(util::WeakPtr<ZombieProcess> zombie_process);
 
+  // impl ProcessEntry
   bool is_none() const;
 
   ktl::optional<std::reference_wrapper<const util::WeakPtr<ThreadGroup>>> thread_group() const;
-  ktl::optional<std::reference_wrapper<const util::WeakPtr<ZombieProcess>>> zombie() const;
+
+  // C++
+  ~ProcessEntry();
 
  private:
+  friend class PidTable;
+
+  // Helpers from the reference documentation for std::visit<>, to allow
+  // visit-by-overload of the std::variant<> returned by GetLastReference():
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
   explicit ProcessEntry(Variant variant);
 
-  ktl::variant<ktl::monostate, util::WeakPtr<ThreadGroup>, util::WeakPtr<ZombieProcess>> process_;
+  Variant variant_;
 };
 
-struct PidEntry : public fbl::SinglyLinkedListable<ktl::unique_ptr<PidEntry>> {
+class PidEntry : public fbl::SinglyLinkedListable<ktl::unique_ptr<PidEntry>> {
  private:
   ktl::optional<util::WeakPtr<Task>> task_;
 
@@ -63,7 +78,7 @@ struct PidEntry : public fbl::SinglyLinkedListable<ktl::unique_ptr<PidEntry>> {
 
   static size_t GetHash(pid_t pid);
 
-  PidEntry(pid_t pid);
+  explicit PidEntry(pid_t pid);
 
   ~PidEntry();
 
@@ -84,9 +99,8 @@ class PidTable {
   /// Used to notify thread group changes.
   // thread_group_notifier: Option<memory_attribution::sync::Notifier>,
 
- private:
   /// impl PidTable
-  ktl::optional<const PidEntry*> get_entry(pid_t pid) const;
+  ktl::optional<std::reference_wrapper<const PidEntry>> get_entry(pid_t pid) const;
 
   PidEntry& get_entry_mut(pid_t pid);
 

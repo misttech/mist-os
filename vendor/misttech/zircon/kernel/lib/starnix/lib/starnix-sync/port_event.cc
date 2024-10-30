@@ -20,7 +20,7 @@
 
 namespace starnix_sync {
 
-PortEvent::PortEvent() : event_() {
+PortEvent::PortEvent() {
   zx_status_t result = PortDispatcher::Create(0, &port_, &rights_);
   ZX_ASSERT(result == ZX_OK);
 }
@@ -58,10 +58,9 @@ PortWaitResult PortEvent::Wait(zx_instant_mono_t deadline) {
           ZX_DEBUG_ASSERT(expected_state == state);
           return (expected_state == FUTEX_INTERRUPTED) ? PortWaitResult::NotifyInterrupt()
                                                        : PortWaitResult::NotifyRegular();
-        } else {
-          ZX_DEBUG_ASSERT(expected_state != state);
-          state = expected_state;
         }
+        ZX_DEBUG_ASSERT(expected_state != state);
+        state = expected_state;
         break;
       }
       case FUTEX_USE_PORT:
@@ -132,7 +131,7 @@ fit::result<zx_status_t> PortEvent::ObjectWaitAsync(fbl::RefPtr<Dispatcher> hand
   }
 
   zx_rights_t rights = {};
-  auto h = Handle::Make(handle, rights);
+  auto h = Handle::Make(ktl::move(handle), rights);
   zx_status_t status = port_.dispatcher()->MakeObserver(opts, h.get(), key, signals);
   if (status != ZX_OK) {
     return fit::error(status);
@@ -142,7 +141,7 @@ fit::result<zx_status_t> PortEvent::ObjectWaitAsync(fbl::RefPtr<Dispatcher> hand
 
 void PortEvent::Cancel(fbl::RefPtr<Dispatcher> dispatcher, uint64_t key) {
   zx_rights_t rights = {};
-  auto handle = Handle::Make(dispatcher, rights);
+  auto handle = Handle::Make(ktl::move(dispatcher), rights);
 }
 
 void PortEvent::QueueUserPacketData(NotifyKind kind) {

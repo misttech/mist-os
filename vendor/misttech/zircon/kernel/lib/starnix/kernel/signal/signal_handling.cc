@@ -50,7 +50,7 @@ fit::result<Errno> send_signal_prio(
 
   if (siginfo.signal.is_real_time() && prio != SignalPriority::First) {
     if (task_state->pending_signal_count() >=
-        task->thread_group()->get_rlimit(
+        task->thread_group_->get_rlimit(
             starnix_uapi::Resource{.value = starnix_uapi::ResourceEnum::SIGPENDING})) {
       return fit::error(errno(EAGAIN));
     }
@@ -82,10 +82,10 @@ fit::result<Errno> send_signal_prio(
   // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
   // a stopped process.
   if (siginfo.signal == kSIGKILL) {
-    task->thread_group()->set_stopped(StopState::ForceWaking, siginfo, false);
+    task->thread_group_->set_stopped(StopState::ForceWaking, siginfo, false);
     task->Write()->set_stopped(StopState::ForceWaking, {}, {}, {});
   } else if (siginfo.signal == kSIGCONT || force_wake) {
-    task->thread_group()->set_stopped(StopState::Waking, siginfo, false);
+    task->thread_group_->set_stopped(StopState::Waking, siginfo, false);
     task->Write()->set_stopped(StopState::Waking, {}, {}, {});
   }
 
@@ -201,7 +201,7 @@ ktl::optional<ExitStatus> deliver_signal(
     starnix_sync::RwLock<TaskMutableState>::RwLockWriteGuard task_state, SignalInfo siginfo,
     RegisterState* registers, ExtendedPstateState* extended_pstate) {
   while (true) {
-    auto sigaction = task->thread_group()->signal_actions()->Get(siginfo.signal);
+    auto sigaction = task->thread_group_->signal_actions_->Get(siginfo.signal);
     auto action = action_for_signal(siginfo, sigaction);
     // log_trace("handling signal %d with action %d", siginfo.signal, action);
     ktl::optional<ExitStatus> result;

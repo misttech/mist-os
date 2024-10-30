@@ -20,9 +20,9 @@ using MountFlags = starnix_uapi::MountFlags;
 
 /// Public representation of the mount options.
 struct MountInfo {
-  ktl::optional<MountHandle> handle;
-
  public:
+  ktl::optional<MountHandle> handle_;
+
   // impl MountInfo
   /// `MountInfo` for a element that is not tied to a given mount. Mount flags will be considered
   /// empty.
@@ -34,8 +34,8 @@ struct MountInfo {
   /// Checks whether this `MountInfo` represents a writable file system mounted.
   fit::result<Errno> check_readonly_filesystem();
 
- public:
   // C++
+ public:
   ktl::optional<MountHandle> operator*() const;
 
   ~MountInfo();

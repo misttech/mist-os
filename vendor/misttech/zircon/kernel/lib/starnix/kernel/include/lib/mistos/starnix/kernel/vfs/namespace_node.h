@@ -87,10 +87,10 @@ struct NamespaceNode {
   ///
   /// A given FsNode can be mounted in multiple places in a namespace. This
   /// field distinguishes between them.
-  MountInfo mount;
+  MountInfo mount_;
 
   /// The FsNode that corresponds to this namespace entry.
-  DirEntryHandle entry;
+  DirEntryHandle entry_;
 
  public:
   // impl NamespaceNode
@@ -181,7 +181,7 @@ struct NamespaceNode {
   /// A task may have a custom root set by `chroot`.
   PathWithReachability path_from_root(ktl::optional<NamespaceNode>) const;
 
-  NamespaceNode with_new_entry(DirEntryHandle _entry) const;
+  NamespaceNode with_new_entry(DirEntryHandle entry) const;
 
   fit::result<Errno, SymlinkTarget> readlink(const CurrentTask& current_task) const;
 

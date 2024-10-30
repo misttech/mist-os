@@ -33,7 +33,9 @@ fit::result<zx_status_t> StorageTraits<fbl::RefPtr<VmObject>>::EnsureCapacity(
   auto current = Capacity(vmo);
   if (current.is_error()) {
     return current.take_error();
-  } else if (current.value() >= capacity_bytes) {
+  }
+
+  if (current.value() >= capacity_bytes) {
     return fit::ok();  // Current capacity is sufficient.
   }
 
@@ -70,9 +72,12 @@ fit::result<zx_status_t, fbl::RefPtr<VmObject>> StorageTraits<fbl::RefPtr<VmObje
 
   // Make the new VMO resizable only if the original is.
   uint32_t options = 0;
-  if (auto result = IsResizable(old); result.is_error()) {
+  auto result = IsResizable(old);
+  if (result.is_error()) {
     return result.take_error();
-  } else if (result.value()) {
+  }
+
+  if (result.value()) {
     options |= VmObjectPaged::kResizable;
   }
 
@@ -134,9 +139,11 @@ StorageTraits<fbl::RefPtr<VmObject>>::DoClone(const fbl::RefPtr<VmObject>& origi
   // Make the child resizable only if the parent is.
   CloneType type = CloneType::Snapshot;
   Resizability resizable = Resizability::NonResizable;
-  if (auto result = IsResizable(original); result.is_error()) {
+  auto result = IsResizable(original);
+  if (result.is_error()) {
     return result.take_error();
-  } else if (result.value()) {
+  }
+  if (result.value()) {
     resizable = Resizability::Resizable;
   }
 

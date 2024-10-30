@@ -87,18 +87,20 @@ struct WhatToMount {
 /// The mounts in a namespace form a mount tree, with `mountpoint` pointing to the parent and
 /// `submounts` pointing to the children.
 class Mount : public fbl::RefCountedUpgradeable<Mount> {
- public:
+ private:
   DirEntryHandle root_;
-  FileSystemHandle fs;
+
+  FileSystemHandle fs_;
+
   mutable starnix_sync::StarnixMutex<MountFlags> flags_;
 
   // A unique identifier for this mount reported in /proc/pid/mountinfo.
-  uint64_t id;
+  uint64_t id_;
 
   /// A count of the number of active clients.
   // active_client_counter: MountClientMarker,
 
-  mutable starnix_sync::RwLock<MountState> state;
+  mutable starnix_sync::RwLock<MountState> state_;
   // Mount used to contain a Weak<Namespace>. It no longer does because since the mount point
   // hash was moved from Namespace to Mount, nothing actually uses it. Now that
   // Namespace::clone_namespace() is implemented in terms of Mount::clone_mount_recursive, it
@@ -128,6 +130,8 @@ class Mount : public fbl::RefCountedUpgradeable<Mount> {
   ~Mount();
 
  private:
+  friend struct NamespaceNode;
+
   Mount(uint64_t id, MountFlags flags, DirEntryHandle root, FileSystemHandle fs);
 };
 
