@@ -40,7 +40,9 @@ fn bench_toggle_lease(
 
 fn get_sag_benches() -> criterion::Benchmark {
     let sag_arc = sag_work::obtain_sag_proxy();
-    criterion::Benchmark::new("TakeWakeLease", move |b| bench_take_wake_lease(b, sag_arc.clone()))
+    criterion::Benchmark::new("TakeWakeLease", move |b| {
+        bench_take_wake_lease(b, sag_arc.clone())
+    })
 }
 
 fn get_daemon_benches() -> criterion::Benchmark {
@@ -57,8 +59,8 @@ fn main() -> Result<()> {
         .warm_up_time(std::time::Duration::from_millis(10))
         .measurement_time(std::time::Duration::from_millis(100))
         .sample_size(100);
-    let _: &mut Criterion = c.bench("fuchsia.power.sag", get_sag_benches());
-    let _: &mut Criterion = c.bench("fuchsia.power.daemon", get_daemon_benches());
+    let _: &mut Criterion = c.bench("fuchsia.power.framework", get_sag_benches());
+    let _: &mut Criterion = c.bench("fuchsia.power.framework", get_daemon_benches());
 
     Ok(())
 }
