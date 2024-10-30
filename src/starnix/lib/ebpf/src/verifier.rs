@@ -2743,7 +2743,7 @@ impl BpfVisitor for DataDependencies {
         _context: &mut Self::Context<'a>,
         dst: Register,
         src: Register,
-        _offset: i16,
+        _offset: i32,
         register_offset: Option<Register>,
         _width: DataWidth,
     ) -> Result<(), String> {
@@ -3901,7 +3901,7 @@ impl BpfVisitor for ComputationContext {
         context: &mut Self::Context<'a>,
         dst: Register,
         src: Register,
-        offset: i16,
+        offset: i32,
         register_offset: Option<Register>,
         width: DataWidth,
     ) -> Result<(), String> {
@@ -3911,7 +3911,7 @@ impl BpfVisitor for ComputationContext {
             "ldp{} {}{}",
             width.str(),
             register_offset.map(display_register).unwrap_or_else(Default::default),
-            print_offset(offset as i16)
+            print_offset(offset)
         );
         let Some(memory_id) = context.calling_context.packet_memory_id.clone() else {
             return Err(format!("incorrect packet access at pc {}", self.pc));
@@ -4009,7 +4009,8 @@ fn scomp32(x: u64, y: u64, op: impl FnOnce(i32, i32) -> bool) -> bool {
     op(x as i32, y as i32)
 }
 
-fn print_offset(offset: i16) -> String {
+fn print_offset<T: Into<i32>>(offset: T) -> String {
+    let offset: i32 = offset.into();
     if offset == 0 {
         String::new()
     } else if offset > 0 {
