@@ -1224,6 +1224,7 @@ impl FileSystemOps for OverlayFs {
 
     fn rename(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -1233,7 +1234,6 @@ impl FileSystemOps for OverlayFs {
         renamed: &FsNodeHandle,
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461648): Propagate Locked through FileSystemOps; needs to be before FileOpsCore
         let renamed = OverlayNode::from_fs_node(renamed)?;
         if renamed.has_lower() && renamed.main_entry().entry().node.is_dir() {
             // Return EXDEV for directory renames. Potentially they may be handled with the
@@ -1241,19 +1241,19 @@ impl FileSystemOps for OverlayFs {
             // See https://docs.kernel.org/filesystems/overlayfs.html#renaming-directories
             return error!(EXDEV);
         }
-        renamed.ensure_upper(&mut locked, current_task)?;
+        renamed.ensure_upper(locked, current_task)?;
 
         let old_parent_overlay = OverlayNode::from_fs_node(old_parent)?;
-        let old_parent_upper = old_parent_overlay.ensure_upper(&mut locked, current_task)?;
+        let old_parent_upper = old_parent_overlay.ensure_upper(locked, current_task)?;
 
         let new_parent_overlay = OverlayNode::from_fs_node(new_parent)?;
-        let new_parent_upper = new_parent_overlay.ensure_upper(&mut locked, current_task)?;
+        let new_parent_upper = new_parent_overlay.ensure_upper(locked, current_task)?;
 
         let need_whiteout =
-            old_parent_overlay.lower_entry_exists(&mut locked, current_task, old_name)?;
+            old_parent_overlay.lower_entry_exists(locked, current_task, old_name)?;
 
         DirEntry::rename(
-            &mut locked,
+            locked,
             current_task,
             old_parent_upper.entry(),
             old_parent_upper.mount(),
@@ -1266,7 +1266,7 @@ impl FileSystemOps for OverlayFs {
 
         // If the old node existed in lower FS, then override it in the upper FS with a whiteout.
         if need_whiteout {
-            match old_parent_upper.create_whiteout(&mut locked, current_task, old_name) {
+            match old_parent_upper.create_whiteout(locked, current_task, old_name) {
                 Err(e) => log_warn!("overlayfs: failed to create whiteout for {old_name}: {e}"),
                 Ok(_) => (),
             }

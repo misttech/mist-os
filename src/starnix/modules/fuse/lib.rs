@@ -239,6 +239,7 @@ impl FuseFs {
 impl FileSystemOps for FuseFs {
     fn rename(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -331,6 +332,7 @@ struct FuseCtlFs;
 impl FileSystemOps for FuseCtlFs {
     fn rename(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,

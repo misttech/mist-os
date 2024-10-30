@@ -714,6 +714,7 @@ impl DirEntry {
                 )?;
             } else {
                 fs.rename(
+                    locked,
                     current_task,
                     &old_parent.node,
                     old_basename,

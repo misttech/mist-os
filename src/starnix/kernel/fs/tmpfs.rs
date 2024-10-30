@@ -40,6 +40,7 @@ impl FileSystemOps for Arc<TmpFs> {
 
     fn rename(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         old_parent: &FsNodeHandle,

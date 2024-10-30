@@ -175,6 +175,7 @@ impl FileSystemOps for RemoteFs {
 
     fn rename(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
