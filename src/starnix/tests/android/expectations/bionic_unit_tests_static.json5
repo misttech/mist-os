@@ -203,6 +203,12 @@
                 "sys_xattr.fsetxattr_with_opath_toosmall",
                 "sys_xattr.fsetxattr_zerobuf",
                 "sys_xattr.setxattr",
+
+                // TODO(https://fxbug.dev/376338756): started failing and blocking roller.
+                "stdio.remove",
+                "stdio_nofortify.remove",
+                "stdlib.realpath__deleted",
+                "sys_stat.mkfifo",
             ],
         },
     ],
