@@ -167,16 +167,43 @@ class LinkingSession {
     return &runtime_modules_.back();
   }
 
+  // Return the list of modules that will be used for symbol resolution. This is
+  // is an ordered list of global modules that have already been loaded and the
+  // non-global dependencies of the root module loaded by this session.
+  ModuleRefList BuildResolutionList(Diagnostics& diag, const auto& session_modules) {
+    auto loaded_global_modules = std::ranges::views::filter(
+        loaded_modules_, [](const RuntimeModule& m) { return m.is_global(); });
+    auto local_non_global_modules = std::ranges::views::filter(
+        session_modules, [](const RuntimeModule& m) { return !m.is_global(); });
+
+    ModuleRefList resolution_modules;
+    auto enqueue = [&diag, &resolution_modules](const RuntimeModule& m) {
+      return resolution_modules.push_back(diag, "resolution module container", &m);
+    };
+
+    if (!std::ranges::all_of(loaded_global_modules, enqueue) ||
+        !std::ranges::all_of(local_non_global_modules, enqueue)) {
+      return {};
+    }
+
+    return resolution_modules;
+  }
+
   // Perform relocations on all pending modules to be loaded. Return a boolean
   // if relocations succeeded on all modules.
-  bool Relocate(Diagnostics& diag, const auto& resolution_list) {
-    // TODO(https://fxbug.dev/324136831): Include global modules.
+  bool Relocate(Diagnostics& diag, const auto& session_modules) {
+    // TODO(https://fxbug.dev/373886578): Replace with a concat-view adaptor.
+    ModuleRefList resolution_modules = BuildResolutionList(diag, session_modules);
+    if (resolution_modules.is_empty()) {
+      return false;
+    }
+    auto view = RuntimeModule::const_derefed_element_view(resolution_modules);
     auto relocate_and_relro = [&](SessionModule& session_module) -> bool {
       // TODO(https://fxbug.dev/339662473): this doesn't use the root module's
       // name in the scoped diagnostics. Add test for missing transitive symbol
       // and make sure the correct name is used in the error message.
       ld::ScopedModuleDiagnostics root_module_diag{diag, session_module.name().str()};
-      return session_module.Relocate(diag, resolution_list) && session_module.ProtectRelro(diag);
+      return session_module.Relocate(diag, view) && session_module.ProtectRelro(diag);
     };
     return std::all_of(std::begin(session_modules_), std::end(session_modules_),
                        relocate_and_relro);

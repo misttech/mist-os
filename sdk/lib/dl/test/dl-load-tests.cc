@@ -918,10 +918,6 @@ TYPED_TEST(DlTests, GlobalDep) {
   const auto kParentFile = TestShlib("libhas-foo-v2");
   constexpr int64_t kReturnValueFromGlobalDep = 7;
 
-  if constexpr (!TestFixture::kSupportsGlobalMode) {
-    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
-  }
-
   this->Needed({kGlobalDepFile});
 
   auto open_global_dep = this->DlOpen(kGlobalDepFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
@@ -968,10 +964,6 @@ TYPED_TEST(DlTests, GlobalPrecedence) {
   const std::string kDepFile = TestShlib("libld-dep-foo-v1");
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
-
-  if constexpr (!TestFixture::kSupportsGlobalMode) {
-    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
-  }
 
   this->Needed({kFile1});
 
@@ -1024,10 +1016,6 @@ TYPED_TEST(DlTests, GlobalPrecedenceDeps) {
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
-  if constexpr (!TestFixture::kSupportsGlobalMode) {
-    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
-  }
-
   this->Needed({kFile1, kDepFile1});
 
   auto res1 = this->DlOpen(kFile1.c_str(), RTLD_NOW | RTLD_GLOBAL);
@@ -1077,10 +1065,6 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
   const std::string kDepFile = TestShlib("libld-dep-missing-sym-dep");
   constexpr int64_t kReturnValue = 6;
 
-  if constexpr (!TestFixture::kSupportsGlobalMode) {
-    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
-  }
-
   this->Needed({kFile1});
 
   auto res1 = this->DlOpen(kFile1.c_str(), RTLD_NOW | RTLD_GLOBAL);
@@ -1129,10 +1113,6 @@ TYPED_TEST(DlTests, UpdateModeToGlobal) {
   const std::string kBarV1File = TestShlib("libbar-v1");
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
-
-  if constexpr (!TestFixture::kSupportsGlobalMode) {
-    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
-  }
 
   this->Needed({kHasFooV1File, kFooV1DepFile});
 
@@ -1212,10 +1192,6 @@ TYPED_TEST(DlTests, GlobalModuleOrdering) {
   constexpr int64_t kReturnValueFromFooV1 = 2;
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
-  if constexpr (!TestFixture::kSupportsGlobalMode) {
-    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
-  }
-
   this->Needed({kFooV1DepFile});
 
   auto local_foo_v1_open = this->DlOpen(kFooV1DepFile.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -1293,10 +1269,6 @@ TYPED_TEST(DlTests, GlobalModuleOrderingMultiDlopen) {
   const std::string kBarV2File = TestShlib("libbar-v1");
   constexpr int64_t kReturnValueFromFooV2 = 7;
 
-  if constexpr (!TestFixture::kSupportsGlobalMode) {
-    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
-  }
-
   this->Needed({kFooV2DepFile});
 
   auto global_foo_v2_open = this->DlOpen(kFooV2DepFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
@@ -1350,10 +1322,6 @@ TYPED_TEST(DlTests, GlobalModuleOrderingOfDeps) {
   const std::string kFooV1DepFile = TestShlib("libld-dep-foo-v1");
   const std::string kBarV2File = TestShlib("libbar-v1");
   constexpr int64_t kReturnValueFromFooV2 = 7;
-
-  if constexpr (!TestFixture::kSupportsGlobalMode) {
-    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
-  }
 
   this->Needed({kFooV2DepFile});
 

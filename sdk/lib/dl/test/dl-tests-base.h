@@ -37,9 +37,6 @@ class DlTestsBase : public ::testing::Test {
   // Whether the test fixture's implementation supports `RTLD_NOLOAD`
   static constexpr bool kSupportsNoLoadMode = true;
 
-  // Whether the test fixture's implementation supports `RTLD_GLOBAL`
-  static constexpr bool kSupportsGlobalMode = true;
-
   // Whether the test fixture will always prioritize a loaded module in symbol
   // resolution, regardless of whether it is a global module.
   static constexpr bool kStrictLoadOrderPriority = false;
