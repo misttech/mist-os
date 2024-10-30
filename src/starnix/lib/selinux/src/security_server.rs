@@ -538,10 +538,7 @@ impl SecurityServer {
         let state = self.state.lock();
         let bounded_type = state.sid_to_security_context(bounded_sid).type_();
         let parent_type = state.sid_to_security_context(parent_sid).type_();
-        state
-            .policy
-            .as_ref()
-            .map_or(false, |policy| policy.parsed.is_bounded_by(bounded_type, parent_type))
+        state.policy.as_ref().unwrap().parsed.is_bounded_by(bounded_type, parent_type)
     }
 
     /// Assign a [`SeLinuxStatusPublisher`] to be used for pushing updates to the security server's
