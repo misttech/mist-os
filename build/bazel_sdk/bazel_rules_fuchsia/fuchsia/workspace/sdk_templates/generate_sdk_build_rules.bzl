@@ -986,14 +986,14 @@ def _generate_cc_prebuilt_library_build_rules(
                     process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
 
     prebuilt_select_str = (
-        "fuchsia_select(" + _get_starlark_dict(runtime, prebuilt_select) + ")"
+        "variant_select(" + _get_starlark_dict(runtime, prebuilt_select) + ")"
     )
 
     # Assumption: if one architecture doesn't have distlib binaries for this library,
     # the other architectures will also not have them.
     if has_distlibs:
         dist_select_str = (
-            "fuchsia_select(" + _get_starlark_dict(runtime, dist_select) + ")"
+            "variant_select(" + _get_starlark_dict(runtime, dist_select) + ")"
         )
     else:
         dist_select_str = "[]"

@@ -1,6 +1,6 @@
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
-    "fuchsia_select",
+    "variant_select",
 )
 load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 

@@ -143,6 +143,7 @@ load(
 load(
     "//fuchsia/private:fuchsia_select.bzl",
     _fuchsia_select = "fuchsia_select",
+    _variant_select = "variant_select",
 )
 load(
     "//fuchsia/private:fuchsia_structured_config.bzl",
@@ -220,6 +221,7 @@ fuchsia_wrap_rust_binary = _fuchsia_wrap_rust_binary
 get_component_manifests = _get_component_manifests
 get_driver_component_manifests = _get_driver_component_manifests
 get_fuchsia_api_levels = _get_fuchsia_api_levels
+variant_select = _variant_select
 # keep-sorted end
 
 # Platform definitions
