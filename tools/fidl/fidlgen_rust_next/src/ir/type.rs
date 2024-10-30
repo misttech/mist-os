@@ -4,7 +4,7 @@
 
 use serde::Deserialize;
 
-use crate::ir::{CompIdent, HandleRights, HandleSubtype, ObjectType, PrimSubtype};
+use crate::ir::{CompIdent, HandleRights, HandleSubtype, PrimSubtype};
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -34,8 +34,6 @@ pub enum Type {
     Handle {
         nullable: bool,
         #[expect(dead_code)]
-        obj_type: ObjectType,
-        #[expect(dead_code)]
         rights: HandleRights,
         #[expect(dead_code)]
         subtype: HandleSubtype,
@@ -44,7 +42,6 @@ pub enum Type {
     },
     Endpoint {
         nullable: bool,
-        #[expect(dead_code)]
         role: EndpointRole,
         #[expect(dead_code)]
         protocol: CompIdent,

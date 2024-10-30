@@ -55,13 +55,12 @@ impl Property for IsWireStatic {
 
     fn calculate_type(compiler: &mut Compiler<'_>, ty: &Type) -> Self::Type {
         match &ty {
-            Type::Primitive { .. } | Type::Handle { .. } => true,
+            Type::Primitive { .. } | Type::Handle { .. } | Type::Endpoint { .. } => true,
             Type::Vector { .. } | Type::String { .. } => false,
             Type::Array { element_type, .. } => Self::calculate_type(compiler, element_type),
             Type::Identifier { identifier, nullable, .. } => {
                 !nullable && compiler.query::<Self>(identifier)
             }
-            Type::Endpoint { .. } => todo!(),
             Type::Internal { .. } => true,
         }
     }

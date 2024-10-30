@@ -256,8 +256,8 @@ fidl_testdata_info = [
     name = "handles"
     target = "//tools/fidl/fidlc/testdata:test.handles"
     build_denylist = [ "fidlgen_libfuzzer" ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -320,9 +320,8 @@ fidl_testdata_info = [
     host_build_denylist = [
       # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
-    ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },

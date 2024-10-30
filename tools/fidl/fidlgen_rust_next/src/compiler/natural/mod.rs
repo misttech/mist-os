@@ -11,7 +11,7 @@ use std::io::{Error, Write};
 
 use crate::compiler::util::emit_natural_comp_ident;
 use crate::compiler::Compiler;
-use crate::ir::{DeclType, InternalSubtype, PrimSubtype, Type};
+use crate::ir::{DeclType, EndpointRole, InternalSubtype, PrimSubtype, Type};
 
 pub use self::r#enum::emit_enum;
 pub use self::r#struct::emit_struct;
@@ -52,16 +52,23 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 write!(out, "Option<{}>", compiler.config.resource_bindings.handle.natural_path)?;
             }
         }
-        Type::Endpoint { nullable, .. } => {
-            if !*nullable {
-                write!(out, "{}", compiler.config.resource_bindings.server_end.natural_path)?;
-            } else {
-                write!(
-                    out,
-                    "Option<{}>",
-                    compiler.config.resource_bindings.server_end.natural_path
-                )?;
+        Type::Endpoint { nullable, role, .. } => {
+            write!(out, "::fidl_next::EndpointResource<")?;
+            if *nullable {
+                write!(out, "Option<")?;
             }
+            write!(out, "{}", compiler.config.resource_bindings.handle.natural_path,)?;
+            if *nullable {
+                write!(out, ">")?;
+            }
+            write!(
+                out,
+                ", {}>",
+                match role {
+                    EndpointRole::Client => "::fidl_next::ClientEndpoint",
+                    EndpointRole::Server => "::fidl_next::ServerEndpoint",
+                }
+            )?;
         }
         Type::Primitive { subtype } => {
             write!(
@@ -102,13 +109,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 DeclType::Resource => todo!(),
                 DeclType::NewType => todo!(),
                 DeclType::Overlay => todo!(),
-                DeclType::Protocol => {
-                    write!(
-                        out,
-                        "Option<{}>",
-                        compiler.config.resource_bindings.client_end.natural_path
-                    )?;
-                }
+                DeclType::Protocol => todo!(),
                 DeclType::Service => todo!(),
             }
         }

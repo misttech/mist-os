@@ -14,7 +14,7 @@ use crate::compiler::util::{
     emit_prefixed_comp_ident, emit_wire_comp_ident, prim_subtype_wire_name,
 };
 use crate::compiler::Compiler;
-use crate::ir::{DeclType, InternalSubtype, Type};
+use crate::ir::{DeclType, EndpointRole, InternalSubtype, Type};
 
 pub use self::r#enum::emit_enum;
 pub use self::r#struct::emit_struct;
@@ -52,12 +52,21 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 write!(out, "{}", compiler.config.resource_bindings.handle.optional_wire_path)?;
             }
         }
-        Type::Endpoint { nullable, .. } => {
+        Type::Endpoint { nullable, role, .. } => {
+            write!(out, "::fidl_next::EndpointResource<")?;
             if !*nullable {
-                write!(out, "{}", compiler.config.resource_bindings.server_end.wire_path)?;
+                write!(out, "{}", compiler.config.resource_bindings.handle.wire_path)?;
             } else {
-                write!(out, "{}", compiler.config.resource_bindings.server_end.optional_wire_path)?;
+                write!(out, "{}", compiler.config.resource_bindings.handle.optional_wire_path)?;
             }
+            write!(
+                out,
+                ", {}>",
+                match role {
+                    EndpointRole::Client => "::fidl_next::ClientEndpoint",
+                    EndpointRole::Server => "::fidl_next::ServerEndpoint",
+                },
+            )?;
         }
         Type::Primitive { subtype } => {
             write!(out, "{}", prim_subtype_wire_name(*subtype))?;
@@ -91,17 +100,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                     }
                     write!(out, "<'buf>")?;
                 }
-                DeclType::Protocol => {
-                    if !*nullable {
-                        write!(out, "{}", compiler.config.resource_bindings.client_end.wire_path)?;
-                    } else {
-                        write!(
-                            out,
-                            "{}",
-                            compiler.config.resource_bindings.client_end.optional_wire_path
-                        )?;
-                    }
-                }
+                DeclType::Protocol => todo!(),
                 DeclType::Alias => todo!(),
                 DeclType::Bits => todo!(),
                 DeclType::Const => todo!(),
