@@ -36,7 +36,7 @@ class AmlSuspend : public fdf::DriverBase,
 
  protected:
   virtual zx::result<zx::resource> GetCpuResource();
-  virtual zx_status_t SystemSuspendEnter(zx_time_t resume_deadline);
+  virtual zx_status_t SystemSuspendEnter();
 
   // Called just at Start(). Used in testing, otherwise a no-op.
   virtual void AtStart() {}

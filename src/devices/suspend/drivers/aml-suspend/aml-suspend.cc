@@ -10,6 +10,7 @@
 #include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls-next.h>
+#include <zircon/time.h>
 
 #include "fidl/fuchsia.hardware.suspend/cpp/markers.h"
 #include "fidl/fuchsia.hardware.suspend/cpp/wire_types.h"
@@ -22,7 +23,6 @@
 #include "lib/fidl/cpp/wire/channel.h"
 #include "lib/fidl/cpp/wire/vector_view.h"
 #include "lib/fidl/cpp/wire/wire_messaging_declarations.h"
-#include "lib/zx/time.h"
 #include "zircon/status.h"
 
 namespace suspend {
@@ -32,7 +32,6 @@ namespace fobs = fuchsia_power_observability;
 namespace {
 
 constexpr char kDeviceName[] = "aml-suspend-device";
-constexpr zx::duration kDebugSuspendDuration = zx::sec(5);
 
 constexpr uint64_t kInspectHistorySize = 128;
 }  // namespace
@@ -142,9 +141,9 @@ void AmlSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
   completer.ReplySuccess(resp);
 }
 
-zx_status_t AmlSuspend::SystemSuspendEnter(zx_time_t resume_deadline) {
+zx_status_t AmlSuspend::SystemSuspendEnter() {
   TRACE_DURATION("power", "aml-suspend:suspend");
-  return zx_system_suspend_enter(cpu_resource_.get(), resume_deadline);
+  return zx_system_suspend_enter(cpu_resource_.get(), ZX_TIME_INFINITE);
 }
 
 void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& completer) {
@@ -163,7 +162,7 @@ void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& com
   });
 
   auto suspend_start = zx_clock_get_boot();
-  zx_status_t result = SystemSuspendEnter(zx::deadline_after(kDebugSuspendDuration).get());
+  zx_status_t result = SystemSuspendEnter();
   auto suspend_return = zx_clock_get_boot();
 
   if (result != ZX_OK) {
