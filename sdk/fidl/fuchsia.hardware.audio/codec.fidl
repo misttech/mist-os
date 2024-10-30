@@ -6,19 +6,6 @@ library fuchsia.hardware.audio;
 using zx;
 using fuchsia.hardware.audio.signalprocessing;
 
-/// Textual information about the codec.
-@available(deprecated=11, removed=12)
-type CodecInfo = struct {
-    /// Unique identifier for the codec.
-    unique_id string:UNIQUE_ID_SIZE;
-
-    /// Name of the codec manufacturer.
-    manufacturer string:MAX_UI_STRING_SIZE;
-
-    /// Product name of the codec.
-    product_name string:MAX_UI_STRING_SIZE;
-};
-
 @available(added=20)
 type CodecProperties = table {
     /// Driver type is input (true) or output (false)
@@ -49,63 +36,6 @@ type CodecProperties = table {
     ///
     /// Required.
     5: plug_detect_capabilities PlugDetectCapabilities;
-};
-
-/// Gain type of representation.
-///
-/// # Deprecation
-///
-/// Not needed anymore since the functionality is available in the signal processing API defined
-/// at //sdk/fidl/fuchsia.hardware.audio.signalprocessing. Use a `Gain` `Element` instead, see
-/// //sdk/fidl/fuchsia.hardware.audio.signalprocessing/gain.fidl.
-@available(deprecated=9, removed=12)
-type GainType = strict enum : uint8 {
-    /// Gain specified in dB, for example -103.0dB or +3.2dB.
-    DECIBELS = 1;
-
-    /// Gain specified as a percentage, for example 10.0% or 80.5%.
-    PERCENT = 2;
-};
-
-/// Gain format/parameters.
-///
-/// # Deprecation
-///
-/// Not needed anymore since the functionality is available in the signal processing API defined
-/// at //sdk/fidl/fuchsia.hardware.audio.signalprocessing. Use a `Gain` `Element` instead, see
-/// //sdk/fidl/fuchsia.hardware.audio.signalprocessing/gain.fidl.
-@available(deprecated=9, removed=12)
-type GainFormat = table {
-    /// Specifies what the numbers for gain represent, e.g. a percentage.
-    ///
-    /// Required.
-    1: type GainType;
-
-    /// Minimum gain.
-    ///
-    /// Required.
-    2: min_gain float32;
-
-    /// Maximum gain.
-    ///
-    /// Required.
-    3: max_gain float32;
-
-    /// Gain step in decibels, this value must not be negative, but may be zero to convey an
-    /// effectively continuous range of values. Must not exceed `max_gain_db` - `min_gain_db`.
-    ///
-    /// Required.
-    4: gain_step float32;
-
-    /// Gain mute capability. If not included, mute is not supported.
-    ///
-    /// Optional.
-    5: can_mute bool;
-
-    /// Automatic Gain Control (AGC) capability. If not included, AGC is not supported.
-    ///
-    /// Optional.
-    6: can_agc bool;
 };
 
 /// Codec format information.
@@ -160,12 +90,6 @@ closed protocol Codec {
     /// codec it will close the codec protocol channel, in this case the client may obtain a new
     /// codec protocol channel and retry.
     strict Reset() -> ();
-
-    /// Retrieves textual information about the codec.
-    @available(deprecated=11, removed=12)
-    strict GetInfo() -> (struct {
-        info CodecInfo;
-    });
 
     /// Retrieves top level static properties.
     @available(added=20)
@@ -239,51 +163,6 @@ closed protocol Codec {
     }) -> (struct {
         state CodecFormatInfo;
     }) error zx.Status;
-
-    /// Retrieves gain format.
-    ///
-    /// # Deprecation
-    ///
-    /// Not needed anymore since the functionality is available in the signal processing API defined
-    /// at //sdk/fidl/fuchsia.hardware.audio.signalprocessing. Use a `Gain` `Element` instead, see
-    /// //sdk/fidl/fuchsia.hardware.audio.signalprocessing/gain.fidl.
-    @available(deprecated=9, removed=12)
-    strict GetGainFormat() -> (struct {
-        gain_format GainFormat;
-    });
-
-    /// Retrieves Plug Detect Capabilities.
-    @available(deprecated=11, removed=12)
-    strict GetPlugDetectCapabilities() -> (struct {
-        plug_detect_capabilities PlugDetectCapabilities;
-    });
-
-    /// Get the gain state via a hanging get. The driver will reply to the first `WatchGainState`
-    /// sent by the client and this reply must include a `gain_db` set to 0dB or lower. The driver
-    /// will not respond to subsequent client `WatchGainState` calls until the gain state changes
-    /// from what was most recently reported.
-    ///
-    /// # Deprecation
-    ///
-    /// Not needed anymore since the functionality is available in the signal processing API defined
-    /// at //sdk/fidl/fuchsia.hardware.audio.signalprocessing. Use a `Gain` `Element` instead, see
-    /// //sdk/fidl/fuchsia.hardware.audio.signalprocessing/gain.fidl.
-    @available(deprecated=9, removed=12)
-    strict WatchGainState() -> (struct {
-        gain_state GainState;
-    });
-
-    /// Client update of the gain state.
-    ///
-    /// # Deprecation
-    ///
-    /// Not needed anymore since the functionality is available in the signal processing API defined
-    /// at //sdk/fidl/fuchsia.hardware.audio.signalprocessing. Use a `Gain` `Element` instead, see
-    /// //sdk/fidl/fuchsia.hardware.audio.signalprocessing/gain.fidl.
-    @available(deprecated=9, removed=12)
-    strict SetGainState(struct {
-        target_state GainState;
-    });
 
     /// Get the plug detect state via a hanging get. The driver will reply to the first
     /// `WatchPlugState` sent by the client. The driver will not respond to subsequent client

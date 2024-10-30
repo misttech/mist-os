@@ -21,10 +21,6 @@ type ElementType = flexible enum {
     /// Vendor Specific. A type of processing element not covered by any subsequent type definition.
     VENDOR_SPECIFIC = 1;
 
-    /// The start/end of a pipeline.
-    @available(removed=12)
-    END_POINT = 2;
-
     /// Controls pipelines channel mixing and routing.
     CONNECTION_POINT = 3;
 
@@ -56,7 +52,7 @@ type ElementType = flexible enum {
     SAMPLE_RATE_CONVERSION = 11;
 
     /// The start/end of a pipeline.
-    @available(added=12, removed=20)
+    @available(removed=20)
     ENDPOINT = 12;
 
     /// Ring Buffer.
@@ -85,7 +81,7 @@ type TypeSpecificElement = flexible union {
     4: dynamics Dynamics;
 
     // See dai_interconnect.fidl.
-    @available(added=12, removed=20)
+    @available(removed=20)
     5: endpoint Endpoint;
 
     // See dai_interconnect.fidl.
@@ -169,7 +165,7 @@ type TypeSpecificElementState = flexible union {
     4: dynamics DynamicsElementState;
 
     // See dai_interconnect.fidl.
-    @available(added=12, removed=20)
+    @available(removed=20)
     5: endpoint EndpointElementState;
 
     // See dai_interconnect.fidl.

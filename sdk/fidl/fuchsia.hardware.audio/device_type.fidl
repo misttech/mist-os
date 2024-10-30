@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.audio;
 
-@available(added=14)
 type DeviceType = flexible enum {
     /// Device supports the fuchsia.hardware.audio/StreamConfig protocol.
     STREAM_CONFIG = 1;

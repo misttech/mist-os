@@ -8,7 +8,6 @@ const MAX_UI_STRING_SIZE uint32 = 256;
 
 const MAX_COUNT_FORMATS uint32 = 64;
 
-@available(added=12)
 type DriverError = flexible enum {
     /// The driver encountered an otherwise unspecified error while performing the operation.
     INTERNAL_ERROR = 1;

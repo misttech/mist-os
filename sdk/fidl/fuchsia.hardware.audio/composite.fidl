@@ -8,22 +8,7 @@ using fuchsia.hardware.audio.signalprocessing;
 alias ElementId = fuchsia.hardware.audio.signalprocessing.ElementId;
 alias TopologyId = fuchsia.hardware.audio.signalprocessing.TopologyId;
 
-@available(added=12)
 type CompositeProperties = table {
-    /// Driver type is input (true) or output (false)
-    /// If not included, then the driver may be used for both input and output.
-    ///
-    /// Optional.
-    ///
-    /// # Deprecation
-    ///
-    /// Removed in favor of the signal processing topology describing the one or many
-    /// input and output pipelines that could not be expressed with this one field for
-    /// the whole driver. If the driver exposes only one input or output that is also
-    /// described by the signal processing topology.
-    @available(deprecated=12, removed=13)
-    1: is_input bool;
-
     /// UI string for the manufacturer name. If not set, the manufacturer is unknown.
     /// If included, this string must be non-empty.
     ///
@@ -75,7 +60,6 @@ type CompositeProperties = table {
 /// by the `StreamConfig`, `Dai` and `Codec` FIDL interfaces. The `Composite` interface is more
 /// generic and provides more flexible routing within audio subsystems. Also see
 /// [Audio Driver Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite.md)
-@available(added=12)
 closed protocol Composite {
     /// Allows providing driver health state.
     compose Health;
@@ -165,7 +149,6 @@ closed protocol Composite {
     }) -> () error DriverError;
 };
 
-@available(added=12)
 service DeviceService {
     device client_end:Composite;
 };
