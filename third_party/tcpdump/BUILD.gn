@@ -229,7 +229,6 @@ config("suppress_warnings") {
     "-Wno-implicit-float-conversion",
     "-Wno-implicit-fallthrough",
     "-Wno-unused-function",
-    "-Wno-deprecated-declarations",
   ]
 }
 

@@ -9,7 +9,6 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
-#include <lib/fidl/cpp/interface_handle.h>
 #include <lib/vfs/cpp/composed_service_dir.h>
 #include <lib/zx/channel.h>
 #include <zircon/assert.h>
@@ -25,6 +24,7 @@ constexpr char kRootDirectory[] = "/";
 constexpr char kServiceDirectory[] = "/svc";
 constexpr const char* kPacketSocketProviderName =
     fidl::DiscoverableProtocolName<fuchsia_posix_socket_packet::Provider>;
+constexpr fuchsia_io::Flags kServeFlags = fuchsia_io::wire::kPermReadable;
 
 }  // namespace
 
@@ -53,25 +53,17 @@ __attribute__((constructor)) void init_packet_socket_provider() {
       ZX_ASSERT_MSG(status == ZX_OK, "fdio_ns_get_installed(_): %s", zx_status_get_string(status));
     }
 
-    constexpr fuchsia::io::OpenFlags kServeFlags(fuchsia::io::OpenFlags::DIRECTORY);
-
     auto bind_to_ns = [ns](const char* path, vfs::ComposedServiceDir& composed_dir) {
-      zx::channel client, server;
+      auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
       {
-        zx_status_t status = zx::channel::create(0, &client, &server);
-        ZX_ASSERT_MSG(status == ZX_OK, "zx::channel::create(0, _, _): %s",
-                      zx_status_get_string(status));
-      }
-      {
-        zx_status_t status = fdio_ns_bind(ns, path, client.release());
+        zx_status_t status = fdio_ns_bind(ns, path, client.TakeChannel().release());
         ZX_ASSERT_MSG(status == ZX_OK, "fdio_ns_bind(_, %s, _): %s", path,
                       zx_status_get_string(status));
       }
       {
         zx_status_t status =
             composed_dir.Serve(kServeFlags, std::move(server), composed_dir_loop.dispatcher());
-        ZX_ASSERT_MSG(status == ZX_OK, "composed_dir.Serve(0x%x, _, _): %s",
-                      static_cast<unsigned int>(kServeFlags), zx_status_get_string(status));
+        ZX_ASSERT_MSG(status == ZX_OK, "Serve failed: %s", zx_status_get_string(status));
       }
     };
 
@@ -91,9 +83,7 @@ __attribute__((constructor)) void init_packet_socket_provider() {
         default:
           ZX_PANIC("component::OpenServiceRoot(): %s", zx_status_get_string(status));
       }
-      // TODO(https://fxbug.dev/42152501): Avoid this type-unsafe conversion.
-      composed_svc_dir.set_fallback(
-          fidl::InterfaceHandle<fuchsia::io::Directory>(original_svc_dir->TakeChannel()));
+      composed_svc_dir.SetFallback(std::move(*original_svc_dir));
     }
 
     // Add the packet socket provider service to our composed service directory
@@ -138,30 +128,24 @@ __attribute__((constructor)) void init_packet_socket_provider() {
         std::filesystem::path root(kRootDirectory);
         static vfs::ComposedServiceDir composed_root_dir;
         {
-          zx::channel client, server;
+          auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
           {
-            zx_status_t status = zx::channel::create(0, &client, &server);
-            ZX_ASSERT_MSG(status == ZX_OK, "zx::channel::create(0, _, _): %s",
-                          zx_status_get_string(status));
-          }
-          {
-            zx_status_t status = fdio_service_connect(root.c_str(), server.release());
+            zx_status_t status = fdio_service_connect(root.c_str(), server.TakeChannel().release());
             ZX_ASSERT_MSG(status == ZX_OK, "fdio_service_connect(%s, _): %s", root.c_str(),
                           zx_status_get_string(status));
           }
-          composed_root_dir.set_fallback(
-              fidl::InterfaceHandle<fuchsia::io::Directory>(std::move(client)));
+          composed_root_dir.SetFallback(std::move(client));
         }
 
         composed_root_dir.AddService(
             svc_dir_path.filename().c_str(),
-            std::make_unique<vfs::Service>([](zx::channel request,
-                                              async_dispatcher_t* dispatcher) mutable {
-              zx_status_t status =
-                  composed_svc_dir.Serve(kServeFlags, std::move(request), dispatcher);
-              ZX_ASSERT_MSG(status == ZX_OK, "composed_svc_dir.Serve(0x%x, _, _): %s",
-                            static_cast<unsigned int>(kServeFlags), zx_status_get_string(status));
-            }));
+            std::make_unique<vfs::Service>(
+                [](zx::channel request, async_dispatcher_t* dispatcher) mutable {
+                  zx_status_t status = composed_svc_dir.Serve(
+                      kServeFlags, fidl::ServerEnd<fuchsia_io::Directory>(std::move(request)),
+                      dispatcher);
+                  ZX_ASSERT_MSG(status == ZX_OK, "Serve failed: %s", zx_status_get_string(status));
+                }));
 
         {
           zx_status_t status = fdio_ns_unbind(ns, root.c_str());
