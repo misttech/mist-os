@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 load("@fuchsia_build_info//:args.bzl", "authorized_ssh_keys_label")
-load("//build/info:info.bzl", "DEFAULT_PRODUCT_BUILD_INFO")
 load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "ARCH",
@@ -15,6 +14,7 @@ load(
     "fuchsia_product_configuration",
     "fuchsia_virtual_device",
 )
+load("//build/info:info.bzl", "DEFAULT_PRODUCT_BUILD_INFO")
 
 package(default_visibility = ["//visibility:public"])
 

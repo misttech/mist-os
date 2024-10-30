@@ -9,6 +9,10 @@ See //build/bazel/README.md for details about this file.
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_devicetree_toolchain_info",
+)
+load(
     "//:build/bazel/toolchains/linux_sysroot.bzl",
     "linux_sysroot_headers",
     "linux_sysroot_libs",
@@ -89,11 +93,6 @@ filegroup(
     name = "prebuilt_python_files",
     srcs = _python_prebuilt_files,
     visibility = ["//build/bazel/toolchains/python:__pkg__"],
-)
-
-load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
-    "fuchsia_devicetree_toolchain_info",
 )
 
 fuchsia_devicetree_toolchain_info(
