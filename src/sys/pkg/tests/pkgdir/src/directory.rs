@@ -8,7 +8,7 @@ use assert_matches::assert_matches;
 use fidl::endpoints::{create_proxy, Proxy as _};
 use fidl::AsHandleRef as _;
 use fidl_fuchsia_io as fio;
-use fuchsia_fs::directory::{open_directory_deprecated, DirEntry, DirentKind};
+use fuchsia_fs::directory::{open_directory, DirEntry, DirentKind};
 use futures::future::Future;
 use futures::StreamExt;
 use itertools::Itertools as _;
@@ -448,11 +448,11 @@ async fn open_parent(package_root: &fio::DirectoryProxy, parent_path: &str) -> f
         || parent_path.starts_with("meta/")
         || parent_path.starts_with("/meta/")
     {
-        fio::OpenFlags::RIGHT_READABLE
+        fuchsia_fs::PERM_READABLE
     } else {
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE
+        fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_EXECUTABLE
     };
-    fuchsia_fs::directory::open_directory_deprecated(package_root, parent_path, parent_rights)
+    fuchsia_fs::directory::open_directory(package_root, parent_path, parent_rights)
         .await
         .expect("open parent directory")
 }
@@ -812,20 +812,22 @@ async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, pa
 async fn assert_clone_directory_no_overflow(
     package_root: &fio::DirectoryProxy,
     path: &str,
-    flags: fio::OpenFlags,
+    flags_deprecated: fio::OpenFlags,
     expected_dirents: Vec<DirEntry>,
 ) {
-    let parent = open_directory_deprecated(
-        package_root,
-        path,
-        flags & (fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE),
-    )
-    .await
-    .expect("open parent directory");
+    // Only interested in opening connection to path with READABLE and EXECUTABLE rights.
+    let mut flags = fio::Flags::empty();
+    if flags_deprecated.intersects(fio::OpenFlags::RIGHT_READABLE) {
+        flags |= fuchsia_fs::PERM_READABLE;
+    }
+    if flags_deprecated.intersects(fio::OpenFlags::RIGHT_EXECUTABLE) {
+        flags |= fuchsia_fs::PERM_EXECUTABLE;
+    }
+    let parent = open_directory(package_root, path, flags).await.expect("open parent directory");
     let (clone, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy");
 
     let node_request = fidl::endpoints::ServerEnd::new(server_end.into_channel());
-    parent.clone(flags, node_request).expect("cloned node");
+    parent.clone(flags_deprecated, node_request).expect("cloned node");
 
     assert_read_dirents_no_overflow(&clone, expected_dirents).await;
 }
@@ -833,14 +835,14 @@ async fn assert_clone_directory_no_overflow(
 async fn assert_clone_directory_overflow(
     package_root: &fio::DirectoryProxy,
     path: &str,
-    flags: fio::OpenFlags,
+    flags_deprecated: fio::OpenFlags,
     expected_dirents: Vec<DirEntry>,
 ) {
     let parent = open_parent(package_root, path).await;
     let (clone, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy");
 
     let node_request = fidl::endpoints::ServerEnd::new(server_end.into_channel());
-    parent.clone(flags, node_request).expect("cloned node");
+    parent.clone(flags_deprecated, node_request).expect("cloned node");
 
     assert_read_dirents_overflow(&clone, expected_dirents).await;
 }
@@ -872,13 +874,9 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_overflow(
-        &fuchsia_fs::directory::open_directory_deprecated(
-            &root_dir,
-            "meta",
-            fio::OpenFlags::empty(),
-        )
-        .await
-        .expect("open meta as dir"),
+        &fuchsia_fs::directory::open_directory(&root_dir, "meta", fio::Flags::empty())
+            .await
+            .expect("open meta as dir"),
         vec![
             DirEntry { name: "contents".to_string(), kind: DirentKind::File },
             DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
@@ -896,10 +894,10 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_overflow(
-        &fuchsia_fs::directory::open_directory_deprecated(
+        &fuchsia_fs::directory::open_directory(
             &root_dir,
             "dir_overflow_readdirents",
-            fio::OpenFlags::empty(),
+            fio::Flags::empty(),
         )
         .await
         .expect("open dir_overflow_readdirents"),
@@ -907,10 +905,10 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_overflow(
-        &fuchsia_fs::directory::open_directory_deprecated(
+        &fuchsia_fs::directory::open_directory(
             &root_dir,
             "meta/dir_overflow_readdirents",
-            fio::OpenFlags::empty(),
+            fio::Flags::empty(),
         )
         .await
         .expect("open meta/dir_overflow_readdirents"),
@@ -920,13 +918,9 @@ async fn read_dirents_per_package_source(source: PackageSource) {
 
     // Handle no-overflow cases (e.g. when size of total dirents does not exceed MAX_BUF).
     assert_read_dirents_no_overflow(
-        &fuchsia_fs::directory::open_directory_deprecated(
-            &root_dir,
-            "dir",
-            fio::OpenFlags::empty(),
-        )
-        .await
-        .expect("open dir"),
+        &fuchsia_fs::directory::open_directory(&root_dir, "dir", fio::Flags::empty())
+            .await
+            .expect("open dir"),
         vec![
             DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
             DirEntry { name: "file".to_string(), kind: DirentKind::File },
@@ -934,13 +928,9 @@ async fn read_dirents_per_package_source(source: PackageSource) {
     )
     .await;
     assert_read_dirents_no_overflow(
-        &fuchsia_fs::directory::open_directory_deprecated(
-            &root_dir,
-            "meta/dir",
-            fio::OpenFlags::empty(),
-        )
-        .await
-        .expect("open meta/dir"),
+        &fuchsia_fs::directory::open_directory(&root_dir, "meta/dir", fio::Flags::empty())
+            .await
+            .expect("open meta/dir"),
         vec![
             DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
             DirEntry { name: "file".to_string(), kind: DirentKind::File },
@@ -1014,13 +1004,9 @@ async fn rewind_per_package_source(source: PackageSource) {
     let root_dir = source.dir;
     // Handle overflow cases.
     for path in [".", "meta", "dir_overflow_readdirents", "meta/dir_overflow_readdirents"] {
-        let dir = fuchsia_fs::directory::open_directory_deprecated(
-            &root_dir,
-            path,
-            fio::OpenFlags::empty(),
-        )
-        .await
-        .unwrap();
+        let dir = fuchsia_fs::directory::open_directory(&root_dir, path, fio::Flags::empty())
+            .await
+            .unwrap();
         assert_rewind_overflow_when_seek_offset_at_end(&dir).await;
         assert_rewind_overflow_when_seek_offset_in_middle(&dir).await;
     }
@@ -1028,13 +1014,9 @@ async fn rewind_per_package_source(source: PackageSource) {
     // Handle non-overflow cases.
     for path in ["dir", "meta/dir"] {
         assert_rewind_no_overflow(
-            &fuchsia_fs::directory::open_directory_deprecated(
-                &root_dir,
-                path,
-                fio::OpenFlags::empty(),
-            )
-            .await
-            .unwrap(),
+            &fuchsia_fs::directory::open_directory(&root_dir, path, fio::Flags::empty())
+                .await
+                .unwrap(),
         )
         .await;
     }
@@ -1109,70 +1091,15 @@ async fn get_token() {
 async fn get_token_per_package_source(source: PackageSource) {
     let root_dir = &source.dir;
     for path in [".", "dir", "meta", "meta/dir"] {
-        let dir = fuchsia_fs::directory::open_directory_deprecated(
-            root_dir,
-            path,
-            fio::OpenFlags::empty(),
-        )
-        .await
-        .unwrap();
+        let dir = fuchsia_fs::directory::open_directory(root_dir, path, fio::Flags::empty())
+            .await
+            .unwrap();
 
         let (status, token) = dir.get_token().await.unwrap();
         let status = zx::Status::ok(status);
         assert_eq!(status, Err(zx::Status::NOT_SUPPORTED));
         assert!(token.is_none(), "token should be absent");
     }
-}
-
-#[fuchsia::test]
-async fn get_flags() {
-    for source in dirs_to_test().await {
-        get_flags_per_package_source(source).await
-    }
-}
-
-async fn get_flags_per_package_source(source: PackageSource) {
-    // Test get_flags APIs for root directory and subdirectory.
-    assert_get_flags_directory_calls(
-        &source,
-        ".",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )
-    .await;
-    assert_get_flags_directory_calls(
-        &source,
-        "dir",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )
-    .await;
-
-    // Test get_flags APIs for meta directory and subdirectory.
-    assert_get_flags_directory_calls(&source, "meta", fio::OpenFlags::RIGHT_READABLE).await;
-    assert_get_flags_directory_calls(&source, "meta/dir", fio::OpenFlags::RIGHT_READABLE).await;
-}
-
-async fn assert_get_flags_directory_calls(
-    source: &PackageSource,
-    path: &str,
-    expected_rights: fio::OpenFlags,
-) {
-    let package_root = &source.dir;
-    let dir = fuchsia_fs::directory::open_directory_deprecated(
-        package_root,
-        path,
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::DIRECTORY
-            | fio::OpenFlags::POSIX_WRITABLE
-            | fio::OpenFlags::POSIX_EXECUTABLE,
-    )
-    .await
-    .expect("open directory");
-
-    let (status, flags) = dir.get_flags().await.unwrap();
-    let status = zx::Status::ok(status);
-
-    let result = status.map(|()| flags);
-    assert_eq!(result, Ok(expected_rights))
 }
 
 #[fuchsia::test]
@@ -1202,13 +1129,10 @@ async fn assert_unsupported_directory_calls(
     parent_path: &str,
     child_base_path: &str,
 ) {
-    let parent = fuchsia_fs::directory::open_directory_deprecated(
-        &source.dir,
-        parent_path,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .expect("open parent directory");
+    let parent =
+        fuchsia_fs::directory::open_directory(&source.dir, parent_path, fuchsia_fs::PERM_READABLE)
+            .await
+            .expect("open parent directory");
 
     // Verify unlink() is not supported.
     assert_eq!(
