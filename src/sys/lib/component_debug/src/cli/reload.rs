@@ -42,72 +42,12 @@ pub async fn reload_cmd<W: std::io::Write>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::test_utils::serve_realm_query_instances;
-    use fidl::endpoints::create_proxy_and_stream;
-    use futures::TryStreamExt;
-    use moniker::Moniker;
-
-    fn setup_fake_lifecycle_controller(
-        expected_moniker: &'static str,
-    ) -> fsys::LifecycleControllerProxy {
-        let (lifecycle_controller, mut stream) =
-            create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
-
-        fuchsia_async::Task::local(async move {
-            // Expect 3 requests: Unresolve, Resolve, Start.
-            match stream.try_next().await.unwrap().unwrap() {
-                fsys::LifecycleControllerRequest::UnresolveInstance { moniker, responder } => {
-                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
-                    responder.send(Ok(())).unwrap();
-                }
-                r => panic!(
-                    "Unexpected Lifecycle Controller request when expecting Unresolve: {:?}",
-                    r
-                ),
-            }
-            match stream.try_next().await.unwrap().unwrap() {
-                fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
-                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
-                    responder.send(Ok(())).unwrap();
-                }
-                r => {
-                    panic!(
-                        "Unexpected Lifecycle Controller request when expecting Resolve: {:?}",
-                        r
-                    )
-                }
-            }
-            match stream.try_next().await.unwrap().unwrap() {
-                fsys::LifecycleControllerRequest::StartInstanceWithArgs {
-                    moniker,
-                    binder: _,
-                    args: _,
-                    responder,
-                } => {
-                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
-                    responder.send(Ok(())).unwrap();
-                }
-                fsys::LifecycleControllerRequest::StartInstance {
-                    moniker,
-                    binder: _,
-                    responder,
-                } => {
-                    assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
-                    responder.send(Ok(())).unwrap();
-                }
-                r => {
-                    panic!("Unexpected Lifecycle Controller request when expecting Start: {:?}", r)
-                }
-            }
-        })
-        .detach();
-        lifecycle_controller
-    }
+    use crate::test_utils::{serve_lifecycle_controller, serve_realm_query_instances};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_success() -> Result<()> {
         let mut output = Vec::new();
-        let lifecycle_controller = setup_fake_lifecycle_controller("/core/ffx-laboratory:test");
+        let lifecycle_controller = serve_lifecycle_controller("/core/ffx-laboratory:test");
         let realm_query = serve_realm_query_instances(vec![fsys::Instance {
             moniker: Some("/core/ffx-laboratory:test".to_string()),
             url: Some("fuchsia-pkg://fuchsia.com/test#meta/test.cml".to_string()),

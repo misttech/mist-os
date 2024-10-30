@@ -4,7 +4,7 @@
 use anyhow::Result;
 use fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd};
 use fuchsia_async::Task;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use moniker::Moniker;
 use std::collections::HashMap;
 use std::fs::{create_dir_all, write};
@@ -180,6 +180,55 @@ pub fn serve_realm_query(
     })
     .detach();
     client
+}
+
+pub fn serve_lifecycle_controller(
+    expected_moniker: &'static str,
+) -> fsys::LifecycleControllerProxy {
+    let (lifecycle_controller, mut stream) =
+        create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
+
+    fuchsia_async::Task::local(async move {
+        // Expect 3 requests: Unresolve, Resolve, Start.
+        match stream.try_next().await.unwrap().unwrap() {
+            fsys::LifecycleControllerRequest::UnresolveInstance { moniker, responder } => {
+                assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
+                responder.send(Ok(())).unwrap();
+            }
+            r => {
+                panic!("Unexpected Lifecycle Controller request when expecting Unresolve: {:?}", r)
+            }
+        }
+        match stream.try_next().await.unwrap().unwrap() {
+            fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
+                assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
+                responder.send(Ok(())).unwrap();
+            }
+            r => {
+                panic!("Unexpected Lifecycle Controller request when expecting Resolve: {:?}", r)
+            }
+        }
+        match stream.try_next().await.unwrap().unwrap() {
+            fsys::LifecycleControllerRequest::StartInstanceWithArgs {
+                moniker,
+                binder: _,
+                args: _,
+                responder,
+            } => {
+                assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
+                responder.send(Ok(())).unwrap();
+            }
+            fsys::LifecycleControllerRequest::StartInstance { moniker, binder: _, responder } => {
+                assert_eq!(Moniker::parse_str(expected_moniker), Moniker::parse_str(&moniker));
+                responder.send(Ok(())).unwrap();
+            }
+            r => {
+                panic!("Unexpected Lifecycle Controller request when expecting Start: {:?}", r)
+            }
+        }
+    })
+    .detach();
+    lifecycle_controller
 }
 
 // Converts a vector of Files to a vector of SeedPaths.

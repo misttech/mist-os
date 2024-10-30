@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::realm::resolve_declaration;
+use crate::realm::{get_resolved_declaration, resolve_declaration};
 use cm_rust::NativeIntoFidl;
 use config_value_file::field::config_value_from_json_value;
 use moniker::Moniker;
@@ -77,6 +77,18 @@ pub async fn resolve_raw_config_capabilities(
     }
 
     Ok(resolved_capabilities)
+}
+
+pub async fn resolve_config_capability_use_decls(
+    realm_query: &fsys::RealmQueryProxy,
+    moniker: &Moniker,
+) -> Result<Vec<cm_rust::UseConfigurationDecl>, ConfigResolveError> {
+    let manifest = get_resolved_declaration(moniker, realm_query).await?;
+    Ok(manifest
+        .uses
+        .into_iter()
+        .filter_map(|u| if let cm_rust::UseDecl::Config(c) = u { Some(c) } else { None })
+        .collect())
 }
 
 async fn resolve_manifest(
