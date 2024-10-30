@@ -31,12 +31,6 @@
                 // Reenable once Netstack2 uses the bound device when
                 // connecting.
                 "tcp_connect_bound_to_device_ns2",
-
-                // TODO(https://fxbug.dev/375012282): Flakily times out.
-                // Reenable once netstack3 can consistently receive UDP packets
-                // from peers with identical IPs via sockets bound to different
-                // devices without encountering conntrack conflicts.
-                "udp_receive_on_bound_to_devices_ns3",
             ],
         },
     ],

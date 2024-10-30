@@ -1499,4 +1499,61 @@ mod tests {
         assert_eq!(verdict, Verdict::Accept(()));
         assert_ne!(packet.body.src_port, src_port);
     }
+
+    #[ip_test(I)]
+    fn packet_adopts_tracked_connection_in_table_if_identical<I: TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        let mut core_ctx = FakeCtx::new(&mut bindings_ctx);
+
+        // Simulate a race where two packets in the same flow both end up
+        // creating identical exclusive connections.
+        let mut first_packet = FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value();
+        let mut first_metadata = PacketMetadata::default();
+        let verdict = FilterImpl(&mut core_ctx).local_egress_hook(
+            &mut bindings_ctx,
+            &mut first_packet,
+            &ethernet_interface(),
+            &mut first_metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+
+        let mut second_packet = FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value();
+        let mut second_metadata = PacketMetadata::default();
+        let verdict = FilterImpl(&mut core_ctx).local_egress_hook(
+            &mut bindings_ctx,
+            &mut second_packet,
+            &ethernet_interface(),
+            &mut second_metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+
+        // Finalize the first connection; it should get inserted in the table.
+        let (verdict, _proof) = FilterImpl(&mut core_ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut first_packet,
+            &ethernet_interface(),
+            &mut first_metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+
+        // The second packet conflicts with the connection that's in the table, but it's
+        // identical to the first one, so it should adopt the finalized connection.
+        let (verdict, _proof) = FilterImpl(&mut core_ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut second_packet,
+            &ethernet_interface(),
+            &mut second_metadata,
+        );
+        assert_eq!(second_packet.body.src_port, first_packet.body.src_port);
+        assert_eq!(verdict, Verdict::Accept(()));
+
+        let first_conn = first_metadata.take_conntrack_connection().unwrap();
+        let second_conn = second_metadata.take_conntrack_connection().unwrap();
+        assert_matches!(
+            (first_conn, second_conn),
+            (Connection::Shared(first), Connection::Shared(second)) => {
+                assert!(Arc::ptr_eq(&first, &second));
+            }
+        );
+    }
 }
