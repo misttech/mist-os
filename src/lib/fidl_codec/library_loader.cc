@@ -522,11 +522,6 @@ std::unique_ptr<Type> Library::TypeFromIdentifier(bool is_nullable, const std::s
     uni->second->DecodeTypes();
     return std::make_unique<UnionType>(std::ref(*uni->second), is_nullable);
   }
-  Protocol* ifc;
-  if (GetProtocolByName(identifier, &ifc)) {
-    return std::make_unique<HandleType>(ZX_DEFAULT_CHANNEL_RIGHTS, ZX_OBJ_TYPE_CHANNEL,
-                                        is_nullable);
-  }
   return std::make_unique<InvalidType>();
 }
 

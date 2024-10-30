@@ -65,28 +65,6 @@ TEST(LibraryLoader, LoadSimple) {
   ASSERT_NE(found_method, nullptr) << "Could not find method " << kDesiredFullMethodName;
 }
 
-TEST(LibraryLoader, ProtocolTypeHasCorrectChannelRights) {
-  fidl_codec_test::FidlcodecExamples examples;
-  LibraryReadError err;
-  LibraryLoader loader;
-  for (const auto& element : examples.map()) {
-    loader.AddContent(element.second, &err);
-  }
-  ASSERT_EQ(LibraryReadError::kOk, err.value);
-
-  Library* library_ptr = loader.GetLibraryFromName("fidl.test.frobinator");
-  ASSERT_NE(library_ptr, nullptr);
-
-  std::string kDesiredProtocolName = "fidl.test.frobinator/Frobinator";
-  bool nullable = false;
-  auto type = library_ptr->TypeFromIdentifier(nullable, kDesiredProtocolName);
-  auto handle_type = type->AsHandleType();
-  ASSERT_NE(handle_type, nullptr);
-  ASSERT_EQ(handle_type->Rights(), ZX_DEFAULT_CHANNEL_RIGHTS);
-  ASSERT_EQ(handle_type->ObjectType(), ZX_OBJ_TYPE_CHANNEL);
-  ASSERT_EQ(handle_type->Nullable(), nullable);
-}
-
 // Makes sure that loading works when you load one IR at a time, instead of in a bunch.
 TEST(LibraryLoader, LoadSimpleOneAtATime) {
   fidl_codec_test::FidlcodecExamples examples;

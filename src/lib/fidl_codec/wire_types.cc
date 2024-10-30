@@ -1045,11 +1045,11 @@ std::unique_ptr<Type> Type::TypeFromIdentifier(LibraryLoader* loader,
 }
 
 std::unique_ptr<Type> Type::GetType(LibraryLoader* loader, const rapidjson::Value& type) {
-  if (!type.HasMember("kind")) {
+  if (!type.HasMember("kind_v2")) {
     FX_LOGS_OR_CAPTURE(ERROR) << "Invalid type";
     return std::make_unique<InvalidType>();
   }
-  std::string kind = type["kind"].GetString();
+  std::string kind = type["kind_v2"].GetString();
   if (kind == "string") {
     return std::make_unique<StringType>();
   }
@@ -1078,15 +1078,23 @@ std::unique_ptr<Type> Type::GetType(LibraryLoader* loader, const rapidjson::Valu
     const rapidjson::Value& element_type = type["element_type"];
     return std::make_unique<VectorType>(GetType(loader, element_type));
   }
-  if (kind == "request") {
-    std::optional<zx_obj_type_t> object_type = std::nullopt;
-    std::optional<zx_obj_type_t> rights = std::nullopt;
-    std::string_view transport = type["protocol_transport"].GetString();
-    if (transport == "Channel") {
-      object_type = std::optional<zx_obj_type_t>(ZX_OBJ_TYPE_CHANNEL);
-      rights = std::optional<zx_rights_t>(ZX_DEFAULT_CHANNEL_RIGHTS);
+  if (kind == "endpoint") {
+    if (type["role"] == "client") {
+      return std::make_unique<HandleType>(ZX_DEFAULT_CHANNEL_RIGHTS, ZX_OBJ_TYPE_CHANNEL,
+                                          type["nullable"].GetBool());
     }
-    return std::make_unique<HandleType>(rights, object_type, type["nullable"].GetBool());
+    if (type["role"] == "server") {
+      std::optional<zx_obj_type_t> object_type = std::nullopt;
+      std::optional<zx_obj_type_t> rights = std::nullopt;
+      std::string_view transport = type["protocol_transport"].GetString();
+      if (transport == "Channel") {
+        object_type = std::optional<zx_obj_type_t>(ZX_OBJ_TYPE_CHANNEL);
+        rights = std::optional<zx_rights_t>(ZX_DEFAULT_CHANNEL_RIGHTS);
+      }
+      return std::make_unique<HandleType>(rights, object_type, type["nullable"].GetBool());
+    }
+    FX_LOGS_OR_CAPTURE(ERROR) << "Invalid type " << kind;
+    return std::make_unique<InvalidType>();
   }
   if (kind == "primitive") {
     return Type::TypeFromPrimitive(type);

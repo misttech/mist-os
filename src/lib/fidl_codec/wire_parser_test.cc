@@ -1592,7 +1592,7 @@ TEST_F(WireParserTest, BadSchemaPrintHex) {
           },
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "test.fidlcodec.examples/FidlCodecTestProtocolRequest",
             "nullable": false,
             "type_shape_v2": {
@@ -1628,7 +1628,7 @@ TEST_F(WireParserTest, BadSchemaPrintHex) {
       "members": [
         {
           "type": {
-            "kind": "primitive",
+            "kind_v2": "primitive",
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
