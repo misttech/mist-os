@@ -93,9 +93,13 @@ class RuntimeDynamicLinker {
 
     Soname name{file};
     // If a module for this file is already loaded, return a reference to it.
+    // Update its global visibility if dlopen(...RTLD_GLOBAL) was passed.
     if (RuntimeModule* found = FindModule(name)) {
       if (!found->ReifyModuleTree(diag)) {
         return diag.take_error();
+      }
+      if (mode & OpenSymbolScope::kGlobal) {
+        MakeGlobal(found->module_tree());
       }
       return diag.ok(found);
     }
@@ -121,6 +125,14 @@ class RuntimeDynamicLinker {
     // created by the linking session to the dynamic linker's module list.
     modules_.splice(modules_.end(), pending_modules);
 
+    // If RTLD_GLOBAL was passed, make the module and all of its dependencies
+    // global. This is done after modules from the linking session have been
+    // added to the modules_ list, because this operation may change the
+    // ordering of all loaded modules.
+    if (mode & OpenSymbolScope::kGlobal) {
+      MakeGlobal(root_module.module_tree());
+    }
+
     return diag.ok(&root_module);
   }
 
@@ -128,6 +140,12 @@ class RuntimeDynamicLinker {
   // Attempt to find the loaded module with the given name, returning a nullptr
   // if the module was not found.
   RuntimeModule* FindModule(Soname name);
+
+  // Apply RTLD_GLOBAL to any module that is not already global in the provided
+  // `module_tree`. When a module is promoted to global, its load order in the
+  // dynamic linker's modules_ list changes: it is moved to the back of the
+  // list, as if it was just loaded with RTLD_GLOBAL.
+  void MakeGlobal(const ModuleTree& module_tree);
 
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
