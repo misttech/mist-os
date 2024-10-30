@@ -349,6 +349,9 @@ hlcpp_visibility = [
   "//src/zircon/bin/hwstress:*",
   "//src/zircon/bin/ktrace:*",
   "//src/zircon/testing/mutex_pi_exerciser:*",
+
+  # TODO(https://fxbug.dev/376322253): remove abseil from hlcpp allowlist once new C++ binding is supported in cctz and rolled in Fuchsia.
+  "//third_party/abseil-cpp/absl/time/internal/cctz:time_zone",
   "//third_party/mesa/src/util/tests/inflight_list:*",
   "//third_party/openweave-core/src/include:*",
   "//third_party/openweave-core/src/inet:*",
