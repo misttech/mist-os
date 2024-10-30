@@ -249,6 +249,13 @@ _DEBUG = False
 # This is useful to find them when performing expensive builds on CQ
 _ASSERT_ON_IGNORED_FILES = True
 
+# The name of an environment variable that will be checked. If set
+# to "1", this adds `--sandbox_debug` to each `bazel build` invocation
+# in order to allow developers to see the content of sandboxes for
+# failed commands.
+# See https://blog.bazel.build/2016/03/18/sandbox-easier-debug.html
+_ENV_DEBUG_SANDBOX = "FUCHSIA_DEBUG_BAZEL_SANDBOX"
+
 
 def debug(msg: str) -> None:
     # Print debug message to stderr if _DEBUG is True.
@@ -1269,6 +1276,11 @@ def main() -> int:
     # Bazel commands fail. This is necessary to make the log output of
     # CQ/CI bots usable.
     cmd += ["--verbose_failures"]
+
+    # Add --sandbox_debug if FUCHSIA_DEBUG_BAZEL_SANDBOX=1 is
+    # in the environment.
+    if os.environ.get(_ENV_DEBUG_SANDBOX, "0") == "1":
+        cmd.append("--sandbox_debug")
 
     if any(
         entry.copy_debug_symbols
