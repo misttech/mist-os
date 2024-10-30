@@ -202,7 +202,7 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
         starnix_uapi::S_IFBLK => Ok(FileClass::Block),
         starnix_uapi::S_IFIFO => Ok(FileClass::Fifo),
         starnix_uapi::S_IFSOCK => Ok(FileClass::Socket),
-        _ => error!(EINVAL),
+        _ => error!(EINVAL, format!("mode: {:?}", mode)),
     }
 }
 
