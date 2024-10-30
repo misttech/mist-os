@@ -52,10 +52,12 @@ class MemoryTest(unittest.TestCase):
         metrics = memory.MemoryMetricsProcessor().process_metrics(model)
         self.assertEqual(metrics, [])
 
-    def test_process_freeforn_metrics(self) -> None:
-        metrics = memory.MemoryMetricsProcessor().process_freeform_metrics(
+    def test_process_freeform_metrics(self) -> None:
+        processor = memory.MemoryMetricsProcessor()
+        name, metrics = processor.process_freeform_metrics(
             self.construct_trace_model()
         )
+        self.assertEqual(name, processor.FREEFORM_METRICS_FILE_NAME)
         self.assertEqual(
             metrics,
             {

@@ -119,8 +119,8 @@ def RunCpuBreakdown(args: argparse.Namespace, trace_path_json: str) -> None:
     )
     processor = cpu.CpuMetricsProcessor(args.percent_cutoff)
 
-    breakdown = processor.process_freeform_metrics(model)
-    assert isinstance(breakdown, list)
+    _, breakdown = processor.process_freeform_metrics(model)
+
     if args.group_processes:
         breakdown = cpu.group_by_process_name(breakdown)
 

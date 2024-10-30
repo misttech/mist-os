@@ -95,7 +95,9 @@ class MetricProcessorsTest(unittest.TestCase):
         self.assertSequenceEqual(
             processor.process_metrics(_EMPTY_MODEL), expected_results
         )
-        self.assertEqual(processor.process_freeform_metrics(_EMPTY_MODEL), None)
+        name, metrics = processor.process_freeform_metrics(_EMPTY_MODEL)
+        self.assertEqual(name, processor.FREEFORM_METRICS_FILE_NAME)
+        self.assertEqual(metrics, None)
 
     def test_constant_processor_freeform(self) -> None:
         freeform_metrics: trace_metrics.JsonType = ["hello"]
@@ -103,9 +105,9 @@ class MetricProcessorsTest(unittest.TestCase):
             freeform_metrics=freeform_metrics
         )
         self.assertSequenceEqual(processor.process_metrics(_EMPTY_MODEL), [])
-        self.assertEqual(
-            processor.process_freeform_metrics(_EMPTY_MODEL), freeform_metrics
-        )
+        name, metrics = processor.process_freeform_metrics(_EMPTY_MODEL)
+        self.assertEqual(name, processor.FREEFORM_METRICS_FILE_NAME)
+        self.assertEqual(metrics, freeform_metrics)
 
     def test_constant_processor_both(self) -> None:
         freeform_metrics: trace_metrics.JsonType = ["hello"]
@@ -118,9 +120,9 @@ class MetricProcessorsTest(unittest.TestCase):
         self.assertSequenceEqual(
             processor.process_metrics(_EMPTY_MODEL), metrics
         )
-        self.assertEqual(
-            processor.process_freeform_metrics(_EMPTY_MODEL), freeform_metrics
-        )
+        name, freeform = processor.process_freeform_metrics(_EMPTY_MODEL)
+        self.assertEqual(name, processor.FREEFORM_METRICS_FILE_NAME)
+        self.assertEqual(freeform, freeform_metrics)
 
     @parameterized.expand(
         [

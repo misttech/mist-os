@@ -51,9 +51,11 @@ class MemoryMetricsProcessor(trace_metrics.MetricsProcessor):
     }
     """
 
+    FREEFORM_METRICS_FILE_NAME = "memory"
+
     def process_freeform_metrics(
         self, model: trace_model.Model
-    ) -> trace_metrics.JsonType | tuple[str, trace_metrics.JsonType]:
+    ) -> tuple[str, trace_metrics.JsonType]:
         series_by_name = collections.defaultdict(list)
         for event in trace_utils.filter_events(
             model.all_events(),
@@ -64,9 +66,12 @@ class MemoryMetricsProcessor(trace_metrics.MetricsProcessor):
                 for name, value in event.args.items():
                     series_by_name[name].append(value)
 
-        return dict(
-            kernel={
-                name: standard_metrics_json(series)
-                for name, series in series_by_name.items()
-            }
+        return (
+            self.FREEFORM_METRICS_FILE_NAME,
+            dict(
+                kernel={
+                    name: standard_metrics_json(series)
+                    for name, series in series_by_name.items()
+                }
+            ),
         )
