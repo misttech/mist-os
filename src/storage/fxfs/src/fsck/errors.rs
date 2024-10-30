@@ -266,6 +266,8 @@ pub enum FsckError {
     IncorrectMerkleTreeSize(u64, u64, u64, u64),
     TombstonedAttributeDoesNotExist(u64, u64, u64),
     TrimValueForGraveyardAttributeEntry(u64, u64, u64),
+    MissingOverwriteExtents(u64, u64, u64),
+    OverwriteExtentFlagUnset(u64, u64, u64),
 }
 
 impl FsckError {
@@ -512,6 +514,20 @@ impl FsckError {
                     object_id, store_id, attribute_id,
                 )
             }
+            FsckError::MissingOverwriteExtents(store_id, object_id, attribute_id) => {
+                format!(
+                    "Object {} in store {} has an attribute {} that indicated it had overwrite \
+                    extents but none were found",
+                    object_id, store_id, attribute_id,
+                )
+            }
+            FsckError::OverwriteExtentFlagUnset(store_id, object_id, attribute_id) => {
+                format!(
+                    "Object {} in store {} has an attribute {} with overwrite extents but the \
+                    metadata indicated it would not",
+                    object_id, store_id, attribute_id,
+                )
+            }
         }
     }
 
@@ -690,6 +706,22 @@ impl FsckError {
                 error!(
                     store_id,
                     oid, attribute_id, "Invalid Trim value for a graveyard attribute entry",
+                )
+            }
+            FsckError::MissingOverwriteExtents(store_id, oid, attribute_id) => {
+                error!(
+                    store_id,
+                    oid,
+                    attribute_id,
+                    "Overwrite extents indicated, but no overwrite extents were found",
+                )
+            }
+            FsckError::OverwriteExtentFlagUnset(store_id, oid, attribute_id) => {
+                error!(
+                    store_id,
+                    oid,
+                    attribute_id,
+                    "Overwrite extents were found, but metadata flag was not set",
                 )
             }
         }
