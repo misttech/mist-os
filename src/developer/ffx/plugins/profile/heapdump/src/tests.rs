@@ -55,7 +55,7 @@ fn load_profile_file(path: &Path) -> Result<pprof::Profile> {
 #[fuchsia::test]
 async fn test_ffx_profile_heapdump() {
     let scratch_dir = tempdir().expect("Failed to create a temporary directory");
-    let emu = IsolatedEmulator::start("test_ffx_profile_heapdump").await.unwrap();
+    let emu = IsolatedEmulator::start("test-ffx-profile-heapdump").await.unwrap();
 
     // Enable heapdump's experimental plugin.
     emu.ffx(&["config", "set", "ffx_profile_heapdump", "true"]).await.unwrap();

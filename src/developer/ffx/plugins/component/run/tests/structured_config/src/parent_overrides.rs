@@ -8,7 +8,7 @@ use tracing::info;
 
 #[fuchsia::test]
 async fn override_echo_greeting_and_observe_in_logs() {
-    let emu = IsolatedEmulator::start("test_ffx_run_parent_overrides").await.unwrap();
+    let emu = IsolatedEmulator::start("test-ffx-run-parent-overrides").await.unwrap();
 
     let moniker = "/core/ffx-laboratory:run-parent-override-echo";
     let url = "fuchsia-pkg://fuchsia.com/ffx_run_parent_overrides_echo#meta/echo_config.cm";

@@ -25,6 +25,7 @@ struct EmuState {
 /// An isolated environment for testing ffx against a running emulator.
 pub struct IsolatedEmulator {
     emu_name: String,
+    package_server_name: String,
     ffx_isolate: Isolate,
     emu_state: Mutex<Option<EmuState>>,
     children: Mutex<Vec<std::process::Child>>,
@@ -66,8 +67,10 @@ impl IsolatedEmulator {
             .await
             .context("creating ffx isolate")?;
 
+        let package_server_name = format!("repo-{name}-{}", std::process::id());
         let this = Self {
             emu_name,
+            package_server_name,
             ffx_isolate,
             _temp_dir: temp_dir,
             _test_env: test_env,
@@ -85,12 +88,6 @@ impl IsolatedEmulator {
         this.ffx(&["config", "set", "log.level", "debug"])
             .await
             .context("setting ffx log level")?;
-
-        // TODO(slgrady) remove once we have debugged the flake in which the ssh
-        // connection is never made
-        this.ffx(&["config", "set", "daemon.host_pipe_ssh_timeout", "110"])
-            .await
-            .context("setting ffx daemon ssh timeout")?;
 
         this.ffx_isolate.start_daemon().await?;
 
@@ -110,8 +107,6 @@ impl IsolatedEmulator {
                 &this.emu_name,
                 "--log",
                 &*emulator_log,
-                // TODO(slgrady) remove once we have debugged the flake in which the
-                // ssh connection is never made
                 "--startup-timeout",
                 "120",
                 "--kernel-args",
@@ -151,23 +146,47 @@ impl IsolatedEmulator {
 
         // serve packages by creating a repository and a server, then registering the server
         if let Some(amber_files_path) = amber_files_path {
-            this.ffx(&["repository", "add-from-pm", &amber_files_path])
-                .await
-                .context("adding repository from build dir")?;
+            if let Err(e) = fuchsia_url::RepositoryUrl::parse(&format!(
+                "fuchsia-pkg://{}",
+                this.package_server_name
+            )) {
+                // underscores are usually the culprit.
+                if this.package_server_name.contains("_") {
+                    anyhow::bail!(
+                        "Invalid Fuchsia repository name, underscores are not allowed. {}: {e}",
+                        this.package_server_name
+                    )
+                }
+                anyhow::bail!("Invalid Fuchsia repository name  {}: {e}", this.package_server_name)
+            }
             this.ffx(&[
                 "repository",
                 "server",
                 "start",
+                "--background",
+                "--no-device",
                 // ask the kernel to give us a random unused port
                 "--address",
                 "[::]:0",
+                "--repository",
+                &this.package_server_name,
+                "--repo-path",
+                &amber_files_path,
             ])
             .await
             .context("starting repository server")?;
 
-            this.ffx(&["target", "repository", "register", "--alias", "fuchsia.com"])
-                .await
-                .context("registering repository")?;
+            this.ffx(&[
+                "target",
+                "repository",
+                "register",
+                "--repository",
+                &this.package_server_name,
+                "--alias",
+                "fuchsia.com",
+            ])
+            .await
+            .context("registering repository")?;
         }
 
         Ok(this)
@@ -321,12 +340,16 @@ impl IsolatedEmulator {
         Ok(parsed)
     }
 
-    // TODO(slgrady): remove when some variation of fxr/907483 gets added
     pub async fn stop(&self) {
-        self.ffx(&["emu", "stop", &self.emu_name]).await.expect("emu stop failed");
-        let mut emu = self.emu_state.lock().unwrap();
-        if let Some(ref mut c) = emu.as_mut() {
-            c.emu.kill().ok();
+        match self.ffx(&["emu", "stop", &self.emu_name]).await {
+            Ok(()) => return,
+            Err(e) => {
+                tracing::error!("Error stopping {}: {e}. Cleaning up manually.", self.emu_name);
+                let mut emu = self.emu_state.lock().unwrap();
+                if let Some(ref mut c) = emu.as_mut() {
+                    c.emu.kill().ok();
+                }
+            }
         }
     }
 }
@@ -361,11 +384,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn public_apis_succeed() {
-        // TODO(slgrady) change back to start() when we have debugged the flake in which the ssh
-        // connection is never made
         let amber_files_path = std::env::var("PACKAGE_REPOSITORY_PATH")
             .expect("PACKAGE_REPOSITORY_PATH env var must be set -- run this test with 'fx test'");
-        let emu = IsolatedEmulator::start_internal("e2e_emu_public_apis", Some(&amber_files_path))
+        let emu = IsolatedEmulator::start_internal("e2e-emu-public-apis", Some(&amber_files_path))
             .await
             .expect("Couldn't start emulator");
 
@@ -402,7 +423,7 @@ mod tests {
         let test_package_name = std::env::var("TEST_PACKAGE_NAME")
             .expect("TEST_PACKAGE_NAME env var must be set -- run this test with 'fx test'");
         let test_package_url = format!("fuchsia-pkg://fuchsia.com/{test_package_name}");
-        let emu = IsolatedEmulator::start_internal("pkg_resolve", Some(&test_amber_files_path))
+        let emu = IsolatedEmulator::start_internal("pkg-resolve", Some(&test_amber_files_path))
             .await
             .unwrap();
         emu.ssh(&["pkgctl", "resolve", &test_package_url]).await.unwrap();
@@ -413,7 +434,7 @@ mod tests {
     /// demonstrating that the same package is unavailable when there's no server running.
     #[fuchsia::test]
     async fn fail_to_resolve_package_when_no_package_server_running() {
-        let emu = IsolatedEmulator::start_internal("pkg_resolve_fail", None).await.unwrap();
+        let emu = IsolatedEmulator::start_internal("pkg-resolve-fail", None).await.unwrap();
         let test_package_name = std::env::var("TEST_PACKAGE_NAME")
             .expect("TEST_PACKAGE_NAME env var must be set -- run this test with 'fx test'");
         let test_package_url = format!("fuchsia-pkg://fuchsia.com/{test_package_name}");
