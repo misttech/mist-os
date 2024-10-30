@@ -5,25 +5,20 @@
 */}}
 
 import fuchsia_controller_py
+from fuchsia_controller_py import BaseHandle, Channel, Event, Handle, Socket
 import fidl.test_conformance as test_conformance
 import struct
 import unittest
 
 from fidl import construct_response_object
-from fidl_codec import decode_standalone
-
-def create_handle(cls):
-    """Generalized handle-maker (for sockets, events, channel, etc."""
-    res = cls.create()
-    if isinstance(res, tuple):
-        return res[0]
-    return res
+# TODO(https://fxbug.dev/346628306): Enable type checking here once fidl_codec has stubs
+from fidl_codec import decode_standalone # type: ignore
 
 class EncodeConformanceTests(unittest.TestCase):
 {{ range .EncodeSuccessCases }}
-    def test_{{ .Name }}_encode(self):
+    def test_{{ .Name }}_encode(self) -> None:
         {{- if .HandleDefs }}
-        handle_defs = {{ .HandleDefs }}
+        handle_defs: list[BaseHandle] = {{ .HandleDefs }}
         {{- end }}
         value = {{ .Value }}
         b, hdls = value.encode()
@@ -40,15 +35,13 @@ class EncodeConformanceTests(unittest.TestCase):
 
 class DecodeConformanceTests(unittest.TestCase):
 {{ range .DecodeSuccessCases }}
-    def test_{{ .Name }}_decode(self):
+    def test_{{ .Name }}_decode(self) -> None:
         {{- if .HandleDefs }}
-        handle_defs = {{ .HandleDefs }}
+        handle_defs: list[BaseHandle] = {{ .HandleDefs }}
         handles = [handle_defs[i].as_int() for i in {{ .Handles }}]
         handle_koids = [h.koid() for h in handle_defs]
         {{- else }}
-        handle_defs = []
-        handles = []
-        handle_koids = []
+        handles: list[int] = []
         {{- end }}
         bytes = {{ .Bytes }}
         type_name = "{{ .ValueType }}"

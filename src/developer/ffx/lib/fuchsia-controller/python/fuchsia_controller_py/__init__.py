@@ -7,6 +7,7 @@ from fuchsia_controller_internal import ZxStatus
 
 __all__ = ["ZxStatus"]
 
+from abc import ABC, abstractmethod
 from typing import Self
 
 
@@ -14,7 +15,29 @@ def connect_handle_notifier() -> int:
     return fuchsia_controller_internal.connect_handle_notifier()
 
 
-class Handle:
+class BaseHandle(ABC):
+    @abstractmethod
+    def as_int(self) -> int:
+        """Returns the underlying handle as an integer."""
+
+    @abstractmethod
+    def koid(self) -> int:
+        """Returns the underlying kernel object ID."""
+
+    @abstractmethod
+    def take(self) -> int:
+        """Takes the underlying fidl handle, setting it internally to zero.
+
+        This invalidates the underlying channel. Used for sending a handle
+        through FIDL function calls.
+        """
+
+    @abstractmethod
+    def close(self) -> None:
+        """Releases the underlying handle."""
+
+
+class Handle(BaseHandle):
     """Fuchsia controller FIDL handle.
 
     This is used to bootstrap processes for FIDL interactions.
@@ -35,29 +58,21 @@ class Handle:
             self._handle = handle
 
     def as_int(self) -> int:
-        """Returns the underlying handle as an integer."""
         if self._handle is None:
             raise ValueError("Handle is already closed")
         return fuchsia_controller_internal.handle_as_int(self._handle)
 
     def koid(self) -> int:
-        """Returns the underlying kernel object ID."""
         if self._handle is None:
             raise ValueError("Handle is already closed")
         return fuchsia_controller_internal.handle_koid(self._handle)
 
     def take(self) -> int:
-        """Takes the underlying fidl handle, setting it internally to zero.
-
-        This invalidates the underlying channel. Used for sending a handle
-        through FIDL function calls.
-        """
         if self._handle is None:
             raise ValueError("Handle is already closed")
         return fuchsia_controller_internal.handle_take(self._handle)
 
     def close(self) -> None:
-        """Releases the underlying handle."""
         self._handle = None
 
     @classmethod
@@ -70,7 +85,7 @@ class Handle:
         return Handle(fuchsia_controller_internal.handle_create())
 
 
-class Socket:
+class Socket(BaseHandle):
     """Fuchsia controller Zircon socket. This can be read from and written to.
 
     Can be constructed from a Handle object, but keep in mind that this will mark
@@ -115,29 +130,21 @@ class Socket:
         return fuchsia_controller_internal.socket_read(self._socket)
 
     def as_int(self) -> int:
-        """Returns the underlying socket as an integer."""
         if self._socket is None:
             raise ValueError("Socket is already closed")
         return fuchsia_controller_internal.socket_as_int(self._socket)
 
     def take(self) -> int:
-        """Takes the underlying fidl handle, setting it internally to zero.
-
-        This invalidates the underlying socket. Used for sending a handle
-        through FIDL function calls.
-        """
         if self._socket is None:
             raise ValueError("Socket is already closed")
         return fuchsia_controller_internal.socket_take(self._socket)
 
     def koid(self) -> int:
-        """Returns the underlying kernel object ID."""
         if self._socket is None:
             raise ValueError("Socket is already closed")
         return fuchsia_controller_internal.socket_koid(self._socket)
 
     def close(self) -> None:
-        """Releases the underlying handle."""
         self._socket = None
 
     @classmethod
@@ -269,7 +276,7 @@ class Context:
         self._handle = None
 
 
-class Channel:
+class Channel(BaseHandle):
     """Fuchsia controller FIDL channel. This can be read from and written to.
 
     Can be constructed from a Handle object, but keep in mind that this will
@@ -338,29 +345,21 @@ class Channel:
         return (retval[0], [Handle(x) for x in retval[1]])
 
     def as_int(self) -> int:
-        """Returns the underlying channel as an integer."""
         if self._channel is None:
             raise ValueError("Channel is already closed")
         return fuchsia_controller_internal.channel_as_int(self._channel)
 
     def koid(self) -> int:
-        """Returns the underlying kernel object ID."""
         if self._channel is None:
             raise ValueError("Channel is already closed")
         return fuchsia_controller_internal.channel_koid(self._channel)
 
     def take(self) -> int:
-        """Takes the underlying fidl handle, setting it internally to zero.
-
-        This invalidates the underlying channel. Used for sending a handle
-        through FIDL function calls.
-        """
         if self._channel is None:
             raise ValueError("Channel is already closed")
         return fuchsia_controller_internal.channel_take(self._channel)
 
     def close(self) -> None:
-        """Releases the underlying handle."""
         self._channel = None
 
     def close_with_epitaph(self, epitaph: int) -> None:
@@ -400,7 +399,7 @@ class Channel:
         return (Channel(handles[0]), Channel(handles[1]))
 
 
-class Event:
+class Event(BaseHandle):
     """
     Fuchsia controller zx Event object. This can signalled.
 
@@ -440,29 +439,21 @@ class Event:
         )
 
     def as_int(self) -> int:
-        """Returns the underlying channel as an integer."""
         if self._event is None:
             raise ValueError("Event is already closed")
         return fuchsia_controller_internal.event_as_int(self._event)
 
     def koid(self) -> int:
-        """Returns the underlying kernel object ID."""
         if self._event is None:
             raise ValueError("Event is already closed")
         return fuchsia_controller_internal.event_koid(self._event)
 
     def take(self) -> int:
-        """Takes the underlying fidl handle, setting it internally to zero.
-
-        This invalidates the underlying event. Used for sending a handle
-        through FIDL function calls.
-        """
         if self._event is None:
             raise ValueError("Event is already closed")
         return fuchsia_controller_internal.event_take(self._event)
 
     def close(self) -> None:
-        """Releases the underlying handle."""
         self._handle = None
 
     @classmethod
