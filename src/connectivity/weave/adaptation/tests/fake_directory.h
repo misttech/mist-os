@@ -35,11 +35,9 @@ class FakeDirectory final {
   }
 
   // Serves the added files over the provided channel.
-  void Serve(fidl::InterfaceRequest<fuchsia::io::Directory> channel,
-             async_dispatcher_t* dispatcher) {
-    root_->Serve(fuchsia::io::OpenFlags::DIRECTORY | fuchsia::io::OpenFlags::RIGHT_READABLE |
-                     fuchsia::io::OpenFlags::DESCRIBE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
-                 channel.TakeChannel(), dispatcher);
+  void Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end, async_dispatcher_t* dispatcher) {
+    root_->Serve(fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermWritable,
+                 std::move(server_end), dispatcher);
   }
 
  private:

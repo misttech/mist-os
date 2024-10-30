@@ -22,7 +22,7 @@ class FakeFactoryWeaveFactoryStoreProvider final
 
   // Returns a directory containing the factory data.
   void GetFactoryStore(fidl::InterfaceRequest<fuchsia::io::Directory> directory) override {
-    directory_.Serve(std::move(directory), dispatcher_);
+    directory_.Serve(fidl::ServerEnd<fuchsia_io::Directory>(directory.TakeChannel()), dispatcher_);
   }
 
   // Returns an interface request handler to attach to a service directory.
