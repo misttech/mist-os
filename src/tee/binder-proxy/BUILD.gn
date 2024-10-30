@@ -16,9 +16,9 @@ rustc_binary("bin") {
   edition = "2021"
 
   sources = [
-    "src/accessor_microfuchsia.rs",
     "src/binder_proxy.rs",
     "src/main.rs",
+    "src/microfuchsia_control.rs",
   ]
 
   deps = [
@@ -35,18 +35,19 @@ rustc_binary("bin") {
   ]
 }
 
+android_system_microfuchsia_vm_service_aidl_interfaces = [
+  "aidl/android/system/microfuchsia/vm_service/IMicrofuchsia.aidl",
+  "aidl/android/system/microfuchsia/vm_service/IHostProxy.aidl",
+]
+
 aidl_rust("android_system_microfuchsia_vm_service") {
   base = "aidl"
-  interfaces = [
-    "aidl/android/system/microfuchsia/vm_service/IAccessorMicrofuchsia.aidl",
-  ]
+  interfaces = android_system_microfuchsia_vm_service_aidl_interfaces
 }
 
 aidl_cpp("android_system_microfuchsia_vm_service_cpp") {
   base = "aidl"
-  interfaces = [
-    "aidl/android/system/microfuchsia/vm_service/IAccessorMicrofuchsia.aidl",
-  ]
+  interfaces = android_system_microfuchsia_vm_service_aidl_interfaces
 }
 
 fuchsia_component("component") {

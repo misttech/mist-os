@@ -7,7 +7,7 @@
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 
-#include <android/system/microfuchsia/vm_service/IAccessorMicrofuchsia.h>
+#include <android/system/microfuchsia/vm_service/IMicrofuchsia.h>
 #include <binder/Binder.h>
 #include <binder/RpcSession.h>
 #include <binder/unique_fd.h>
@@ -17,7 +17,7 @@
 
 namespace {
 
-using IAccessorMicrofuchsia = android::system::microfuchsia::vm_service::IAccessorMicrofuchsia;
+using IMicrofuchsia = android::system::microfuchsia::vm_service::IMicrofuchsia;
 
 int BinderProxyHostTool() {
   constexpr int kLoopbackPort = 5680;

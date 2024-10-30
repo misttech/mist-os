@@ -5,10 +5,14 @@
  */
 package android.system.microfuchsia.vm_service;
 
+import android.system.microfuchsia.vm_service.IHostProxy;
+
 /** {@hide} */
 // This is the protocol used to communicate with the microfuchsia VM.
-interface IAccessorMicrofuchsia {
+interface IMicrofuchsia {
   const int GUEST_PORT = 5680;
 
-  // TODO: Add APIs to communicate with TAs running inside microfuchsia.
+  void setHostProxy(IHostProxy proxy);
+
+  // TODO: Add API to instantiate sessions with specific TAs.
 }

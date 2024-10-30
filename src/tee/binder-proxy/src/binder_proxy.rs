@@ -6,7 +6,7 @@ use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 
 use anyhow::Error;
 
-use crate::accessor_microfuchsia;
+use crate::microfuchsia_control;
 use vsock_sys::{create_virtio_stream_socket, sockaddr_vm};
 
 use rpcbinder;
@@ -42,8 +42,8 @@ impl BinderProxy {
         if r == -1 {
             anyhow::bail!("Bind failed: {:?}", std::io::Error::last_os_error())
         }
-        // Set up rpcbinder server bound to instance of accessor_microfuchsia.
-        let service = accessor_microfuchsia::new_binder();
+        // Set up rpcbinder server bound to instance of microfuchsia_control.
+        let service = microfuchsia_control::new_binder();
         let server = rpcbinder::RpcServer::new_bound_socket(service, socket_fd)?;
         Ok(Self { server })
     }
