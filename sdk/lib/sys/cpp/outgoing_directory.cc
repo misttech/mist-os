@@ -63,9 +63,13 @@ zx_status_t OutgoingDirectory::Serve(
   if (!directory_request.is_valid()) {
     return ZX_ERR_BAD_HANDLE;
   }
-  return root_->Serve(
-      fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
-      directory_request.TakeChannel(), dispatcher);
+  // TODO(https://fxbug.dev/324932108): Use fuchsia_io::kPermReadable | fuchsia_io::kPermWritable
+  // when available at all API levels.
+  constexpr fuchsia_io::Flags kServeFlags =
+      static_cast<fuchsia_io::Flags>(static_cast<uint64_t>(fuchsia_io::wire::kRwStarDir));
+  return root_->Serve(kServeFlags,
+                      fidl::ServerEnd<fuchsia_io::Directory>(directory_request.TakeChannel()),
+                      dispatcher);
 }
 
 zx_status_t OutgoingDirectory::ServeFromStartupInfo(async_dispatcher_t* dispatcher) {
