@@ -632,12 +632,16 @@ fn fs_node_effective_sid(fs_node: &FsNode) -> SecurityId {
     }
 
     let info = fs_node.info();
-    log_error!(
-        "Unlabeled FsNode@{} of class {:?} in {}",
-        info.ino,
-        file_class_from_file_mode(info.mode),
-        fs_node.fs().name()
-    );
+    if fs_node.fs().name() == "anon" {
+        track_stub!(TODO("https://fxbug.dev/376237171"), "Label anon nodes properly");
+    } else {
+        log_error!(
+            "Unlabeled FsNode@{} of class {:?} in {}",
+            info.ino,
+            file_class_from_file_mode(info.mode),
+            fs_node.fs().name()
+        );
+    }
     SecurityId::initial(InitialSid::Unlabeled)
 }
 
