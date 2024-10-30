@@ -138,9 +138,18 @@
 						};
 					};
 				};
+				boot-level {
+					level = <2>;
+					level-dependencies = <&cpu_on_level 1>;
+					level-transition-table {
+						transition-to-off {
+							target-level = <0>;
+							latency-us = <200>;
+						};
+					};
+        		};
 				on-level {
 					level = <1>;
-					level-dependencies = <&cpu_on_level 1>;
 					level-transition-table {
 						transition-to-off {
 							target-level = <0>;
