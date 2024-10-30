@@ -109,7 +109,7 @@ pub(super) fn fs_node_init_with_dentry(
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
         FileSystemLabelingScheme::FsUse { fs_use_type, def_sid, root_sid, .. } => {
-            match fs_use_type {
+            let maybe_sid = match fs_use_type {
                 FsUseType::Xattr => {
                     // Determine the SID from the "security.selinux" attribute.
                     let attr = fs_node.ops().get_xattr(
@@ -119,37 +119,34 @@ pub(super) fn fs_node_init_with_dentry(
                         SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
                     );
                     match attr {
-                        Ok(ValueOrSize::Value(security_context)) => security_server
-                            .security_context_to_sid((&security_context).into())
-                            .unwrap_or(SecurityId::initial(InitialSid::Unlabeled)),
+                        Ok(ValueOrSize::Value(security_context)) => Some(
+                            security_server
+                                .security_context_to_sid((&security_context).into())
+                                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled)),
+                        ),
                         _ => {
                             // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
                             // `ENODATA` (no such xattr).
-                            def_sid
+                            None
                         }
                     }
                 }
-                _ => {
-                    if dir_entry.parent().is_none() {
-                        // This is the root node of an "fs_use_task"/"fs_use_trans"-labeled
-                        // filesystem.
-                        root_sid
-                    } else {
-                        // This is a non-root node if an "fs_use_task"/"fs_use_trans"-labeled
-                        // filesystem. Because these labeling schemes are only intended for use
-                        // with pseudo or temporary filesystems, all nodes should have been created
-                        // at run-time, and therefore labeled by `fs_node_init_on_create()`.
-                        // If an unlabeled node is somehow encountered then log a warning and treat
-                        // it in the same way as an "fs_use_xattr" node that is missing the xattr.
-                        log_warn!(
-                            "Unlabeled node in {} ({:?}-labeled) filesystem",
-                            fs.name(),
-                            fs_use_type
-                        );
-                        def_sid
-                    }
+                _ => None,
+            };
+            maybe_sid.unwrap_or_else(|| {
+                // The node does not have a label, so apply the filesystem's default or root SID,
+                // depending on whether this is the root node.
+                if dir_entry.parent().is_none() {
+                    root_sid
+                } else {
+                    log_warn!(
+                        "Unlabeled node in {} ({:?}-labeled) filesystem",
+                        fs.name(),
+                        fs_use_type
+                    );
+                    def_sid
                 }
-            }
+            })
         }
         FileSystemLabelingScheme::GenFsCon => {
             let fs_type = fs_node.fs().name();
@@ -585,9 +582,6 @@ pub(super) fn fs_node_getsecurity(
     max_size: usize,
 ) -> Result<ValueOrSize<FsString>, Errno> {
     if name == FsStr::new(XATTR_NAME_SELINUX.to_bytes()) {
-        // TODO: https://fxbug.dev/351195217 - If a `FileSystem` supports xattrs then just return
-        // them; this logic is only for `FileSystem`s which don't have xattrs, to synthesize a label
-        // for userspace.
         let sid = fs_node_effective_sid(&fs_node);
         if sid != SecurityId::initial(InitialSid::Unlabeled) {
             if let Some(context) = security_server.sid_to_security_context(sid) {
