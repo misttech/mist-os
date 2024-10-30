@@ -90,7 +90,6 @@
 
                 // Skipped with tmpfs.
                 "fdatasync03",
-                "fs_di",
                 "fsetxattr02",
                 "futimesat01",
                 "getitimer01",
@@ -195,7 +194,6 @@
                 "times03",
                 "umount2_01",
                 "umount2_02",
-                "writetest01",
 
                 // These tests fail when an init is run in the container to set up /apex.
                 // TODO(https://fxbug.dev/42080241) re-enable these tests
@@ -209,10 +207,6 @@
                 // TODO(https://fxbug.dev/374802310)
                 "inotify03",
                 "inotify12",
-
-                // TODO(https://fxbug.dev/373897750): These tests require cgroups to be unlinkable.
-                "cgroup_core03",
-                "clone303",
             ],
         },
         {
@@ -271,6 +265,10 @@
                 // TODO(https://fxbug.dev/374984756) Crashes the kernel in debug builds
                 // (cycle in mutex deps).
                 "inotify08",
+
+                // TODO(https://fxbug.dev/373897750): These tests require cgroups to be unlinkable.
+                "cgroup_core03",
+                "clone303",
             ],
         },
     ],

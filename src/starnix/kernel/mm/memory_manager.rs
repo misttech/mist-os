@@ -3540,7 +3540,7 @@ impl MemoryManager {
             DesiredAddress::Hint(addr),
             length,
             prot_flags,
-            MappingOptions::ANONYMOUS,
+            MappingOptions::ANONYMOUS | MappingOptions::GROWSDOWN,
             MappingName::Stack,
         )?;
         if stack_addr != addr {
