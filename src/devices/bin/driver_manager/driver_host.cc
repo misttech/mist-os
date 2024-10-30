@@ -176,8 +176,8 @@ void DriverHostComponent::Start(
   }
 
   if (start_info.has_runtime_dir()) {
-    runtime_dir_.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE,
-                       start_info.runtime_dir().TakeChannel(), dispatcher_);
+    runtime_dir_.Serve(fuchsia_io::wire::kPermReadable, std::move(start_info.runtime_dir()),
+                       dispatcher_);
   }
 
   driver_host_->Start(args.Build(), std::move(driver))
