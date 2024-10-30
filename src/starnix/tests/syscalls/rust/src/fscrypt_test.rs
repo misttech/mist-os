@@ -430,7 +430,9 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/376246108) Launching two processes should not fail with EBUSY
     fn set_encryption_policy_with_fake_identifier_non_root() {
         let Some(root_path) = get_root_path() else { return };
         let dir_path = std::path::Path::new(&root_path).join("my_dir");
