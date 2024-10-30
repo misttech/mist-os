@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite pci_test_driver;
+
 using fuchsia.hardware.pci;
 using fuchsia.pci;
 
-fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
-fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.TEST;
-fuchsia.BIND_PCI_DID == fuchsia.pci.BIND_PCI_DID.TEST;
-fuchsia.BIND_COMPOSITE != 1;
+primary node "pci" {
+  fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
+  fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.TEST;
+  fuchsia.BIND_PCI_DID == fuchsia.pci.BIND_PCI_DID.TEST;
+}

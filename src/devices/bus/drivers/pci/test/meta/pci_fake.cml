@@ -15,5 +15,13 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [],
+    capabilities: [
+        { service: "fuchsia.hardware.pci.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.pci.Service",
+            from: "self",
+        },
+    ],
 }

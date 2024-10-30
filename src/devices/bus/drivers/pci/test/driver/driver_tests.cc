@@ -48,7 +48,7 @@ class PciDriverTests : public zxtest::Test {
 // TestRunner(driver_tests) -> pbus -> fake_pci <-> ProtocolTestDriver(pci.proxy)
 //       \---------------> Fuchsia.Device.Test <-------------/
 // TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST_F(PciDriverTests, DISABLED_TestRunner) {
+TEST_F(PciDriverTests, TestRunner) {
   IsolatedDevmgr::Args args;
 
   args.device_list.push_back(kDeviceEntry);
@@ -70,11 +70,12 @@ TEST_F(PciDriverTests, DISABLED_TestRunner) {
 
   // The final path is made up of the FakeBusDriver, the bind point it creates, and
   // the final protocol test driver.
+  // dev.sys.platform.pcictl.pcictl.00_01.2.00_01_2.pciproto
   std::array<char, 64> proto_driver_path = {};
   snprintf(proto_driver_path.data(), proto_driver_path.max_size(),
-           "sys/platform/%02x:%02x:%01x/%s/%02x:%02x.%1x/%s", kDeviceEntry.vid, kDeviceEntry.pid,
-           kDeviceEntry.did, kDeviceEntry.name, PCI_TEST_BUS_ID, PCI_TEST_DEV_ID, PCI_TEST_FUNC_ID,
-           kProtocolTestDriverName);
+           "sys/platform/%s/%s/%02x:%02x.%1x/%02x_%02x_%1x/%s", kDeviceEntry.name,
+           kDeviceEntry.name, PCI_TEST_BUS_ID, PCI_TEST_DEV_ID, PCI_TEST_FUNC_ID, PCI_TEST_BUS_ID,
+           PCI_TEST_DEV_ID, PCI_TEST_FUNC_ID, kProtocolTestDriverName);
   zx::result channel =
       device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), proto_driver_path.data());
   ASSERT_OK(channel.status_value());
