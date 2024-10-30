@@ -195,14 +195,6 @@
                 "PtraceResumptionTest.zombie_seize",
                 "PtraceResumptionTest.zombie_seize_interrupt",
                 "PtraceResumptionTest.zombie_seize_interrupt_cont",
-                "sys_xattr.flistattr",
-                "sys_xattr.flistattr_opath",
-                "sys_xattr.fsetxattr",
-                "sys_xattr.fsetxattr_toosmallbuf",
-                "sys_xattr.fsetxattr_with_opath",
-                "sys_xattr.fsetxattr_with_opath_toosmall",
-                "sys_xattr.fsetxattr_zerobuf",
-                "sys_xattr.setxattr",
 
                 // TODO(https://fxbug.dev/376338756): started failing and blocking roller.
                 "stdio.remove",
