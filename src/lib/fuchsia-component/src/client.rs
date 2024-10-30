@@ -15,7 +15,6 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 
 use crate::directory::{open_directory_async, AsRefDirectory};
-use crate::DEFAULT_SERVICE_INSTANCE;
 
 /// Path to the service directory in an application's root namespace.
 const SVC_DIR: &'static str = "/svc";
@@ -230,12 +229,6 @@ impl MemberOpener for ServiceInstanceDirectory {
     }
 }
 
-/// Connect to the "default" instance of a FIDL service in the `/svc` directory of
-/// the application's root namespace.
-pub fn connect_to_service<S: ServiceMarker>() -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at::<S>(SVC_DIR, DEFAULT_SERVICE_INSTANCE)
-}
-
 /// Connect to an instance of a FIDL service in the `/svc` directory of
 /// the application's root namespace.
 /// `instance` is a path of one or more components.
@@ -262,14 +255,6 @@ pub fn connect_to_service_instance_at<S: ServiceMarker>(
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 
-/// Connect to the "default" instance of a FIDL service hosted on the directory protocol
-/// channel `directory`.
-pub fn connect_to_default_instance_in_service_dir<S: ServiceMarker>(
-    directory: &fio::DirectoryProxy,
-) -> Result<S::Proxy, Error> {
-    connect_to_instance_in_service_dir::<S>(directory, DEFAULT_SERVICE_INSTANCE)
-}
-
 /// Connect to an instance of a FIDL service hosted on the directory protocol channel `directory`.
 /// `instance` is a path of one or more components.
 pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
@@ -282,22 +267,6 @@ pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
         fio::Flags::empty(),
     )?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
-}
-
-/// Connect to the "default" instance of a FIDL service hosted in the service subdirectory under
-/// the directory protocol channel `directory`
-pub fn connect_to_service_at_dir<S: ServiceMarker>(
-    directory: &fio::DirectoryProxy,
-) -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at_dir::<S>(directory, DEFAULT_SERVICE_INSTANCE)
-}
-
-/// Connect to the "default" instance of a FIDL service hosted in the service subdirectory under
-/// the directory protocol channel `directory`, in the `svc/` subdir.
-pub fn connect_to_service_at_dir_svc<S: ServiceMarker>(
-    directory: &impl AsRefDirectory,
-) -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at_dir_svc::<S>(directory, DEFAULT_SERVICE_INSTANCE)
 }
 
 /// Connect to a named instance of a FIDL service hosted in the service subdirectory under the
@@ -326,35 +295,6 @@ pub fn connect_to_service_instance_at_dir_svc<S: ServiceMarker>(
     // resolved one way or the other.
     let service_path = service_path.strip_prefix('/').unwrap();
     let directory_proxy = open_directory_async(directory, service_path, fio::Rights::empty())?;
-    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
-}
-
-/// Connect to the "default" instance of a FIDL service hosted in `directory`.
-pub fn connect_to_service_at_channel<S: ServiceMarker>(
-    directory: &zx::Channel,
-) -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at_channel::<S>(directory, DEFAULT_SERVICE_INSTANCE)
-}
-
-/// Connect to an instance of a FIDL service hosted in `directory`.
-/// `instance` is a path of one or more components.
-// NOTE: We would like to use impl AsRef<T> to accept a wide variety of string-like
-// inputs but Rust limits specifying explicit generic parameters when `impl-traits`
-// are present.
-pub fn connect_to_service_instance_at_channel<S: ServiceMarker>(
-    directory: &zx::Channel,
-    instance: &str,
-) -> Result<S::Proxy, Error> {
-    let service_path = format!("{}/{}", S::SERVICE_NAME, instance);
-    let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    // NB: This has to use `fdio` because we are holding a channel rather than a
-    // proxy, and we can't make FIDL calls on unowned channels in Rust.
-    let () = fdio::open_at(
-        directory,
-        &service_path,
-        fio::OpenFlags::DIRECTORY,
-        server_end.into_channel(),
-    )?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 

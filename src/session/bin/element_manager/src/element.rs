@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServiceMarker};
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fuchsia_async as fasync;
 
 /// Represents a component launched by an Element Manager.
@@ -105,20 +105,6 @@ impl Element {
         let (client_channel, server_channel) = zx::Channel::create();
         self.connect_to_protocol_with_channel::<P>(server_channel)?;
         Ok(P::Proxy::from_channel(fasync::Channel::from_channel(client_channel)))
-    }
-
-    /// Connect to the "default" instance of a FIDL service provided by the `Element`.
-    ///
-    /// # Type Parameters
-    /// - US: A FIDL service `Marker` type.
-    ///
-    /// # Returns
-    /// - A service `Proxy` matching the `Marker`, or an error if the service is not available from
-    /// the `Element`.
-    #[inline]
-    #[allow(unused)]
-    pub fn connect_to_service<US: ServiceMarker>(&self) -> Result<US::Proxy, Error> {
-        fuchsia_component::client::connect_to_service_at_channel::<US>(self.directory_channel())
     }
 
     /// Connect to a protocol by passing a channel for the server.

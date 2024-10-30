@@ -4,12 +4,12 @@
 
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_examples::EchoServiceMarker;
-use fuchsia_component::client::connect_to_service;
+use fuchsia_component::client::connect_to_service_instance;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let echo =
-        connect_to_service::<EchoServiceMarker>().context("Failed to connect to echo service")?;
+    let echo = connect_to_service_instance::<EchoServiceMarker>("default")
+        .context("Failed to connect to echo service")?;
 
     let regular =
         echo.connect_to_regular_echo().context("failed to connect to regular_echo member")?;
