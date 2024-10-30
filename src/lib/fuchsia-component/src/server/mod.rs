@@ -4,7 +4,6 @@
 
 //! Tools for providing Fuchsia services.
 
-use crate::DEFAULT_SERVICE_INSTANCE;
 use anyhow::Error;
 use fidl::endpoints::{
     DiscoverableProtocolMarker, Proxy as _, RequestStream, ServerEnd, ServiceMarker, ServiceRequest,
@@ -270,21 +269,6 @@ macro_rules! add_functions {
             FidlService<F, RS, ServiceObjTy::Output>: Into<ServiceObjTy>,
         {
             self.add_service_at(path, FidlService::from(service))
-        }
-
-        /// DEPRECATED
-        pub fn add_unified_service<F, SR>(&mut self, service: F) -> &mut Self
-        where
-            F: Fn(SR) -> ServiceObjTy::Output,
-            F: Clone,
-            SR: ServiceRequest,
-            FidlServiceMember<F, SR, ServiceObjTy::Output>: Into<ServiceObjTy>,
-        {
-            self.add_fidl_service_instance_at(
-                SR::Service::SERVICE_NAME,
-                DEFAULT_SERVICE_INSTANCE,
-                service,
-            )
         }
 
         /// Adds a named instance of a FIDL service to the directory.
