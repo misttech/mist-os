@@ -571,7 +571,11 @@ impl VolumesDirectory {
             outgoing_dir_server_end.into_channel().into(),
         );
 
-        info!(store_id, "Serving volume");
+        info!(
+            store_id,
+            "Serving volume, pager port koid={}",
+            fasync::EHandle::local().port().get_koid().unwrap().raw_koid()
+        );
         Ok(())
     }
 

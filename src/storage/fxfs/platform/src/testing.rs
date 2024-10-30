@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod fuchsia {
-    pub use fxfs_platform::fuchsia::*;
-    pub mod testing;
-}
+mod fuchsia;
+use self::fuchsia::*;
 
 pub use self::fuchsia::testing::*;

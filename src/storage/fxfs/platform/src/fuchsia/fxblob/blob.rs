@@ -29,8 +29,6 @@ use zx::{self as zx, AsHandleRef, HandleBased, Status};
 
 pub const BLOCK_SIZE: u64 = fuchsia_merkle::BLOCK_SIZE as u64;
 
-pub const READ_AHEAD_SIZE: u64 = 131_072;
-
 // When the top bit of the open count is set, it means the file has been deleted and when the count
 // drops to zero, it will be tombstoned.  Once it has dropped to zero, it cannot be opened again
 // (assertions will fire).
@@ -314,6 +312,7 @@ impl PagerBacked for FxBlob {
 mod tests {
     use super::*;
     use crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture};
+    use crate::fuchsia::pager::READ_AHEAD_SIZE;
     use assert_matches::assert_matches;
     use delivery_blob::CompressionMode;
     use fuchsia_async as fasync;

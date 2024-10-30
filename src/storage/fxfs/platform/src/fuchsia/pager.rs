@@ -23,6 +23,8 @@ use vfs::execution_scope::ExecutionScope;
 use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ};
 use zx::{self as zx, AsHandleRef, PacketContents, PagerPacket, SignalPacket};
 
+pub const READ_AHEAD_SIZE: u64 = 128 * 1024;
+
 fn watch_for_zero_children(file: &impl PagerBacked) -> Result<(), zx::Status> {
     file.vmo().as_handle_ref().wait_async_handle(
         file.pager().executor.port(),
@@ -171,10 +173,6 @@ enum FileHolder<T> {
 impl Pager {
     /// Creates a new pager.
     pub fn new(scope: ExecutionScope) -> Result<Self, Error> {
-        info!(
-            "fxfs pager port koid: {:?}",
-            fasync::EHandle::local().port().as_handle_ref().get_koid()
-        );
         Ok(Pager {
             pager: zx::Pager::create(zx::PagerOptions::empty())?,
             scope,
@@ -458,7 +456,6 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>
 
     assert!(pager_range.end() < i64::MAX as u64);
 
-    const READ_AHEAD_SIZE: u64 = 128 * 1024;
     let read_alignment = this.read_alignment();
     let readahead_alignment = if read_alignment > READ_AHEAD_SIZE {
         read_alignment

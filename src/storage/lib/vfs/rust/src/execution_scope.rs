@@ -85,6 +85,11 @@ impl ExecutionScope {
         ExecutionScopeParams::default()
     }
 
+    /// Returns the active count: the number of tasks that are active and will prevent shutdown.
+    pub fn active_count(&self) -> usize {
+        self.executor.inner.lock().unwrap().active_count
+    }
+
     /// Sends a `task` to be executed in this execution scope.  This is very similar to
     /// [`futures::task::Spawn::spawn_obj()`] with a minor difference that `self` reference is not
     /// exclusive.

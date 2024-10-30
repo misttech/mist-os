@@ -32,6 +32,8 @@ use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::{HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore};
 use std::future::Future;
 use std::pin::pin;
+#[cfg(any(test, feature = "testing"))]
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use vfs::directory::entry::DirectoryEntry;
@@ -126,6 +128,9 @@ pub struct FxVolume {
     dirent_cache: DirentCache,
 
     profile_state: Mutex<Option<Box<dyn ProfileState>>>,
+
+    #[cfg(any(test, feature = "testing"))]
+    poisoned: AtomicBool,
 }
 
 #[fxfs_trace::trace]
@@ -147,6 +152,8 @@ impl FxVolume {
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
             profile_state: Mutex::new(None),
+            #[cfg(any(test, feature = "testing"))]
+            poisoned: AtomicBool::new(false),
         })
     }
 
@@ -436,7 +443,9 @@ impl FxVolume {
                     if new_level != level {
                         level = new_level;
                         should_update_cache_limit = true;
-                        timer.as_mut().reset(fasync::MonotonicInstant::after(config.for_level(&level).background_task_period.into()));
+                        timer.as_mut().reset(fasync::MonotonicInstant::after(
+                            config.for_level(&level).background_task_period.into())
+                        );
                         debug!(
                             "Background task period changed to {:?} due to new memory pressure \
                             level ({:?}).",
@@ -445,7 +454,9 @@ impl FxVolume {
                     }
                 }
                 _ = timer => {
-                    timer.as_mut().reset(fasync::MonotonicInstant::after(config.for_level(&level).background_task_period.into()));
+                    timer.as_mut().reset(fasync::MonotonicInstant::after(
+                        config.for_level(&level).background_task_period.into())
+                    );
                     should_flush = true;
                     // Only purge layer file caches once we have elevated memory pressure.
                     should_purge_layer_files = !matches!(level, MemoryPressureLevel::Normal);
@@ -519,6 +530,26 @@ impl FxVolume {
             task.await;
             std::mem::drop(guard);
         });
+    }
+
+    /// Tries to unwrap this volume.  If it fails, it will poison the volume so that when it is
+    /// dropped, you get a backtrace.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn try_unwrap(self: Arc<Self>) -> Option<FxVolume> {
+        self.poisoned.store(true, Ordering::Relaxed);
+        if let Ok(volume) = Arc::try_unwrap(self) {
+            volume.poisoned.store(false, Ordering::Relaxed);
+            Some(volume)
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl Drop for FxVolume {
+    fn drop(&mut self) {
+        assert!(!*self.poisoned.get_mut());
     }
 }
 
@@ -2313,21 +2344,30 @@ mod tests {
         device.reopen(false);
         let device = {
             let fixture = blob_testing::open_blob_fixture(device).await;
-            fixture
-                .volume()
-                .volume()
-                .record_or_replay_profile(new_profile_state(true), "foo")
-                .await
-                .expect("Recording");
 
-            // Page in the zero offsets only to avoid readahead strangeness.
             {
-                let mut writable = [0u8];
-                let hash = &hashes[0];
-                let vmo = fixture.get_blob_vmo(*hash).await;
-                vmo.read(&mut writable, 0).expect("Vmo read");
+                let volume = fixture.volume().volume();
+                volume
+                    .record_or_replay_profile(new_profile_state(true), "foo")
+                    .await
+                    .expect("Recording");
+
+                // Page in the zero offsets only to avoid readahead strangeness.
+                {
+                    let mut writable = [0u8];
+                    let hash = &hashes[0];
+                    let vmo = fixture.get_blob_vmo(*hash).await;
+                    vmo.read(&mut writable, 0).expect("Vmo read");
+                }
+
+                // The recording happens asynchronously, so we must wait.  This is crude, but it's
+                // only for testing and it's simple.
+                while volume.scope().active_count() > 0 {
+                    fasync::Timer::new(std::time::Duration::from_millis(10)).await;
+                }
+
+                volume.stop_profile_tasks().await;
             }
-            fixture.volume().volume().stop_profile_tasks().await;
             fixture.close().await
         };
 
@@ -2350,9 +2390,9 @@ mod tests {
                 assert_eq!(blob.vmo().info().unwrap().committed_bytes, 0);
             }
 
-            fixture
-                .volume()
-                .volume()
+            let volume = fixture.volume().volume();
+
+            volume
                 .record_or_replay_profile(new_profile_state(true), "foo")
                 .await
                 .expect("Replaying");
@@ -2374,8 +2414,14 @@ mod tests {
                 vmo.read(&mut writable, 0).expect("Vmo read");
             }
 
+            // The recording happens asynchronously, so we must wait.  This is crude, but it's only
+            // for testing and it's simple.
+            while volume.scope().active_count() > 0 {
+                fasync::Timer::new(std::time::Duration::from_millis(10)).await;
+            }
+
             // Complete the recording.
-            fixture.volume().volume().stop_profile_tasks().await;
+            volume.stop_profile_tasks().await;
         }
         let device = fixture.close().await;
 
