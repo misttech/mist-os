@@ -56,28 +56,22 @@ class BuildInfoServiceTestFixture : public gtest::TestLoopFixture {
 
     loop_.StartThread();
 
-    // Create a channel.
-    zx_handle_t endpoint0;
-    zx_handle_t endpoint1;
-    zx_status_t status = zx_channel_create(0, &endpoint0, &endpoint1);
-    ZX_ASSERT_MSG(status == ZX_OK, "Cannot create channel: %s\n", zx_status_get_string(status));
-
     // Get the process's namespace.
     fdio_ns_t *ns;
-    status = fdio_ns_get_installed(&ns);
+    zx_status_t status = fdio_ns_get_installed(&ns);
     ZX_ASSERT_MSG(status == ZX_OK, "Cannot get namespace: %s\n", zx_status_get_string(status));
 
     // Create the /config/build-info path in the namespace.
+    auto [build_info_client, build_info_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     std::string build_info_directory_path(kFuchsiaBuildInfoDirectoryPath);
-    status = fdio_ns_bind(ns, build_info_directory_path.c_str(), endpoint0);
+    status = fdio_ns_bind(ns, build_info_directory_path.c_str(),
+                          build_info_client.TakeChannel().release());
     ZX_ASSERT_MSG(status == ZX_OK, "Cannot bind %s to namespace: %s\n",
                   build_info_directory_path.c_str(), zx_status_get_string(status));
 
     // Connect the build-info PseudoDir to the /config/build-info path.
-    zx::channel channel(endpoint1);
-    build_info_directory_.Serve(
-        fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
-        std::move(channel), loop_.dispatcher());
+    build_info_directory_.Serve(fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermWritable,
+                                std::move(build_info_server), loop_.dispatcher());
   }
 
   // Creates a PsuedoDir named |build_info_filename| in the PsuedoDir "/config/build-info" in
