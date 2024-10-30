@@ -25,7 +25,7 @@ zx_status_t AnonymousPageRequest::Wait() {
   zx_status_t status = ZX_OK;
   uint32_t waited = 0;
   while ((status = pmm_wait_till_should_retry_single_alloc(Deadline::after(kReportWaitTime))) ==
-         ZX_ERR_SHOULD_WAIT) {
+         ZX_ERR_TIMED_OUT) {
     waited++;
     printf("WARNING: Waited %" PRIi64 " seconds to retry PMM allocations\n",
            (kReportWaitTime * waited) / ZX_SEC(1));
