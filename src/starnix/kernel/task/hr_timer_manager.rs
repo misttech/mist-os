@@ -18,7 +18,9 @@ use std::collections::BinaryHeap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Weak};
 
-use crate::power::{clear_wake_proxy_signal, create_proxy_for_wake_events, OnWakeOps};
+use crate::power::{
+    clear_wake_proxy_signal, create_proxy_for_wake_events, set_wake_proxy_signal, OnWakeOps,
+};
 use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 
@@ -141,9 +143,15 @@ impl HrTimerManagerState {
             wake_event: Default::default(),
         }
     }
-    /// Clears the `EVENT_SIGNALED` signal on the hrtimer event.
-    fn reset_wake_event(&mut self) {
+
+    /// Clears the wake signal on the hrtimer event to accept the driver message.
+    fn clear_wake_proxy_signal(&mut self) {
         self.wake_event.as_ref().map(clear_wake_proxy_signal);
+    }
+
+    /// Signal the wake event to prevent suspend.
+    fn set_wake_proxy_signal(&mut self) {
+        self.wake_event.as_ref().map(set_wake_proxy_signal);
     }
 }
 
@@ -279,7 +287,7 @@ impl HrTimerManager {
             // The hrtimer client is responsible for clearing the timer fired
             // signal, so we clear it here right before starting the next
             // timer.
-            guard.reset_wake_event();
+            guard.clear_wake_proxy_signal();
             drop(guard);
 
             match start_and_wait.await {
@@ -309,7 +317,7 @@ impl HrTimerManager {
                         // If there are more timers to start, we have to keep the event signaled
                         // to prevent suspension until the hanging get has been scheduled.
                         // Otherwise, we might miss a wake up.
-                        guard.reset_wake_event();
+                        guard.clear_wake_proxy_signal();
                         continue;
                     }
 
@@ -436,6 +444,12 @@ impl HrTimerManager {
             InspectHrTimerEvent::retain_err(prev_len, after_len, "adding timer")
         };
         self.record_event(&mut guard, inspect_event_type, Some(new_timer_node.deadline));
+
+        // Signal the wake event before starting the first timer. This ensures that the
+        // kernel will not suspend until the first timer has been started.
+        if prev_len == 0 {
+            guard.set_wake_proxy_signal();
+        }
 
         if let Some(running_timer) = guard.timer_heap.peek() {
             // If the new timer is in front, it has a sooner deadline. (Re)Start the HrTimer device

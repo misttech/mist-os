@@ -518,4 +518,8 @@ TEST_F(SysfsPowerTest, WakeLockFileWrite) {
   EXPECT_TRUE(files::WriteFile("/sys/power/wake_unlock", "test1"));
   EXPECT_TRUE(files::WriteFile("/sys/power/wake_unlock", "test2"));
   EXPECT_TRUE(files::WriteFile("/sys/power/wake_unlock", "test3"));
+
+  EXPECT_TRUE(files::ReadFileToString("/sys/power/wake_lock", &wake_locks_str));
+  // Ensure there is no active wake lock.
+  EXPECT_TRUE(std::ranges::all_of(wake_locks_str, isspace));
 }

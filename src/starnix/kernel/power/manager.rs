@@ -714,6 +714,15 @@ pub fn clear_wake_proxy_signal(event: &zx::EventPair) {
     }
 }
 
+/// Raise the `RUNNER_PROXY_EVENT_SIGNAL`, which will prevent the container from being suspended.
+pub fn set_wake_proxy_signal(event: &zx::EventPair) {
+    let (clear_mask, set_mask) = (zx::Signals::empty(), RUNNER_PROXY_EVENT_SIGNAL);
+    match event.signal_peer(clear_mask, set_mask) {
+        Ok(_) => (),
+        Err(e) => log_warn!("Failed to signal wake event {:?}", e),
+    }
+}
+
 /// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
 ///
 /// The proxying is done by the Starnix runner, and allows messages on the channel to wake
