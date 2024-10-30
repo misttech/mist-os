@@ -30,14 +30,14 @@ load(
     "fuchsia_component",
     "fuchsia_component_manifest",
     "fuchsia_package",
+    "get_fuchsia_api_levels",
 )
+load("//fuchsia/packaging/fuchsia_package:fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test")
 load(":fuchsia_board_configuration_test.bzl", "fuchsia_board_configuration_test")
 load(":fuchsia_board_input_bundle_test.bzl", "fuchsia_board_input_bundle_test")
 load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
 load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test", "fuchsia_product_ota_config_test")
 load(":fuchsia_virtual_device_test.bzl", "fuchsia_virtual_device_test")
-load("//fuchsia/packaging/fuchsia_package:fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test")
-load("@fuchsia_sdk//fuchsia:defs.bzl", "get_fuchsia_api_levels")
 
 HEAD_ABI_REVISION = [
     level.abi_revision

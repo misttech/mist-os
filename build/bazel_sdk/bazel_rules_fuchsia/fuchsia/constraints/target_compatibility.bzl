@@ -4,8 +4,8 @@
 
 """Tools to check the comatibility of fuchsia targets"""
 
-load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
 
 _SUPPORTED_HOST_CPU_PLATFORMS = [
     "@platforms//cpu:x86_64",
