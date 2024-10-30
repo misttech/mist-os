@@ -68,7 +68,7 @@ zx::result<fuchsia_hardware_power::ComponentPowerConfiguration> GetAllPowerConfi
 
 zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> SdmmcBlockDevice::AcquireInitLease(
     const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client) {
-  const fidl::WireResult result = lessor_client->Lease(SdmmcBlockDevice::kPowerLevelBoot);
+  const fidl::WireResult result = lessor_client->Lease(SdmmcBlockDevice::kPowerLevelOn);
   if (!result.ok()) {
     FDF_LOGL(ERROR, logger(), "Call to Lease failed: %s", result.status_string());
     return zx::error(result.status());
@@ -380,16 +380,6 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
     }
   }
 
-  // The lease request on the hardware power element remains until we register
-  // our power element token with the CpuElementManager protocol
-  zx::result lease_control_client_end = AcquireInitLease(hardware_power_lessor_client_);
-  if (!lease_control_client_end.is_ok()) {
-    FDF_LOGL(ERROR, logger(), "Failed to acquire lease on hardware power: %s",
-             zx_status_get_string(lease_control_client_end.status_value()));
-    return lease_control_client_end.take_error();
-  }
-  hardware_power_lease_control_client_end_ = std::move(lease_control_client_end.value());
-
   // Start continuous monitoring of the required level and adjusting of the hardware's power level.
   WatchHardwareRequiredLevel();
 
@@ -439,8 +429,7 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
 
         const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
         switch (required_level) {
-          case kPowerLevelOn:
-          case kPowerLevelBoot: {
+          case kPowerLevelOn: {
             const zx::time start = zx::clock::get_monotonic();
 
             fbl::AutoLock lock(&worker_lock_);
@@ -453,16 +442,8 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
               return;
             }
 
-            // If we're rising above the boot power level, it must because an
-            // external lease raised our power level. This means we can drop
-            // our self-lease and allow the external entity to drive our power
-            // state.
-            if (kPowerLevelOn && hardware_power_lease_control_client_end_.is_valid()) {
-              hardware_power_lease_control_client_end_.reset();
-            }
-
             // Communicate to Power Broker that the hardware power level has been raised.
-            UpdatePowerLevel(hardware_power_current_level_client_, required_level);
+            UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
 
             worker_condition_.Broadcast();
             break;

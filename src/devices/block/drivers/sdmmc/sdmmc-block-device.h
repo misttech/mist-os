@@ -96,10 +96,6 @@ class SdmmcBlockDevice : public block_server::Interface {
   // Power levels for the sdmmc-hardware element.
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
-  // Note that this power level actually represents a LOWER power
-  // state than kPowerLevelOn, based on the order the level is
-  // supplied when the element is created.
-  static constexpr fuchsia_power_broker::PowerLevel kPowerLevelBoot = 2;
 
   SdmmcBlockDevice(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc)
       : parent_(parent), sdmmc_(std::move(sdmmc)) {

@@ -65,10 +65,7 @@ zx_status_t AmlSdmmc::AcquireInitLease(
     return ZX_ERR_ALREADY_BOUND;
   }
 
-  const fuchsia_power_broker::PowerLevel power_level =
-      three_level_power_ ? AmlSdmmc::kPowerLevelBoot : AmlSdmmc::kPowerLevelOn;
-
-  const fidl::WireResult result = lessor_client->Lease(power_level);
+  const fidl::WireResult result = lessor_client->Lease(AmlSdmmc::kPowerLevelOn);
   if (!result.ok()) {
     FDF_LOGL(ERROR, logger(), "Call to Lease failed: %s", result.status_string());
     return result.status();
@@ -347,19 +344,14 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(fdf::PDev& pdev) {
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
           std::move(description.required_level_client.value()), dispatcher());
       hardware_power_assertive_token_ = std::move(description.assertive_token);
-      if (config.element.levels.size() == 3) {
-        three_level_power_ = true;
-      }
     } else {
       FDF_LOGL(ERROR, logger(), "Unexpected power element: %s", config.element.name.c_str());
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }
 
-  // Maintain a lease on the hardware power element until:
-  //   - power level goes to the maximum level if we support three power levels
-  //   - a child driver obtains a power dependency token to it via the
-  //     GetToken() call if we support two levels.
+  // Maintain a lease on the hardware power element until a child driver obtains a power dependency
+  // token to it via the GetToken() call.
   zx_status_t status =
       AcquireInitLease(hardware_power_lessor_client_, hardware_power_lease_control_client_end_);
   if (status != ZX_OK) {
@@ -385,7 +377,7 @@ void AmlSdmmc::GetToken(GetTokenCompleter::Sync& completer) {
 
   // Drop the lease on the hardware power element, and allow the caller to declare a dependency on
   // it using the power dependency token returned in this call.
-  if (!three_level_power_ && hardware_power_lease_control_client_end_.is_valid()) {
+  if (hardware_power_lease_control_client_end_.is_valid()) {
     hardware_power_lease_control_client_end_.channel().reset();
   }
   completer.Reply(
@@ -428,8 +420,7 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
 
         const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
         switch (required_level) {
-          case kPowerLevelOn:
-          case kPowerLevelBoot: {
+          case kPowerLevelOn: {
             const zx::time start = zx::clock::get_monotonic();
 
             // If tuning was delayed, will do it now.
@@ -444,18 +435,8 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
               return;
             }
 
-            // Drop lease if we're transitioning to power level ON and we still
-            // have the lease we acquired during init. If we support three
-            // levels, we leased the element at the intermediate level, meaning
-            // if we're going to the highest level, something else is causing
-            // the rise and we no longer need our own lease.
-            if (three_level_power_ && required_level == kPowerLevelOn &&
-                hardware_power_lease_control_client_end_.is_valid()) {
-              hardware_power_lease_control_client_end_.reset();
-            }
-
             // Communicate to Power Broker that the hardware power level has been raised.
-            UpdatePowerLevel(hardware_power_current_level_client_, required_level);
+            UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
 
             // Serve delayed requests that were received during power suspension, if any.
             if (delayed_requests_.size()) {

@@ -53,10 +53,6 @@ class AmlSdmmc : public fdf::DriverBase,
   // Levels for hardware power element.
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOff = 0;
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelOn = 1;
-  // Note that this power level actually represents a LOWER power
-  // state than kPowerLevelOn, based on the order the level is
-  // supplied when the element is created.
-  static constexpr fuchsia_power_broker::PowerLevel kPowerLevelBoot = 2;
 
   AmlSdmmc(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
@@ -152,7 +148,6 @@ class AmlSdmmc : public fdf::DriverBase,
 
   fuchsia_hardware_sdmmc::wire::SdmmcHostInfo dev_info_;
   bool power_suspended_ TA_GUARDED(lock_) = false;
-  bool three_level_power_ = false;
 
   // TODO(https://fxbug.dev/42084501): Remove redundant locking when Banjo is removed.
   std::mutex lock_ TA_ACQ_AFTER(tuning_lock_);

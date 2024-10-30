@@ -862,19 +862,6 @@
 
 					power-levels {
 
-						boot-level {
-							level = <0x02>;
-							level-dependencies = <0x2b 0x01>;
-
-							level-transition-table {
-
-								transition-to-off {
-									latency-us = <0xc8>;
-									target-level = <0x00>;
-								};
-							};
-						};
-
 						off-level {
 							level = <0x00>;
 
@@ -889,6 +876,7 @@
 
 						on-level {
 							level = <0x01>;
+							level-dependencies = <0x2b 0x01>;
 
 							level-transition-table {
 
