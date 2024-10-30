@@ -132,6 +132,7 @@ async fn main() {
                     allocated_blocks: AnyProperty,
                     deallocated_blocks: AnyProperty,
                     failed_allocations: 0u64,
+                    utilization_per_ten_k: AnyProperty,
                 },
                 components: {
                     "<component_manager>": contains {},
@@ -159,6 +160,7 @@ async fn main() {
             allocated_blocks: AnyProperty,
             deallocated_blocks: AnyProperty,
             failed_allocations: 0u64,
+            utilization_per_ten_k: AnyProperty,
         }
     });
 
