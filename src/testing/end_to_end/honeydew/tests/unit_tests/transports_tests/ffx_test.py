@@ -202,7 +202,7 @@ class FfxConfigTests(unittest.TestCase):
             ),
             mock.call(
                 _FFX_CONFIG_SET
-                + ["daemon.ssh_keepalive_timeout", str(_SSH_KEEPALIVE_TIMEOUT)]
+                + ["ssh.keepalive_timeout", str(_SSH_KEEPALIVE_TIMEOUT)]
             ),
             mock.call(
                 _FFX_CONFIG_SET

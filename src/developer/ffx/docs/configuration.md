@@ -19,9 +19,6 @@ When updating, please add the value in alphabetical order.
 | `daemon.host_pipe_ssh_timeout`          | Time the daemon waits for an       |
 :                                         : initial response from ssh on the   :
 :                                         : target. Defaults to `50` seconds.  :
-| `daemon.ssh_keepalive_timeout`          | Time the daemon waits on an ssh    |
-:                                         : connection before timing out.      :
-:                                         : Defaults to `20` seconds.          :
 | `discovery.expire_targets`              | Determines if targets discovered   |
 :                                         : should expire. Defaults to `true`  :
 | `discovery.mdns.autoconnect`            | Determines whether to connect      |
@@ -148,6 +145,9 @@ When updating, please add the value in alphabetical order.
 | `ssh.auth-sock`                         | If set, the path to the            |
 :                                         : authorization socket for SSH used  :
 :                                         : by overnet. Defaults to unset      :
+| `ssh.keepalive_timeout`                 | Time for an ssh connection to wait |
+:                                         : before timing out.                 :
+:                                         : Defaults to `20` seconds.          :
 | `target.default`                        | The default target to use if one   |
 :                                         : is unspecified.                    :
 :                                         : Defaults to first available of:    :
