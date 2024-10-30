@@ -74,23 +74,23 @@ class FileObject : public fbl::RefCounted<FileObject> {
  public:
   /// Weak reference to the `FileHandle` of this `FileObject`. This allows to retrieve the
   /// `FileHandle` from a `FileObject`.
-  WeakFileHandle weak_handle;
+  WeakFileHandle weak_handle_;
 
   // A unique identifier for this file object.
-  FileObjectId id;
+  FileObjectId id_;
 
  private:
-  ktl::unique_ptr<FileOps> ops;
+  ktl::unique_ptr<FileOps> ops_;
 
  public:
   // The NamespaceNode associated with this FileObject.
   //
   // Represents the name the process used to open this file.
-  NamespaceNode name;
+  NamespaceNode name_;
 
-  FileSystemHandle fs;
+  FileSystemHandle fs_;
 
-  mutable starnix_sync::StarnixMutex<off_t> offset;
+  mutable starnix_sync::StarnixMutex<off_t> offset_;
 
  private:
   mutable starnix_sync::StarnixMutex<OpenFlags> flags_;
@@ -123,7 +123,9 @@ class FileObject : public fbl::RefCounted<FileObject> {
 
   bool can_write() const { return OpenFlagsImpl(*flags_.Lock()).can_write(); }
 
-  FileOps& ops_() const { return *ops; }
+  FileOps& ops() const { return *ops_; }
+
+  fit::result<Errno, pid_t> as_pid() const;
 
   OpenFlags flags() const { return *flags_.Lock(); }
 
@@ -137,9 +139,7 @@ class FileObject : public fbl::RefCounted<FileObject> {
       return fit::error(errno(EBADF));
     }
 
-    auto result = read();
-    if (result.is_error())
-      return result.take_error();
+    auto result = read() _EP(result);
     auto bytes_read = result.value();
 
     // TODO(steveaustin) - omit updating time_access to allow info to be immutable
@@ -174,9 +174,7 @@ class FileObject : public fbl::RefCounted<FileObject> {
 
     // self.node().clear_suid_and_sgid_bits(current_task) ? ;
 
-    auto result = write();
-    if (result.is_error())
-      return result.take_error();
+    auto result = write() _EP(result);
     auto bytes_written = result.value();
 
     // self.node().update_ctime_mtime();

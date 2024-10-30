@@ -32,8 +32,8 @@ MountInfo::~MountInfo() = default;
 MountInfo MountInfo::detached() { return {ktl::nullopt}; }
 
 MountFlags MountInfo::flags() {
-  if (handle.has_value()) {
-    return handle.value()->flags();
+  if (handle_.has_value()) {
+    return handle_.value()->flags();
   } else {
     // Consider not mounted node have the NOATIME flags.
     return MountFlags(MountFlagsEnum::NOATIME);
@@ -47,13 +47,15 @@ fit::result<Errno> MountInfo::check_readonly_filesystem() {
   return fit::ok();
 }
 
-ktl::optional<MountHandle> MountInfo::operator*() const { return handle; }
+ktl::optional<MountHandle> MountInfo::operator*() const { return handle_; }
 
-NamespaceNode Mount::root() { return {{fbl::RefPtr<Mount>(this)}, root_}; }
+NamespaceNode Mount::root() {
+  return NamespaceNode{.mount_ = MountInfo{.handle_ = fbl::RefPtr<Mount>(this)}, .entry_ = root_};
+}
 
 ktl::optional<NamespaceNode> Mount::mountpoint() const {
-  auto _state = state.Read();
-  auto &[mount, entry] = _state->mountpoint.value();
+  auto state = state_.Read();
+  auto &[mount, entry] = state->mountpoint.value();
   return NamespaceNode::New(mount.Lock(), entry);
 }
 
@@ -84,8 +86,8 @@ MountHandle Mount::new_with_root(DirEntryHandle root, MountFlags flags) {
   return handle;
 }
 
-Mount::Mount(uint64_t _id, MountFlags flags, DirEntryHandle root, FileSystemHandle fs)
-    : root_(ktl::move(root)), fs(ktl::move(fs)), flags_(ktl::move(flags)), id(_id) {}
+Mount::Mount(uint64_t id, MountFlags flags, DirEntryHandle root, FileSystemHandle fs)
+    : root_(ktl::move(root)), fs_(ktl::move(fs)), flags_(ktl::move(flags)), id_(id) {}
 
 Mount::~Mount() = default;
 

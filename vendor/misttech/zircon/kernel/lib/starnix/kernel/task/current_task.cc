@@ -61,20 +61,18 @@
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
-using namespace util;
-
 namespace starnix {
 
 TaskBuilder::TaskBuilder(fbl::RefPtr<Task> task) : task_(ktl::move(task)) {}
 
 TaskBuilder::TaskBuilder(TaskBuilder&& other) {
   task_ = ktl::move(other.task_);
-  thread_state_ = ktl::move(other.thread_state_);
+  thread_state_ = other.thread_state_;
 }
 
 TaskBuilder& TaskBuilder::operator=(TaskBuilder&& other) {
   task_ = ktl::move(other.task_);
-  thread_state_ = ktl::move(other.thread_state_);
+  thread_state_ = other.thread_state_;
   return *this;
 }
 
@@ -95,12 +93,12 @@ CurrentTask::CurrentTask(fbl::RefPtr<Task> task, ThreadState thread_state)
 
 CurrentTask::CurrentTask(CurrentTask&& other) {
   task_ = ktl::move(other.task_);
-  thread_state_ = ktl::move(other.thread_state_);
+  thread_state_ = other.thread_state_;
 }
 
 CurrentTask& CurrentTask::operator=(CurrentTask&& other) {
   task_ = ktl::move(other.task_);
-  thread_state_ = ktl::move(other.thread_state_);
+  thread_state_ = other.thread_state_;
   return *this;
 }
 
@@ -134,23 +132,23 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(
 
   auto task_info_factory = [kernel, initial_name](pid_t pid,
                                                   fbl::RefPtr<ProcessGroup> process_group) {
-    return create_zircon_process(kernel, {}, pid, process_group, SignalActions::Default(),
-                                 initial_name);
+    return create_zircon_process(kernel, {}, pid, ktl::move(process_group),
+                                 SignalActions::Default(), initial_name);
   };
 
-  return create_task_with_pid(kernel, pids, pid, initial_name, fs, task_info_factory,
+  return create_task_with_pid(kernel, pids, pid, initial_name, ktl::move(fs), task_info_factory,
                               Credentials::root(), ktl::move(rlimits));
 }
 
 fit::result<Errno, CurrentTask> CurrentTask::create_system_task(const fbl::RefPtr<Kernel>& kernel,
                                                                 fbl::RefPtr<FsContext> fs) {
   auto builder = CurrentTask::create_task(
-      kernel, "[kthreadd]", fs,
+      kernel, "[kthreadd]", ktl::move(fs),
       [kernel](pid_t pid, fbl::RefPtr<ProcessGroup> process_group) -> fit::result<Errno, TaskInfo> {
         KernelHandle<ProcessDispatcher> process;
         auto memory_manager = fbl::RefPtr(MemoryManager::new_empty());
-        auto thread_group = ThreadGroup::New(kernel, ktl::move(process), {}, pid, process_group,
-                                             SignalActions::Default());
+        auto thread_group = ThreadGroup::New(kernel, ktl::move(process), {}, pid,
+                                             ktl::move(process_group), SignalActions::Default());
 
         return fit::ok(
             TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = memory_manager});
@@ -170,24 +168,24 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
 
   auto task_info_factory = [kernel, initial_name](pid_t pid,
                                                   fbl::RefPtr<ProcessGroup> process_group) {
-    return create_zircon_process(kernel, {}, pid, process_group, SignalActions::Default(),
-                                 initial_name);
+    return create_zircon_process(kernel, {}, pid, ktl::move(process_group),
+                                 SignalActions::Default(), initial_name);
   };
 
   auto task =
       create_task(kernel, initial_name, init_task->fs()->fork(), task_info_factory) _EP(task);
 
   {
-    auto init_writer = init_task->thread_group()->Write();
-    auto new_process_writer = task->thread_group()->Write();
-    new_process_writer->parent() = ThreadGroupParent::From(init_task->thread_group().get());
-    init_writer->get_children().insert(util::WeakPtr(task->thread_group().get()));
+    auto init_writer = init_task->thread_group_->Write();
+    auto new_process_writer = task->thread_group_->Write();
+    new_process_writer->parent_ = ThreadGroupParent::From(init_task->thread_group_.get());
+    init_writer->children_.insert(util::WeakPtr(task->thread_group_.get()));
   }
 
   // A child process created via fork(2) inherits its parent's
   // resource limits. Resource limits are preserved across execve(2).
-  auto limits = init_task->thread_group()->limits.Lock();
-  *task->thread_group()->limits.Lock() = *limits;
+  auto limits = init_task->thread_group_->limits.Lock();
+  *task->thread_group_->limits.Lock() = *limits;
 
   return fit::ok(ktl::move(task.value()));
 }
@@ -233,16 +231,16 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
 
   // TODO (Herrera) Add fit::defer
   {
-    auto temp_task = builder.task();
-    _EP(builder->thread_group()->add(temp_task));
+    const auto& temp_task = builder.task();
+    _EP(builder->thread_group_->add(temp_task));
 
     for (auto& [resouce, limit] : rlimits) {
-      builder->thread_group()->limits.Lock()->set(resouce,
-                                                  rlimit{.rlim_cur = limit, .rlim_max = limit});
+      builder->thread_group_->limits.Lock()->set(resouce,
+                                                 rlimit{.rlim_cur = limit, .rlim_max = limit});
     }
 
     pids->add_task(temp_task);
-    pids->add_thread_group(builder->thread_group());
+    pids->add_thread_group(builder->thread_group_);
   }
 
   return fit::ok(ktl::move(builder));
@@ -323,7 +321,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   }
 
   auto fs = clone_fs ? task_->fs() : task_->fs()->fork();
-  auto files = clone_files ? task_->files() : task_->files().fork();
+  auto files = clone_files ? task_->files_ : task_->files_.fork();
 
   auto kernel = task_->kernel();
   auto pids = kernel->pids.Write();
@@ -350,14 +348,14 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     // Make sure to drop these locks ASAP to avoid inversion
     auto thread_group_state = [&]()
         -> fit::result<Errno, starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> {
-      auto thread_group_state_inner = task_->thread_group()->Write();
+      auto thread_group_state_inner = task_->thread_group_->Write();
       if (clone_parent) {
         // With the CLONE_PARENT flag, the parent of the new task is our parent
         // instead of ourselves.
-        if (!thread_group_state_inner->parent().has_value()) {
+        if (!thread_group_state_inner->parent_.has_value()) {
           return fit::error(errno(EINVAL));
         }
-        weak_original_parent = *thread_group_state_inner->parent();
+        weak_original_parent = *thread_group_state_inner->parent_;
         std::destroy_at(std::addressof(thread_group_state_inner));
         original_parent = weak_original_parent.upgrade();
         return fit::ok(ktl::move(original_parent->Write()));
@@ -395,26 +393,25 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     }
 
     if (clone_thread) {
-      auto thread_group = task_->thread_group();
+      auto thread_group = task_->thread_group_;
       auto memory_manager = task_->mm();
       return fit::ok(
           TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = memory_manager});
-    } else {
-      // Drop the lock on this task before entering `create_zircon_process`, because it will
-      // take a lock on the new thread group, and locks on thread groups have a higher
-      // priority than locks on the task in the thread group.
-      std::destroy_at(std::addressof(state));
-      auto signal_actions = [&]() -> fbl::RefPtr<SignalActions> {
-        if (clone_sighand) {
-          return task_->thread_group()->signal_actions();
-        } else {
-          return task_->thread_group()->signal_actions()->Fork();
-        }
-      }();
-      auto process_group = thread_group_state->process_group_;
-      return create_zircon_process(kernel, ktl::move(*thread_group_state), pid, process_group,
-                                   signal_actions, command);
     }
+
+    // Drop the lock on this task before entering `create_zircon_process`, because it will
+    // take a lock on the new thread group, and locks on thread groups have a higher
+    // priority than locks on the task in the thread group.
+    std::destroy_at(std::addressof(state));
+    auto signal_actions = [&]() -> fbl::RefPtr<SignalActions> {
+      if (clone_sighand) {
+        return task_->thread_group_->signal_actions_;
+      }
+      return task_->thread_group_->signal_actions_->Fork();
+    }();
+    auto process_group = thread_group_state->process_group_;
+    return create_zircon_process(kernel, ktl::move(*thread_group_state), pid, process_group,
+                                 signal_actions, command);
   }() _EP(task_info);
 
   // Only create the vfork event when the caller requested CLONE_VFORK.
@@ -434,7 +431,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     // takes place we have a self deadlock.
     pids->add_task(child_task);
     if (!clone_thread) {
-      pids->add_thread_group(child->thread_group());
+      pids->add_thread_group(child->thread_group_);
     }
     std::destroy_at(std::addressof(pids));
 
@@ -448,15 +445,15 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       // Take the lock on the thread group and its child in the correct order to ensure any wrong
       // ordering will trigger the tracing-mutex at the right call site.
       if (!clone_thread) {
-        auto _l1 = task_->thread_group()->Read();
-        auto _l2 = child->thread_group()->Read();
+        auto _l1 = task_->thread_group_->Read();
+        auto _l2 = child->thread_group_->Read();
       }
     }
 
     if (clone_thread) {
-      _EP(task_->thread_group()->add(child_task));
+      _EP(task_->thread_group_->add(child_task));
     } else {
-      _EP(child->thread_group()->add(child_task));
+      _EP(child->thread_group_->add(child_task));
 
       // These manipulations of the signal handling state appear to be related to
       // CLONE_SIGHAND and CLONE_VM rather than CLONE_THREAD. However, we do not support
@@ -502,7 +499,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   // will trigger the tracing-mutex at the right call site.
   // #[cfg(any(test, debug_assertions))]
   {
-    auto _l1 = child->thread_group()->Read();
+    auto _l1 = child->thread_group_->Read();
     auto _l2 = child->Read();
   }
   return fit::ok(ktl::move(child));
@@ -517,7 +514,7 @@ void CurrentTask::set_stopped_and_notify(StopState stopped,
   }
 
   if (!StopStateHelper::is_in_progress(stopped)) {
-    auto parent = task_->thread_group()->Read()->parent();
+    auto parent = task_->thread_group_->Read()->parent_;
     if (parent) {
       parent->upgrade()->Write()->child_status_waiters_.notify_all();
     }
@@ -526,7 +523,7 @@ void CurrentTask::set_stopped_and_notify(StopState stopped,
 
 void CurrentTask::thread_group_exit(ExitStatus exit_status) {
   // self.ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
-  task_->thread_group()->exit(exit_status, {});
+  task_->thread_group_->exit(exit_status, {});
 }
 
 starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
@@ -565,7 +562,7 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::st
     return resolved_elf.take_error();
   }
 
-  if (task_->thread_group()->Read()->tasks_count() > 1) {
+  if (task_->thread_group_->Read()->tasks_count() > 1) {
     // track_stub !(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
     return fit::error(errno(EINVAL));
   }
@@ -601,7 +598,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
     self.notify_robust_list();
   */
 
-  auto exec_result = (*this)->mm()->exec(resolved_elf.file->name);
+  auto exec_result = (*this)->mm()->exec(resolved_elf.file->name_);
   if (exec_result.is_error()) {
     fit::error(errno(from_status_like_fdio(exec_result.error_value())));
   }
@@ -654,7 +651,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
     // TODO: POSIX timers are not preserved.
   */
 
-  task_->thread_group()->Write()->did_exec() = true;
+  task_->thread_group_->Write()->did_exec_ = true;
 
   // `prctl(PR_GET_NAME)` and `/proc/self/stat`
   /*
@@ -671,11 +668,11 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
 }
 
 CurrentTask CurrentTask::From(TaskBuilder builder) {
-  return CurrentTask::New(ktl::move(builder.task()), ktl::move(builder.thread_state()));
+  return CurrentTask::New(ktl::move(builder.task()), builder.thread_state());
 }
 
 CurrentTask CurrentTask::New(fbl::RefPtr<Task> task, ThreadState thread_state) {
-  return CurrentTask(task, thread_state);
+  return CurrentTask(ktl::move(task), thread_state);
 }
 
 util::WeakPtr<Task> CurrentTask::weak_task() const {
@@ -683,10 +680,7 @@ util::WeakPtr<Task> CurrentTask::weak_task() const {
   return util::WeakPtr<Task>(task_.get());
 }
 
-void CurrentTask::set_creds(Credentials creds) const {
-  // Guard<Mutex> lock(persistent_info->lock());
-  // persistent_info->state().creds = creds;
-}
+void CurrentTask::set_creds(Credentials creds) const {}
 
 void CurrentTask::release() {
   LTRACE_ENTRY_OBJ;
@@ -698,7 +692,7 @@ void CurrentTask::release() {
     // We remove from the thread group here because the WeakRef in the pid
     // table to this task must be valid until this task is removed from the
     // thread group, but self.task.release() below invalidates it.
-    task_->thread_group()->remove(task_);
+    task_->thread_group_->remove(task_);
 
     task_->release(thread_state_);
   }
@@ -742,32 +736,29 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
   auto dir_result = [this, &path_is_absolute, &flags,
                      &dir_fd]() -> fit::result<Errno, NamespaceNode> {
     if (path_is_absolute && !flags.contains(ResolveFlagsEnum::IN_ROOT)) {
-      return fit::ok((*this)->fs()->root());
-    } else if (dir_fd == FdNumber::AT_FDCWD_) {
-      return fit::ok((*this)->fs()->cwd());
-    } else {
-      // O_PATH allowed for:
-      //
-      //   Passing the file descriptor as the dirfd argument of
-      //   openat() and the other "*at()" system calls.  This
-      //   includes linkat(2) with AT_EMPTY_PATH (or via procfs
-      //   using AT_SYMLINK_FOLLOW) even if the file is not a
-      //   directory.
-      //
-      // See https://man7.org/linux/man-pages/man2/open.2.html
-      auto result = task_->files().get_allowing_opath(dir_fd);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-      return fit::ok(result.value()->name);
+      return fit::ok(task_->fs()->root());
     }
-  }();
-  if (dir_result.is_error())
-    return dir_result.take_error();
+
+    if (dir_fd == FdNumber::AT_FDCWD_) {
+      return fit::ok(task_->fs()->cwd());
+    }
+
+    // O_PATH allowed for:
+    //
+    //   Passing the file descriptor as the dirfd argument of
+    //   openat() and the other "*at()" system calls.  This
+    //   includes linkat(2) with AT_EMPTY_PATH (or via procfs
+    //   using AT_SYMLINK_FOLLOW) even if the file is not a
+    //   directory.
+    //
+    // See https://man7.org/linux/man-pages/man2/open.2.html
+    auto result = task_->files_.get_allowing_opath(dir_fd) _EP(result);
+    return fit::ok(result.value()->name_);
+  }() _EP(dir_result);
   auto dir = dir_result.value();
 
   if (!path.empty()) {
-    if (!dir.entry->node_->is_dir()) {
+    if (!dir.entry_->node_->is_dir()) {
       return fit::error(errno(ENOTDIR));
     }
     if (auto check_access_result = dir.check_access(*this, Access(Access::EnumType::EXEC));
@@ -811,10 +802,10 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
   auto child_context = context.with(SymlinkMode::NoFollow);
   child_context.must_be_directory = false;
 
-  if (auto lookup_child_result = parent.lookup_child(*this, child_context, basename);
-      lookup_child_result.is_ok()) {
+  auto lookup_child_result = parent.lookup_child(*this, child_context, basename);
+  if (lookup_child_result.is_ok()) {
     auto name = lookup_child_result.value();
-    if (name.entry->node_->is_lnk()) {
+    if (name.entry_->node_->is_lnk()) {
       if (flags.contains(OpenFlagsEnum::PATH) && context.symlink_mode == SymlinkMode::NoFollow) {
         // When O_PATH is specified in flags, if pathname is a symbolic link
         // and the O_NOFOLLOW flag is also specified, then the call returns
@@ -848,9 +839,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
 
       context.remaining_follows -= 1;
 
-      auto readlink_result = name.readlink(*this);
-      if (readlink_result.is_error())
-        return readlink_result.take_error();
+      auto readlink_result = name.readlink(*this) _EP(readlink_result);
       return ktl::visit(
           SymlinkTarget::overloaded{
               [&, p = ktl::move(parent)](
@@ -858,7 +847,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
                 auto dir = (path[0] == '/') ? (*this)->fs()->root() : p;
                 return resolve_open_path(context, dir, path, mode, flags);
               },
-              [&](NamespaceNode node) -> fit::result<Errno, ktl::pair<NamespaceNode, bool>> {
+              [&](NamespaceNode& node) -> fit::result<Errno, ktl::pair<NamespaceNode, bool>> {
                 if (context.resolve_flags.contains(ResolveFlagsEnum::NO_MAGICLINKS)) {
                   return fit::error(errno(ELOOP));
                 }
@@ -866,29 +855,26 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
               },
           },
           readlink_result.value().value);
-
-    } else {
-      if (must_create) {
-        return fit::error(errno(EEXIST));
-      }
-      return fit::ok(ktl::pair(name, false));
     }
-  } else {
-    auto _errno = lookup_child_result.error_value();
-    if ((_errno == errno(ENOENT)) && flags.contains(OpenFlagsEnum::CREAT)) {
-      if (context.must_be_directory) {
-        return fit::error(errno(EISDIR));
-      }
-      auto open_create_node_result = parent.open_create_node(
-          *this, basename, mode.with_type(FileMode::IFREG), DeviceType::NONE, flags);
-      if (open_create_node_result.is_error())
-        return open_create_node_result.take_error();
 
-      return fit::ok(ktl::pair(open_create_node_result.value(), true));
-    } else {
-      return lookup_child_result.take_error();
+    if (must_create) {
+      return fit::error(errno(EEXIST));
     }
+    return fit::ok(ktl::pair(name, false));
   }
+
+  auto err = lookup_child_result.error_value();
+  if ((err == errno(ENOENT)) && flags.contains(OpenFlagsEnum::CREAT)) {
+    if (context.must_be_directory) {
+      return fit::error(errno(EISDIR));
+    }
+    auto open_create_node_result =
+        parent.open_create_node(*this, basename, mode.with_type(FileMode::IFREG), DeviceType::NONE,
+                                flags) _EP(open_create_node_result);
+
+    return fit::ok(ktl::pair(open_create_node_result.value(), true));
+  }
+  return lookup_child_result.take_error();
 }
 
 fit::result<Errno, FileHandle> CurrentTask::open_file_at(FdNumber dir_fd, const FsStr& path,
@@ -987,45 +973,42 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
   auto name_result = [&]() -> fit::result<Errno, NamespaceNode> {
     if (flags.contains(OpenFlagsEnum::TMPFILE)) {
       return name.create_tmpfile(*this, mode.with_type(FileMode::IFREG), flags);
-    } else {
-      auto mode_ = name.entry->node_->info()->mode;
-
-      // These checks are not needed in the `O_TMPFILE` case because `mode` refers to the
-      // file we are opening. With `O_TMPFILE`, that file is the regular file we just
-      // created rather than the node we found by resolving the path.
-      //
-      // For example, we do not need to produce `ENOTDIR` when `must_be_directory` is set
-      // because `must_be_directory` refers to the node we found by resolving the path.
-      // If that node was not a directory, then `create_tmpfile` will produce an error.
-      //
-      // Similarly, we never need to call `truncate` because `O_TMPFILE` is newly created
-      // and therefor already an empty file.
-
-      if (nofollow && mode_.is_lnk()) {
-        return fit::error(errno(ELOOP));
-      }
-
-      if (mode.is_dir()) {
-      } else if (context.must_be_directory) {
-        return fit::error(errno(ENOTDIR));
-      }
-
-      if (flags.contains(OpenFlagsEnum::TRUNC) && mode.is_reg() && !created) {
-        // You might think we should check file.can_write() at this
-        // point, which is what the docs suggest, but apparently we
-        // are supposed to truncate the file if this task can write
-        // to the underlying node, even if we are opening the file
-        // as read-only. See OpenTest.CanTruncateReadOnly.
-        if (auto truncate_result = name.truncate(*this, 0); truncate_result.is_error()) {
-          return truncate_result.take_error();
-        }
-      }
-      return fit::ok(name);
     }
-  }();
 
-  if (name_result.is_error())
-    return name_result.take_error();
+    auto mode_ = name.entry_->node_->info()->mode;
+
+    // These checks are not needed in the `O_TMPFILE` case because `mode` refers to the
+    // file we are opening. With `O_TMPFILE`, that file is the regular file we just
+    // created rather than the node we found by resolving the path.
+    //
+    // For example, we do not need to produce `ENOTDIR` when `must_be_directory` is set
+    // because `must_be_directory` refers to the node we found by resolving the path.
+    // If that node was not a directory, then `create_tmpfile` will produce an error.
+    //
+    // Similarly, we never need to call `truncate` because `O_TMPFILE` is newly created
+    // and therefor already an empty file.
+
+    if (nofollow && mode_.is_lnk()) {
+      return fit::error(errno(ELOOP));
+    }
+
+    if (mode.is_dir()) {
+    } else if (context.must_be_directory) {
+      return fit::error(errno(ENOTDIR));
+    }
+
+    if (flags.contains(OpenFlagsEnum::TRUNC) && mode.is_reg() && !created) {
+      // You might think we should check file.can_write() at this
+      // point, which is what the docs suggest, but apparently we
+      // are supposed to truncate the file if this task can write
+      // to the underlying node, even if we are opening the file
+      // as read-only. See OpenTest.CanTruncateReadOnly.
+      if (auto truncate_result = name.truncate(*this, 0); truncate_result.is_error()) {
+        return truncate_result.take_error();
+      }
+    }
+    return fit::ok(name);
+  }() _EP(name_result);
 
   // If the node has been created, the open operation should not verify access right:
   // From <https://man7.org/linux/man-pages/man2/open.2.html>
@@ -1049,18 +1032,14 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_paren
   context.update_for_path(path);
 
   auto current_node = dir;
-  auto split = SplitStringCopy(path, "/", kTrimWhitespace, kSplitWantNonEmpty);
+  auto split = util::SplitStringCopy(path, "/", util::kTrimWhitespace, util::kSplitWantNonEmpty);
   auto it = split.begin();
   FsString current_path_component = (it != split.end()) ? *it++ : "";
   for (; it != split.end(); ++it) {
-    if (auto lookup_child_result =
-            current_node.lookup_child(*this, context, current_path_component);
-        lookup_child_result.is_error()) {
-      return lookup_child_result.take_error();
-    } else {
-      current_node = lookup_child_result.value();
-      current_path_component = *it;
-    }
+    auto lookup_child_result =
+        current_node.lookup_child(*this, context, current_path_component) _EP(lookup_child_result);
+    current_node = lookup_child_result.value();
+    current_path_component = *it;
   }
   return fit::ok(ktl::pair(current_node, current_path_component));
 }
@@ -1070,9 +1049,7 @@ fit::result<Errno, NamespaceNode> CurrentTask::lookup_path(LookupContext& contex
                                                            const FsStr& path) const {
   LTRACEF_LEVEL(2, "path=[%.*s]\n", static_cast<int>(path.length()), path.data());
 
-  auto lookup_parent_result = lookup_parent(context, dir, path);
-  if (lookup_parent_result.is_error())
-    return lookup_parent_result.take_error();
+  auto lookup_parent_result = lookup_parent(context, dir, path) _EP(lookup_parent_result);
   auto [parent, basename] = lookup_parent_result.value();
   return parent.lookup_child(*this, context, basename);
 }

@@ -18,8 +18,6 @@
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 
-#include <utility>
-
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_counted_upgradeable.h>
@@ -325,7 +323,7 @@ class TaskMutableState {
   Task* base_;
 };
 
-enum class TaskStateCode {
+enum class TaskStateCode : uint8_t {
   // Task is being executed.
   Running,
 
@@ -381,11 +379,7 @@ class TaskPersistentInfoState {
  private:
   TaskPersistentInfoState(pid_t tid, pid_t pid, const ktl::string_view& command,
                           const Credentials& creds, ktl::optional<Signal> exit_signal)
-      : tid_(tid),
-        pid_(pid),
-        command_(ktl::move(command)),
-        creds_(ktl::move(creds)),
-        exit_signal_(exit_signal) {}
+      : tid_(tid), pid_(pid), command_(command), creds_(creds), exit_signal_(exit_signal) {}
 };
 
 class MemoryManager;
@@ -514,7 +508,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   StopState load_stopped() const { return stop_state_.load(std::memory_order_relaxed); }
 
   /// Upgrade a Reference to a Task, returning a ESRCH errno if the reference cannot be borrowed.
-  static fit::result<Errno, fbl::RefPtr<Task>> from_weak(util::WeakPtr<Task> weak) {
+  static fit::result<Errno, fbl::RefPtr<Task>> from_weak(const util::WeakPtr<Task>& weak) {
     fbl::RefPtr<Task> task = weak.Lock();
     if (!task) {
       return fit::error(errno(ESRCH));
@@ -597,14 +591,9 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
     return mutable_state_.Write();
   }
 
-  const fbl::RefPtr<ThreadGroup>& thread_group() const { return thread_group_; }
-
-  const FdTable& files() const { return files_; }
-  FdTable& files() { return files_; }
-
   class ThreadSignalObserver final : public SignalObserver {
    public:
-    ThreadSignalObserver(util::WeakPtr<Task> task) : SignalObserver(), task_(ktl::move(task)) {}
+    explicit ThreadSignalObserver(util::WeakPtr<Task> task) : task_(ktl::move(task)) {}
     ~ThreadSignalObserver() final = default;
 
    private:
@@ -649,7 +638,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 /// the thread for the different wait syscalls.
 class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContainer>> {
  public:
-  static ktl::unique_ptr<TaskContainer> From(fbl::RefPtr<Task> task) {
+  static ktl::unique_ptr<TaskContainer> From(const fbl::RefPtr<Task>& task) {
     fbl::AllocChecker ac;
     ktl::unique_ptr<TaskContainer> ptr = ktl::unique_ptr<TaskContainer>(
         new (&ac) TaskContainer(util::WeakPtr<Task>(task.get()), task->persistent_info_));

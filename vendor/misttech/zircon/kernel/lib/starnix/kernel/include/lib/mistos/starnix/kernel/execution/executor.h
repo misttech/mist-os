@@ -71,7 +71,7 @@ void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
   auto task_thread_guard = ref_task->thread_.Write();
 
   auto user_thread =
-      create_thread(ref_task->thread_group()->process().dispatcher(), ref_task->command());
+      create_thread(ref_task->thread_group_->process().dispatcher(), ref_task->command());
   if (user_thread.is_ok()) {
     *task_thread_guard = ktl::move(user_thread.value().release());
   }

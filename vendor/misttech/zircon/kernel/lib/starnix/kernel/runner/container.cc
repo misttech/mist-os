@@ -121,7 +121,7 @@ fit::result<Errno, Container> create_container(const Config& config) {
 
   auto pre_run = [&](CurrentTask& init_task) -> fit::result<Errno> {
     auto stdio = SyslogFile::new_file(init_task);
-    auto files = init_task->files();
+    auto files = init_task->files_;
     for (int i : {0, 1, 2}) {
       if (files.get(FdNumber::from_raw(i)).is_error()) {
         auto result = files.insert(*init_task.task(), FdNumber::from_raw(i), stdio) _EP(result);

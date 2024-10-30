@@ -12,6 +12,7 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/task/waiter.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/starnix_uapi/user_buffer.h>
@@ -23,8 +24,6 @@
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
-
-using namespace starnix_uapi;
 
 namespace starnix {
 
@@ -43,6 +42,7 @@ fit::result<Errno> sys_kill(const CurrentTask& current_task, pid_t pid,
   return fit::error(errno(ENOSYS));
 }
 
+namespace {
 /// Waits on the task with `pid` to exit or change state.
 ///
 /// - `current_task`: The current task.
@@ -71,7 +71,7 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
       //
 
       {
-        auto thread_group = current_task->thread_group()->Write();
+        auto thread_group = current_task->thread_group_->Write();
 
         // TODO (Herrera): Implement ptrace-related functionality
         // Per the above, see if traced tasks have become waitable. If they have, release
@@ -112,6 +112,7 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
     _EP(map_eintr(waiter.wait(current_task), errno(ERESTARTSYS)));
   } while (true);
 }
+}  // namespace
 
 fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_selector,
                                     starnix_uapi::UserRef<int32_t> user_wstatus, uint32_t options,
@@ -122,12 +123,15 @@ fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_s
   auto selector = [&]() -> fit::result<Errno, ProcessSelector> {
     if (raw_selector == 0) {
       return fit::ok(ProcessSelector::ProcessGroup(
-          current_task->thread_group()->Read()->process_group_->leader_));
-    } else if (raw_selector == -1) {
+          current_task->thread_group_->Read()->process_group_->leader_));
+    }
+    if (raw_selector == -1) {
       return fit::ok(ProcessSelector::AnyProcess());
-    } else if (raw_selector > 0) {
+    }
+    if (raw_selector > 0) {
       return fit::ok(ProcessSelector::SpecificPid(raw_selector));
-    } else if (raw_selector < -1) {
+    }
+    if (raw_selector < -1) {
       auto negated = negate_pid(raw_selector) _EP(negated);
       return fit::ok(ProcessSelector::ProcessGroup(negated.value()));
     }

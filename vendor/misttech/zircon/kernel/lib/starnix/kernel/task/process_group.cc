@@ -39,7 +39,7 @@ fbl::Vector<fbl::RefPtr<ThreadGroup>> ProcessGroupMutableState::thread_groups() 
 }
 
 bool ProcessGroupMutableState::remove(fbl::RefPtr<ThreadGroup> thread_group) {
-  auto it = thread_groups_.find(thread_group->leader());
+  auto it = thread_groups_.find(thread_group->leader_);
   if (it != thread_groups_.end()) {
     thread_groups_.erase(it);
   }
@@ -63,7 +63,7 @@ fbl::RefPtr<ProcessGroup> ProcessGroup::New(pid_t leader,
 ProcessGroup::~ProcessGroup() = default;
 
 void ProcessGroup::insert(fbl::RefPtr<ThreadGroup> thread_group) {
-  mutable_state_.Write()->thread_groups_.insert(thread_group->weak_thread_group());
+  mutable_state_.Write()->thread_groups_.insert(thread_group->weak_thread_group_);
 }
 
 bool ProcessGroup::remove(fbl::RefPtr<ThreadGroup> thread_group) {
@@ -88,7 +88,7 @@ void ProcessGroup::check_orphaned() const {
 
   // Check if any parent is in same session but different process group
   for (const auto& tg : thread_groups) {
-    auto parent = tg->Read()->parent();
+    auto parent = tg->Read()->parent_;
     if (!parent.has_value()) {
       return;
     }

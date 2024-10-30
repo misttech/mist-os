@@ -30,12 +30,12 @@ using namespace starnix_uapi;
 
 namespace starnix {
 
-FdTableEntry::FdTableEntry(FileHandle _file, FdTableId fd_table_id, FdFlags flags)
-    : file(ktl::move(_file)), fd_table_id_(fd_table_id), flags_(flags) {}
+FdTableEntry::FdTableEntry(FileHandle file, FdTableId fd_table_id, FdFlags flags)
+    : file_(ktl::move(file)), fd_table_id_(fd_table_id), flags_(flags) {}
 
 FdTableEntry::~FdTableEntry() {
   LTRACEF_LEVEL(3, "fd_table_id %zx\n", fd_table_id_.id);
-  auto fs = file->name.entry->node_->fs();
+  auto fs = file_->name_.entry_->node_->fs();
   auto kernel = fs->kernel().Lock();
   if (kernel) {
     // kernel->delayed_releaser.flush_file(file, fd_table_id_);
@@ -156,7 +156,7 @@ fit::result<Errno> FdTable::insert(const Task& task, FdNumber fd, FileHandle fil
 
 fit::result<Errno> FdTable::insert_with_flags(const Task& task, FdNumber fd, FileHandle file,
                                               FdFlags flags) const {
-  auto rlimit = task.thread_group()->get_rlimit({ResourceEnum::NOFILE});
+  auto rlimit = task.thread_group_->get_rlimit({ResourceEnum::NOFILE});
   auto id_ = id();
   auto inner = inner_.Lock();
   auto state = inner->get()->store_.Lock();
@@ -167,7 +167,7 @@ fit::result<Errno> FdTable::insert_with_flags(const Task& task, FdNumber fd, Fil
 fit::result<Errno, FdNumber> FdTable::add_with_flags(const Task& task, FileHandle file,
                                                      FdFlags flags) const {
   // profile_duration!("AddFd");
-  auto rlimit = task.thread_group()->get_rlimit({ResourceEnum::NOFILE});
+  auto rlimit = task.thread_group_->get_rlimit({ResourceEnum::NOFILE});
   auto id_ = id();
   auto inner = inner_.Lock();
   auto state = inner->get()->store_.Lock();
@@ -195,7 +195,7 @@ fit::result<Errno, ktl::pair<FileHandle, FdFlags>> FdTable::get_allowing_opath_w
   auto entry = state->get(fd);
   if (entry.has_value()) {
     LTRACEF("has_value fd %d\n", fd.raw());
-    return fit::ok(ktl::pair(entry->file, entry->flags_));
+    return fit::ok(ktl::pair(entry->file_, entry->flags_));
   }
   return fit::error(errno(EBADF));
 }

@@ -10,7 +10,7 @@ namespace starnix {
 
 SystemTask::SystemTask(CurrentTask system_task)
     : system_task_(ktl::move(system_task)),
-      system_thread_group_(util::WeakPtr<ThreadGroup>((*system_task_)->thread_group().get())) {}
+      system_thread_group_(util::WeakPtr<ThreadGroup>((*system_task_)->thread_group_.get())) {}
 
 KernelThreads KernelThreads::New(util::WeakPtr<Kernel> kernel) { return KernelThreads(kernel); }
 

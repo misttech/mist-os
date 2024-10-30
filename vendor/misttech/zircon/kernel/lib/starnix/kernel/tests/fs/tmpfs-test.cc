@@ -110,7 +110,7 @@ bool test_persistence() {
   auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
 
   {
-    auto root = (*current_task)->fs()->root().entry;
+    auto root = (*current_task)->fs()->root().entry_;
     auto usr = root->create_dir(*current_task, "usr").value();
     auto _etc = root->create_dir(*current_task, "etc").value();
     auto _usr_bin = usr->create_dir(*current_task, "bin").value();

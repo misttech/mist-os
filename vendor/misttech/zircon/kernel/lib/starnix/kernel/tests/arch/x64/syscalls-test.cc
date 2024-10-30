@@ -33,7 +33,7 @@ bool test_sys_creat() {
   ASSERT_TRUE(fd_or_error.is_ok());
   auto file_handle = current_task->open_file(path, OpenFlags(OpenFlagsEnum::RDONLY));
 
-  auto flag_or_error = (*current_task)->files().get_fd_flags(fd_or_error.value());
+  auto flag_or_error = (*current_task)->files_.get_fd_flags(fd_or_error.value());
   ASSERT_TRUE(flag_or_error.is_ok());
 
   END_TEST;

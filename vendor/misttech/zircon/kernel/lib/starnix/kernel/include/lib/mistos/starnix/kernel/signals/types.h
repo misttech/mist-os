@@ -17,7 +17,6 @@
 
 #include <algorithm>
 #include <deque>
-#include <utility>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
@@ -89,6 +88,15 @@ struct SignalInfo {
   static SignalInfo New(starnix_uapi::Signal signal, int32_t code, SignalDetail detail) {
     return SignalInfo{
         .signal = signal, .errno = 0, .code = code, ._pad = 0, .detail = detail, .force = false};
+  }
+
+  // Convert SignalInfo to siginfo_t bytes
+  ktl::array<uint8_t, sizeof(siginfo_t)> as_siginfo_bytes() const {
+    ktl::array<uint8_t, sizeof(siginfo_t)> array = {};
+    siginfo_t info = {};
+
+    memcpy(array.data(), &info, sizeof(siginfo_t));
+    return array;
   }
 
 #if 0

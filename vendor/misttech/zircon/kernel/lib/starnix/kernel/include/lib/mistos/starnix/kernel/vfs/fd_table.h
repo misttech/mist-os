@@ -42,7 +42,7 @@ using FileHandle = fbl::RefPtr<FileObject>;
 
 struct FdTableEntry {
  public:
-  FileHandle file;
+  FileHandle file_;
 
  private:
   // Identifier of the FdTable containing this entry.
@@ -54,7 +54,7 @@ struct FdTableEntry {
   FdFlags flags_;
 
  public:
-  FdTableEntry(FileHandle _file, FdTableId fd_table_id, FdFlags flags);
+  FdTableEntry(FileHandle file, FdTableId fd_table_id, FdFlags flags);
 
   ~FdTableEntry();
 

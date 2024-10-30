@@ -22,7 +22,7 @@ struct WaitResult;
 
 class WaitingOptions {
  public:
-  WaitingOptions(uint32_t options)
+  explicit WaitingOptions(uint32_t options)
       : wait_for_exited_(options & WEXITED),
         wait_for_stopped_(options & WSTOPPED),
         wait_for_continued_(options & WCONTINUED),

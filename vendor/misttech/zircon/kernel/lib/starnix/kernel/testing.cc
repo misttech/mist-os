@@ -32,11 +32,15 @@ fbl::RefPtr<Kernel> create_test_kernel(/*security_server: Arc<SecurityServer>*/)
   return Kernel::New("").value();
 }
 
+namespace {
+
 template <typename CreateFsFn>
 fbl::RefPtr<FsContext> create_test_fs_context(const fbl::RefPtr<Kernel>& kernel,
                                               CreateFsFn&& create_fs) {
   return FsContext::New(Namespace::New(create_fs(kernel)));
 }
+
+}  // namespace
 
 TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs) {
   auto init_pid = kernel->pids.Write()->allocate_pid();
@@ -60,7 +64,7 @@ TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsCont
   // Take the lock on thread group and task in the correct order to ensure any wrong ordering
   // will trigger the tracing-mutex at the right call site.
   {
-    auto _l1 = init_task->thread_group()->Read();
+    auto _l1 = init_task->thread_group_->Read();
     auto _l2 = init_task->mutable_state_.Read();
   }
 
@@ -122,7 +126,7 @@ AutoReleasableTask create_task(fbl::RefPtr<Kernel>& kernel, const ktl::string_vi
   // Take the lock on thread group and task in the correct order to ensure any wrong ordering
   // will trigger the tracing-mutex at the right call site.
   {
-    auto _l1 = task->thread_group()->Read();
+    auto _l1 = task->thread_group_->Read();
     auto _l2 = task->Read();
   }
 

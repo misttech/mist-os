@@ -55,10 +55,9 @@ util::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& cur
                                                  pid_t pid) {
   if (pid == 0) {
     return current_task.weak_task();
-  } else {
-    // TODO(security): Should this use get_task_if_owner_or_has_capabilities() ?
-    return current_task->get_task(pid);
   }
+  // TODO(security): Should this use get_task_if_owner_or_has_capabilities() ?
+  return current_task->get_task(pid);
 }
 
 void __NO_RETURN do_exit(long code) { Thread::Current::Exit(static_cast<int>(code)); }
@@ -213,8 +212,8 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
   // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
   const size_t PAGE_LIMIT = 32;
   size_t page_limit_size = PAGE_LIMIT * static_cast<size_t>(PAGE_SIZE);
-  auto rlimit = current_task->thread_group()->get_rlimit(
-      starnix_uapi::Resource{.value = ResourceEnum::STACK});
+  auto rlimit =
+      current_task->thread_group_->get_rlimit(starnix_uapi::Resource{.value = ResourceEnum::STACK});
   auto stack_limit = rlimit / 4;
   auto argv_env_limit = ktl::max(page_limit_size, static_cast<size_t>(stack_limit));
 
@@ -268,7 +267,7 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
       //   directory.
       //
       // See https://man7.org/linux/man-pages/man2/open.2.html
-      auto file = current_task->files().get_allowing_opath(dir_fd) _EP(file);
+      auto file = current_task->files_.get_allowing_opath(dir_fd) _EP(file);
 
       // We are forced to reopen the file with O_RDONLY to get access to the underlying VMO.
       // Note that skip the access check in the arguments in case the file mode does
@@ -280,9 +279,9 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
       //
       // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
       // file->name()
-      return file->name.open(current_task,
-                             starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY),
-                             /* AccessCheck::check_for(Access::EXEC)*/ true);
+      return file->name_.open(current_task,
+                              starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY),
+                              /* AccessCheck::check_for(Access::EXEC)*/ true);
     } else {
       return current_task.open_file_at(
           dir_fd, *path, open_flags, FileMode(),
@@ -334,14 +333,14 @@ fit::result<Errno, pid_t> sys_gettid(const CurrentTask& current_task) {
   return fit::ok(current_task->get_tid());
 }
 fit::result<Errno, pid_t> sys_getppid(const CurrentTask& current_task) {
-  return fit::ok(current_task->thread_group()->Read()->get_ppid());
+  return fit::ok(current_task->thread_group_->Read()->get_ppid());
 }
 
 fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid) {
   util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
   auto task = Task::from_weak(weak) _EP(task);
   // security::check_task_getsid(current_task, &target_task)?;
-  auto sid = task->thread_group()->Read()->process_group_->session_->leader_;
+  auto sid = task->thread_group_->Read()->process_group_->session_->leader_;
   return fit::ok(sid);
 }
 
@@ -349,7 +348,7 @@ fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid
   util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
   auto task = Task::from_weak(weak) _EP(task);
   // selinux_hooks::check_getpgid_access(current_task, &task)?;
-  auto pgid = task->thread_group()->Read()->process_group_->leader_;
+  auto pgid = task->thread_group_->Read()->process_group_->leader_;
   return fit::ok(pgid);
 }
 

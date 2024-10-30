@@ -178,7 +178,7 @@ class FileOps {
   /// Returns the associated pid_t.
   ///
   /// Used by pidfd and `/proc/<pid>`. Unlikely to be used by other files.
-  virtual fit::result<Errno, pid_t> as_pid(const FileObject& file) {
+  virtual fit::result<Errno, pid_t> as_pid(const FileObject& file) const {
     return fit::error(errno(EBADF));
   }
 

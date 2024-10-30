@@ -169,7 +169,7 @@ fit::result<Errno, size_t> do_writev(const CurrentTask& current_task, FdNumber f
     // track_stub !(TODO("https://fxbug.dev/322874523"), "pwritev2 flags", flags);
   }
 
-  auto file = current_task->files().get(fd) _EP(file);
+  auto file = current_task->files_.get(fd) _EP(file);
   auto iovec = current_task.read_iovec(iovec_addr, iovec_count) _EP(iovec);
   auto data = UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new(
       current_task, ktl::move(iovec.value())) _EP(data);
@@ -194,7 +194,7 @@ fit::result<Errno, size_t> do_writev(const CurrentTask& current_task, FdNumber f
 
 fit::result<Errno, size_t> sys_read(const CurrentTask& current_task, FdNumber fd,
                                     starnix_uapi::UserAddress address, size_t length) {
-  auto file = current_task->files().get(fd) _EP(file);
+  auto file = current_task->files_.get(fd) _EP(file);
   auto buffer =
       UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new_at(current_task, address, length);
   return map_eintr(file->read(current_task, &*buffer), errno(ERESTARTSYS));
@@ -202,21 +202,21 @@ fit::result<Errno, size_t> sys_read(const CurrentTask& current_task, FdNumber fd
 
 fit::result<Errno, size_t> sys_write(const CurrentTask& current_task, FdNumber fd,
                                      starnix_uapi::UserAddress address, size_t length) {
-  auto file = current_task->files().get(fd) _EP(file);
+  auto file = current_task->files_.get(fd) _EP(file);
   auto buffer = UserBuffersInputBuffer<TaskMemoryAccessor>::unified_new_at(current_task, address,
                                                                            length) _EP(buffer);
   return map_eintr(file->write(current_task, &*buffer), errno(ERESTARTSYS));
 }
 
 fit::result<Errno> sys_close(const CurrentTask& current_task, FdNumber fd) {
-  auto result = current_task->files().close(fd) _EP(result);
+  auto result = current_task->files_.close(fd) _EP(result);
   return fit::ok();
 }
 
 fit::result<Errno, size_t> sys_pread64(const CurrentTask& current_task, FdNumber fd,
                                        starnix_uapi::UserAddress address, size_t length,
                                        off_t offset) {
-  auto file = current_task->files().get(fd) _EP(file);
+  auto file = current_task->files_.get(fd) _EP(file);
   auto unsiged_offset = mtl::TryFrom<off_t, size_t>(offset);
   if (!unsiged_offset.has_value()) {
     return fit::error(errno(EINVAL));
@@ -244,7 +244,7 @@ fit::result<Errno> sys_fstat(const CurrentTask& current_task, FdNumber fd,
   //   fstat(2) (since Linux 3.6).
   //
   // See https://man7.org/linux/man-pages/man2/open.2.html
-  auto file = current_task->files().get_allowing_opath(fd) _EP(file);
+  auto file = current_task->files_.get_allowing_opath(fd) _EP(file);
   auto result = file->node()->stat(current_task) _EP(result);
   auto write_result = current_task.write_object(buffer, *result) _EP(write_result);
   return fit::ok();
@@ -256,7 +256,7 @@ fit::result<Errno> sys_newfstatat(const CurrentTask& current_task, FdNumber dir_
   auto lflags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT)
       _EP(lflags);
   auto name = lookup_at(current_task, dir_fd, user_path, lflags.value()) _EP(name);
-  auto result = name->entry->node_->stat(current_task) _EP(result);
+  auto result = name->entry_->node_->stat(current_task) _EP(result);
   return fit::ok();
 }
 

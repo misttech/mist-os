@@ -46,9 +46,9 @@ fbl::RefPtr<ZombieProcess> ZombieProcess::New(const ThreadGroupMutableState& thr
   // TaskTimeStats time_stats = thread_group.base.TimeStats() + thread_group.children_time_stats;
   // Note: TaskTimeStats addition is commented out as it's not implemented in the C++ version
   fbl::AllocChecker ac;
-  auto zp = fbl::AdoptRef(new (&ac) ZombieProcess(thread_group.base_->leader(),
+  auto zp = fbl::AdoptRef(new (&ac) ZombieProcess(thread_group.base_->leader_,
                                                   thread_group.process_group_->leader_,
-                                                  credentials.uid, ktl::move(exit_info), true));
+                                                  credentials.uid, exit_info, true));
   ZX_ASSERT(ac.check());
   return zp;
 }
@@ -68,7 +68,7 @@ ThreadGroupMutableState::ThreadGroupMutableState(ThreadGroup* base,
                                                  fbl::RefPtr<ProcessGroup> process_group)
     : parent_(ktl::move(parent)), process_group_(ktl::move(process_group)), base_(base) {}
 
-pid_t ThreadGroupMutableState::leader() const { return base_->leader(); }
+pid_t ThreadGroupMutableState::leader() const { return base_->leader_; }
 
 fbl::Vector<fbl::RefPtr<ThreadGroup>> ThreadGroupMutableState::children() const {
   fbl::Vector<fbl::RefPtr<ThreadGroup>> children_vec;
@@ -122,12 +122,12 @@ fbl::RefPtr<Task> ThreadGroupMutableState::get_task(pid_t tid) const {
 
 pid_t ThreadGroupMutableState::get_ppid() const {
   if (parent_.has_value()) {
-    return parent_->upgrade()->leader();
+    return parent_->upgrade()->leader_;
   }
   return leader();
 }
 
-void ThreadGroupMutableState::set_process_group(fbl::RefPtr<ProcessGroup> process_group,
+void ThreadGroupMutableState::set_process_group(const fbl::RefPtr<ProcessGroup>& process_group,
                                                 PidTable& pids) {
   if (process_group_ == process_group) {
     return;
@@ -159,7 +159,7 @@ ktl::optional<WaitResult> ThreadGroupMutableState::get_waitable_zombie(
                           [](ProcessSelector::Any) { return true; },
                           [&](ProcessSelector::Pid pid) { return zombie->pid == pid.value; },
                           [&](ProcessSelector::Pgid pgid) { return zombie->pgid == pgid.value; }},
-                      selector.selector());
+                      selector.selector_);
   };
 
   // The zombies whose exit signal matches the waiting options queried.
@@ -185,14 +185,14 @@ ktl::optional<WaitResult> ThreadGroupMutableState::get_waitable_zombie(
   size_t position = std::distance(it, zombie_list(this).rend()) - 1;
 
   if (options.keep_waitable_state()) {
-    return zombie_list(this)[position]->ToWaitResult();
-  } else {
-    auto zombie = zombie_list(this).erase(position);
-    // children_time_stats_ += zombie->time_stats;
-    auto result = zombie->ToWaitResult();
-    // zombie->release(pids);
-    return result;
+    return zombie_list(this)[position]->to_wait_result();
   }
+
+  auto zombie = zombie_list(this).erase(position);
+  // children_time_stats_ += zombie->time_stats;
+  auto result = zombie->to_wait_result();
+  // zombie->release(pids);
+  return result;
 }
 
 bool ThreadGroupMutableState::is_correct_exit_signal(bool wait_for_clone,
@@ -207,12 +207,12 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
   auto filter_children_by_pid_selector = [&](const fbl::RefPtr<ThreadGroup>& child) -> bool {
     return ktl::visit(ProcessSelector::overloaded{
                           [](ProcessSelector::Any) { return true; },
-                          [&](ProcessSelector::Pid pid) { return child->leader() == pid.value; },
+                          [&](ProcessSelector::Pid pid) { return child->leader_ == pid.value; },
                           [&](ProcessSelector::Pgid pgid) {
                             return pids.get_process_group(pgid.value) ==
                                    child->Read()->process_group_;
                           }},
-                      selector.selector());
+                      selector.selector_);
   };
 
   // The children whose exit signal matches the waiting options queried.
@@ -221,7 +221,7 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
       return true;
     }
     auto child_state = child->Read();
-    if (child_state->terminating()) {
+    if (child_state->terminating_) {
       // Child is terminating.  In addition to its original location,
       // the leader may have exited, and its exit signal may be in the
       // leader_exit_info.
@@ -229,7 +229,7 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
         auto& info = child_state->leader_exit_info_.value();
         if (info.exit_signal.has_value()) {
           return ThreadGroupMutableState::is_correct_exit_signal(options.wait_for_clone(),
-                                                                 info.exit_signal.value());
+                                                                 info.exit_signal);
         }
       }
     }
@@ -251,7 +251,7 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
     auto thread_group = it.CopyPointer().Lock();
     if (thread_group && filter_children_by_pid_selector(thread_group) &&
         filter_children_by_waiting_options(thread_group)) {
-      LTRACEF("Found child pid: %d\n", thread_group->leader());
+      LTRACEF("Found child pid: %d\n", thread_group->leader_);
       fbl::AllocChecker ac;
       selected_children.push_back(thread_group, &ac);
       ZX_ASSERT(ac.check());
@@ -274,7 +274,7 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
     return WaitableChildResult::NoneFound();
   }
 
-  for (auto child : selected_children) {
+  for (auto& child : selected_children) {
     auto c = child->Write();
     if (c->last_signal_.has_value()) {
       auto build_wait_result = [&](ThreadGroupMutableState& child,
@@ -282,22 +282,20 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
         SignalInfo siginfo = [&options, &c]() {
           if (options.keep_waitable_state()) {
             return c->last_signal_.value();
-          } else {
-            return ktl::move(c->last_signal_).value();
           }
+          return ktl::move(c->last_signal_).value();
         }();
 
         ExitStatus exit_status = [&siginfo, &exit_status_fn]() {
           if (siginfo.signal == kSIGKILL) {
             // This overrides the stop/continue choice.
             return ExitStatus::Kill(siginfo);
-          } else {
-            return exit_status_fn(siginfo);
           }
+          return exit_status_fn(siginfo);
         }();
 
         auto info = (*child.tasks_.begin()).info();
-        return WaitResult{.pid = child.base_->leader(),
+        return WaitResult{.pid = child.base_->leader_,
                           .uid = info->creds().uid,
                           .exit_info = {.status = exit_status, .exit_signal = info->exit_signal()},
                           .time_stats = {}};
@@ -428,7 +426,7 @@ void ThreadGroupMutableState::send_signal(SignalInfo signal_info) {
   }
 
   bool has_interrupted_task = false;
-  for (auto tc : tasks) {
+  for (auto& tc : tasks) {
     auto task = tc.Lock();
     auto task_state = task->Write();
 
@@ -464,8 +462,9 @@ fbl::RefPtr<ThreadGroup> ThreadGroup::New(
     pid_t leader, fbl::RefPtr<ProcessGroup> process_group,
     fbl::RefPtr<SignalActions> signal_actions) {
   fbl::AllocChecker ac;
-  fbl::RefPtr<ThreadGroup> thread_group = fbl::AdoptRef(new (&ac) ThreadGroup(
-      ktl::move(kernel), ktl::move(process), parent, leader, process_group, signal_actions));
+  fbl::RefPtr<ThreadGroup> thread_group =
+      fbl::AdoptRef(new (&ac) ThreadGroup(ktl::move(kernel), ktl::move(process), parent, leader,
+                                          process_group, ktl::move(signal_actions)));
   ASSERT(ac.check());
 
   if (parent.has_value()) {
@@ -502,7 +501,7 @@ ThreadGroup::ThreadGroup(
     tgp = ThreadGroupParent::From(p);
   }
 
-  *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, tgp, process_group));
+  *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, tgp, ktl::move(process_group)));
 
   LTRACE_EXIT_OBJ;
 }
@@ -549,7 +548,7 @@ void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> curren
   //        let _ = ptrace_detach(self, task_ref.as_ref(), &UserAddress::NULL);
   //    }
   //}
-  for (auto task : tasks) {
+  for (auto& task : tasks) {
     task->Write()->set_exit_status(exit_status);
     send_standard_signal(task, SignalInfo::Default(kSIGKILL));
   }
@@ -604,7 +603,7 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
 
     // Replace PID table entry with a zombie.
     ZX_ASSERT_MSG(state->leader_exit_info_.has_value(), "Failed to capture leader exit status");
-    auto exit_info = ktl::move(state->leader_exit_info_.value());
+    auto exit_info = state->leader_exit_info_.value();
     auto zombie = ZombieProcess::New(*state, persistent_info->Lock()->creds(), exit_info);
     pids->kill_process(leader_, util::WeakPtr(zombie.get()));
 
@@ -679,7 +678,7 @@ void ThreadGroup::do_zombie_notifications(fbl::RefPtr<ZombieProcess> zombie) con
 */
 
   auto exit_signal = zombie->exit_info.exit_signal;
-  auto signal_info = zombie->ToWaitResult().AsSignalInfo();
+  auto signal_info = zombie->to_wait_result().as_signal_info();
 
   fbl::AllocChecker ac;
   state->zombie_children_.push_back(ktl::move(zombie), &ac);
@@ -707,7 +706,7 @@ fit::result<Errno> ThreadGroup::setsid() const {
   return fit::ok();
 }
 
-void ThreadGroup::check_orphans() {
+void ThreadGroup::check_orphans() const {
   fbl::AllocChecker ac;
   fbl::Vector<fbl::RefPtr<ThreadGroup>> thread_groups;
 
@@ -738,16 +737,16 @@ void ThreadGroup::release() {
   auto pids = kernel_->pids.Write();
   auto state = Write();
 
-  for (auto& zombie : state->zombie_children()) {
+  for (auto& zombie : state->zombie_children_) {
     zombie->release(*pids);
   }
-  state->zombie_children().reset();
+  state->zombie_children_.reset();
 
   // state->zombie_ptracees().release(*pids);
   LTRACE_EXIT_OBJ;
 }
 
-bool ProcessSelector::DoMatch(pid_t pid, const PidTable& pid_table) const {
+bool ProcessSelector::do_match(pid_t pid, const PidTable& pid_table) const {
   return ktl::visit(ProcessSelector::overloaded{
                         [](Any) { return true; }, [pid](Pid p) { return p.value == pid; },
                         [pid, &pid_table](Pgid pg) {
@@ -755,7 +754,7 @@ bool ProcessSelector::DoMatch(pid_t pid, const PidTable& pid_table) const {
                           if (task_ref) {
                             if (auto group = pid_table.get_process_group(pg.value)) {
                               if (group.has_value()) {
-                                return group == task_ref->thread_group()->Read()->process_group_;
+                                return group == task_ref->thread_group_->Read()->process_group_;
                               }
                             }
                           }
