@@ -20,18 +20,18 @@ use crate::state::{Action, FilterIpMetadata, Hook, Routine, Rule, TransparentPro
 
 /// The final result of packet processing at a given filtering hook.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Verdict {
+pub enum Verdict<R = ()> {
     /// The packet should continue traversing the stack.
-    Accept,
+    Accept(R),
     /// The packet should be dropped immediately.
     Drop,
 }
 
 /// The final result of packet processing at the INGRESS hook.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum IngressVerdict<I: IpExt> {
+pub enum IngressVerdict<I: IpExt, R = ()> {
     /// A verdict that is valid at any hook.
-    Verdict(Verdict),
+    Verdict(Verdict<R>),
     /// The packet should be immediately redirected to a local socket without its
     /// header being changed in any way.
     TransparentLocalDelivery {
@@ -42,8 +42,8 @@ pub enum IngressVerdict<I: IpExt> {
     },
 }
 
-impl<I: IpExt> From<Verdict> for IngressVerdict<I> {
-    fn from(verdict: Verdict) -> Self {
+impl<I: IpExt, R> From<Verdict<R>> for IngressVerdict<I, R> {
+    fn from(verdict: Verdict<R>) -> Self {
         IngressVerdict::Verdict(verdict)
     }
 }
@@ -207,7 +207,7 @@ where
             }
         }
     }
-    Verdict::Accept
+    Verdict::Accept(())
 }
 
 fn check_routines_for_ingress<I, P, D, DeviceClass>(
@@ -233,7 +233,7 @@ where
             }
         }
     }
-    Verdict::Accept.into()
+    Verdict::Accept(()).into()
 }
 
 /// An implementation of packet filtering logic, providing entry points at
@@ -359,7 +359,7 @@ where
                 Interfaces { ingress: Some(interface), egress: None },
             ) {
                 v @ IngressVerdict::Verdict(Verdict::Drop) => return v,
-                v @ IngressVerdict::Verdict(Verdict::Accept)
+                v @ IngressVerdict::Verdict(Verdict::Accept(()))
                 | v @ IngressVerdict::TransparentLocalDelivery { .. } => v,
             };
 
@@ -380,7 +380,7 @@ where
                     // `TransparentLocalDelivery`; in case of an `Accept` verdict from the NAT
                     // routines, we do not change the existing verdict.
                     v @ IngressVerdict::Verdict(Verdict::Drop) => return v,
-                    IngressVerdict::Verdict(Verdict::Accept) => {}
+                    IngressVerdict::Verdict(Verdict::Accept(())) => {}
                     v @ IngressVerdict::TransparentLocalDelivery { .. } => {
                         verdict = v;
                     }
@@ -429,7 +429,7 @@ where
                 Interfaces { ingress: Some(interface), egress: None },
             ) {
                 Verdict::Drop => return Verdict::Drop,
-                Verdict::Accept => Verdict::Accept,
+                Verdict::Accept(()) => Verdict::Accept(()),
             };
 
             if let Some(mut conn) = conn {
@@ -446,7 +446,7 @@ where
                     Interfaces { ingress: Some(interface), egress: None },
                 ) {
                     Verdict::Drop => return Verdict::Drop,
-                    Verdict::Accept => {}
+                    Verdict::Accept(()) => {}
                 }
 
                 match state.conntrack.finalize_connection(bindings_ctx, conn) {
@@ -513,7 +513,7 @@ where
                 Interfaces { ingress: None, egress: Some(interface) },
             ) {
                 Verdict::Drop => return Verdict::Drop,
-                Verdict::Accept => Verdict::Accept,
+                Verdict::Accept(()) => Verdict::Accept(()),
             };
 
             if let Some(mut conn) = conn {
@@ -530,7 +530,7 @@ where
                     Interfaces { ingress: None, egress: Some(interface) },
                 ) {
                     Verdict::Drop => return Verdict::Drop,
-                    Verdict::Accept => {}
+                    Verdict::Accept(()) => {}
                 }
 
                 let res = metadata.replace_conntrack_connection(conn);
@@ -576,7 +576,7 @@ where
                 Interfaces { ingress: None, egress: Some(interface) },
             ) {
                 Verdict::Drop => return Verdict::Drop,
-                Verdict::Accept => Verdict::Accept,
+                Verdict::Accept(()) => Verdict::Accept(()),
             };
 
             if let Some(mut conn) = conn {
@@ -593,7 +593,7 @@ where
                     Interfaces { ingress: None, egress: Some(interface) },
                 ) {
                     Verdict::Drop => return Verdict::Drop,
-                    Verdict::Accept => {}
+                    Verdict::Accept(()) => {}
                 }
 
                 match state.conntrack.finalize_connection(bindings_ctx, conn) {
@@ -685,7 +685,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            Verdict::Accept.into()
+            Verdict::Accept(()).into()
         }
 
         fn local_ingress_hook<P, M>(
@@ -699,7 +699,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            Verdict::Accept
+            Verdict::Accept(())
         }
 
         fn forwarding_hook<P, M>(
@@ -713,7 +713,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            Verdict::Accept
+            Verdict::Accept(())
         }
 
         fn local_egress_hook<P, M>(
@@ -727,7 +727,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            Verdict::Accept
+            Verdict::Accept(())
         }
 
         fn egress_hook<P, M>(
@@ -741,7 +741,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            (Verdict::Accept, ProofOfEgressCheck::forge_proof_for_test())
+            (Verdict::Accept(()), ProofOfEgressCheck::forge_proof_for_test())
         }
     }
 
@@ -865,7 +865,7 @@ mod tests {
                 &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
-            Verdict::Accept
+            Verdict::Accept(())
         );
     }
 
@@ -883,7 +883,7 @@ mod tests {
                 &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
-            Verdict::Accept
+            Verdict::Accept(())
         );
     }
 
@@ -1230,10 +1230,10 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(22 => Verdict::Accept; "port 22 allowed for SSH")]
-    #[test_case(80 => Verdict::Accept; "port 80 allowed for HTTP")]
-    #[test_case(1024 => Verdict::Accept; "ephemeral port 1024 allowed")]
-    #[test_case(65535 => Verdict::Accept; "ephemeral port 65535 allowed")]
+    #[test_case(22 => Verdict::Accept(()); "port 22 allowed for SSH")]
+    #[test_case(80 => Verdict::Accept(()); "port 80 allowed for HTTP")]
+    #[test_case(1024 => Verdict::Accept(()); "ephemeral port 1024 allowed")]
+    #[test_case(65535 => Verdict::Accept(()); "ephemeral port 65535 allowed")]
     #[test_case(1023 => Verdict::Drop; "privileged port 1023 blocked")]
     #[test_case(53 => Verdict::Drop; "privileged port 53 blocked")]
     fn block_privileged_ports_except_ssh_http<I: TestIpExt>(port: u16) -> Verdict {
@@ -1314,7 +1314,7 @@ mod tests {
 
     #[ip_test(I)]
     #[test_case(
-        ethernet_interface() => Verdict::Accept;
+        ethernet_interface() => Verdict::Accept(());
         "allow incoming traffic on ethernet interface"
     )]
     #[test_case(wlan_interface() => Verdict::Drop; "drop incoming traffic on wlan interface")]
@@ -1364,7 +1364,7 @@ mod tests {
             &ethernet_interface(),
             &mut metadata,
         );
-        assert_eq!(verdict, Verdict::Accept);
+        assert_eq!(verdict, Verdict::Accept(()));
 
         // The stashed reference should point to the connection that is in the table.
         let stashed =
@@ -1389,7 +1389,7 @@ mod tests {
             &ethernet_interface(),
             &mut metadata,
         );
-        assert_eq!(verdict, Verdict::Accept.into());
+        assert_eq!(verdict, Verdict::Accept(()).into());
 
         // As a result, rather than there being a new connection in the packet metadata,
         // it should contain the same connection that is still in the table.
@@ -1426,7 +1426,7 @@ mod tests {
                 &ethernet_interface(),
                 &mut NullMetadata {},
             );
-            assert_eq!(verdict, Verdict::Accept);
+            assert_eq!(verdict, Verdict::Accept(()));
         }
 
         // Finalizing the connection should fail when the conntrack table is at maximum
@@ -1479,7 +1479,7 @@ mod tests {
             &ethernet_interface(),
             &mut NullMetadata {},
         );
-        assert_eq!(verdict, Verdict::Accept);
+        assert_eq!(verdict, Verdict::Accept(()));
         assert_eq!(packet.src_ip, I::SRC_IP);
 
         // Now simulate a locally-generated packet that conflicts with this flow; it is
@@ -1496,7 +1496,7 @@ mod tests {
             &ethernet_interface(),
             &mut NullMetadata {},
         );
-        assert_eq!(verdict, Verdict::Accept);
+        assert_eq!(verdict, Verdict::Accept(()));
         assert_ne!(packet.body.src_port, src_port);
     }
 }
