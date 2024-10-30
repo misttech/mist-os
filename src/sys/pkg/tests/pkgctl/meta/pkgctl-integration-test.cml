@@ -53,6 +53,12 @@
             to: [ "#dns_resolver" ],
         },
         {
+            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
+            from: "void",
+            to: "#http_client",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.posix.socket.Provider" ],
             from: "#netstack",
             to: [
