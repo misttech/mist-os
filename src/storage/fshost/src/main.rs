@@ -123,12 +123,7 @@ async fn main() -> Result<(), Error> {
         let (partitions, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let options = fio::Options::default();
-        gpt.open3(
-            "partitions",
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE,
-            &options,
-            server_end.into_channel(),
-        )?;
+        gpt.open3("partitions", fio::PERM_READABLE, &options, server_end.into_channel())?;
         export.add_entry("partitions", remote_dir(partitions)).unwrap();
     }
     let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));

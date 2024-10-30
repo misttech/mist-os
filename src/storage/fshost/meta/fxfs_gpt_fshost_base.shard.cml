@@ -32,10 +32,7 @@
         },
         {
             directory: "partitions",
-            rights: [
-                "execute",
-                "rw*",
-            ],
+            rights: [ "r*" ],
             path: "/partitions",
         },
         {
@@ -97,6 +94,7 @@
             directory: [
                 "blob",
                 "blob-exec",
+                "partitions",
             ],
             from: "self",
         },

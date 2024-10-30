@@ -166,7 +166,7 @@ impl FshostBuilder {
                     .capability(Capability::protocol::<BlobReaderMarker>())
                     .capability(Capability::directory("blob").rights(fio::RW_STAR_DIR))
                     .capability(Capability::directory("data").rights(fio::RW_STAR_DIR))
-                    .capability(Capability::directory("partitions").rights(fio::RW_STAR_DIR))
+                    .capability(Capability::directory("partitions").rights(fio::R_STAR_DIR))
                     .capability(Capability::directory("tmp").rights(fio::RW_STAR_DIR))
                     .capability(Capability::directory("volumes").rights(fio::RW_STAR_DIR))
                     .from(&fshost)

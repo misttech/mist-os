@@ -292,10 +292,10 @@ template("fshost_integration_test_package") {
 
     # TODO(https://fxbug.dev/339491886): Support these components in storage-host
     if (defined(fshost_options.storage_host) && fshost_options.storage_host) {
-      test_components -= [ ":$_wipe_storage_component_target" ]
       if (defined(fshost_options.fxfs_blob) && !fshost_options.fxfs_blob) {
         test_components -= [
           ":$_migration_component_target",
+          ":$_wipe_storage_component_target",
           ":$_write_data_file_component_target",
         ]
       }

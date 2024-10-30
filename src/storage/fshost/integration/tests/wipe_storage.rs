@@ -66,13 +66,16 @@ async fn write_blob() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
-    let ramdisk_dir =
-        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
-    if cfg!(feature = "fxblob") {
-        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+    if cfg!(feature = "storage-host") {
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
     } else {
-        recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
-        recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
+        let ramdisk_dir =
+            fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+        if !cfg!(feature = "fxblob") {
+            recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+            recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
+        }
     }
 
     let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
@@ -123,12 +126,15 @@ async fn write_blob_no_existing_data_partition() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
-    let ramdisk_dir =
-        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
-    if cfg!(feature = "fxblob") {
-        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+    if cfg!(feature = "storage-host") {
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
     } else {
-        recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+        let ramdisk_dir =
+            fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+        if !cfg!(feature = "fxblob") {
+            recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+        }
     }
 
     let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
@@ -184,13 +190,16 @@ async fn blobfs_formatted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
-    let ramdisk_dir =
-        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
-    if cfg!(feature = "fxblob") {
-        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+    if cfg!(feature = "storage-host") {
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
     } else {
-        recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
-        recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
+        let ramdisk_dir =
+            fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+        if !cfg!(feature = "fxblob") {
+            recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+            recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
+        }
     }
 
     let blob_creator = if cfg!(feature = "fxblob") {
@@ -235,10 +244,17 @@ async fn data_unformatted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
-    let ramdisk_dir =
-        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
-    recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
-    recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
+    if cfg!(feature = "storage-host") {
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
+    } else {
+        let ramdisk_dir =
+            fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+        if !cfg!(feature = "fxblob") {
+            recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+            recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
+        }
+    }
 
     let test_disk = fixture.ramdisks.first().unwrap();
     let test_disk_path = test_disk
@@ -328,9 +344,13 @@ async fn handles_corrupt_fvm() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     // Also wait for any driver binding on the "on-disk" devices
-    let ramdisk_dir =
-        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
-    recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+    if cfg!(feature = "storage-host") {
+        recursive_wait(&fixture.dir("partitions", fio::PERM_READABLE), "part-0").await.unwrap();
+    } else {
+        let ramdisk_dir =
+            fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+    }
 
     let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
         let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
