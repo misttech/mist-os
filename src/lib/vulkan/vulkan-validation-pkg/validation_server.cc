@@ -12,17 +12,11 @@
 
 // Serve /pkg as /pkg in the outgoing directory.
 int main(int argc, const char* const* argv) {
+  constexpr auto kServeFlags = fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermExecutable;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  zx::channel client_end, server_end;
-  zx_status_t status = zx::channel::create(0, &client_end, &server_end);
-  if (status != ZX_OK) {
-    fprintf(stderr, "Couldn't create channel, %d\n", status);
-    return -1;
-  }
-  status = fdio_open("/pkg",
-                     static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                           fuchsia::io::OpenFlags::RIGHT_EXECUTABLE),
-                     server_end.release());
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  zx_status_t status =
+      fdio_open3("/pkg", static_cast<uint64_t>(kServeFlags), server_end.TakeChannel().release());
   if (status != ZX_OK) {
     fprintf(stderr, "Failed to open /pkg");
     return -1;
@@ -31,9 +25,9 @@ int main(int argc, const char* const* argv) {
   vfs::PseudoDir root_dir;
   root_dir.AddEntry("pkg", std::make_unique<vfs::RemoteDir>(std::move(client_end)));
 
-  status = root_dir.Serve(
-      fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_EXECUTABLE,
-      zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST)));
+  fidl::ServerEnd<fuchsia_io::Directory> outgoing_dir{
+      zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST))};
+  status = root_dir.Serve(kServeFlags, std::move(outgoing_dir));
 
   if (status != ZX_OK) {
     fprintf(stderr, "Failed to serve outgoing.");

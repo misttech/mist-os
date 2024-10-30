@@ -510,19 +510,12 @@ void FlatlandScreenshot::TakeFile(fuchsia_ui_composition::ScreenshotTakeFileRequ
 void FlatlandScreenshot::FinishTakeFile(zx::vmo response_vmo) {
   ScreenshotTakeFileResponse response;
   auto [file_client, file_server] = fidl::Endpoints<fuchsia_io::File>::Create();
-
-  if (!file_server.is_valid()) {
-    FX_LOGS(ERROR) << "Cannot create file server channel";
-    return;
-  }
-
   const size_t screenshot_index = served_screenshots_next_id_++;
-  if (ServeScreenshot(file_server.TakeChannel(), std::move(response_vmo), screenshot_index,
+  if (ServeScreenshot(std::move(file_server), std::move(response_vmo), screenshot_index,
                       &served_screenshots_)) {
     response.file() = std::move(file_client);
     response.size() = {display_size_.width, display_size_.height};
   }
-
   take_file_callback_(std::move(response));
   take_file_callback_ = nullptr;
   render_event_.reset();
