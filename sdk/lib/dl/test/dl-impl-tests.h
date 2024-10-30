@@ -32,6 +32,8 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsGlobalMode = false;
   // TODO(https://fxbug.dev/342480690): Support TLS
   static constexpr bool kSupportsTls = false;
+  // TODO(https://fxbug.dev/324136831): Support startup modules
+  static constexpr bool kSupportsStartupModules = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were

@@ -10,6 +10,7 @@
 
 #include "dl-impl-tests.h"
 #include "dl-system-tests.h"
+#include "startup-symbols.h"
 
 // It's too much hassle the generate ELF test modules on a system where the
 // host code is not usually built with ELF, so don't bother trying to test any
@@ -1420,6 +1421,98 @@ TYPED_TEST(DlTests, GlobalModuleOrderingOfDeps) {
 
 // TODO(https://fxbug.dev/362604713)
 // - Test applying RTLD_GLOBAL to a node along the circular dependency chain.
+
+// Test startup modules are global modules managed by the dynamic linker
+// - (startup module) foo-v1 -> foo() returns 2
+// - (startup module) foo-v2 -> foo() returns 7
+// dlopen(foo-v1, RTLD_NOLOAD) and expect the module to be loaded.
+// dlopen(foo-v2, RTLD_NOLOAD) and expect the module to be loaded.
+// dlopen has-foo-v2:
+//  - foo-v2 -> foo() returns 7
+// call foo from has-foo-v2 and expect 2 from global startup module that was
+// loaded first (foo-v1).
+TYPED_TEST(DlTests, StartupModulesBasic) {
+  const std::string kFooV1File = TestShlib("libld-dep-foo-v1");
+  const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
+  const std::string kHasFooV2File = TestShlib("libhas-foo-v2");
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
+
+  if constexpr (!TestFixture::kSupportsStartupModules) {
+    GTEST_SKIP() << "test requires startup module support";
+  }
+
+  // Make sure foo-v1, foo-v2 are linked in with this test by making direct
+  // calls to their unique symbols.
+  EXPECT_EQ(foo_v1_StartupModulesBasic(), kReturnValueFromFooV1);
+  EXPECT_EQ(foo_v2_StartupModulesBasic(), kReturnValueFromFooV2);
+
+  auto foo_v1_open = this->DlOpen(kFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(foo_v1_open.is_ok()) << foo_v1_open.error_value();
+  EXPECT_TRUE(foo_v1_open.value());
+
+  auto foo_v2_open = this->DlOpen(kFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(foo_v2_open.is_ok()) << foo_v2_open.error_value();
+  EXPECT_TRUE(foo_v2_open.value());
+
+  this->Needed({kHasFooV2File});
+
+  auto has_foov2_open = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(has_foov2_open.is_ok()) << has_foov2_open.error_value();
+  EXPECT_TRUE(has_foov2_open.value());
+
+  auto has_foo_v2 = this->DlSym(has_foov2_open.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(has_foo_v2.is_ok()) << has_foo_v2.error_value();
+  ASSERT_TRUE(has_foo_v2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2.value()), kReturnValueFromFooV1);
+
+  ASSERT_TRUE(this->DlClose(foo_v1_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(foo_v2_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(has_foov2_open.value()).is_ok());
+}
+
+// Test that global modules that are dlopen-ed are ordered after startup modules.
+// (startup module) has-foo-v1:
+//     - foo-v1 -> foo() returns 2
+// dlopen RTLD_GLOBAL has-foo-v2:
+//  - foo-v2 -> foo() returns 7
+// call foo from has-foo-v2 and expect 2 from global startup module that was
+// loaded first (foo-v1).
+TYPED_TEST(DlTests, StartupModulesPriorityOverGlobal) {
+  const std::string kHasFooV1File = TestShlib("libhas-foo-v1");
+  const std::string kHasFooV2File = TestShlib("libhas-foo-v2");
+  const std::string kFooV2DepFile = TestShlib("libld-dep-foo-v2");
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+
+  if constexpr (!TestFixture::kSupportsStartupModules) {
+    GTEST_SKIP() << "test requires startup module support";
+  }
+
+  // Make sure has-foo-v1 is linked in with this test by making a direct call to
+  // its unique symbol.
+  EXPECT_EQ(call_foo_v1_StartupModulesPriorityOverGlobal(), kReturnValueFromFooV1);
+
+  auto startup_parent_open =
+      this->DlOpen(kHasFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(startup_parent_open.is_ok()) << startup_parent_open.error_value();
+  EXPECT_TRUE(startup_parent_open.value());
+
+  this->Needed({kHasFooV2File, kFooV2DepFile});
+
+  auto has_foov2_open = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(has_foov2_open.is_ok()) << has_foov2_open.error_value();
+  EXPECT_TRUE(has_foov2_open.value());
+
+  auto has_foo_v2 = this->DlSym(has_foov2_open.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(has_foo_v2.is_ok()) << has_foo_v2.error_value();
+  ASSERT_TRUE(has_foo_v2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2.value()), kReturnValueFromFooV1);
+
+  ASSERT_TRUE(this->DlClose(startup_parent_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(has_foov2_open.value()).is_ok());
+}
 
 // A common test subroutine for basic TLS accesses.
 //
