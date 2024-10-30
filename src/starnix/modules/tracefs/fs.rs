@@ -55,8 +55,7 @@ impl TraceFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-
-        let trace_event_queue = Arc::new(TraceEventQueue::new()?);
+        let trace_event_queue = Arc::new(TraceEventQueue::new(&kernel.inspect_node)?);
         let fs = FileSystem::new(kernel, CacheMode::Uncached, TraceFs, options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
 

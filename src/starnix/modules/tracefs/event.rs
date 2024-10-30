@@ -21,6 +21,9 @@ const COMMIT_FIELD_OFFSET: u64 = std::mem::size_of::<u64>() as u64;
 // The event id for atrace events.
 const FTRACE_PRINT_ID: u16 = 5;
 
+// Used for inspect tracking.
+const DROPPED_PAGES: &str = "dropped_pages";
+
 #[repr(C)]
 #[derive(Debug, Default, IntoBytes, Immutable)]
 struct PrintEventHeader {
@@ -158,6 +161,10 @@ struct TraceEventQueueMetadata {
 
     /// If true, overwrites old pages of events when queue is full. Defaults to true.
     overwrite: bool,
+
+    /// The number of pages of events dropped because the ring buffer was full and the queue is in
+    /// overwrite mode.
+    dropped_pages: u64,
 }
 
 impl TraceEventQueueMetadata {
@@ -171,6 +178,7 @@ impl TraceEventQueueMetadata {
             tracing_enabled: false,
             is_readable: false,
             overwrite: true,
+            dropped_pages: 0,
         }
     }
 
@@ -219,6 +227,7 @@ impl TraceEventQueueMetadata {
             if maybe_new_tail_page == self.head_page_offset() {
                 if self.overwrite {
                     self.head += *PAGE_SIZE;
+                    self.dropped_pages += 1;
                 } else {
                     return error!(ENOMEM);
                 }
@@ -288,15 +297,19 @@ pub struct TraceEventQueue {
     ///   // size of the page header.
     ///   N trace events
     ring_buffer: MemoryObject,
+
+    /// Insepct node used for diagnostics.
+    tracefs_node: fuchsia_inspect::Node,
 }
 
 impl<'a> TraceEventQueue {
-    pub fn new() -> Result<Self, Errno> {
+    pub fn new(inspect_node: &fuchsia_inspect::Node) -> Result<Self, Errno> {
+        let tracefs_node = inspect_node.create_child("tracefs");
         let metadata = TraceEventQueueMetadata::new();
         let ring_buffer: MemoryObject = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0)
             .map_err(|_| errno!(ENOMEM))?
             .into();
-        Ok(Self { metadata: Mutex::new(metadata), ring_buffer })
+        Ok(Self { metadata: Mutex::new(metadata), ring_buffer, tracefs_node })
     }
 
     pub fn is_enabled(&self) -> bool {
@@ -316,6 +329,7 @@ impl<'a> TraceEventQueue {
 
     pub fn disable(&self) -> Result<(), Errno> {
         let mut metadata = self.metadata.lock();
+        self.tracefs_node.record_uint(DROPPED_PAGES, metadata.dropped_pages);
         *metadata = TraceEventQueueMetadata::new();
         self.ring_buffer.set_size(0).map_err(|e| from_status_like_fdio!(e))?;
         Ok(())
@@ -463,6 +477,8 @@ mod tests {
         // Otherwise, reserving should wrap around to the front of the ring buffer.
         metadata.overwrite = true;
         assert_eq!(metadata.reserve(30), Ok(PAGE_HEADER_SIZE));
+        assert_eq!(metadata.head_page_offset(), *PAGE_SIZE);
+        assert_eq!(metadata.dropped_pages, 1);
     }
 
     #[fuchsia::test]
@@ -488,14 +504,16 @@ mod tests {
 
     #[fuchsia::test]
     fn read_empty_queue() {
-        let queue = TraceEventQueue::new().expect("create queue");
+        let inspect_node = fuchsia_inspect::Node::default();
+        let queue = TraceEventQueue::new(&inspect_node).expect("create queue");
         let mut buffer = VecOutputBuffer::new(*PAGE_SIZE as usize);
         assert_eq!(queue.read(&mut buffer), error!(EAGAIN));
     }
 
     #[fuchsia::test]
     fn enable_disable_queue() {
-        let queue = TraceEventQueue::new().expect("create queue");
+        let inspect_node = fuchsia_inspect::Node::default();
+        let queue = TraceEventQueue::new(&inspect_node).expect("create queue");
         assert_eq!(queue.ring_buffer.get_size(), 0);
 
         // Enable tracing and check the queue's state.
@@ -537,7 +555,8 @@ mod tests {
     // This can be removed when we support reading incomplete pages.
     #[fuchsia::test]
     fn single_trace_event_fails_read() {
-        let queue = TraceEventQueue::new().expect("create queue");
+        let inspect_node = fuchsia_inspect::Node::default();
+        let queue = TraceEventQueue::new(&inspect_node).expect("create queue");
         queue.enable().expect("enable queue");
         let queue_start_timestamp = queue.prev_timestamp();
 
@@ -554,7 +573,8 @@ mod tests {
 
     #[fuchsia::test]
     fn page_overflow() {
-        let queue = TraceEventQueue::new().expect("create queue");
+        let inspect_node = fuchsia_inspect::Node::default();
+        let queue = TraceEventQueue::new(&inspect_node).expect("create queue");
         queue.enable().expect("enable queue");
         let queue_start_timestamp = queue.prev_timestamp();
         let timestamp = zx::MonotonicInstant::get();
