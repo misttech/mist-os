@@ -501,6 +501,7 @@ zx_system_get_physmem
 zx_thread_create
 zx_thread_self
 zx_ticks_get
+zx_ticks_get_boot
 zx_ticks_per_second
 zx_timer_cancel
 zx_timer_create
