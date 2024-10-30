@@ -62,7 +62,7 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
                   ],
                   "effects": [
                     {
-                      "lib": "audio-core-api-test-effects.so",
+                      "lib": "audio_core_api_test_effects.so",
                       "effect": "sleeper_filter",
                       "name": "sleeper"
                     }
@@ -281,7 +281,7 @@ class AudioRendererPipelineUnderflowTest : public HermeticAudioTest {
                   ],
                   "effects": [
                     {
-                      "lib": "audio-core-api-test-effects.so",
+                      "lib": "audio_core_api_test_effects.so",
                       "effect": "sleeper_filter",
                       "name": "sleeper"
                     }
@@ -347,7 +347,7 @@ class AudioRendererEffectsV1Test
                   ],
                   "effects": [
                     {
-                      "lib": "audio-core-api-test-effects.so",
+                      "lib": "audio_core_api_test_effects.so",
                       "effect": "inversion_filter",
                       "name": "inverter"
                     }
@@ -466,7 +466,7 @@ class AudioRendererPipelineTuningTest
                   ],
                   "effects": [
                     {
-                      "lib": "audio-core-api-test-effects.so",
+                      "lib": "audio_core_api_test_effects.so",
                       "effect": "inversion_filter",
                       "name": "inverter"
                     }

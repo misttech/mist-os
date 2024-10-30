@@ -41,13 +41,13 @@ class AudioCoreThermalTest : public HermeticPipelineTest {
                   ],
                   "effects": [
                     {
-                      "lib": "audio-core-api-test-effects.so",
+                      "lib": "audio_core_api_test_effects.so",
                       "effect": "doubler_filter",
                       "name": "doubler",
                       "config": { "enabled": true }
                     },
                     {
-                      "lib": "audio-core-api-test-effects.so",
+                      "lib": "audio_core_api_test_effects.so",
                       "effect": "inversion_filter",
                       "name": "inverter",
                       "config": { "enabled": false }

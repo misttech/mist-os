@@ -6,14 +6,14 @@ import("pipeline_benchmark_v2.gni")
 
 group("tools") {
   testonly = true
-  deps = [ ":audio-pipeline-benchmark-empty-pipeline" ]
+  deps = [ ":audio_pipeline_benchmark_empty_pipeline" ]
 }
 
 # Included to ensure we have a rule that builds this executable.
 # This needs to be a system-test so that config-data is available.
 # See config-data use in ../pipeline_benchmark_v2.gni
 # Run with the following command on the device:
-# $ run-test-suite --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/audio-pipeline-benchmark-empty-pipeline#meta/audio-pipeline-benchmark-empty-pipeline.cm
-audio_pipeline_benchmark("audio-pipeline-benchmark-empty-pipeline") {
+# $ run-test-suite --realm /core/testing:system-tests fuchsia-pkg://fuchsia.com/audio_pipeline_benchmark_empty_pipeline#meta/audio_pipeline_benchmark_empty_pipeline.cm
+audio_pipeline_benchmark("audio_pipeline_benchmark_empty_pipeline") {
   config_files = [ "testdata_empty_pipeline/audio_core_config.json" ]
 }

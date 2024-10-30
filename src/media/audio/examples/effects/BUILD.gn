@@ -46,7 +46,7 @@ cc_test_executable("test_bin") {
   testonly = true
   output_name = "audio_effects_example_tests"
 
-  sources = [ "test/audio_effects_example_tests.cc" ]
+  sources = [ "test/audio_effects_example_test.cc" ]
 
   deps = [
     ":headers",

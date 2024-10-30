@@ -12,23 +12,23 @@ group("api") {
   testonly = true
 
   deps = [
-    ":audio-core-api-error-tests",
-    ":audio-core-api-test-effects",
-    ":audio-core-api-tests",
+    ":audio_core_api_error_tests",
+    ":audio_core_api_test_effects",
+    ":audio_core_api_tests",
   ]
 
   # These have real-time requirements and must run in release builds (debug builds are too slow).
   if (!is_debug) {
     deps += [
-      ":audio-core-api-pipeline-error-tests",
-      ":audio-core-api-pipeline-tests",
+      ":audio_core_api_pipeline_error_tests",
+      ":audio_core_api_pipeline_tests",
       ":audio_core_fidelity_tests",
       ":audio_core_thermal_tests",
     ]
   }
 }
 
-loadable_module("audio-core-api-test-effects") {
+loadable_module("audio_core_api_test_effects") {
   sources = [ "effects.cc" ]
 
   deps = [
@@ -72,7 +72,7 @@ source_set("fidelity_results") {
   ]
 }
 
-audio_core_api_test_component("activity-reporter-test") {
+audio_core_api_test_component("audio-activity-reporter-test") {
   source = "activity_reporter_test.cc"
   executable_deps = []
   test_type = "system"
@@ -110,7 +110,7 @@ audio_core_api_test_component("audio-clock-pipeline-test") {
   test_type = "system"
 }
 
-audio_core_api_test_component("audio_core_fidelity_test") {
+audio_core_api_test_component("audio-core-fidelity-test") {
   source = "audio_core_fidelity_test.cc"
   executable_deps = [
     ":fidelity_results",
@@ -120,7 +120,7 @@ audio_core_api_test_component("audio_core_fidelity_test") {
   test_type = "system"
 }
 
-audio_core_api_test_component("audio_core_thermal_test") {
+audio_core_api_test_component("audio-core-thermal-test") {
   source = "audio_core_thermal_test.cc"
   executable_deps = [
     "//src/media/audio/lib/analysis",
@@ -132,6 +132,18 @@ audio_core_api_test_component("audio_core_thermal_test") {
 audio_core_api_test_component("audio-device-enumerator-test") {
   source = "audio_device_enumerator_test.cc"
   executable_deps = [ "//src/media/audio/audio_core/v1/testing" ]
+  test_type = "system"
+}
+
+audio_core_api_test_component("audio-gain-control-test") {
+  source = "gain_control_test.cc"
+  executable_deps = [ ":audio_api_test_shared" ]
+  test_type = "system"
+}
+
+audio_core_api_test_component("audio-gain-control-error-test") {
+  source = "gain_control_error_test.cc"
+  executable_deps = [ ":audio_api_test_shared" ]
   test_type = "system"
 }
 
@@ -186,15 +198,22 @@ audio_core_api_test_component("audio-tuner-test") {
   test_type = "system"
 }
 
-audio_core_api_test_component("gain-control-test") {
-  source = "gain_control_test.cc"
-  executable_deps = [ ":audio_api_test_shared" ]
+audio_core_api_test_component("audio-usage-gain-reporter-test") {
+  source = "usage_gain_reporter_test.cc"
+  executable_deps =
+      [ "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_hlcpp" ]
   test_type = "system"
 }
 
-audio_core_api_test_component("gain-control-error-test") {
-  source = "gain_control_error_test.cc"
-  executable_deps = [ ":audio_api_test_shared" ]
+audio_core_api_test_component("audio-usage-reporter-test") {
+  source = "usage_reporter_test.cc"
+  executable_deps = []
+  test_type = "system"
+}
+
+audio_core_api_test_component("audio-volume-control-test") {
+  source = "volume_control_test.cc"
+  executable_deps = []
   test_type = "system"
 }
 
@@ -214,42 +233,23 @@ audio_core_api_test_component("ultrasound-error-test") {
   test_type = "system"
 }
 
-audio_core_api_test_component("usage-gain-reporter-test") {
-  source = "usage_gain_reporter_test.cc"
-  executable_deps =
-      [ "//sdk/fidl/fuchsia.media.audio:fuchsia.media.audio_hlcpp" ]
-  test_type = "system"
-}
-
-audio_core_api_test_component("usage-reporter-test") {
-  source = "usage_reporter_test.cc"
-  executable_deps = []
-  test_type = "system"
-}
-
-audio_core_api_test_component("volume-control-test") {
-  source = "volume_control_test.cc"
-  executable_deps = []
-  test_type = "system"
-}
-
 # These tests can run anywhere, including in emulators.
-audio_core_test_package("audio-core-api-tests") {
-  package_deps = [ ":audio-core-api-test-effects" ]
+audio_core_test_package("audio_core_api_tests") {
+  package_deps = [ ":audio_core_api_test_effects" ]
   audio_core_manifest_shards =
       [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
   test_components = [
-    ":activity-reporter-test",
+    ":audio-activity-reporter-test",
     ":audio-capturer-test",
     ":audio-device-enumerator-test",
+    ":audio-gain-control-test",
     ":audio-renderer-test",
     ":audio-test",
-    ":gain-control-test",
+    ":audio-usage-gain-reporter-test",
+    ":audio-usage-reporter-test",
+    ":audio-volume-control-test",
     ":ultrasound-test",
-    ":usage-gain-reporter-test",
-    ":usage-reporter-test",
-    ":volume-control-test",
   ]
 
   # Tests that intentionally cause ERROR logs in audio_core have been moved to another test suite.
@@ -261,20 +261,20 @@ audio_core_test_package("audio-core-api-tests") {
 }
 
 # These tests can run anywhere, including in emulators.
-audio_core_test_package("audio-core-api-error-tests") {
-  package_deps = [ ":audio-core-api-test-effects" ]
+audio_core_test_package("audio_core_api_error_tests") {
+  package_deps = [ ":audio_core_api_test_effects" ]
   audio_core_manifest_shards =
       [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
   test_components = [
     ":audio-capturer-error-test",
+    ":audio-gain-control-error-test",
     ":audio-renderer-error-test",
     ":audio-tuner-test",
-    ":gain-control-error-test",
     ":ultrasound-error-test",
   ]
 
-  # This suite includes cases from audio-core-api-tests and audio-core-api-pipeline-tests that
+  # This suite includes cases from audio_core_api_tests and audio_core_api_pipeline_tests that
   # intentionally cause audio_core to log at the ERROR level.
   test_specs = {
     log_settings = {
@@ -284,8 +284,8 @@ audio_core_test_package("audio-core-api-error-tests") {
 }
 
 # These tests have real-time constraints and must run on real hardware (emulators are too slow).
-audio_core_test_package("audio-core-api-pipeline-tests") {
-  package_deps = [ ":audio-core-api-test-effects" ]
+audio_core_test_package("audio_core_api_pipeline_tests") {
+  package_deps = [ ":audio_core_api_test_effects" ]
   audio_core_manifest_shards =
       [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
@@ -306,14 +306,14 @@ audio_core_test_package("audio-core-api-pipeline-tests") {
 }
 
 # These tests have real-time constraints and must run on real hardware (emulators are too slow).
-audio_core_test_package("audio-core-api-pipeline-error-tests") {
-  package_deps = [ ":audio-core-api-test-effects" ]
+audio_core_test_package("audio_core_api_pipeline_error_tests") {
+  package_deps = [ ":audio_core_api_test_effects" ]
   audio_core_manifest_shards =
       [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
   test_components = [ ":audio-renderer-pipeline-error-test" ]
 
-  # This suite includes cases from audio-core-api-pipeline-tests that intentionally cause audio_core
+  # This suite includes cases from audio_core_api_pipeline_tests that intentionally cause audio_core
   # to log at the ERROR level.
   test_specs = {
     log_settings = {
@@ -328,7 +328,7 @@ audio_core_test_package("audio_core_fidelity_tests") {
   audio_core_manifest_shards =
       [ "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml" ]
 
-  test_components = [ ":audio_core_fidelity_test" ]
+  test_components = [ ":audio-core-fidelity-test" ]
 
   # Many of the above tests print ERROR logs in cases where the client makes an error.
   test_specs = {
@@ -341,13 +341,13 @@ audio_core_test_package("audio_core_fidelity_tests") {
 
 # These tests have real-time constraints and must run on real hardware (emulators are too slow).
 audio_core_test_package("audio_core_thermal_tests") {
-  package_deps = [ ":audio-core-api-test-effects" ]
+  package_deps = [ ":audio_core_api_test_effects" ]
   audio_core_manifest_shards = [
     "//sdk/lib/syslog/client.shard.cml",
     "//src/media/audio/audio_core/meta/audio_core.shard.ultrasound.cml",
   ]
 
-  test_components = [ ":audio_core_thermal_test" ]
+  test_components = [ ":audio-core-thermal-test" ]
 
   # AudioCore emits ERRORs upon output pipeline underflows, which are not incorrect audio,
   # but they are system failures (and are no longer expected) so we consider them failures.
