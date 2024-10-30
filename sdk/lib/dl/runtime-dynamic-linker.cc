@@ -18,6 +18,9 @@ RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
 fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule& root,
                                                              const char* ref) {
   Diagnostics diag;
+  // The root module's name is included in symbol not found errors.
+  ld::ScopedModuleDiagnostics root_diag{diag, root.name().str()};
+
   elfldltl::SymbolName name{ref};
   // TODO(https://fxbug.dev/338229633): use elfldltl::MakeSymbolResolver.
   for (const RuntimeModule& module : root.module_tree()) {

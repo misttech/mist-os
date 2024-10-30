@@ -66,14 +66,14 @@ using DlTests = Fixture;
 // Example:
 //    EXPECT_THAT(msg, IsUndefinedSymbolErrMsg(name, module));
 MATCHER_P2(IsUndefinedSymbolErrMsg, symbol_name, module_name,
-           std::format("error for undefined symbol {} in module{}", symbol_name, module_name)) {
+           std::format("error for undefined symbol {} in module {}", symbol_name, module_name)) {
   return testing::ExplainMatchResult(
       MatchesRegex(std::format(
           // Emitted by Fuchsia-musl when dlsym fails to locate the symbol.
           "Symbol not found: {}"
           // Emitted by Fuchsia-musl when relocation fails to resolve the symbol.
           "|.*Error relocating {}: {}: symbol not found"
-          // Emitted by Linux-glibc.
+          // Emitted by Linux-glibc and Libdl.
           "|.*{}: undefined symbol: {}",
           symbol_name, module_name, symbol_name, module_name, symbol_name)),
       arg, result_listener);
