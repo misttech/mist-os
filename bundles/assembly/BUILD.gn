@@ -2427,6 +2427,27 @@ assembly_input_bundle("adb_support") {
   ]
 }
 
+# Core Nanohub support. Does not include driver. Driver should be included separately.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: all
+#
+assembly_input_bundle("nanohub_support") {
+  base_packages = [ "//src/starnix/modules/socket-tunnel:sockettunnel" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/starnix/modules/socket-tunnel/meta/sockettunnel.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # This AIB enables testing support, and is meant to be used with either the
 # `common_standard_eng` and `common_standard_userdebug` AIBs.
 #

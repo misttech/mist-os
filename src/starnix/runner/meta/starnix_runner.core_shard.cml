@@ -158,10 +158,11 @@
             availability: "optional",
         },
         {
-            service: "fuchsia.hardware.sockettunnel.Service",
-            from: "parent",
+            protocol: "fuchsia.hardware.sockettunnel.Device",
+            from: "#sockettunnel",
             to: "#starnix_runner",
             availability: "optional",
+            source_availability: "unknown",
         },
         {
             service: "fuchsia.power.broker.ElementInfoProviderService",

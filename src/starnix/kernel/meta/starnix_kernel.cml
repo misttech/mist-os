@@ -84,6 +84,7 @@
             protocol: [
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.feedback.CrashReporter",
+                "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.kernel.Stats",
                 "fuchsia.net.filter.Control",
                 "fuchsia.net.interfaces.admin.Installer",
@@ -118,11 +119,6 @@
                 "fuchsia.vulkan.loader.Loader",
                 "fuchsia.wlan.wlanix.Wlanix",
             ],
-            from: "parent",
-            availability: "optional",
-        },
-        {
-            service: "fuchsia.hardware.sockettunnel.Service",
             from: "parent",
             availability: "optional",
         },

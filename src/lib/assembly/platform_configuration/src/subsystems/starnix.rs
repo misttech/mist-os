@@ -40,6 +40,7 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                     ),
                 )?;
                 builder.platform_bundle("adb_support");
+                builder.platform_bundle("nanohub_support");
             } else {
                 builder.set_config_capability(
                     "fuchsia.starnix.runner.EnableDataCollection",
