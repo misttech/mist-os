@@ -187,28 +187,41 @@ class ProcessMemReader {
 }  // anonymous namespace
 
 zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
-  TRACE_DURATION("elf-search", __func__);
-  ProcessMemReader reader(process);
+  TRACE_DURATION("elf-search", __PRETTY_FUNCTION__);
+  Searcher searcher;
+  return searcher.ForEachModule(process, std::move(action));
+}
 
-  // Read in the process maps.
-  size_t actual, avail;
-  TRACE_DURATION_BEGIN("elf-search", "ForEachModule/ReadProcessMaps");
-  zx_status_t status = process.get_info(ZX_INFO_PROCESS_MAPS, nullptr, 0, &actual, &avail);
-  TRACE_DURATION_END("elf-search", "ForEachModule/ReadProcessMaps");
-  if (status != ZX_OK) {
-    return status;
-  }
-  std::unique_ptr<zx_info_maps[]> maps;
-  do {
-    TRACE_DURATION_BEGIN("elf-search", "ForEachModule/ReadProcessMapsLoop");
+zx_status_t Searcher::Reserve(size_t target_size) {
+  TRACE_DURATION("elf-search", "AllocateBuffer");
+  if (target_size > capacity_) {
     fbl::AllocChecker ac;
-    maps.reset(new (&ac) zx_info_maps[avail]);
+    zx_info_maps* new_buffer = new (&ac) zx_info_maps[target_size];
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
-    status = process.get_info(ZX_INFO_PROCESS_MAPS, maps.get(), avail * sizeof(zx_info_maps),
+    maps_.reset(new_buffer);
+    capacity_ = target_size;
+  }
+  return ZX_OK;
+}
+
+zx_status_t Searcher::ForEachModule(const zx::process& process, ModuleAction action) {
+  TRACE_DURATION("elf-search", __PRETTY_FUNCTION__);
+  ProcessMemReader reader(process);
+
+  zx_status_t status;
+  size_t actual, avail = 0;
+  do {
+    // On the first pass of this loop with a freshly constructed Searcher, this will be a no-op.
+    status = Reserve(avail);
+    if (status != ZX_OK) {
+      return status;
+    }
+
+    TRACE_DURATION("elf-search", "ReadProcessMaps");
+    status = process.get_info(ZX_INFO_PROCESS_MAPS, maps_.get(), capacity_ * sizeof(zx_info_maps),
                               &actual, &avail);
-    TRACE_DURATION_END("elf-search", "ForEachModule/ReadProcessMapsLoop");
     if (status != ZX_OK) {
       return status;
     }
@@ -223,8 +236,8 @@ zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
   zx_vaddr_t end_of_last_module = 0;
 
   for (size_t i = 0; i < actual; ++i) {
-    TRACE_DURATION("elf-search", "ForEachModule/IterateMaps");
-    const auto& map = maps[i];
+    TRACE_DURATION("elf-search", "IterateMaps");
+    const auto& map = maps_[i];
 
     // Skip regions overlapping with the last module to avoid parsing the same ELF header twice.
     if (map.base < end_of_last_module) {
