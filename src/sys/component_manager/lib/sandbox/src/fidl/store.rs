@@ -4,7 +4,7 @@
 
 use crate::dict::Key;
 use crate::fidl::registry;
-use crate::{Capability, Connector, Dict, Message};
+use crate::{Capability, Connector, Dict, DirConnector, Message};
 use fidl::handle::Signals;
 use fidl::AsHandleRef;
 use futures::{FutureExt, TryStreamExt};
@@ -70,6 +70,21 @@ pub async fn serve_capability_store(
                 let result = (|| {
                     let this = get_connector(&store, id)?;
                     let _ = this.send(Message { channel: server_end });
+                    Ok(())
+                })();
+                responder.send(result)?;
+            }
+            fsandbox::CapabilityStoreRequest::DirConnectorCreate { id, receiver, responder } => {
+                let result = (|| {
+                    let connector = DirConnector::new_with_owned_receiver(receiver);
+                    insert_capability(&mut store, id, Capability::DirConnector(connector))
+                })();
+                responder.send(result)?;
+            }
+            fsandbox::CapabilityStoreRequest::DirConnectorOpen { id, server_end, responder } => {
+                let result = (|| {
+                    let this = get_dir_connector(&store, id)?;
+                    let _ = this.send(server_end);
                     Ok(())
                 })();
                 responder.send(result)?;
@@ -407,6 +422,18 @@ fn get_connector(
 ) -> Result<&Connector, fsandbox::CapabilityStoreError> {
     let conn = store.get(&id).ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
     if let Capability::Connector(conn) = conn {
+        Ok(conn)
+    } else {
+        Err(fsandbox::CapabilityStoreError::WrongType)
+    }
+}
+
+fn get_dir_connector(
+    store: &HashMap<u64, Capability>,
+    id: u64,
+) -> Result<&DirConnector, fsandbox::CapabilityStoreError> {
+    let conn = store.get(&id).ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+    if let Capability::DirConnector(conn) = conn {
         Ok(conn)
     } else {
         Err(fsandbox::CapabilityStoreError::WrongType)

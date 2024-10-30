@@ -81,6 +81,7 @@ impl Explain for RemoteError {
 pub enum Capability {
     Unit(crate::Unit),
     Connector(crate::Connector),
+    DirConnector(crate::DirConnector),
     Dictionary(crate::Dict),
     Data(crate::Data),
     Directory(crate::Directory),
@@ -104,6 +105,7 @@ impl Capability {
     pub fn try_clone(&self) -> Result<Self, ()> {
         let out = match self {
             Self::Connector(s) => Self::Connector(s.clone()),
+            Self::DirConnector(s) => Self::DirConnector(s.clone()),
             Self::ConnectorRouter(s) => Self::ConnectorRouter(s.clone()),
             Self::DictionaryRouter(s) => Self::DictionaryRouter(s.clone()),
             Self::DirEntryRouter(s) => Self::DirEntryRouter(s.clone()),
@@ -122,6 +124,7 @@ impl Capability {
     pub fn debug_typename(&self) -> &'static str {
         match self {
             Self::Connector(_) => crate::Connector::debug_typename(),
+            Self::DirConnector(_) => crate::DirConnector::debug_typename(),
             Self::ConnectorRouter(_) => crate::Router::<crate::Connector>::debug_typename(),
             Self::DictionaryRouter(_) => crate::Router::<crate::Dict>::debug_typename(),
             Self::DirEntryRouter(_) => crate::Router::<crate::DirEntry>::debug_typename(),
@@ -143,6 +146,17 @@ impl TryFrom<Capability> for crate::Connector {
     fn try_from(c: Capability) -> Result<Self, Self::Error> {
         match c {
             Capability::Connector(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for crate::DirConnector {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::DirConnector(c) => Ok(c),
             _ => Err(()),
         }
     }

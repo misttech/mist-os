@@ -33,6 +33,11 @@ type Connector = resource struct {
 };
 
 @available(added=HEAD)
+type DirConnector = resource struct {
+    token Token;
+};
+
+@available(added=HEAD)
 type DirEntry = resource struct {
     token Token;
 };
@@ -52,7 +57,7 @@ type Capability = flexible resource union {
     3: data Data;
     4: dictionary DictionaryRef;
     5: connector Connector;
-    6: directory_connector Connector;
+    6: dir_connector DirConnector;
     7: directory client_end:fuchsia.io.Directory;
     8: dir_entry DirEntry;
     9: connector_router client_end:ConnectorRouter;
@@ -233,6 +238,37 @@ open protocol CapabilityStore {
     flexible ConnectorOpen(resource struct {
         id CapabilityId;
         server_end zx.Handle:CHANNEL;
+    }) -> () error CapabilityStoreError;
+
+    /// Creates a [DirConnector] from a [DirReceiver]. Incoming connections to the [DirConnector]
+    /// will be dispatched to this [DirReceiver].
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if a capability with `id` already exists in this store.
+    flexible DirConnectorCreate(resource struct {
+        id NewCapabilityId;
+        receiver client_end:DirReceiver;
+    }) -> () error CapabilityStoreError;
+
+    /// Open a connection from the provided [DirConnector] capability that will be dispatched to
+    /// the [DirReceiver] on the other end.
+    ///
+    /// This method does not take `Open`/`Open3` parameters such as `flags` or `path`.
+    /// Clients that wish to specify these can get an initial connection from this method
+    /// and call `fuchsia.io/Directory.Open` on it. See the [DirReceiver] documentation for
+    /// more information about the expectations of the server side.
+    ///
+    /// If there was an error making the connection, it will be reported as a zx.Status
+    /// epitaph on `server_end`.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `WRONG_TYPE` if `id` was not a connector capability.
+    flexible DirConnectorOpen(resource struct {
+        id CapabilityId;
+        server_end server_end:fuchsia.io.Directory;
     }) -> () error CapabilityStoreError;
 
     /// Creates a new empty dictionary in this [`CapabilityStore`] with client-assigned `id`.
@@ -565,6 +601,23 @@ open protocol DataRouter {
 open protocol Receiver {
     /// Sends a channel to this receiver.
     flexible Receive(ProtocolPayload);
+};
+
+/// A receiver is served by components and allows them to receive directory channels
+/// framework.
+@discoverable(client="platform")
+@available(added=HEAD)
+open protocol DirReceiver {
+    /// Sends a directory channel to this receiver.
+    ///
+    /// The server should implement this method by forwarding `channel` to a vfs instance
+    /// of the language appropriate `vfs` library. To keep this interface decoupled from
+    /// `fuchsia.io`, it deliberately omits `Open`/`Open3` parameters such as `flags` and
+    /// `path`. If a client wishes to specify these, they can obtain an initial
+    /// [fuchsia.io/Directory] channel first and then call `Open`/`Open3` on it.
+    flexible Receive(resource struct {
+        channel server_end:fuchsia.io.Directory;
+    });
 };
 
 /// Contains a protocol open request.

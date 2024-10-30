@@ -4,6 +4,8 @@
 
 use crate::Message;
 use derivative::Derivative;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{self, UnboundedReceiver};
 use futures::lock::Mutex;
 use futures::StreamExt;
@@ -34,6 +36,36 @@ impl Receiver {
     /// Waits to receive a message, or return `None` if there are no more messages and all
     /// senders are dropped.
     pub async fn receive(&self) -> Option<Message> {
+        let mut receiver_guard = self.inner.lock().await;
+        receiver_guard.next().await
+    }
+}
+
+/// Type that represents the receiving end of a [DirConnector]. The [DirConnector] counterpart of
+/// [Receiver]. Every [DirConnector] is coupled to some [Receiver] to which connection requests to
+/// that [DirConnector] (or any of its clones) are delivered.
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct DirReceiver {
+    /// `inner` uses an async mutex because it will be locked across an await point
+    /// when asynchronously waiting for the next message.
+    inner: Arc<Mutex<UnboundedReceiver<ServerEnd<fio::DirectoryMarker>>>>,
+}
+
+impl Clone for DirReceiver {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
+
+impl DirReceiver {
+    pub fn new(receiver: mpsc::UnboundedReceiver<ServerEnd<fio::DirectoryMarker>>) -> Self {
+        Self { inner: Arc::new(Mutex::new(receiver)) }
+    }
+
+    /// Waits to receive a message, or return `None` if there are no more messages and all
+    /// senders are dropped.
+    pub async fn receive(&self) -> Option<ServerEnd<fio::DirectoryMarker>> {
         let mut receiver_guard = self.inner.lock().await;
         receiver_guard.next().await
     }

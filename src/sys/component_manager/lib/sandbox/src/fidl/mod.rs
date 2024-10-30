@@ -9,6 +9,7 @@ mod data;
 mod data_router;
 pub(crate) mod dict;
 mod dictionary_router;
+mod dir_connector;
 mod dir_entry;
 mod dir_entry_router;
 mod directory;
