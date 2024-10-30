@@ -451,13 +451,13 @@ config("download_outputs") {
 # optimization level by remove default_optimize and manually applying one of
 # the configs below.
 
+# This is the default optimization level for "debug" builds.
 config("optimize_none") {
   cflags = [ "-O0" ]
   ldflags = cflags
   rustflags = [ "-Copt-level=0" ]
 }
 
-# This is the default optimization level for "debug" builds.
 config("optimize_debug") {
   cflags = [ "-Og" ]
   ldflags = cflags
