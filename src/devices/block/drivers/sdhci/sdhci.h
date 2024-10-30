@@ -8,8 +8,6 @@
 #include <fuchsia/hardware/sdhci/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/dma-buffer/buffer.h>
-#include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sdmmc/hw.h>
 #include <lib/sync/completion.h>
@@ -21,13 +19,18 @@
 #include <mutex>
 #include <optional>
 
+#include <ddktl/device.h>
+
 #include "dma-descriptor-builder.h"
 #include "sdhci-reg.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace sdhci {
 
-class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
+class Sdhci;
+using DeviceType = ddk::Device<Sdhci, ddk::Initializable, ddk::Unbindable>;
+
+class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_protocol> {
  public:
   // Visible for testing.
   struct AdmaDescriptor96 {
@@ -50,10 +53,15 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   } __PACKED;
   static_assert(sizeof(AdmaDescriptor64) == 8, "unexpected ADMA2 descriptor size");
 
-  static constexpr char kDriverName[] = "sdhci";
-
-  Sdhci(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
+  Sdhci(zx_device_t* parent, fdf::MmioBuffer regs_mmio_buffer, zx::bti bti, zx::interrupt irq,
+        const ddk::SdhciProtocolClient sdhci, uint64_t quirks, uint64_t dma_boundary_alignment)
+      : DeviceType(parent),
+        regs_mmio_buffer_(std::move(regs_mmio_buffer)),
+        irq_(std::move(irq)),
+        sdhci_(sdhci),
+        bti_(std::move(bti)),
+        quirks_(quirks),
+        dma_boundary_alignment_(dma_boundary_alignment),
         registered_vmo_stores_{
             // SdmmcVmoStore does not have a default constructor, so construct each one using an
             // empty Options (do not map or pin automatically upon VMO registration).
@@ -69,9 +77,13 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
             // clang-format on
         } {}
 
-  zx::result<> Start() override;
+  virtual ~Sdhci() = default;
 
-  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+  static zx_status_t Create(void* ctx, zx_device_t* parent);
+
+  void DdkInit(ddk::InitTxn txn);
+  void DdkRelease();
+  void DdkUnbind(ddk::UnbindTxn txn);
 
   zx_status_t SdmmcHostInfo(sdmmc_host_info_t* out_info);
   zx_status_t SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) TA_EXCL(mtx_);
@@ -90,6 +102,8 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   zx_status_t SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) TA_EXCL(mtx_);
 
   // Visible for testing.
+  zx_status_t Init();
+
   uint32_t base_clock() const { return base_clock_; }
 
  protected:
@@ -128,15 +142,13 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
     return RequestStatus::IDLE;
   }
 
-  // Override to inject dependency for unit testing.
-  virtual zx_status_t InitMmio();
   virtual zx_status_t WaitForReset(SoftwareReset mask);
   virtual zx_status_t WaitForInterrupt() { return irq_.wait(nullptr); }
 
-  std::optional<fdf::MmioBuffer> regs_mmio_buffer_;
+  fdf::MmioBuffer regs_mmio_buffer_;
 
   // DMA descriptors, visible for testing
-  std::unique_ptr<dma_buffer::ContiguousBuffer> iobuf_;
+  std::unique_ptr<dma_buffer::ContiguousBuffer> iobuf_ = {};
 
  private:
   struct OwnedVmoInfo {
@@ -190,8 +202,6 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
 
   static void PrepareCmd(const sdmmc_req_t& req, TransferMode* transfer_mode, Command* command);
 
-  zx_status_t Init();
-
   bool SupportsAdma2() const {
     return (info_.caps & SDMMC_HOST_CAP_DMA) && !(quirks_ & SDHCI_QUIRK_NO_DMA);
   }
@@ -226,9 +236,8 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
 
   zx::interrupt irq_;
   thrd_t irq_thread_;
-  bool irq_thread_started_ = false;
 
-  ddk::SdhciProtocolClient sdhci_;
+  const ddk::SdhciProtocolClient sdhci_;
 
   zx::bti bti_;
 
@@ -242,8 +251,8 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   sdmmc_host_info_t info_ = {};
 
   // Controller specific quirks
-  uint64_t quirks_;
-  uint64_t dma_boundary_alignment_;
+  const uint64_t quirks_;
+  const uint64_t dma_boundary_alignment_;
 
   // Base clock rate
   uint32_t base_clock_ = 0;
@@ -255,12 +264,6 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   std::array<SdmmcVmoStore, SDMMC_MAX_CLIENT_ID + 1> registered_vmo_stores_;
 
   std::optional<PendingRequest> pending_request_ TA_GUARDED(mtx_);
-
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
-
-  compat::BanjoServer sdmmc_server_{ZX_PROTOCOL_SDMMC, this, &sdmmc_protocol_ops_};
-  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace sdhci
