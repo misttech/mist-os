@@ -12,6 +12,7 @@
 #include <lib/zx/process.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
+#include <zircon/system/ulib/elf-search/include/elf-search.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -23,6 +24,8 @@
 #include <src/lib/unwinder/fp_unwinder.h>
 #include <src/lib/unwinder/fuchsia.h>
 #include <src/lib/unwinder/unwind.h>
+
+#include "symbolization_context.h"
 
 namespace profiler {
 struct ThreadTarget {
@@ -122,17 +125,6 @@ struct JobTarget {
   zx::result<> RemoveThread(cpp20::span<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
 };
 
-// Given a process, create a process target containing it and all its threads
-zx::result<profiler::ProcessTarget> MakeProcessTarget(zx::process process);
-
-// Given a job, create a job target containing it, its processes, their threads, and its child jobs.
-// Additionally, the created job will be given the ancestry specified by `ancestry`.
-zx::result<profiler::JobTarget> MakeJobTarget(zx::job job, cpp20::span<const zx_koid_t> ancestry);
-
-// Given a job, create a job target containing it, its processes, their threads, and its child jobs.
-// The resulting job will have no parent or ancestors.
-zx::result<profiler::JobTarget> MakeJobTarget(zx::job job);
-
 class TargetTree {
  public:
   TargetTree() = default;
@@ -203,9 +195,24 @@ class TargetTree {
       const fit::function<zx::result<>(cpp20::span<const zx_koid_t> job_path,
                                        const ProcessTarget& target)>& f);
 
+  // Given a job, create a job target containing it, its processes, their threads, and its child
+  // jobs. Additionally, the created job will be given the ancestry specified by `ancestry`.
+  zx::result<profiler::JobTarget> MakeJobTarget(zx::job job, cpp20::span<const zx_koid_t> ancestry);
+
+  // Given a job, create a job target containing it, its processes, their threads, and its child
+  // jobs. The resulting job will have no parent or ancestors.
+  zx::result<profiler::JobTarget> MakeJobTarget(zx::job job);
+
+  // Given a process, create a process target containing it and all its threads
+  zx::result<profiler::ProcessTarget> MakeProcessTarget(zx::process process);
+
+  zx::result<std::vector<Module>> GetProcessModules(const zx::process&);
+
  private:
   std::unordered_map<zx_koid_t, JobTarget> jobs_;
   std::unordered_map<zx_koid_t, ProcessTarget> processes_;
+
+  elf_search::Searcher searcher_;
 };
 
 }  // namespace profiler

@@ -53,7 +53,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   for (auto&& [koid, job] : tasks.jobs) {
     TRACE_DURATION("cpu_profiler", "PopulateTargets/EachJob");
-    zx::result<profiler::JobTarget> job_target = profiler::MakeJobTarget(std::move(job));
+    zx::result<profiler::JobTarget> job_target = tree.MakeJobTarget(std::move(job));
     if (job_target.is_error()) {
       // A job might exit in the time between us walking the tree and attempting to find its
       // children. Skip it in this case.
@@ -74,8 +74,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
       // children. Skip it in this case.
       continue;
     }
-    zx::result<profiler::ProcessTarget> process_target =
-        profiler::MakeProcessTarget(std::move(process));
+    zx::result<profiler::ProcessTarget> process_target = tree.MakeProcessTarget(std::move(process));
     if (process_target.is_error()) {
       continue;
     }
@@ -111,12 +110,16 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
     profiler::ProcessTarget process_target{std::move(process), pid,
                                            std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
     FX_LOGS(DEBUG) << "Collecting process modules for process " << pid << ".";
-    elf_search::ForEachModule(process_target.handle,
-                              [&process_target](const elf_search::ModuleInfo& info) {
-                                process_target.unwinder_data->modules.emplace_back(
-                                    info.vaddr, &process_target.unwinder_data->memory,
-                                    unwinder::Module::AddressMode::kProcess);
-                              });
+    zx::result<std::vector<profiler::Module>> modules =
+        tree.GetProcessModules(process_target.handle);
+    if (modules.is_error()) {
+      return zx::error(modules.error_value());
+    }
+    for (const auto& module : *modules) {
+      process_target.unwinder_data->modules.emplace_back(module.vaddr,
+                                                         &process_target.unwinder_data->memory,
+                                                         unwinder::Module::AddressMode::kProcess);
+    }
 
     if (zx::result<> res = tree.AddProcess(std::move(process_target)); res.is_error()) {
       // If the process already exists, then we'll just append to the existing one below
@@ -476,7 +479,7 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
     }
     for (auto& [koid, handle] : handles->jobs) {
       if (koid == job_id) {
-        zx::result<JobTarget> target = MakeJobTarget(zx::job(handle.release()));
+        zx::result<JobTarget> target = targets_.MakeJobTarget(zx::job(handle.release()));
         if (target.is_error()) {
           FX_PLOGS(ERROR, target.status_value()) << "Failed to make target for: " << moniker;
           return;

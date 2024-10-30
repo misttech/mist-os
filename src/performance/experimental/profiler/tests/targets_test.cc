@@ -25,10 +25,11 @@
 #include "zircon/types.h"
 
 TEST(TargetsTest, OwnJob) {
+  profiler::TargetTree tree;
   zx::job parent;
   ASSERT_EQ(ZX_OK, zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &parent));
 
-  zx::result<profiler::JobTarget> target = profiler::MakeJobTarget(std::move(parent));
+  zx::result<profiler::JobTarget> target = tree.MakeJobTarget(std::move(parent));
   ASSERT_TRUE(target.is_ok());
 
   // We don't expect to have any sub jobs
@@ -74,11 +75,12 @@ TEST(TargetsTest, JobsDone) {
 
   // Run a bunch of times to give the race condition a chance to occur.
   // Experimentally, the thread above is enough to trigger the race condition about 20% of the time.
+  profiler::TargetTree tree;
   for (size_t i = 0; i < 100; i++) {
     zx::job parent;
     ASSERT_EQ(ZX_OK, zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &parent));
 
-    zx::result<profiler::JobTarget> target = profiler::MakeJobTarget(std::move(parent));
+    zx::result<profiler::JobTarget> target = tree.MakeJobTarget(std::move(parent));
     // This should succeed regardless of if a job disappeared from under us or not. In the log for
     // the test, we'll likely see some warnings about jobs not being found.
     ASSERT_TRUE(target.is_ok());

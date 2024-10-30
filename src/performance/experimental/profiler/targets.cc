@@ -163,7 +163,7 @@ zx::result<std::vector<zx_koid_t>> GetChildrenTids(const zx::process& process) {
   return zx::ok(children);
 }
 
-zx::result<profiler::ProcessTarget> profiler::MakeProcessTarget(zx::process process) {
+zx::result<profiler::ProcessTarget> profiler::TargetTree::MakeProcessTarget(zx::process process) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx_info_handle_basic_t handle_info;
   zx_status_t res =
@@ -190,17 +190,21 @@ zx::result<profiler::ProcessTarget> profiler::MakeProcessTarget(zx::process proc
   }
   profiler::ProcessTarget process_target{std::move(process), handle_info.koid, std::move(threads)};
 
-  elf_search::ForEachModule(*zx::unowned_process{process_target.handle},
-                            [&process_target](const elf_search::ModuleInfo& info) {
-                              process_target.unwinder_data->modules.emplace_back(
-                                  info.vaddr, &process_target.unwinder_data->memory,
-                                  unwinder::Module::AddressMode::kProcess);
-                            });
+  zx::result<std::vector<profiler::Module>> modules =
+      GetProcessModules(*zx::unowned_process{process_target.handle});
+  if (modules.is_error()) {
+    return zx::error(modules.error_value());
+  }
+  for (const auto& module : *modules) {
+    process_target.unwinder_data->modules.emplace_back(module.vaddr,
+                                                       &process_target.unwinder_data->memory,
+                                                       unwinder::Module::AddressMode::kProcess);
+  }
   return zx::ok(std::move(process_target));
 }
 
-zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
-                                                        cpp20::span<const zx_koid_t> ancestry) {
+zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(
+    zx::job job, cpp20::span<const zx_koid_t> ancestry) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx_info_handle_basic_t info;
   if (zx_status_t status =
@@ -289,8 +293,7 @@ zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
         FX_PLOGS(WARNING, status) << "failed to get process: " << process_koid;
         continue;
       }
-      zx::result<profiler::ProcessTarget> process_target =
-          profiler::MakeProcessTarget(std::move(process));
+      zx::result<profiler::ProcessTarget> process_target = MakeProcessTarget(std::move(process));
 
       if (process_target.is_error()) {
         FX_PLOGS(WARNING, process_target.status_value()) << "failed to make process_target";
@@ -303,7 +306,7 @@ zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
                                     std::move(child_job_targets), ancestry});
 }
 
-zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job) {
+zx::result<profiler::JobTarget> profiler::TargetTree::MakeJobTarget(zx::job job) {
   return MakeJobTarget(std::move(job), cpp20::span<const zx_koid_t>{});
 }
 
@@ -424,4 +427,31 @@ zx::result<> profiler::TargetTree::ForEachProcess(
     }
   }
   return zx::ok();
+}
+
+zx::result<std::vector<profiler::Module>> profiler::TargetTree::GetProcessModules(
+    const zx::process& process) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  std::vector<profiler::Module> modules;
+  zx_status_t search_result = searcher_.ForEachModule(
+      process, [&modules, count = 0u](const elf_search::ModuleInfo& info) mutable {
+        TRACE_DURATION("cpu_profiler", "ForEachModule");
+        profiler::Module& mod = modules.emplace_back();
+        mod.module_id = count++;
+        mod.module_name = info.name;
+        mod.vaddr = info.vaddr;
+        std::transform(info.build_id.begin(), info.build_id.end(), std::back_inserter(mod.build_id),
+                       [](const uint8_t byte) { return std::byte{byte}; });
+
+        for (const auto& phdr : info.phdrs) {
+          if (phdr.p_type != PT_LOAD) {
+            continue;
+          }
+          mod.loads.push_back({phdr.p_vaddr, phdr.p_memsz, phdr.p_flags});
+        }
+      });
+  if (search_result != ZX_OK) {
+    return zx::error(search_result);
+  }
+  return zx::ok(std::move(modules));
 }
