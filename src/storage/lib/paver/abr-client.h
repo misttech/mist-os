@@ -119,6 +119,8 @@ class Client {
   Client& operator=(Client&&) = delete;
 
  private:
+  friend class KolaAbrClientTest;
+
   AbrOps abr_ops_;
 
   // ReadAbrMetaData and WriteAbrMetaData will be assigned to fields in AbrOps

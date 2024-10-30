@@ -190,19 +190,6 @@ class KolaAbrClient : public abr::Client {
   }
 
  private:
-  struct GptEntryAttributes {
-    static constexpr uint8_t kKolaMaxPriority = 3;
-
-    GptEntryAttributes(uint64_t flags) : flags(flags) {}
-
-    uint64_t flags;
-    DEF_SUBFIELD(flags, 49, 48, priority);
-    DEF_SUBBIT(flags, 50, active);
-    DEF_SUBFIELD(flags, 53, 51, retry_count);
-    DEF_SUBBIT(flags, 54, boot_success);
-    DEF_SUBBIT(flags, 55, unbootable);
-  };
-
   KolaAbrClient(std::unique_ptr<KolaPartitioner> partitioner, FindPartitionResult zircon_a,
                 FindPartitionResult zircon_b)
       : Client(/*custom=*/true),
@@ -223,10 +210,10 @@ class KolaAbrClient : public abr::Client {
     // The priority field in Kola is only 2 bits wide (max value 3). Normalize AbrSlotData::priority
     // while maintaining the slots' relative priority.
     const uint8_t kola_priority = current.priority >= alternative.priority
-                                      ? GptEntryAttributes::kKolaMaxPriority
-                                      : GptEntryAttributes::kKolaMaxPriority - 1;
+                                      ? KolaGptEntryAttributes::kKolaMaxPriority
+                                      : KolaGptEntryAttributes::kKolaMaxPriority - 1;
 
-    GptEntryAttributes attributes(gpt_entry_flags);
+    KolaGptEntryAttributes attributes(gpt_entry_flags);
     attributes.set_priority(kola_priority)
         .set_retry_count(current.tries_remaining)  // Both fields are 3 bits wide.
         .set_boot_success(current.successful_boot);
@@ -243,13 +230,13 @@ class KolaAbrClient : public abr::Client {
       return slot_info.take_error();
     }
 
-    GptEntryAttributes attributes(gpt_entry_flags);
+    KolaGptEntryAttributes attributes(gpt_entry_flags);
     attributes.set_active(slot_info->is_active).set_unbootable(!slot_info->is_bootable);
     return zx::ok(attributes.flags);
   }
 
   AbrSlotData ToFuchsia(uint64_t gpt_entry_flags) {
-    const GptEntryAttributes attributes(gpt_entry_flags);
+    const KolaGptEntryAttributes attributes(gpt_entry_flags);
 
     AbrSlotData abr_slot_data = {};
     abr_slot_data.priority = static_cast<uint8_t>(attributes.priority());

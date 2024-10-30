@@ -5,6 +5,8 @@
 #ifndef SRC_STORAGE_LIB_PAVER_KOLA_H_
 #define SRC_STORAGE_LIB_PAVER_KOLA_H_
 
+#include <hwreg/bitfields.h>
+
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/gpt.h"
@@ -13,6 +15,19 @@
 namespace paver {
 
 using FindPartitionResult = GptDevicePartitioner::FindPartitionResult;
+
+struct KolaGptEntryAttributes {
+  static constexpr uint8_t kKolaMaxPriority = 3;
+
+  KolaGptEntryAttributes(uint64_t flags) : flags(flags) {}
+
+  uint64_t flags;
+  DEF_SUBFIELD(flags, 49, 48, priority);
+  DEF_SUBBIT(flags, 50, active);
+  DEF_SUBFIELD(flags, 53, 51, retry_count);
+  DEF_SUBBIT(flags, 54, boot_success);
+  DEF_SUBBIT(flags, 55, unbootable);
+};
 
 class KolaPartitioner : public DevicePartitioner {
  public:

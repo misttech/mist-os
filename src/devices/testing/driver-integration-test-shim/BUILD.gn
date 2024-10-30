@@ -87,6 +87,7 @@ source_set("driver-integration-test-shim") {
     "//src/storage/fshost/testing:test-fshost-no-watcher",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
