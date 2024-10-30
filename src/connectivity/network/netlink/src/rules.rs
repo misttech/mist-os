@@ -13,7 +13,7 @@ use either::Either;
 use linux_uapi::{
     rt_class_t_RT_TABLE_DEFAULT, rt_class_t_RT_TABLE_LOCAL, rt_class_t_RT_TABLE_MAIN,
 };
-use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
+use net_types::ip::{GenericOverIp, Ip, IpVersion, IpVersionMarker, Ipv4, Ipv6};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::rule::{RuleAction, RuleAttribute, RuleMessage};
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
@@ -91,14 +91,16 @@ fn to_nlm_new_rule(
     msg
 }
 
-/// A table of PBR rules.
+/// Holds an IP-versioned table of PBR rules.
 ///
 /// Note that Fuchsia does not support policy based routing, so this
 /// implementation merely tracks the state of the "rule table", so that requests
 /// are handled consistently (E.g. RTM_GETRULE correctly returns rules that were
 /// previously installed via RTM_NEWRULE).
-#[derive(Default)]
-struct RuleTableInner {
+#[derive(GenericOverIp, Derivative)]
+#[generic_over_ip(I, Ip)]
+#[derivative(Default(bound = ""))]
+pub(crate) struct RuleTable<I: Ip> {
     /// The rules held by this rule table.
     ///
     /// The [`BTreeMap`] ensures that the rules are sorted by their
@@ -107,10 +109,24 @@ struct RuleTableInner {
     /// the back). This gives the rule table a consistent ordering based first
     /// on priority, and then by age.
     rules: BTreeMap<RulePriority, Vec<RuleMessage>>,
+    _ip_version_marker: IpVersionMarker<I>,
 }
 
-impl RuleTableInner {
-    fn new_with_defaults<I: Ip>() -> RuleTableInner {
+impl<I: Ip> RuleTable<I> {
+    #[cfg(test)]
+    /// Constructs an empty RuleTable.
+    pub(crate) fn new() -> RuleTable<I> {
+        RuleTable { rules: BTreeMap::default(), _ip_version_marker: I::VERSION_MARKER }
+    }
+
+    /// Constructs a RuleTable prepopulated with the default rules present on
+    /// Linux.
+    /// * [V4] 0:        from all lookup local
+    /// * [V4] 32766:    from all lookup main
+    /// * [V4] 32767:    from all lookup default
+    /// * [V6] 0:        from all lookup local
+    /// * [V6] 32766:    from all lookup main
+    pub(crate) fn new_with_defaults() -> RuleTable<I> {
         fn build_lookup_rule<I: Ip>(priority: RulePriority, table: u8) -> RuleMessage {
             let mut rule = RuleMessage::default();
             rule.header.family = match I::VERSION {
@@ -123,7 +139,8 @@ impl RuleTableInner {
             rule
         }
 
-        let mut table = RuleTableInner::default();
+        let mut table =
+            RuleTable { rules: BTreeMap::default(), _ip_version_marker: I::VERSION_MARKER };
         let rules_to_add = match I::VERSION {
             IpVersion::V4 => itertools::Either::Left(
                 [
@@ -290,36 +307,6 @@ impl DelRuleError {
         }
     }
 }
-/// Holds an IPv4 and an IPv6 [`RuleTableInner`].
-///
-/// The inner rule tables are wrapped with `Arc<Mutex>` to support concurrent
-/// access from multiple NETLINK_ROUTE clients.
-pub(crate) struct RuleTable {
-    v4_rules: RuleTableInner,
-    v6_rules: RuleTableInner,
-}
-
-impl RuleTable {
-    #[cfg(test)]
-    /// Constructs an empty RuleTable.
-    pub(crate) fn new() -> RuleTable {
-        RuleTable { v4_rules: RuleTableInner::default(), v6_rules: RuleTableInner::default() }
-    }
-
-    /// Constructs a RuleTable prepopulated with the default rules present on
-    /// Linux.
-    /// * [V4] 0:        from all lookup local
-    /// * [V4] 32766:    from all lookup main
-    /// * [V4] 32767:    from all lookup default
-    /// * [V6] 0:        from all lookup local
-    /// * [V6] 32766:    from all lookup main
-    pub(crate) fn new_with_defaults() -> RuleTable {
-        RuleTable {
-            v4_rules: RuleTableInner::new_with_defaults::<Ipv4>(),
-            v6_rules: RuleTableInner::new_with_defaults::<Ipv6>(),
-        }
-    }
-}
 
 /// The set of possible requests related to PBR rules.
 #[derive(Debug, Clone, PartialEq)]
@@ -335,45 +322,41 @@ pub(crate) enum RuleRequestArgs {
 }
 
 /// A Netlink request related to PBR rules.
-#[derive(Derivative)]
+#[derive(Derivative, GenericOverIp)]
 #[derivative(Debug(bound = ""))]
-pub(crate) struct RuleRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> {
+#[generic_over_ip(I, Ip)]
+pub(crate) struct RuleRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> {
     /// The arguments for this request.
     pub(crate) args: RuleRequestArgs,
-    /// The IP Version of this request.
-    pub(crate) ip_version: IpVersion,
     /// The request's sequence number.
     pub(crate) sequence_number: u32,
     /// The client that made the request.
     pub(crate) client: InternalClient<NetlinkRoute, S>,
+    /// The IP Version of this request.
+    pub(crate) _ip_version_marker: IpVersionMarker<I>,
 }
 
-impl RuleTable {
+impl<I: Ip> RuleTable<I> {
     pub(crate) fn handle_request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
         &mut self,
-        req: RuleRequest<S>,
+        req: RuleRequest<S, I>,
     ) -> Result<(), Errno> {
-        let RuleTable { v4_rules, v6_rules } = self;
-        let RuleRequest { args, ip_version, sequence_number, mut client } = req;
-        let rule_table = match ip_version {
-            IpVersion::V4 => v4_rules,
-            IpVersion::V6 => v6_rules,
-        };
+        let RuleRequest { args, _ip_version_marker: _, sequence_number, mut client } = req;
 
         match args {
             RuleRequestArgs::DumpRules => {
-                for rule in rule_table.iter_rules() {
+                for rule in self.iter_rules() {
                     client.send_unicast(to_nlm_new_rule(rule.clone(), sequence_number, true));
                 }
                 Ok(())
             }
             RuleRequestArgs::New(rule) => {
-                rule_table.add_rule(rule).map_err(|e| e.errno())
+                self.add_rule(rule).map_err(|e| e.errno())
                 // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_NEWRULE`.
             }
             RuleRequestArgs::Del(del_pattern) => {
-                rule_table.del_rule(&del_pattern).map_err(|e| e.errno())
+                self.del_rule(&del_pattern).map_err(|e| e.errno())
                 // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_DELRULE`.
             }
@@ -385,7 +368,9 @@ impl RuleTable {
 mod tests {
     use super::*;
 
+    use ip_test_macro::ip_test;
     use linux_uapi::{AF_INET, AF_INET6, FR_ACT_TO_TBL, FR_ACT_UNSPEC};
+    use net_types::ip::IpInvariant;
     use test_case::test_case;
 
     use crate::messaging::testutil::{FakeSender, FakeSenderSink, SentMessage};
@@ -403,16 +388,15 @@ mod tests {
     }
 
     /// Helper function to dump the rules in the rule table.
-    fn dump_rules(
+    fn dump_rules<I: Ip>(
         sink: &mut FakeSenderSink<RouteNetlinkMessage>,
         client: InternalClient<NetlinkRoute, FakeSender<RouteNetlinkMessage>>,
-        table: &mut RuleTable,
-        ip_version: IpVersion,
+        table: &mut RuleTable<I>,
     ) -> Vec<NetlinkMessage<RouteNetlinkMessage>> {
         table
             .handle_request(RuleRequest {
                 args: RuleRequestArgs::DumpRules,
-                ip_version,
+                _ip_version_marker: I::VERSION_MARKER,
                 sequence_number: DUMP_SEQUENCE_NUM,
                 client: client,
             })
@@ -503,17 +487,18 @@ mod tests {
         assert_eq!(rule_matches_del_pattern(&rule, &pattern), expect_match);
     }
 
+    #[ip_test(I)]
     #[test_case(&[], 0; "no_existing_rules_defaults_to_zero")]
     #[test_case(&[99], 0; "one_existing_rules_defaults_to_zero")]
     #[test_case(&[0, 100], 99; "two_existing_rules_defaults_to_second_minus_1")]
     #[test_case(&[0, 100, 200], 99; "three_existing_rules_defaults_to_second_minus_1")]
     #[test_case(&[0, 1], 0; "default_priority_duplicates_existing_priority")]
     #[test_case(&[0, 0], 0; "default_priority_saturates_at_0")]
-    fn test_rule_table_default_priority(
+    fn test_rule_table_default_priority<I: Ip>(
         existing_rule_priorities: &[RulePriority],
         expected_default_priority: RulePriority,
     ) {
-        let mut table = RuleTableInner::default();
+        let mut table = RuleTable::<I>::default();
         for (index, priority) in existing_rule_priorities.iter().enumerate() {
             // Give each rule a different `OifName` to avoid "already exists"
             // conflicts.
@@ -526,9 +511,9 @@ mod tests {
         assert_eq!(table.default_priority(), expected_default_priority);
     }
 
-    #[test]
-    fn test_rule_table_frees_unused_priorities() {
-        let mut table = RuleTableInner::default();
+    #[ip_test(I)]
+    fn test_rule_table_frees_unused_priorities<I: Ip>() {
+        let mut table = RuleTable::<I>::default();
         const PRIORITY: RulePriority = 99;
         let rule = build_rule(FR_ACT_UNSPEC, vec![RuleAttribute::Priority(PRIORITY)]);
 
@@ -540,15 +525,15 @@ mod tests {
         assert!(!table.rules.contains_key(&PRIORITY));
     }
 
-    #[test_case(IpVersion::V4; "v4")]
-    #[test_case(IpVersion::V6; "v6")]
-    fn test_rule_table(ip_version: IpVersion) {
+    #[test_case(<Ipv4 as Ip>::VERSION_MARKER; "v4")]
+    #[test_case(<Ipv6 as Ip>::VERSION_MARKER; "v6")]
+    fn test_rule_table<I: Ip>(ip_version_marker: IpVersionMarker<I>) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::new();
+        let mut table = RuleTable::<I>::new();
 
         // Verify that the table is empty.
-        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..], &[],);
+        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table)[..], &[],);
 
         const LOW_PRIORITY: RulePriority = 100;
         const HIGH_PRIORITY: RulePriority = 200;
@@ -560,13 +545,13 @@ mod tests {
         table
             .handle_request(RuleRequest {
                 args: RuleRequestArgs::New(low_priority_rule.clone()),
-                ip_version,
+                _ip_version_marker: ip_version_marker,
                 sequence_number: 0,
                 client: client.clone(),
             })
             .expect("new rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table)[..],
             &[to_nlm_new_rule(low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true)]
         );
 
@@ -578,13 +563,13 @@ mod tests {
         table
             .handle_request(RuleRequest {
                 args: RuleRequestArgs::New(newer_low_priority_rule.clone()),
-                ip_version,
+                _ip_version_marker: ip_version_marker,
                 sequence_number: 0,
                 client: client.clone(),
             })
             .expect("new rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table)[..],
             // Ordered oldest to newest
             &[
                 to_nlm_new_rule(low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
@@ -598,13 +583,13 @@ mod tests {
         table
             .handle_request(RuleRequest {
                 args: RuleRequestArgs::New(high_priority_rule.clone()),
-                ip_version,
+                _ip_version_marker: ip_version_marker,
                 sequence_number: 0,
                 client: client.clone(),
             })
             .expect("new rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table)[..],
             &[
                 // Ordered in ascending priority
                 to_nlm_new_rule(low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
@@ -619,13 +604,13 @@ mod tests {
         table
             .handle_request(RuleRequest {
                 args: RuleRequestArgs::Del(del_pattern_match_all.clone()),
-                ip_version,
+                _ip_version_marker: ip_version_marker,
                 sequence_number: 0,
                 client: client.clone(),
             })
             .expect("del rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table)[..],
             &[
                 to_nlm_new_rule(newer_low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
                 to_nlm_new_rule(high_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
@@ -640,13 +625,13 @@ mod tests {
         table
             .handle_request(RuleRequest {
                 args: RuleRequestArgs::Del(del_pattern_match_high_priority),
-                ip_version,
+                _ip_version_marker: ip_version_marker,
                 sequence_number: 0,
                 client: client.clone(),
             })
             .expect("del rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table)[..],
             &[to_nlm_new_rule(newer_low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true)]
         );
 
@@ -656,17 +641,17 @@ mod tests {
         table
             .handle_request(RuleRequest {
                 args: RuleRequestArgs::Del(del_pattern_match_all),
-                ip_version,
+                _ip_version_marker: ip_version_marker,
                 sequence_number: 0,
                 client: client.clone(),
             })
             .expect("del rule should succeed");
-        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..], &[]);
+        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table)[..], &[]);
     }
 
-    #[test_case(IpVersion::V4; "v4")]
-    #[test_case(IpVersion::V6; "v6")]
-    fn test_rule_table_new_rule_already_exists(ip_version: IpVersion) {
+    #[test_case(<Ipv4 as Ip>::VERSION_MARKER; "v4")]
+    #[test_case(<Ipv6 as Ip>::VERSION_MARKER; "v6")]
+    fn test_rule_table_new_rule_already_exists<I: Ip>(ip_version_marker: IpVersionMarker<I>) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
         let mut table = RuleTable::new();
@@ -680,20 +665,20 @@ mod tests {
         table
             .handle_request(RuleRequest {
                 args: RuleRequestArgs::New(rule.clone()),
-                ip_version,
+                _ip_version_marker: ip_version_marker,
                 sequence_number: 0,
                 client: client.clone(),
             })
             .expect("new rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table)[..],
             &[to_nlm_new_rule(rule.clone(), DUMP_SEQUENCE_NUM, true)]
         );
 
         // Adding the same rule should return EEXIST.
         let result = table.handle_request(RuleRequest {
             args: RuleRequestArgs::New(rule.clone()),
-            ip_version,
+            _ip_version_marker: ip_version_marker,
             sequence_number: 0,
             client: client.clone(),
         });
@@ -704,7 +689,7 @@ mod tests {
         let out_of_order_rule = build_rule(FR_ACT_UNSPEC, vec![PRIORITY_NLA, oif_nla.clone()]);
         let result = table.handle_request(RuleRequest {
             args: RuleRequestArgs::New(out_of_order_rule),
-            ip_version,
+            _ip_version_marker: ip_version_marker,
             sequence_number: 0,
             client: client.clone(),
         });
@@ -717,7 +702,7 @@ mod tests {
         let rule_without_priority = build_rule(FR_ACT_UNSPEC, vec![oif_nla.clone()]);
         let result = table.handle_request(RuleRequest {
             args: RuleRequestArgs::New(rule_without_priority),
-            ip_version,
+            _ip_version_marker: ip_version_marker,
             sequence_number: 0,
             client: client.clone(),
         });
@@ -725,81 +710,38 @@ mod tests {
     }
 
     // Conversions are safe as these constants fit into a u8.
-    #[test_case(RuleMessage::default(), Errno::ENOTSUP, IpVersion::V4;
+    #[test_case(RuleMessage::default(), Errno::ENOTSUP, <Ipv4 as Ip>::VERSION_MARKER;
         "empty_patern_not_supported_v4")]
-    #[test_case(build_rule(FR_ACT_TO_TBL, vec![]), Errno::ENOENT, IpVersion::V4;
+    #[test_case(build_rule(FR_ACT_TO_TBL, vec![]), Errno::ENOENT, <Ipv4 as Ip>::VERSION_MARKER;
         "no_matching_rules_v4")]
-    #[test_case(RuleMessage::default(), Errno::ENOTSUP, IpVersion::V4;
+    #[test_case(RuleMessage::default(), Errno::ENOTSUP, <Ipv6 as Ip>::VERSION_MARKER;
         "empty_patern_not_supported_v6")]
-    #[test_case(build_rule(FR_ACT_TO_TBL, vec![]), Errno::ENOENT, IpVersion::V4;
+    #[test_case(build_rule(FR_ACT_TO_TBL, vec![]), Errno::ENOENT, <Ipv6 as Ip>::VERSION_MARKER;
         "no_matching_rules_v6")]
-    fn test_rule_table_del_rule_fails(pattern: RuleMessage, error: Errno, ip_version: IpVersion) {
+    fn test_rule_table_del_rule_fails<I: Ip>(
+        pattern: RuleMessage,
+        error: Errno,
+        ip_version_marker: IpVersionMarker<I>,
+    ) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
         let mut table = RuleTable::new();
-        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table, ip_version)[..], &[]);
+        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table)[..], &[]);
 
         let result = table.handle_request(RuleRequest {
             args: RuleRequestArgs::Del(pattern),
-            ip_version,
+            _ip_version_marker: ip_version_marker,
             sequence_number: 0,
             client: client,
         });
         assert_eq!(result, Err(error));
     }
 
-    #[test_case(IpVersion::V4, IpVersion::V6; "v4_independent_from_v6")]
-    #[test_case(IpVersion::V6, IpVersion::V4; "v6_independent_from_v4")]
-    fn test_v4_and_v6_rule_tables_are_independent(version: IpVersion, opposite_version: IpVersion) {
+    #[ip_test(I)]
+    fn test_default_rules<I: Ip>() {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::new();
-        // Add a new rule to the table and expect success.
-        // Conversion is safe as FR_ACT_UNSPEC (0) fits into a u8.
-        let rule = build_rule(FR_ACT_UNSPEC, vec![RuleAttribute::Priority(1)]);
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::New(rule.clone()),
-                ip_version: version,
-                sequence_number: 0,
-                client: client.clone(),
-            })
-            .expect("new rule should succeed");
-        assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table, version)[..],
-            &[to_nlm_new_rule(rule.clone(), DUMP_SEQUENCE_NUM, true)]
-        );
-
-        // The rule should not be present in the opposite_version's table.
-        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table, opposite_version)[..], &[]);
-
-        // Attempting to delete the rule from the opposite_version's table
-        // should fail.
-        let result = table.handle_request(RuleRequest {
-            args: RuleRequestArgs::Del(rule.clone()),
-            ip_version: opposite_version,
-            sequence_number: 0,
-            client: client.clone(),
-        });
-        assert_eq!(result, Err(Errno::ENOENT));
-
-        // Attempting to add the same rule to the opposite_version's table
-        // should succeed.
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::New(rule.clone()),
-                ip_version: opposite_version,
-                sequence_number: 0,
-                client: client.clone(),
-            })
-            .expect("new rule should succeed");
-    }
-
-    #[test]
-    fn test_default_rules() {
-        let (mut sink, client) =
-            crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::new_with_defaults();
+        let mut table = RuleTable::<I>::new_with_defaults();
 
         let new_rule = |table: u8, priority: RulePriority, family: u16| {
             let mut rule = RuleMessage::default();
@@ -811,41 +753,48 @@ mod tests {
             to_nlm_new_rule(rule, DUMP_SEQUENCE_NUM, true)
         };
         // Conversion is safe as these compile-time constants are guaranteed to fit into a u8.
-        assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table, IpVersion::V4)[..],
-            &[
-                new_rule(
-                    rt_class_t_RT_TABLE_LOCAL as u8,
-                    LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
-                    AF_INET as u16
-                ),
-                new_rule(
-                    rt_class_t_RT_TABLE_MAIN as u8,
-                    LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
-                    AF_INET as u16
-                ),
-                new_rule(
-                    rt_class_t_RT_TABLE_DEFAULT as u8,
-                    LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY,
-                    AF_INET as u16
-                ),
-            ]
-        );
 
-        assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table, IpVersion::V6)[..],
-            &[
-                new_rule(
-                    rt_class_t_RT_TABLE_LOCAL as u8,
-                    LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
-                    AF_INET6 as u16
-                ),
-                new_rule(
-                    rt_class_t_RT_TABLE_MAIN as u8,
-                    LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
-                    AF_INET6 as u16
-                ),
-            ]
-        );
+        I::map_ip_in(
+            (IpInvariant((&mut sink, client.clone())), &mut table),
+            |(IpInvariant((sink, client)), table)| {
+                assert_eq!(
+                    &dump_rules(sink, client, table)[..],
+                    &[
+                        new_rule(
+                            rt_class_t_RT_TABLE_LOCAL as u8,
+                            LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
+                            AF_INET as u16
+                        ),
+                        new_rule(
+                            rt_class_t_RT_TABLE_MAIN as u8,
+                            LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
+                            AF_INET as u16
+                        ),
+                        new_rule(
+                            rt_class_t_RT_TABLE_DEFAULT as u8,
+                            LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY,
+                            AF_INET as u16
+                        ),
+                    ]
+                );
+            },
+            |(IpInvariant((sink, client)), table)| {
+                assert_eq!(
+                    &dump_rules(sink, client, table)[..],
+                    &[
+                        new_rule(
+                            rt_class_t_RT_TABLE_LOCAL as u8,
+                            LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
+                            AF_INET6 as u16
+                        ),
+                        new_rule(
+                            rt_class_t_RT_TABLE_MAIN as u8,
+                            LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
+                            AF_INET6 as u16
+                        ),
+                    ]
+                );
+            },
+        )
     }
 }

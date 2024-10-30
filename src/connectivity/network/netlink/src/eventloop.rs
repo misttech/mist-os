@@ -11,7 +11,7 @@ use derivative::Derivative;
 use futures::channel::{mpsc, oneshot};
 use futures::stream::BoxStream;
 use futures::{FutureExt as _, StreamExt as _};
-use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::ip::{Ip, IpInvariant, Ipv4, Ipv6};
 use {
     fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
@@ -32,7 +32,8 @@ pub(crate) enum UnifiedRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::Inner
     InterfacesRequest(interfaces::Request<S>),
     RoutesV4Request(routes::Request<S, Ipv4>),
     RoutesV6Request(routes::Request<S, Ipv6>),
-    RuleRequest(rules::RuleRequest<S>, oneshot::Sender<Result<(), Errno>>),
+    RuleV4Request(rules::RuleRequest<S, Ipv4>, oneshot::Sender<Result<(), Errno>>),
+    RuleV6Request(rules::RuleRequest<S, Ipv6>, oneshot::Sender<Result<(), Errno>>),
 }
 
 impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> From<routes::Request<S, I>>
@@ -40,6 +41,19 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> From<rout
 {
     fn from(request: routes::Request<S, I>) -> Self {
         I::map_ip_in(request, UnifiedRequest::RoutesV4Request, UnifiedRequest::RoutesV6Request)
+    }
+}
+
+impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> UnifiedRequest<S> {
+    pub(crate) fn rule_request<I: Ip>(
+        request: rules::RuleRequest<S, I>,
+        sender: oneshot::Sender<Result<(), Errno>>,
+    ) -> Self {
+        I::map_ip_in(
+            (request, IpInvariant(sender)),
+            |(request, IpInvariant(sender))| UnifiedRequest::RuleV4Request(request, sender),
+            |(request, IpInvariant(sender))| UnifiedRequest::RuleV6Request(request, sender),
+        )
     }
 }
 
@@ -336,7 +350,8 @@ impl<
             routes_v4_worker,
             routes_v6_worker,
             interfaces_worker,
-            rules_worker: rules::RuleTable::new_with_defaults(),
+            rules_v4_worker: rules::RuleTable::new_with_defaults(),
+            rules_v6_worker: rules::RuleTable::new_with_defaults(),
             unified_pending_request: None,
             unified_event_stream,
             route_clients,
@@ -381,11 +396,12 @@ pub(crate) struct EventLoopState<
     routes_v6_worker: EventLoopComponent<routes::RoutesWorker<Ipv6>, E::RoutesV6Worker>,
     interfaces_worker:
         EventLoopComponent<interfaces::InterfacesWorkerState<H, S>, E::InterfacesWorker>,
+    rules_v4_worker: rules::RuleTable<Ipv4>,
+    rules_v6_worker: rules::RuleTable<Ipv6>,
 
     route_clients: EventLoopComponent<ClientTable<NetlinkRoute, S>, E::RouteClients>,
     interfaces_proxy: EventLoopComponent<fnet_root::InterfacesProxy, E::InterfacesProxy>,
 
-    rules_worker: rules::RuleTable,
     v4_route_table_map:
         EventLoopComponent<crate::route_tables::RouteTableMap<Ipv4>, E::RoutesV4Worker>,
     v6_route_table_map:
@@ -431,7 +447,8 @@ impl<
             routes_v4_worker,
             routes_v6_worker,
             interfaces_worker,
-            rules_worker,
+            rules_v4_worker,
+            rules_v6_worker,
             unified_pending_request,
             unified_request_stream,
             unified_event_stream,
@@ -513,8 +530,12 @@ impl<
                             ).await;
                         *unified_pending_request = request.map(UnifiedPendingRequest::RoutesV6);
                     }
-                    UnifiedRequest::RuleRequest(request, completer) => {
-                        completer.send(rules_worker.handle_request(request))
+                    UnifiedRequest::RuleV4Request(request, completer) => {
+                        completer.send(rules_v4_worker.handle_request(request))
+                            .expect("receiving end of completer should not be dropped");
+                    }
+                    UnifiedRequest::RuleV6Request(request, completer) => {
+                        completer.send(rules_v6_worker.handle_request(request))
                             .expect("receiving end of completer should not be dropped");
                     }
                 }
