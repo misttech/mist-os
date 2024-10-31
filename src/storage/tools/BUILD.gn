@@ -4,15 +4,9 @@
 
 group("tests") {
   testonly = true
-  deps = [
-    "blobfs-compression:tests",
-    "blobfs-corrupt:tests",
-  ]
+  deps = [ "blobfs-compression:tests" ]
 }
 
 group("tools") {
-  deps = [
-    "blobfs-compression",
-    "blobfs-corrupt",
-  ]
+  deps = [ "blobfs-compression" ]
 }
