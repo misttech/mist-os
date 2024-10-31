@@ -62,9 +62,8 @@ class FileOps {
   /// Read from the file at an offset. If the file does not have persistent offsets (either
   /// directly, or because it is not seekable), offset will be 0 and can be ignored.
   /// Returns the number of bytes read.
-  virtual fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file,
-                                          const CurrentTask& current_task, size_t offset,
-                                          OutputBuffer* data) = 0;
+  virtual fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask& current_task,
+                                          size_t offset, OutputBuffer* data) = 0;
 
   /// Write to the file with an offset. If the file does not have persistent offsets (either
   /// directly, or because it is not seekable), offset will be 0 and can be ignored.
@@ -118,7 +117,7 @@ class FileOps {
   /// The `file.offset` lock will be held while entering this method. The implementation must look
   /// at `sink.offset()` to read the current offset into the file.
   virtual fit::result<Errno> readdir(const FileObject& file, const CurrentTask& current_task,
-                                     DirentSink& sink) {
+                                     DirentSink* sink) {
     return fit::error(errno(ENOTDIR));
   }
 
@@ -371,15 +370,13 @@ struct OPathOps : FileOps {
 
   bool is_seekable() const final { return true; }
 
-  fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file,
-                                  const CurrentTask& current_task, size_t offset,
-                                  OutputBuffer* data) final {
+  fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask& current_task,
+                                  size_t offset, OutputBuffer* data) final {
     return fit::error(errno(EBADF));
   }
 
-  fit::result<Errno, size_t> write(/*Locked<WriteOps>& locked,*/ const FileObject& file,
-                                   const CurrentTask& current_task, size_t offset,
-                                   InputBuffer* data) final {
+  fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task,
+                                   size_t offset, InputBuffer* data) final {
     return fit::error(errno(EBADF));
   }
 
@@ -396,13 +393,12 @@ struct OPathOps : FileOps {
   }
 
   fit::result<Errno> readdir(const FileObject& file, const CurrentTask& current_task,
-                             DirentSink& sink) final {
+                             DirentSink* sink) final {
     return fit::error(errno(EBADF));
   }
 
-  fit::result<Errno, SyscallResult> ioctl(/*Locked<FileOpsCore>& locked,*/ const FileObject& file,
-                                          const CurrentTask& current_task, uint32_t request,
-                                          long arg) final {
+  fit::result<Errno, SyscallResult> ioctl(const FileObject& file, const CurrentTask& current_task,
+                                          uint32_t request, long arg) final {
     return fit::error(errno(EBADF));
   }
 };

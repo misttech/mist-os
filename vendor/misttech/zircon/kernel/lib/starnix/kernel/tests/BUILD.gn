@@ -6,6 +6,7 @@ source_set("tests") {
   sources = [
     "arch/${current_cpu}/syscalls-test.cc",
     "atomic_counter-test.cc",
+    "device/kobject-test.cc",
     "fd_table-test.cc",
     "fs/mistos/bootfs-test.cc",
     "fs/mistos/tree_builder-test.cc",
