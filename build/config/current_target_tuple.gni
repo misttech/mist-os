@@ -9,6 +9,8 @@ import("//build/config/clang/clang_cpu.gni")
 # and Clang.
 if (is_fuchsia) {
   current_target_tuple = "${clang_cpu}-unknown-fuchsia"
+} else if (current_cpu == "arm" && is_linux) {
+  current_target_tuple = "armv7-unknown-linux-gnueabihf"
 } else if (is_linux) {
   current_target_tuple = "${clang_cpu}-unknown-linux-gnu"
 } else if (is_mac) {
