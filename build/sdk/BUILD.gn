@@ -94,7 +94,7 @@ _partner_idk_source_sets_list = [
   "//sdk/lib/fidl/cpp:natural_ostream",
   "//sdk/lib/fidl/cpp",
   "//sdk/lib/syslog/cpp",
-  "//zircon/system/ulib/hwreg:hwreg_sdk",
+  "//zircon/system/ulib/hwreg:hwreg_public",
   "//zircon/system/ulib/inspect",
   "//zircon/system/ulib/mmio-ptr",
   "//zircon/system/ulib/sync:sync-cpp",

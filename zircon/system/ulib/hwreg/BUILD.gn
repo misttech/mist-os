@@ -60,7 +60,7 @@ source_set("hwreg-mock") {
 }
 
 # Subset of API exported via the SDK.
-sdk_source_set("hwreg_sdk") {
+sdk_source_set("hwreg_public") {
   category = "partner"
   sdk_name = "hwreg"
   stable = true
