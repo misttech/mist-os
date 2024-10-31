@@ -25,6 +25,7 @@ rustc_library("selinuxfs") {
 
   deps = [
     "//sdk/rust/zx",
+    "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/fuchsia-runtime",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",

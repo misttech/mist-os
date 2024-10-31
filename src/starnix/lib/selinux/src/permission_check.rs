@@ -7,6 +7,9 @@ use crate::policy::AccessVectorComputer;
 use crate::security_server::SecurityServer;
 use crate::{ClassPermission, Permission, SecurityId};
 
+#[cfg(target_os = "fuchsia")]
+use fuchsia_inspect_contrib::profile_duration;
+
 use std::sync::Weak;
 
 /// Describes the result of a permission lookup between two Security Contexts.
@@ -71,6 +74,8 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     target_sid: SecurityId,
     permission: P,
 ) -> PermissionCheckResult {
+    #[cfg(target_os = "fuchsia")]
+    profile_duration!("libselinux.check_permission");
     let target_class = permission.class();
     let has_permission = if let Some(permission_access_vector) =
         access_vector_computer.access_vector_from_permissions(&[permission])

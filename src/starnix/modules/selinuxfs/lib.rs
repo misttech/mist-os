@@ -6,6 +6,8 @@
 
 mod seq_lock;
 
+use fuchsia_inspect_contrib::profile_duration;
+
 use seq_lock::SeqLock;
 
 use starnix_core::mm::memory::MemoryObject;
@@ -238,6 +240,7 @@ impl SeLinuxApiOps for LoadApi {
         SecurityPermission::LoadPolicy
     }
     fn api_write_with_task(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        profile_duration!("selinuxfs.load");
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
             log_error!("Policy load error: {}", error);
@@ -287,6 +290,7 @@ impl SeLinuxApiOps for EnforceApi {
 
     fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
         // Callers may write any number of times to this API, so long as the `data` is valid.
+        profile_duration!("selinuxfs.enforce");
         let enforce = parse_unsigned_file::<u32>(&data)? != 0;
         self.security_server.set_enforcing(enforce);
         Ok(())
@@ -399,6 +403,7 @@ impl SeLinuxApiOps for ContextApi {
     }
 
     fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
+        profile_duration!("selinuxfs.context");
         // If this instance was already written-to then fail the operation.
         let mut context_sid = self.context_sid.lock();
         if context_sid.is_some() {
@@ -443,6 +448,7 @@ impl InitialContextFile {
 
 impl BytesFileOps for InitialContextFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        profile_duration!("selinuxfs.initial_sid");
         let sid = SecurityId::initial(self.initial_sid);
         if let Some(context) = self.security_server.sid_to_security_context(sid) {
             Ok(context.into())
@@ -540,6 +546,7 @@ impl FsNodeOps for BooleansDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         let utf8_name = String::from_utf8(name.to_vec()).map_err(|_| errno!(ENOENT))?;
         if self.security_server.conditional_booleans().contains(&utf8_name) {
+            profile_duration!("selinuxfs.booleans.lookup");
             Ok(node.fs().create_node(
                 current_task,
                 BooleanFile::new_node(self.security_server.clone(), utf8_name),
@@ -562,6 +569,7 @@ impl FileOps for BooleansDirectory {
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
+        profile_duration!("selinuxfs.booleans.seek");
         unbounded_seek(current_offset, target)
     }
 
@@ -572,6 +580,7 @@ impl FileOps for BooleansDirectory {
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
+        profile_duration!("selinuxfs.booleans.readdir");
         emit_dotdot(file, sink)?;
 
         // `emit_dotdot()` provides the first two directory entries, so that the entries for
@@ -603,11 +612,13 @@ impl BooleanFile {
 
 impl BytesFileOps for BooleanFile {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        profile_duration!("selinuxfs.boolean.write");
         let value = parse_unsigned_file::<u32>(&data)? != 0;
         self.security_server.set_pending_boolean(&self.name, value).map_err(|_| errno!(EIO))
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        profile_duration!("selinuxfs.boolean.read");
         // Each boolean has a current active value, and a pending value that
         // will become active if "commit_pending_booleans" is written to.
         // e.g. "1 0" will be read if a boolean is True but will become False.
@@ -635,6 +646,7 @@ impl SeLinuxApiOps for CommitBooleansApi {
     }
 
     fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
+        profile_duration!("selinuxfs.commit_booleans.write");
         // "commit_pending_booleans" expects a numeric argument, which is
         // interpreted as a boolean, with the pending booleans committed if the
         // value is true (i.e. non-zero).
@@ -689,6 +701,7 @@ impl FsNodeOps for ClassDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
+        profile_duration!("selinuxfs.class.lookup");
         let fs = node.fs();
         let mut dir = StaticDirectoryBuilder::new(&fs);
         dir.set_mode(mode!(IFDIR, 0o555));
@@ -753,6 +766,7 @@ impl FsNodeOps for PermsDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
+        profile_duration!("selinuxfs.perms.lookup");
         let found_permission_id = self
             .security_server
             .class_permissions_by_name(&(self.class_name))
@@ -853,6 +867,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        profile_duration!("selinuxfs.api.read");
         let response = self.ops.api_read()?;
         data.write(&response[offset..])
     }
@@ -865,6 +880,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        profile_duration!("selinuxfs.api.write");
         if offset != 0 && !T::api_write_ignores_offset() {
             return error!(EINVAL);
         }
@@ -882,6 +898,7 @@ pub fn selinux_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
+    profile_duration!("selinuxfs.mount");
     current_task
         .kernel()
         .selinux_fs
