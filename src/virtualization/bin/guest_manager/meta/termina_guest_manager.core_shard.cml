@@ -95,7 +95,7 @@
         },
         {
             protocol: [ "fuchsia.memorypressure.Provider" ],
-            from: "#memory_monitor",
+            from: "#memory_pressure_signaler",
             to: "#termina-guest-manager",
         },
     ],

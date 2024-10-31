@@ -664,12 +664,17 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.memory.inspection.Collector",
+            from: "#memory_monitor",
+            to: "#sshd-host",
+            source_availability: "unknown",
+        },
+        {
             protocol: [
                 "fuchsia.memory.debug.MemoryPressure",
-                "fuchsia.memory.inspection.Collector",
                 "fuchsia.memorypressure.Provider",
             ],
-            from: "#memory_monitor",
+            from: "#memory_pressure_signaler",
             to: "#sshd-host",
             source_availability: "unknown",
         },

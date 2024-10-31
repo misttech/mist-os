@@ -402,7 +402,7 @@
         },
         {
             protocol: "fuchsia.memorypressure.Provider",
-            from: "#memory_monitor",
+            from: "#memory_pressure_signaler",
             to: "#vulkan_loader",
             source_availability: "unknown",
         },

@@ -131,6 +131,7 @@
                     "/bootstrap/netsvc",
                     "/core/memory_monitor",
                     "/core/memory_monitor2",
+                    "/core/memory_pressure_signaler",
                 ],
             },
             {

@@ -22,6 +22,7 @@
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
+                "fuchsia.memorypressure.Provider",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.scheduler.RoleManager",
             ],
@@ -81,11 +82,7 @@
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.memory.debug.MemoryPressure",
-                "fuchsia.memory.inspection.Collector",
-                "fuchsia.memorypressure.Provider",
-            ],
+            protocol: [ "fuchsia.memory.inspection.Collector" ],
             from: "self",
         },
     ],

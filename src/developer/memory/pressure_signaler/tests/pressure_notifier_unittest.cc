@@ -17,7 +17,6 @@
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-
 namespace pressure_signaler::test {
 
 namespace fmp = fuchsia::memorypressure;
@@ -63,9 +62,9 @@ class PressureNotifierUnitTest : public fuchsia::memory::debug::MemoryPressure,
 
  protected:
   void SetUpNewPressureNotifier(bool send_critical_pressure_crash_reports) {
-    notifier_ = std::make_unique<PressureNotifier>(
-        false, send_critical_pressure_crash_reports, context_provider_->context(),
-        async_get_default_dispatcher(), [this](Level l) { last_level_ = l; });
+    notifier_ = std::make_unique<PressureNotifier>(false, send_critical_pressure_crash_reports,
+                                                   context_provider_->context(),
+                                                   async_get_default_dispatcher());
     // Set up initial pressure level.
     notifier_->observer_.WaitOnLevelChange();
   }
@@ -177,13 +176,6 @@ TEST_F(PressureNotifierUnitTest, Watcher) {
 
   RunLoopUntilIdle();
   ASSERT_EQ(GetWatcherCount(), 0ul);
-}
-
-TEST_F(PressureNotifierUnitTest, NotifyCb) {
-  ASSERT_EQ(last_level(), Level::kNormal);
-  TriggerLevelChange(Level::kCritical);
-  RunLoopUntilIdle();
-  ASSERT_EQ(last_level(), Level::kCritical);
 }
 
 TEST_F(PressureNotifierUnitTest, NoResponse) {
@@ -650,4 +642,4 @@ TEST_F(PressureNotifierUnitTest, SimulatePressure) {
   ASSERT_EQ(GetWatcherCount(), 0ul);
 }
 
-} // namespace pressure_signaler::test
+}  // namespace pressure_signaler::test

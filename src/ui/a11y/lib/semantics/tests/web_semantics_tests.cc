@@ -110,13 +110,8 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
   static constexpr auto kIntl = "intl";
   static constexpr auto kIntlUrl = "#meta/intl_property_manager.cm";
 
-  static constexpr auto kMemoryPressureProvider = "memory_pressure_provider";
-  static constexpr auto kMemoryPressureProviderUrl = "#meta/memory_monitor.cm";
-  static constexpr auto kCaptureOnPressureChange = "fuchsia.memory.CaptureOnPressureChange";
-  static constexpr auto kImminentOomCaptureDelay = "fuchsia.memory.ImminentOomCaptureDelay";
-  static constexpr auto kCriticalCaptureDelay = "fuchsia.memory.CriticalCaptureDelay";
-  static constexpr auto kWarningCaptureDelay = "fuchsia.memory.WarningCaptureDelay";
-  static constexpr auto kNormalCaptureDelay = "fuchsia.memory.NormalCaptureDelay";
+  static constexpr auto kMemoryPressureSignaler = "memory_pressure_signaler";
+  static constexpr auto kMemoryPressureSignalerUrl = "#meta/memory_pressure_signaler.cm";
 
   static constexpr auto kNetstack = "netstack";
   static constexpr auto kNetstackUrl = "#meta/netstack.cm";
@@ -140,7 +135,7 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
     realm()->AddChild(kFontsProvider, kFontsProviderUrl);
     realm()->AddChild(kTextManager, kTextManagerUrl);
     realm()->AddChild(kIntl, kIntlUrl);
-    realm()->AddChild(kMemoryPressureProvider, kMemoryPressureProviderUrl);
+    realm()->AddChild(kMemoryPressureSignaler, kMemoryPressureSignalerUrl);
     realm()->AddChild(kNetstack, kNetstackUrl);
     realm()->AddChild(kWebContextProvider, kWebContextProviderUrl);
     realm()->AddChild(kBuildInfoProvider, kBuildInfoProviderUrl);
@@ -163,7 +158,7 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
                        .source = ChildRef{kTextManager},
                        .targets = {ChildRef{kWebView}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::memorypressure::Provider::Name_}},
-                       .source = ChildRef{kMemoryPressureProvider},
+                       .source = ChildRef{kMemoryPressureSignaler},
                        .targets = {ChildRef{kWebView}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::net::interfaces::State::Name_}},
                        .source = ChildRef{kNetstack},
@@ -183,32 +178,17 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
     realm()->AddRoute(
         {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
          .source = ChildRef{kFakeCobalt},
-         .targets = {ChildRef{kMemoryPressureProvider}}});
+         .targets = {ChildRef{kMemoryPressureSignaler}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
                                         Protocol{fuchsia::sysmem2::Allocator::Name_}},
                        .source = ParentRef(),
-                       .targets = {ChildRef{kMemoryPressureProvider}, ChildRef{kWebView}}});
+                       .targets = {ChildRef{kMemoryPressureSignaler}, ChildRef{kWebView}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::kernel::RootJobForInspect::Name_},
                                         Protocol{fuchsia::kernel::Stats::Name_},
                                         Protocol{fuchsia::scheduler::RoleManager::Name_},
                                         Protocol{fuchsia::tracing::provider::Registry::Name_}},
                        .source = ParentRef(),
-                       .targets = {ChildRef{kMemoryPressureProvider}}});
-    realm()->AddRoute({.capabilities = {Config{kCaptureOnPressureChange}},
-                       .source = VoidRef(),
-                       .targets = {ChildRef{kMemoryPressureProvider}}});
-    realm()->AddRoute({.capabilities = {Config{kImminentOomCaptureDelay}},
-                       .source = VoidRef(),
-                       .targets = {ChildRef{kMemoryPressureProvider}}});
-    realm()->AddRoute({.capabilities = {Config{kCriticalCaptureDelay}},
-                       .source = VoidRef(),
-                       .targets = {ChildRef{kMemoryPressureProvider}}});
-    realm()->AddRoute({.capabilities = {Config{kWarningCaptureDelay}},
-                       .source = VoidRef(),
-                       .targets = {ChildRef{kMemoryPressureProvider}}});
-    realm()->AddRoute({.capabilities = {Config{kNormalCaptureDelay}},
-                       .source = VoidRef(),
-                       .targets = {ChildRef{kMemoryPressureProvider}}});
+                       .targets = {ChildRef{kMemoryPressureSignaler}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::posix::socket::Provider::Name_}},
                        .source = ChildRef{kNetstack},
                        .targets = {ChildRef{kWebView}}});

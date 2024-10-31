@@ -40,16 +40,14 @@ Level ConvertFromMemoryPressureServiceLevel(fuchsia::memorypressure::Level level
 
 }  // namespace
 
-// |dispatcher| is the dispatcher associated with memory_monitor's main thread.
+// |dispatcher| is the dispatcher associated with memory_pressure_signaler's main thread.
 // The fuchsia::memorypressure::Provider service which the |PressureNotifier| class implements runs
 // on this thread.
 PressureNotifier::PressureNotifier(bool watch_for_changes,
                                    bool send_critical_pressure_crash_reports,
-                                   sys::ComponentContext* context, async_dispatcher_t* dispatcher,
-                                   NotifyCb notify_cb)
+                                   sys::ComponentContext* context, async_dispatcher_t* dispatcher)
     : provider_dispatcher_(dispatcher),
       context_(context),
-      notify_cb_(std::move(notify_cb)),
       observer_(watch_for_changes, this),
       send_critical_pressure_crash_reports_(send_critical_pressure_crash_reports) {
   if (context) {
@@ -65,10 +63,6 @@ void PressureNotifier::Notify() {
 
 void PressureNotifier::PostLevelChange() {
   Level level_to_send = observer_.GetCurrentLevel();
-  if (notify_cb_) {
-    async::PostTask(provider_dispatcher_, [level_to_send, this]() { notify_cb_(level_to_send); });
-  }
-
   if (level_to_send == Level::kImminentOOM) {
     // We condition sending a crash report for imminent OOM the same way as for critical memory
     // pressure.

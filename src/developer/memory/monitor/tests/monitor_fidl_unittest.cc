@@ -8,19 +8,18 @@
 #include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
+#include <cstddef>
 #include <future>
+#include <memory>
 
 #include <gtest/gtest.h>
 #include <src/cobalt/bin/testing/stub_metric_event_logger.h>
 
 #include "lib/fpromise/result.h"
-#include "src/developer/memory/metrics/capture_strategy.h"
 #include "src/developer/memory/monitor/monitor.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace monitor::test {
-
-using namespace memory;
 
 class FakeRamDevice : public fuchsia::hardware::ram::metrics::testing::Device_TestBase {
  public:
@@ -40,7 +39,7 @@ class FakeRamDevice : public fuchsia::hardware::ram::metrics::testing::Device_Te
 
     fuchsia::hardware::ram::metrics::BandwidthInfo info = {};
     info.timestamp = zx::msec(1234).to_nsecs();
-    info.frequency = 256 * 1024 * 1024;
+    info.frequency = static_cast<uint64_t>(256 * 1024 * 1024);
     info.bytes_per_cycle = 1;
     info.channels[0].readwrite_cycles = 10 * mul;
     info.channels[1].readwrite_cycles = 20 * mul;
@@ -91,7 +90,7 @@ class MockLoggerFactory : public ::fuchsia::metrics::testing::MetricEventLoggerF
                                ::fidl::InterfaceRequest<fuchsia::metrics::MetricEventLogger> logger,
                                CreateMetricEventLoggerCallback callback) override {
     received_project_id_ = project_spec.project_id();
-    logger_.reset(new MockLogger());
+    logger_ = std::make_unique<MockLogger>();
     logger_bindings_.AddBinding(logger_.get(), std::move(logger));
     callback(fpromise::ok());
   }
@@ -110,9 +109,9 @@ class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
  public:
   MemoryBandwidthInspectTest()
       : monitor_(std::make_unique<Monitor>(
-            context_provider_.TakeContext(), fxl::CommandLine{}, dispatcher(), false, false, false,
+            context_provider_.TakeContext(), fxl::CommandLine{}, dispatcher(), false, false,
             memory_monitor_config::Config{},
-            memory::CaptureMaker::Create(CreateDefaultOS()).value())),
+            memory::CaptureMaker::Create(memory::CreateDefaultOS()).value())),
         executor_(dispatcher()),
         ram_binding_(&fake_device_),
         logger_factory_(new MockLoggerFactory()) {
@@ -156,7 +155,7 @@ class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
       // Run the main thread's loop, allowing the MockLogger* objects to respond to requests.
       RunLoopUntilIdle();
     }
-    return result.get();
+    result.get();
   }
 
   sys::testing::ComponentContextProvider context_provider_;

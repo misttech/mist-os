@@ -27,11 +27,11 @@
 #include <soc/aml-common/aml-ram.h>
 #include <trace-vthread/event_vthread.h>
 
+#include "lib/component/incoming/cpp/protocol.h"
 #include "lib/fpromise/result.h"
 #include "lib/zx/result.h"
 #include "src/developer/memory/metrics/bucket_match.h"
 #include "src/developer/memory/metrics/capture.h"
-#include "src/developer/memory/metrics/capture_strategy.h"
 #include "src/developer/memory/metrics/printer.h"
 #include "src/developer/memory/monitor/high_water.h"
 #include "src/developer/memory/monitor/memory_metrics_registry.cb.h"
@@ -131,7 +131,7 @@ std::vector<memory::BucketMatch> CreateBucketMatchesFromConfigData() {
 Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
                  const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
                  bool send_metrics, bool watch_memory_pressure,
-                 bool send_critical_pressure_crash_reports, memory_monitor_config::Config config,
+                 memory_monitor_config::Config config,
                  std::unique_ptr<memory::CaptureMaker> capture_maker)
     : capture_maker_(std::move(capture_maker)),
       prealloc_size_(0),
@@ -150,7 +150,7 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
   auto bucket_matches = CreateBucketMatchesFromConfigData();
   digester_ = std::make_unique<Digester>(Digester(bucket_matches));
   high_water_ = std::make_unique<HighWater>(
-      "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher,
+      "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher_,
       [this](Capture* c, CaptureLevel l) { return capture_maker_->GetCapture(c, l); },
       [this](const Capture& c, Digest* d) { digester_->Digest(c, d); });
 
@@ -165,7 +165,9 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
   inspect::Node config_node = inspector_.root().CreateChild("config");
   config_.RecordInspect(&config_node);
 
-  zx_status_t status = component_context_->outgoing()->AddPublicService(bindings_.GetHandler(this));
+  zx_status_t status =
+      component_context_->outgoing()->AddPublicService<fuchsia::memory::inspection::Collector>(
+          bindings_.GetHandler(this));
   FX_CHECK(status == ZX_OK);
 
   if (command_line.HasOption("help")) {
@@ -223,15 +225,56 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
                   << " Total Heap: " << kmem.total_heap_bytes;
   }
 
-  pressure_notifier_ = std::make_unique<pressure_signaler::PressureNotifier>(
-      watch_memory_pressure, send_critical_pressure_crash_reports, component_context_.get(),
-      dispatcher, [this](pressure_signaler::Level l) { PressureLevelChanged(l); });
-  memory_debugger_ =
-      std::make_unique<pressure_signaler::MemoryDebugger>(component_context_.get(), pressure_notifier_.get());
+  if (watch_memory_pressure) {
+    {
+      // Pressure monitoring
+      zx::result client_end = component::Connect<fuchsia_memorypressure::Provider>();
+      if (!client_end.is_ok()) {
+        FX_LOGS(ERROR) << "Error connecting to FIDL fuchsia.memorypressure.Provider: "
+                       << client_end.status_string();
+        exit(-1);
+      }
+      pressure_provider_ = fidl::Client{std::move(*client_end), dispatcher_};
+      auto watcher_endpoints = fidl::CreateEndpoints<fuchsia_memorypressure::Watcher>();
+      auto watcher = fidl::BindServer(dispatcher_, std::move(watcher_endpoints->server), this);
+
+      auto result = pressure_provider_->RegisterWatcher(std::move(watcher_endpoints->client));
+      if (!result.is_ok()) {
+        FX_LOGS(ERROR) << "Error registering to memory pressure changes: " << result.error_value();
+        exit(-1);
+      }
+    }
+
+    {
+      // Imminent OOM monitoring
+      auto client_end = component::Connect<fuchsia_kernel::RootJobForInspect>();
+      if (!client_end.is_ok()) {
+        FX_LOGS(ERROR) << "Error connecting to root job: " << client_end.error_value();
+        exit(-1);
+      }
+
+      auto result = fidl::WireCall(*client_end)->Get();
+      if (result.status() != ZX_OK) {
+        FX_LOGS(ERROR) << "Error getting root job: " << result.status();
+        exit(-1);
+      }
+
+      zx_status_t status = zx_system_get_event(
+          result->job.get(), ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY, &imminent_oom_event_handle_);
+      if (status != ZX_OK) {
+        FX_LOGS(ERROR) << "zx_system_get_event [IMMINENT-OOM] returned "
+                       << zx_status_get_string(status);
+        exit(-1);
+      }
+
+      // Start imminent oom monitoring on a new named thread.
+      imminent_oom_loop_.StartThread("imminent-oom-loop");
+      watch_task_.Post(imminent_oom_loop_.dispatcher());
+    }
+  }
+
   SampleAndPost();
 }
-
-Monitor::~Monitor() {}
 
 void Monitor::SetRamDevice(fuchsia::hardware::ram::metrics::DevicePtr ptr) {
   ram_device_ = std::move(ptr);
@@ -584,28 +627,63 @@ void Monitor::GetDigest(const memory::Capture& capture, memory::Digest* digest) 
   digester_->Digest(capture, digest);
 }
 
-void Monitor::PressureLevelChanged(pressure_signaler::Level level) {
-  if (level == pressure_signaler::Level::kImminentOOM) {
-    // Force the current state to be written as the high_waters. Later is better.
-    memory::Capture c;
-    auto s = capture_maker_->GetCapture(&c, CaptureLevel::VMO);
-    if (s == ZX_OK) {
-      high_water_->RecordHighWater(c);
-      high_water_->RecordHighWaterDigest(c);
-    } else {
-      FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
-    }
+namespace {
+pressure_signaler::Level ConvertPressureLevel(fuchsia_memorypressure::Level level) {
+  switch (level) {
+    case fuchsia_memorypressure::Level::kCritical:
+      return pressure_signaler::kCritical;
+    case fuchsia_memorypressure::Level::kWarning:
+      return pressure_signaler::kWarning;
+    case fuchsia_memorypressure::Level::kNormal:
+      return pressure_signaler::kNormal;
   }
+}
+}  // namespace
+
+void Monitor::OnLevelChanged(pressure_signaler::Level level) {
   if (level == level_) {
     return;
   }
-  FX_LOGS(INFO) << "Memory pressure level changed from " << pressure_signaler::kLevelNames[level_] << " to "
-                << pressure_signaler::kLevelNames[level];
+  FX_LOGS(INFO) << "Memory pressure level changed from " << pressure_signaler::kLevelNames[level_]
+                << " to " << pressure_signaler::kLevelNames[level];
   TRACE_INSTANT("memory_monitor", "MemoryPressureLevelChange", TRACE_SCOPE_THREAD, "from",
-                pressure_signaler::kLevelNames[level_], "to", pressure_signaler::kLevelNames[level]);
-
+                pressure_signaler::kLevelNames[level_], "to",
+                pressure_signaler::kLevelNames[level]);
   level_ = level;
   logger_.SetPressureLevel(level_);
+}
+
+void Monitor::OnLevelChanged(OnLevelChangedRequest& request,
+                             OnLevelChangedCompleter::Sync& completer) {
+  completer.Reply();
+  OnLevelChanged(ConvertPressureLevel(request.level()));
+}
+
+void Monitor::WaitForImminentOom() {
+  zx_signals_t observed;
+  zx_status_t status = zx_object_wait_one(imminent_oom_event_handle_, ZX_EVENT_SIGNALED,
+                                          ZX_TIME_INFINITE, &observed);
+  if (status != ZX_OK) {
+    FX_LOGS(ERROR) << "zx_object_wait_one returned " << zx_status_get_string(status);
+    return;
+  }
+
+  // Force the current state to be written as the high_waters. Later is better.
+  memory::Capture c;
+  auto s = capture_maker_->GetCapture(&c, CaptureLevel::VMO);
+  if (s == ZX_OK) {
+    high_water_->RecordHighWater(c);
+    high_water_->RecordHighWaterDigest(c);
+  } else {
+    FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
+  }
+
+  OnLevelChanged(pressure_signaler::Level::kImminentOOM);
+}
+
+void Monitor::WatchForImminentOom() {
+  WaitForImminentOom();
+  watch_task_.Post(imminent_oom_loop_.dispatcher());
 }
 
 }  // namespace monitor

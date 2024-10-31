@@ -12,7 +12,6 @@
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-
 namespace pressure_signaler::test {
 
 class PressureObserverUnitTest : public gtest::TestLoopFixture {
@@ -70,4 +69,4 @@ TEST_F(PressureObserverUnitTest, InitialLevel) { VerifyInitialLevel(); }
 
 TEST_F(PressureObserverUnitTest, WaitOnEvents) { VerifyEventsWaitedOn(); }
 
-} // namespace pressure_signaler::test
+}  // namespace pressure_signaler::test

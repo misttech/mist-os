@@ -13,8 +13,6 @@
 
 #include <array>
 #include <atomic>
-#include <memory>
-#include <string>
 
 namespace pressure_signaler {
 
@@ -23,7 +21,7 @@ class PressureObserverUnitTest;
 class PressureNotifierUnitTest;
 }  // namespace test
 
-enum Level : size_t {
+enum Level : std::uint8_t {
   kImminentOOM = 0,
   kCritical,
   kWarning,

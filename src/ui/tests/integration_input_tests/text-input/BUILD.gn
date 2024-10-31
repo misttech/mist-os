@@ -104,7 +104,7 @@ fuchsia_test_package("text-input-test") {
     "//src/cobalt/bin/testing/fake_cobalt",
     "//src/connectivity/network:netstack-for-tests",
     "//src/developer/build_info/testing:fake-build-info-component",
-    "//src/developer/memory/monitor:component",
+    "//src/developer/memory/pressure_signaler:component",
     "//src/fonts:font_provider_hermetic_for_test",
     "//src/testing/fidl/intl_property_manager:intl_property_manager_component",
     "//src/ui/bin/text:text_manager_comp",

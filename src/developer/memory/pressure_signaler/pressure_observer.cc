@@ -31,8 +31,8 @@ PressureObserver::PressureObserver(bool watch_for_changes, PressureNotifier* not
   if (watch_for_changes) {
     // Set up a new thread (memory-pressure-loop) that watches for memory pressure changes from the
     // kernel. All this thread does is wait on memory pressure events in a loop, hence is kept
-    // separate from memory_monitor's main dispatcher thread. Once the |PressureObserver| object has
-    // been created, it is run entirely on the memory-pressure-loop thread.
+    // separate from memory_pressure_signaler's main dispatcher thread. Once the |PressureObserver|
+    // object has been created, it is run entirely on the memory-pressure-loop thread.
     loop_.StartThread("memory-pressure-loop");
     watch_task_.Post(loop_.dispatcher());
   }

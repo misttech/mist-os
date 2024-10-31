@@ -56,6 +56,7 @@ forensics
 ?mediasession
 ?memory_monitor
 ?memory_monitor2
+?memory_pressure_signaler
 ?memory_sampler
 ?metrics-logger-standalone
 ?nc

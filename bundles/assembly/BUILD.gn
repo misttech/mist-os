@@ -1761,6 +1761,9 @@ assembly_input_bundle("common_standard") {
 
     # Connectivity
     "//src/connectivity/network/mdns/service:mdns",
+
+    # Memory pressure monitoring
+    "//src/developer/memory/pressure_signaler",
   ]
 
   config_data = [
@@ -1845,6 +1848,7 @@ assembly_input_bundle("common_standard") {
             "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
             "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
             "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
+            "//src/developer/memory/pressure_signaler/meta/memory_pressure_signaler.core_shard.cml",
           ]
         },
       ]
