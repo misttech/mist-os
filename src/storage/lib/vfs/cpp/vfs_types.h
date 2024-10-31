@@ -37,28 +37,6 @@ namespace fs {
 
 class Vnode;
 
-namespace Rights {
-
-// Alias for commonly used read-only directory rights.
-constexpr fuchsia_io::Rights ReadOnly() { return fuchsia_io::kRStarDir; }
-
-// Alias for commonly used write-only directory rights.
-constexpr fuchsia_io::Rights WriteOnly() {
-  // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
-  return fuchsia_io::Rights::kGetAttributes | fuchsia_io::kWStarDir;
-}
-
-// Alias for commonly used read-write directory rights.
-constexpr fuchsia_io::Rights ReadWrite() { return fuchsia_io::kRwStarDir; }
-
-// Alias for commonly used read-execute directory rights.
-constexpr fuchsia_io::Rights ReadExec() { return fuchsia_io::kRxStarDir; }
-
-// Alias for all possible rights.
-constexpr fuchsia_io::Rights All() { return fuchsia_io::Rights::kMask; }
-
-}  // namespace Rights
-
 // All io1 OpenFlags that correspond to connection rights.
 constexpr fuchsia_io::OpenFlags kAllIo1Rights = fuchsia_io::OpenFlags::kRightReadable |
                                                 fuchsia_io::OpenFlags::kRightWritable |
@@ -122,25 +100,25 @@ struct VnodeConnectionOptions {
 
   constexpr static VnodeConnectionOptions ReadOnly() {
     VnodeConnectionOptions options;
-    options.rights = Rights::ReadOnly();
+    options.rights = fuchsia_io::kRStarDir;
     return options;
   }
 
   constexpr static VnodeConnectionOptions WriteOnly() {
     VnodeConnectionOptions options;
-    options.rights = Rights::WriteOnly();
+    options.rights = fuchsia_io::kWStarDir;
     return options;
   }
 
   constexpr static VnodeConnectionOptions ReadWrite() {
     VnodeConnectionOptions options;
-    options.rights = Rights::ReadWrite();
+    options.rights = fuchsia_io::kRwStarDir;
     return options;
   }
 
   constexpr static VnodeConnectionOptions ReadExec() {
     VnodeConnectionOptions options;
-    options.rights = Rights::ReadExec();
+    options.rights = fuchsia_io::kRxStarDir;
     return options;
   }
 

@@ -71,12 +71,12 @@ zx_status_t LoaderApp::InitDeviceFs() {
 }
 
 zx_status_t LoaderApp::ServeDeviceFs(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-  return debug_fs_.ServeDirectory(device_root_node_, std::move(server_end), fs::Rights::ReadOnly());
+  return debug_fs_.ServeDirectory(device_root_node_, std::move(server_end), fuchsia_io::kRStarDir);
 }
 
 zx_status_t LoaderApp::ServeManifestFs(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
   return debug_fs_.ServeDirectory(manifest_fs_root_node_, std::move(server_end),
-                                  fs::Rights::ReadOnly());
+                                  fuchsia_io::kRStarDir);
 }
 
 zx_status_t LoaderApp::InitDebugFs() {
@@ -88,7 +88,7 @@ zx_status_t LoaderApp::InitDebugFs() {
   ZX_ASSERT(debug_root_node_->AddEntry("manifest-fs", manifest_fs_root_node_) == ZX_OK);
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (zx_status_t status = debug_fs_.ServeDirectory(debug_root_node_, std::move(endpoints->server),
-                                                    fs::Rights::ReadOnly());
+                                                    fuchsia_io::kRStarDir);
       status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to serve debug filesystem: ";
     return status;

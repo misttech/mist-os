@@ -243,7 +243,7 @@ std::unique_ptr<Result> RunTest(const char* argv[], const char* output_dir, cons
         fbl::RefPtr proxy_dir = fbl::MakeRefCounted<ServiceProxyDir>(std::move(client_end));
         proxy_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_debugdata::Publisher>, node);
 
-        vfs->ServeDirectory(std::move(proxy_dir), std::move(endpoints->server), fs::Rights::All());
+        vfs->ServeDirectory(std::move(proxy_dir), std::move(endpoints->server));
 
         fdio_actions.push_back(action_ns_entry(path, endpoints->client.channel().release()));
       } else {

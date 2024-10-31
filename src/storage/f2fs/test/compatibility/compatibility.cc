@@ -411,7 +411,7 @@ int FuchsiaOperator::Rmdir(std::string_view path) {
 }
 
 std::unique_ptr<TestFile> FuchsiaOperator::Open(std::string_view path, int flags, mode_t mode) {
-  auto result = fs_->vfs()->Open(root_, path, ConvertFlag(flags), fs::Rights::ReadWrite(), mode);
+  auto result = fs_->vfs()->Open(root_, path, ConvertFlag(flags), fuchsia_io::kRwStarDir, mode);
   if (result.is_error()) {
     return std::unique_ptr<TestFile>(new FuchsiaTestFile(nullptr));
   }

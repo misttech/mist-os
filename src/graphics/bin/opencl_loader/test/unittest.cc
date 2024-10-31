@@ -101,7 +101,7 @@ TEST_F(LoaderUnittest, MagmaDevice) {
             ZX_OK);
   vfs_loop.StartThread("vfs-loop");
   auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  ASSERT_EQ(vfs.ServeDirectory(root, std::move(server), fs::Rights::ReadOnly()), ZX_OK);
+  ASSERT_EQ(vfs.ServeDirectory(root, std::move(server), fuchsia_io::kRStarDir), ZX_OK);
 
   zx::result device = MagmaDevice::Create(app(), client, kDeviceNodeName, &inspector().GetRoot());
   ASSERT_TRUE(device.is_ok()) << device.status_string();
@@ -260,7 +260,7 @@ TEST_F(LoaderUnittest, MagmaDependencyInjection) {
                                       magma_dependency_injection.ProtocolConnector())),
             ZX_OK);
   auto gpu_dir = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ASSERT_EQ(vfs.ServeDirectory(root, std::move(gpu_dir->server), fs::Rights::ReadOnly()), ZX_OK);
+  ASSERT_EQ(vfs.ServeDirectory(root, std::move(gpu_dir->server), fuchsia_io::kRStarDir), ZX_OK);
 
   fdio_ns_t* ns;
   EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));

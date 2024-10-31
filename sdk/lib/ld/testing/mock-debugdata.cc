@@ -30,7 +30,7 @@ class MockSvcDirectory::Impl {
   }
 
   void Serve(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
-    zx_status_t status = vfs_.ServeDirectory(dir_, std::move(server_end), fs::Rights::ReadWrite());
+    zx_status_t status = vfs_.ServeDirectory(dir_, std::move(server_end), fuchsia_io::kRwStarDir);
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
   }
 

@@ -257,8 +257,7 @@ int emu_open(const char* path, int flags) {
     if (fdtab[fd].vn == nullptr) {
       std::string_view str(path + PREFIX_SIZE);
       fs::VnodeConnectionOptions options = fdio_flags_to_connection_options(flags);
-      auto result =
-          fake_fs.fake_vfs->Open(fake_fs.fake_root, str, options, fs::Rights::ReadWrite());
+      auto result = fake_fs.fake_vfs->Open(fake_fs.fake_root, str, options, fuchsia_io::kRwStarDir);
       if (result.is_error()) {
         STATUS(result.error());
       }
@@ -476,7 +475,7 @@ DIR* emu_opendir(const char* name) {
   std::string_view path(name + PREFIX_SIZE);
   fs::VnodeConnectionOptions options{.flags = fuchsia_io::OpenFlags::kPosixWritable,
                                      .rights = fuchsia_io::kRStarDir};
-  auto result = fake_fs.fake_vfs->Open(fake_fs.fake_root, path, options, fs::Rights::ReadWrite());
+  auto result = fake_fs.fake_vfs->Open(fake_fs.fake_root, path, options, fuchsia_io::kRwStarDir);
   if (result.is_error()) {
     return nullptr;
   }
