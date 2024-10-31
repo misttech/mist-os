@@ -767,7 +767,18 @@ impl MultiHeterogeneousMemberServiceProxy {
         Ok(proxy)
     }
 
+    /// Like `connect_to_first_member`, but returns a sync proxy.
+    /// See [`Self::connect_to_first_member`] for more details.
+    pub fn connect_to_first_member_sync(
+        &self,
+    ) -> Result<FirstProtocolSynchronousProxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<FirstProtocolMarker>();
+        self.connect_channel_to_first_member(server_end)?;
+        Ok(proxy)
+    }
+
     /// Like `connect_to_first_member`, but accepts a server end.
+    /// See [`Self::connect_to_first_member`] for more details.
     pub fn connect_channel_to_first_member(
         &self,
         server_end: fidl::endpoints::ServerEnd<FirstProtocolMarker>,
@@ -780,7 +791,18 @@ impl MultiHeterogeneousMemberServiceProxy {
         Ok(proxy)
     }
 
+    /// Like `connect_to_second_member`, but returns a sync proxy.
+    /// See [`Self::connect_to_second_member`] for more details.
+    pub fn connect_to_second_member_sync(
+        &self,
+    ) -> Result<SecondProtocolSynchronousProxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<SecondProtocolMarker>();
+        self.connect_channel_to_second_member(server_end)?;
+        Ok(proxy)
+    }
+
     /// Like `connect_to_second_member`, but accepts a server end.
+    /// See [`Self::connect_to_second_member`] for more details.
     pub fn connect_channel_to_second_member(
         &self,
         server_end: fidl::endpoints::ServerEnd<SecondProtocolMarker>,
@@ -853,7 +875,18 @@ impl MultiHomogeneousMemberServiceProxy {
         Ok(proxy)
     }
 
+    /// Like `connect_to_first_member`, but returns a sync proxy.
+    /// See [`Self::connect_to_first_member`] for more details.
+    pub fn connect_to_first_member_sync(
+        &self,
+    ) -> Result<FirstProtocolSynchronousProxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<FirstProtocolMarker>();
+        self.connect_channel_to_first_member(server_end)?;
+        Ok(proxy)
+    }
+
     /// Like `connect_to_first_member`, but accepts a server end.
+    /// See [`Self::connect_to_first_member`] for more details.
     pub fn connect_channel_to_first_member(
         &self,
         server_end: fidl::endpoints::ServerEnd<FirstProtocolMarker>,
@@ -866,7 +899,18 @@ impl MultiHomogeneousMemberServiceProxy {
         Ok(proxy)
     }
 
+    /// Like `connect_to_second_member`, but returns a sync proxy.
+    /// See [`Self::connect_to_second_member`] for more details.
+    pub fn connect_to_second_member_sync(
+        &self,
+    ) -> Result<FirstProtocolSynchronousProxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<FirstProtocolMarker>();
+        self.connect_channel_to_second_member(server_end)?;
+        Ok(proxy)
+    }
+
     /// Like `connect_to_second_member`, but accepts a server end.
+    /// See [`Self::connect_to_second_member`] for more details.
     pub fn connect_channel_to_second_member(
         &self,
         server_end: fidl::endpoints::ServerEnd<FirstProtocolMarker>,
@@ -931,7 +975,18 @@ impl SingleMemberServiceProxy {
         Ok(proxy)
     }
 
+    /// Like `connect_to_single_member`, but returns a sync proxy.
+    /// See [`Self::connect_to_single_member`] for more details.
+    pub fn connect_to_single_member_sync(
+        &self,
+    ) -> Result<FirstProtocolSynchronousProxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<FirstProtocolMarker>();
+        self.connect_channel_to_single_member(server_end)?;
+        Ok(proxy)
+    }
+
     /// Like `connect_to_single_member`, but accepts a server end.
+    /// See [`Self::connect_to_single_member`] for more details.
     pub fn connect_channel_to_single_member(
         &self,
         server_end: fidl::endpoints::ServerEnd<FirstProtocolMarker>,

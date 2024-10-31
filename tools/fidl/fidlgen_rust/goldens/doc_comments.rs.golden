@@ -728,7 +728,16 @@ impl ServiceProxy {
         Ok(proxy)
     }
 
+    /// Like `connect_to_interface`, but returns a sync proxy.
+    /// See [`Self::connect_to_interface`] for more details.
+    pub fn connect_to_interface_sync(&self) -> Result<InterfaceSynchronousProxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<InterfaceMarker>();
+        self.connect_channel_to_interface(server_end)?;
+        Ok(proxy)
+    }
+
     /// Like `connect_to_interface`, but accepts a server end.
+    /// See [`Self::connect_to_interface`] for more details.
     pub fn connect_channel_to_interface(
         &self,
         server_end: fidl::endpoints::ServerEnd<InterfaceMarker>,
