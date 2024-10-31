@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod constant;
 mod r#enum;
 mod r#struct;
 mod table;
@@ -13,13 +14,30 @@ use crate::compiler::util::emit_natural_comp_ident;
 use crate::compiler::Compiler;
 use crate::ir::{DeclType, EndpointRole, InternalSubtype, PrimSubtype, Type};
 
+pub use self::constant::emit_constant;
 pub use self::r#enum::emit_enum;
 pub use self::r#struct::emit_struct;
 pub use self::r#union::emit_union;
 pub use self::table::emit_table;
 
+fn primitive_subtype(subtype: &PrimSubtype) -> &'static str {
+    match subtype {
+        PrimSubtype::Bool => "bool",
+        PrimSubtype::Float32 => "f32",
+        PrimSubtype::Float64 => "f64",
+        PrimSubtype::Int8 => "i8",
+        PrimSubtype::Int16 => "i16",
+        PrimSubtype::Int32 => "i32",
+        PrimSubtype::Int64 => "i64",
+        PrimSubtype::Uint8 => "u8",
+        PrimSubtype::Uint16 => "u16",
+        PrimSubtype::Uint32 => "u32",
+        PrimSubtype::Uint64 => "u64",
+    }
+}
+
 fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> Result<(), Error> {
-    match &ty {
+    match ty {
         Type::Array { element_type, element_count } => {
             write!(out, "[")?;
             emit_type(compiler, out, element_type)?;
@@ -71,23 +89,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
             )?;
         }
         Type::Primitive { subtype } => {
-            write!(
-                out,
-                "{}",
-                match subtype {
-                    PrimSubtype::Bool => "bool",
-                    PrimSubtype::Float32 => "f32",
-                    PrimSubtype::Float64 => "f64",
-                    PrimSubtype::Int8 => "i8",
-                    PrimSubtype::Int16 => "i16",
-                    PrimSubtype::Int32 => "i32",
-                    PrimSubtype::Int64 => "i64",
-                    PrimSubtype::Uint8 => "u8",
-                    PrimSubtype::Uint16 => "u16",
-                    PrimSubtype::Uint32 => "u32",
-                    PrimSubtype::Uint64 => "u64",
-                }
-            )?;
+            write!(out, "{}", primitive_subtype(subtype))?;
         }
         Type::Identifier { identifier, nullable, .. } => {
             match compiler.schema.get_decl_type(identifier).unwrap() {

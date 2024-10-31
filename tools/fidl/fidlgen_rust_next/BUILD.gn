@@ -12,6 +12,7 @@ if (is_host) {
     edition = "2021"
     sources = [
       "src/compiler/mod.rs",
+      "src/compiler/natural/constant.rs",
       "src/compiler/natural/enum.rs",
       "src/compiler/natural/mod.rs",
       "src/compiler/natural/struct.rs",

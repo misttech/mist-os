@@ -42,7 +42,7 @@ pub fn emit_enum<W: Write>(
 
     for member in &e.members {
         let member_name = member.name.to_uppercase();
-        let value = &member.constant.value;
+        let value = &member.value.value;
 
         write!(out, "pub const {member_name}: Wire{name} = Wire{name} {{ value: ",)?;
 
@@ -90,7 +90,7 @@ pub fn emit_enum<W: Write>(
         )?;
 
         for member in &e.members {
-            let value = &member.constant.value;
+            let value = &member.value.value;
             write!(out, "| {value}")?;
         }
 

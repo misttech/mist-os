@@ -6,14 +6,14 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use super::{CompIdent, DeclType, Enum, Library, Struct, Table, Union};
+use super::{CompIdent, Const, DeclType, Enum, Library, Struct, Table, Union};
 
 /// A FIDL JSON IR schema.
 #[derive(Deserialize)]
 pub struct Schema {
     pub name: String,
-    // #[serde(deserialize_with = "crate::de::index")]
-    // pub const_declarations: Vec<Const>,
+    #[serde(deserialize_with = "crate::de::index")]
+    pub const_declarations: HashMap<CompIdent, Const>,
     // pub bits_declarations: Vec<Bits>,
     #[serde(deserialize_with = "crate::de::index")]
     pub enum_declarations: HashMap<CompIdent, Enum>,
