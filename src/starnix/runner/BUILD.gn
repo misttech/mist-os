@@ -30,6 +30,7 @@ rustc_binary("starnix_runner_bin") {
     "//src/lib/trace/rust:trace-provider",
     "//src/starnix/lib/kernel_manager",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
