@@ -41,6 +41,7 @@ reclient_auth_test_cmd=(
   env
   --unset=FX_BUILD_RBE_STATS
   FX_REMOTE_BUILD_METRICS=0
+  # Let the wrapper use a default --logdir and --tmpdir.
   "${reproxy_wrap_cmd[@]}" --
   "$python" -S "$remote_action" --
   echo "greetings from a remote RBE worker"
@@ -180,9 +181,9 @@ function auth_subcommand() {
 }
 
 # LINT.IfChange(reproxy_log_dirs)
-# build/rbe/fuchsia-reproxy-wrap.sh writes to logs here:
+# vars.sh:fx-run-ninja writes RBE logs here:
 readonly rbe_logs_dir="${FUCHSIA_DIR}/out/.reproxy_logs"
-# LINT.ThenChange(/build/rbe/fuchsia-reproxy-wrap.sh:reproxy_log_dirs)
+# LINT.ThenChange(/tools/devshell/lib/vars.sh:reproxy_log_dirs)
 function cleanlogs_subcommand() {
   echo "Removing $rbe_logs_dir"
   rm -rf "$rbe_logs_dir"

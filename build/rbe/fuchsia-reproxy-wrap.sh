@@ -58,8 +58,11 @@ example:
   $script -- ninja
 
 options:
-  --cfg FILE: reclient config for reproxy (default: $default_config)
+  --cfg FILE: reclient configs for reproxy [repeatable, cumulative]
+    (default: $default_config)
   --bindir DIR: location of reproxy tools
+  --logdir DIR: unique reproxy log dir
+  --tmpdir DIR: reproxy temp dir
   -t: print additional timestamps for measuring overhead.
   -v | --verbose: print events verbosely
   All other flags before -- are forwarded to the reproxy bootstrap.
@@ -73,10 +76,14 @@ environment variables:
 EOF
 }
 
-config="$default_config"
+configs=()
+reproxy_logdir=
+reproxy_tmpdir=
 verbose=0
 print_times=0
 bootstrap_options=()
+prev_opt=
+prev_opt_append=
 # Extract script options before --
 for opt
 do
@@ -89,6 +96,15 @@ do
     continue
   fi
 
+  # handle cumulative args
+  if test -n "$prev_opt_append"
+  then
+    eval "$prev_opt_append"+=\(\$opt\)
+    prev_opt_append=
+    shift
+    continue
+  fi
+
   # Extract optarg from --opt=optarg
   optarg=
   case "$opt" in
@@ -96,10 +112,14 @@ do
   esac
 
   case "$opt" in
-    --cfg=*) config="$optarg" ;;
-    --cfg) prev_opt=config ;;
+    --cfg=*) configs+=("$optarg") ;;
+    --cfg) prev_opt_append=configs ;;
     --bindir=*) reclient_bindir="$optarg" ;;
     --bindir) prev_opt=reclient_bindir ;;
+    --logdir=*) reproxy_logdir="$optarg" ;;
+    --logdir) prev_opt=reproxy_logdir ;;
+    --tmpdir=*) reproxy_tmpdir="$optarg" ;;
+    --tmpdir) prev_opt=reproxy_tmpdir ;;
     -t) print_times=1 ;;
     -v | --verbose) verbose=1 ;;
     # stop option processing
@@ -111,69 +131,39 @@ do
 done
 test -z "$prev_out" || { echo "Option is missing argument to set $prev_opt." ; exit 1;}
 
+[[ "${#configs[@]}" > 0 ]] || configs=( "$default_config" )
+
 function _timetrace() {
   [[ "$print_times" == 0 ]] || timetrace "$@"
 }
 
 _timetrace "main start (after option processing)"
 
-readonly reproxy_cfg="$config"
 readonly bootstrap="$reclient_bindir"/bootstrap
 readonly reproxy="$reclient_bindir"/reproxy
 
-# Establish a single log dir per reproxy instance so that statistics are
-# accumulated per build invocation.
+# Generate unique dirs per invocation.
 readonly date="$(date +%Y%m%d-%H%M%S)"
-readonly build_dir_file="$project_root_rel/.fx-build-dir"
-build_subdir=out/unknown
-if test -f "$build_dir_file"
-then
-  # Locate the reproxy logs and temporary dirs on the same device as
-  # the build output, so that moves can be done atomically,
-  # and this avoids cross-device linking problems.
-  build_dir_file_contents="$(cat "$build_dir_file")"
-  # In some cases, .fx-build-dir might contain an absolute path.
-  # We want only the relative-path.
-  if [[ "$build_dir_file_contents" =~ ^/ ]]
-  then build_subdir="$(relpath "$project_root" "$build_dir_file_contents")"
-  else build_subdir="$build_dir_file_contents"
-  fi
-fi
-# assume build_subdir path has depth=2
-IFS=/ read -r -a build_subdir_arr <<< "$build_subdir"
+# Default location, when log/tmp dirs are unspecified.
+readonly build_subdir=out/_unknown
 
-[[ "${#build_subdir_arr[@]}" == 2 ]] || {
-  cat <<EOF
-Warning: expected a relative build subdir with 2 components, but got ${build_subdir_arr[@]}.
-If you see this, file a go/fx-build-bug.
-EOF
+[[ -n "$reproxy_logdir" ]] || {
+  # 'mktemp -p' still yields to TMPDIR in the environment (bug?),
+  # so override TMPDIR instead.
+  reproxy_logdir="$(mktemp -d -t "reproxy.$date.XXXX")"
 }
-
-# LINT.IfChange(reproxy_log_dirs)
-readonly old_logs_root="$project_root/$build_subdir/.reproxy_logs"
-# Move the reproxy logs outside of $build_subdir so they do not get cleaned,
-# but under 'out' so it does not pollute the source root.
-# `fx rbe cleanlogs` will remove all of the accumulated reproxy logs.
-readonly logs_root="$project_root/${build_subdir_arr[0]}/.reproxy_logs/${build_subdir_arr[1]}"
-# LINT.ThenChange(/tools/devshell/rbe:reproxy_log_dirs)
-mkdir -p "$old_logs_root"
-mkdir -p "$logs_root"
-
-# 'mktemp -p' still yields to TMPDIR in the environment (bug?),
-# so override TMPDIR instead.
-readonly reproxy_logdir="$(env TMPDIR="$logs_root" mktemp -d -t "reproxy.$date.XXXX")"
-readonly log_base="${reproxy_logdir##*/}"  # basename
+readonly _log_base="${reproxy_logdir##*/}"  # basename
+[[ -n "$reproxy_tmpdir" ]] || {
+  reproxy_tmpdir="$project_root/$build_subdir"/.reproxy_tmpdirs/"$_log_base"
+}
 
 readonly _fake_tmpdir="$(mktemp -u)"
 readonly _tmpdir="${_fake_tmpdir%/*}"  # dirname
-# Symlink to the old locations, where users may be accustomed to looking.
-ln -s -f "$reproxy_logdir" "$_tmpdir"/
-( cd "$old_logs_root" && ln -s "$reproxy_logdir" . )
 
 # The socket file doesn't need to be co-located with logs.
 # Using an absolute path to the socket allows rewrapper to be invoked
 # from different working directories.
-readonly socket_path="$_tmpdir/$log_base.sock"
+readonly socket_path="$_tmpdir/$_log_base.sock"
 test "${#socket_path}" -le 100 || {
   cat <<EOF
 Socket paths are limited to around 100 characters on some platforms.
@@ -291,35 +281,23 @@ fi
 # the build happens.  The default $TMPDIR is not guaranteed to
 # be on the same physical device.
 # Re-use the randomly generated dir name in a custom tempdir.
-reproxy_tmpdir="$project_root/$build_subdir"/.reproxy_tmpdirs/"$log_base"
+reproxy_tmpdir="$project_root/$build_subdir"/.reproxy_tmpdirs/"$_log_base"
 mkdir -p "$reproxy_tmpdir"
 
 function cleanup() {
   rm -rf "$reproxy_tmpdir"
 }
 
-# Honor additional reproxy configs from the current build dir.
-bootstrap_reproxy_cfg="$reproxy_cfg"
-rbe_config_json="$project_root/$build_subdir/rbe_config.json"
-if [[ -r "$rbe_config_json" ]]
+# Honor additional reproxy configs and overrides.
+bootstrap_reproxy_cfg="${configs[0]}"
+if [[ "${#configs[@]}" -gt 1 ]]
 then
-  all_proxy_cfgs=($("$jq" '.[] | .path' < "$rbe_config_json" | sed -e 's|"\(.*\)"|\1|'))
+  # If needed, concatenate multiple reproxy configs to a single file.
+  bootstrap_reproxy_cfg="$reproxy_logdir/joined_reproxy.cfg"
+  cat "${configs[@]}" > "$bootstrap_reproxy_cfg"
   [[ "$verbose" != 1 ]] || {
-    echo "all reproxy cfgs (${#all_proxy_cfgs[@]}): '${all_proxy_cfgs[@]}'"
+    echo "concatenated reproxy cfg: $bootstrap_reproxy_cfg"
   }
-  if [[ "${#all_proxy_cfgs[@]}" -gt 1 ]]
-  then
-    # Concatenate all reproxy configs to a new file.
-    # The first config is $reproxy_config.
-    # Paths listed in $rbe_config_json are relative to the build output
-    # directory.  Adjust the paths so they can be referenced here.
-    proxy_cfg_abspaths=("${all_proxy_cfgs[@]/#/$project_root/$build_subdir/}")
-    bootstrap_reproxy_cfg="$project_root/$build_subdir/joint_reproxy.cfg"
-    cat "${proxy_cfg_abspaths[@]}" > "$bootstrap_reproxy_cfg"
-    [[ "$verbose" != 1 ]] || {
-      echo "concatenated reproxy cfg: $bootstrap_reproxy_cfg"
-    }
-  fi
 fi
 
 # Startup reproxy.
@@ -369,7 +347,7 @@ test "$BUILD_METRICS_ENABLED" = 0 || {
   _timetrace "Authenticating for metrics upload (done)"
 }
 
-shutdown() {
+function shutdown() {
   _timetrace "Shutting down reproxy"
   # b/188923283 -- added --cfg to shut down properly
   shutdown_status=0
@@ -378,7 +356,8 @@ shutdown() {
     --shutdown \
     --fast_log_collection \
     --async_reproxy_termination \
-    --cfg="$reproxy_cfg" > "$reproxy_logdir"/shutdown.stdout 2>&1 || shutdown_status="$?"
+    --cfg="$bootstrap_reproxy_cfg" \
+    > "$reproxy_logdir"/shutdown.stdout 2>&1 || shutdown_status="$?"
   [[ "$shutdown_status" == 0 && "$verbose" != 1 ]] || {
     cat "$reproxy_logdir"/shutdown.stdout
   }
