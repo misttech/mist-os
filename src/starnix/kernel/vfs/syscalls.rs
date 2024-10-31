@@ -2023,8 +2023,8 @@ pub fn sys_timerfd_settime(
     Ok(())
 }
 
-fn select<L>(
-    locked: &mut Locked<'_, L>,
+fn select(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     nfds: u32,
     readfds_addr: UserRef<__kernel_fd_set>,
@@ -2032,10 +2032,7 @@ fn select<L>(
     exceptfds_addr: UserRef<__kernel_fd_set>,
     deadline: zx::MonotonicInstant,
     sigmask_addr: UserRef<pselect6_sigmask>,
-) -> Result<i32, Errno>
-where
-    L: LockEqualOrBefore<FileOpsCore>,
-{
+) -> Result<i32, Errno> {
     const BITS_PER_BYTE: usize = 8;
 
     fn sizeof<T>(_: &T) -> usize {
@@ -2307,18 +2304,15 @@ pub fn sys_epoll_ctl(
 }
 
 // Backend for sys_epoll_pwait and sys_epoll_pwait2 that takes an already-decoded deadline.
-fn do_epoll_pwait<L>(
-    locked: &mut Locked<'_, L>,
+fn do_epoll_pwait(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
     unvalidated_max_events: i32,
     deadline: zx::MonotonicInstant,
     user_sigmask: UserRef<SigSet>,
-) -> Result<usize, Errno>
-where
-    L: LockEqualOrBefore<FileOpsCore>,
-{
+) -> Result<usize, Errno> {
     let file = current_task.files.get(epfd)?;
     let epoll_file = file.downcast_file::<EpollFileObject>().ok_or_else(|| errno!(EINVAL))?;
 
@@ -2451,17 +2445,14 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
     }
 }
 
-pub fn poll<L>(
-    locked: &mut Locked<'_, L>,
+pub fn poll(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     user_pollfds: UserRef<pollfd>,
     num_fds: i32,
     mask: Option<SigSet>,
     deadline: zx::MonotonicInstant,
-) -> Result<usize, Errno>
-where
-    L: LockEqualOrBefore<FileOpsCore>,
-{
+) -> Result<usize, Errno> {
     if num_fds < 0 || num_fds as u64 > current_task.thread_group.get_rlimit(Resource::NOFILE) {
         return error!(EINVAL);
     }
