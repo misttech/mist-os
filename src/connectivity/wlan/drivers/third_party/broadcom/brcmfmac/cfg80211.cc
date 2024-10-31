@@ -5481,7 +5481,19 @@ zx_status_t brcmf_update_bss_info(struct brcmf_if* ifp) {
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
   struct brcmf_cfg80211_profile* prof = &ifp->vif->profile;
   bcme_status_t fw_err = BCME_OK;
+  if (ifp->roam_req.has_value()) {
+    cfg->capability = ifp->roam_req->selected_bss()->capability_info();
 
+    ifp->connect_req.selected_bss().emplace(ifp->roam_req->selected_bss().value());
+
+    brcmf_init_prof(prof);
+    memcpy(&prof->bssid, ifp->roam_req->selected_bss()->bssid().data(), ETH_ALEN);
+    prof->beacon_period = ifp->roam_req->selected_bss()->beacon_period();
+    return ZX_OK;
+  }
+
+  // No roam request, so attempt to get the current BSS info from firmware.
+  BRCMF_INFO("Getting current BSS info from firmware");
   // Firmware returns the BSS info data after a small offset.
   const size_t kBssInfoOffset = 4;
   const size_t kBssInfoBufLen = sizeof(brcmf_bss_info_le) + kBssInfoOffset;

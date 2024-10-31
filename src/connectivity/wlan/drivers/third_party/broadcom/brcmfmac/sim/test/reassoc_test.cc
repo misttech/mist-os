@@ -219,38 +219,4 @@ TEST_F(ReassocTest, DisconnectOnRoamSuccessWhenDriverCannotSyncChannel) {
   EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
 }
 
-TEST_F(ReassocTest, DisconnectOnRoamSuccessWhenDriverCannotRetrieveBssInfo) {
-  Init();
-
-  simulation::FakeAp ap_0(env_.get(), kAp0Bssid, kDefaultSsid, kAp0Channel);
-  simulation::FakeAp ap_1(env_.get(), kAp1Bssid, kDefaultSsid, kAp1Channel);
-  ap_0.EnableBeacon(zx::msec(60));
-  ap_1.EnableBeacon(zx::msec(60));
-  aps_.push_back(&ap_0);
-  aps_.push_back(&ap_1);
-
-  // Inject firmware error to simulate firmware busy error.
-  WithSimDevice([this](brcmfmac::SimDevice* device) {
-    brcmf_simdev* sim = device->GetSim();
-    sim->sim_fw->err_inj_.AddErrInjCmd(BRCMF_C_GET_BSS_INFO, ZX_ERR_SHOULD_WAIT, BCME_BUSY,
-                                       client_ifc_.iface_id_);
-  });
-  client_ifc_.AssociateWith(ap_0, zx::sec(1));
-
-  common::MacAddr client_mac;
-  client_ifc_.GetMacAddr(&client_mac);
-
-  ScheduleRoam(ap_1, zx::sec(3));
-  env_->Run(kTestDuration);
-
-  // Make sure the expected roam attempt failed.
-  EXPECT_EQ(1U, client_ifc_.stats_.roam_attempts);
-  EXPECT_EQ(0U, client_ifc_.stats_.roam_successes);
-  // Check that there were not multiple connects.
-  EXPECT_EQ(1U, client_ifc_.stats_.connect_attempts);
-  EXPECT_EQ(SimInterface::AssocContext::kNone, client_ifc_.assoc_ctx_.state);
-  // Current implementation only sends disconnect for original BSS in this scenario.
-  EXPECT_EQ(0U, ap_0.GetNumAssociatedClient());
-}
-
 }  // namespace wlan::brcmfmac
