@@ -12,6 +12,7 @@ zx_library("starnix_core") {
   sources = [
     "arch/${current_cpu}/loader.cc",
     "arch/${current_cpu}/syscalls.cc",
+    "device/kobject.cc",
     "execution/executor.cc",
     "fs/mistos/bootfs.cc",
     "fs/mistos/syslog.cc",
@@ -41,6 +42,8 @@ zx_library("starnix_core") {
     "vfs/anon_node.cc",
     "vfs/buffers/io_buffers.cc",
     "vfs/dir_entry.cc",
+    "vfs/directory_file.cc",
+    "vfs/dirent_sink.cc",
     "vfs/fd_number.cc",
     "vfs/fd_table.cc",
     "vfs/file_object.cc",

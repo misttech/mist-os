@@ -292,6 +292,23 @@ class DirEntry
   /// which this node is mounted.
   FsString local_name() const;
 
+  /// The parent DirEntry object or this DirEntry if this entry is the root.
+  ///
+  /// Useful when traversing up the tree if you always want to find a parent
+  /// (e.g., for "..").
+  ///
+  /// Be aware that the root of one file system might be mounted as a child
+  /// in another file system. For that reason, consider walking the
+  /// NamespaceNode tree (which understands mounts) rather than the DirEntry
+  /// tree.
+  DirEntryHandle parent_or_self() {
+    auto parent = state_.Read()->parent;
+    return parent ? parent.value() : fbl::RefPtr<DirEntry>(this);
+  }
+
+  /// Whether this directory entry has been removed from the tree.
+  bool is_dead() const { return state_.Read()->is_dead; }
+
   /// Whether the given name has special semantics as a directory entry.
   ///
   /// Specifically, whether the name is empty (which means "self"), dot
