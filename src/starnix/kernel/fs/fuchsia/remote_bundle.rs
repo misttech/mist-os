@@ -536,7 +536,7 @@ mod test {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let (server, client) = zx::Channel::create();
-        fdio::open("/pkg", rights, server).expect("failed to open /pkg");
+        fdio::open_deprecated("/pkg", rights, server).expect("failed to open /pkg");
         let fs = RemoteBundle::new_fs(
             &kernel,
             &fio::DirectorySynchronousProxy::new(client),

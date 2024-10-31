@@ -132,7 +132,7 @@ mod fuchsia {
         request: fidl::endpoints::ServerEnd<fio::FileMarker>,
     ) -> Result<(), OpenError> {
         let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+        namespace.open_deprecated(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
     /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
@@ -151,7 +151,7 @@ mod fuchsia {
     ) -> Result<(), OpenError> {
         let flags = flags | fio::Flags::PROTOCOL_FILE;
         let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-        namespace.open3(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
     /// Write the given data into a file at `path` in the current namespace. The path must be an

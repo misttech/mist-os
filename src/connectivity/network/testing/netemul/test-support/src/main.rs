@@ -46,7 +46,7 @@ async fn handle_counter(
                 }
                 CounterRequest::OpenInNamespace { path, flags, request, control_handle: _ } => {
                     info!("connecting to node at '{}'", path);
-                    let () = fdio::open(&path, flags, request).unwrap_or_else(|e| {
+                    let () = fdio::open_deprecated(&path, flags, request).unwrap_or_else(|e| {
                         error!("error connecting request to node at path '{}': {}", path, e)
                     });
                 }

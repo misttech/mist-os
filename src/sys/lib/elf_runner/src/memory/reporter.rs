@@ -88,7 +88,7 @@ impl MemoryReporter {
             detailed_attribution: component.get_outgoing_directory().and_then(
                 |outgoing_directory| {
                     let (server, client) = fidl::Channel::create();
-                    fdio::open_at(
+                    fdio::open_at_deprecated(
                         outgoing_directory.channel(),
                         &format!("svc/{}", fattribution::ProviderMarker::PROTOCOL_NAME),
                         fio::OpenFlags::empty(),

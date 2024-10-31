@@ -26,7 +26,7 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
             fresolution::ResolverRequest::Resolve { component_url, responder } => {
                 if component_url == "test://trigger" {
                     let (client, server) = fidl::endpoints::create_endpoints();
-                    fdio::open(
+                    fdio::open_deprecated(
                         "/pkg",
                         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
                         server.into_channel(),

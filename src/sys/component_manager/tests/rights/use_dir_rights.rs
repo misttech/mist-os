@@ -40,9 +40,9 @@ impl RightsTestCase {
 
     /// Verifies that the rights are correctly implemented for the type.
     fn verify(&self) -> io::Result<()> {
-        fdio::open_fd(self.path, self.rights)?;
+        fdio::open_fd_deprecated(self.path, self.rights)?;
         for invalid_right in self.unavailable_rights() {
-            if let Ok(_) = fdio::open_fd(self.path, invalid_right) {
+            if let Ok(_) = fdio::open_fd_deprecated(self.path, invalid_right) {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
                     format!(

@@ -634,7 +634,7 @@ mod tests {
 
         // Test that the flags are passed correctly.
         let flags_for_abc = fio::OpenFlags::DIRECTORY | fio::OpenFlags::DESCRIBE;
-        fdio::open_at(&dir, "abc", flags_for_abc, server_end).unwrap();
+        fdio::open_at_deprecated(&dir, "abc", flags_for_abc, server_end).unwrap();
 
         // Capability is opened with "." and a `server_end`.
         let (relative_path, server_end) = exec.run_singlethreaded(&mut receiver.recv()).unwrap();

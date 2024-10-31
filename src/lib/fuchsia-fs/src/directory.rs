@@ -90,7 +90,7 @@ mod fuchsia {
     ) -> Result<(), OpenError> {
         let flags = flags | fio::OpenFlags::DIRECTORY;
         let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+        namespace.open_deprecated(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
     /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
@@ -109,7 +109,7 @@ mod fuchsia {
     ) -> Result<(), OpenError> {
         let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
         let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-        namespace.open3(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
     /// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.

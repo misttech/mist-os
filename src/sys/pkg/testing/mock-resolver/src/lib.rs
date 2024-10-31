@@ -41,7 +41,7 @@ impl TestPackage {
         // Connect to the backing directory which we'll proxy _most_ requests to.
         let (backing_dir_proxy, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        fdio::open(
+        fdio::open_deprecated(
             self.root.to_str().unwrap(),
             fio::OpenFlags::RIGHT_READABLE,
             server_end.into_channel(),
