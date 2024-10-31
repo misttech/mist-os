@@ -7,6 +7,7 @@ use attribution_testing::PrincipalIdentifier;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl::AsHandleRef;
+use fidl_fuchsia_sys2::OpenError;
 use fuchsia_component_test::{
     RealmBuilder, RealmBuilderParams, RealmInstance, ScopedInstanceFactory,
 };
@@ -247,22 +248,35 @@ async fn init_attribution_test() -> AttributionTest {
     // exact name of the starnix kernel moniker is random, so unknown to the test at this point.
     let realm_query =
         realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
-    std::thread::sleep(std::time::Duration::from_secs(10));
-    let starnix_kernel_moniker = find_starnix_kernel_moniker(&realm_query).await;
-    let (attribution_provider, server_end) =
-        fidl::endpoints::create_proxy::<fattribution::ProviderMarker>().unwrap();
-    realm_query
-        .open(
-            &starnix_kernel_moniker,
-            fsys2::OpenDirType::ExposedDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            fattribution::ProviderMarker::PROTOCOL_NAME,
-            server_end.into_channel().into(),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+    let starnix_kernel_moniker = loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        match find_starnix_kernel_moniker(&realm_query).await {
+            Some(moniker) => break moniker,
+            None => continue,
+        };
+    };
+
+    let attribution_provider = loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let (attribution_provider, server_end) =
+            fidl::endpoints::create_proxy::<fattribution::ProviderMarker>().unwrap();
+        match realm_query
+            .open(
+                &starnix_kernel_moniker,
+                fsys2::OpenDirType::ExposedDir,
+                fio::OpenFlags::empty(),
+                fio::ModeType::empty(),
+                fattribution::ProviderMarker::PROTOCOL_NAME,
+                server_end.into_channel().into(),
+            )
+            .await
+            .unwrap()
+        {
+            Ok(()) => break attribution_provider,
+            Err(OpenError::InstanceNotResolved) => continue,
+            Err(e) => panic!("Error opening the starnix kernel memory provider: {:?}", e),
+        }
+    };
 
     let attribution = attribution_testing::attribute_memory(
         PrincipalIdentifier(1),
@@ -292,7 +306,7 @@ async fn get_process_handle_by_name(realm: &RealmInstance, name: &str) -> zx::Pr
     // Get the job of the starnix kernel.
     let realm_query =
         realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
-    let starnix_kernel_moniker = find_starnix_kernel_moniker(&realm_query).await;
+    let starnix_kernel_moniker = find_starnix_kernel_moniker(&realm_query).await.unwrap();
     let (starnix_controller, server_end) =
         fidl::endpoints::create_proxy::<fcontainer::ControllerMarker>().unwrap();
     realm_query
@@ -322,7 +336,7 @@ async fn get_process_handle_by_name(realm: &RealmInstance, name: &str) -> zx::Pr
     panic!("Did not find test starnix program");
 }
 
-async fn find_starnix_kernel_moniker(realm_query: &fsys2::RealmQueryProxy) -> String {
+async fn find_starnix_kernel_moniker(realm_query: &fsys2::RealmQueryProxy) -> Option<String> {
     // Enumerate the instances until we find the starnix kernel.
     let iterator = realm_query.get_all_instances().await.unwrap().unwrap();
     let iterator = iterator.into_proxy().unwrap();
@@ -330,13 +344,13 @@ async fn find_starnix_kernel_moniker(realm_query: &fsys2::RealmQueryProxy) -> St
         for instance in instances {
             if let Some(url) = instance.url {
                 if url.contains("starnix_kernel") {
-                    return instance.moniker.unwrap();
+                    return Some(instance.moniker.unwrap());
                 }
             }
         }
     }
 
-    panic!("Did not find starnix kernel");
+    None
 }
 
 /// Find a mapping in the process that satisfies the predicate.
