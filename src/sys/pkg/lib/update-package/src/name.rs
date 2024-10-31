@@ -26,13 +26,9 @@ pub enum VerifyNameError {
 }
 
 pub(crate) async fn verify(proxy: &fio::DirectoryProxy) -> Result<(), VerifyNameError> {
-    let file = fuchsia_fs::directory::open_file_deprecated(
-        proxy,
-        "meta/package",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .map_err(VerifyNameError::OpenMetaPackage)?;
+    let file = fuchsia_fs::directory::open_file(proxy, "meta/package", fio::PERM_READABLE)
+        .await
+        .map_err(VerifyNameError::OpenMetaPackage)?;
     let contents = fuchsia_fs::file::read(&file).await.map_err(VerifyNameError::ReadMetaPackage)?;
 
     let expected = MetaPackage::from_name_and_variant_zero("update".parse().unwrap());

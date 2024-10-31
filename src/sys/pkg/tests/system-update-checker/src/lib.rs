@@ -89,9 +89,9 @@ impl TestEnvBuilder {
 
         let mut fs = ServiceFs::new();
         // Add fake directories.
-        let system = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let system = fuchsia_fs::directory::open_in_namespace(
             mounts.system.path().to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .unwrap();
         fs.add_remote("system", system);

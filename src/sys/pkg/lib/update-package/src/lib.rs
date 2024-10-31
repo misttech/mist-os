@@ -123,9 +123,9 @@ impl TestUpdatePackage {
 
     fn new() -> Self {
         let temp_dir = tempfile::tempdir().expect("/tmp to exist");
-        let update_pkg_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let update_pkg_proxy = fuchsia_fs::directory::open_in_namespace(
             temp_dir.path().to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .expect("temp dir to open");
         Self { temp_dir, update_pkg: UpdatePackage::new(update_pkg_proxy) }

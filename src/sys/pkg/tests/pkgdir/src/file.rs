@@ -492,6 +492,7 @@ async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, pa
                     _ => Err(anyhow!("wrong fio::NodeInfoDeprecated returned")),
                 }
             }
+            Some(Ok(fio::FileEvent::OnRepresentation { payload: _ })) => Ok(()),
             Some(Ok(other)) => Err(anyhow!("wrong node type returned: {:?}", other)),
             Some(Err(e)) => Err(e).context("failed to call onopen"),
             None => Err(anyhow!("no events!")),

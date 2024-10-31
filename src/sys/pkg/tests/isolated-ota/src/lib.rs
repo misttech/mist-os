@@ -94,7 +94,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
         let directories_out_dir = vfs::pseudo_directory! {
             "config" => vfs::pseudo_directory! {
                 "data" => vfs::pseudo_directory!{
-                    "repositories" => vfs::remote::remote_dir(fuchsia_fs::directory::open_in_namespace_deprecated(params.repo_config_dir.path().to_str().unwrap(), fio::OpenFlags::RIGHT_READABLE).unwrap())
+                    "repositories" => vfs::remote::remote_dir(fuchsia_fs::directory::open_in_namespace(params.repo_config_dir.path().to_str().unwrap(), fio::PERM_READABLE).unwrap())
                 },
                 "build-info" => vfs::pseudo_directory!{
                     "build" => read_only(b"test")

@@ -208,14 +208,14 @@ impl TestEnvBuilder {
         let mut fs = ServiceFs::new();
         let config_data_path = mounts.config_data.clone().into_os_string().into_string().unwrap();
         let build_info_path = mounts.build_info.clone().into_os_string().into_string().unwrap();
-        let config_data = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let config_data = fuchsia_fs::directory::open_in_namespace(
             config_data_path.as_str(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
         )
         .unwrap();
-        let build_info = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let build_info = fuchsia_fs::directory::open_in_namespace(
             build_info_path.as_str(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
         )
         .unwrap();
         fs.dir("config").add_remote("data", config_data);

@@ -73,12 +73,8 @@ pub(crate) async fn update_mode(
     proxy: &fio::DirectoryProxy,
 ) -> Result<Option<UpdateMode>, ParseUpdateModeError> {
     // Open the update-mode file.
-    let fopen_res = fuchsia_fs::directory::open_file_deprecated(
-        proxy,
-        "update-mode",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await;
+    let fopen_res =
+        fuchsia_fs::directory::open_file(proxy, "update-mode", fio::PERM_READABLE).await;
     if let Err(fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND)) = fopen_res {
         return Ok(None);
     }
