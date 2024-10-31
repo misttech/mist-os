@@ -53,6 +53,18 @@ PidEntry::PidEntry(pid_t pid) : pid_(pid) {}
 
 PidEntry::~PidEntry() = default;
 
+ProcessEntryRef ProcessEntryRef::Process(fbl::RefPtr<ThreadGroup> thread_group) {
+  return ProcessEntryRef(Variant(ktl::move(thread_group)));
+}
+
+ProcessEntryRef ProcessEntryRef::Zombie(fbl::RefPtr<ZombieProcess> zombie) {
+  return ProcessEntryRef(Variant(ktl::move(zombie)));
+}
+
+ProcessEntryRef::ProcessEntryRef(Variant variant) : variant_(ktl::move(variant)) {}
+
+ProcessEntryRef::~ProcessEntryRef() = default;
+
 ktl::optional<std::reference_wrapper<const PidEntry>> PidTable::get_entry(pid_t pid) const {
   const auto& entry = table_.find(pid);
   if (entry == table_.end()) {
@@ -116,6 +128,49 @@ void PidTable::remove_task(pid_t pid) {
     entry.task_ = ktl::nullopt;
     ZX_ASSERT(removed.has_value());
   });
+}
+
+ktl::optional<ProcessEntryRef> PidTable::get_process(pid_t pid) const {
+  auto entry = get_entry(pid);
+  if (!entry.has_value()) {
+    return ktl::nullopt;
+  }
+
+  const auto& pid_entry = entry.value();
+  if (pid_entry.get().process_.is_none()) {
+    return ktl::nullopt;
+  }
+
+  return ktl::visit(
+      ProcessEntry::overloaded{
+          [](const ktl::monostate&) -> ktl::optional<ProcessEntryRef> { return ktl::nullopt; },
+          [](const util::WeakPtr<ThreadGroup>& thread_group) -> ktl::optional<ProcessEntryRef> {
+            if (auto locked = thread_group.Lock()) {
+              return ProcessEntryRef::Process(ktl::move(locked));
+            }
+            return ktl::nullopt;
+          },
+          [](const util::WeakPtr<ZombieProcess>& zombie) -> ktl::optional<ProcessEntryRef> {
+            if (auto locked = zombie.Lock()) {
+              return ProcessEntryRef::Zombie(ktl::move(locked));
+            }
+            return ktl::nullopt;
+          }},
+      pid_entry.get().process_.variant_);
+}
+
+fbl::Vector<fbl::RefPtr<ThreadGroup>> PidTable::get_thread_groups() const {
+  fbl::Vector<fbl::RefPtr<ThreadGroup>> thread_groups;
+  for (auto it = table_.begin(); it != table_.end(); ++it) {
+    if (auto thread_group_ref = it->process_.thread_group()) {
+      if (auto locked = thread_group_ref->get().Lock()) {
+        fbl::AllocChecker ac;
+        thread_groups.push_back(ktl::move(locked), &ac);
+        ZX_ASSERT(ac.check());
+      }
+    }
+  }
+  return thread_groups;
 }
 
 void PidTable::add_thread_group(const fbl::RefPtr<ThreadGroup>& thread_group) {

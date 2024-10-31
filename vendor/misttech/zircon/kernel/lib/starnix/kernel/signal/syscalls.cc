@@ -39,7 +39,81 @@ fit::result<Errno, pid_t> negate_pid(pid_t pid) {
 
 fit::result<Errno> sys_kill(const CurrentTask& current_task, pid_t pid,
                             starnix_uapi::UncheckedSignal unchecked_signal) {
-  return fit::error(errno(ENOSYS));
+  auto pids = current_task->kernel()->pids.Write();
+
+  if (pid > 0) {
+    // "If pid is positive, then signal sig is sent to the process with
+    // the ID specified by pid."
+    auto target_thread_group = [&]() -> fit::result<Errno, fbl::RefPtr<ThreadGroup>> {
+      if (auto process = pids->get_process(pid)) {
+        return ktl::visit(
+            ProcessEntryRef::overloaded{
+                [](const fbl::RefPtr<ThreadGroup>& thread_group)
+                    -> fit::result<Errno, fbl::RefPtr<ThreadGroup>> {
+                  return fit::ok(thread_group);
+                },
+
+                // Zombies cannot receive signals. Just ignore it.
+                [](const fbl::RefPtr<ZombieProcess>&)
+                    -> fit::result<Errno, fbl::RefPtr<ThreadGroup>> { return fit::ok(nullptr); }},
+
+            process.value().variant_);
+      }
+
+      // If we don't have process with `pid` then check if there is a task with
+      // the `pid`.
+      auto weak_task = pids->get_task(pid);
+      auto task = weak_task.Lock();
+      if (task) {
+        return fit::ok(task->thread_group_);
+      }
+      return fit::error(errno(ESRCH));
+    }() _EP(target_thread_group);
+
+    if (auto thread_group = target_thread_group.value()) {
+      // return thread_group->send_signal_unchecked(current_task, unchecked_signal);
+    }
+  } else if (pid == -1) {
+    // "If pid equals -1, then sig is sent to every process for which
+    // the calling process has permission to send signals, except for
+    // process 1 (init), but ... POSIX.1-2001 requires that kill(-1,sig)
+    // send sig to all processes that the calling process may send
+    // signals to, except possibly for some implementation-defined
+    // system processes. Linux allows a process to signal itself, but on
+    // Linux the call kill(-1,sig) does not signal the calling process."
+
+    auto thread_groups = pids->get_thread_groups();
+    for (const auto& thread_group : thread_groups) {
+      if (thread_group == current_task->thread_group_ || thread_group->leader_ == 1) {
+        continue;
+      }
+      // auto result = thread_group->send_signal_unchecked(current_task, unchecked_signal)
+      // _EP(result);
+    }
+  } else {
+    // "If pid equals 0, then sig is sent to every process in the
+    // process group of the calling process."
+    //
+    // "If pid is less than -1, then sig is sent to every process in the
+    // process group whose ID is -pid."
+
+    pid_t process_group_id;
+    if (pid == 0) {
+      process_group_id = current_task->thread_group_->Read()->process_group_->leader_;
+    } else {
+      auto negated = negate_pid(pid) _EP(negated);
+      process_group_id = negated.value();
+    }
+
+    if (auto process_group = pids->get_process_group(process_group_id)) {
+      auto thread_groups = (*process_group)->Read()->thread_groups();
+      for (auto thread_group : thread_groups) {
+        // auto result = thread_group->send_signal_unchecked(current_task, unchecked_signal)
+        // _EP(result);
+      }
+    }
+  }
+  return fit::ok();
 }
 
 namespace {
@@ -113,6 +187,70 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
   } while (true);
 }
 }  // namespace
+
+fit::result<Errno> sys_waitid(const CurrentTask& current_task, uint32_t id_type, int32_t id,
+                              starnix_uapi::UserAddress user_info, uint32_t options,
+                              starnix_uapi::UserRef<struct ::rusage> user_rusage) {
+  auto waiting_options = WaitingOptions::new_for_waitid(options) _EP(waiting_options);
+
+  auto task_selector = [&]() -> fit::result<Errno, ProcessSelector> {
+    switch (id_type) {
+      case P_PID:
+        return fit::ok(ProcessSelector::SpecificPid(id));
+      case P_ALL:
+        return fit::ok(ProcessSelector::AnyProcess());
+      case P_PGID:
+        if (id == 0) {
+          return fit::ok(ProcessSelector::ProcessGroup(
+              current_task->thread_group_->Read()->process_group_->leader_));
+        }
+        return fit::ok(ProcessSelector::ProcessGroup(id));
+      case P_PIDFD: {
+        auto fd = FdNumber::from_raw(id);
+        auto file = current_task->files_.get(fd) _EP(file);
+        if (file->flags().contains(OpenFlagsEnum::NONBLOCK)) {
+          // waiting_options.value().set_block(false);
+        }
+        auto pid = file->as_pid() _EP(pid);
+        return fit::ok(ProcessSelector::SpecificPid(pid.value()));
+      }
+      default:
+        return fit::error(errno(EINVAL));
+    }
+  }() _EP(task_selector);
+
+  // wait_on_pid returns None if the task was not waited on. In that case, we don't write out a
+  // siginfo. This seems weird but is the correct behavior according to the waitid(2) man page.
+  auto waitable_process = wait_on_pid(current_task, task_selector.value(), waiting_options.value())
+      _EP(waitable_process);
+
+  if (waitable_process.value().has_value()) {
+    auto& process = waitable_process.value().value();
+
+    if (!user_rusage->is_null()) {
+      // TODO(https://fxbug.dev/322874712): Implement real rusage from waitid
+      struct ::rusage usage = {};
+      _EP(current_task->write_object(user_rusage, usage));
+    }
+
+    if (!user_info.is_null()) {
+      auto siginfo = process.as_signal_info();
+      _EP(current_task->write_memory(user_info, siginfo.as_siginfo_bytes()));
+    }
+  } else if (id_type == P_PIDFD) {
+    // From <https://man7.org/linux/man-pages/man2/pidfd_open.2.html>:
+    //
+    //   PIDFD_NONBLOCK
+    //     Return a nonblocking file descriptor.  If the process
+    //     referred to by the file descriptor has not yet terminated,
+    //     then an attempt to wait on the file descriptor using
+    //     waitid(2) will immediately return the error EAGAIN rather
+    //     than blocking.
+    return fit::error(errno(EAGAIN));
+  }
+
+  return fit::ok();
+}
 
 fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_selector,
                                     starnix_uapi::UserRef<int32_t> user_wstatus, uint32_t options,

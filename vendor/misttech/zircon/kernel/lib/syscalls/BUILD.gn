@@ -24,6 +24,7 @@ source_set("linux_impl") {
     "fs/stat.cc",
     "kernel/exit.cc",
     "kernel/fork.cc",
+    "kernel/signal.cc",
     "kernel/sys.cc",
     "mm/mmap.cc",
     "mm/mprotect.cc",

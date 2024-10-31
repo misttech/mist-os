@@ -33,9 +33,11 @@ class ThreadDispatcher;
 
 namespace starnix {
 
-class TaskBuilder;
-class Kernel;
 class FsContext;
+class FsNode;
+using FsNodeHandle = fbl::RefPtr<FsNode>;
+class Kernel;
+class TaskBuilder;
 struct ThreadState;
 
 namespace testing {
@@ -488,7 +490,6 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   // pub trace_syscalls: AtomicBool,
 
   /// impl Task
- public:
   fbl::RefPtr<Kernel>& kernel() const;
 
   bool has_same_address_space(const Task* other) const { return mm() == other->mm(); }

@@ -75,6 +75,10 @@ class WaitingOptions {
 fit::result<Errno> sys_kill(const CurrentTask& current_task, pid_t pid,
                             starnix_uapi::UncheckedSignal unchecked_signal);
 
+fit::result<Errno> sys_waitid(const CurrentTask& current_task, uint32_t id_type, int32_t id,
+                              starnix_uapi::UserAddress user_info, uint32_t options,
+                              starnix_uapi::UserRef<struct ::rusage> user_rusage);
+
 fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_selector,
                                     starnix_uapi::UserRef<int32_t> user_wstatus, uint32_t options,
                                     starnix_uapi::UserRef<struct ::rusage> user_rusage);
