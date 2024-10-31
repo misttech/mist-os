@@ -681,11 +681,10 @@ pub fn selinuxfs_get_admin_api(current_task: &CurrentTask) -> Option<Arc<Securit
 // TODO: https://fxbug.dev/362917997 - Remove this when SELinux LSM is modularized.
 pub fn selinuxfs_check_access(
     current_task: &CurrentTask,
-    node: &FsNode,
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::selinuxfs_check_access(security_server, current_task, node, permission)
+        selinux_hooks::selinuxfs_check_access(security_server, current_task, permission)
     })
 }
 

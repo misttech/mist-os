@@ -825,22 +825,12 @@ pub(super) fn selinuxfs_policy_loaded(
 pub(super) fn selinuxfs_check_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
-    node: &FsNode,
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
     let source_sid = current_task.read().security_state.attrs.current_sid;
-    let target_sid = fs_node_effective_sid(node);
+    let target_sid = SecurityId::initial(InitialSid::Security);
     let permission_check = security_server.as_permission_check();
-    todo_check_permission!(
-        TODO(
-            "https://fxbug.dev/349117435",
-            "Security permission checks require selinuxfs to be labeled"
-        ),
-        &permission_check,
-        source_sid,
-        target_sid,
-        permission
-    )
+    check_permission(&permission_check, source_sid, target_sid, permission)
 }
 
 /// The global SELinux security structures, held by the `Kernel`.

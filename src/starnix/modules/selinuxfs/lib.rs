@@ -855,7 +855,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
     fn write(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
-        file: &FileObject,
+        _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
@@ -863,11 +863,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         if offset != 0 && !T::api_write_ignores_offset() {
             return error!(EINVAL);
         }
-        security::selinuxfs_check_access(
-            current_task,
-            &file.name.entry.node,
-            T::api_write_permission(),
-        )?;
+        security::selinuxfs_check_access(current_task, T::api_write_permission())?;
         let data = data.read_all()?;
         let data_len = data.len();
         self.ops.api_write_with_task(current_task, data)?;
