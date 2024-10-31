@@ -170,7 +170,8 @@
 
     "clangd.arguments": [
         "--clang-tidy",
-        "--background-index"
+        "--background-index",
+        "--header-insertion=never"
     ],
     "clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/mac-x64/bin/clangd",
 
