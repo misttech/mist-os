@@ -1,5 +1,5 @@
 pub async fn ffx_plugin_impl(
-  _injector: &std::sync::Arc<dyn ffx_core::Injector>,
+  _injector: &Option<std::sync::Arc<dyn ffx_core::Injector>>,
   _cmd: {{suite_args_lib}}::FfxPluginCommand,
 ) -> fho::Result<()>
 {
@@ -120,7 +120,7 @@ pub fn ffx_plugin_has_schema(
 /// //src/developer/ffx/core/macro/src/impl.rs
 struct SuiteAdapter {
     cmd: {{suite_args_lib}}::FfxPluginCommand,
-    injector: std::sync::Arc<dyn ffx_core::Injector>,
+    injector: Option<std::sync::Arc<dyn ffx_core::Injector>>,
 }
 
 #[fho::macro_deps::async_trait(?Send)]

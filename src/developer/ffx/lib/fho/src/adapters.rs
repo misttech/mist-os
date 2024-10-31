@@ -10,7 +10,7 @@
 macro_rules! embedded_plugin {
     ($tool:ty) => {
         pub async fn ffx_plugin_impl(
-            injector: &::std::sync::Arc<dyn ffx_core::Injector>,
+            injector: &Option<::std::sync::Arc<dyn ffx_core::Injector>>,
             cmd: <$tool as $crate::FfxTool>::Command,
         ) -> $crate::Result<()> {
             #[allow(unused_imports)]
@@ -113,7 +113,7 @@ mod tests {
         };
 
         let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
-        ffx_plugin_impl(&injector, fake_tool).await.expect("Plugin to run successfully");
+        ffx_plugin_impl(&Some(injector), fake_tool).await.expect("Plugin to run successfully");
 
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),

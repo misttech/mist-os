@@ -15,7 +15,7 @@ pub fn ffx_plugin_has_schema() -> bool {
 }
 
 pub async fn ffx_plugin_impl(
-    _: &std::sync::Arc<dyn ffx_core::Injector>,
+    _: &Option<std::sync::Arc<dyn ffx_core::Injector>>,
     _: FfxBuiltIn,
 ) -> Result<()> {
     unreachable!("This is a side effect needed for the jinja template")
