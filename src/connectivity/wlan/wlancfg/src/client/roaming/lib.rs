@@ -4,11 +4,17 @@
 
 use crate::client::config_management::Credential;
 use crate::client::types;
+use crate::util::historical_list::{HistoricalList, Timestamped};
 use crate::util::pseudo_energy::{EwmaSignalData, RssiVelocity};
 use tracing::error;
 use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
 
 pub const ROAMING_CHANNEL_BUFFER_SIZE: usize = 100;
+/// This is how many past roam events will be remembered for limiting roams per day. Each roam
+/// monitor implementation decides how to limit roams per day, and this number must be greater
+/// than or equal to all of them.
+pub const NUM_PLATFORM_MAX_ROAMS_PER_DAY: usize = 5;
+pub const TIMESPAN_TO_LIMIT_SCANS: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(24);
 
 // LINT.IfChange
 #[derive(Clone, Copy)]
@@ -119,3 +125,23 @@ pub enum RoamReason {
     RssiBelowThreshold,
     SnrBelowThreshold,
 }
+
+/// Only used for recording when the last roam attempts happened in order to limit their frequency.
+#[derive(Clone)]
+pub struct RoamEvent {
+    time: fasync::MonotonicInstant,
+}
+
+impl RoamEvent {
+    pub fn new_roam_now() -> Self {
+        Self { time: fasync::MonotonicInstant::now() }
+    }
+}
+
+impl Timestamped for RoamEvent {
+    fn time(&self) -> fasync::MonotonicInstant {
+        self.time
+    }
+}
+
+pub type PastRoamList = HistoricalList<RoamEvent>;
