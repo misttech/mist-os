@@ -319,6 +319,7 @@ pub async fn write_instance_info(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffx_config::ConfigLevel;
     use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
     use std::collections::BTreeSet;
     use std::net::Ipv6Addr;
@@ -328,6 +329,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_write_instance_info_with_global_context() {
         let env = ffx_config::test_init().await.expect("test env");
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
         let instance_name = "some-instance";
         let repo_config =
@@ -363,6 +370,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_write_instance_info_with_context() {
         let env = ffx_config::test_init().await.expect("test env");
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
         let repo_config =
             RepositoryConfigBuilder::new("fuchsia-pkg://somename".parse().unwrap()).build();

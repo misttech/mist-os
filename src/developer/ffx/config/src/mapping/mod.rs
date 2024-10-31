@@ -17,6 +17,7 @@ mod filter;
 mod flatten;
 mod home;
 mod runtime;
+mod shared_data;
 mod workspace;
 
 pub(crate) use self::build::build;
@@ -29,6 +30,7 @@ pub(crate) use file_check::file_check;
 pub(crate) use filter::filter;
 pub(crate) use flatten::flatten;
 pub(crate) use runtime::runtime;
+pub(crate) use shared_data::shared_data;
 pub(crate) use workspace::workspace;
 
 // Negative lookbehind (or lookahead for that matter) is not supported in Rust's regex.

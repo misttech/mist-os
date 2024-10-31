@@ -174,7 +174,7 @@ impl RepoStopTool {
 mod tests {
     use super::*;
     use camino::Utf8PathBuf;
-    use ffx_config::TestEnv;
+    use ffx_config::{ConfigLevel, TestEnv};
     use fho::Format;
     use fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest};
     use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
@@ -267,6 +267,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_daemon_stop() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
 
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
 
@@ -300,6 +306,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_standalone_stop() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
 
         let (_mgr, _server_proc) =
             make_standalone_instance("default".into(), None, &env.context, &env)
@@ -327,6 +339,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_product_bundle_stop() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
 
         let product_bundle_path =
             Utf8PathBuf::from_path_buf(env.isolate_root.path().join("pb")).expect("utf8 path");
@@ -364,6 +382,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_stop_disables_daemon_server_on_error() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
         pkg_config::set_repository_server_enabled(true).await.unwrap();
 
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
@@ -400,6 +424,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_stop_disables_daemon_server_on_communication_error() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
         pkg_config::set_repository_server_enabled(true).await.unwrap();
 
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
@@ -428,6 +458,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_stop_daemon_machine() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
 
         let (sender, receiver) = channel();
@@ -466,6 +502,12 @@ mod tests {
     #[fuchsia::test]
     async fn test_stop_daemon_error_machine() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
 
         let (sender, receiver) = channel();
@@ -506,6 +548,13 @@ mod tests {
     #[fuchsia::test]
     async fn test_stop_multiple_servers_error() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
+
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
         make_daemon_instance("default2".into(), &env.context).expect("test daemon instance");
 
@@ -542,6 +591,13 @@ mod tests {
     #[fuchsia::test]
     async fn test_stop_multiple_servers_ok() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
+
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
         make_daemon_instance("default2".into(), &env.context).expect("test daemon instance");
 
@@ -582,6 +638,13 @@ mod tests {
     #[fuchsia::test]
     async fn test_stop_servers_not_found() {
         let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
+            .await
+            .expect("setting isolated process dir");
+
         make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
 
         let (sender, _receiver) = channel();
