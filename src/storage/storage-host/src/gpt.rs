@@ -26,7 +26,7 @@ use {
 /// A single partition in a GPT device.
 pub struct GptPartition {
     gpt: Weak<GptManager>,
-    block_client: RemoteBlockClient,
+    block_client: Arc<RemoteBlockClient>,
     block_range: Range<u64>,
     index: u32,
 }
@@ -34,7 +34,7 @@ pub struct GptPartition {
 impl GptPartition {
     pub fn new(
         gpt: &Arc<GptManager>,
-        block_client: RemoteBlockClient,
+        block_client: Arc<RemoteBlockClient>,
         index: u32,
         block_range: Range<u64>,
     ) -> Arc<Self> {
@@ -164,7 +164,7 @@ struct PendingTransaction {
 }
 
 struct Inner {
-    gpt: gpt::GptManager,
+    gpt: gpt::Gpt,
     partitions: BTreeMap<u32, Arc<BlockServer<SessionManager<PartitionBackend>>>>,
     // Exposes all partitions for discovery by other components.  Should be kept in sync with
     // `partitions`.
@@ -192,10 +192,9 @@ impl Inner {
         let mut partitions = BTreeMap::new();
         for (index, info) in self.gpt.partitions().iter() {
             tracing::info!("GPT part {index}: {info:?}");
-            let block_client = RemoteBlockClient::new(&parent.block).await?;
             let partition = PartitionBackend::new(GptPartition::new(
                 parent,
-                block_client,
+                self.gpt.client().clone(),
                 *index,
                 info.start_block
                     ..info
@@ -219,7 +218,6 @@ impl Inner {
 
 /// Runs a GPT device.
 pub struct GptManager {
-    block: fblock::BlockProxy,
     block_size: u32,
     block_count: u64,
     inner: Mutex<Inner>,
@@ -241,13 +239,12 @@ impl GptManager {
         partitions_dir: Arc<vfs::directory::immutable::Simple>,
     ) -> Result<Arc<Self>, Error> {
         tracing::info!("Binding to GPT");
-        let client = RemoteBlockClient::new(&block).await?;
+        let client = Arc::new(RemoteBlockClient::new(&block).await?);
         let block_size = client.block_size();
         let block_count = client.block_count();
-        let gpt = gpt::GptManager::open(client).await.context("Failed to load GPT")?;
+        let gpt = gpt::Gpt::open(client).await.context("Failed to load GPT")?;
 
         let this = Arc::new(Self {
-            block,
             block_size,
             block_count,
             inner: Mutex::new(Inner {
