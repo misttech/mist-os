@@ -230,6 +230,38 @@ fuchsia_test_package("{x}") {{
 """
 )
 
+PYTHON_HOST_TEST = (
+    lambda name: f"""
+python_host_test("{name}") {{
+
+}}
+"""
+)
+
+HOST_TEST = (
+    lambda name: f"""
+host_test("{name}") {{
+
+}}
+"""
+)
+
+PYTHON_MOBLY_TEST = (
+    lambda name: f"""
+python_mobly_test("{name}") {{
+
+}}
+"""
+)
+
+PYTHON_PERF_TEST = (
+    lambda name: f"""
+python_perf_test("{name}") {{
+
+}}
+"""
+)
+
 
 class TestBuildFileMatcher(unittest.TestCase):
     def test_simple_packages(self) -> None:
@@ -408,6 +440,64 @@ class TestBuildFileMatcher(unittest.TestCase):
                 ],
                 [],
             )
+
+    def test_host_tests(self) -> None:
+        with tempfile.TemporaryDirectory() as dir:
+            os.makedirs(os.path.join(dir, "src"))
+            with open(os.path.join(dir, "src", "BUILD.gn"), "w") as f:
+                f.write(HOST_TEST("my_host_test"))
+                f.write(PYTHON_HOST_TEST("my_python_test"))
+                f.write(PYTHON_MOBLY_TEST("my_mobly_test"))
+
+            build_matcher = search_tests.BuildFileMatcher(dir)
+            matcher = search_tests.Matcher(threshold=1)
+
+            for expected_name in [
+                "my_host_test",
+                "my_python_test",
+                "my_mobly_test",
+            ]:
+                self.assertEqual(
+                    [
+                        (val.matched_name, val.full_suggestion)
+                        for val in build_matcher.find_matches(
+                            expected_name, matcher
+                        )
+                    ],
+                    [
+                        (
+                            expected_name,
+                            f"fx add-host-test //src:{expected_name}",
+                        )
+                    ],
+                )
+
+    def test_developer_tests(self) -> None:
+        with tempfile.TemporaryDirectory() as dir:
+            os.makedirs(os.path.join(dir, "src"))
+            with open(os.path.join(dir, "src", "BUILD.gn"), "w") as f:
+                f.write(PYTHON_PERF_TEST("my_perf_test"))
+
+            build_matcher = search_tests.BuildFileMatcher(dir)
+            matcher = search_tests.Matcher(threshold=1)
+
+            for expected_name in [
+                "my_perf_test",
+            ]:
+                self.assertEqual(
+                    [
+                        (val.matched_name, val.full_suggestion)
+                        for val in build_matcher.find_matches(
+                            expected_name, matcher
+                        )
+                    ],
+                    [
+                        (
+                            expected_name,
+                            f"fx add-test //src:{expected_name}",
+                        )
+                    ],
+                )
 
 
 class TestTimingTracker(PreserveEnvAndCaptureOutputTestCase):
