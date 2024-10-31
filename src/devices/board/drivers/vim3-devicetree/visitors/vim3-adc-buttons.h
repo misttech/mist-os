@@ -21,8 +21,6 @@ class Vim3AdcButtonsVisitor : public fdf_devicetree::DriverVisitor {
 
  private:
   zx::result<> AddAdcButtonMetadata(fdf_devicetree::Node& node);
-  zx::result<> AddAdcButtonCompositeSpec(fdf_devicetree::Node& node);
-  zx::result<> AddAdcMetadata(fdf_devicetree::Node& node);
 };
 
 }  // namespace vim3_dt

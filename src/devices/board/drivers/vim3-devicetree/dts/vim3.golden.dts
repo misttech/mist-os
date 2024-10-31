@@ -9,6 +9,8 @@
 
 	adc-buttons {
 		compatible = "fuchsia,adc-buttons";
+		io-channel-names = "VIM3_ADC_BUTTON";
+		io-channels = <0x36 0x02>;
 	};
 
 	backlight {
@@ -24,7 +26,7 @@
 		boot-metadata = "CAMm\0\0\0";
 		compatible = "amlogic,bt-uart";
 		interrupts = <0x00 0x1a 0x01>;
-		pinctrl-0 = <0x36>;
+		pinctrl-0 = <0x37>;
 		pwm-init = <0x22>;
 		reg = <0x00 0xffd24000 0x00 0x18>;
 		serial-port = <0x02 0x06 0x03>;
@@ -213,7 +215,7 @@
 		compatible = "fuchsia,gpio-buttons";
 		gpio-names = "POWER";
 		gpios = <0x06 0x5c 0x00>;
-		pinctrl-0 = <0x37>;
+		pinctrl-0 = <0x38>;
 	};
 
 	gpio_header {
@@ -437,8 +439,10 @@
 			reg = <0x00 0xff800000 0x00 0x100000>;
 
 			adc@9000 {
+				#io-channel-cells = <0x01>;
 				compatible = "amlogic,meson-g12a-saradc";
 				interrupts = <0x00 0xc8 0x01>;
+				phandle = <0x36>;
 				reg = <0x00 0x9000 0x00 0x1000 0x00 0x00 0x00 0x100000>;
 			};
 
@@ -609,7 +613,7 @@
 
 			bt-uart-pins {
 				function = <0x00 0x01>;
-				phandle = <0x36>;
+				phandle = <0x37>;
 				pins = <0x44 0x45 0x46 0x47>;
 			};
 
@@ -660,7 +664,7 @@
 			gpio-buttons-pins {
 				bias-disable;
 				function = <0x00 0x00>;
-				phandle = <0x37>;
+				phandle = <0x38>;
 				pins = <0x5c>;
 			};
 
@@ -753,7 +757,7 @@
 
 			wifi-pins {
 				bias-disable;
-				phandle = <0x38>;
+				phandle = <0x39>;
 				pins = <0x3f>;
 			};
 		};
@@ -1075,6 +1079,6 @@
 		compatible = "broadcom,bcm4359";
 		gpio-names = "WIFI_WAKE_HOST";
 		gpios = <0x06 0x3f 0x00>;
-		pinctrl-0 = <0x38>;
+		pinctrl-0 = <0x39>;
 	};
 };

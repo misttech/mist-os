@@ -171,6 +171,8 @@
 
 	function_button: adc-buttons {
 		compatible = "fuchsia,adc-buttons";
+		io-channels = <&saradc 2>;
+		io-channel-names = "VIM3_ADC_BUTTON";
 	};
 
 	bt_uart: bt-uart@ffd24000 {
