@@ -21,6 +21,7 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/error_propagation.h>
+#include <lib/starnix/modules/modules.h>
 #include <trace.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -73,10 +74,10 @@ fit::result<Errno, Container> create_container(const Config& config) {
   auto& system_task = kernel->kthreads().system_task();
 
   // Register common devices and add them in sysfs and devtmpfs.
-  // init_common_devices(kernel.kthreads.unlocked_for_async().deref_mut(), &system_task);
-  // register_common_file_systems(kernel.kthreads.unlocked_for_async().deref_mut(), &kernel);
-  /*
+  starnix_modules::init_common_devices(system_task);
+  starnix_modules::register_common_file_systems(kernel);
 
+  /*
   mount_filesystems(locked, &system_task, config, &pkg_dir_proxy)
         .source_context("mounting filesystems")?;
   */
