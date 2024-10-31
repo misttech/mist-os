@@ -65,8 +65,6 @@ chmod +x $rust_prefix/bin/rustfmt
   # this writing, but slightly brittle. We keep `disable_elf_checks` below to
   # disarm any failures that would occur if it were dynamically linked again.
   cd $rust_prefix/lib
-  a64_libstd_path=$(ls rustlib/aarch64-unknown-fuchsia/lib/libstd-*.so)
-  a64_libstd_soname=$(basename $a64_libstd_path)
   x64_libstd_path=$(ls rustlib/x86_64-unknown-fuchsia/lib/libstd-*.so)
   x64_libstd_soname=$(basename $x64_libstd_path)
   cat <<END >runtime.json
@@ -87,11 +85,6 @@ chmod +x $rust_prefix/bin/rustfmt
     },
     {
       "runtime": [
-        {
-          "name": "libstd",
-          "dist": "$a64_libstd_path",
-          "soname": "$a64_libstd_soname"
-        }
       ],
       "rustflags": [
         "-Cprefer-dynamic"
@@ -124,7 +117,7 @@ $fx metrics disable || echo "Warning: Failed to disable metrics"
 print_banner
 
 # Detect Rust toolchain changes by hashing the entire toolchain.
-version_string="$(find prebuilt/third_party/rust/linux-x64 -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum)"
+version_string="$(find $rust_prefix -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | awk '{print $1}')"
 
 set -x
 
