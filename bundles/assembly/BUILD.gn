@@ -1394,14 +1394,7 @@ assembly_input_bundle("core_realm_eng") {
             # The process_resolver core shard (either the base-resolver or
             # pkg-resolver variant) should only be present in
             # the `core_realm_development_access` AIB, but it's required
-            # here until optional exposes are available, as the
-            # `fuchsia.process.Resolver` capability is routed to the
-            # `/bootstrap/console-launcher` component which is currently
-            # present on all build-types (but is not needed on user, as
-            # there is no reachable console there).
-            # Note that the `process-resolver` component itself is not
-            # present except when the `core_realm_development_access` is
-            # added to the system.
+            # here to avoid a userdebug and eng variant of that AIB.
             #
             # eng uses the pkg-resolver, as opposed to the base-resolver,
             # to support ephemeral resolution of shell packages.
@@ -1440,14 +1433,7 @@ assembly_input_bundle("core_realm_user_and_userdebug") {
             # The process_resolver core shard (either the base-resolver or
             # pkg-resolver variant) should only be present in
             # the `core_realm_development_access` AIB, but it's required
-            # here until optional exposes are available, as the
-            # `fuchsia.process.Resolver` capability is routed to the
-            # `/bootstrap/console-launcher` component which is currently
-            # present on all build-types (but is not needed on user, as
-            # there is no reachable console there).
-            # Note that the `process-resolver` component itself is not
-            # present except when the `core_realm_development_access` is
-            # added to the system.
+            # here to avoid a userdebug and eng variant of that AIB.
             #
             # user and userdebug only have the base-resolver, not the
             # pkg-resolver.
@@ -1544,6 +1530,34 @@ assembly_input_bundle("core_realm_development_access_userdebug") {
 # suitable for eng builds.
 assembly_input_bundle("core_realm_development_access_eng") {
   config_data_labels = [ "//src/developer/sshd-host:config_eng" ]
+}
+
+assembly_input_bundle("bootstrap_realm_development_access") {
+  bootfs_packages = [ "//src/sys/process-resolver" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [ "//src/sys/process-resolver/meta/process_resolver.bootstrap_shard.cml" ]
+        },
+      ]
+    },
+    {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = [
+            "//src/sys/process-resolver/meta/process_resolver.root_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
 }
 
 assembly_input_bundle("bootstrap_realm_vsock_development_access") {

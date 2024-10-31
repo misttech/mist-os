@@ -45,6 +45,7 @@ pkg-cache
 platform-bus
 power
 power-manager
+?process-resolver
 ?ptysvc
 pwm
 ramdisk
