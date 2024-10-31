@@ -110,7 +110,7 @@ pub(crate) mod testutil {
     use crate::logic::FilterTimerId;
     use crate::matchers::testutil::FakeDeviceId;
     use crate::state::validation::ValidRoutines;
-    use crate::state::{IpRoutines, NatRoutines, Routines};
+    use crate::state::{IpRoutines, NatRoutines, OneWayBoolean, Routines};
 
     #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
     pub enum FakeDeviceClass {
@@ -135,6 +135,7 @@ pub(crate) mod testutil {
                     installed_routines: ValidRoutines::default(),
                     uninstalled_routines: Vec::default(),
                     conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
+                    nat_installed: OneWayBoolean::default(),
                 },
                 nat: FakeNatCtx::default(),
             }
@@ -152,6 +153,7 @@ pub(crate) mod testutil {
                     installed_routines,
                     uninstalled_routines,
                     conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
+                    nat_installed: OneWayBoolean::default(),
                 },
                 nat: FakeNatCtx::default(),
             }
@@ -170,6 +172,7 @@ pub(crate) mod testutil {
                     installed_routines,
                     uninstalled_routines,
                     conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
+                    nat_installed: OneWayBoolean::TRUE,
                 },
                 nat: FakeNatCtx { device_addrs },
             }

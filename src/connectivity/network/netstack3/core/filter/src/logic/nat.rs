@@ -460,6 +460,7 @@ impl<I: IpExt, BT: FilterBindingsTypes> Connection<I, BT, NatConfig> {
 pub(crate) fn perform_nat<N, I, P, CC, BC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
+    nat_installed: bool,
     table: &Table<I, BC, NatConfig>,
     conn: &mut Connection<I, BC, NatConfig>,
     hook: &Hook<I, BC::DeviceClass, ()>,
@@ -473,6 +474,10 @@ where
     CC: NatContext<I, BC>,
     BC: FilterBindingsContext,
 {
+    if !nat_installed {
+        return Verdict::Accept(()).into();
+    }
+
     let Some(tuple) = Tuple::from_packet(packet) else {
         return Verdict::Accept(()).into();
     };
@@ -1350,6 +1355,8 @@ mod tests {
         }
     }
 
+    const NAT_ENABLED_FOR_TESTS: bool = true;
+
     #[ip_test(I)]
     fn nat_disabled_for_self_connected_flows<I: TestIpExt>() {
         let mut bindings_ctx = FakeBindingsCtx::<I>::new();
@@ -1372,6 +1379,7 @@ mod tests {
         let verdict = perform_nat::<LocalEgressHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
             &Hook {
@@ -1390,6 +1398,7 @@ mod tests {
         let verdict = perform_nat::<EgressHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
             &Hook {
@@ -1435,6 +1444,7 @@ mod tests {
         let verdict = perform_nat::<LocalEgressHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
             &nat_routines,
@@ -1454,6 +1464,7 @@ mod tests {
         let verdict = perform_nat::<EgressHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
             &Hook::default(),
@@ -1479,6 +1490,7 @@ mod tests {
         let verdict = perform_nat::<IngressHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
             &Hook::default(),
@@ -1546,6 +1558,7 @@ mod tests {
         let verdict = perform_nat::<Original, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
             &nat_routines,
@@ -1596,6 +1609,7 @@ mod tests {
         let verdict = perform_nat::<Reply, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
             &nat_routines,
@@ -1640,6 +1654,7 @@ mod tests {
         let verdict = perform_nat::<EgressHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
             &nat_routines,
@@ -1684,6 +1699,7 @@ mod tests {
         let verdict = perform_nat::<IngressHook, _, _, _, _>(
             &mut core_ctx,
             &mut bindings_ctx,
+            NAT_ENABLED_FOR_TESTS,
             &conntrack,
             &mut conn,
             &nat_routines,

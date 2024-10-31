@@ -50,6 +50,13 @@ where
         let (v6_installed, v6_uninstalled) = ValidRoutines::new(v6)?;
 
         self.core_ctx().with_all_filter_state_mut(|v4, v6| {
+            if v4_installed.get().nat.contains_rules() {
+                v4.nat_installed.set();
+            }
+            if v6_installed.get().nat.contains_rules() {
+                v6.nat_installed.set();
+            }
+
             v4.installed_routines = v4_installed;
             v4.uninstalled_routines = v4_uninstalled;
             v6.installed_routines = v6_installed;

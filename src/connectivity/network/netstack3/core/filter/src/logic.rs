@@ -370,6 +370,7 @@ where
                 match nat::perform_nat::<nat::IngressHook, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
+                    state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
                     &state.installed_routines.get().nat.ingress,
@@ -439,6 +440,7 @@ where
                 match nat::perform_nat::<nat::LocalIngressHook, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
+                    state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
                     &state.installed_routines.get().nat.local_ingress,
@@ -523,6 +525,7 @@ where
                 match nat::perform_nat::<nat::LocalEgressHook, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
+                    state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
                     &state.installed_routines.get().nat.local_egress,
@@ -586,6 +589,7 @@ where
                 match nat::perform_nat::<nat::EgressHook, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
+                    state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
                     &state.installed_routines.get().nat.egress,

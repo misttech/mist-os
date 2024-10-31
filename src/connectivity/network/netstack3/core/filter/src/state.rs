@@ -356,6 +356,19 @@ pub struct NatRoutines<I: IpExt, DeviceClass, RuleInfo> {
     pub egress: Hook<I, DeviceClass, RuleInfo>,
 }
 
+impl<I: IpExt, DeviceClass, RuleInfo> NatRoutines<I, DeviceClass, RuleInfo> {
+    pub(crate) fn contains_rules(&self) -> bool {
+        let Self { ingress, local_ingress, local_egress, egress } = self;
+
+        let hook_contains_rules =
+            |hook: &Hook<_, _, _>| hook.routines.iter().any(|routine| !routine.rules.is_empty());
+        hook_contains_rules(&ingress)
+            || hook_contains_rules(&local_ingress)
+            || hook_contains_rules(&local_egress)
+            || hook_contains_rules(&egress)
+    }
+}
+
 impl<I: IpExt, DeviceClass: Debug> Inspectable for NatRoutines<I, DeviceClass, ()> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let Self { ingress, local_ingress, local_egress, egress } = self;
@@ -381,6 +394,33 @@ pub struct Routines<I: IpExt, DeviceClass, RuleInfo> {
     pub nat: NatRoutines<I, DeviceClass, RuleInfo>,
 }
 
+/// A one-way boolean toggle that can only go from `false` to `true`.
+///
+/// Once it has been flipped to `true`, it will remain in that state forever.
+#[derive(Default)]
+pub struct OneWayBoolean(bool);
+
+impl OneWayBoolean {
+    /// A [`OneWayBoolean`] that is enabled on creation.
+    pub const TRUE: Self = Self(true);
+
+    /// Get the value of the boolean.
+    pub fn get(&self) -> bool {
+        let Self(inner) = self;
+        *inner
+    }
+
+    /// Toggle the boolean to `true`.
+    ///
+    /// This operation is idempotent: even though the [`OneWayBoolean`]'s value will
+    /// only ever change from `false` to `true` once, this method can be called any
+    /// number of times safely and the value will remain `true`.
+    pub fn set(&mut self) {
+        let Self(inner) = self;
+        *inner = true;
+    }
+}
+
 /// IP version-specific filtering state.
 pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     /// Routines used for filtering packets that are installed on hooks.
@@ -393,6 +433,21 @@ pub struct State<I: IpExt, BT: FilterBindingsTypes> {
     pub(crate) uninstalled_routines: Vec<UninstalledRoutine<I, BT::DeviceClass, ()>>,
     /// Connection tracking state.
     pub conntrack: conntrack::Table<I, BT, NatConfig>,
+    /// One-way boolean toggle indicating whether any rules have ever been added to
+    /// an installed NAT routine. If not, performing NAT can safely be skipped.
+    ///
+    /// This is useful because if any NAT is being performed, we have to check
+    /// whether it's necessary to perform implicit NAT for *all* traffic -- even if
+    /// it doesn't match any NAT rules -- to avoid conflicting tracked connections.
+    /// If we know that no NAT is being performed at all, this extra work can be
+    /// avoided.
+    ///
+    /// Note that this value will only ever go from false to true; it does not
+    /// indicate whether any NAT rules are *currently* installed. This avoids a race
+    /// condition where NAT rules are removed but connections are still being NATed
+    /// based on those rules, and therefore must be considered when creating new
+    /// connection tracking entries.
+    pub nat_installed: OneWayBoolean,
 }
 
 impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {
@@ -402,13 +457,14 @@ impl<I: IpExt, BC: FilterBindingsContext> State<I, BC> {
             installed_routines: Default::default(),
             uninstalled_routines: Default::default(),
             conntrack: conntrack::Table::new::<CC>(bindings_ctx),
+            nat_installed: OneWayBoolean::default(),
         }
     }
 }
 
 impl<I: IpExt, BT: FilterBindingsTypes> Inspectable for State<I, BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
-        let Self { installed_routines, uninstalled_routines, conntrack } = self;
+        let Self { installed_routines, uninstalled_routines, conntrack, nat_installed: _ } = self;
         let Routines { ip, nat } = installed_routines.get();
 
         inspector.record_child("IP", |inspector| inspector.delegate_inspectable(ip));
