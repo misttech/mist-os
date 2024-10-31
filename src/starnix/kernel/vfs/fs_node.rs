@@ -897,11 +897,11 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _owner: starnix_uapi::auth::FsCred,
         ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("mkdir failed: {:?}", name))
         }
 
         fn mknod(
@@ -909,12 +909,12 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _dev: starnix_uapi::device_type::DeviceType,
             _owner: starnix_uapi::auth::FsCred,
         ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("mknod failed: {:?}", name))
         }
 
         fn create_symlink(
@@ -922,11 +922,11 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _target: &starnix_core::vfs::FsStr,
             _owner: starnix_uapi::auth::FsCred,
         ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("symlink failed: {:?}", name))
         }
 
         fn link(
@@ -934,10 +934,10 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut Locked<'_, FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _child: &starnix_core::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("link failed: {:?}", name))
         }
 
         fn unlink(
@@ -945,10 +945,10 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _child: &starnix_core::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("unlink failed: {:?}", name))
         }
     };
 }
