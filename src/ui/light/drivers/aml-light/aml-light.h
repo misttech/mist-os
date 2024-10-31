@@ -19,6 +19,7 @@
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/array.h>
 #include <soc/aml-common/aml-pwm-regs.h>
+
 namespace aml_light {
 
 using fuchsia_hardware_light::Light;
