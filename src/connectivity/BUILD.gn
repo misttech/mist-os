@@ -34,6 +34,7 @@ group("tests_no_e2e") {
     "location:tests",
     "lowpan:tests",
     "network:tests",
+    "nfc:tests",
     "overnet:tests_no_e2e",
     "policy:tests",
     "ppp:tests",
