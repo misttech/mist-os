@@ -5,10 +5,10 @@
 use crate::device::{BlockDevice, Device, NandDevice, VolumeProtocolDevice};
 use anyhow::{Context as _, Error};
 use async_trait::async_trait;
-use fuchsia_fs::directory::WatchEvent;
+use fuchsia_fs::directory::{WatchEvent, WatchMessage};
 use futures::channel::mpsc;
-use futures::lock::Mutex;
 use futures::{stream, SinkExt, StreamExt};
+use std::future::ready;
 use std::sync::Arc;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -20,30 +20,20 @@ pub trait WatchSource: Send + Sync + 'static {
 }
 
 fn common_filters(watcher: fuchsia_fs::directory::Watcher) -> stream::BoxStream<'static, String> {
-    Box::pin(
-        watcher
-            .filter_map(|result| {
-                futures::future::ready({
-                    match result {
-                        Ok(message) => Some(message),
-                        Err(error) => {
-                            tracing::error!(?error, "fshost block watcher stream error");
-                            None
-                        }
-                    }
-                })
-            })
-            .filter(|message| futures::future::ready(message.filename.as_os_str() != "."))
-            .filter_map(move |fuchsia_fs::directory::WatchMessage { event, filename }| {
-                futures::future::ready({
-                    let filename = filename.to_str().unwrap().to_owned();
-                    match event {
-                        WatchEvent::ADD_FILE | WatchEvent::EXISTING => Some(filename),
-                        _ => None,
-                    }
-                })
-            }),
-    )
+    Box::pin(watcher.filter_map(|result| {
+        ready(match result {
+            Ok(WatchMessage { event: WatchEvent::ADD_FILE | WatchEvent::EXISTING, filename })
+                if filename.as_os_str() != "." =>
+            {
+                Some(filename.to_str().unwrap().to_owned())
+            }
+            Err(error) => {
+                tracing::error!(?error, "fshost block watcher stream error");
+                None
+            }
+            _ => None,
+        })
+    }))
 }
 
 /// An implementation of `WatchSource` based on a path in the local namespace.
@@ -147,7 +137,7 @@ impl WatchSource for DirSource {
 
 /// Watcher generates new [`BlockDevice`]s for fshost to process.
 pub struct Watcher {
-    device_tx: Arc<Mutex<mpsc::UnboundedSender<Box<dyn Device>>>>,
+    device_tx: mpsc::UnboundedSender<Box<dyn Device>>,
     // Each source has its own Task, and they all feed into _device_tx.
     tasks: Vec<fasync::Task<()>>,
 }
@@ -161,7 +151,7 @@ impl Watcher {
     ) -> Result<(Self, impl futures::Stream<Item = Box<dyn Device>>), Error> {
         let (device_tx, device_rx) = mpsc::unbounded();
 
-        let mut this = Watcher { device_tx: Arc::new(Mutex::new(device_tx)), tasks: vec![] };
+        let mut this = Watcher { device_tx, tasks: vec![] };
         for source in sources.into_iter() {
             this.add_source(source).await?;
         }
@@ -170,20 +160,19 @@ impl Watcher {
     }
 
     pub async fn add_source(&mut self, mut source: Box<dyn WatchSource>) -> Result<(), Error> {
-        let device_tx = self.device_tx.clone();
         self.tasks.push(fasync::Task::spawn(Self::process_one_stream(
             source.as_stream().await?,
-            device_tx,
+            self.device_tx.clone(),
         )));
         Ok(())
     }
 
     async fn process_one_stream(
         mut device_stream: stream::BoxStream<'static, Box<dyn Device>>,
-        device_tx: Arc<Mutex<mpsc::UnboundedSender<Box<dyn Device>>>>,
+        mut device_tx: mpsc::UnboundedSender<Box<dyn Device>>,
     ) {
         while let Some(device) = device_stream.next().await {
-            device_tx.lock().await.send(device).await.expect("failed to send device");
+            device_tx.send(device).await.expect("failed to send device");
         }
     }
 }
