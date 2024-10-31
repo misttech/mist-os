@@ -152,7 +152,7 @@ struct PortPacket final : public fbl::DoublyLinkedListable<PortPacket*> {
 };
 
 struct PortInterruptPacket final : public fbl::DoublyLinkedListable<PortInterruptPacket*> {
-  zx_time_t timestamp;
+  zx_instant_boot_t timestamp;
   uint64_t key;
 };
 
@@ -243,7 +243,7 @@ class PortDispatcher final : public SoloDispatcher<PortDispatcher, ZX_DEFAULT_PO
 
   zx_status_t Queue(PortPacket* port_packet, zx_signals_t observed);
   zx_status_t QueueUser(const zx_port_packet_t& packet);
-  bool QueueInterruptPacket(PortInterruptPacket* port_packet, zx_time_t timestamp);
+  bool QueueInterruptPacket(PortInterruptPacket* port_packet, zx_instant_boot_t timestamp);
   zx_status_t Dequeue(const Deadline& deadline, zx_port_packet_t* packet);
   bool RemoveInterruptPacket(PortInterruptPacket* port_packet);
 

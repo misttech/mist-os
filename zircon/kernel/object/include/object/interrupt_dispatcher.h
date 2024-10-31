@@ -36,8 +36,8 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
 
   bool is_wake_vector() const { return flags_ & INTERRUPT_WAKE_VECTOR; }
 
-  zx_status_t WaitForInterrupt(zx_time_t* out_timestamp);
-  zx_status_t Trigger(zx_time_t timestamp);
+  zx_status_t WaitForInterrupt(zx_instant_boot_t* out_timestamp);
+  zx_status_t Trigger(zx_instant_boot_t timestamp);
   zx_status_t Ack();
   zx_status_t Destroy();
   void InterruptHandler();
@@ -81,7 +81,7 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
   // It is an error to specify both INTERRUPT_UNMASK_PREWAIT and INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
   explicit InterruptDispatcher(Flags flags);
   void Signal() { event_.Signal(); }
-  bool SendPacketLocked(zx_time_t timestamp) TA_REQ(spinlock_);
+  bool SendPacketLocked(zx_instant_boot_t timestamp) TA_REQ(spinlock_);
 
   // Allow subclasses to add/remove the wake event instance from the global diagnostics list at the
   // appropriate times during initialization and teardown. These methods do not need to be called
@@ -93,7 +93,7 @@ class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAUL
  private:
   AutounsignalEvent event_;
 
-  zx_time_t timestamp_ TA_GUARDED(spinlock_);
+  zx_instant_boot_t timestamp_ TA_GUARDED(spinlock_);
   const Flags flags_;
   // Current state of the interrupt object
   InterruptState state_ TA_GUARDED(spinlock_);

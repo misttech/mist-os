@@ -55,7 +55,7 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
       return;
     }
     // Trigger the interrupt so that the test can wait on it.
-    irq.trigger(0, {});
+    irq.trigger(0, zx::time_boot());
     completer.ReplySuccess(std::move(irq));
   }
 
@@ -68,7 +68,7 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
       completer.ReplyError(status);
       return;
     }
-    irq.trigger(0, {});
+    irq.trigger(0, zx::time_boot());
     completer.ReplySuccess(std::move(irq));
   }
 

@@ -98,7 +98,7 @@ int AmlTSensor::TripPointIrqHandler() {
   }
 
   while (running_.load()) {
-    status = tsensor_irq_.wait(NULL);
+    status = tsensor_irq_.wait(nullptr);
     if (status != ZX_OK) {
       return status;
     }

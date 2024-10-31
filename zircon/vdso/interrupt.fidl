@@ -122,7 +122,7 @@ closed protocol Interrupt {
     /// option.
     ///
     /// When a bound interrupt object is triggered, a `ZX_PKT_TYPE_INTERRUPT` packet will
-    /// be delivered to the port it is bound to, with the timestamp (relative to `ZX_CLOCK_MONOTONIC`)
+    /// be delivered to the port it is bound to, with the timestamp (relative to `ZX_CLOCK_BOOT`)
     /// of when the interrupt was triggered in the `zx_packet_interrupt_t`.  The *key* used
     /// when binding the interrupt will be present in the `key` field of the `zx_port_packet_t`.
     ///
@@ -209,7 +209,7 @@ closed protocol Interrupt {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_status_t zx_interrupt_wait(zx_handle_t handle, zx_instant_mono_t* out_timestamp);
+    /// zx_status_t zx_interrupt_wait(zx_handle_t handle, zx_instant_boot_t* out_timestamp);
     /// ```
     ///
     /// ## Description
@@ -231,7 +231,7 @@ closed protocol Interrupt {
     ///
     /// `zx_interrupt_wait()` returns `ZX_OK` on success, and *out_timestamp*, if
     /// non-NULL, returns the timestamp of when the interrupt was triggered (relative
-    /// to `ZX_CLOCK_MONOTONIC`)
+    /// to `ZX_CLOCK_BOOT`)
     ///
     /// ## Errors
     ///
@@ -269,7 +269,7 @@ closed protocol Interrupt {
     strict Wait(resource struct {
         handle Handle:INTERRUPT;
     }) -> (struct {
-        out_timestamp InstantMono;
+        out_timestamp InstantBoot;
     }) error Status;
 
     // TODO(https://fxbug.dev/42107929): No DESTROY rights here.
@@ -424,7 +424,7 @@ closed protocol Interrupt {
     ///
     /// zx_status_t zx_interrupt_trigger(zx_handle_t handle,
     ///                                  uint32_t options,
-    ///                                  zx_instant_mono_t timestamp);
+    ///                                  zx_instant_boot_t timestamp);
     /// ```
     ///
     /// ## Description
@@ -478,6 +478,6 @@ closed protocol Interrupt {
     strict Trigger(resource struct {
         handle Handle:INTERRUPT;
         options uint32;
-        timestamp InstantMono;
+        timestamp InstantBoot;
     }) -> () error Status;
 };

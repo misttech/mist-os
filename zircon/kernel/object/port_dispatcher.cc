@@ -253,7 +253,8 @@ bool PortDispatcher::RemoveInterruptPacket(PortInterruptPacket* port_packet) {
   return false;
 }
 
-bool PortDispatcher::QueueInterruptPacket(PortInterruptPacket* port_packet, zx_time_t timestamp) {
+bool PortDispatcher::QueueInterruptPacket(PortInterruptPacket* port_packet,
+                                          zx_instant_boot_t timestamp) {
   {
     Guard<SpinLock, IrqSave> guard{&spinlock_};
     if (port_packet->InContainer()) {
