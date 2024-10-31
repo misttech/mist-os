@@ -177,20 +177,19 @@ void WearSimulator::Init() {
   fs_management::MountedVolume* blobfs;
   fs_management::NamespaceBinding blobfs_bind;
   {
-    blobfs = ramnand.fvm_partition()
-                 ->fvm()
-                 .fs()
-                 .CreateVolume("blobfs",
-                               fuchsia_fs_startup::wire::CreateOptions::Builder(arena)
-                                   .type_guid({1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1})
-                                   .guid({1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1})
-                                   .initial_size(config_.blobfs_partition_size)
-                                   .Build(),
-                               fuchsia_fs_startup::wire::MountOptions::Builder(arena)
-                                   .as_blob(true)
-                                   .uri("#meta/blobfs.cm")
-                                   .Build())
-                 .value();
+    auto res = ramnand.fvm_partition()->fvm().fs().CreateVolume(
+        "blobfs",
+        fuchsia_fs_startup::wire::CreateOptions::Builder(arena)
+            .type_guid({1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1})
+            .guid({1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1})
+            .initial_size(config_.blobfs_partition_size)
+            .Build(),
+        fuchsia_fs_startup::wire::MountOptions::Builder(arena)
+            .as_blob(true)
+            .uri("#meta/blobfs.cm")
+            .Build());
+    ASSERT_TRUE(res.is_ok()) << "Failed to create blobfs: " << res.error_value();
+    blobfs = res.value();
 
     auto binding = fs_management::NamespaceBinding::Create("/blob/", blobfs->DataRoot().value());
     ASSERT_TRUE(binding.is_ok()) << binding.status_string();
@@ -200,19 +199,16 @@ void WearSimulator::Init() {
   fs_management::MountedVolume* minfs;
   fs_management::NamespaceBinding minfs_bind;
   {
-    minfs = ramnand.fvm_partition()
-                ->fvm()
-                .fs()
-                .CreateVolume("minfs",
-                              fuchsia_fs_startup::wire::CreateOptions::Builder(arena)
-                                  .type_guid({2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2})
-                                  .guid({2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2})
-                                  .initial_size(config_.minfs_partition_size)
-                                  .Build(),
-                              fuchsia_fs_startup::wire::MountOptions::Builder(arena)
-                                  .uri("#meta/minfs.cm")
-                                  .Build())
-                .value();
+    auto res = ramnand.fvm_partition()->fvm().fs().CreateVolume(
+        "minfs",
+        fuchsia_fs_startup::wire::CreateOptions::Builder(arena)
+            .type_guid({2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2})
+            .guid({2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2})
+            .initial_size(config_.minfs_partition_size)
+            .Build(),
+        fuchsia_fs_startup::wire::MountOptions::Builder(arena).uri("#meta/minfs.cm").Build());
+    ASSERT_TRUE(res.is_ok()) << "Failed to create minfs: " << res.error_value();
+    minfs = res.value();
 
     auto binding = fs_management::NamespaceBinding::Create("/minfs/", minfs->DataRoot().value());
     ASSERT_TRUE(binding.is_ok()) << binding.status_string();
@@ -364,14 +360,14 @@ TEST(Wear, DISABLED_LargeScale) {
   WearSimulator sim = WearSimulator({
       .fvm_slice_size = 32ul * 1024,
       .nand_size = kSize,
-      // Set up A/B partitions and leave 2MB of breathing room so we don't fill up.
-      .blobfs_partition_size = (kBlobUpdateSize + 2) * 2 * 1024 * 1024,
+      // Set up A/B partitions each with 2MB of breathing room so we don't fill up.
+      .blobfs_partition_size = kBlobUpdateSize + (4ul * 1024 * 1024),
       .minfs_partition_size = 13ul * 1024 * 1024,
       .minfs_cold_data_size = 2ul * 1024 * 1024,
       .minfs_cycle_data_size = 2ul * 1024 * 1024,
   });
   sim.Init();
-  sim.FillBlobfs(kBlobUpdateSize * 2 * 1024 * 1024);
+  sim.FillBlobfs(kBlobUpdateSize * 2);
 
   // Perform a number of cycles between updates.
   for (int i = 0; i < 2; i++) {
