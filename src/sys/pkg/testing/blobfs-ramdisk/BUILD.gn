@@ -17,10 +17,8 @@ rustc_library("blobfs-ramdisk") {
     "//sdk/rust/zx",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
-    "//src/lib/fuchsia-runtime",
     "//src/storage/blobfs/bin:blobfs-component",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
@@ -31,13 +29,14 @@ rustc_library("blobfs-ramdisk") {
     "//src/sys/pkg/lib/blobfs",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:openat",
   ]
 
   test_deps = [
+    "//src/lib/fuchsia-async",
     "//src/storage/lib/ramdevice_client",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures",
   ]
 
   sources = [
@@ -59,7 +58,6 @@ fuchsia_component("test-component") {
     ":blobfs-ramdisk_test",
     "//src/storage/fxfs:fxfs_component",
     "//src/storage/testing:storage_driver_test_realm",
-    "//src/storage/tools/blobfs-corrupt",
   ]
 }
 

@@ -6,9 +6,10 @@ use super::*;
 use assert_matches::assert_matches;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use futures::stream::StreamExt as _;
 use std::io::Write as _;
 use std::time::Duration;
-use zx::Status;
+use zx::{AsHandleRef as _, Status};
 
 // merkle root of b"Hello world!\n".
 static BLOB_MERKLE: &str = "e5892a9b652ede2e19460a9103fd9cb3417f782a8d29f6c93ec0c31170a94af3";
@@ -525,107 +526,6 @@ async fn readdirents_only_returns_valid_blobs() {
     assert_eq!(blobfs_server.list_blobs().unwrap(), BTreeSet::new());
 
     let () = blobfs_server.stop().await.unwrap();
-}
-
-struct TestBlob {
-    merkle: Hash,
-    contents: &'static [u8],
-}
-
-impl TestBlob {
-    fn new(contents: &'static [u8]) -> Self {
-        Self { merkle: fuchsia_merkle::from_slice(contents).root(), contents }
-    }
-}
-
-impl BlobfsRamdisk {
-    async fn create_and_write_blob(&self, blob: &TestBlob) {
-        let proxy = self.root_dir_proxy().unwrap();
-        create_blob(&proxy, &blob.merkle.to_string(), blob.contents).await.unwrap();
-    }
-
-    async fn verify_blob(&self, blob: &TestBlob) -> Result<(), Status> {
-        let proxy = self.root_dir_proxy().unwrap();
-        let (file, _) =
-            open_blob(&proxy, &blob.merkle.to_string(), fio::OpenFlags::RIGHT_READABLE).await?;
-        verify_blob(&file, blob.contents).await?;
-        file.close().await.unwrap().map_err(Status::from_raw).unwrap();
-        Ok(())
-    }
-}
-
-#[fuchsia_async::run_singlethreaded(test)]
-async fn corrupt_blob() {
-    let blobfs = BlobfsRamdisk::start().await.unwrap();
-
-    // write a few blobs and verify they are valid
-    let first = TestBlob::new(b"corrupt me bro");
-    let second = TestBlob::new(b"don't corrupt me bro");
-    blobfs.create_and_write_blob(&first).await;
-    assert_eq!(blobfs.verify_blob(&first).await, Ok(()));
-    blobfs.create_and_write_blob(&second).await;
-    assert_eq!(blobfs.verify_blob(&second).await, Ok(()));
-
-    // unmount blobfs, corrupt the first blob, and restart blobfs
-    let ramdisk = blobfs.unmount().await.unwrap();
-    ramdisk.corrupt_blob(&first.merkle).await;
-    let blobfs = BlobfsRamdisk::builder().formatted_ramdisk(ramdisk).start().await.unwrap();
-
-    // verify the first blob is now corrupt and the second is still not
-    assert_eq!(blobfs.verify_blob(&first).await, Err(Status::IO_DATA_INTEGRITY));
-    assert_eq!(blobfs.verify_blob(&second).await, Ok(()));
-
-    blobfs.stop().await.unwrap();
-}
-
-#[fuchsia_async::run_singlethreaded(test)]
-async fn corrupt_blob_with_many_blobs() {
-    let blobfs = BlobfsRamdisk::start().await.unwrap();
-
-    const LIPSUM: &[u8] = b"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque ultrices pharetra ullamcorper. Duis vestibulum nulla eget porta lacinia. Nulla nunc nibh, dictum nec risus aliquam, accumsan aliquet tellus. Sed eget lectus sit amet odio ultrices maximus. Vestibulum eget mi ut eros porta consequat. Quisque a risus id purus cursus faucibus pulvinar et mi. Etiam vel scelerisque risus, eget ullamcorper quam.";
-
-    let mut ls = BTreeSet::new();
-    let mut valid = vec![];
-
-    // write many blobs to force blobfs to utilize more than 1 block of inodes
-    for i in 1..LIPSUM.len() {
-        let blob = TestBlob::new(&LIPSUM[..i]);
-        blobfs.create_and_write_blob(&blob).await;
-        assert_eq!(blobfs.verify_blob(&blob).await, Ok(()));
-        ls.insert(blob.merkle);
-        valid.push(blob);
-    }
-
-    // write the blob to corrupt
-    let corrupt = TestBlob::new(b"corrupt me bro");
-    blobfs.create_and_write_blob(&corrupt).await;
-    assert_eq!(blobfs.verify_blob(&corrupt).await, Ok(()));
-    ls.insert(corrupt.merkle);
-
-    // write many more blobs after the blob to corrupt
-    for i in 1..(LIPSUM.len() - 1) {
-        let blob = TestBlob::new(&LIPSUM[i..]);
-        blobfs.create_and_write_blob(&blob).await;
-        assert_eq!(blobfs.verify_blob(&blob).await, Ok(()));
-        ls.insert(blob.merkle);
-        valid.push(blob);
-    }
-
-    // unmount blobfs, corrupt the blob, and restart blobfs
-    let ramdisk = blobfs.unmount().await.unwrap();
-    ramdisk.corrupt_blob(&corrupt.merkle).await;
-    let blobfs = BlobfsRamdisk::builder().formatted_ramdisk(ramdisk).start().await.unwrap();
-
-    // verify all the blobs are still considered present
-    assert_eq!(blobfs.list_blobs().unwrap(), ls);
-
-    // verify the corrupt blob is now corrupt and all the rest aren't
-    assert_eq!(blobfs.verify_blob(&corrupt).await, Err(Status::IO_DATA_INTEGRITY));
-    for blob in valid {
-        assert_eq!(blobfs.verify_blob(&blob).await, Ok(()));
-    }
-
-    blobfs.stop().await.unwrap();
 }
 
 #[fuchsia_async::run_singlethreaded(test)]
