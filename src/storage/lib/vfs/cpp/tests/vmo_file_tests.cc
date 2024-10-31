@@ -112,17 +112,22 @@ TEST(VmoFile, Open) {
 
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, 0u);
     fbl::RefPtr<fs::Vnode> redirect;
-    auto result = file->ValidateOptions(VnodeOptions::ReadOnly());
+    auto result = file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRStarDir});
     EXPECT_RESULT_OK(result);
     EXPECT_EQ(ZX_OK, file->Open(&redirect));
     EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::ReadWrite()));
+    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED,
+                        file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRwStarDir}));
     EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::WriteOnly()));
+    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED,
+                        file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kWStarDir}));
     EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::ReadExec()));
+    EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED,
+                        file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRxStarDir}));
     EXPECT_EQ(redirect, nullptr);
-    EXPECT_RESULT_ERROR(ZX_ERR_NOT_DIR, file->ValidateOptions(VnodeOptions().set_directory()));
+    EXPECT_RESULT_ERROR(
+        ZX_ERR_NOT_DIR,
+        file->ValidateOptions(VnodeOptions{.flags = fuchsia_io::OpenFlags::kDirectory}));
     EXPECT_EQ(redirect, nullptr);
   }
 
@@ -134,25 +139,28 @@ TEST(VmoFile, Open) {
     auto file = fbl::MakeRefCounted<fs::VmoFile>(std::move(dup), 0u, true);
     fbl::RefPtr<fs::Vnode> redirect;
     {
-      zx::result result = file->ValidateOptions(VnodeOptions::ReadOnly());
+      zx::result result = file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRStarDir});
       EXPECT_RESULT_OK(result);
       EXPECT_EQ(ZX_OK, file->Open(&redirect));
       EXPECT_EQ(redirect, nullptr);
     }
     {
-      zx::result result = file->ValidateOptions(VnodeOptions::ReadWrite());
+      zx::result result = file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRwStarDir});
       EXPECT_RESULT_OK(result);
       EXPECT_EQ(ZX_OK, file->Open(&redirect));
       EXPECT_EQ(redirect, nullptr);
     }
     {
-      zx::result result = file->ValidateOptions(VnodeOptions::WriteOnly());
+      zx::result result = file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kWStarDir});
       EXPECT_RESULT_OK(result);
       EXPECT_EQ(ZX_OK, file->Open(&redirect));
       EXPECT_EQ(redirect, nullptr);
-      EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED, file->ValidateOptions(VnodeOptions::ReadExec()));
+      EXPECT_RESULT_ERROR(ZX_ERR_ACCESS_DENIED,
+                          file->ValidateOptions(VnodeOptions{.rights = fuchsia_io::kRxStarDir}));
       EXPECT_EQ(redirect, nullptr);
-      EXPECT_RESULT_ERROR(ZX_ERR_NOT_DIR, file->ValidateOptions(VnodeOptions().set_directory()));
+      EXPECT_RESULT_ERROR(
+          ZX_ERR_NOT_DIR,
+          file->ValidateOptions(VnodeOptions{.flags = fuchsia_io::OpenFlags::kDirectory}));
       EXPECT_EQ(redirect, nullptr);
     }
   }

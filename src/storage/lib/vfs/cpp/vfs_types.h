@@ -71,57 +71,6 @@ struct VnodeConnectionOptions {
   fuchsia_io::OpenFlags flags;
   fuchsia_io::Rights rights;
 
-  // TODO(https://fxbug.dev/324112857): Remove the following setters, as some aren't compatible with
-  // io2 directly (e.g. not_directory has no equivalent, and set_truncate only applies if the file
-  // protocol was selected). These setters are only used in tests anyways - same with the factory
-  // functions below.
-
-  constexpr VnodeConnectionOptions set_directory() {
-    flags |= fuchsia_io::OpenFlags::kDirectory;
-    return *this;
-  }
-
-  constexpr VnodeConnectionOptions set_not_directory() {
-    flags |= fuchsia_io::OpenFlags::kNotDirectory;
-    return *this;
-  }
-
-  constexpr VnodeConnectionOptions set_node_reference() {
-    flags |= fuchsia_io::OpenFlags::kNodeReference;
-    return *this;
-  }
-
-  constexpr VnodeConnectionOptions set_truncate() {
-    flags |= fuchsia_io::OpenFlags::kTruncate;
-    return *this;
-  }
-
-  // Convenience factory functions for commonly used option combinations.
-
-  constexpr static VnodeConnectionOptions ReadOnly() {
-    VnodeConnectionOptions options;
-    options.rights = fuchsia_io::kRStarDir;
-    return options;
-  }
-
-  constexpr static VnodeConnectionOptions WriteOnly() {
-    VnodeConnectionOptions options;
-    options.rights = fuchsia_io::kWStarDir;
-    return options;
-  }
-
-  constexpr static VnodeConnectionOptions ReadWrite() {
-    VnodeConnectionOptions options;
-    options.rights = fuchsia_io::kRwStarDir;
-    return options;
-  }
-
-  constexpr static VnodeConnectionOptions ReadExec() {
-    VnodeConnectionOptions options;
-    options.rights = fuchsia_io::kRxStarDir;
-    return options;
-  }
-
   // Translates the io1 flags passed by the client into an equivalent set of io2 protocols.
   constexpr fuchsia_io::NodeProtocolKinds protocols() const {
     constexpr fuchsia_io::NodeProtocolKinds kSupportedIo1Protocols =
