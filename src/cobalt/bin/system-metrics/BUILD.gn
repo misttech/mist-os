@@ -44,6 +44,8 @@ source_set("system_metrics_daemon_lib") {
     "//src/lib/cobalt/cpp:metric_event_builder",
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
+    "//src/lib/timekeeper",
+    "//src/lib/timekeeper:system",
     "//third_party/cobalt/src/lib/client/cpp:buckets_config",
     "//zircon/system/ulib/abs_clock",
     "//zircon/system/ulib/trace",
@@ -89,6 +91,7 @@ cc_test_executable("cobalt_system_metrics_unittests") {
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/lib/timekeeper:testing",
   ]
 
   # TODO(67363): Temporarily disable lsan for this target. Reenable once all leaks are fixed.
