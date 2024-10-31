@@ -33,7 +33,7 @@
         {
             directory: "partitions",
             rights: [ "r*" ],
-            path: "/partitions",
+            path: "/gpt/partitions",
         },
         {
             protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
@@ -48,6 +48,10 @@
         {
             protocol: "fuchsia.fxfs.BlobReader",
             path: "/fs/blob/svc/fuchsia.fxfs.BlobReader",
+        },
+        {
+            protocol: "fuchsia.storagehost.PartitionsAdmin",
+            path: "/gpt/fuchsia.storagehost.PartitionsAdmin",
         },
     ],
     use: [
@@ -120,6 +124,11 @@
         },
         {
             protocol: "fuchsia.fxfs.BlobReader",
+            from: "self",
+            availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.storagehost.PartitionsAdmin",
             from: "self",
             availability: "same_as_target",
         },

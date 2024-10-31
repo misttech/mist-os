@@ -95,7 +95,7 @@ class Client {
 
   static zx::result<> AbrResultToZxStatus(AbrResult status);
 
-  virtual zx::result<> Flush() const = 0;
+  virtual zx::result<> Flush() = 0;
 
   void InitializeAbrOps();
 
@@ -186,7 +186,7 @@ class AbrPartitionClient : public Client {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx::result<> Flush() const override { return partition_->Flush(); }
+  zx::result<> Flush() override { return partition_->Flush(); }
 
   std::unique_ptr<paver::PartitionClient> partition_;
   zx::vmo vmo_;

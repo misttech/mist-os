@@ -61,12 +61,6 @@ bool LuisPartitioner::SupportsPartition(const PartitionSpec& spec) const {
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }
 
-zx::result<std::unique_ptr<PartitionClient>> LuisPartitioner::AddPartition(
-    const PartitionSpec& spec) const {
-  ERROR("Cannot add partitions to a luis device\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
 zx::result<std::unique_ptr<PartitionClient>> LuisPartitioner::GetBootloaderPartitionClient() const {
   auto boot0_part =
       OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
@@ -142,26 +136,20 @@ zx::result<std::unique_ptr<PartitionClient>> LuisPartitioner::FindPartition(
       return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  const auto filter = [part_name](const gpt_partition_t& part) {
-    char cstring_name[GPT_NAME_LEN] = {};
-    utf16_to_cstring(cstring_name, part.name, GPT_NAME_LEN);
-    return part_name == std::string_view(cstring_name);
+  const auto filter = [part_name](const GptPartitionMetadata& part) {
+    return FilterByName(part, part_name);
   };
   auto status = gpt_->FindPartition(std::move(filter));
   if (status.is_error()) {
     return status.take_error();
   }
-  return zx::ok(std::move(status->partition));
+  return zx::ok(std::move(*status));
 }
 
 zx::result<> LuisPartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
-zx::result<> LuisPartitioner::InitPartitionTables() const {
+zx::result<> LuisPartitioner::ResetPartitionTables() const {
   ERROR("Initializing gpt partitions from paver is not supported on luis\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
-zx::result<> LuisPartitioner::WipePartitionTables() const {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -185,7 +173,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> LuisPartitionerFactory::New(
 zx::result<std::unique_ptr<abr::Client>> LuisAbrClientFactory::New(
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  zx::result partitioner = LuisPartitioner::Initialize(devices, std::move(svc_root), {});
+  zx::result partitioner = LuisPartitioner::Initialize(devices, svc_root, {});
 
   if (partitioner.is_error()) {
     return partitioner.take_error();

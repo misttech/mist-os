@@ -63,7 +63,7 @@ TEST(SherlockAbrTests, CreateFails) {
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   ASSERT_NOT_OK(
-      paver::SherlockAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
+      paver::SherlockAbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
 }
 
 TEST(KolaAbrTests, CreateFails) {
@@ -77,7 +77,7 @@ TEST(KolaAbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(paver::KolaAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
+  ASSERT_NOT_OK(paver::KolaAbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
 }
 
 TEST(LuisAbrTests, CreateFails) {
@@ -91,7 +91,7 @@ TEST(LuisAbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(paver::LuisAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
+  ASSERT_NOT_OK(paver::LuisAbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
 }
 
 TEST(X64AbrTests, CreateFails) {
@@ -105,7 +105,7 @@ TEST(X64AbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(paver::X64AbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
+  ASSERT_NOT_OK(paver::X64AbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
 }
 
 class CurrentSlotUuidTest : public zxtest::Test {
@@ -164,7 +164,7 @@ class CurrentSlotUuidTest : public zxtest::Test {
                   .status_value());
   }
 
-  fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.fshost_svc_dir(); }
+  fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.RealmExposedDir(); }
 
   IsolatedDevmgr::Args args_;
   IsolatedDevmgr devmgr_;
@@ -275,7 +275,7 @@ class KolaAbrClientTest : public CurrentSlotUuidTest {
     zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
     ASSERT_OK(devices);
     auto abr_client =
-        paver::KolaAbrClientFactory().Create(*devices, devmgr_.fshost_svc_dir(), nullptr);
+        paver::KolaAbrClientFactory().Create(*devices, devmgr_.RealmExposedDir(), nullptr);
     ASSERT_OK(abr_client);
     abr_client_ = std::move(*abr_client);
   }
@@ -434,6 +434,7 @@ class FakePartitionClient final : public paver::PartitionClient {
     }
     return zx::error(result_);
   }
+
   zx::result<> Read(const zx::vmo& vmo, size_t size) final {
     if (size > partition_size_) {
       return zx::error(ZX_ERR_OUT_OF_RANGE);

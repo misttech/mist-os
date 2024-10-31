@@ -64,6 +64,7 @@ source_set("paver-core") {
     "//src/lib/uuid",
     "//src/storage/fvm",
     "//src/storage/lib/block_client/cpp",
+    "//src/storage/storage-host/fidl/fuchsia.storagehost:fuchsia.storagehost_cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

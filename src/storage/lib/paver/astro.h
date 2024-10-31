@@ -28,9 +28,6 @@ class AstroPartitioner : public DevicePartitioner {
 
   bool SupportsPartition(const PartitionSpec& spec) const override;
 
-  zx::result<std::unique_ptr<PartitionClient>> AddPartition(
-      const PartitionSpec& spec) const override;
-
   zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const override;
 
@@ -38,9 +35,7 @@ class AstroPartitioner : public DevicePartitioner {
 
   zx::result<> WipeFvm() const override;
 
-  zx::result<> InitPartitionTables() const override;
-
-  zx::result<> WipePartitionTables() const override;
+  zx::result<> ResetPartitionTables() const override;
 
   zx::result<> ValidatePayload(const PartitionSpec& spec,
                                std::span<const uint8_t> data) const override;
@@ -138,7 +133,7 @@ class AstroPartitionerContext : public ContextBase {
  public:
   std::unique_ptr<::sysconfig::SyncClientBuffered> client_;
 
-  AstroPartitionerContext(std::unique_ptr<::sysconfig::SyncClientBuffered> client)
+  explicit AstroPartitionerContext(std::unique_ptr<::sysconfig::SyncClientBuffered> client)
       : client_{std::move(client)} {}
 };
 

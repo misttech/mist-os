@@ -194,7 +194,7 @@ class FactoryResetTest : public gtest::RealLoopFixture {
       fshost_binding.emplace().AddBinding(dispatcher(), std::move(fshost_server_end.value()),
                                           &mock_fshost.value().get(), fidl::kIgnoreBindingClosure);
     } else {
-      zx::result result = component::ConnectAt<fuchsia_fshost::Admin>(devmgr_.fshost_svc_dir());
+      zx::result result = component::ConnectAt<fuchsia_fshost::Admin>(devmgr_.RealmExposedDir());
       ASSERT_TRUE(result.is_ok()) << result.status_string();
       fshost_admin = std::move(result.value());
     }

@@ -2098,25 +2098,6 @@ TEST_F(PaverServiceBlockTest, DISABLED_InitializePartitionTablesMultipleDevices)
   ASSERT_OK(result.value().status);
 }
 
-TEST_F(PaverServiceBlockTest, DISABLED_WipePartitionTables) {
-  std::unique_ptr<BlockDevice> gpt_dev;
-  // 32GiB disk.
-  constexpr uint64_t block_count = (32LU << 30) / kBlockSize;
-  ASSERT_NO_FATAL_FAILURE(
-      BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev));
-
-  zx::result connections = GetNewConnections(gpt_dev->block_controller_interface());
-  ASSERT_OK(connections);
-  ASSERT_NO_FATAL_FAILURE(UseBlockDevice(std::move(connections.value())));
-  auto result = data_sink_->InitializePartitionTables();
-  ASSERT_OK(result.status());
-  ASSERT_OK(result.value().status);
-
-  auto wipe_result = data_sink_->WipePartitionTables();
-  ASSERT_OK(wipe_result.status());
-  ASSERT_OK(wipe_result.value().status);
-}
-
 #endif
 
 class PaverServiceGptDeviceTest : public PaverServiceTest {

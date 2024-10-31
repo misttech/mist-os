@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.storagehost/cpp/markers.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -25,6 +26,7 @@
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/devices/block/drivers/core/block-fifo.h"
+#include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/block_client/cpp/client.h"
 #include "src/storage/lib/paver/block-devices.h"
 
@@ -38,7 +40,6 @@ class PartitionClient {
   // Returns the block size which the vmo provided to read/write should be aligned to.
   virtual zx::result<size_t> GetBlockSize() = 0;
 
-  // Returns the partition size.
   virtual zx::result<size_t> GetPartitionSize() = 0;
 
   // Reads the specified size from the partition into |vmo|. |size| must be aligned to the block
@@ -58,7 +59,18 @@ class PartitionClient {
   // Indicates whether the derrived class supports block operations.
   virtual bool SupportsBlockPartition() { return false; }
 
+  virtual const VolumeConnector* connector() { return nullptr; }
+
   virtual ~PartitionClient() = default;
+};
+
+struct PartitionMetadata {
+  std::string name;
+  uuid::Uuid type_guid;
+  uuid::Uuid instance_guid;
+  uint64_t start_block_offset;
+  uint64_t num_blocks;
+  uint64_t flags;
 };
 
 class BlockPartitionClient : public PartitionClient {
@@ -68,6 +80,11 @@ class BlockPartitionClient : public PartitionClient {
 
   zx::result<size_t> GetBlockSize() override;
   zx::result<size_t> GetPartitionSize() override;
+
+  /// Fetches the metadata of the partition.  Fails if any of the fields aren't supported by the
+  /// underlying partition implementation.  In general, this only makes sense to call on GPT-backed
+  /// partitions.
+  zx::result<PartitionMetadata> GetMetadata() const;
 
   zx::result<> Read(const zx::vmo& vmo, size_t size) override;
   zx::result<> Read(const zx::vmo& vmo, size_t size, size_t dev_offset, size_t vmo_offset);
@@ -82,6 +99,8 @@ class BlockPartitionClient : public PartitionClient {
   zx::result<> Trim() override;
   zx::result<> Flush() override;
 
+  const VolumeConnector* connector() override { return partition_connector_.get(); }
+
   // Returns the Controller connection for the partition.  Asserts if the partition is not backed by
   // a Devfs instance.
   // TODO(https://fxbug.dev/339491886): This only exists to support Fvm's need to rebind drivers.
@@ -91,7 +110,8 @@ class BlockPartitionClient : public PartitionClient {
   }
 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> Block() const {
-    return partition_.client_end().borrow();
+    return fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(
+        partition_.client_end().borrow().channel());
   }
 
   // No copy.
@@ -106,14 +126,14 @@ class BlockPartitionClient : public PartitionClient {
 
  private:
   BlockPartitionClient(std::unique_ptr<VolumeConnector> connector,
-                       fidl::WireSyncClient<fuchsia_hardware_block::Block> partition)
+                       fidl::WireSyncClient<fuchsia_hardware_block_partition::Partition> partition)
       : partition_connector_(std::move(connector)), partition_(std::move(partition)) {}
 
   zx::result<> RegisterFastBlockIo();
   zx::result<std::reference_wrapper<fuchsia_hardware_block::wire::BlockInfo>> ReadBlockInfo();
 
   std::unique_ptr<VolumeConnector> partition_connector_;
-  fidl::WireSyncClient<fuchsia_hardware_block::Block> partition_;
+  fidl::WireSyncClient<fuchsia_hardware_block_partition::Partition> partition_;
   std::unique_ptr<block_client::Client> client_;
   std::optional<fuchsia_hardware_block::wire::BlockInfo> block_info_;
 };

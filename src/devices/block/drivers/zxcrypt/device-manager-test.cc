@@ -139,7 +139,7 @@ TEST_F(ZxcryptInspect, ExportsGuid) {
 
   // Use a new connection rather than using devfs_root because devfs_root has the empty set of
   // rights.
-  const fidl::ClientEnd svc = devmgr().fshost_svc_dir();
+  const fidl::ClientEnd svc = devmgr().RealmExposedDir();
 
   // Unsealing should fail right now until we format. It'll look like a bad key error, but really we
   // haven't even got a formatted device yet.

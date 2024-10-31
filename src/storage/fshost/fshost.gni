@@ -72,7 +72,7 @@ template("fshost_cml") {
       }
 
       # These are components that must be included in the package depending on the data filesystem
-      # format.
+      # format and other configuration knobs.
       # TODO(https://fxbug.dev/42064086):  Remove these dep when adding fshost to the common platform AIB,
       # and add these component to the AIB at the same time.
       deps = [
@@ -90,6 +90,10 @@ template("fshost_cml") {
         ]
       } else if (options.data_filesystem_format == "f2fs") {
         deps += [ "//src/storage/f2fs/bin:f2fs-component" ]
+      }
+
+      if (defined(options.storage_host) && options.storage_host) {
+        deps += [ "//src/storage/storage-host" ]
       }
     }
   }

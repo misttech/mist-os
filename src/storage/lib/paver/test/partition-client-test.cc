@@ -390,7 +390,7 @@ class FixedOffsetBlockPartitionClientTest : public zxtest::Test {
         partition_offset, buffer_offset);
   }
 
-  fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.fshost_svc_dir(); }
+  fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.RealmExposedDir(); }
 
  private:
   IsolatedDevmgr devmgr_;

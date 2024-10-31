@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.board.test/cpp/wire.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire_test_base.h>
 #include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <fuchsia/driver/test/cpp/fidl.h>
@@ -100,7 +101,15 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
   driver_test_realm::Setup(realm_builder);
 
   // Setup Fshost.
-  if (args->disable_block_watcher) {
+  if (args->enable_storage_host) {
+    if (args->netboot) {
+      realm_builder.AddChild("fshost", "#meta/test-fshost-storage-host-netboot.cm");
+      realm_builder.AddChild("fshost_config", "#meta/test-fshost-storage-host-netboot_config.cm");
+    } else {
+      realm_builder.AddChild("fshost", "#meta/test-fshost-storage-host.cm");
+      realm_builder.AddChild("fshost_config", "#meta/test-fshost-storage-host_config.cm");
+    }
+  } else if (args->disable_block_watcher) {
     realm_builder.AddChild("fshost", "#meta/test-fshost-no-watcher.cm");
     realm_builder.AddChild("fshost_config", "#meta/test-fshost-no-watcher_config.cm");
   } else {
@@ -172,7 +181,11 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .targets = {ChildRef{"fshost"}},
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{"fuchsia.fshost.Admin"}},
+      .capabilities =
+          {
+              Protocol{"fuchsia.fshost.Admin"},
+              Protocol{"fuchsia.storagehost.PartitionsAdmin"},
+          },
       .source = {ChildRef{"fshost"}},
       .targets = {ParentRef()},
   });
@@ -201,6 +214,13 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .source = {ChildRef{"fshost"}},
       .targets = {ParentRef()},
   });
+  if (args->enable_storage_host) {
+    realm_builder.AddRoute(Route{
+        .capabilities = {Directory{.name = "partitions", .rights = fuchsia::io::R_STAR_DIR}},
+        .source = {ChildRef{"fshost"}},
+        .targets = {ParentRef()},
+    });
+  }
 
   realm_builder.AddRoute(Route{
       .capabilities = {Directory{.name = "dev-topological", .rights = fuchsia::io::R_STAR_DIR}},
@@ -209,6 +229,11 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
   });
   realm_builder.AddRoute(Route{
       .capabilities = {Directory{.name = "dev-class", .rights = fuchsia::io::R_STAR_DIR}},
+      .source = {ChildRef{"driver_test_realm"}},
+      .targets = {ChildRef{"fshost"}},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Service{"fuchsia.hardware.block.volume.Service"}},
       .source = {ChildRef{"driver_test_realm"}},
       .targets = {ChildRef{"fshost"}},
   });
@@ -229,6 +254,14 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .source = {ChildRef{"fake-bootargs"}},
       .targets = {ParentRef()},
   });
+
+  std::vector<fuchsia_component_test::Capability> exposes = {{
+      fuchsia_component_test::Capability::WithService(
+          fuchsia_component_test::Service{{.name = "fuchsia.hardware.block.volume.Service"}}),
+      fuchsia_component_test::Capability::WithService(
+          fuchsia_component_test::Service{{.name = "fuchsia.hardware.ramdisk.Service"}}),
+  }};
+  driver_test_realm::AddDtrExposes(realm_builder, exposes);
 
   // Build the realm.
   devmgr.realm_ = std::make_unique<component_testing::RealmRoot>(
@@ -268,8 +301,8 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
 
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  if (zx_status_t status =
-          devmgr.realm_->component().Connect("dev-topological", dev.NewRequest().TakeChannel());
+  if (zx_status_t status = devmgr.realm_->component().exposed()->Open3(
+          "dev-topological", fuchsia::io::PERM_READABLE, {}, dev.NewRequest().TakeChannel());
       status != ZX_OK) {
     return status;
   }
@@ -284,6 +317,12 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       device_watcher::RecursiveWaitForFile(devmgr.devfs_root_.get(), "sys/platform/pt/test-board");
   if (channel.is_error()) {
     return channel.status_value();
+  }
+
+  // Connect to fshost to ensure it starts up and watches for block devices.
+  if (zx::result result = devmgr.realm_->component().Connect<fuchsia_fshost::Admin>();
+      result.is_error()) {
+    return result.status_value();
   }
 
   fidl::ClientEnd<fuchsia_board_test::Board> client_end(std::move(channel.value()));

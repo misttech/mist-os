@@ -121,30 +121,23 @@ bool CheckIfSame(PartitionClient* partition, const zx::vmo& vmo, size_t payload_
   return memcmp(first_mapper.start(), second_mapper.start(), payload_size) == 0;
 }
 
-// Returns a client for the FVM partition. If the FVM volume doesn't exist, a new
-// volume will be created, without any associated children partitions.
+// Returns a client for the FVM partition.
 zx::result<std::unique_ptr<PartitionClient>> GetFvmPartition(const DevicePartitioner& partitioner) {
   // FVM doesn't need content type support, use the default.
   const PartitionSpec spec(Partition::kFuchsiaVolumeManager);
-  {
-    zx::result partition = partitioner.FindPartition(spec);
-    if (partition.is_ok()) {
-      LOG("FVM Partition already exists\n");
-      return partition;
-    }
-
-    if (partition.status_value() != ZX_ERR_NOT_FOUND) {
-      ERROR("Failure looking for FVM partition: %s\n", partition.status_string());
-      return partition.take_error();
-    }
+  zx::result partition = partitioner.FindPartition(spec);
+  if (partition.is_ok()) {
+    LOG("FVM Partition already exists\n");
+    return partition;
   }
 
-  LOG("Could not find FVM Partition on device. Attemping to add new partition\n");
-  zx::result partition = partitioner.AddPartition(spec);
-  if (partition.is_error()) {
-    ERROR("Failure creating FVM partition: %s\n", partition.status_string());
+  if (partition.status_value() != ZX_ERR_NOT_FOUND) {
+    ERROR("Failure looking for FVM partition: %s\n", partition.status_string());
+    return partition.take_error();
   }
-  return partition;
+
+  ERROR("Could not find FVM Partition on device. The device may need to be re-initialized.\n");
+  return partition.take_error();
 }
 
 // TODO(https://fxbug.dev/339491886): Support FVM in storage-host
@@ -368,17 +361,9 @@ zx::result<> PartitionPave(const DevicePartitioner& partitioner, zx::vmo payload
             status.status_string());
       return status.take_error();
     }
-
-    LOG("Could not find \"%s\" Partition on device. Attemping to add new partition\n",
-        spec.ToString().c_str());
-
-    if (auto status = partitioner.AddPartition(spec); status.is_ok()) {
-      partition = std::move(status.value());
-    } else {
-      ERROR("Failure creating partition \"%s\": %s\n", spec.ToString().c_str(),
-            status.status_string());
-      return status.take_error();
-    }
+    ERROR("Could not find \"%s\" Partition on device.  The device may need to be re-initalized.\n",
+          spec.ToString().c_str());
+    return status.take_error();
   }
 
   status = sparse ? WriteSparse(*partition, spec, std::move(payload_vmo), payload_size)
@@ -666,11 +651,11 @@ void DynamicDataSink::Bind(async_dispatcher_t* dispatcher, BlockDevices devices,
 
 void DynamicDataSink::InitializePartitionTables(
     InitializePartitionTablesCompleter::Sync& completer) {
-  completer.Reply(sink_.partitioner()->InitPartitionTables().status_value());
+  completer.Reply(sink_.partitioner()->ResetPartitionTables().status_value());
 }
 
 void DynamicDataSink::WipePartitionTables(WipePartitionTablesCompleter::Sync& completer) {
-  completer.Reply(sink_.partitioner()->WipePartitionTables().status_value());
+  completer.Reply(ZX_ERR_NOT_SUPPORTED);
 }
 
 void DynamicDataSink::ReadAsset(ReadAssetRequestView request, ReadAssetCompleter::Sync& completer) {

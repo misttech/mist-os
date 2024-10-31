@@ -200,12 +200,6 @@ bool AstroPartitioner::SupportsPartition(const PartitionSpec& spec) const {
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }
 
-zx::result<std::unique_ptr<PartitionClient>> AstroPartitioner::AddPartition(
-    const PartitionSpec& spec) const {
-  ERROR("Cannot add partitions to an astro.\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
 zx::result<std::unique_ptr<PartitionClient>> AstroPartitioner::FindPartition(
     const PartitionSpec& spec) const {
   if (!SupportsPartition(spec)) {
@@ -284,11 +278,7 @@ zx::result<> AstroPartitioner::Flush() const {
 
 zx::result<> AstroPartitioner::WipeFvm() const { return skip_block_->WipeFvm(); }
 
-zx::result<> AstroPartitioner::InitPartitionTables() const {
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
-zx::result<> AstroPartitioner::WipePartitionTables() const {
+zx::result<> AstroPartitioner::ResetPartitionTables() const {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 

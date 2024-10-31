@@ -219,12 +219,6 @@ bool FixedDevicePartitioner::SupportsPartition(const PartitionSpec& spec) const 
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }
 
-zx::result<std::unique_ptr<PartitionClient>> FixedDevicePartitioner::AddPartition(
-    const PartitionSpec& spec) const {
-  ERROR("Cannot add partitions to a fixed-map partition device\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
 zx::result<std::unique_ptr<PartitionClient>> FixedDevicePartitioner::FindPartition(
     const PartitionSpec& spec) const {
   if (!SupportsPartition(spec)) {
@@ -255,11 +249,7 @@ zx::result<> FixedDevicePartitioner::WipeFvm() const {
   return zx::ok();
 }
 
-zx::result<> FixedDevicePartitioner::InitPartitionTables() const {
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
-zx::result<> FixedDevicePartitioner::WipePartitionTables() const {
+zx::result<> FixedDevicePartitioner::ResetPartitionTables() const {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
