@@ -51,7 +51,7 @@ zx_status_t fdio_service_connect_by_name(const char* name, ZX_HANDLE_RELEASE zx_
 // `flags` asynchronously. `flags` corresponds to `fuchsia.io/Flags`. Always consumes `request`.
 // See `fdio_ns_open3` for details.
 zx_status_t fdio_open3(const char* path, uint64_t flags, ZX_HANDLE_RELEASE zx_handle_t request)
-    ZX_AVAILABLE_SINCE(24);
+    ZX_AVAILABLE_SINCE(16);
 
 // Opens an object at `path` with `flags` relative to `directory`. `flags` corresponds to
 // `fuchsia.io/Flags`. Always consumes `request`.
@@ -60,7 +60,7 @@ zx_status_t fdio_open3(const char* path, uint64_t flags, ZX_HANDLE_RELEASE zx_ha
 //
 // ZX_ERR_INVALID_ARGS: `directory` or `path` is invalid.
 zx_status_t fdio_open3_at(zx_handle_t directory, const char* path, uint64_t flags,
-                          ZX_HANDLE_RELEASE zx_handle_t request) ZX_AVAILABLE_SINCE(24);
+                          ZX_HANDLE_RELEASE zx_handle_t request) ZX_AVAILABLE_SINCE(16);
 
 // Opens an object at `path` relative to the root of the namespace for the current process with
 // `flags` synchronously, and on success, binds that channel to `out_fd` as a file descriptor.
@@ -68,14 +68,14 @@ zx_status_t fdio_open3_at(zx_handle_t directory, const char* path, uint64_t flag
 // for a response indicating the open result.
 //
 // `flags` corresponds to `fuchsia.io/Flags`. See `fdio_open3` for details.
-zx_status_t fdio_open3_fd(const char* path, uint64_t flags, int* out_fd) ZX_AVAILABLE_SINCE(24);
+zx_status_t fdio_open3_fd(const char* path, uint64_t flags, int* out_fd) ZX_AVAILABLE_SINCE(16);
 
 // Opens an object at `path` relative to `dir_fd` with `flags` synchronously, and on success, binds
 // that channel to a file descriptor, returned via `out_fd`.
 //
 // `flags` corresponds to `fuchsia.io/Flags`. See `fdio_open3_at` for details.
 zx_status_t fdio_open3_fd_at(int dir_fd, const char* path, uint64_t flags, int* out_fd)
-    ZX_AVAILABLE_SINCE(24);
+    ZX_AVAILABLE_SINCE(16);
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 //                      Deprecated fuchsia.io/Directory.Open1 Functionality
