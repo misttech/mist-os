@@ -86,7 +86,12 @@ impl SeLinuxStatusPublisher for StatusSeqLock {
 
 struct SeLinuxFs;
 impl FileSystemOps for SeLinuxFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(SELINUX_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

@@ -4519,7 +4519,12 @@ impl From<Errno> for TransactionError {
 
 pub struct BinderFs;
 impl FileSystemOps for BinderFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(BINDERFS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

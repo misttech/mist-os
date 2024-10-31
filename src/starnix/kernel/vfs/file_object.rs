@@ -933,10 +933,10 @@ pub fn default_ioctl(
             Ok(SUCCESS)
         }
         FS_IOC_ENABLE_VERITY => {
-            Ok(fsverity::ioctl::enable(current_task, UserAddress::from(arg).into(), file)?)
+            Ok(fsverity::ioctl::enable(locked, current_task, UserAddress::from(arg).into(), file)?)
         }
         FS_IOC_MEASURE_VERITY => {
-            Ok(fsverity::ioctl::measure(current_task, UserAddress::from(arg).into(), file)?)
+            Ok(fsverity::ioctl::measure(locked, current_task, UserAddress::from(arg).into(), file)?)
         }
         FS_IOC_READ_VERITY_METADATA => {
             Ok(fsverity::ioctl::read_metadata(current_task, UserAddress::from(arg).into(), file)?)

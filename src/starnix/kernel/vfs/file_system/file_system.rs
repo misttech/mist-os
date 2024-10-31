@@ -373,8 +373,16 @@ impl FileSystem {
     /// the filesystem.
     ///
     /// Returns `ENOSYS` if the `FileSystemOps` don't implement `stat`.
-    pub fn statfs(&self, current_task: &CurrentTask) -> Result<statfs, Errno> {
-        let mut stat = self.ops.statfs(self, current_task)?;
+    pub fn statfs<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<statfs, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let mut stat = self.ops.statfs(&mut locked, self, current_task)?;
         if stat.f_frsize == 0 {
             stat.f_frsize = stat.f_bsize as i64;
         }
@@ -455,7 +463,12 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     ///     ..statfs::default(FILE_SYSTEM_MAGIC)
     /// })
     /// ```
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno>;
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno>;
 
     fn name(&self) -> &'static FsStr;
 

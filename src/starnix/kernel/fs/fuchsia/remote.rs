@@ -116,7 +116,12 @@ const SYNC_IOC_FILE_INFO: u8 = 4;
 const SYNC_IOC_MERGE: u8 = 3;
 
 impl FileSystemOps for RemoteFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         let (status, info) = self
             .root_proxy
             .query_filesystem(zx::MonotonicInstant::INFINITE)
@@ -2388,7 +2393,7 @@ mod test {
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
             .expect("clone failed");
 
-        let (kernel, _init_task) = create_kernel_and_task();
+        let (kernel, _init_task, mut locked) = create_kernel_task_and_unlocked();
         kernel
             .kthreads
             .spawner()
@@ -2404,7 +2409,7 @@ mod test {
                     )
                     .expect("new_fs failed");
 
-                    let statfs = fs.statfs(&current_task).expect("statfs failed");
+                    let statfs = fs.statfs(&mut locked, &current_task).expect("statfs failed");
                     assert!(statfs.f_type != 0);
                     assert!(statfs.f_bsize > 0);
                     assert!(statfs.f_blocks > 0);

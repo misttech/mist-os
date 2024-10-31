@@ -181,7 +181,12 @@ struct DevPtsFs {
 }
 
 impl FileSystemOps for DevPtsFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(DEVPTS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

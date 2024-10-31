@@ -235,7 +235,12 @@ impl FunctionFs {
 }
 
 impl FileSystemOps for FunctionFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(FUNCTIONFS_MAGIC))
     }
 

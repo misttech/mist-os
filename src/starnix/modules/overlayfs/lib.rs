@@ -1214,8 +1214,13 @@ struct OverlayFs {
 }
 
 impl FileSystemOps for OverlayFs {
-    fn statfs(&self, _fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
-        self.stack.upper_fs.statfs(current_task)
+    fn statfs(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
+        self.stack.upper_fs.statfs(locked, current_task)
     }
 
     fn name(&self) -> &'static FsStr {

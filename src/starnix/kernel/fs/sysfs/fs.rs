@@ -14,7 +14,7 @@ use crate::vfs::{
     SymlinkNode,
 };
 use starnix_logging::bug_ref;
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
@@ -29,7 +29,12 @@ pub const SYSFS_DEV: &str = "dev";
 
 struct SysFs;
 impl FileSystemOps for SysFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(SYSFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

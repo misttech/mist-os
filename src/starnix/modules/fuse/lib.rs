@@ -265,7 +265,12 @@ impl FileSystemOps for FuseFs {
         true
     }
 
-    fn statfs(&self, fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        fs: &FileSystem,
+        current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         let node = FuseNode::from_node(&fs.root().node);
         let response =
             self.connection.lock().execute_operation(current_task, &node, FuseOperation::Statfs)?;
@@ -345,7 +350,12 @@ impl FileSystemOps for FuseCtlFs {
         error!(ENOTSUP)
     }
 
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         // Magic number has been extracted from the stat utility.
         const FUSE_CTL_MAGIC: u32 = 0x65735543;
         Ok(default_statfs(FUSE_CTL_MAGIC))
