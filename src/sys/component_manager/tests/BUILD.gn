@@ -66,7 +66,10 @@ group("hermetic_tests") {
 
 group("benchmarks") {
   testonly = true
-  deps = [ "bootfs_launching_benchmark:benchmark" ]
+  deps = [
+    "bootfs_launching_benchmark:benchmark",
+    "lifecycle_benchmark:benchmark",
+  ]
 }
 
 rustc_binary("trigger_bin") {

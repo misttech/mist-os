@@ -6,6 +6,7 @@ import("fuchsia_component.gni")
 
 type_moniker_map = {
   chromium = "/core/testing:chromium-tests"
+  component_framework = "/core/testing:component-framework-tests"
   ctf = "/core/testing:ctf-tests"
   device = "/core/testing:devices-tests"
   drm = "/core/testing:drm-tests"

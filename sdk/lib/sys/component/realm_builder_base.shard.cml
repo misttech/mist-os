@@ -36,7 +36,6 @@
             event_stream: [
                 "capability_requested",
                 "destroyed",
-                "running_v2",
                 "started",
                 "stopped",
             ],

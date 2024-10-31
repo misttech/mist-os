@@ -1,0 +1,72 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/offer.shard.cml" ],
+    children: [
+        {
+            name: "elf_runner",
+            url: "fuchsia-builtin://#elf_runner.cm",
+        },
+        {
+            name: "full-resolver",
+            url: "#meta/full-resolver.cm",
+            environment: "#elf-env",
+        },
+    ],
+    collections: [
+        {
+            name: "coll",
+            environment: "#full-env",
+            durability: "transient",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.process.Launcher",
+            from: "parent",
+            to: "#elf_runner",
+        },
+        {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "parent",
+            to: "#full-resolver",
+        },
+    ],
+    expose: [
+        // Allows the test to launch components
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
+    ],
+    environments: [
+        {
+            name: "elf-env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "elf",
+                    from: "#elf_runner",
+                },
+            ],
+        },
+        {
+            name: "full-env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "elf",
+                    from: "#elf_runner",
+                },
+            ],
+            resolvers: [
+                {
+                    resolver: "full-resolver",
+                    from: "#full-resolver",
+                    scheme: "fuchsia-pkg",
+                },
+            ],
+        },
+    ],
+}
