@@ -92,6 +92,7 @@ zx_library("starnix_runner") {
   deps = [
     ":starnix_core",
     "//vendor/misttech/zircon/kernel/lib/handoff",
+    "//vendor/misttech/zircon/kernel/lib/starnix/modules",
     "//zircon/kernel/lib/console",
   ]
 }

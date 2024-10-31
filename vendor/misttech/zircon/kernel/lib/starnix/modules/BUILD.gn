@@ -2,11 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("lib") {
-}
+import("//build/zircon/migrated_targets.gni")
 
 group("tests") {
 }
 
-group("benchmarks") {
+zx_library("modules") {
+  sources = [ "modules.cc" ]
+
+  deps = [ "//vendor/misttech/zircon/kernel/lib/starnix/kernel:starnix_core" ]
 }
