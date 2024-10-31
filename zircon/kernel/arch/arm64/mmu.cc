@@ -85,6 +85,8 @@ paddr_t arm64_kernel_translation_table_phys;
 // Global accessor for the kernel page table
 pte_t* arm64_get_kernel_ptable() { return arm64_kernel_translation_table; }
 
+paddr_t arm64_get_kernel_ptable_phys() { return arm64_kernel_translation_table_phys; }
+
 namespace {
 
 // Whether ASID use is enabled.
@@ -108,23 +110,20 @@ KCOUNTER(vm_mmu_page_table_reclaim, "vm.mmu.pt.reclaim")
 
 page_cache::PageCache page_cache;
 
-zx_status_t CacheAllocPage(vm_page_t** p, paddr_t* pa) {
+zx::result<vm_page_t*> CacheAllocPage() {
   if (!page_cache) {
-    return pmm_alloc_page(PMM_ALLOC_FLAG_ANY, p, pa);
+    return Pmm::Node().AllocPage(PMM_ALLOC_FLAG_ANY);
   }
 
   zx::result result = page_cache.Allocate(1);
   if (result.is_error()) {
-    return result.error_value();
+    return result.take_error();
   }
 
   vm_page_t* page = list_remove_head_type(&result->page_list, vm_page_t, queue_node);
   DEBUG_ASSERT(page != nullptr);
   DEBUG_ASSERT(result->page_list.is_empty());
-
-  *p = page;
-  *pa = page->paddr();
-  return ZX_OK;
+  return zx::ok(page);
 }
 
 void CacheFreePages(list_node_t* list) {
@@ -393,18 +392,6 @@ int first_used_page_table_entry(const volatile pte_t* page_table, uint page_size
     }
   }
   return -1;
-}
-
-bool page_table_is_clear(const volatile pte_t* page_table, uint page_size_shift) {
-  const int index = first_used_page_table_entry(page_table, page_size_shift);
-  const bool clear = index == -1;
-  if (clear) {
-    LTRACEF("page table at %p is clear\n", page_table);
-  } else {
-    LTRACEF("page_table at %p still in use, index %d is %#" PRIx64 "\n", page_table, index,
-            page_table[index]);
-  }
-  return clear;
 }
 
 ArmAspaceType AspaceTypeFromFlags(uint mmu_flags) {
@@ -680,50 +667,51 @@ zx_status_t ArmArchVmAspace::QueryLocked(vaddr_t vaddr, paddr_t* paddr, uint* mm
   }
 }
 
-zx_status_t ArmArchVmAspace::AllocPageTable(paddr_t* paddrp) {
+zx::result<vm_page_t*> ArmArchVmAspace::AllocPageTable() {
   LTRACEF("page_size_shift %u\n", page_size_shift_);
 
   // currently we only support allocating a single page
   DEBUG_ASSERT(page_size_shift_ == PAGE_SIZE_SHIFT);
 
+  auto test_alloc = [&]() -> zx::result<vm_page_t*> {
+    vm_page_t* page;
+    paddr_t paddr;
+    zx_status_t status = test_page_alloc_func_(0, &page, &paddr);
+    if (status == ZX_OK) {
+      return zx::ok(page);
+    }
+    return zx::error(status);
+  };
+
   // Allocate a page from the pmm via function pointer passed to us in Init().
   // The default is CacheAllocPage so test and explicitly call it to avoid any unnecessary
   // virtual functions.
-  vm_page_t* page;
-  zx_status_t status;
-  if (likely(!test_page_alloc_func_)) {
-    status = CacheAllocPage(&page, paddrp);
-  } else {
-    status = test_page_alloc_func_(0, &page, paddrp);
+  auto result = likely(!test_page_alloc_func_) ? CacheAllocPage() : test_alloc();
+  if (likely(result.is_ok())) {
+    (*result)->set_state(vm_page_state::MMU);
+    pt_pages_++;
+    kcounter_add(vm_mmu_page_table_alloc, 1);
+    (*result)->mmu.num_mappings = 0;
+
+    LOCAL_KTRACE("page table alloc");
+
+    LTRACEF("allocated %#lx\n", (*result)->paddr());
   }
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  page->set_state(vm_page_state::MMU);
-  pt_pages_++;
-  kcounter_add(vm_mmu_page_table_alloc, 1);
-
-  LOCAL_KTRACE("page table alloc");
-
-  LTRACEF("allocated %#lx\n", *paddrp);
-  return ZX_OK;
+  return result;
 }
 
-void ArmArchVmAspace::FreePageTable(void* vaddr, paddr_t paddr, ConsistencyManager& cm,
+void ArmArchVmAspace::FreePageTable(void* vaddr, vm_page_t* page, ConsistencyManager& cm,
                                     Reclaim reclaim) {
-  LTRACEF("vaddr %p paddr %#lx page_size_shift %u\n", vaddr, paddr, page_size_shift_);
+  ASSERT(page);
+  LTRACEF("vaddr %p paddr %#lx page_size_shift %u\n", vaddr, page->paddr(), page_size_shift_);
 
   // currently we only support freeing a single page
   DEBUG_ASSERT(page_size_shift_ == PAGE_SIZE_SHIFT);
 
   LOCAL_KTRACE("page table free");
 
-  vm_page_t* page = paddr_to_vm_page(paddr);
-  if (!page) {
-    panic("bad page table paddr %#lx\n", paddr);
-  }
   DEBUG_ASSERT(page->state() == vm_page_state::MMU);
+  DEBUG_ASSERT(page->mmu.num_mappings == 0);
   cm.FreePage(page);
 
   pt_pages_--;
@@ -740,16 +728,16 @@ zx_status_t ArmArchVmAspace::SplitLargePage(vaddr_t vaddr, const uint index_shif
   const pte_t pte = page_table[pt_index];
   DEBUG_ASSERT((pte & MMU_PTE_DESCRIPTOR_MASK) == MMU_PTE_L012_DESCRIPTOR_BLOCK);
 
-  paddr_t paddr;
-  zx_status_t ret = AllocPageTable(&paddr);
-  if (ret) {
+  auto result = AllocPageTable();
+  if (result.is_error()) {
     TRACEF("failed to allocate page table\n");
-    return ret;
+    return result.status_value();
   }
+  vm_page_t* page = *result;
 
   const uint next_shift = (index_shift - (page_size_shift_ - 3));
 
-  const auto new_page_table = static_cast<volatile pte_t*>(paddr_to_physmap(paddr));
+  const auto new_page_table = static_cast<volatile pte_t*>(paddr_to_physmap(page->paddr()));
   const auto new_desc_type =
       (next_shift == page_size_shift_) ? MMU_PTE_L3_DESCRIPTOR_PAGE : MMU_PTE_L012_DESCRIPTOR_BLOCK;
   const auto attrs = (pte & ~(MMU_PTE_OUTPUT_ADDR_MASK | MMU_PTE_DESCRIPTOR_MASK)) | new_desc_type;
@@ -761,6 +749,7 @@ zx_status_t ArmArchVmAspace::SplitLargePage(vaddr_t vaddr, const uint index_shif
     // a completely new table
     new_page_table[i] = mapped_paddr | attrs;
   }
+  page->mmu.num_mappings = MMU_KERNEL_PAGE_TABLE_ENTRIES;
 
   if (allow_bbm) {
     // As we are changing the block size of a translation we must do a break-before-make in
@@ -773,7 +762,7 @@ zx_status_t ArmArchVmAspace::SplitLargePage(vaddr_t vaddr, const uint index_shif
     cm.Flush();
   }
 
-  update_pte(&page_table[pt_index], paddr | MMU_PTE_L012_DESCRIPTOR_TABLE);
+  update_pte(&page_table[pt_index], page->paddr() | MMU_PTE_L012_DESCRIPTOR_TABLE);
   LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, pt_index, page_table[pt_index]);
 
   // no need to update the page table count here since we're replacing a block entry with a table
@@ -863,20 +852,15 @@ void ArmArchVmAspace::FlushAsid() const {
   __UNREACHABLE;
 }
 
-zx::result<bool> ArmArchVmAspace::UnmapPageTable(VirtualAddressCursor& cursor,
-                                                 EnlargeOperation enlarge, CheckForEmptyPt pt_check,
-                                                 const uint index_shift, volatile pte_t* page_table,
-                                                 ConsistencyManager& cm, Reclaim reclaim) {
+ktl::pair<zx_status_t, uint> ArmArchVmAspace::UnmapPageTable(
+    VirtualAddressCursor& cursor, EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+    const uint index_shift, volatile pte_t* page_table, ConsistencyManager& cm, Reclaim reclaim) {
   const vaddr_t block_size = 1UL << index_shift;
   const uint num_entries = (1u << (page_size_shift_ - 3));
   const uint64_t index_mask = num_entries - 1;
   uint index = static_cast<uint>((cursor.vaddr_rel() >> index_shift) & index_mask);
+  uint unmapped = 0;
 
-  bool unmapped = false;
-  // Track if there are any entries at all. This is necessary to properly rollback if an
-  // attempt to map a page fails to allocate a page table, as that case can result in an
-  // empty non-last-level page table.
-  bool any_pages = false;
   for (; index != num_entries && cursor.size() != 0; ++index) {
     pte_t pte = page_table[index];
 
@@ -884,7 +868,6 @@ zx::result<bool> ArmArchVmAspace::UnmapPageTable(VirtualAddressCursor& cursor,
       cursor.SkipEntry(block_size);
       continue;
     }
-    any_pages = true;
 
     // Check if this is a large page and we need to split it.
     if (index_shift > page_size_shift_ &&
@@ -893,21 +876,22 @@ zx::result<bool> ArmArchVmAspace::UnmapPageTable(VirtualAddressCursor& cursor,
       // Splitting a large page may perform break-before-make, and during that window we will have
       // temporarily unmapped beyond our range, so make sure we are permitted to do that.
       if (!allow_bbm && enlarge != EnlargeOperation::Yes) {
-        return zx::error(ZX_ERR_NOT_SUPPORTED);
+        return {ZX_ERR_NOT_SUPPORTED, unmapped};
       }
       zx_status_t s = SplitLargePage(cursor.vaddr(), index_shift, index, page_table, cm);
       if (unlikely(s != ZX_OK)) {
         // If split fails, just unmap the whole thing, and let a
         // subsequent page fault clean it up.
         if (enlarge == EnlargeOperation::No) {
-          return zx::error(s);
+          return {s, unmapped};
         }
         // We must unmap here, and not in the normal block below, so that we can use SkipEntry
         // instead of ConsumeVAddr on the cursor. This is necessary since the range we are having to
         // unmap is, by definition, larger than our actual target cursor, and it would be an error
         // to call ConsumeVAddr.
         update_pte(&page_table[index], MMU_PTE_DESCRIPTOR_INVALID);
-        unmapped = true;
+        unmapped++;
+
         cm.FlushEntry(cursor.vaddr(), true);
         cursor.SkipEntry(block_size);
         continue;
@@ -924,30 +908,36 @@ zx::result<bool> ArmArchVmAspace::UnmapPageTable(VirtualAddressCursor& cursor,
       // Recurse a level but remember where we are unmapping from in case we need to do a second
       // pass to remove a PT.
       const vaddr_t unmap_vaddr = cursor.vaddr();
-      auto result = UnmapPageTable(cursor, enlarge, pt_check, index_shift - (page_size_shift_ - 3),
-                                   next_page_table, cm, reclaim);
-      if (result.is_error()) {
-        return result;
+      auto [status, lower_unmapped] =
+          UnmapPageTable(cursor, enlarge, pt_check, index_shift - (page_size_shift_ - 3),
+                         next_page_table, cm, reclaim);
+      bool unmap_lower = false;
+      // Regardless of success or failure we must update the mapping count. Since this involves
+      // looking up the vm_page_t we take this opportunity to check if it's empty and needs
+      // unmapping.
+      vm_page_t* lower_page = nullptr;
+      if (lower_unmapped > 0 || pt_check == CheckForEmptyPt::Yes) {
+        lower_page = Pmm::Node().PaddrToPage(page_table_paddr);
+        DEBUG_ASSERT(lower_page->mmu.num_mappings >= lower_unmapped);
+        lower_page->mmu.num_mappings -= lower_unmapped;
+        unmap_lower = lower_page->mmu.num_mappings == 0;
       }
-      const size_t unmap_size = cursor.vaddr() - unmap_vaddr;
-      bool lower_unmapped = *result;
+      if (unlikely(status != ZX_OK)) {
+        return {status, unmapped};
+      }
 
-      // If we unmapped an entire page table leaf and/or the unmap made the level below us empty,
-      // and we are not in the top page of an aspace with a prepopulated top page, free the page
-      // table.
-      bool in_prepopulated_pt = IsShared() && index_shift == top_index_shift_;
-      if (!in_prepopulated_pt &&
-          (unmap_size >= block_size ||
-           (lower_unmapped && page_table_is_clear(next_page_table, page_size_shift_)))) {
-        unmapped = true;
+      // If the unmap made the level below us empty we want to free the page table, unless in the
+      // top page of an aspace with a prepopulated top page.
+      if (unmap_lower && !(IsShared() && index_shift == top_index_shift_)) {
         LTRACEF("pte %p[0x%x] = 0 (was page table phys %#lx)\n", page_table, index,
                 page_table_paddr);
         update_pte(&page_table[index], MMU_PTE_DESCRIPTOR_INVALID);
+        unmapped++;
 
         // We can safely defer TLB flushing as the consistency manager will not return the backing
         // page to the PMM until after the tlb is flushed.
         cm.FlushEntry(unmap_vaddr, false);
-        FreePageTable(const_cast<pte_t*>(next_page_table), page_table_paddr, cm, reclaim);
+        FreePageTable(const_cast<pte_t*>(next_page_table), lower_page, cm, reclaim);
       }
     } else {
       // Empty entries were already handled and skipped at the top of the loop
@@ -955,23 +945,25 @@ zx::result<bool> ArmArchVmAspace::UnmapPageTable(VirtualAddressCursor& cursor,
       LTRACEF("pte %p[0x%x] = 0 (was phys %#lx)\n", page_table, index,
               page_table[index] & MMU_PTE_OUTPUT_ADDR_MASK);
       update_pte(&page_table[index], MMU_PTE_DESCRIPTOR_INVALID);
-      unmapped = true;
+      unmapped++;
       cm.FlushEntry(cursor.vaddr(), true);
       cursor.Consume(block_size);
     }
   }
 
-  return zx::ok(unmapped || (!any_pages && pt_check == CheckForEmptyPt::Yes));
+  return {ZX_OK, unmapped};
 }
 
-zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift,
-                                          volatile pte_t* page_table,
-                                          ExistingEntryAction existing_action,
-                                          MappingCursor& cursor, ConsistencyManager& cm) {
+ktl::pair<zx_status_t, uint> ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift,
+                                                           volatile pte_t* page_table,
+                                                           ExistingEntryAction existing_action,
+                                                           MappingCursor& cursor,
+                                                           ConsistencyManager& cm) {
   const vaddr_t block_size = 1UL << index_shift;
   const uint num_entries = (1u << (page_size_shift_ - 3));
   const uint64_t index_mask = num_entries - 1;
   uint index = static_cast<uint>((cursor.vaddr_rel() >> index_shift) & index_mask);
+  uint mapped = 0;
 
   for (; index != num_entries && cursor.size() != 0; ++index) {
     pte_t pte = page_table[index];
@@ -988,16 +980,18 @@ zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift
 
       switch (pte & MMU_PTE_DESCRIPTOR_MASK) {
         case MMU_PTE_DESCRIPTOR_INVALID: {
-          zx_status_t ret = AllocPageTable(&page_table_paddr);
-          if (ret) {
+          auto result = AllocPageTable();
+          if (result.is_error()) {
             TRACEF("failed to allocate page table\n");
             // The mapping wasn't fully updated, but there is work here that might need to be undone
             // as we may have allocated various levels of page tables. By consuming a single page we
             // make the cleanup operation think we have added a mapping here, causing it to check
             // the page table for potential cleanup.
             cursor.Consume(PAGE_SIZE);
-            return ZX_ERR_NO_MEMORY;
+            return {result.status_value(), mapped};
           }
+          page_table_paddr = (*result)->paddr();
+
           void* pt_vaddr = paddr_to_physmap(page_table_paddr);
 
           LTRACEF("allocated page table, vaddr %p, paddr 0x%lx\n", pt_vaddr, page_table_paddr);
@@ -1013,6 +1007,7 @@ zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift
           // mappings as having the AF set.
           pte = page_table_paddr | MMU_PTE_L012_DESCRIPTOR_TABLE | MMU_PTE_ATTR_RES_SOFTWARE_AF;
           update_pte(&page_table[index], pte);
+          mapped++;
 
           // Tell the consistency manager that we've mapped an inner node.
           cm.MapEntry(cursor.vaddr(), false);
@@ -1032,17 +1027,23 @@ zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift
           next_page_table = static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
           break;
         case MMU_PTE_L012_DESCRIPTOR_BLOCK:
-          return ZX_ERR_ALREADY_EXISTS;
+          return {ZX_ERR_ALREADY_EXISTS, mapped};
 
         default:
           panic("unexpected pte value %" PRIx64, pte);
       }
       DEBUG_ASSERT(next_page_table);
 
-      zx_status_t ret = MapPageTable(attrs, ro, index_shift - (page_size_shift_ - 3),
-                                     next_page_table, existing_action, cursor, cm);
+      auto [ret, lower_mapped] = MapPageTable(attrs, ro, index_shift - (page_size_shift_ - 3),
+                                              next_page_table, existing_action, cursor, cm);
+      // Regardless of success or failure we must update the mapping counts.
+      if (lower_mapped > 0) {
+        vm_page_t* lower_page = Pmm::Node().PaddrToPage(page_table_paddr);
+        DEBUG_ASSERT(lower_page);
+        lower_page->mmu.num_mappings += lower_mapped;
+      }
       if (ret != ZX_OK) {
-        return ret;
+        return {ret, mapped};
       }
     } else {
       pte_t new_pte = cursor.paddr() | attrs;
@@ -1054,7 +1055,7 @@ zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift
 
       const bool valid = is_pte_valid(pte);
       if (unlikely(valid && existing_action == ExistingEntryAction::Error)) {
-        return ZX_ERR_ALREADY_EXISTS;
+        return {ZX_ERR_ALREADY_EXISTS, mapped};
       } else if (valid && existing_action == ExistingEntryAction::Skip) {
         // Empty case to simplify the other branches.
       } else if (valid && existing_action == ExistingEntryAction::Upgrade &&
@@ -1067,6 +1068,11 @@ zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift
           cm.FlushEntry(cursor.vaddr(), true);
         }
       } else {
+        if (!valid) {
+          // As we are going to transition an entry form INVALID->VALID we must count this as an
+          // additional mapping. All other cases are changing an entry from VALID->VALID.
+          mapped++;
+        }
         // Either no current entry, or we need to upgrade the existing one, potentially performing
         // a break-before-make.
         if (valid && !ro) {
@@ -1090,7 +1096,7 @@ zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift
     }
   }
 
-  return ZX_OK;
+  return {ZX_OK, mapped};
 }
 
 zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in,
@@ -1170,7 +1176,7 @@ zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_re
 size_t ArmArchVmAspace::HarvestAccessedPageTable(
     size_t* entry_limit, vaddr_t vaddr, vaddr_t vaddr_rel_in, size_t size, const uint index_shift,
     NonTerminalAction non_terminal_action, TerminalAction terminal_action,
-    volatile pte_t* page_table, ConsistencyManager& cm, bool* unmapped_out) {
+    volatile pte_t* page_table, ConsistencyManager& cm) {
   const vaddr_t block_size = 1UL << index_shift;
   const vaddr_t block_mask = block_size - 1;
   // We always want to recursively call `HarvestAccessedPageTable` on entries in the top level page
@@ -1185,6 +1191,7 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
 
   size_t harvested_size = 0;
 
+  vm_page_t* table_page = Pmm::Node().PaddrToPage(physmap_to_paddr((void*)page_table));
   while (size > 0 && *entry_limit > 0) {
     ktrace::Scope trace =
         KTRACE_BEGIN_SCOPE_ENABLE(LOCAL_KTRACE_ENABLE, "kernel:vm", "page_table_loop");
@@ -1213,14 +1220,16 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
       // TODO: make this optional when hardware AF is supported (see todo on
       // MMU_PTE_ATTR_RES_SOFTWARE_AF for details)
       bool should_recurse = always_recurse || (pte & MMU_PTE_ATTR_RES_SOFTWARE_AF);
+      vm_page_t* lower_page = nullptr;
       if (should_recurse) {
-        bool unmapped = false;
         chunk_size = HarvestAccessedPageTable(
             entry_limit, vaddr, vaddr_rem, chunk_size, index_shift - (page_size_shift_ - 3),
-            non_terminal_action, terminal_action, next_page_table, cm, &unmapped);
+            non_terminal_action, terminal_action, next_page_table, cm);
         // This was accessed so we don't necessarily want to unmap it, unless our recursive call
         // caused the page table to be empty, in which case we are obligated to.
-        do_unmap = (unmapped && page_table_is_clear(next_page_table, page_size_shift_));
+        lower_page = Pmm::Node().PaddrToPage(page_table_paddr);
+
+        do_unmap = lower_page->mmu.num_mappings == 0;
         // If we processed till the end of sub page table, and we are not retaining page tables,
         // then we can clear the AF as we know we will not have to process entries from this one
         // again.
@@ -1246,20 +1255,22 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
           // already processed, which by definition must have been valid.
           DEBUG_ASSERT(result);
         }
-        zx::result<bool> result =
+        auto [result, lower_unmapped] =
             UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::No,
                            index_shift - (page_size_shift_ - 3), next_page_table, cm, Reclaim::Yes);
-        ASSERT(result.is_ok());
-        DEBUG_ASSERT(page_table_is_clear(next_page_table, page_size_shift_));
+        ASSERT(result == ZX_OK);
+        if (!lower_page) {
+          lower_page = Pmm::Node().PaddrToPage(page_table_paddr);
+        }
+        DEBUG_ASSERT(lower_page->mmu.num_mappings == lower_unmapped);
+        lower_page->mmu.num_mappings -= lower_unmapped;
         update_pte(&page_table[index], MMU_PTE_DESCRIPTOR_INVALID);
+        table_page->mmu.num_mappings--;
 
         // We can safely defer TLB flushing as the consistency manager will not return the backing
         // page to the PMM until after the tlb is flushed.
         cm.FlushEntry(vaddr, false);
-        FreePageTable(const_cast<pte_t*>(next_page_table), page_table_paddr, cm, Reclaim::Yes);
-        if (unmapped_out) {
-          *unmapped_out = true;
-        }
+        FreePageTable(const_cast<pte_t*>(next_page_table), lower_page, cm, Reclaim::Yes);
       }
     } else if (is_pte_valid(pte) && (pte & MMU_PTE_ATTR_AF)) {
       const paddr_t pte_addr = pte & MMU_PTE_OUTPUT_ADDR_MASK;
@@ -1441,16 +1452,18 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
       return ZX_ERR_OUT_OF_RANGE;
     }
     const bool ro = (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
-    zx_status_t status =
+    auto [status, lower_mapped] =
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, ExistingEntryAction::Error, cursor, cm);
+    tt_page_->mmu.num_mappings += lower_mapped;
     MarkAspaceModified();
     if (status != ZX_OK) {
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
-        [[maybe_unused]] auto result =
+        auto [unmap_status, unmapped] =
             UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::Yes,
                            top_index_shift_, tt_virt_, cm, Reclaim::No);
-        DEBUG_ASSERT(result.is_ok());
+        DEBUG_ASSERT(unmap_status == ZX_OK);
+        tt_page_->mmu.num_mappings -= unmapped;
       }
       return status;
     }
@@ -1524,16 +1537,18 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
       return ZX_ERR_OUT_OF_RANGE;
     }
     const bool ro = (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
-    zx_status_t status =
+    auto [status, lower_mapped] =
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, existing_action, cursor, cm);
+    tt_page_->mmu.num_mappings += lower_mapped;
     MarkAspaceModified();
     if (status != ZX_OK) {
       VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
-        [[maybe_unused]] auto result =
+        auto [unmap_status, unmapped] =
             UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::Yes,
                            top_index_shift_, tt_virt_, cm, Reclaim::No);
-        DEBUG_ASSERT(result.is_ok());
+        DEBUG_ASSERT(unmap_status == ZX_OK);
+        tt_page_->mmu.num_mappings -= unmapped;
       }
       return status;
     }
@@ -1582,11 +1597,11 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation
   if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
-  zx::result<bool> result = UnmapPageTable(cursor, enlarge, CheckForEmptyPt::No, top_index_shift_,
-                                           tt_virt_, cm, Reclaim::No);
+  auto [ret, lower_unmapped] = UnmapPageTable(cursor, enlarge, CheckForEmptyPt::No,
+                                              top_index_shift_, tt_virt_, cm, Reclaim::No);
+  tt_page_->mmu.num_mappings -= lower_unmapped;
   MarkAspaceModified();
 
-  zx_status_t ret = result.status_value();
   DEBUG_ASSERT(cursor.size() == 0 || ret != ZX_OK);
 
   if (unmapped) {
@@ -1726,7 +1741,7 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
       ConsistencyManager cm(*this);
       const size_t harvested_size = HarvestAccessedPageTable(
           &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
-          non_terminal_action, terminal_action, tt_virt_, cm, nullptr);
+          non_terminal_action, terminal_action, tt_virt_, cm);
       DEBUG_ASSERT(harvested_size > 0);
       DEBUG_ASSERT(harvested_size <= remaining_size);
 
@@ -1820,8 +1835,11 @@ zx_status_t ArmArchVmAspace::Init() {
     top_index_shift_ = MMU_KERNEL_TOP_SHIFT;
     page_size_shift_ = MMU_KERNEL_PAGE_SIZE_SHIFT;
 
-    tt_virt_ = arm64_kernel_translation_table;
+    tt_virt_ = (volatile pte_t*)paddr_to_physmap(arm64_kernel_translation_table_phys);
     tt_phys_ = arm64_kernel_translation_table_phys;
+    tt_page_ = Pmm::Node().PaddrToPage(arm64_kernel_translation_table_phys);
+    DEBUG_ASSERT(tt_page_);
+    DEBUG_ASSERT(tt_page_->state() == vm_page_state::MMU);
     asid_ = (uint16_t)MMU_ARM64_GLOBAL_ASID;
   } else {
     if (type_ == ArmAspaceType::kUser) {
@@ -1861,16 +1879,18 @@ zx_status_t ArmArchVmAspace::Init() {
     }
 
     // allocate a top level page table to serve as the translation table
-    paddr_t pa;
-    zx_status_t status = AllocPageTable(&pa);
-    if (status != ZX_OK) {
-      return status;
+    auto result = AllocPageTable();
+    if (result.is_error()) {
+      return result.status_value();
     }
+    paddr_t pa = (*result)->paddr();
 
     volatile pte_t* va = static_cast<volatile pte_t*>(paddr_to_physmap(pa));
 
     tt_virt_ = va;
     tt_phys_ = pa;
+    tt_page_ = Pmm::Node().PaddrToPage(tt_phys_);
+    DEBUG_ASSERT(tt_page_);
 
     // zero the top level translation table.
     arch_zero_page(const_cast<pte_t*>(tt_virt_));
@@ -1904,11 +1924,11 @@ zx_status_t ArmArchVmAspace::InitShared() {
   const ulong end = (base_ + size_ - 1) >> top_index_shift_;
   for (ulong i = start; i <= end; i++) {
     DEBUG_ASSERT((tt_virt_[i] & MMU_PTE_DESCRIPTOR_MASK) == MMU_PTE_DESCRIPTOR_INVALID);
-    paddr_t page_table_paddr = 0;
-    status = AllocPageTable(&page_table_paddr);
-    if (status != ZX_OK) {
-      return status;
+    auto result = AllocPageTable();
+    if (result.is_error()) {
+      return result.status_value();
     }
+    paddr_t page_table_paddr = (*result)->paddr();
     void* pt_vaddr = paddr_to_physmap(page_table_paddr);
     arch_zero_page(pt_vaddr);
     __dsb(ARM_MB_ISHST);
@@ -1946,6 +1966,7 @@ zx_status_t ArmArchVmAspace::InitUnified(ArchVmAspaceInterface& s, ArchVmAspaceI
     // Unified aspaces use the same page table root that the restricted page table does.
     tt_virt_ = restricted.tt_virt_;
     tt_phys_ = restricted.tt_phys_;
+    tt_page_ = restricted.tt_page_;
 
     // Set up our pointers to the restricted and shared aspaces.
     restricted_aspace_ = &restricted;
@@ -2134,7 +2155,7 @@ zx_status_t ArmArchVmAspace::DestroyIndividual() {
   }
 
   // Free the top level page table.
-  vm_page_t* page = paddr_to_vm_page(tt_phys_);
+  vm_page_t* page = tt_page_;
   DEBUG_ASSERT(page);
   CacheFreePage(page);
   pt_pages_--;
@@ -2142,6 +2163,7 @@ zx_status_t ArmArchVmAspace::DestroyIndividual() {
 
   tt_phys_ = 0;
   tt_virt_ = nullptr;
+  tt_page_ = nullptr;
 
   return ZX_OK;
 }
@@ -2164,6 +2186,7 @@ zx_status_t ArmArchVmAspace::DestroyUnified() {
   restricted_aspace_ = nullptr;
   asid_ = MMU_ARM64_UNUSED_ASID;
   tt_phys_ = 0;
+  tt_page_ = nullptr;
   tt_virt_ = nullptr;
   return ZX_OK;
 }
@@ -2178,6 +2201,7 @@ zx_status_t ArmArchVmAspace::Destroy() {
   // Make sure initialization succeeded.
   if (!tt_virt_) {
     DEBUG_ASSERT(!tt_phys_);
+    DEBUG_ASSERT(!tt_page_);
     return ZX_OK;
   }
 

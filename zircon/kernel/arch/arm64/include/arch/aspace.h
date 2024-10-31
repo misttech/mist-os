@@ -102,27 +102,35 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
     return (vaddr >= base_ && vaddr <= base_ + size_ - 1);
   }
 
-  zx_status_t AllocPageTable(paddr_t* paddrp) TA_REQ(lock_);
+  zx::result<vm_page_t*> AllocPageTable() TA_REQ(lock_);
 
   enum class Reclaim : bool { No = false, Yes = true };
-  void FreePageTable(void* vaddr, paddr_t paddr, ConsistencyManager& cm, Reclaim reclaim)
+  void FreePageTable(void* vaddr, vm_page_t* page, ConsistencyManager& cm, Reclaim reclaim)
       TA_REQ(lock_);
 
-  zx_status_t MapPageTable(pte_t attrs, bool ro, uint index_shift, volatile pte_t* page_table,
-                           ExistingEntryAction existing_action, MappingCursor& cursor,
-                           ConsistencyManager& cm) TA_REQ(lock_);
+  // Returns both a status, as well as how many new mappings were installed in |page_table|. If the
+  // new mapping count is non-zero, regardless of the error value, the num_mappings field in the
+  // page must be updated by the caller.
+  ktl::pair<zx_status_t, uint> MapPageTable(pte_t attrs, bool ro, uint index_shift,
+                                            volatile pte_t* page_table,
+                                            ExistingEntryAction existing_action,
+                                            MappingCursor& cursor, ConsistencyManager& cm)
+      TA_REQ(lock_);
 
   // Used by callers of UnmapPageTable to indicate whether there might be empty page tables in the
   // tree that need to be checked for. Empty page tables are normally not allowed, but might be
   // there due to cleaning up a failed attempt at mapping.
   enum class CheckForEmptyPt : bool { No, Yes };
 
-  // Unmaps the range of |cursor| from the |page_table| and returns whether or not the caller needs
-  // to scan the page table to check if it is empty.
-  zx::result<bool> UnmapPageTable(VirtualAddressCursor& cursor, EnlargeOperation enlarge,
-                                  CheckForEmptyPt pt_check, uint index_shift,
-                                  volatile pte_t* page_table, ConsistencyManager& cm,
-                                  Reclaim reclaim) TA_REQ(lock_);
+  // Unmaps the range of |cursor| from the |page_table| and returns both a status, as well as how
+  // many mappings were removed in |page_table|. If the removed mapping count is non-zero,
+  // regardless of the error value, the num_mappings field in the page must be updated by the
+  // caller.
+  ktl::pair<zx_status_t, uint> UnmapPageTable(VirtualAddressCursor& cursor,
+                                              EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+                                              uint index_shift, volatile pte_t* page_table,
+                                              ConsistencyManager& cm, Reclaim reclaim)
+      TA_REQ(lock_);
 
   zx_status_t ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, size_t size_in, pte_t attrs,
                                EnlargeOperation enlarge, uint index_shift,
@@ -132,7 +140,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
                                   size_t size_in, uint index_shift,
                                   NonTerminalAction non_terminal_action,
                                   TerminalAction terminal_action, volatile pte_t* page_table,
-                                  ConsistencyManager& cm, bool* unmapped_out) TA_REQ(lock_);
+                                  ConsistencyManager& cm) TA_REQ(lock_);
 
   void MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in, size_t size, uint index_shift,
                              volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
@@ -233,6 +241,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
 
   // Pointer to the translation table.
   paddr_t tt_phys_ = 0;
+  vm_page_t* tt_page_ = nullptr;
   volatile pte_t* tt_virt_ = nullptr;
 
   // Upper bound of the number of pages allocated to back the translation
