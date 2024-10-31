@@ -27,7 +27,7 @@ impl DynamicFileSource for TraceMarkerFileSource {
 
 pub struct TraceMarkerFile {
     source: DynamicFile<TraceMarkerFileSource>,
-    event_stacks: Mutex<HashMap<u64, Vec<(String, zx::MonotonicTicks)>>>,
+    event_stacks: Mutex<HashMap<u64, Vec<(String, zx::BootTicks)>>>,
     queue: Arc<TraceEventQueue>,
 }
 
@@ -58,7 +58,7 @@ impl FileOps for TraceMarkerFile {
         let bytes = data.read_all()?;
         if let Some(atrace_event) = ATraceEvent::parse(&String::from_utf8_lossy(&bytes)) {
             if self.queue.is_enabled() {
-                let timestamp = zx::MonotonicInstant::get();
+                let timestamp = zx::BootInstant::get();
                 let trace_event = TraceEvent::new(
                     self.queue.prev_timestamp(),
                     timestamp,
@@ -71,7 +71,7 @@ impl FileOps for TraceMarkerFile {
             // manager when dependencies have been migrated.
             if let Some(context) = TraceCategoryContext::acquire(CATEGORY_ATRACE) {
                 if let Ok(mut event_stacks) = self.event_stacks.lock() {
-                    let now = zx::MonotonicTicks::get();
+                    let now = zx::BootTicks::get();
                     match atrace_event {
                         ATraceEvent::Begin { pid, name } => {
                             event_stacks
