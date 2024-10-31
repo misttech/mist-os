@@ -17,6 +17,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ops::Range;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use storage_device::buffer;
 use vfs::execution_scope::ExecutionScope;
@@ -24,6 +25,7 @@ use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ};
 use zx::{self as zx, AsHandleRef, PacketContents, PagerPacket, SignalPacket};
 
 pub const READ_AHEAD_SIZE: u64 = 128 * 1024;
+pub static STRONG_FILE_REFS: AtomicU64 = AtomicU64::new(0);
 
 fn watch_for_zero_children(file: &impl PagerBacked) -> Result<(), zx::Status> {
     file.vmo().as_handle_ref().wait_async_handle(
@@ -55,6 +57,7 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
             let FileHolder::Strong(strong) = std::mem::replace(&mut *file, weak) else {
                 unreachable!();
             };
+            STRONG_FILE_REFS.fetch_sub(1, Ordering::Relaxed);
             strong.on_zero_children();
         }
     }
@@ -110,6 +113,7 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
             // `FxNode.terminate()` as part of `NodeCache.terminate()` in the FxVolume termination
             // thread.
             let Some(_guard) = strong.pager().scope.try_active_guard() else {
+                info!("Ignoring zero-children notification due to shutting down");
                 return;
             };
             match strong.vmo().info() {
@@ -119,6 +123,7 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
                         let FileHolder::Strong(strong) = std::mem::replace(&mut *file, weak) else {
                             unreachable!();
                         };
+                        STRONG_FILE_REFS.fetch_sub(1, Ordering::Relaxed);
                         strong.on_zero_children();
                     } else {
                         // There's not much we can do here if this fails, so we panic.
@@ -194,7 +199,7 @@ impl Pager {
     /// Set the current profile recorder, or set to None to not record.
     pub fn set_recorder(&self, recorder: Option<Box<dyn Recorder>>) {
         // Drop the old one outside of the lock.
-        let _ = std::mem::replace(&mut (*self.recorder.lock().unwrap()), recorder);
+        let _old = std::mem::replace(&mut (*self.recorder.lock().unwrap()), recorder);
     }
 
     /// Borrow the profile recorder. Used to record file opens.
@@ -253,6 +258,7 @@ impl Pager {
 
                 watch_for_zero_children(strong.as_ref())?;
 
+                STRONG_FILE_REFS.fetch_add(1, Ordering::Relaxed);
                 *file = FileHolder::Strong(strong);
                 Ok(true)
             }

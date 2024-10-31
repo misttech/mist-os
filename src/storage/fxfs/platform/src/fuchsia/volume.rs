@@ -537,11 +537,31 @@ impl FxVolume {
     #[cfg(any(test, feature = "testing"))]
     pub fn try_unwrap(self: Arc<Self>) -> Option<FxVolume> {
         self.poisoned.store(true, Ordering::Relaxed);
-        if let Ok(volume) = Arc::try_unwrap(self) {
-            volume.poisoned.store(false, Ordering::Relaxed);
-            Some(volume)
-        } else {
-            None
+        match Arc::try_unwrap(self) {
+            Ok(volume) => {
+                volume.poisoned.store(false, Ordering::Relaxed);
+                Some(volume)
+            }
+            Err(this) => {
+                // Log details about all the places where there might be a reference cycle.
+                info!(
+                    "background_task: {}, profile_state: {}, dirent_cache count: {}, \
+                     pager strong file refs={}, no tasks={}",
+                    this.background_task.lock().unwrap().is_some(),
+                    this.profile_state.lock().unwrap().is_some(),
+                    this.dirent_cache.len(),
+                    crate::pager::STRONG_FILE_REFS.load(Ordering::Relaxed),
+                    {
+                        let mut no_tasks = pin!(this.scope.wait());
+                        no_tasks
+                            .poll_unpin(&mut std::task::Context::from_waker(
+                                &futures::task::noop_waker(),
+                            ))
+                            .is_ready()
+                    },
+                );
+                None
+            }
         }
     }
 }
