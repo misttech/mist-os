@@ -16,7 +16,6 @@ do the following:
    ```posix-terminal
    fx set <PRODUCT>.<BOARD> \
    --release \
-   --args='debuginfo="backtrace"' \
    --args='enable_frame_pointers=true' \
    --args='experimental_thread_sampler_enabled=true'
    ```
