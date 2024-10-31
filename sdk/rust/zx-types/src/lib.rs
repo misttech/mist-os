@@ -1540,6 +1540,13 @@ pub struct zx_packet_guest_mem_t {
     pub default_operand_size: u8,
 }
 
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct zx_packet_interrupt_t {
+    pub timestamp: zx_time_t,
+    pub reserved: [u64; 3],
+}
+
 // Helper for constructing topics that have been versioned.
 const fn info_topic(topic: u32, version: u32) -> u32 {
     (version << 28) | topic
@@ -2302,6 +2309,17 @@ multiconst!(u32, [
     ZX_BTI_PERM_EXECUTE = 1 << 2;
     ZX_BTI_COMPRESS = 1 << 3;
     ZX_BTI_CONTIGUOUS = 1 << 4;
+]);
+
+// Options for zx_port_create
+multiconst!(u32, [
+    ZX_PORT_BIND_TO_INTERRUPT = 1 << 0;
+]);
+
+// Options for zx_interrupt_bind
+multiconst!(u32, [
+    ZX_INTERRUPT_BIND = 0;
+    ZX_INTERRUPT_UNBIND = 1;
 ]);
 
 #[cfg(test)]

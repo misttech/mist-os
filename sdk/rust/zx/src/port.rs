@@ -20,6 +20,13 @@ use std::mem;
 pub struct Port(Handle);
 impl_handle_based!(Port);
 
+bitflags! {
+    /// Options that may be used when creating a `Port`.
+    pub struct PortOptions: u32 {
+        const BIND_TO_INTERRUPT = sys::ZX_PORT_BIND_TO_INTERRUPT;
+    }
+}
+
 /// The contents of a `Packet`.
 #[derive(Debug, Copy, Clone)]
 pub enum PacketContents {
@@ -37,6 +44,8 @@ pub enum PacketContents {
     GuestVcpu(GuestVcpuPacket),
     /// Pager packets
     Pager(PagerPacket),
+    /// Interrupt packets
+    Interrupt(InterruptPacket),
 
     #[doc(hidden)]
     __Nonexhaustive,
@@ -76,6 +85,11 @@ pub struct GuestVcpuPacket(sys::zx_packet_guest_vcpu_t);
 /// zx_packet_page_request_t
 #[derive(Debug, Copy, Clone)]
 pub struct PagerPacket(sys::zx_packet_page_request_t);
+
+/// Contents of an interrupt packet (one received because of an interrupt bound to this port).
+/// This is a type-safe wrapper for zx_packet_interrupt_t.
+#[derive(Debug, Copy, Clone)]
+pub struct InterruptPacket(sys::zx_packet_interrupt_t);
 
 /// A packet sent through a port. This is a type-safe wrapper for
 /// [zx_port_packet_t](https://fuchsia.dev/fuchsia-src/reference/syscalls/port_wait.md).
@@ -190,6 +204,12 @@ impl Packet {
 
             sys::zx_packet_type_t::ZX_PKT_TYPE_PAGE_REQUEST => {
                 PacketContents::Pager(PagerPacket(unsafe { mem::transmute_copy(&self.0.union) }))
+            }
+
+            sys::zx_packet_type_t::ZX_PKT_TYPE_INTERRUPT => {
+                PacketContents::Interrupt(InterruptPacket(unsafe {
+                    mem::transmute_copy(&self.0.union)
+                }))
             }
 
             _ => panic!("unexpected packet type"),
@@ -406,6 +426,12 @@ impl PagerPacket {
     }
 }
 
+impl InterruptPacket {
+    pub fn timestamp(&self) -> sys::zx_time_t {
+        self.0.timestamp
+    }
+}
+
 impl Port {
     /// Create an IO port, allowing IO packets to be read and enqueued.
     ///
@@ -418,10 +444,13 @@ impl Port {
     /// If the kernel reports no memory available to create a port or the process' job policy
     /// denies port creation.
     pub fn create() -> Self {
+        Self::create_with_opts(PortOptions::from_bits_truncate(0))
+    }
+
+    pub fn create_with_opts(opts: PortOptions) -> Self {
         unsafe {
             let mut handle = 0;
-            let opts = 0;
-            let status = sys::zx_port_create(opts, &mut handle);
+            let status = sys::zx_port_create(opts.bits(), &mut handle);
             ok(status).expect(
                 "port creation always succeeds except with OOM or when job policy denies it",
             );
@@ -500,6 +529,11 @@ mod tests {
         // Waiting should succeed this time. We should get back the packet we sent.
         let read_packet = port.wait(MonotonicInstant::after(ten_ms)).unwrap();
         assert_eq!(read_packet, packet);
+    }
+
+    #[test]
+    fn create_with_opts() {
+        let _port = Port::create_with_opts(PortOptions::BIND_TO_INTERRUPT);
     }
 
     #[test]
