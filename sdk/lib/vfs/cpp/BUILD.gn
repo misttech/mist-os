@@ -36,39 +36,6 @@ sdk_source_set("cpp") {
   deps = [ "//sdk/lib/vfs/internal:vfs_internal" ]
 
   public_configs = [ "//sdk/config" ]
-
-  #  ________  _________  ________  ________
-  # |\   ____\|\___   ___\\   __  \|\   __  \
-  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
-  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
-  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
-  #     ____\_\  \   \ \__\ \ \_______\ \__\
-  #    |\_________\   \|__|  \|_______|\|__|
-  #    \|_________|
-  #
-  # **WARNING**: This library is currently undergoing an API overhaul. In the meantime, please reach
-  # out to the storage team before adding new entries to this allow-list.
-  #
-  # See https://fxbug.dev/311176363 for details.
-  #
-  # TODO(https://fxbug.dev/336617685): Relax this visibility list for public SDK usage once this
-  # library has support for fuchsia.io/Flags (io2), and functions that use fuchsia.io/OpenFlags
-  # (io1) have been deprecated.
-  visibility = [
-    ":*",
-    "//build/sdk:*",
-    "//sdk/ctf/tests/pkg/svc:*",
-    "//sdk/lib/driver/devicetree/testing:*",
-    "//sdk/lib/sys/cpp:*",
-    "//sdk/lib/sys/cpp/testing:*",
-    "//sdk/lib/sys/cpp/tests:*",
-    "//sdk/lib/sys/inspect/cpp:*",
-    "//sdk/lib/sys/service/cpp:*",
-    "//sdk/lib/vfs/cpp/testing:*",
-    "//src/*",
-    "//third_party/tcpdump:*",
-    "//vendor/google/*",
-  ]
 }
 
 test("vfs_cpp_unittests") {

@@ -39,10 +39,8 @@ class RemoteDirTest : public ::gtest::RealLoopFixture {
     auto file = std::make_unique<vfs::VmoFile>(std::move(vmo), kFileSize);
     ASSERT_EQ(remote_dir_->AddEntry("file", std::move(file)), ZX_OK);
     // Serve the pseudo-dir and use it to create a remote node.
-    zx::channel remote_client, remote_server;
-    ASSERT_EQ(zx::channel::create(0, &remote_client, &remote_server), ZX_OK);
-    ASSERT_EQ(remote_dir_->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(remote_server)),
-              ZX_OK);
+    auto [remote_client, remote_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(remote_dir_->Serve(fuchsia_io::kPermReadable, std::move(remote_server)), ZX_OK);
     auto remote_node = std::make_shared<vfs::RemoteDir>(std::move(remote_client));
     // Create the root directory and add the remote node.
     root_ = std::make_unique<vfs::PseudoDir>();

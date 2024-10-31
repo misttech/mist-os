@@ -65,11 +65,14 @@ class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
     }
 
     // TODO(https://fxbug.dev/324112857): Convert this to use the new Serve signature when the
-    // GetDirectory method is compatible with fuchsia.io/Flags.
+    // GetDirectory method is compatible with fuchsia.io/Flags and remove the suppression.
     fuchsia::io::OpenFlags deprecated_flags =
         static_cast<fuchsia::io::OpenFlags>(static_cast<uint32_t>(request.flags()));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     ZX_ASSERT_MSG(dir->Serve(deprecated_flags, request.directory_request().TakeChannel()) == ZX_OK,
                   "Failed to serve directory!");
+#pragma clang diagnostic pop
     directories_.push_back(std::move(dir));
   }
 

@@ -90,50 +90,6 @@ TEST_F(PseudoDirTest, RemoveEntry) {
   ASSERT_EQ(root()->RemoveEntry("subdir_b", /*node*/ subdir()), ZX_OK);
 }
 
-TEST_F(PseudoDirTest, ServeDeprecated) {
-  // Serve should fail with an invalid channel.
-  ASSERT_EQ(root()->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, {}), ZX_ERR_BAD_HANDLE);
-  // Serve should fail with an invalid set of flags.
-  zx::channel root_client, root_server;
-  ASSERT_EQ(zx::channel::create(0, &root_client, &root_server), ZX_OK);
-  ASSERT_EQ(root()->Serve(static_cast<fuchsia::io::OpenFlags>(~0ull), std::move(root_server)),
-            ZX_ERR_INVALID_ARGS);
-
-  ASSERT_EQ(zx::channel::create(0, &root_client, &root_server), ZX_OK);
-  ASSERT_EQ(root()->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(root_server)), ZX_OK);
-
-  PerformBlockingWork([root_client = std::move(root_client)]() mutable {
-    fbl::unique_fd root_fd;
-    ASSERT_EQ(fdio_fd_create(root_client.release(), root_fd.reset_and_get_address()), ZX_OK);
-
-    fbl::unique_fd subdir_fd(openat(root_fd.get(), "subdir_a", O_DIRECTORY));
-    ASSERT_TRUE(subdir_fd) << strerror(errno);
-    fbl::unique_fd file_fd(openat(subdir_fd.get(), "unique_file", O_RDONLY));
-    ASSERT_TRUE(file_fd) << strerror(errno);
-
-    std::string read_buffer(kFileContents.size(), 0);
-    ssize_t bytes_read = read(file_fd.get(), read_buffer.data(), kFileContents.size());
-    ASSERT_EQ(bytes_read, static_cast<ssize_t>(kFileContents.size()));
-    ASSERT_EQ(kFileContents, read_buffer);
-  });
-}
-
-TEST_F(PseudoDirTest, ServeDeprecatedFailWithDifferentDispatcher) {
-  zx::channel root_client, root_server;
-  // We should be able to serve the same node multiple times so long as we use the same dispatcher.
-  ASSERT_EQ(zx::channel::create(0, &root_client, &root_server), ZX_OK);
-  ASSERT_EQ(root()->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(root_server)), ZX_OK);
-  ASSERT_EQ(zx::channel::create(0, &root_client, &root_server), ZX_OK);
-  ASSERT_EQ(root()->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(root_server)), ZX_OK);
-  // Serve should fail with a different dispatcher. Only one dispatcher may be registered to serve
-  // a given node.
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  ASSERT_EQ(zx::channel::create(0, &root_client, &root_server), ZX_OK);
-  ASSERT_EQ(root()->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(root_server),
-                          loop.dispatcher()),
-            ZX_ERR_INVALID_ARGS);
-}
-
 TEST_F(PseudoDirTest, Serve) {
   auto [root_client, root_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   ASSERT_EQ(root()->Serve(fuchsia_io::kPermReadable, std::move(root_server)), ZX_OK);

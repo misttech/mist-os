@@ -74,10 +74,10 @@ class Node {
   // otherwise `ZX_ERR_INVALID_ARGS` will be returned.
   //
   // *WARNING*: Not all node types support `Serve()` due to lifetime restrictions (e.g. `LazyDir`).
-  // TODO(https://fxbug.dev/336617685): Annotate this function with `ZX_DEPRECATED_SINCE` when all
-  // in-tree usages have been migrated to the new typed signatures in each concrete node type.
+  // TODO(https://fxbug.dev/336617685): Mark this as removed at NEXT once we ship API level 24.
   zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
-                    async_dispatcher_t* dispatcher = nullptr) {
+                    async_dispatcher_t* dispatcher = nullptr)
+      ZX_DEPRECATED_SINCE(1, NEXT, "Use new signature of Serve which takes fuchsia.io/Flags.") {
     if (!dispatcher) {
       dispatcher = async_get_default_dispatcher();
     }

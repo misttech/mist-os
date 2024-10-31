@@ -56,17 +56,11 @@ class ComposedServiceDir final : public Node {
               ZX_OK);
   }
 
-  // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-  // Deprecated HLCPP Signatures
-  // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-  //
-  // TODO(https://fxbug.dev/336617685): Mark the following signatures as deprecated once all callers
-  // have migratred to the above LLCPP signatures.
-
   // Sets the fallback directory for services. Services in this directory can be connected to, but
   // will not be enumerated. This method may only be called once.
+  // TODO(https://fxbug.dev/336617685): Mark this as removed at NEXT once we ship API level 24.
   void set_fallback(fidl::InterfaceHandle<fuchsia::io::Directory> fallback_dir)
-      ZX_DEPRECATED_SINCE(1, 16, "Use SetFallback instead.") {
+      ZX_REMOVED_SINCE(1, NEXT, HEAD, "Replaced by SetFallback().") {
     ZX_ASSERT(vfs_internal_composed_svc_dir_set_fallback(
                   handle(), fallback_dir.TakeChannel().release()) == ZX_OK);
   }
