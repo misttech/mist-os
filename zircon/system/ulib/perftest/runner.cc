@@ -32,8 +32,10 @@ namespace perftest {
 namespace {
 
 #if defined(__Fuchsia__)
-using Timestamp = uint64_t;
-Timestamp Now() { return zx_ticks_get(); }
+// These timestamps are used as timestamps for Fuchsia trace events, so they need to use the same
+// clock as the trace events do, which is the boot timeline.
+using Timestamp = zx_instant_boot_ticks_t;
+Timestamp Now() { return zx_ticks_get_boot(); }
 double GetDurationNanos(Timestamp t1, Timestamp t2) {
   double nanoseconds_per_tick = 1e9 / static_cast<double>(zx_ticks_per_second());
   uint64_t time_taken = t2 - t1;
@@ -387,14 +389,14 @@ bool RunTests(const char* test_suite, TestList* test_list, uint32_t run_count,
 
 void ParseCommandArgs(int argc, char** argv, CommandArgs* dest) {
   static const struct option opts[] = {
-    {"out", required_argument, nullptr, 'o'},
-    {"filter", required_argument, nullptr, 'f'},
-    {"runs", required_argument, nullptr, 'r'},
-    {"quiet", no_argument, nullptr, 'q'},
-    {"random-order", no_argument, nullptr, 'n'},
+      {"out", required_argument, nullptr, 'o'},
+      {"filter", required_argument, nullptr, 'f'},
+      {"runs", required_argument, nullptr, 'r'},
+      {"quiet", no_argument, nullptr, 'q'},
+      {"random-order", no_argument, nullptr, 'n'},
 #if defined(__Fuchsia__)
-    {"enable-tracing", no_argument, nullptr, 't'},
-    {"startup-delay", required_argument, nullptr, 'd'},
+      {"enable-tracing", no_argument, nullptr, 't'},
+      {"startup-delay", required_argument, nullptr, 'd'},
 #endif
   };
   optind = 1;
