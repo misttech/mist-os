@@ -820,7 +820,7 @@ mod tests {
     };
     use netstack3_base::{CtxPair, IntoCoreTimerCtx};
     use packet::{Buf, ParsablePacket, ParseBuffer, Serializer};
-    use packet_formats::ip::{IpProto, Ipv6ExtHdrType};
+    use packet_formats::ip::{FragmentOffset, IpProto, Ipv6ExtHdrType};
     use packet_formats::ipv4::Ipv4PacketBuilder;
     use packet_formats::ipv6::Ipv6PacketBuilder;
 
@@ -963,7 +963,7 @@ mod tests {
     ) {
         let mut builder = get_ipv4_builder();
         builder.id(fragment_id);
-        builder.fragment_offset(fragment_offset);
+        builder.fragment_offset(FragmentOffset::new(fragment_offset).unwrap());
         builder.mf_flag(m_flag);
         let body =
             generate_body_fragment(fragment_id, fragment_offset, usize::from(FRAGMENT_BLOCK_SIZE));
@@ -1528,7 +1528,7 @@ mod tests {
         // `FRAGMENT_BLOCK_SIZE` and more flag is `true`).
         let mut builder = get_ipv4_builder();
         builder.id(fragment_id);
-        builder.fragment_offset(1);
+        builder.fragment_offset(FragmentOffset::new(1).unwrap());
         builder.mf_flag(true);
         // Body with 1 byte less than `FRAGMENT_BLOCK_SIZE` so it is not a
         // multiple of `FRAGMENT_BLOCK_SIZE`.
@@ -1546,7 +1546,7 @@ mod tests {
         // allowed to not be a multiple of `FRAGMENT_BLOCK_SIZE`.
         let mut builder = get_ipv4_builder();
         builder.id(fragment_id);
-        builder.fragment_offset(1);
+        builder.fragment_offset(FragmentOffset::new(1).unwrap());
         builder.mf_flag(false);
         // Body with 1 byte less than `FRAGMENT_BLOCK_SIZE` so it is not a
         // multiple of `FRAGMENT_BLOCK_SIZE`.

@@ -29,7 +29,7 @@ use zerocopy::{
 
 use crate::error::{IpParseError, IpParseResult, ParseError};
 use crate::ip::{
-    DscpAndEcn, IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto, Nat64Error,
+    DscpAndEcn, FragmentOffset, IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto, Nat64Error,
     Nat64TranslationResult,
 };
 use crate::ipv6::Ipv6PacketBuilder;
@@ -882,13 +882,8 @@ impl Ipv4PacketBuilder {
     }
 
     /// Set the fragment offset.
-    ///
-    /// # Panics
-    ///
-    /// `fragment_offset` panics if `fragment_offset` is greater than 2^13 - 1.
-    pub fn fragment_offset(&mut self, fragment_offset: u16) {
-        assert!(fragment_offset < 1 << 13, "invalid fragment offset: {}", fragment_offset);
-        self.frag_off = fragment_offset;
+    pub fn fragment_offset(&mut self, fragment_offset: FragmentOffset) {
+        self.frag_off = fragment_offset.into_raw();
     }
 }
 
@@ -1419,7 +1414,7 @@ mod tests {
     fn test_fragment_type() {
         fn test_fragment_type_helper(fragment_offset: u16, expect_fragment_type: Ipv4FragmentType) {
             let mut builder = new_builder();
-            builder.fragment_offset(fragment_offset);
+            builder.fragment_offset(FragmentOffset::new(fragment_offset).unwrap());
 
             let mut buf = [0; IPV4_MIN_HDR_LEN]
                 .into_serializer()
@@ -1442,7 +1437,7 @@ mod tests {
         builder.id(0x0405);
         builder.df_flag(true);
         builder.mf_flag(true);
-        builder.fragment_offset(0x0607);
+        builder.fragment_offset(FragmentOffset::new(0x0607).unwrap());
 
         let mut buf = (&[0, 1, 2, 3, 3, 4, 5, 7, 8, 9])
             .into_serializer()
@@ -1580,7 +1575,7 @@ mod tests {
         ipv4_builder.id(0x0405);
         ipv4_builder.df_flag(true);
         ipv4_builder.mf_flag(false);
-        ipv4_builder.fragment_offset(0);
+        ipv4_builder.fragment_offset(FragmentOffset::ZERO);
 
         let mut ipv6_builder =
             Ipv6PacketBuilder::new(DEFAULT_V6_SRC_IP, DEFAULT_V6_DST_IP, IP_TTL, proto_v6);

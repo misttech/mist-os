@@ -18,7 +18,7 @@ use packet_formats::icmp::{
     Icmpv4TimestampRequest, Icmpv6DestUnreachableCode, Icmpv6TimeExceededCode, MessageBody,
     OriginalPacket,
 };
-use packet_formats::ip::{IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ip::{FragmentOffset, IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
 use packet_formats::udp::UdpPacketBuilder;
 
@@ -354,7 +354,7 @@ fn test_net_unreachable() {
     // Same test for IPv4 but with a non-initial fragment. No ICMP error
     // should be sent.
     test_receive_ip_packet::<Ipv4, _, IcmpDestUnreachable, _, _, _>(
-        |pb| pb.fragment_offset(64),
+        |pb| pb.fragment_offset(FragmentOffset::new(64).unwrap()),
         |_: &mut StackStateBuilder| {},
         &mut [0u8; 128],
         SpecifiedAddr::new(Ipv4Addr::new([1, 2, 3, 4])).unwrap(),
@@ -397,7 +397,7 @@ fn test_ttl_expired() {
     // Same test for IPv4 but with a non-initial fragment. No ICMP error
     // should be sent.
     test_receive_ip_packet::<Ipv4, _, IcmpTimeExceeded, _, _, _>(
-        |pb| pb.fragment_offset(64),
+        |pb| pb.fragment_offset(FragmentOffset::new(64).unwrap()),
         |_: &mut StackStateBuilder| {},
         &mut [0u8; 128],
         SpecifiedAddr::new(Ipv4Addr::new([1, 2, 3, 4])).unwrap(),

@@ -42,6 +42,11 @@ impl<'a> Ipv6ExtensionHeader<'a> {
     pub fn data(&self) -> &Ipv6ExtensionHeaderData<'a> {
         &self.data
     }
+
+    /// Consumes `self` returning only the containing data.
+    pub fn into_data(self) -> Ipv6ExtensionHeaderData<'a> {
+        self.data
+    }
 }
 
 /// The data associated with an IPv6 Extension Header.
