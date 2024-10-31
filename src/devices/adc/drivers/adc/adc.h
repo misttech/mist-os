@@ -13,6 +13,8 @@
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
 
+#include <optional>
+
 #include <fbl/mutex.h>
 
 namespace adc {
@@ -22,7 +24,7 @@ class Adc;
 class AdcDevice : public fidl::Server<fuchsia_hardware_adc::Device> {
  public:
   AdcDevice(fdf::ClientEnd<fuchsia_hardware_adcimpl::Device> adc_impl, uint32_t channel,
-            std::string_view name, uint8_t resolution, Adc* adc);
+            std::string_view name, std::optional<uint8_t> resolution, Adc* adc);
 
   static zx::result<std::unique_ptr<AdcDevice>> Create(
       fdf::ClientEnd<fuchsia_hardware_adcimpl::Device> adc_impl,
@@ -48,7 +50,7 @@ class AdcDevice : public fidl::Server<fuchsia_hardware_adc::Device> {
   const uint32_t channel_;
   const std::string name_;
 
-  const uint8_t resolution_;
+  const std::optional<uint8_t> resolution_;
 
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
