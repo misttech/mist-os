@@ -45,11 +45,6 @@ $ ffx trace start --buffer-size 64 --duration 2 --categories $categories
 After you have the `.fxt` file on your desktop you can load it into
 the [Perfetto viewer][perfetto-viewer]{:.external}.
 
-If you're using `traceutil`, an easier way to view the trace is by loading
-the corresponding `.html` file that `traceutil` generates. The author finds
-it easiest to run `traceutil` from the top level Fuchsia directory, view
-that directory in Chrome (e.g., `file:///home/dje/fnl/ipt/fuchsia`).
-
 ## Basic Operation
 
 The basic operation of performance data collection is to allocate a
