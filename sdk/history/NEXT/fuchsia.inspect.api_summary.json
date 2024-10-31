@@ -75,7 +75,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.inspect/Tree",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -122,7 +122,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.inspect/TreeNameIterator",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {

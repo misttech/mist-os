@@ -59,6 +59,9 @@ pub async fn handle_request_stream(
                         .detach()
                 }
             }
+            TreeRequest::_UnknownMethod { ordinal, method_type, .. } => {
+                warn!(ordinal, ?method_type, "Unknown request");
+            }
         }
     }
     Ok(())
@@ -122,6 +125,9 @@ fn spawn_tree_name_iterator_server(values: Vec<String>, mut stream: TreeNameIter
                             return Ok(());
                         }
                         responder.send(&result)?;
+                    }
+                    TreeNameIteratorRequest::_UnknownMethod { ordinal, method_type, .. } => {
+                        warn!(ordinal, ?method_type, "Unknown request");
                     }
                 }
             }
