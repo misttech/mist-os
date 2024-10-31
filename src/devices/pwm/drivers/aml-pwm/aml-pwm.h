@@ -43,7 +43,8 @@ class AmlPwm {
                      .duty_cycle = 0.0,
                      .mode_config_buffer = reinterpret_cast<uint8_t*>(&mode_configs_[i]),
                      .mode_config_size = sizeof(mode_config)};
-      if (!channels_[i].skip_init()) {
+      const bool should_initialize = !channels_[i].skip_init().value_or(false);
+      if (should_initialize) {
         SetMode(i, Mode::kOff);
       }
     }
