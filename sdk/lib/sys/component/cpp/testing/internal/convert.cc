@@ -108,6 +108,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     ZX_COMPONENT_ADD_STR_IF_PRESENT(protocol, from_dictionary, fidl_capability);
 #endif
+    ZX_COMPONENT_ADD_IF_PRESENT(protocol, availability, fidl_capability);
 
     return fuchsia::component::test::Capability::WithProtocol(std::move(fidl_capability));
   }
@@ -120,6 +121,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     ZX_COMPONENT_ADD_STR_IF_PRESENT(service, from_dictionary, fidl_capability);
 #endif
+    ZX_COMPONENT_ADD_IF_PRESENT(service, availability, fidl_capability);
 
     return fuchsia::component::test::Capability::WithService(std::move(fidl_capability));
   }
@@ -135,6 +137,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     ZX_COMPONENT_ADD_STR_IF_PRESENT(directory, from_dictionary, fidl_capability);
 #endif
+    ZX_COMPONENT_ADD_IF_PRESENT(directory, availability, fidl_capability);
 
     return fuchsia::component::test::Capability::WithDirectory(std::move(fidl_capability));
   }
@@ -144,6 +147,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     fidl_capability.set_name(std::string(storage->name));
     ZX_COMPONENT_ADD_STR_IF_PRESENT(storage, as, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(storage, path, fidl_capability);
+    ZX_COMPONENT_ADD_IF_PRESENT(storage, availability, fidl_capability);
 
     return fuchsia::component::test::Capability::WithStorage(std::move(fidl_capability));
   }
@@ -154,6 +158,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     fidl_capability.set_name(std::string(dictionary->name));
     ZX_COMPONENT_ADD_STR_IF_PRESENT(dictionary, as, fidl_capability);
     ZX_COMPONENT_ADD_STR_IF_PRESENT(dictionary, from_dictionary, fidl_capability);
+    ZX_COMPONENT_ADD_IF_PRESENT(dictionary, availability, fidl_capability);
 
     return fuchsia::component::test::Capability::WithDictionary(std::move(fidl_capability));
 #else
@@ -166,6 +171,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
 
     fidl_capability.set_name(std::string(config->name));
     ZX_COMPONENT_ADD_STR_IF_PRESENT(config, as, fidl_capability);
+    ZX_COMPONENT_ADD_IF_PRESENT(config, availability, fidl_capability);
 
     return fuchsia::component::test::Capability::WithConfig(std::move(fidl_capability));
 #else

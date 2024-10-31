@@ -47,6 +47,7 @@ struct Protocol final {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 #endif
+  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
 };
 
 // A service capability. The name refers to the name of the FIDL service,
@@ -59,6 +60,7 @@ struct Service final {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 #endif
+  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
 };
 
 // A directory capability.
@@ -73,6 +75,7 @@ struct Directory final {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
 #endif
+  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
 };
 
 // A storage capability.
@@ -81,12 +84,14 @@ struct Storage final {
   std::string_view name;
   cpp17::optional<std::string_view> as = cpp17::nullopt;
   cpp17::optional<std::string_view> path = cpp17::nullopt;
+  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
 };
 
 // Routing information for a configuration capability.
 struct Config final {
   std::string_view name;
   cpp17::optional<std::string_view> as = cpp17::nullopt;
+  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
 };
 
 // Routing information for a dictionary capability.
@@ -94,6 +99,7 @@ struct Dictionary final {
   std::string_view name;
   cpp17::optional<std::string_view> as = cpp17::nullopt;
   cpp17::optional<std::string_view> from_dictionary = cpp17::nullopt;
+  cpp17::optional<fuchsia::component::decl::Availability> availability = cpp17::nullopt;
 };
 
 // A resolver capability.

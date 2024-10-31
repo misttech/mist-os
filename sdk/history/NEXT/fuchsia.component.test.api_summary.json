@@ -363,6 +363,26 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.component.test/Realm.AddCollection",
+        "strictness": "strict",
+        "ordinal": "6248553239361001909",
+        "direction": "two_way",
+        "request": "fuchsia.component.test/RealmAddCollectionRequest",
+        "response": "fuchsia.component.test/Realm_AddCollection_Response",
+        "error": "fuchsia.component.test/RealmBuilderError"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.component.test/Realm.AddEnvironment",
+        "strictness": "strict",
+        "ordinal": "2078352883632103657",
+        "direction": "two_way",
+        "request": "fuchsia.component.test/RealmAddEnvironmentRequest",
+        "response": "fuchsia.component.test/Realm_AddEnvironment_Response",
+        "error": "fuchsia.component.test/RealmBuilderError"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.component.test/Realm.AddLocalChild",
         "strictness": "strict",
         "ordinal": "3623569743397563323",
@@ -542,6 +562,26 @@
     {
         "kind": "struct",
         "name": "fuchsia.component.test/RealmAddChildRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component.test/RealmAddCollectionRequest.collection",
+        "ordinal": "1",
+        "type": "fuchsia.component.decl/Collection"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component.test/RealmAddCollectionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.component.test/RealmAddEnvironmentRequest.environment",
+        "ordinal": "1",
+        "type": "fuchsia.component.decl/Environment"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.component.test/RealmAddEnvironmentRequest"
     },
     {
         "kind": "struct/member",

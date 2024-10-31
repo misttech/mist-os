@@ -21,7 +21,13 @@ const LOCAL_COMPONENT_NAME_KEY string = "LOCAL_COMPONENT_NAME";
 /// This protocol can be used to instruct the Realm Builder Server to begin
 /// creating a new realm.
 // Realm Builder Server is built both in tree and as part of the SDK.
-@discoverable
+//
+// NOTE on `server="platform"`:
+// This protocol is served by platform in the sense that either the full url to the realm builder
+// server component is used, in which case it is actually the platform, or if it is used as a
+// subpackage through the sdk, it will be on the same version as the realm builder library being
+// used by the test. In both cases ABI compatibility is not a concern.
+@discoverable(server="platform")
 closed protocol RealmBuilderFactory {
     /// Creates a new RealmBuilder. The client end of `realm_server_end` can be
     /// used to mutate the realm that is being constructed, by doing things such
@@ -136,6 +142,12 @@ type RealmBuilderError = strict(removed=20) flexible(added=20) enum : uint32 {
     CONFIG_OVERRIDE_UNSUPPORTED = 21;
 };
 
+// NOTE on `server="platform"`:
+// This protocol is served by platform in the sense that either the full url to the realm builder
+// server component is used, in which case it is actually the platform, or if it is used as a
+// subpackage through the sdk, it will be on the same version as the realm builder library being
+// used by the test. In both cases ABI compatibility is not a concern.
+@discoverable(server="platform")
 closed protocol Builder {
     /// Assembles the realm being constructed and returns the URL for the root
     /// component in the realm, which may then be used to create a new component
@@ -469,6 +481,12 @@ type DirectoryEntry = resource struct {
     file_contents fuchsia.mem.Buffer;
 };
 
+// NOTE on `server="platform"`:
+// This protocol is served by platform in the sense that either the full url to the realm builder
+// server component is used, in which case it is really in the platform, or if it is used as a
+// subpackage through the sdk, it will be on the same version as the realm builder library being
+// used by the test. In both cases ABI compatibility is not a concern.
+@discoverable(server="platform")
 closed protocol Realm {
     /// Adds a component to the realm.
     ///
@@ -721,6 +739,18 @@ closed protocol Realm {
     @available(added=20)
     strict AddCapability(struct {
         capability fuchsia.component.decl.Capability;
+    }) -> () error RealmBuilderError;
+
+    /// Adds a collection to the realm.
+    @available(added=NEXT)
+    strict AddCollection(struct {
+        collection fuchsia.component.decl.Collection;
+    }) -> () error RealmBuilderError;
+
+    /// Adds an environment to the realm.
+    @available(added=NEXT)
+    strict AddEnvironment(struct {
+        environment fuchsia.component.decl.Environment;
     }) -> () error RealmBuilderError;
 
     /// Sets the configuration value for a field specified by `key`.

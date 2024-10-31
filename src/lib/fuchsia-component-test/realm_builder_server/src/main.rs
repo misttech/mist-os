@@ -571,6 +571,40 @@ impl Realm {
                         }
                     }
                 }
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                ftest::RealmRequest::AddCollection { collection, responder } => {
+                    if self.realm_has_been_built.load(Ordering::Relaxed) {
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        continue;
+                    }
+
+                    match self.realm_node.add_collection(collection).await {
+                        Ok(()) => {
+                            responder.send(Ok(()))?;
+                        }
+                        Err(err) => {
+                            warn!(method = "Realm.AddCollection", message = %err);
+                            responder.send(Err(err.into()))?;
+                        }
+                    }
+                }
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                ftest::RealmRequest::AddEnvironment { environment, responder } => {
+                    if self.realm_has_been_built.load(Ordering::Relaxed) {
+                        responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
+                        continue;
+                    }
+
+                    match self.realm_node.add_environment(environment).await {
+                        Ok(()) => {
+                            responder.send(Ok(()))?;
+                        }
+                        Err(err) => {
+                            warn!(method = "Realm.AddEnvironment", message = %err);
+                            responder.send(Err(err.into()))?;
+                        }
+                    }
+                }
                 ftest::RealmRequest::SetConfigValue { name, key, value, responder } => {
                     if self.realm_has_been_built.load(Ordering::Relaxed) {
                         responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
@@ -1170,6 +1204,26 @@ impl RealmNode2 {
         cm_fidl_validator::validate_namespace_capabilities(&capabilities)
             .map_err(|e| RealmBuilderError::CapabilityInvalid(anyhow::anyhow!(e)))?;
         push_if_not_present(&mut state_guard.decl.capabilities, capability.fidl_into_native());
+        Ok(())
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    async fn add_collection(
+        &self,
+        collection: fcdecl::Collection,
+    ) -> Result<(), RealmBuilderError> {
+        let mut state_guard = self.state.lock().await;
+        push_if_not_present(&mut state_guard.decl.collections, collection.fidl_into_native());
+        Ok(())
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    async fn add_environment(
+        &self,
+        environment: fcdecl::Environment,
+    ) -> Result<(), RealmBuilderError> {
+        let mut state_guard = self.state.lock().await;
+        push_if_not_present(&mut state_guard.decl.environments, environment.fidl_into_native());
         Ok(())
     }
 
