@@ -190,6 +190,36 @@ bool test_wait4_by_pgid() {
   END_TEST;
 }
 
+bool test_waitid_by_pgid() {
+  BEGIN_TEST;
+
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
+  auto child1 = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
+  auto child1_pid = (*child1)->id_;
+  (*child1)->thread_group_->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
+  child1.~AutoReleasableTask();
+  auto child2 = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
+  ASSERT_TRUE((*child2)->thread_group_->setsid().is_ok(), "setsid");
+  auto child2_pid = (*child2)->id_;
+  (*child2)->thread_group_->exit(starnix::ExitStatus::Exit(42), ktl::nullopt);
+  child2.~AutoReleasableTask();
+
+  auto address =
+      starnix::testing::map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  auto result = sys_waitid(*current_task, P_PGID, child2_pid, address, WEXITED,
+                           mtl::DefaultConstruct<UserRef<struct ::rusage>>());
+  ASSERT_TRUE(result.is_ok());
+
+  // The previous wait matched child2, only child1 should be in the available zombies
+  ASSERT_EQ((*current_task)->thread_group_->Read()->zombie_children_[0]->pid, child1_pid);
+
+  result = sys_waitid(*current_task, P_PGID, 0, address, WEXITED,
+                      mtl::DefaultConstruct<UserRef<struct ::rusage>>());
+  ASSERT_TRUE(result.is_ok());
+
+  END_TEST;
+}
+
 }  // namespace
 
 }  // namespace unit_testing
@@ -200,5 +230,6 @@ UNITTEST("test echild when no zombie", unit_testing::test_echild_when_no_zombie)
 UNITTEST("test no error when zombie", unit_testing::test_no_error_when_zombie)
 UNITTEST("test waiting for child", unit_testing::test_waiting_for_child)
 UNITTEST("test wait4 by pgid", unit_testing::test_wait4_by_pgid)
+UNITTEST("test waitid by pgid", unit_testing::test_waitid_by_pgid)
 UNITTEST_END_TESTCASE(starnix_signal_syscalls, "starnix_signal_syscalls",
                       "Tests for Signal Syscalls")

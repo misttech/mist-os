@@ -88,6 +88,38 @@ class PidEntry : public fbl::SinglyLinkedListable<ktl::unique_ptr<PidEntry>> {
   pid_t pid_ = 0;
 };
 
+class CurrentTask;
+class ProcessEntryRef {
+ public:
+  using Variant = ktl::variant<fbl::RefPtr<ThreadGroup>, fbl::RefPtr<ZombieProcess>>;
+
+  static ProcessEntryRef Process(fbl::RefPtr<ThreadGroup> thread_group);
+  static ProcessEntryRef Zombie(fbl::RefPtr<ZombieProcess> zombie);
+
+  // C++
+  ~ProcessEntryRef();
+
+ private:
+  // Helpers from the reference documentation for std::visit<>, to allow
+  // visit-by-overload of the std::variant<> returned by GetLastReference():
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
+  friend class PidTable;
+  friend fit::result<Errno> sys_kill(const CurrentTask& current_task, pid_t pid,
+                                     starnix_uapi::UncheckedSignal unchecked_signal);
+
+  explicit ProcessEntryRef(Variant variant);
+
+  Variant variant_;
+};
+
+class ThreadGroup;
 class PidTable {
  private:
   /// The most-recently allocated pid in this table.
@@ -119,6 +151,10 @@ class PidTable {
   void add_task(const fbl::RefPtr<Task>& task);
 
   void remove_task(pid_t pid);
+
+  ktl::optional<ProcessEntryRef> get_process(pid_t pid) const;
+
+  fbl::Vector<fbl::RefPtr<ThreadGroup>> get_thread_groups() const;
 
   void add_thread_group(const fbl::RefPtr<ThreadGroup>& thread_group);
 
