@@ -13,6 +13,12 @@
 
 namespace starnix {
 
+fit::result<Errno, off_t> unbounded_seek(off_t current_offset, SeekTarget target) {
+  return default_seek(current_offset, target, [](off_t) -> fit::result<Errno, off_t> {
+    return fit::ok(std::numeric_limits<off_t>::max());
+  });
+}
+
 fit::result<Errno, UserAddress> FileOps::mmap(const FileObject& file,
                                               const CurrentTask& current_task, DesiredAddress addr,
                                               uint64_t memory_offset, size_t length,

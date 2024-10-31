@@ -253,6 +253,16 @@ fit::result<Errno, off_t> default_seek(off_t current_offset, SeekTarget target,
   return fit::ok(*new_offset);
 }
 
+/// Implement the seek method for a file without an upper bound on the resulting offset.
+///
+/// This is useful for files without a defined size.
+///
+/// Errors if the calculated offset is invalid.
+///
+/// - `current_offset`: The current position
+/// - `target`: The location to seek to.
+fit::result<Errno, off_t> unbounded_seek(off_t current_offset, SeekTarget target);
+
 #define fileops_impl_delegate_read_and_seek(delegate)                                      \
   bool is_seekable() const final { return true; }                                          \
                                                                                            \
