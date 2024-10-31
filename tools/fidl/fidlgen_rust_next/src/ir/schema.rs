@@ -21,8 +21,8 @@ pub struct Schema {
     // pub service_declarations: Vec<Service>,
     #[serde(deserialize_with = "crate::de::index")]
     pub struct_declarations: HashMap<CompIdent, Struct>,
-    #[serde(deserialize_with = "crate::de::index")]
-    pub external_struct_declarations: HashMap<CompIdent, Struct>,
+    // #[serde(deserialize_with = "crate::de::index")]
+    // pub external_struct_declarations: HashMap<CompIdent, Struct>,
     #[serde(deserialize_with = "crate::de::index")]
     pub table_declarations: HashMap<CompIdent, Table>,
     #[serde(deserialize_with = "crate::de::index")]

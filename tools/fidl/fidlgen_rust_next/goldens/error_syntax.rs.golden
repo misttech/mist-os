@@ -211,7 +211,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireExampleUseOfErrorSyntax_CallWhichMayFail_Result { raw } = slot);
+        ::fidl_next::munge!(let WireExampleUseOfErrorSyntax_CallWhichMayFail_Result { raw, _phantom: _ } = slot);
 
         match self {
             Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
@@ -241,7 +241,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -288,20 +288,21 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalExampleUseOfErrorSyntax_CallWhichMa
 
 #[repr(transparent)]
 pub struct WireExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireExampleUseOfErrorSyntax_CallWhichMayFail_ResultRef<'buf> {
-    Response(&'buf crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response),
-    Err(&'buf ::fidl_next::u32_le),
+pub enum WireExampleUseOfErrorSyntax_CallWhichMayFail_ResultRef<'union> {
+    Response(&'union crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response),
+    Err(&'union ::fidl_next::u32_le),
 }
 
-pub enum WireExampleUseOfErrorSyntax_CallWhichMayFail_ResultMut<'buf> {
-    Response(&'buf mut crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response),
-    Err(&'buf mut ::fidl_next::u32_le),
+pub enum WireExampleUseOfErrorSyntax_CallWhichMayFail_ResultMut<'union> {
+    Response(&'union mut crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response),
+    Err(&'union mut ::fidl_next::u32_le),
 }
 
-impl WireExampleUseOfErrorSyntax_CallWhichMayFail_Result<'_> {
+impl<'buf> WireExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf> {
     pub fn as_ref(&self) -> WireExampleUseOfErrorSyntax_CallWhichMayFail_ResultRef<'_> {
         match self.raw.ordinal() {
             1 => WireExampleUseOfErrorSyntax_CallWhichMayFail_ResultRef::Response(unsafe {
@@ -329,10 +330,10 @@ impl WireExampleUseOfErrorSyntax_CallWhichMayFail_Result<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
     crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
@@ -341,7 +342,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<
                 ___D,
@@ -372,7 +373,8 @@ crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response>().fmt(f)
 
 #[repr(transparent)]
 pub struct WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 impl<'buf> WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf> {
@@ -406,6 +408,7 @@ impl<'buf> WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf> {
         if self.is_some() {
             Some(WireExampleUseOfErrorSyntax_CallWhichMayFail_Result {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -415,14 +418,14 @@ impl<'buf> WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf> {
 
 impl<'buf> Default for WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf> {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalExampleUseOfErrorSyntax_CallWhichMayFail_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
     crate::WireExampleUseOfErrorSyntax_CallWhichMayFail_Response: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
@@ -431,7 +434,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<
                 ___D,

@@ -12,7 +12,7 @@ use std::io::{Error, Write};
 
 use crate::compiler::util::emit_natural_comp_ident;
 use crate::compiler::Compiler;
-use crate::ir::{DeclType, EndpointRole, InternalSubtype, PrimSubtype, Type};
+use crate::ir::{DeclType, EndpointRole, InternalSubtype, PrimSubtype, Type, TypeKind};
 
 pub use self::constant::emit_constant;
 pub use self::r#enum::emit_enum;
@@ -37,13 +37,13 @@ fn primitive_subtype(subtype: &PrimSubtype) -> &'static str {
 }
 
 fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> Result<(), Error> {
-    match ty {
-        Type::Array { element_type, element_count } => {
+    match &ty.kind {
+        TypeKind::Array { element_type, element_count } => {
             write!(out, "[")?;
             emit_type(compiler, out, element_type)?;
             write!(out, "; {element_count}]")?;
         }
-        Type::Vector { element_type, nullable, .. } => {
+        TypeKind::Vector { element_type, nullable, .. } => {
             if *nullable {
                 write!(out, "Option<")?;
             }
@@ -54,7 +54,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 write!(out, ">")?;
             }
         }
-        Type::String { nullable, .. } => {
+        TypeKind::String { nullable, .. } => {
             if *nullable {
                 write!(out, "Option<")?;
             }
@@ -63,14 +63,14 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 write!(out, ">")?;
             }
         }
-        Type::Handle { nullable, .. } => {
+        TypeKind::Handle { nullable, .. } => {
             if !*nullable {
                 write!(out, "{}", compiler.config.resource_bindings.handle.natural_path)?;
             } else {
                 write!(out, "Option<{}>", compiler.config.resource_bindings.handle.natural_path)?;
             }
         }
-        Type::Endpoint { nullable, role, .. } => {
+        TypeKind::Endpoint { nullable, role, .. } => {
             write!(out, "::fidl_next::EndpointResource<")?;
             if *nullable {
                 write!(out, "Option<")?;
@@ -88,10 +88,10 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 }
             )?;
         }
-        Type::Primitive { subtype } => {
+        TypeKind::Primitive { subtype } => {
             write!(out, "{}", primitive_subtype(subtype))?;
         }
-        Type::Identifier { identifier, nullable, .. } => {
+        TypeKind::Identifier { identifier, nullable, .. } => {
             match compiler.schema.get_decl_type(identifier).unwrap() {
                 DeclType::Enum | DeclType::Table => {
                     emit_natural_comp_ident(compiler, out, identifier)?;
@@ -115,7 +115,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 DeclType::Service => todo!(),
             }
         }
-        Type::Internal { subtype } => match subtype {
+        TypeKind::Internal { subtype } => match subtype {
             InternalSubtype::FrameworkError => write!(out, "::fidl_next::FrameworkError")?,
         },
     }

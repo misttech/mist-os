@@ -99,10 +99,10 @@ pub fn emit_table<W: Write>(
                 let max_ord = self.__max_ordinal();
 
                 let mut backing = ::core::mem::MaybeUninit::<
-                    ::fidl_next::WireEnvelope<'_>
+                    ::fidl_next::WireEnvelope
                 >::uninit();
                 let mut preallocated = ::fidl_next::EncoderExt::preallocate::<
-                    ::fidl_next::WireEnvelope<'_>
+                    ::fidl_next::WireEnvelope
                 >(encoder, max_ord);
 
                 for i in 1..=max_ord {{

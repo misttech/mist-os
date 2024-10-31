@@ -5,7 +5,7 @@
 use serde::Deserialize;
 
 use super::r#type::Type;
-use super::{Attributes, CompIdent};
+use super::{Attributes, CompIdent, TypeShape};
 use crate::de::Index;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -16,6 +16,8 @@ pub struct Struct {
     pub members: Vec<StructMember>,
     #[serde(rename = "resource")]
     pub is_resource: bool,
+    #[serde(rename = "type_shape_v2")]
+    pub shape: TypeShape,
 }
 
 impl Index for Struct {

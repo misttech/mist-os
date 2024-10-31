@@ -43,9 +43,9 @@ where
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope<'_>>::uninit();
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
         let mut preallocated =
-            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope<'_>>(encoder, max_ord);
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl_next::Slot::new(&mut backing);
@@ -145,7 +145,7 @@ pub enum ComposedProtocolTwoWayAnonComposedRequest {
 }
 
 impl ::fidl_next::Encodable for ComposedProtocolTwoWayAnonComposedRequest {
-    type Encoded<'buf> = WireComposedProtocolTwoWayAnonComposedRequest<'buf>;
+    type Encoded<'buf> = WireComposedProtocolTwoWayAnonComposedRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedRequest
@@ -159,7 +159,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireComposedProtocolTwoWayAnonComposedRequest { raw } = slot);
+        ::fidl_next::munge!(let WireComposedProtocolTwoWayAnonComposedRequest { raw, _phantom: _ } = slot);
 
         match self {
             Self::B(value) => {
@@ -172,7 +172,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ComposedProtocolTwoWayAnonComposedRequest> {
-    type EncodedOption<'buf> = WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf>;
+    type EncodedOption<'buf> = WireOptionalComposedProtocolTwoWayAnonComposedRequest;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ComposedProtocolTwoWayAnonComposedRequest>
@@ -185,7 +185,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalComposedProtocolTwoWayAnonComposedRequest { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalComposedProtocolTwoWayAnonComposedRequest { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -198,10 +198,10 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedRequest<'buf>>
+impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedRequest>
     for ComposedProtocolTwoWayAnonComposedRequest
 {
-    fn take_from(from: &mut WireComposedProtocolTwoWayAnonComposedRequest<'buf>) -> Self {
+    fn take_from(from: &mut WireComposedProtocolTwoWayAnonComposedRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
                 from.raw.get_mut().deref_mut_unchecked()
@@ -212,10 +212,10 @@ impl<'buf> ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedRequest<'
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf>>
+impl ::fidl_next::TakeFrom<WireOptionalComposedProtocolTwoWayAnonComposedRequest>
     for Option<Box<ComposedProtocolTwoWayAnonComposedRequest>>
 {
-    fn take_from(from: &mut WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf>) -> Self {
+    fn take_from(from: &mut WireOptionalComposedProtocolTwoWayAnonComposedRequest) -> Self {
         if let Some(inner) = from.as_mut() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
@@ -225,19 +225,20 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalComposedProtocolTwoWayAnonComposedR
 }
 
 #[repr(transparent)]
-pub struct WireComposedProtocolTwoWayAnonComposedRequest<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireComposedProtocolTwoWayAnonComposedRequest {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireComposedProtocolTwoWayAnonComposedRequestRef<'buf> {
-    B(&'buf bool),
+pub enum WireComposedProtocolTwoWayAnonComposedRequestRef<'union> {
+    B(&'union bool),
 }
 
-pub enum WireComposedProtocolTwoWayAnonComposedRequestMut<'buf> {
-    B(&'buf mut bool),
+pub enum WireComposedProtocolTwoWayAnonComposedRequestMut<'union> {
+    B(&'union mut bool),
 }
 
-impl WireComposedProtocolTwoWayAnonComposedRequest<'_> {
+impl WireComposedProtocolTwoWayAnonComposedRequest {
     pub fn as_ref(&self) -> WireComposedProtocolTwoWayAnonComposedRequestRef<'_> {
         match self.raw.ordinal() {
             1 => WireComposedProtocolTwoWayAnonComposedRequestRef::B(unsafe {
@@ -257,10 +258,22 @@ impl WireComposedProtocolTwoWayAnonComposedRequest<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireComposedProtocolTwoWayAnonComposedRequest<'buf>
+impl Clone for WireComposedProtocolTwoWayAnonComposedRequest {
+    fn clone(&self) -> Self {
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+    for WireComposedProtocolTwoWayAnonComposedRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -268,9 +281,9 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -279,7 +292,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireComposedProtocolTwoWayAnonComposedRequest<'buf> {
+impl ::core::fmt::Debug for WireComposedProtocolTwoWayAnonComposedRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<bool>().fmt(f) },
@@ -290,11 +303,12 @@ impl<'buf> ::core::fmt::Debug for WireComposedProtocolTwoWayAnonComposedRequest<
 }
 
 #[repr(transparent)]
-pub struct WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireOptionalComposedProtocolTwoWayAnonComposedRequest {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-impl<'buf> WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf> {
+impl WireOptionalComposedProtocolTwoWayAnonComposedRequest {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -303,7 +317,7 @@ impl<'buf> WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireComposedProtocolTwoWayAnonComposedRequest<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireComposedProtocolTwoWayAnonComposedRequest> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
@@ -311,7 +325,7 @@ impl<'buf> WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> Option<&mut WireComposedProtocolTwoWayAnonComposedRequest<'buf>> {
+    pub fn as_mut(&mut self) -> Option<&mut WireComposedProtocolTwoWayAnonComposedRequest> {
         if self.is_some() {
             Some(unsafe { &mut *(self as *mut Self).cast() })
         } else {
@@ -319,10 +333,11 @@ impl<'buf> WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf> {
         }
     }
 
-    pub fn take(&mut self) -> Option<WireComposedProtocolTwoWayAnonComposedRequest<'buf>> {
+    pub fn take(&mut self) -> Option<WireComposedProtocolTwoWayAnonComposedRequest> {
         if self.is_some() {
             Some(WireComposedProtocolTwoWayAnonComposedRequest {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -330,16 +345,35 @@ impl<'buf> WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf> {
     }
 }
 
-impl<'buf> Default for WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf> {
+impl Default for WireOptionalComposedProtocolTwoWayAnonComposedRequest {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf>
+impl Clone for WireOptionalComposedProtocolTwoWayAnonComposedRequest {
+    fn clone(&self) -> Self {
+        if self.is_none() {
+            return WireOptionalComposedProtocolTwoWayAnonComposedRequest {
+                raw: ::fidl_next::RawWireUnion::null(),
+                _phantom: ::core::marker::PhantomData,
+            };
+        }
+
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+    for WireOptionalComposedProtocolTwoWayAnonComposedRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -347,19 +381,19 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalComposedProtocolTwoWayAnonComposedRequest<'buf> {
+impl ::core::fmt::Debug for WireOptionalComposedProtocolTwoWayAnonComposedRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -399,9 +433,9 @@ where
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope<'_>>::uninit();
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
         let mut preallocated =
-            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope<'_>>(encoder, max_ord);
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl_next::Slot::new(&mut backing);
@@ -528,9 +562,9 @@ where
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope<'_>>::uninit();
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
         let mut preallocated =
-            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope<'_>>(encoder, max_ord);
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl_next::Slot::new(&mut backing);
@@ -632,7 +666,7 @@ pub enum ComposedProtocol_TwoWayAnonComposedWithError_Response {
 }
 
 impl ::fidl_next::Encodable for ComposedProtocol_TwoWayAnonComposedWithError_Response {
-    type Encoded<'buf> = WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>;
+    type Encoded<'buf> = WireComposedProtocol_TwoWayAnonComposedWithError_Response;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocol_TwoWayAnonComposedWithError_Response
@@ -646,7 +680,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireComposedProtocol_TwoWayAnonComposedWithError_Response { raw } = slot);
+        ::fidl_next::munge!(let WireComposedProtocol_TwoWayAnonComposedWithError_Response { raw, _phantom: _ } = slot);
 
         match self {
             Self::B(value) => {
@@ -659,8 +693,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ComposedProtocol_TwoWayAnonComposedWithError_Response> {
-    type EncodedOption<'buf> =
-        WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>;
+    type EncodedOption<'buf> = WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E>
@@ -674,7 +707,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -687,12 +720,10 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>>
+impl ::fidl_next::TakeFrom<WireComposedProtocol_TwoWayAnonComposedWithError_Response>
     for ComposedProtocol_TwoWayAnonComposedWithError_Response
 {
-    fn take_from(
-        from: &mut WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>,
-    ) -> Self {
+    fn take_from(from: &mut WireComposedProtocol_TwoWayAnonComposedWithError_Response) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
                 from.raw.get_mut().deref_mut_unchecked()
@@ -703,12 +734,11 @@ impl<'buf> ::fidl_next::TakeFrom<WireComposedProtocol_TwoWayAnonComposedWithErro
     }
 }
 
-impl<'buf>
-    ::fidl_next::TakeFrom<WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>>
+impl ::fidl_next::TakeFrom<WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response>
     for Option<Box<ComposedProtocol_TwoWayAnonComposedWithError_Response>>
 {
     fn take_from(
-        from: &mut WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>,
+        from: &mut WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response,
     ) -> Self {
         if let Some(inner) = from.as_mut() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -719,19 +749,20 @@ impl<'buf>
 }
 
 #[repr(transparent)]
-pub struct WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireComposedProtocol_TwoWayAnonComposedWithError_Response {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireComposedProtocol_TwoWayAnonComposedWithError_ResponseRef<'buf> {
-    B(&'buf bool),
+pub enum WireComposedProtocol_TwoWayAnonComposedWithError_ResponseRef<'union> {
+    B(&'union bool),
 }
 
-pub enum WireComposedProtocol_TwoWayAnonComposedWithError_ResponseMut<'buf> {
-    B(&'buf mut bool),
+pub enum WireComposedProtocol_TwoWayAnonComposedWithError_ResponseMut<'union> {
+    B(&'union mut bool),
 }
 
-impl WireComposedProtocol_TwoWayAnonComposedWithError_Response<'_> {
+impl WireComposedProtocol_TwoWayAnonComposedWithError_Response {
     pub fn as_ref(&self) -> WireComposedProtocol_TwoWayAnonComposedWithError_ResponseRef<'_> {
         match self.raw.ordinal() {
             1 => WireComposedProtocol_TwoWayAnonComposedWithError_ResponseRef::B(unsafe {
@@ -751,10 +782,22 @@ impl WireComposedProtocol_TwoWayAnonComposedWithError_Response<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>
+impl Clone for WireComposedProtocol_TwoWayAnonComposedWithError_Response {
+    fn clone(&self) -> Self {
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+    for WireComposedProtocol_TwoWayAnonComposedWithError_Response
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -762,9 +805,9 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -773,7 +816,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf> {
+impl ::core::fmt::Debug for WireComposedProtocol_TwoWayAnonComposedWithError_Response {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<bool>().fmt(f) },
@@ -784,11 +827,12 @@ impl<'buf> ::core::fmt::Debug for WireComposedProtocol_TwoWayAnonComposedWithErr
 }
 
 #[repr(transparent)]
-pub struct WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-impl<'buf> WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'buf> {
+impl WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -797,9 +841,7 @@ impl<'buf> WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'bu
         self.raw.is_none()
     }
 
-    pub fn as_ref(
-        &self,
-    ) -> Option<&WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireComposedProtocol_TwoWayAnonComposedWithError_Response> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
@@ -809,7 +851,7 @@ impl<'buf> WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'bu
 
     pub fn as_mut(
         &mut self,
-    ) -> Option<&mut WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>> {
+    ) -> Option<&mut WireComposedProtocol_TwoWayAnonComposedWithError_Response> {
         if self.is_some() {
             Some(unsafe { &mut *(self as *mut Self).cast() })
         } else {
@@ -817,12 +859,11 @@ impl<'buf> WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'bu
         }
     }
 
-    pub fn take(
-        &mut self,
-    ) -> Option<WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>> {
+    pub fn take(&mut self) -> Option<WireComposedProtocol_TwoWayAnonComposedWithError_Response> {
         if self.is_some() {
             Some(WireComposedProtocol_TwoWayAnonComposedWithError_Response {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -830,16 +871,35 @@ impl<'buf> WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'bu
     }
 }
 
-impl<'buf> Default for WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'buf> {
+impl Default for WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>
+impl Clone for WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response {
+    fn clone(&self) -> Self {
+        if self.is_none() {
+            return WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response {
+                raw: ::fidl_next::RawWireUnion::null(),
+                _phantom: ::core::marker::PhantomData,
+            };
+        }
+
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+    for WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -847,21 +907,19 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug
-    for WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>
-{
+impl ::core::fmt::Debug for WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Response {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -890,7 +948,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireComposedProtocol_TwoWayAnonComposedWithError_Result { raw } = slot);
+        ::fidl_next::munge!(let WireComposedProtocol_TwoWayAnonComposedWithError_Result { raw, _phantom: _ } = slot);
 
         match self {
             Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
@@ -922,7 +980,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Result { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Result { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -970,20 +1028,21 @@ impl<'buf>
 
 #[repr(transparent)]
 pub struct WireComposedProtocol_TwoWayAnonComposedWithError_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireComposedProtocol_TwoWayAnonComposedWithError_ResultRef<'buf> {
-    Response(&'buf crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>),
-    Err(&'buf ::fidl_next::u32_le),
+pub enum WireComposedProtocol_TwoWayAnonComposedWithError_ResultRef<'union> {
+    Response(&'union crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response),
+    Err(&'union ::fidl_next::u32_le),
 }
 
-pub enum WireComposedProtocol_TwoWayAnonComposedWithError_ResultMut<'buf> {
-    Response(&'buf mut crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>),
-    Err(&'buf mut ::fidl_next::u32_le),
+pub enum WireComposedProtocol_TwoWayAnonComposedWithError_ResultMut<'union> {
+    Response(&'union mut crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response),
+    Err(&'union mut ::fidl_next::u32_le),
 }
 
-impl WireComposedProtocol_TwoWayAnonComposedWithError_Result<'_> {
+impl<'buf> WireComposedProtocol_TwoWayAnonComposedWithError_Result<'buf> {
     pub fn as_ref(&self) -> WireComposedProtocol_TwoWayAnonComposedWithError_ResultRef<'_> {
         match self.raw.ordinal() {
             1 => WireComposedProtocol_TwoWayAnonComposedWithError_ResultRef::Response(unsafe {
@@ -1011,24 +1070,23 @@ impl WireComposedProtocol_TwoWayAnonComposedWithError_Result<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireComposedProtocol_TwoWayAnonComposedWithError_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>:
-        ::fidl_next::Decode<___D>,
+    crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<
                 ___D,
-                crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>,
+                crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response,
             >(raw, decoder)?,
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
@@ -1044,7 +1102,7 @@ impl<'buf> ::core::fmt::Debug for WireComposedProtocol_TwoWayAnonComposedWithErr
         match self.raw.ordinal() {
             1 => unsafe {
                 self.raw.get().deref_unchecked::<
-crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>>().fmt(f)
+crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response>().fmt(f)
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
 
@@ -1055,7 +1113,8 @@ crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>>().fmt(f)
 
 #[repr(transparent)]
 pub struct WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 impl<'buf> WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Result<'buf> {
@@ -1091,6 +1150,7 @@ impl<'buf> WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Result<'buf>
         if self.is_some() {
             Some(WireComposedProtocol_TwoWayAnonComposedWithError_Result {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -1100,28 +1160,27 @@ impl<'buf> WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Result<'buf>
 
 impl<'buf> Default for WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Result<'buf> {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocol_TwoWayAnonComposedWithError_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>:
-        ::fidl_next::Decode<___D>,
+    crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<
                 ___D,
-                crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response<'buf>,
+                crate::WireComposedProtocol_TwoWayAnonComposedWithError_Response,
             >(raw, decoder)?,
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
@@ -1148,7 +1207,7 @@ pub enum ComposedProtocolOnAnonComposedRequest {
 }
 
 impl ::fidl_next::Encodable for ComposedProtocolOnAnonComposedRequest {
-    type Encoded<'buf> = WireComposedProtocolOnAnonComposedRequest<'buf>;
+    type Encoded<'buf> = WireComposedProtocolOnAnonComposedRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolOnAnonComposedRequest
@@ -1162,7 +1221,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireComposedProtocolOnAnonComposedRequest { raw } = slot);
+        ::fidl_next::munge!(let WireComposedProtocolOnAnonComposedRequest { raw, _phantom: _ } = slot);
 
         match self {
             Self::B(value) => {
@@ -1175,7 +1234,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ComposedProtocolOnAnonComposedRequest> {
-    type EncodedOption<'buf> = WireOptionalComposedProtocolOnAnonComposedRequest<'buf>;
+    type EncodedOption<'buf> = WireOptionalComposedProtocolOnAnonComposedRequest;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ComposedProtocolOnAnonComposedRequest>
@@ -1188,7 +1247,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalComposedProtocolOnAnonComposedRequest { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalComposedProtocolOnAnonComposedRequest { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -1201,10 +1260,10 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireComposedProtocolOnAnonComposedRequest<'buf>>
+impl ::fidl_next::TakeFrom<WireComposedProtocolOnAnonComposedRequest>
     for ComposedProtocolOnAnonComposedRequest
 {
-    fn take_from(from: &mut WireComposedProtocolOnAnonComposedRequest<'buf>) -> Self {
+    fn take_from(from: &mut WireComposedProtocolOnAnonComposedRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
                 from.raw.get_mut().deref_mut_unchecked()
@@ -1215,10 +1274,10 @@ impl<'buf> ::fidl_next::TakeFrom<WireComposedProtocolOnAnonComposedRequest<'buf>
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalComposedProtocolOnAnonComposedRequest<'buf>>
+impl ::fidl_next::TakeFrom<WireOptionalComposedProtocolOnAnonComposedRequest>
     for Option<Box<ComposedProtocolOnAnonComposedRequest>>
 {
-    fn take_from(from: &mut WireOptionalComposedProtocolOnAnonComposedRequest<'buf>) -> Self {
+    fn take_from(from: &mut WireOptionalComposedProtocolOnAnonComposedRequest) -> Self {
         if let Some(inner) = from.as_mut() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
@@ -1228,19 +1287,20 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalComposedProtocolOnAnonComposedReque
 }
 
 #[repr(transparent)]
-pub struct WireComposedProtocolOnAnonComposedRequest<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireComposedProtocolOnAnonComposedRequest {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireComposedProtocolOnAnonComposedRequestRef<'buf> {
-    B(&'buf bool),
+pub enum WireComposedProtocolOnAnonComposedRequestRef<'union> {
+    B(&'union bool),
 }
 
-pub enum WireComposedProtocolOnAnonComposedRequestMut<'buf> {
-    B(&'buf mut bool),
+pub enum WireComposedProtocolOnAnonComposedRequestMut<'union> {
+    B(&'union mut bool),
 }
 
-impl WireComposedProtocolOnAnonComposedRequest<'_> {
+impl WireComposedProtocolOnAnonComposedRequest {
     pub fn as_ref(&self) -> WireComposedProtocolOnAnonComposedRequestRef<'_> {
         match self.raw.ordinal() {
             1 => WireComposedProtocolOnAnonComposedRequestRef::B(unsafe {
@@ -1260,10 +1320,21 @@ impl WireComposedProtocolOnAnonComposedRequest<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireComposedProtocolOnAnonComposedRequest<'buf>
+impl Clone for WireComposedProtocolOnAnonComposedRequest {
+    fn clone(&self) -> Self {
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireComposedProtocolOnAnonComposedRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1271,9 +1342,9 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -1282,7 +1353,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireComposedProtocolOnAnonComposedRequest<'buf> {
+impl ::core::fmt::Debug for WireComposedProtocolOnAnonComposedRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<bool>().fmt(f) },
@@ -1293,11 +1364,12 @@ impl<'buf> ::core::fmt::Debug for WireComposedProtocolOnAnonComposedRequest<'buf
 }
 
 #[repr(transparent)]
-pub struct WireOptionalComposedProtocolOnAnonComposedRequest<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireOptionalComposedProtocolOnAnonComposedRequest {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-impl<'buf> WireOptionalComposedProtocolOnAnonComposedRequest<'buf> {
+impl WireOptionalComposedProtocolOnAnonComposedRequest {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -1306,7 +1378,7 @@ impl<'buf> WireOptionalComposedProtocolOnAnonComposedRequest<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireComposedProtocolOnAnonComposedRequest<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireComposedProtocolOnAnonComposedRequest> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
@@ -1314,7 +1386,7 @@ impl<'buf> WireOptionalComposedProtocolOnAnonComposedRequest<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> Option<&mut WireComposedProtocolOnAnonComposedRequest<'buf>> {
+    pub fn as_mut(&mut self) -> Option<&mut WireComposedProtocolOnAnonComposedRequest> {
         if self.is_some() {
             Some(unsafe { &mut *(self as *mut Self).cast() })
         } else {
@@ -1322,10 +1394,11 @@ impl<'buf> WireOptionalComposedProtocolOnAnonComposedRequest<'buf> {
         }
     }
 
-    pub fn take(&mut self) -> Option<WireComposedProtocolOnAnonComposedRequest<'buf>> {
+    pub fn take(&mut self) -> Option<WireComposedProtocolOnAnonComposedRequest> {
         if self.is_some() {
             Some(WireComposedProtocolOnAnonComposedRequest {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -1333,16 +1406,35 @@ impl<'buf> WireOptionalComposedProtocolOnAnonComposedRequest<'buf> {
     }
 }
 
-impl<'buf> Default for WireOptionalComposedProtocolOnAnonComposedRequest<'buf> {
+impl Default for WireOptionalComposedProtocolOnAnonComposedRequest {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireOptionalComposedProtocolOnAnonComposedRequest<'buf>
+impl Clone for WireOptionalComposedProtocolOnAnonComposedRequest {
+    fn clone(&self) -> Self {
+        if self.is_none() {
+            return WireOptionalComposedProtocolOnAnonComposedRequest {
+                raw: ::fidl_next::RawWireUnion::null(),
+                _phantom: ::core::marker::PhantomData,
+            };
+        }
+
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+    for WireOptionalComposedProtocolOnAnonComposedRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1350,19 +1442,19 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalComposedProtocolOnAnonComposedRequest<'buf> {
+impl ::core::fmt::Debug for WireOptionalComposedProtocolOnAnonComposedRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -1402,9 +1494,9 @@ where
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope<'_>>::uninit();
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
         let mut preallocated =
-            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope<'_>>(encoder, max_ord);
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl_next::Slot::new(&mut backing);
@@ -1501,7 +1593,7 @@ pub enum UnionPayload {
 }
 
 impl ::fidl_next::Encodable for UnionPayload {
-    type Encoded<'buf> = WireUnionPayload<'buf>;
+    type Encoded<'buf> = WireUnionPayload;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionPayload
@@ -1515,7 +1607,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireUnionPayload { raw } = slot);
+        ::fidl_next::munge!(let WireUnionPayload { raw, _phantom: _ } = slot);
 
         match self {
             Self::B(value) => {
@@ -1528,7 +1620,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionPayload> {
-    type EncodedOption<'buf> = WireOptionalUnionPayload<'buf>;
+    type EncodedOption<'buf> = WireOptionalUnionPayload;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionPayload>
@@ -1541,7 +1633,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalUnionPayload { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalUnionPayload { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -1554,8 +1646,8 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireUnionPayload<'buf>> for UnionPayload {
-    fn take_from(from: &mut WireUnionPayload<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireUnionPayload> for UnionPayload {
+    fn take_from(from: &mut WireUnionPayload) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
                 from.raw.get_mut().deref_mut_unchecked()
@@ -1566,8 +1658,8 @@ impl<'buf> ::fidl_next::TakeFrom<WireUnionPayload<'buf>> for UnionPayload {
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionPayload<'buf>> for Option<Box<UnionPayload>> {
-    fn take_from(from: &mut WireOptionalUnionPayload<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireOptionalUnionPayload> for Option<Box<UnionPayload>> {
+    fn take_from(from: &mut WireOptionalUnionPayload) -> Self {
         if let Some(inner) = from.as_mut() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
@@ -1577,19 +1669,20 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionPayload<'buf>> for Option<Box<
 }
 
 #[repr(transparent)]
-pub struct WireUnionPayload<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireUnionPayload {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireUnionPayloadRef<'buf> {
-    B(&'buf bool),
+pub enum WireUnionPayloadRef<'union> {
+    B(&'union bool),
 }
 
-pub enum WireUnionPayloadMut<'buf> {
-    B(&'buf mut bool),
+pub enum WireUnionPayloadMut<'union> {
+    B(&'union mut bool),
 }
 
-impl WireUnionPayload<'_> {
+impl WireUnionPayload {
     pub fn as_ref(&self) -> WireUnionPayloadRef<'_> {
         match self.raw.ordinal() {
             1 => WireUnionPayloadRef::B(unsafe { self.raw.get().deref_unchecked() }),
@@ -1605,9 +1698,21 @@ impl WireUnionPayload<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionPayload<'buf>
+impl Clone for WireUnionPayload {
+    fn clone(&self) -> Self {
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionPayload
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1615,9 +1720,9 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -1626,7 +1731,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireUnionPayload<'buf> {
+impl ::core::fmt::Debug for WireUnionPayload {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<bool>().fmt(f) },
@@ -1637,11 +1742,12 @@ impl<'buf> ::core::fmt::Debug for WireUnionPayload<'buf> {
 }
 
 #[repr(transparent)]
-pub struct WireOptionalUnionPayload<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireOptionalUnionPayload {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-impl<'buf> WireOptionalUnionPayload<'buf> {
+impl WireOptionalUnionPayload {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -1650,7 +1756,7 @@ impl<'buf> WireOptionalUnionPayload<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireUnionPayload<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireUnionPayload> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
@@ -1658,7 +1764,7 @@ impl<'buf> WireOptionalUnionPayload<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> Option<&mut WireUnionPayload<'buf>> {
+    pub fn as_mut(&mut self) -> Option<&mut WireUnionPayload> {
         if self.is_some() {
             Some(unsafe { &mut *(self as *mut Self).cast() })
         } else {
@@ -1666,10 +1772,11 @@ impl<'buf> WireOptionalUnionPayload<'buf> {
         }
     }
 
-    pub fn take(&mut self) -> Option<WireUnionPayload<'buf>> {
+    pub fn take(&mut self) -> Option<WireUnionPayload> {
         if self.is_some() {
             Some(WireUnionPayload {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -1677,15 +1784,34 @@ impl<'buf> WireOptionalUnionPayload<'buf> {
     }
 }
 
-impl<'buf> Default for WireOptionalUnionPayload<'buf> {
+impl Default for WireOptionalUnionPayload {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionPayload<'buf>
+impl Clone for WireOptionalUnionPayload {
+    fn clone(&self) -> Self {
+        if self.is_none() {
+            return WireOptionalUnionPayload {
+                raw: ::fidl_next::RawWireUnion::null(),
+                _phantom: ::core::marker::PhantomData,
+            };
+        }
+
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionPayload
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1693,19 +1819,19 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalUnionPayload<'buf> {
+impl ::core::fmt::Debug for WireOptionalUnionPayload {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -1734,7 +1860,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireComposedProtocol_TwoWayNamedComposedWithError_Result { raw } = slot);
+        ::fidl_next::munge!(let WireComposedProtocol_TwoWayNamedComposedWithError_Result { raw, _phantom: _ } = slot);
 
         match self {
             Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
@@ -1766,7 +1892,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalComposedProtocol_TwoWayNamedComposedWithError_Result { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalComposedProtocol_TwoWayNamedComposedWithError_Result { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -1816,20 +1942,21 @@ impl<'buf>
 
 #[repr(transparent)]
 pub struct WireComposedProtocol_TwoWayNamedComposedWithError_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireComposedProtocol_TwoWayNamedComposedWithError_ResultRef<'buf> {
-    Response(&'buf crate::WireUnionPayload<'buf>),
-    Err(&'buf ::fidl_next::u32_le),
+pub enum WireComposedProtocol_TwoWayNamedComposedWithError_ResultRef<'union> {
+    Response(&'union crate::WireUnionPayload),
+    Err(&'union ::fidl_next::u32_le),
 }
 
-pub enum WireComposedProtocol_TwoWayNamedComposedWithError_ResultMut<'buf> {
-    Response(&'buf mut crate::WireUnionPayload<'buf>),
-    Err(&'buf mut ::fidl_next::u32_le),
+pub enum WireComposedProtocol_TwoWayNamedComposedWithError_ResultMut<'union> {
+    Response(&'union mut crate::WireUnionPayload),
+    Err(&'union mut ::fidl_next::u32_le),
 }
 
-impl WireComposedProtocol_TwoWayNamedComposedWithError_Result<'_> {
+impl<'buf> WireComposedProtocol_TwoWayNamedComposedWithError_Result<'buf> {
     pub fn as_ref(&self) -> WireComposedProtocol_TwoWayNamedComposedWithError_ResultRef<'_> {
         match self.raw.ordinal() {
             1 => WireComposedProtocol_TwoWayNamedComposedWithError_ResultRef::Response(unsafe {
@@ -1857,23 +1984,23 @@ impl WireComposedProtocol_TwoWayNamedComposedWithError_Result<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireComposedProtocol_TwoWayNamedComposedWithError_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    crate::WireUnionPayload<'buf>: ::fidl_next::Decode<___D>,
+    crate::WireUnionPayload: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireUnionPayload<'buf>>(
-                raw, decoder,
-            )?,
+            1 => {
+                ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireUnionPayload>(raw, decoder)?
+            }
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -1886,9 +2013,7 @@ where
 impl<'buf> ::core::fmt::Debug for WireComposedProtocol_TwoWayNamedComposedWithError_Result<'buf> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe {
-                self.raw.get().deref_unchecked::<crate::WireUnionPayload<'buf>>().fmt(f)
-            },
+            1 => unsafe { self.raw.get().deref_unchecked::<crate::WireUnionPayload>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1898,7 +2023,8 @@ impl<'buf> ::core::fmt::Debug for WireComposedProtocol_TwoWayNamedComposedWithEr
 
 #[repr(transparent)]
 pub struct WireOptionalComposedProtocol_TwoWayNamedComposedWithError_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 impl<'buf> WireOptionalComposedProtocol_TwoWayNamedComposedWithError_Result<'buf> {
@@ -1936,6 +2062,7 @@ impl<'buf> WireOptionalComposedProtocol_TwoWayNamedComposedWithError_Result<'buf
         if self.is_some() {
             Some(WireComposedProtocol_TwoWayNamedComposedWithError_Result {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -1945,27 +2072,27 @@ impl<'buf> WireOptionalComposedProtocol_TwoWayNamedComposedWithError_Result<'buf
 
 impl<'buf> Default for WireOptionalComposedProtocol_TwoWayNamedComposedWithError_Result<'buf> {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocol_TwoWayNamedComposedWithError_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    crate::WireUnionPayload<'buf>: ::fidl_next::Decode<___D>,
+    crate::WireUnionPayload: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireUnionPayload<'buf>>(
-                raw, decoder,
-            )?,
+            1 => {
+                ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireUnionPayload>(raw, decoder)?
+            }
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -2007,7 +2134,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireMainProtocol_TwoWayLocalWithError_Result { raw } = slot);
+        ::fidl_next::munge!(let WireMainProtocol_TwoWayLocalWithError_Result { raw, _phantom: _ } = slot);
 
         match self {
             Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
@@ -2037,7 +2164,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalMainProtocol_TwoWayLocalWithError_Result { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalMainProtocol_TwoWayLocalWithError_Result { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -2082,20 +2209,21 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalMainProtocol_TwoWayLocalWithError_R
 
 #[repr(transparent)]
 pub struct WireMainProtocol_TwoWayLocalWithError_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireMainProtocol_TwoWayLocalWithError_ResultRef<'buf> {
-    Response(&'buf crate::WireUnionPayload<'buf>),
-    Err(&'buf ::fidl_next::u32_le),
+pub enum WireMainProtocol_TwoWayLocalWithError_ResultRef<'union> {
+    Response(&'union crate::WireUnionPayload),
+    Err(&'union ::fidl_next::u32_le),
 }
 
-pub enum WireMainProtocol_TwoWayLocalWithError_ResultMut<'buf> {
-    Response(&'buf mut crate::WireUnionPayload<'buf>),
-    Err(&'buf mut ::fidl_next::u32_le),
+pub enum WireMainProtocol_TwoWayLocalWithError_ResultMut<'union> {
+    Response(&'union mut crate::WireUnionPayload),
+    Err(&'union mut ::fidl_next::u32_le),
 }
 
-impl WireMainProtocol_TwoWayLocalWithError_Result<'_> {
+impl<'buf> WireMainProtocol_TwoWayLocalWithError_Result<'buf> {
     pub fn as_ref(&self) -> WireMainProtocol_TwoWayLocalWithError_ResultRef<'_> {
         match self.raw.ordinal() {
             1 => WireMainProtocol_TwoWayLocalWithError_ResultRef::Response(unsafe {
@@ -2123,23 +2251,23 @@ impl WireMainProtocol_TwoWayLocalWithError_Result<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireMainProtocol_TwoWayLocalWithError_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    crate::WireUnionPayload<'buf>: ::fidl_next::Decode<___D>,
+    crate::WireUnionPayload: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireUnionPayload<'buf>>(
-                raw, decoder,
-            )?,
+            1 => {
+                ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireUnionPayload>(raw, decoder)?
+            }
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
@@ -2152,9 +2280,7 @@ where
 impl<'buf> ::core::fmt::Debug for WireMainProtocol_TwoWayLocalWithError_Result<'buf> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe {
-                self.raw.get().deref_unchecked::<crate::WireUnionPayload<'buf>>().fmt(f)
-            },
+            1 => unsafe { self.raw.get().deref_unchecked::<crate::WireUnionPayload>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -2164,7 +2290,8 @@ impl<'buf> ::core::fmt::Debug for WireMainProtocol_TwoWayLocalWithError_Result<'
 
 #[repr(transparent)]
 pub struct WireOptionalMainProtocol_TwoWayLocalWithError_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 impl<'buf> WireOptionalMainProtocol_TwoWayLocalWithError_Result<'buf> {
@@ -2196,6 +2323,7 @@ impl<'buf> WireOptionalMainProtocol_TwoWayLocalWithError_Result<'buf> {
         if self.is_some() {
             Some(WireMainProtocol_TwoWayLocalWithError_Result {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -2205,27 +2333,27 @@ impl<'buf> WireOptionalMainProtocol_TwoWayLocalWithError_Result<'buf> {
 
 impl<'buf> Default for WireOptionalMainProtocol_TwoWayLocalWithError_Result<'buf> {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalMainProtocol_TwoWayLocalWithError_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    crate::WireUnionPayload<'buf>: ::fidl_next::Decode<___D>,
+    crate::WireUnionPayload: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireUnionPayload<'buf>>(
-                raw, decoder,
-            )?,
+            1 => {
+                ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireUnionPayload>(raw, decoder)?
+            }
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
@@ -2276,9 +2404,9 @@ where
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope<'_>>::uninit();
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
         let mut preallocated =
-            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope<'_>>(encoder, max_ord);
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl_next::Slot::new(&mut backing);
@@ -2378,7 +2506,7 @@ pub enum MainProtocolTwoWayAnonRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonRequest {
-    type Encoded<'buf> = WireMainProtocolTwoWayAnonRequest<'buf>;
+    type Encoded<'buf> = WireMainProtocolTwoWayAnonRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonRequest
@@ -2392,7 +2520,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireMainProtocolTwoWayAnonRequest { raw } = slot);
+        ::fidl_next::munge!(let WireMainProtocolTwoWayAnonRequest { raw, _phantom: _ } = slot);
 
         match self {
             Self::B(value) => {
@@ -2409,7 +2537,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<MainProtocolTwoWayAnonRequest> {
-    type EncodedOption<'buf> = WireOptionalMainProtocolTwoWayAnonRequest<'buf>;
+    type EncodedOption<'buf> = WireOptionalMainProtocolTwoWayAnonRequest;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolTwoWayAnonRequest>
@@ -2422,7 +2550,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalMainProtocolTwoWayAnonRequest { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalMainProtocolTwoWayAnonRequest { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -2435,10 +2563,8 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonRequest<'buf>>
-    for MainProtocolTwoWayAnonRequest
-{
-    fn take_from(from: &mut WireMainProtocolTwoWayAnonRequest<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonRequest> for MainProtocolTwoWayAnonRequest {
+    fn take_from(from: &mut WireMainProtocolTwoWayAnonRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
                 from.raw.get_mut().deref_mut_unchecked()
@@ -2449,10 +2575,10 @@ impl<'buf> ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonRequest<'buf>>
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalMainProtocolTwoWayAnonRequest<'buf>>
+impl ::fidl_next::TakeFrom<WireOptionalMainProtocolTwoWayAnonRequest>
     for Option<Box<MainProtocolTwoWayAnonRequest>>
 {
-    fn take_from(from: &mut WireOptionalMainProtocolTwoWayAnonRequest<'buf>) -> Self {
+    fn take_from(from: &mut WireOptionalMainProtocolTwoWayAnonRequest) -> Self {
         if let Some(inner) = from.as_mut() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
@@ -2462,21 +2588,22 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalMainProtocolTwoWayAnonRequest<'buf>
 }
 
 #[repr(transparent)]
-pub struct WireMainProtocolTwoWayAnonRequest<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireMainProtocolTwoWayAnonRequest {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireMainProtocolTwoWayAnonRequestRef<'buf> {
-    B(&'buf bool),
+pub enum WireMainProtocolTwoWayAnonRequestRef<'union> {
+    B(&'union bool),
     Unknown(u64),
 }
 
-pub enum WireMainProtocolTwoWayAnonRequestMut<'buf> {
-    B(&'buf mut bool),
+pub enum WireMainProtocolTwoWayAnonRequestMut<'union> {
+    B(&'union mut bool),
     Unknown(u64),
 }
 
-impl WireMainProtocolTwoWayAnonRequest<'_> {
+impl WireMainProtocolTwoWayAnonRequest {
     pub fn as_ref(&self) -> WireMainProtocolTwoWayAnonRequestRef<'_> {
         match self.raw.ordinal() {
             1 => {
@@ -2496,9 +2623,24 @@ impl WireMainProtocolTwoWayAnonRequest<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonRequest<'buf>
+impl Clone for WireMainProtocolTwoWayAnonRequest {
+    fn clone(&self) -> Self {
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => Self {
+                raw: unsafe { self.raw.clone_unchecked::<()>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -2506,17 +2648,17 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireMainProtocolTwoWayAnonRequest<'buf> {
+impl ::core::fmt::Debug for WireMainProtocolTwoWayAnonRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<bool>().fmt(f) },
@@ -2527,11 +2669,12 @@ impl<'buf> ::core::fmt::Debug for WireMainProtocolTwoWayAnonRequest<'buf> {
 }
 
 #[repr(transparent)]
-pub struct WireOptionalMainProtocolTwoWayAnonRequest<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireOptionalMainProtocolTwoWayAnonRequest {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-impl<'buf> WireOptionalMainProtocolTwoWayAnonRequest<'buf> {
+impl WireOptionalMainProtocolTwoWayAnonRequest {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -2540,7 +2683,7 @@ impl<'buf> WireOptionalMainProtocolTwoWayAnonRequest<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireMainProtocolTwoWayAnonRequest<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireMainProtocolTwoWayAnonRequest> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
@@ -2548,7 +2691,7 @@ impl<'buf> WireOptionalMainProtocolTwoWayAnonRequest<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> Option<&mut WireMainProtocolTwoWayAnonRequest<'buf>> {
+    pub fn as_mut(&mut self) -> Option<&mut WireMainProtocolTwoWayAnonRequest> {
         if self.is_some() {
             Some(unsafe { &mut *(self as *mut Self).cast() })
         } else {
@@ -2556,10 +2699,11 @@ impl<'buf> WireOptionalMainProtocolTwoWayAnonRequest<'buf> {
         }
     }
 
-    pub fn take(&mut self) -> Option<WireMainProtocolTwoWayAnonRequest<'buf>> {
+    pub fn take(&mut self) -> Option<WireMainProtocolTwoWayAnonRequest> {
         if self.is_some() {
             Some(WireMainProtocolTwoWayAnonRequest {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -2567,16 +2711,37 @@ impl<'buf> WireOptionalMainProtocolTwoWayAnonRequest<'buf> {
     }
 }
 
-impl<'buf> Default for WireOptionalMainProtocolTwoWayAnonRequest<'buf> {
+impl Default for WireOptionalMainProtocolTwoWayAnonRequest {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireOptionalMainProtocolTwoWayAnonRequest<'buf>
+impl Clone for WireOptionalMainProtocolTwoWayAnonRequest {
+    fn clone(&self) -> Self {
+        if self.is_none() {
+            return WireOptionalMainProtocolTwoWayAnonRequest {
+                raw: ::fidl_next::RawWireUnion::null(),
+                _phantom: ::core::marker::PhantomData,
+            };
+        }
+
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => Self {
+                raw: unsafe { self.raw.clone_unchecked::<()>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalMainProtocolTwoWayAnonRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -2584,19 +2749,19 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalMainProtocolTwoWayAnonRequest<'buf> {
+impl ::core::fmt::Debug for WireOptionalMainProtocolTwoWayAnonRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -2636,9 +2801,9 @@ where
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope<'_>>::uninit();
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
         let mut preallocated =
-            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope<'_>>(encoder, max_ord);
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl_next::Slot::new(&mut backing);
@@ -2764,9 +2929,9 @@ where
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope<'_>>::uninit();
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
         let mut preallocated =
-            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope<'_>>(encoder, max_ord);
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl_next::Slot::new(&mut backing);
@@ -2867,7 +3032,7 @@ pub enum MainProtocol_TwoWayAnonWithError_Response {
 }
 
 impl ::fidl_next::Encodable for MainProtocol_TwoWayAnonWithError_Response {
-    type Encoded<'buf> = WireMainProtocol_TwoWayAnonWithError_Response<'buf>;
+    type Encoded<'buf> = WireMainProtocol_TwoWayAnonWithError_Response;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for MainProtocol_TwoWayAnonWithError_Response
@@ -2881,7 +3046,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireMainProtocol_TwoWayAnonWithError_Response { raw } = slot);
+        ::fidl_next::munge!(let WireMainProtocol_TwoWayAnonWithError_Response { raw, _phantom: _ } = slot);
 
         match self {
             Self::B(value) => {
@@ -2898,7 +3063,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<MainProtocol_TwoWayAnonWithError_Response> {
-    type EncodedOption<'buf> = WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf>;
+    type EncodedOption<'buf> = WireOptionalMainProtocol_TwoWayAnonWithError_Response;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocol_TwoWayAnonWithError_Response>
@@ -2911,7 +3076,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalMainProtocol_TwoWayAnonWithError_Response { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalMainProtocol_TwoWayAnonWithError_Response { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -2924,10 +3089,10 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireMainProtocol_TwoWayAnonWithError_Response<'buf>>
+impl ::fidl_next::TakeFrom<WireMainProtocol_TwoWayAnonWithError_Response>
     for MainProtocol_TwoWayAnonWithError_Response
 {
-    fn take_from(from: &mut WireMainProtocol_TwoWayAnonWithError_Response<'buf>) -> Self {
+    fn take_from(from: &mut WireMainProtocol_TwoWayAnonWithError_Response) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
                 from.raw.get_mut().deref_mut_unchecked()
@@ -2938,10 +3103,10 @@ impl<'buf> ::fidl_next::TakeFrom<WireMainProtocol_TwoWayAnonWithError_Response<'
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf>>
+impl ::fidl_next::TakeFrom<WireOptionalMainProtocol_TwoWayAnonWithError_Response>
     for Option<Box<MainProtocol_TwoWayAnonWithError_Response>>
 {
-    fn take_from(from: &mut WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf>) -> Self {
+    fn take_from(from: &mut WireOptionalMainProtocol_TwoWayAnonWithError_Response) -> Self {
         if let Some(inner) = from.as_mut() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
@@ -2951,21 +3116,22 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalMainProtocol_TwoWayAnonWithError_Re
 }
 
 #[repr(transparent)]
-pub struct WireMainProtocol_TwoWayAnonWithError_Response<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireMainProtocol_TwoWayAnonWithError_Response {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireMainProtocol_TwoWayAnonWithError_ResponseRef<'buf> {
-    B(&'buf bool),
+pub enum WireMainProtocol_TwoWayAnonWithError_ResponseRef<'union> {
+    B(&'union bool),
     Unknown(u64),
 }
 
-pub enum WireMainProtocol_TwoWayAnonWithError_ResponseMut<'buf> {
-    B(&'buf mut bool),
+pub enum WireMainProtocol_TwoWayAnonWithError_ResponseMut<'union> {
+    B(&'union mut bool),
     Unknown(u64),
 }
 
-impl WireMainProtocol_TwoWayAnonWithError_Response<'_> {
+impl WireMainProtocol_TwoWayAnonWithError_Response {
     pub fn as_ref(&self) -> WireMainProtocol_TwoWayAnonWithError_ResponseRef<'_> {
         match self.raw.ordinal() {
             1 => WireMainProtocol_TwoWayAnonWithError_ResponseRef::B(unsafe {
@@ -2985,10 +3151,25 @@ impl WireMainProtocol_TwoWayAnonWithError_Response<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireMainProtocol_TwoWayAnonWithError_Response<'buf>
+impl Clone for WireMainProtocol_TwoWayAnonWithError_Response {
+    fn clone(&self) -> Self {
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => Self {
+                raw: unsafe { self.raw.clone_unchecked::<()>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+    for WireMainProtocol_TwoWayAnonWithError_Response
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -2996,17 +3177,17 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireMainProtocol_TwoWayAnonWithError_Response<'buf> {
+impl ::core::fmt::Debug for WireMainProtocol_TwoWayAnonWithError_Response {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<bool>().fmt(f) },
@@ -3017,11 +3198,12 @@ impl<'buf> ::core::fmt::Debug for WireMainProtocol_TwoWayAnonWithError_Response<
 }
 
 #[repr(transparent)]
-pub struct WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireOptionalMainProtocol_TwoWayAnonWithError_Response {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-impl<'buf> WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf> {
+impl WireOptionalMainProtocol_TwoWayAnonWithError_Response {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -3030,7 +3212,7 @@ impl<'buf> WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireMainProtocol_TwoWayAnonWithError_Response<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireMainProtocol_TwoWayAnonWithError_Response> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
@@ -3038,7 +3220,7 @@ impl<'buf> WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> Option<&mut WireMainProtocol_TwoWayAnonWithError_Response<'buf>> {
+    pub fn as_mut(&mut self) -> Option<&mut WireMainProtocol_TwoWayAnonWithError_Response> {
         if self.is_some() {
             Some(unsafe { &mut *(self as *mut Self).cast() })
         } else {
@@ -3046,10 +3228,11 @@ impl<'buf> WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf> {
         }
     }
 
-    pub fn take(&mut self) -> Option<WireMainProtocol_TwoWayAnonWithError_Response<'buf>> {
+    pub fn take(&mut self) -> Option<WireMainProtocol_TwoWayAnonWithError_Response> {
         if self.is_some() {
             Some(WireMainProtocol_TwoWayAnonWithError_Response {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -3057,16 +3240,38 @@ impl<'buf> WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf> {
     }
 }
 
-impl<'buf> Default for WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf> {
+impl Default for WireOptionalMainProtocol_TwoWayAnonWithError_Response {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf>
+impl Clone for WireOptionalMainProtocol_TwoWayAnonWithError_Response {
+    fn clone(&self) -> Self {
+        if self.is_none() {
+            return WireOptionalMainProtocol_TwoWayAnonWithError_Response {
+                raw: ::fidl_next::RawWireUnion::null(),
+                _phantom: ::core::marker::PhantomData,
+            };
+        }
+
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => Self {
+                raw: unsafe { self.raw.clone_unchecked::<()>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
+    for WireOptionalMainProtocol_TwoWayAnonWithError_Response
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3074,19 +3279,19 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalMainProtocol_TwoWayAnonWithError_Response<'buf> {
+impl ::core::fmt::Debug for WireOptionalMainProtocol_TwoWayAnonWithError_Response {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -3115,7 +3320,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireMainProtocol_TwoWayAnonWithError_Result { raw } = slot);
+        ::fidl_next::munge!(let WireMainProtocol_TwoWayAnonWithError_Result { raw, _phantom: _ } = slot);
 
         match self {
             Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
@@ -3145,7 +3350,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalMainProtocol_TwoWayAnonWithError_Result { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalMainProtocol_TwoWayAnonWithError_Result { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -3190,20 +3395,21 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalMainProtocol_TwoWayAnonWithError_Re
 
 #[repr(transparent)]
 pub struct WireMainProtocol_TwoWayAnonWithError_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireMainProtocol_TwoWayAnonWithError_ResultRef<'buf> {
-    Response(&'buf crate::WireMainProtocol_TwoWayAnonWithError_Response<'buf>),
-    Err(&'buf ::fidl_next::u32_le),
+pub enum WireMainProtocol_TwoWayAnonWithError_ResultRef<'union> {
+    Response(&'union crate::WireMainProtocol_TwoWayAnonWithError_Response),
+    Err(&'union ::fidl_next::u32_le),
 }
 
-pub enum WireMainProtocol_TwoWayAnonWithError_ResultMut<'buf> {
-    Response(&'buf mut crate::WireMainProtocol_TwoWayAnonWithError_Response<'buf>),
-    Err(&'buf mut ::fidl_next::u32_le),
+pub enum WireMainProtocol_TwoWayAnonWithError_ResultMut<'union> {
+    Response(&'union mut crate::WireMainProtocol_TwoWayAnonWithError_Response),
+    Err(&'union mut ::fidl_next::u32_le),
 }
 
-impl WireMainProtocol_TwoWayAnonWithError_Result<'_> {
+impl<'buf> WireMainProtocol_TwoWayAnonWithError_Result<'buf> {
     pub fn as_ref(&self) -> WireMainProtocol_TwoWayAnonWithError_ResultRef<'_> {
         match self.raw.ordinal() {
             1 => WireMainProtocol_TwoWayAnonWithError_ResultRef::Response(unsafe {
@@ -3231,23 +3437,23 @@ impl WireMainProtocol_TwoWayAnonWithError_Result<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireMainProtocol_TwoWayAnonWithError_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    crate::WireMainProtocol_TwoWayAnonWithError_Response<'buf>: ::fidl_next::Decode<___D>,
+    crate::WireMainProtocol_TwoWayAnonWithError_Response: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<
                 ___D,
-                crate::WireMainProtocol_TwoWayAnonWithError_Response<'buf>,
+                crate::WireMainProtocol_TwoWayAnonWithError_Response,
             >(raw, decoder)?,
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
@@ -3264,7 +3470,7 @@ impl<'buf> ::core::fmt::Debug for WireMainProtocol_TwoWayAnonWithError_Result<'b
             1 => unsafe {
                 self.raw
                     .get()
-                    .deref_unchecked::<crate::WireMainProtocol_TwoWayAnonWithError_Response<'buf>>()
+                    .deref_unchecked::<crate::WireMainProtocol_TwoWayAnonWithError_Response>()
                     .fmt(f)
             },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
@@ -3276,7 +3482,8 @@ impl<'buf> ::core::fmt::Debug for WireMainProtocol_TwoWayAnonWithError_Result<'b
 
 #[repr(transparent)]
 pub struct WireOptionalMainProtocol_TwoWayAnonWithError_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 impl<'buf> WireOptionalMainProtocol_TwoWayAnonWithError_Result<'buf> {
@@ -3308,6 +3515,7 @@ impl<'buf> WireOptionalMainProtocol_TwoWayAnonWithError_Result<'buf> {
         if self.is_some() {
             Some(WireMainProtocol_TwoWayAnonWithError_Result {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -3317,27 +3525,27 @@ impl<'buf> WireOptionalMainProtocol_TwoWayAnonWithError_Result<'buf> {
 
 impl<'buf> Default for WireOptionalMainProtocol_TwoWayAnonWithError_Result<'buf> {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalMainProtocol_TwoWayAnonWithError_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
-    crate::WireMainProtocol_TwoWayAnonWithError_Response<'buf>: ::fidl_next::Decode<___D>,
+    crate::WireMainProtocol_TwoWayAnonWithError_Response: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<
                 ___D,
-                crate::WireMainProtocol_TwoWayAnonWithError_Response<'buf>,
+                crate::WireMainProtocol_TwoWayAnonWithError_Response,
             >(raw, decoder)?,
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
 
@@ -3363,7 +3571,7 @@ pub enum MainProtocolOnAnonRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolOnAnonRequest {
-    type Encoded<'buf> = WireMainProtocolOnAnonRequest<'buf>;
+    type Encoded<'buf> = WireMainProtocolOnAnonRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for MainProtocolOnAnonRequest
@@ -3377,7 +3585,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireMainProtocolOnAnonRequest { raw } = slot);
+        ::fidl_next::munge!(let WireMainProtocolOnAnonRequest { raw, _phantom: _ } = slot);
 
         match self {
             Self::B(value) => {
@@ -3394,7 +3602,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<MainProtocolOnAnonRequest> {
-    type EncodedOption<'buf> = WireOptionalMainProtocolOnAnonRequest<'buf>;
+    type EncodedOption<'buf> = WireOptionalMainProtocolOnAnonRequest;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<MainProtocolOnAnonRequest>
@@ -3407,7 +3615,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalMainProtocolOnAnonRequest { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalMainProtocolOnAnonRequest { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -3420,10 +3628,8 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireMainProtocolOnAnonRequest<'buf>>
-    for MainProtocolOnAnonRequest
-{
-    fn take_from(from: &mut WireMainProtocolOnAnonRequest<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireMainProtocolOnAnonRequest> for MainProtocolOnAnonRequest {
+    fn take_from(from: &mut WireMainProtocolOnAnonRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
                 from.raw.get_mut().deref_mut_unchecked()
@@ -3434,10 +3640,10 @@ impl<'buf> ::fidl_next::TakeFrom<WireMainProtocolOnAnonRequest<'buf>>
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalMainProtocolOnAnonRequest<'buf>>
+impl ::fidl_next::TakeFrom<WireOptionalMainProtocolOnAnonRequest>
     for Option<Box<MainProtocolOnAnonRequest>>
 {
-    fn take_from(from: &mut WireOptionalMainProtocolOnAnonRequest<'buf>) -> Self {
+    fn take_from(from: &mut WireOptionalMainProtocolOnAnonRequest) -> Self {
         if let Some(inner) = from.as_mut() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
@@ -3447,21 +3653,22 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalMainProtocolOnAnonRequest<'buf>>
 }
 
 #[repr(transparent)]
-pub struct WireMainProtocolOnAnonRequest<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireMainProtocolOnAnonRequest {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub enum WireMainProtocolOnAnonRequestRef<'buf> {
-    B(&'buf bool),
+pub enum WireMainProtocolOnAnonRequestRef<'union> {
+    B(&'union bool),
     Unknown(u64),
 }
 
-pub enum WireMainProtocolOnAnonRequestMut<'buf> {
-    B(&'buf mut bool),
+pub enum WireMainProtocolOnAnonRequestMut<'union> {
+    B(&'union mut bool),
     Unknown(u64),
 }
 
-impl WireMainProtocolOnAnonRequest<'_> {
+impl WireMainProtocolOnAnonRequest {
     pub fn as_ref(&self) -> WireMainProtocolOnAnonRequestRef<'_> {
         match self.raw.ordinal() {
             1 => WireMainProtocolOnAnonRequestRef::B(unsafe { self.raw.get().deref_unchecked() }),
@@ -3479,9 +3686,24 @@ impl WireMainProtocolOnAnonRequest<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireMainProtocolOnAnonRequest<'buf>
+impl Clone for WireMainProtocolOnAnonRequest {
+    fn clone(&self) -> Self {
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => Self {
+                raw: unsafe { self.raw.clone_unchecked::<()>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolOnAnonRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3489,17 +3711,17 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireMainProtocolOnAnonRequest<'buf> {
+impl ::core::fmt::Debug for WireMainProtocolOnAnonRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<bool>().fmt(f) },
@@ -3510,11 +3732,12 @@ impl<'buf> ::core::fmt::Debug for WireMainProtocolOnAnonRequest<'buf> {
 }
 
 #[repr(transparent)]
-pub struct WireOptionalMainProtocolOnAnonRequest<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+pub struct WireOptionalMainProtocolOnAnonRequest {
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<()>,
 }
 
-impl<'buf> WireOptionalMainProtocolOnAnonRequest<'buf> {
+impl WireOptionalMainProtocolOnAnonRequest {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -3523,7 +3746,7 @@ impl<'buf> WireOptionalMainProtocolOnAnonRequest<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireMainProtocolOnAnonRequest<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireMainProtocolOnAnonRequest> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
@@ -3531,7 +3754,7 @@ impl<'buf> WireOptionalMainProtocolOnAnonRequest<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> Option<&mut WireMainProtocolOnAnonRequest<'buf>> {
+    pub fn as_mut(&mut self) -> Option<&mut WireMainProtocolOnAnonRequest> {
         if self.is_some() {
             Some(unsafe { &mut *(self as *mut Self).cast() })
         } else {
@@ -3539,10 +3762,11 @@ impl<'buf> WireOptionalMainProtocolOnAnonRequest<'buf> {
         }
     }
 
-    pub fn take(&mut self) -> Option<WireMainProtocolOnAnonRequest<'buf>> {
+    pub fn take(&mut self) -> Option<WireMainProtocolOnAnonRequest> {
         if self.is_some() {
             Some(WireMainProtocolOnAnonRequest {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -3550,15 +3774,37 @@ impl<'buf> WireOptionalMainProtocolOnAnonRequest<'buf> {
     }
 }
 
-impl<'buf> Default for WireOptionalMainProtocolOnAnonRequest<'buf> {
+impl Default for WireOptionalMainProtocolOnAnonRequest {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalMainProtocolOnAnonRequest<'buf>
+impl Clone for WireOptionalMainProtocolOnAnonRequest {
+    fn clone(&self) -> Self {
+        if self.is_none() {
+            return WireOptionalMainProtocolOnAnonRequest {
+                raw: ::fidl_next::RawWireUnion::null(),
+                _phantom: ::core::marker::PhantomData,
+            };
+        }
+
+        match self.raw.ordinal() {
+            1 => Self {
+                raw: unsafe { self.raw.clone_unchecked::<bool>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+            _ => Self {
+                raw: unsafe { self.raw.clone_unchecked::<()>() },
+                _phantom: ::core::marker::PhantomData,
+            },
+        }
+    }
+}
+
+unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalMainProtocolOnAnonRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3566,19 +3812,19 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, bool>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, bool>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
-            _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
+            _ => ::fidl_next::RawWireUnion::decode_unknown_static(raw, decoder)?,
         }
 
         Ok(())
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalMainProtocolOnAnonRequest<'buf> {
+impl ::core::fmt::Debug for WireOptionalMainProtocolOnAnonRequest {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }

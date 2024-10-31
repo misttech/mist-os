@@ -17,6 +17,9 @@ pub fn emit_union<W: Write>(
     let u = &compiler.schema.union_declarations[ident];
 
     let name = &u.name.type_name();
+    let is_static = u.shape.max_out_of_line == 0;
+
+    let params = if is_static { "" } else { "<'buf>" };
 
     // Write natural type
 
@@ -54,7 +57,7 @@ pub fn emit_union<W: Write>(
         out,
         r#"
         impl ::fidl_next::Encodable for {name} {{
-            type Encoded<'buf> = Wire{name}<'buf>;
+            type Encoded<'buf> = Wire{name}{params};
         }}
 
         impl<___E> ::fidl_next::Encode<___E> for {name}
@@ -77,7 +80,7 @@ pub fn emit_union<W: Write>(
                 encoder: &mut ___E,
                 slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
             ) -> Result<(), ::fidl_next::EncodeError> {{
-                ::fidl_next::munge!(let Wire{name} {{ raw }} = slot);
+                ::fidl_next::munge!(let Wire{name} {{ raw, _phantom: _ }} = slot);
 
                 match self {{
         "#,
@@ -118,7 +121,7 @@ pub fn emit_union<W: Write>(
         }}
 
         impl ::fidl_next::EncodableOption for Box<{name}> {{
-            type EncodedOption<'buf> = WireOptional{name}<'buf>;
+            type EncodedOption<'buf> = WireOptional{name}{params};
         }}
 
         impl<___E> ::fidl_next::EncodeOption<___E> for Box<{name}>
@@ -131,7 +134,7 @@ pub fn emit_union<W: Write>(
                 encoder: &mut ___E,
                 mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
             ) -> Result<(), ::fidl_next::EncodeError> {{
-                ::fidl_next::munge!(let WireOptional{name} {{ raw }} = slot.as_mut());
+                ::fidl_next::munge!(let WireOptional{name} {{ raw, _phantom: _ }} = slot.as_mut());
 
                 if let Some(inner) = this {{
                     let slot = unsafe {{
@@ -157,8 +160,8 @@ pub fn emit_union<W: Write>(
     writeln!(
         out,
         r#"
-        impl<'buf> ::fidl_next::TakeFrom<Wire{name}<'buf>> for {name} {{
-            fn take_from(from: &mut Wire{name}<'buf>) -> Self {{
+        impl{params} ::fidl_next::TakeFrom<Wire{name}{params}> for {name} {{
+            fn take_from(from: &mut Wire{name}{params}) -> Self {{
                 match from.raw.ordinal() {{
         "#,
     )?;
@@ -185,10 +188,10 @@ pub fn emit_union<W: Write>(
             }}
         }}
 
-        impl<'buf> ::fidl_next::TakeFrom<WireOptional{name}<'buf>>
+        impl{params} ::fidl_next::TakeFrom<WireOptional{name}{params}>
             for Option<Box<{name}>>
         {{
-            fn take_from(from: &mut WireOptional{name}<'buf>) -> Self {{
+            fn take_from(from: &mut WireOptional{name}{params}) -> Self {{
                 if let Some(inner) = from.as_mut() {{
                     Some(::fidl_next::TakeFrom::take_from(inner))
                 }} else {{

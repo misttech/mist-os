@@ -7,6 +7,7 @@ use core::num::NonZeroI64;
 use serde::Deserialize;
 
 use super::r#type::Type;
+use super::type_shape::TypeShape;
 use super::{Attributes, CompIdent};
 use crate::de::Index;
 
@@ -20,6 +21,8 @@ pub struct Union {
     pub is_resource: bool,
     #[serde(rename = "strict")]
     pub is_strict: bool,
+    #[serde(rename = "type_shape_v2")]
+    pub shape: TypeShape,
 }
 
 impl Index for Union {

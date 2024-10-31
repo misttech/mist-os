@@ -18,7 +18,6 @@ if (is_host) {
       "src/compiler/natural/struct.rs",
       "src/compiler/natural/table.rs",
       "src/compiler/natural/union.rs",
-      "src/compiler/query.rs",
       "src/compiler/resource_binding.rs",
       "src/compiler/util.rs",
       "src/compiler/wire/enum.rs",
@@ -41,6 +40,7 @@ if (is_host) {
       "src/ir/struct.rs",
       "src/ir/table.rs",
       "src/ir/type.rs",
+      "src/ir/type_shape.rs",
       "src/ir/union.rs",
       "src/main.rs",
     ]

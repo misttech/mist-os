@@ -9,12 +9,11 @@ mod r#union;
 
 use std::io::{Error, Write};
 
-use crate::compiler::query::IsWireStatic;
 use crate::compiler::util::{
     emit_prefixed_comp_ident, emit_wire_comp_ident, prim_subtype_wire_name,
 };
 use crate::compiler::Compiler;
-use crate::ir::{DeclType, EndpointRole, InternalSubtype, Type};
+use crate::ir::{DeclType, EndpointRole, InternalSubtype, Type, TypeKind};
 
 pub use self::r#enum::emit_enum;
 pub use self::r#struct::emit_struct;
@@ -22,13 +21,13 @@ pub use self::r#union::emit_union;
 pub use self::table::emit_table;
 
 fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> Result<(), Error> {
-    match &ty {
-        Type::Array { element_type, element_count } => {
+    match &ty.kind {
+        TypeKind::Array { element_type, element_count } => {
             write!(out, "[")?;
             emit_type(compiler, out, element_type)?;
             write!(out, "; {element_count}]")?;
         }
-        Type::Vector { element_type, nullable, .. } => {
+        TypeKind::Vector { element_type, nullable, .. } => {
             if *nullable {
                 write!(out, "::fidl_next::WireOptionalVector<'buf, ")?;
             } else {
@@ -37,7 +36,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
             emit_type(compiler, out, element_type)?;
             write!(out, ">")?;
         }
-        Type::String { nullable, .. } => {
+        TypeKind::String { nullable, .. } => {
             if *nullable {
                 write!(out, "::fidl_next::WireOptionalString<'buf>")?;
             } else {
@@ -45,14 +44,14 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
             }
         }
         // Handle and request could eventually be unified under "resource types"
-        Type::Handle { nullable, .. } => {
+        TypeKind::Handle { nullable, .. } => {
             if !*nullable {
                 write!(out, "{}", compiler.config.resource_bindings.handle.wire_path)?;
             } else {
                 write!(out, "{}", compiler.config.resource_bindings.handle.optional_wire_path)?;
             }
         }
-        Type::Endpoint { nullable, role, .. } => {
+        TypeKind::Endpoint { nullable, role, .. } => {
             write!(out, "::fidl_next::EndpointResource<")?;
             if !*nullable {
                 write!(out, "{}", compiler.config.resource_bindings.handle.wire_path)?;
@@ -68,10 +67,10 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 },
             )?;
         }
-        Type::Primitive { subtype } => {
+        TypeKind::Primitive { subtype } => {
             write!(out, "{}", prim_subtype_wire_name(*subtype))?;
         }
-        Type::Identifier { identifier, nullable, .. } => {
+        TypeKind::Identifier { identifier, nullable, .. } => {
             match compiler.schema.declarations[identifier] {
                 DeclType::Enum => {
                     emit_wire_comp_ident(compiler, out, identifier)?;
@@ -85,7 +84,8 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                         write!(out, "::fidl_next::WireBox<'buf, ")?;
                     }
                     emit_wire_comp_ident(compiler, out, identifier)?;
-                    if !compiler.query::<IsWireStatic>(identifier) {
+                    let s = &compiler.schema.struct_declarations[identifier];
+                    if s.shape.max_out_of_line != 0 {
                         write!(out, "<'buf>")?;
                     }
                     if *nullable {
@@ -98,7 +98,10 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                     } else {
                         emit_wire_comp_ident(compiler, out, identifier)?;
                     }
-                    write!(out, "<'buf>")?;
+                    let u = &compiler.schema.union_declarations[identifier];
+                    if u.shape.max_out_of_line != 0 {
+                        write!(out, "<'buf>")?;
+                    }
                 }
                 DeclType::Protocol => todo!(),
                 DeclType::Alias => todo!(),
@@ -110,7 +113,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 DeclType::Service => todo!(),
             }
         }
-        Type::Internal { subtype } => match subtype {
+        TypeKind::Internal { subtype } => match subtype {
             InternalSubtype::FrameworkError => write!(out, "::fidl_next::FrameworkError")?,
         },
     }
@@ -122,11 +125,11 @@ fn emit_type_check<W: Write>(
     out: &mut W,
     write_deref: impl FnOnce(&mut W) -> Result<(), Error>,
     name: &str,
-    kind: &Type,
+    ty: &Type,
 ) -> Result<(), Error> {
-    match kind {
-        Type::Array { .. } => (),
-        Type::Vector { element_count, nullable, .. } => {
+    match &ty.kind {
+        TypeKind::Array { .. } => (),
+        TypeKind::Vector { element_count, nullable, .. } => {
             if let Some(limit) = element_count {
                 write_deref(out)?;
                 if *nullable {
@@ -148,7 +151,7 @@ fn emit_type_check<W: Write>(
                 }
             }
         }
-        Type::String { element_count, nullable } => {
+        TypeKind::String { element_count, nullable } => {
             if let Some(limit) = element_count {
                 write_deref(out)?;
                 if *nullable {
@@ -170,11 +173,11 @@ fn emit_type_check<W: Write>(
                 }
             }
         }
-        Type::Handle { .. }
-        | Type::Endpoint { .. }
-        | Type::Primitive { .. }
-        | Type::Identifier { .. } => (),
-        Type::Internal { subtype } => match subtype {
+        TypeKind::Handle { .. }
+        | TypeKind::Endpoint { .. }
+        | TypeKind::Primitive { .. }
+        | TypeKind::Identifier { .. } => (),
+        TypeKind::Internal { subtype } => match subtype {
             InternalSubtype::FrameworkError => (),
         },
     }

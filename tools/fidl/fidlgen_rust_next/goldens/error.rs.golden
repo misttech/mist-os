@@ -202,7 +202,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireExample_foo_Result { raw } = slot);
+        ::fidl_next::munge!(let WireExample_foo_Result { raw, _phantom: _ } = slot);
 
         match self {
             Self::Response(value) => ::fidl_next::RawWireUnion::encode_as::<
@@ -232,7 +232,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalExample_foo_Result { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalExample_foo_Result { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -275,20 +275,21 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalExample_foo_Result<'buf>>
 
 #[repr(transparent)]
 pub struct WireExample_foo_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireExample_foo_ResultRef<'buf> {
-    Response(&'buf crate::WireExample_foo_Response),
-    Err(&'buf ::fidl_next::u32_le),
+pub enum WireExample_foo_ResultRef<'union> {
+    Response(&'union crate::WireExample_foo_Response),
+    Err(&'union ::fidl_next::u32_le),
 }
 
-pub enum WireExample_foo_ResultMut<'buf> {
-    Response(&'buf mut crate::WireExample_foo_Response),
-    Err(&'buf mut ::fidl_next::u32_le),
+pub enum WireExample_foo_ResultMut<'union> {
+    Response(&'union mut crate::WireExample_foo_Response),
+    Err(&'union mut ::fidl_next::u32_le),
 }
 
-impl WireExample_foo_Result<'_> {
+impl<'buf> WireExample_foo_Result<'buf> {
     pub fn as_ref(&self) -> WireExample_foo_ResultRef<'_> {
         match self.raw.ordinal() {
             1 => WireExample_foo_ResultRef::Response(unsafe { self.raw.get().deref_unchecked() }),
@@ -312,9 +313,9 @@ impl WireExample_foo_Result<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExample_foo_Result<'buf>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireExample_foo_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
     crate::WireExample_foo_Response: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
@@ -323,7 +324,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireExample_foo_Response>(
                 raw, decoder,
@@ -352,7 +353,8 @@ impl<'buf> ::core::fmt::Debug for WireExample_foo_Result<'buf> {
 
 #[repr(transparent)]
 pub struct WireOptionalExample_foo_Result<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 impl<'buf> WireOptionalExample_foo_Result<'buf> {
@@ -384,6 +386,7 @@ impl<'buf> WireOptionalExample_foo_Result<'buf> {
         if self.is_some() {
             Some(WireExample_foo_Result {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -393,13 +396,13 @@ impl<'buf> WireOptionalExample_foo_Result<'buf> {
 
 impl<'buf> Default for WireOptionalExample_foo_Result<'buf> {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalExample_foo_Result<'buf>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalExample_foo_Result<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
     crate::WireExample_foo_Response: ::fidl_next::Decode<___D>,
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
@@ -408,7 +411,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireExample_foo_Response>(
                 raw, decoder,

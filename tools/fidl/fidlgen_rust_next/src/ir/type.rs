@@ -4,7 +4,7 @@
 
 use serde::Deserialize;
 
-use crate::ir::{CompIdent, HandleRights, HandleSubtype, PrimSubtype};
+use crate::ir::{CompIdent, HandleRights, HandleSubtype, PrimSubtype, TypeShape};
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -14,8 +14,16 @@ pub enum EndpointRole {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+pub struct Type {
+    #[serde(flatten)]
+    pub kind: TypeKind,
+    #[serde(rename = "type_shape_v2")]
+    pub shape: TypeShape,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "kind_v2", rename_all = "snake_case")]
-pub enum Type {
+pub enum TypeKind {
     Array {
         element_type: Box<Type>,
         element_count: u32,

@@ -4,16 +4,17 @@
 
 use munge::munge;
 
+use crate::decoder::InternalHandleDecoder;
 use crate::{decode, encode, u64_le, Decode, Decoder, Encode, Encoder, Slot, WireEnvelope};
 
 /// A raw FIDL union
 #[repr(C)]
-pub struct RawWireUnion<'buf> {
+pub struct RawWireUnion {
     ordinal: u64_le,
-    envelope: WireEnvelope<'buf>,
+    envelope: WireEnvelope,
 }
 
-impl<'buf> RawWireUnion<'buf> {
+impl RawWireUnion {
     /// Encodes that a union is absent in a slot.
     pub fn encode_absent(slot: Slot<'_, Self>) {
         munge!(let Self { mut ordinal, envelope } = slot);
@@ -50,10 +51,21 @@ impl<'buf> RawWireUnion<'buf> {
         Ok(())
     }
 
+    /// Decodes an unknown `'static` value from a union.
+    ///
+    /// The handles owned by the unknown value are discarded.
+    pub fn decode_unknown_static<D: InternalHandleDecoder + ?Sized>(
+        slot: Slot<'_, Self>,
+        decoder: &mut D,
+    ) -> Result<(), decode::DecodeError> {
+        munge!(let Self { ordinal: _, envelope } = slot);
+        WireEnvelope::decode_unknown_static(envelope, decoder)
+    }
+
     /// Decodes an unknown value from a union.
     ///
     /// The handles owned by the unknown value are discarded.
-    pub fn decode_unknown<D: Decoder<'buf> + ?Sized>(
+    pub fn decode_unknown<'buf, D: Decoder<'buf> + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
     ) -> Result<(), decode::DecodeError> {
@@ -61,8 +73,17 @@ impl<'buf> RawWireUnion<'buf> {
         WireEnvelope::decode_unknown(envelope, decoder)
     }
 
+    /// Decodes the typed `'static` value in a union.
+    pub fn decode_as_static<D: InternalHandleDecoder + ?Sized, T: Decode<D>>(
+        slot: Slot<'_, Self>,
+        decoder: &mut D,
+    ) -> Result<(), decode::DecodeError> {
+        munge!(let Self { ordinal: _, envelope } = slot);
+        WireEnvelope::decode_as_static::<D, T>(envelope, decoder)
+    }
+
     /// Decodes the typed value in a union.
-    pub fn decode_as<D: Decoder<'buf> + ?Sized, T: Decode<D>>(
+    pub fn decode_as<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
     ) -> Result<(), decode::DecodeError> {
@@ -91,12 +112,21 @@ impl<'buf> RawWireUnion<'buf> {
     }
 
     /// Gets a reference to the envelope underlying the union.
-    pub fn get(&self) -> &WireEnvelope<'buf> {
+    pub fn get(&self) -> &WireEnvelope {
         &self.envelope
     }
 
     /// Gets a mutable reference to the envelope underlying the union.
-    pub fn get_mut(&mut self) -> &mut WireEnvelope<'buf> {
+    pub fn get_mut(&mut self) -> &mut WireEnvelope {
         &mut self.envelope
+    }
+
+    /// Clones the union, assuming that it contains an inline `T`.
+    ///
+    /// # Safety
+    ///
+    /// The union must have been successfully decoded as a `T`.
+    pub unsafe fn clone_unchecked<T: Clone>(&self) -> Self {
+        Self { ordinal: self.ordinal, envelope: unsafe { self.envelope.clone_unchecked::<T>() } }
     }
 }

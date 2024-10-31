@@ -8,18 +8,8 @@ use core::mem::take;
 
 use crate::{Chunk, Decode, DecodeError, Owned, Slot, CHUNK_SIZE};
 
-/// A decoder for FIDL messages.
-pub trait Decoder<'buf> {
-    /// Takes a slice of `Chunk`s from the decoder.
-    ///
-    /// Returns `Err` if the decoder doesn't have enough chunks left.
-    fn take_chunks(&mut self, count: usize) -> Result<&'buf mut [Chunk], DecodeError>;
-
-    /// Finishes decoding.
-    ///
-    /// Returns `Err` if the decoder did not finish successfully.
-    fn finish(&mut self) -> Result<(), DecodeError>;
-
+/// A decoder for FIDL handles (internal).
+pub trait InternalHandleDecoder {
     /// Takes the next `count` handles from the decoder.
     ///
     /// This method exposes details about Fuchsia resources that plain old FIDL shouldn't need to
@@ -35,6 +25,29 @@ pub trait Decoder<'buf> {
     fn __internal_handles_remaining(&self) -> usize;
 }
 
+/// A decoder for FIDL messages.
+pub trait Decoder<'buf>: InternalHandleDecoder {
+    /// Takes a slice of `Chunk`s from the decoder.
+    ///
+    /// Returns `Err` if the decoder doesn't have enough chunks left.
+    fn take_chunks(&mut self, count: usize) -> Result<&'buf mut [Chunk], DecodeError>;
+
+    /// Finishes decoding.
+    ///
+    /// Returns `Err` if the decoder did not finish successfully.
+    fn finish(&mut self) -> Result<(), DecodeError>;
+}
+
+impl<T: InternalHandleDecoder> InternalHandleDecoder for &mut T {
+    fn __internal_take_handles(&mut self, count: usize) -> Result<(), DecodeError> {
+        T::__internal_take_handles(self, count)
+    }
+
+    fn __internal_handles_remaining(&self) -> usize {
+        T::__internal_handles_remaining(self)
+    }
+}
+
 impl<'buf, T: Decoder<'buf>> Decoder<'buf> for &mut T {
     fn take_chunks(&mut self, count: usize) -> Result<&'buf mut [Chunk], DecodeError> {
         T::take_chunks(self, count)
@@ -43,13 +56,15 @@ impl<'buf, T: Decoder<'buf>> Decoder<'buf> for &mut T {
     fn finish(&mut self) -> Result<(), DecodeError> {
         T::finish(self)
     }
+}
 
-    fn __internal_take_handles(&mut self, count: usize) -> Result<(), DecodeError> {
-        T::__internal_take_handles(self, count)
+impl InternalHandleDecoder for &mut [Chunk] {
+    fn __internal_take_handles(&mut self, _: usize) -> Result<(), DecodeError> {
+        Err(DecodeError::InsufficientHandles)
     }
 
     fn __internal_handles_remaining(&self) -> usize {
-        T::__internal_handles_remaining(self)
+        0
     }
 }
 
@@ -71,14 +86,6 @@ impl<'buf> Decoder<'buf> for &'buf mut [Chunk] {
         }
 
         Ok(())
-    }
-
-    fn __internal_take_handles(&mut self, _: usize) -> Result<(), DecodeError> {
-        Err(DecodeError::InsufficientHandles)
-    }
-
-    fn __internal_handles_remaining(&self) -> usize {
-        0
     }
 }
 
