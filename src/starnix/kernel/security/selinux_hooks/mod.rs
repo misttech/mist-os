@@ -91,6 +91,19 @@ pub(super) fn fs_node_init_with_dentry(
         return Ok(());
     }
 
+    // If the parent has a from-task label then propagate it to the new node,  rather than applying
+    // the filesystem's labeling scheme. This allows nodes in per-process and per-task directories
+    // in "proc" to inherit the task's label.
+    let parent = dir_entry.parent();
+    if let Some(parent) = parent {
+        let parent_node = &parent.node;
+        if let FsNodeLabel::FromTask { weak_task } = parent_node.info().security_state.label.clone()
+        {
+            fs_node_set_label_with_task(fs_node, weak_task);
+            return Ok(());
+        }
+    }
+
     // Obtain labeling information for the `FileSystem`. If none has been resolved yet then queue the
     // `dir_entry` to be labeled later.
     let fs = fs_node.fs();
