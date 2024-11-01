@@ -269,6 +269,7 @@ _partner_internal_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.debugger:fuchsia.debugger",
   "//sdk/fidl/fuchsia.developer.ffxdaemonlifecycle:fuchsia.developer.ffxdaemonlifecycle",
   "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol",
+  "//sdk/fidl/fuchsia.device:fuchsia.device",
   "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host",
   "//sdk/fidl/fuchsia.drm:fuchsia.drm",
   "//sdk/fidl/fuchsia.fs:fuchsia.fs",
