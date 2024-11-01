@@ -117,7 +117,7 @@ pub fn verify_ipv4_packet(packet: &Ipv4Packet<&[u8]>, expected: TestPacket<Ipv4P
     assert_eq!(packet.id(), expected.metadata.id);
     assert_eq!(packet.df_flag(), expected.metadata.dont_fragment);
     assert_eq!(packet.mf_flag(), expected.metadata.more_fragments);
-    assert_eq!(packet.fragment_offset(), expected.metadata.fragment_offset);
+    assert_eq!(packet.fragment_offset().into_raw(), expected.metadata.fragment_offset);
     assert_eq!(packet.ttl(), expected.metadata.ttl);
     assert_eq!(packet.proto(), expected.metadata.proto);
     assert_eq!(packet.src_ip(), expected.metadata.src_ip);

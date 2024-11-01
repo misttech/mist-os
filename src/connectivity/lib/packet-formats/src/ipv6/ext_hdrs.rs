@@ -23,7 +23,7 @@ use packet::records::{
 use packet::{BufferView, BufferViewMut};
 use zerocopy::byteorder::network_endian::U16;
 
-use crate::ip::{IpProto, Ipv6ExtHdrType, Ipv6Proto};
+use crate::ip::{FragmentOffset, IpProto, Ipv6ExtHdrType, Ipv6Proto};
 
 /// The length of an IPv6 Fragment Extension Header.
 pub(crate) const IPV6_FRAGMENT_EXT_HDR_LEN: usize = 8;
@@ -687,9 +687,9 @@ pub struct FragmentData<'a> {
 
 impl<'a> FragmentData<'a> {
     /// Returns the fragment offset.
-    pub fn fragment_offset(&self) -> u16 {
+    pub fn fragment_offset(&self) -> FragmentOffset {
         debug_assert!(self.bytes.len() == 6);
-        (u16::from(self.bytes[0]) << 5) | (u16::from(self.bytes[1]) >> 3)
+        FragmentOffset::new_with_msb(U16::from_bytes([self.bytes[0], self.bytes[1]]).get())
     }
 
     /// Returns the more fragments flags.
@@ -1778,7 +1778,7 @@ mod tests {
         assert_eq!(ext_hdrs[0].next_header, IpProto::Tcp.into());
 
         if let Ipv6ExtensionHeaderData::Fragment { fragment_data } = ext_hdrs[0].data() {
-            assert_eq!(fragment_data.fragment_offset(), 5063);
+            assert_eq!(fragment_data.fragment_offset().into_raw(), 5063);
             assert_eq!(fragment_data.m_flag(), true);
             assert_eq!(fragment_data.identification(), 3266246449);
         } else {

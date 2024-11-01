@@ -473,6 +473,18 @@ impl FragmentOffset {
         }
     }
 
+    /// Creates a new offset from a raw u16 value masking to only the lowest 13
+    /// bits.
+    pub(crate) fn new_with_lsb(offset: u16) -> Self {
+        Self(offset & 0x1FFF)
+    }
+
+    /// Creates a new offset from a raw u16 value masking to only the highest 13
+    /// bits.
+    pub(crate) fn new_with_msb(offset: u16) -> Self {
+        Self(offset >> 3)
+    }
+
     /// Creates a new offset from a raw bytes value.
     ///
     /// Returns `None` if `offset_bytes` is not a multiple of `8`.

@@ -235,7 +235,7 @@ pub trait FragmentablePacket {
 
 impl<B: SplitByteSlice> FragmentablePacket for Ipv4Packet<B> {
     fn fragment_data(&self) -> (u32, u16, bool) {
-        (u32::from(self.id()), self.fragment_offset(), self.mf_flag())
+        (u32::from(self.id()), self.fragment_offset().into_raw(), self.mf_flag())
     }
 }
 
@@ -245,7 +245,7 @@ impl<B: SplitByteSlice> FragmentablePacket for Ipv6Packet<B> {
             if let Ipv6ExtensionHeaderData::Fragment { fragment_data } = ext_hdr.data() {
                 return (
                     fragment_data.identification(),
-                    fragment_data.fragment_offset(),
+                    fragment_data.fragment_offset().into_raw(),
                     fragment_data.m_flag(),
                 );
             }

@@ -166,9 +166,8 @@ pub trait Ipv4Header {
     }
 
     /// The fragment offset.
-    fn fragment_offset(&self) -> u16 {
-        ((u16::from(self.get_header_prefix().flags_frag_off[0] & 0x1F)) << 8)
-            | u16::from(self.get_header_prefix().flags_frag_off[1])
+    fn fragment_offset(&self) -> FragmentOffset {
+        FragmentOffset::new_with_lsb(U16::from_bytes(self.get_header_prefix().flags_frag_off).get())
     }
 
     /// The fragment type.
@@ -177,7 +176,7 @@ pub trait Ipv4Header {
     /// `p.fragment_offset() == 0` and [`Ipv4FragmentType::NonInitialFragment`]
     /// otherwise.
     fn fragment_type(&self) -> Ipv4FragmentType {
-        match self.fragment_offset() {
+        match self.fragment_offset().into_raw() {
             0 => Ipv4FragmentType::InitialFragment,
             _ => Ipv4FragmentType::NonInitialFragment,
         }
@@ -358,7 +357,7 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
             id: self.id(),
             dscp_and_ecn: self.dscp_and_ecn(),
             flags: 0,
-            frag_off: self.fragment_offset(),
+            frag_off: self.fragment_offset().into_raw(),
             ttl: self.ttl(),
             proto: self.hdr_prefix.proto.into(),
             src_ip: self.src_ip(),
@@ -1457,7 +1456,7 @@ mod tests {
         assert_eq!(packet.id(), 0x0405);
         assert!(packet.df_flag());
         assert!(packet.mf_flag());
-        assert_eq!(packet.fragment_offset(), 0x0607);
+        assert_eq!(packet.fragment_offset().into_raw(), 0x0607);
         assert_eq!(packet.fragment_type(), Ipv4FragmentType::NonInitialFragment);
     }
 
@@ -1476,7 +1475,7 @@ mod tests {
         assert_eq!(packet.id(), 0);
         assert!(packet.df_flag());
         assert_eq!(packet.mf_flag(), false);
-        assert_eq!(packet.fragment_offset(), 0);
+        assert_eq!(packet.fragment_offset().into_raw(), 0);
         assert_eq!(packet.fragment_type(), Ipv4FragmentType::InitialFragment);
     }
 

@@ -2702,7 +2702,7 @@ mod tests {
                 _ => None,
             })
             .unwrap();
-        assert_eq!(fragment_data.fragment_offset(), fragment_offset.into_raw());
+        assert_eq!(fragment_data.fragment_offset(), fragment_offset);
         assert_eq!(fragment_data.identification(), identification);
         assert_eq!(fragment_data.m_flag(), more_fragments);
     }
