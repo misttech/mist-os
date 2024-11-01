@@ -19,8 +19,7 @@
 
 namespace starnix {
 
-fit::result<Errno> SimpleDirectory::add_entry(const FsStr name, FsNodeHandle entry,
-                                              bool overwrite) {
+fit::result<Errno> SimpleDirectory::add_entry(FsStr name, FsNodeHandle entry, bool overwrite) {
   LTRACEF("this(%p) name=[%.*s]\n", this, static_cast<int>(name.length()), name.data());
   if (!overwrite && entries_.contains(name)) {
     return fit::error(errno(EROFS));
@@ -33,13 +32,13 @@ fit::result<Errno> SimpleDirectory::add_entry(const FsStr name, FsNodeHandle ent
 }
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> SimpleDirectory::create_file_ops(
-    /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task, OpenFlags flags) {
+    const FsNode& node, const CurrentTask& current_task, OpenFlags flags) const {
   return fit::error(errno(ENOSYS));
 }
 
 fit::result<Errno, FsNodeHandle> SimpleDirectory::lookup(const FsNode& node,
                                                          const CurrentTask& current_task,
-                                                         const FsStr& name) {
+                                                         const FsStr& name) const {
   LTRACEF("this(%p) name=[%.*s]\n", this, static_cast<int>(name.length()), name.data());
   auto it = entries_.find(name);
   if (it != entries_.end()) {

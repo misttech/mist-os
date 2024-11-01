@@ -26,9 +26,9 @@ class Anon : public FsNodeOps {
 
   fs_node_impl_not_dir();
 
-  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
-      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
-      OpenFlags flags) final {
+  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
+                                                               const CurrentTask& current_task,
+                                                               OpenFlags flags) const final {
     return fit::error(errno(ENOSYS));
   }
 

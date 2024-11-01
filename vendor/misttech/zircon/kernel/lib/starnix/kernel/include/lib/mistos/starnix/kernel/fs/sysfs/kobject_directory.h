@@ -26,7 +26,7 @@ class KObjectDirectory : public FsNodeOps {
 
   fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
                                                                const CurrentTask& current_task,
-                                                               OpenFlags flags) final {
+                                                               OpenFlags flags) const final {
     fbl::AllocChecker ac;
     fbl::Vector<VecDirectoryEntry> entries;
     for (const auto& name : kobject()->get_children_names()) {
@@ -40,7 +40,7 @@ class KObjectDirectory : public FsNodeOps {
   }
 
   fit::result<Errno, FsNodeHandle> lookup(const FsNode& node, const CurrentTask& current_task,
-                                          const FsStr& name) final {
+                                          const FsStr& name) const final {
     if (auto child = kobject()->get_child(name)) {
       return fit::ok(
           node.fs()->create_node(current_task, ktl::move((*child)->ops()),

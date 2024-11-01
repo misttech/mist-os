@@ -15,6 +15,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/mistos/util/error_propagation.h>
 #include <lib/starnix_sync/locks.h>
 
 #include <fbl/ref_ptr.h>
@@ -35,9 +36,9 @@ using OpenFlags = starnix_uapi::OpenFlags;
 using FileMode = starnix_uapi::FileMode;
 using DeviceType = starnix_uapi::DeviceType;
 using FsCred = starnix_uapi::FsCred;
-struct SymlinkTarget;
+class SymlinkTarget;
 
-enum class XattrOp {
+enum class XattrOp : uint8_t {
   Set,
   Create,
   Replace,
@@ -62,30 +63,37 @@ class XattrOpHelper {
 template <typename T>
 class ValueOrSize {
  public:
-  ValueOrSize(T val) : value(val) {}
+  using Variant = ktl::variant<T, size_t>;
 
-  ValueOrSize(size_t size) : value(size) {}
+  static ValueOrSize Value(T val) { return ValueOrSize(val); }
+  static ValueOrSize Size(size_t size) { return ValueOrSize(size); }
+
+  explicit ValueOrSize(Variant variant) : variant_(variant) {}
 
  private:
-  ktl::variant<T, size_t> value;
+  Variant variant_;
 };
 
 class FsNodeOps {
  public:
-  // Delegate the access check to the node. Returns `Err(ENOSYS)` if the kernel must handle the
-  /// access check by itself.
+  /// Delegate the access check to the node.
   virtual fit::result<Errno> check_access(const FsNode& node, const CurrentTask& current_task,
-                                          int access) {
+                                          int access) const {
     return fit::error(errno(ENOSYS));
   }
+
+  /// Build the [`DirEntryOps`] for a new [`DirEntry`] that will be associated
+  /// to this node.
+  // virtual ktl::unique_ptr<DirEntryOps> create_dir_entry_ops() const {
+  //   return ktl::make_unique<DefaultDirEntryOps>();
+  // }
 
   /// Build the `FileOps` for the file associated to this node.
   ///
   /// The returned FileOps will be used to create a FileObject, which might
   /// be assigned an FdNumber.
   virtual fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
-      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
-      OpenFlags flags) = 0;
+      const FsNode& node, const CurrentTask& current_task, OpenFlags flags) const = 0;
 
   /// Find an existing child node and populate the child parameter. Return the node.
   ///
@@ -93,7 +101,7 @@ class FsNodeOps {
   /// initialize is called.
   virtual fit::result<Errno, FsNodeHandle> lookup(const FsNode& node,
                                                   const CurrentTask& current_task,
-                                                  const FsStr& name);
+                                                  const FsStr& name) const;
 
   /// Create and return the given child node.
   ///
@@ -102,20 +110,20 @@ class FsNodeOps {
   ///
   /// This function is never called with FileMode::IFDIR. The mkdir function
   /// is used to create directories instead.
-  virtual fit::result<Errno, FsNodeHandle> mknod(/*FileOpsCore& locked,*/ const FsNode& node,
+  virtual fit::result<Errno, FsNodeHandle> mknod(const FsNode& node,
                                                  const CurrentTask& current_task, const FsStr& name,
-                                                 FileMode mode, DeviceType dev, FsCred owner);
+                                                 FileMode mode, DeviceType dev, FsCred owner) const;
 
   /// Create and return the given child node as a subdirectory.
   virtual fit::result<Errno, FsNodeHandle> mkdir(const FsNode& node,
                                                  const CurrentTask& current_task, const FsStr& name,
-                                                 FileMode mode, FsCred owner);
+                                                 FileMode mode, FsCred owner) const;
 
   /// Creates a symlink with the given `target` path.
   virtual fit::result<Errno, FsNodeHandle> create_symlink(const FsNode& node,
                                                           const CurrentTask& current_task,
                                                           const FsStr& name, const FsStr& target,
-                                                          FsCred owner);
+                                                          FsCred owner) const;
 
   /// Creates an anonymous file.
   ///
@@ -124,17 +132,17 @@ class FsNodeOps {
   /// Used by O_TMPFILE.
   virtual fit::result<Errno, FsNodeHandle> create_tmpfile(const FsNode& node,
                                                           const CurrentTask& current_task,
-                                                          FileMode mode, FsCred owner);
+                                                          FileMode mode, FsCred owner) const;
 
   /// Reads the symlink from this node.
   virtual fit::result<Errno, SymlinkTarget> readlink(const FsNode& node,
-                                                     const CurrentTask& current_task) {
+                                                     const CurrentTask& current_task) const {
     return fit::error(errno(EINVAL));
   }
 
   /// Create a hard link with the given name to the given child.
   virtual fit::result<Errno> link(const FsNode& node, const CurrentTask& current_task,
-                                  const FsStr& name, const FsNodeHandle& child) {
+                                  const FsStr& name, const FsNodeHandle& child) const {
     return fit::error(errno(EPERM));
   }
 
@@ -143,17 +151,17 @@ class FsNodeOps {
   /// The UnlinkKind parameter indicates whether the caller intends to unlink
   /// a directory or a non-directory child.
   virtual fit::result<Errno> unlink(const FsNode& node, const CurrentTask& current_task,
-                                    const FsStr& name, const FsNodeHandle& child) = 0;
+                                    const FsStr& name, const FsNodeHandle& child) const = 0;
 
   /// Change the length of the file.
   virtual fit::result<Errno> truncate(const FsNode& node, const CurrentTask& current_task,
-                                      uint64_t length) {
+                                      uint64_t length) const {
     return fit::error(errno(EINVAL));
   }
 
   /// Manipulate allocated disk space for the file.
   virtual fit::result<Errno> allocate(const FsNode& node, const CurrentTask& current_task,
-                                      FallocMode mode, uint64_t offset, uint64_t length) {
+                                      FallocMode mode, uint64_t offset, uint64_t length) const {
     return fit::error(errno(EINVAL));
   }
 
@@ -161,7 +169,7 @@ class FsNodeOps {
   ///
   /// FsNode calls this method when created, to allow the FsNodeOps to
   /// set appropriate initial values in the FsNodeInfo.
-  virtual void initial_info(FsNodeInfo& info) {}
+  virtual void initial_info(FsNodeInfo& info) const {}
 
   /// Update node.info as needed.
   ///
@@ -173,9 +181,9 @@ class FsNodeOps {
   /// override this function.
   ///
   /// Return a reader lock on the updated information.
-  virtual fit::result<Errno, FsNodeInfo> refresh_info(const FsNode& node,
-                                                      const CurrentTask& current_task,
-                                                      starnix_sync::RwLock<FsNodeInfo>& info) {
+  virtual fit::result<Errno, FsNodeInfo> fetch_and_refresh_info(
+      const FsNode& node, const CurrentTask& current_task,
+      starnix_sync::RwLock<FsNodeInfo>& info) const {
     return fit::ok(*info.Read());
   }
 
@@ -184,10 +192,10 @@ class FsNodeOps {
   /// Starnix updates the timestamps in node.info directly. However, if the filesystem can manage
   /// the timestamps, then Starnix does not need to do so. `node.info`` will be refreshed with the
   /// timestamps from the filesystem by calling `refresh_info(..)`.
-  virtual bool filesystem_manages_timestamps(const FsNode& node) { return false; }
+  virtual bool filesystem_manages_timestamps(const FsNode& node) const { return false; }
 
   /// Update node attributes persistently.
-  virtual fit::result<Errno> update_attributes(const FsNodeInfo& info, int has) {
+  virtual fit::result<Errno> update_attributes(const FsNodeInfo& info, int has) const {
     return fit::ok();
   }
 
@@ -198,18 +206,19 @@ class FsNodeOps {
   /// 0, and lesser than the required size.
   virtual fit::result<Errno, ValueOrSize<FsString>> get_xattr(const FsNode& node,
                                                               const CurrentTask& current_task,
-                                                              const FsStr& name, size_t max_size) {
+                                                              const FsStr& name,
+                                                              size_t max_size) const {
     return fit::error(errno(ENOTSUP));
   }
 
   /// Set an extended attribute on the node.
   virtual fit::result<Errno> set_xattr(const FsNode& node, const CurrentTask& current_task,
-                                       const FsStr& name, const FsStr& value, XattrOp op) {
+                                       const FsStr& name, const FsStr& value, XattrOp op) const {
     return fit::error(errno(ENOTSUP));
   }
 
   virtual fit::result<Errno> remove_xattr(const FsNode& node, const CurrentTask& current_task,
-                                          const FsStr& name) {
+                                          const FsStr& name) const {
     return fit::error(errno(ENOTSUP));
   }
 
@@ -217,12 +226,12 @@ class FsNodeOps {
   /// instead return the size of the 0 separated string needed to represent the value, and can
   /// return an ERANGE error if max_size is not 0, and lesser than the required size.
   virtual fit::result<Errno, ValueOrSize<fbl::Vector<FsString>>> list_xattrs(
-      const FsNode& node, const CurrentTask& current_task, size_t max_size) {
+      const FsNode& node, const CurrentTask& current_task, size_t max_size) const {
     return fit::error(errno(ENOTSUP));
   }
 
   /// Called when the FsNode is freed by the Kernel.
-  virtual fit::result<Errno> forget(const FsNode& node, const CurrentTask& current_task) {
+  virtual fit::result<Errno> forget(const FsNode& node, const CurrentTask& current_task) const {
     return fit::ok();
   }
 
@@ -233,12 +242,13 @@ class FsNodeOps {
   /// latter computed by the filesystem. This should ensure there are no writable file handles.
   /// Returns EEXIST if the file was already fsverity-enabled. Returns EBUSY if this ioctl was
   /// already running on this file.
-  virtual fit::result<Errno> enable_fsverity(const fsverity_descriptor& descriptor) {
+  virtual fit::result<Errno> enable_fsverity(const fsverity_descriptor& descriptor) const {
     return fit::error(errno(ENOTSUP));
   }
 
   /// Read fsverity descriptor, if the node is fsverity-enabled. Else returns ENODATA.
-  virtual fit::result<Errno, fsverity_descriptor> get_fsverity_descriptor(uint8_t log_blocksize) {
+  virtual fit::result<Errno, fsverity_descriptor> get_fsverity_descriptor(
+      uint8_t log_blocksize) const {
     return fit::error(errno(ENOTSUP));
   }
 
@@ -248,39 +258,42 @@ class FsNodeOps {
 
 /// Implements [`FsNodeOps`] methods in a way that makes sense for symlinks.
 /// You must implement [`FsNodeOps::readlink`].
-#define fs_node_impl_symlink                                                                   \
-  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(                                \
-      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task, int flags) \
-      const final {                                                                            \
-    panic("Symlink nodes cannot be opened.");                                                  \
-  }                                                                                            \
+#define fs_node_impl_symlink                                                              \
+  fs_node_impl_not_dir();                                                                 \
+                                                                                          \
+  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(                           \
+      const FsNode& node, const CurrentTask& current_task, OpenFlags flags) const final { \
+    ZX_ASSERT(node.is_lnk());                                                             \
+    panic("Symlink nodes cannot be opened.");                                             \
+  }                                                                                       \
   using __fs_node_impl_symlink_force_semicolon = int
 
 #define fs_node_impl_dir_readonly                                                                  \
   fit::result<Errno, FsNodeHandle> mkdir(const FsNode& node, const CurrentTask& current_task,      \
-                                         const FsStr& name, FileMode mode, FsCred owner) final {   \
+                                         const FsStr& name, FileMode mode, FsCred owner)           \
+      const final {                                                                                \
     return fit::error(errno(EROFS));                                                               \
   }                                                                                                \
                                                                                                    \
-  fit::result<Errno, FsNodeHandle> mknod(/*FileOpsCore& locked,*/ const FsNode& node,              \
-                                         const CurrentTask& current_task, const FsStr& name,       \
-                                         FileMode mode, DeviceType dev, FsCred owner) final {      \
+  fit::result<Errno, FsNodeHandle> mknod(const FsNode& node, const CurrentTask& current_task,      \
+                                         const FsStr& name, FileMode mode, DeviceType dev,         \
+                                         FsCred owner) const final {                               \
     return fit::error(errno(EROFS));                                                               \
   }                                                                                                \
                                                                                                    \
   fit::result<Errno, FsNodeHandle> create_symlink(                                                 \
       const FsNode& node, const CurrentTask& current_task, const FsStr& name, const FsStr& target, \
-      FsCred owner) final {                                                                        \
+      FsCred owner) const final {                                                                  \
     return fit::error(errno(EROFS));                                                               \
   }                                                                                                \
                                                                                                    \
   fit::result<Errno> link(const FsNode& node, const CurrentTask& current_task, const FsStr& name,  \
-                          const FsNodeHandle& child) final {                                       \
+                          const FsNodeHandle& child) const final {                                 \
     return fit::error(errno(EROFS));                                                               \
   }                                                                                                \
                                                                                                    \
   fit::result<Errno> unlink(const FsNode& node, const CurrentTask& current_task,                   \
-                            const FsStr& name, const FsNodeHandle& child) final {                  \
+                            const FsStr& name, const FsNodeHandle& child) const final {            \
     return fit::error(errno(EROFS));                                                               \
   }                                                                                                \
   using __fs_node_impl_dir_readonly_force_semicolon = int
@@ -323,58 +336,57 @@ class XattrStorage {
 ///     // add other FsNodeOps impls here
 /// }
 /// ```
-#define fs_node_impl_xattr_delegate(delegate)                                                  \
-  fit::result<Errno, ValueOrSize<FsString>> get_xattr(                                         \
-      const FsNode& node, const CurrentTask& current_task, const FsStr& name, size_t max_size) \
-      final {                                                                                  \
-    auto get_xattr_result = delegate.get_xattr(name);                                          \
-    if (get_xattr_result.is_error())                                                           \
-      return get_xattr_result.take_error();                                                    \
-    return fit::ok(get_xattr_result.value());                                                  \
-  }                                                                                            \
-                                                                                               \
-  fit::result<Errno> set_xattr(const FsNode& node, const CurrentTask& current_task,            \
-                               const FsStr& name, const FsStr& value, XattrOp op) final {      \
-    return delegate.set_xattr(name, value, op);                                                \
-  }                                                                                            \
-                                                                                               \
-  fit::result<Errno> remove_xattr(const FsNode& node, const CurrentTask& current_task,         \
-                                  const FsStr& name) final {                                   \
-    return delegate.remove_xattr(name);                                                        \
-  }                                                                                            \
-                                                                                               \
-  fit::result<Errno, ValueOrSize<fbl::Vector<FsString>>> list_xattrs(                          \
-      const FsNode& node, const CurrentTask& current_task, size_t max_size) final {            \
-    return fit::error(errno(ENOTSUP));                                                         \
-  }                                                                                            \
+#define fs_node_impl_xattr_delegate(delegate)                                                   \
+  fit::result<Errno, ValueOrSize<FsString>> get_xattr(                                          \
+      const FsNode& node, const CurrentTask& current_task, const FsStr& name, size_t max_size)  \
+      const final {                                                                             \
+    auto get_xattr_result = (delegate).get_xattr(name) _EP(get_xattr_result);                   \
+    return fit::ok(get_xattr_result.value());                                                   \
+  }                                                                                             \
+                                                                                                \
+  fit::result<Errno> set_xattr(const FsNode& node, const CurrentTask& current_task,             \
+                               const FsStr& name, const FsStr& value, XattrOp op) const final { \
+    return (delegate).set_xattr(name, value, op);                                               \
+  }                                                                                             \
+                                                                                                \
+  fit::result<Errno> remove_xattr(const FsNode& node, const CurrentTask& current_task,          \
+                                  const FsStr& name) const final {                              \
+    return (delegate).remove_xattr(name);                                                       \
+  }                                                                                             \
+                                                                                                \
+  fit::result<Errno, ValueOrSize<fbl::Vector<FsString>>> list_xattrs(                           \
+      const FsNode& node, const CurrentTask& current_task, size_t max_size) const final {       \
+    return fit::error(errno(ENOTSUP));                                                          \
+  }                                                                                             \
   using __fs_node_impl_xattr_delegate_force_semicolon = int
 
 /// Stubs out [`FsNodeOps`] methods that only apply to directories.
 #define fs_node_impl_not_dir                                                                       \
   fit::result<Errno, FsNodeHandle> lookup(const FsNode& node, const CurrentTask& current_task,     \
-                                          const FsStr& name) final {                               \
+                                          const FsStr& name) const final {                         \
     return fit::error(errno(ENOTDIR));                                                             \
   }                                                                                                \
                                                                                                    \
-  fit::result<Errno, FsNodeHandle> mknod(/*FileOpsCore& locked,*/ const FsNode& node,              \
-                                         const CurrentTask& current_task, const FsStr& name,       \
-                                         FileMode mode, DeviceType dev, FsCred owner) final {      \
+  fit::result<Errno, FsNodeHandle> mknod(const FsNode& node, const CurrentTask& current_task,      \
+                                         const FsStr& name, FileMode mode, DeviceType dev,         \
+                                         FsCred owner) const final {                               \
     return fit::error(errno(ENOTDIR));                                                             \
   }                                                                                                \
                                                                                                    \
   fit::result<Errno, FsNodeHandle> mkdir(const FsNode& node, const CurrentTask& current_task,      \
-                                         const FsStr& name, FileMode mode, FsCred owner) final {   \
+                                         const FsStr& name, FileMode mode, FsCred owner)           \
+      const final {                                                                                \
     return fit::error(errno(ENOTDIR));                                                             \
   }                                                                                                \
                                                                                                    \
   fit::result<Errno, FsNodeHandle> create_symlink(                                                 \
       const FsNode& node, const CurrentTask& current_task, const FsStr& name, const FsStr& target, \
-      FsCred owner) final {                                                                        \
+      FsCred owner) const final {                                                                  \
     return fit::error(errno(ENOTDIR));                                                             \
   }                                                                                                \
                                                                                                    \
   fit::result<Errno> unlink(const FsNode& node, const CurrentTask& current_task,                   \
-                            const FsStr& name, const FsNodeHandle& child) final {                  \
+                            const FsStr& name, const FsNodeHandle& child) const final {            \
     return fit::error(errno(ENOTDIR));                                                             \
   }                                                                                                \
   using __fs_node_impl_not_dir_force_semicolon = int

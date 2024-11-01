@@ -173,7 +173,7 @@ fit::result<Errno, SymlinkTarget> FsNode::readlink(const CurrentTask& current_ta
 }
 
 fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) const {
-  auto result = refresh_info(current_task) _EP(result);
+  auto result = fetch_and_refresh_info(current_task) _EP(result);
   auto info = result.value();
 
   /*
@@ -203,8 +203,9 @@ fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) co
   });
 }
 
-fit::result<Errno, FsNodeInfo> FsNode::refresh_info(const CurrentTask& current_task) const {
-  return ops().refresh_info(*this, current_task, info_);
+fit::result<Errno, FsNodeInfo> FsNode::fetch_and_refresh_info(
+    const CurrentTask& current_task) const {
+  return ops().fetch_and_refresh_info(*this, current_task, info_);
 }
 
 }  // namespace starnix

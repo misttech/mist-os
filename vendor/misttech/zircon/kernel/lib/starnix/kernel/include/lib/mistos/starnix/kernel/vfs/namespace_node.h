@@ -25,8 +25,8 @@ class FileObject;
 class FileOps;
 class Task;
 class FsNode;
-struct LookupContext;
-struct SymlinkTarget;
+class LookupContext;
+class SymlinkTarget;
 
 using DeviceType = starnix_uapi::DeviceType;
 using DirEntryHandle = fbl::RefPtr<DirEntry>;
@@ -192,12 +192,17 @@ struct NamespaceNode {
 
   fit::result<Errno> truncate(const CurrentTask& current_task, uint64_t length) const;
 
+  // C++
   bool operator==(const NamespaceNode& other) const;
 };
 
-struct SymlinkTarget {
-  SymlinkTarget(const FsString& path);
-  SymlinkTarget(NamespaceNode node);
+class SymlinkTarget {
+ public:
+  using Variant = ktl::variant<FsString, NamespaceNode>;
+
+  static SymlinkTarget Path(const FsString& path);
+  static SymlinkTarget Node(NamespaceNode node);
+
   ~SymlinkTarget();
 
   // Helpers from the reference documentation for std::visit<>, to allow
@@ -211,7 +216,10 @@ struct SymlinkTarget {
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
 
-  ktl::variant<FsString, NamespaceNode> value;
+  Variant variant_;
+
+ private:
+  explicit SymlinkTarget(Variant variant);
 };
 
 }  // namespace starnix

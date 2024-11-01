@@ -19,10 +19,6 @@
 #include <lib/mistos/util/weak_wrapper.h>
 #include <zircon/compiler.h>
 
-#include <atomic>
-#include <functional>
-#include <optional>
-
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>

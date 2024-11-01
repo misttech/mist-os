@@ -33,7 +33,7 @@ class MemoryDirectoryFile : public FileOps {
   fileops_impl_noop_sync();
 
   fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task,
-                                 off_t current_offset, SeekTarget target) override {
+                                 off_t current_offset, SeekTarget target) const override {
     auto new_offset = unbounded_seek(current_offset, target);
     if (!new_offset.is_ok()) {
       return new_offset;
@@ -62,7 +62,7 @@ class MemoryDirectoryFile : public FileOps {
 
   // Current position for readdir operations
   // nullopt represents an unbounded/start position
-  starnix_sync::StarnixMutex<FsString> readdir_position_;
+  mutable starnix_sync::StarnixMutex<FsString> readdir_position_;
 };
 
 }  // namespace starnix

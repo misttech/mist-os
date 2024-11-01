@@ -45,32 +45,32 @@ class MemoryFileNode : public FsNodeOps {
   fs_node_impl_not_dir();
   fs_node_impl_xattr_delegate(xattrs_);
 
-  void initial_info(FsNodeInfo& info) final;
+  void initial_info(FsNodeInfo& info) const final;
 
-  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
-      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
-      OpenFlags flags) final;
+  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
+                                                               const CurrentTask& current_task,
+                                                               OpenFlags flags) const final;
 
   fit::result<Errno> truncate(const FsNode& node, const CurrentTask& current_task,
-                              uint64_t length) final;
+                              uint64_t length) const final;
 
   fit::result<Errno> allocate(const FsNode& node, const CurrentTask& current_task, FallocMode mode,
-                              uint64_t offset, uint64_t length) final;
+                              uint64_t offset, uint64_t length) const final;
 
  private:
-  MemoryFileNode(fbl::RefPtr<MemoryObject> memory) : memory_(ktl::move(memory)) {}
+  explicit MemoryFileNode(fbl::RefPtr<MemoryObject> memory) : memory_(ktl::move(memory)) {}
 };
 
 #define fileops_impl_memory(memory)                                                          \
   fileops_impl_seekable();                                                                   \
                                                                                              \
   fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask&, size_t offset, \
-                                  OutputBuffer* data) final {                                \
+                                  OutputBuffer* data) const final {                          \
     return MemoryFileObject::read(*(memory), file, offset, data);                            \
   }                                                                                          \
                                                                                              \
   fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task,  \
-                                   size_t offset, InputBuffer* data) final {                 \
+                                   size_t offset, InputBuffer* data) const final {           \
     return MemoryFileObject::write(*(memory), file, current_task, offset, data);             \
   }                                                                                          \
                                                                                              \
@@ -106,13 +106,13 @@ class MemoryFileObject : public FileOps {
   fileops_impl_noop_sync();
 
   fit::result<Errno> readahead(const FileObject& file, const CurrentTask& current_task,
-                               size_t offset, size_t length) final {
+                               size_t offset, size_t length) const final {
     // track_stub !(TODO("https://fxbug.dev/42082608"), "paged VMO readahead");
     return fit::ok();
   }
 
  private:
-  MemoryFileObject(fbl::RefPtr<MemoryObject> memory) : memory_(ktl::move(memory)) {}
+  explicit MemoryFileObject(fbl::RefPtr<MemoryObject> memory) : memory_(ktl::move(memory)) {}
 };
 
 fit::result<Errno, FileHandle> new_memfd(const CurrentTask& current_task, FsString name,

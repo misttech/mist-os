@@ -11,10 +11,10 @@
 #include <lib/mistos/starnix/kernel/vfs/mount_info.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/util/error_propagation.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 
-#include <functional>
 #include <utility>
 
 #include <fbl/ref_counted_upgradeable.h>

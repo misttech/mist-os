@@ -67,11 +67,12 @@ MemoryFileNode* MemoryFileNode::from_memory(fbl::RefPtr<MemoryObject> memory) {
   return ops;
 }
 
-void MemoryFileNode::initial_info(FsNodeInfo& info) { info.size = memory_->get_content_size(); }
+void MemoryFileNode::initial_info(FsNodeInfo& info) const {
+  info.size = memory_->get_content_size();
+}
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> MemoryFileNode::create_file_ops(
-    /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
-    OpenFlags _flags) {
+    const FsNode& node, const CurrentTask& current_task, OpenFlags _flags) const {
   OpenFlagsImpl flags(_flags);
   if (flags.contains(OpenFlagsEnum::TRUNC)) {
     // Truncating to zero length must pass the shrink seal check.
@@ -98,12 +99,13 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> MemoryFileNode::create_file_ops(
 }
 
 fit::result<Errno> MemoryFileNode::truncate(const FsNode& node, const CurrentTask& current_task,
-                                            uint64_t length) {
+                                            uint64_t length) const {
   return fit::error(errno(ENOTSUP));
 }
 
 fit::result<Errno> MemoryFileNode::allocate(const FsNode& node, const CurrentTask& current_task,
-                                            FallocMode mode, uint64_t offset, uint64_t length) {
+                                            FallocMode mode, uint64_t offset,
+                                            uint64_t length) const {
   return fit::error(errno(ENOTSUP));
 }
 

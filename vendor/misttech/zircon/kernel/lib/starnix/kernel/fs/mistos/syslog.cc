@@ -23,7 +23,7 @@ FileHandle SyslogFile::new_file(const CurrentTask& current_task) {
 
 fit::result<Errno, size_t> SyslogFile::write(const FileObject& file,
                                              const CurrentTask& current_task, size_t offset,
-                                             InputBuffer* data) {
+                                             InputBuffer* data) const {
   DEBUG_ASSERT(offset == 0);
   return data->read_each([](const ktl::span<uint8_t>& bytes) {
     printf("%.*s", static_cast<int>(bytes.size()), bytes.data());

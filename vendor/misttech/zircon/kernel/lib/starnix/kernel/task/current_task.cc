@@ -854,7 +854,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
                 return fit::ok(ktl::pair(node, false));
               },
           },
-          readlink_result.value().value);
+          readlink_result.value().variant_);
     }
 
     if (must_create) {

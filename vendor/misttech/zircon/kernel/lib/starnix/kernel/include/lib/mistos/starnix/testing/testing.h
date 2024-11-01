@@ -7,6 +7,8 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_TESTING_TESTING_H_
 
 #include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/vfs/file_system_ops.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
@@ -168,7 +170,22 @@ UserAddress map_memory(starnix::CurrentTask& current_task, UserAddress address, 
 UserAddress map_memory_with_flags(starnix::CurrentTask& current_task, UserAddress address,
                                   uint64_t length, uint32_t flags);
 
-// FileSystemHandle create_fs(fbl::RefPtr<starnix::Kernel>& kernel, fbl::RefPtr<FsNodeOps> ops);
+class TestFs : public FileSystemOps {
+ public:
+  fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
+                                           const CurrentTask& current_task) override {
+    return fit::ok(default_statfs(0));
+  }
+
+  const FsStr& name() override { return name_; }
+
+  bool generate_node_ids() override { return false; }
+
+ private:
+  const FsStr name_ = "test";
+};
+
+FileSystemHandle create_fs(fbl::RefPtr<starnix::Kernel>& kernel, FsNodeOps* ops);
 
 }  // namespace testing
 }  // namespace starnix

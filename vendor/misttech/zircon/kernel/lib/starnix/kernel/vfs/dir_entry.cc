@@ -76,7 +76,17 @@ DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> pa
 
 DirEntryHandle DirEntry::new_unrooted(FsNodeHandle node) { return New(node, {}, {}); }
 
+DirEntry::DirEntryLockedChildren DirEntry::lock_children() {
+  return DirEntry::DirEntryLockedChildren(fbl::RefPtr<DirEntry>(this),
+                                          ktl::move(children_.Write()));
+}
+
 FsString DirEntry::local_name() const { return state_.Read()->local_name; }
+
+DirEntryHandle DirEntry::parent_or_self() {
+  auto parent = state_.Read()->parent;
+  return parent ? parent.value() : fbl::RefPtr<DirEntry>(this);
+}
 
 fit::result<Errno, DirEntryHandle> DirEntry::component_lookup(const CurrentTask& current_task,
                                                               const MountInfo& mount,

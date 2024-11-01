@@ -34,7 +34,7 @@ class MemoryXattrStorage : public XattrStorage {
   /// impl Default
   static MemoryXattrStorage Default();
 
- public:
+ private:
   MemoryXattrStorage() = default;
 };
 

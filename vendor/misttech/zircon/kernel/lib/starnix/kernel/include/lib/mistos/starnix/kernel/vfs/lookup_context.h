@@ -17,7 +17,8 @@ using starnix_uapi::ResolveFlags;
 ///
 /// Namespace lookups need to mutate a shared context in order to correctly
 /// count the number of remaining symlink traversals.
-struct LookupContext {
+class LookupContext {
+ public:
   /// The SymlinkMode for the lookup.
   ///
   /// As the lookup proceeds, the follow count is decremented each time the
@@ -44,8 +45,6 @@ struct LookupContext {
   ResolveBase resolve_base;
 
   /// impl LookupContext
-  //
-  //
   static LookupContext New(SymlinkMode _symlink_mode);
 
   LookupContext with(SymlinkMode _symlink_mode);
@@ -53,8 +52,6 @@ struct LookupContext {
   void update_for_path(const FsStr& path);
 
   /// impl Default
-  //
-  //
   static LookupContext Default();
 };
 
