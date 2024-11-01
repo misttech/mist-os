@@ -322,10 +322,11 @@ pub async fn test_component(
     binary: &str,
     args: Vec<String>,
 ) -> Result<Arc<Component>, Error> {
-    let ns = create_ns_from_current_ns(vec![(
-        "/pkg",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
-    )])?;
+    let ns = create_ns_from_current_ns(vec![
+        ("/pkg", fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE),
+        // TODO(b/376735013): Restrict this to LogSink instead of all of /svc.
+        ("/svc", fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE),
+    ])?;
     let component = Component::create_for_tests(BuilderArgs {
         url: url.to_string(),
         name: name.to_string(),
