@@ -1047,30 +1047,13 @@ pub mod options {
 
     /// An IPv4 header option.
     ///
-    /// An IPv4 header option comprises metadata about the option (which is stored
-    /// in the kind byte) and the option itself.
-    ///
     /// See [Wikipedia] or [RFC 791] for more details.
     ///
     /// [Wikipedia]: https://en.wikipedia.org/wiki/IPv4#Options
     /// [RFC 791]: https://tools.ietf.org/html/rfc791#page-15
     #[derive(PartialEq, Eq, Debug, Clone)]
-    pub struct Ipv4Option<'a> {
-        /// Whether this option needs to be copied into all fragments of a
-        /// fragmented packet.
-        pub copied: bool,
-        /// IPv4 option data.
-        // TODO(joshlf): include "Option Class"? The variable-length option data.
-        pub data: Ipv4OptionData<'a>,
-    }
-
-    /// The data associated with an IPv4 header option.
-    ///
-    /// `Ipv4OptionData` represents the variable-length data field of an IPv4 header
-    /// option.
     #[allow(missing_docs)]
-    #[derive(PartialEq, Eq, Debug, Clone)]
-    pub enum Ipv4OptionData<'a> {
+    pub enum Ipv4Option<'a> {
         /// Used to tell routers to inspect the packet.
         ///
         /// Used by IGMP host messages per [RFC 2236 section 2].
@@ -1089,7 +1072,20 @@ pub mod options {
         // forwarding.
         //
         // `data`'s length is in the range [0, 38].
-        Unrecognized { kind: u8, len: u8, data: &'a [u8] },
+        Unrecognized { kind: u8, data: &'a [u8] },
+    }
+
+    impl<'a> Ipv4Option<'a> {
+        /// Returns whether this option should be copied on all fragments.
+        pub fn copied(&self) -> bool {
+            match self {
+                // The router alert option is copied on all fragments. See
+                // https://datatracker.ietf.org/doc/html/rfc2113#section-2.1.
+                // It is embedded in our definition of OPTION_KIND_RTRALRT.
+                Ipv4Option::RouterAlert { .. } => true,
+                Ipv4Option::Unrecognized { kind, .. } => *kind & (1 << 7) != 0,
+            }
+        }
     }
 
     /// An implementation of [`OptionsImpl`] for IPv4 options.
@@ -1110,19 +1106,13 @@ pub mod options {
         type Option<'a> = Ipv4Option<'a>;
 
         fn parse<'a>(kind: u8, data: &'a [u8]) -> Result<Option<Ipv4Option<'a>>, OptionParseErr> {
-            let copied = kind & (1 << 7) > 0;
             match kind {
                 self::OPTION_KIND_EOL | self::OPTION_KIND_NOP => {
                     unreachable!("records::options::Options promises to handle EOL and NOP")
                 }
                 self::OPTION_KIND_RTRALRT => {
                     if data.len() == OPTION_RTRALRT_LEN {
-                        Ok(Some(Ipv4Option {
-                            copied,
-                            data: Ipv4OptionData::RouterAlert {
-                                data: NetworkEndian::read_u16(data),
-                            },
-                        }))
+                        Ok(Some(Ipv4Option::RouterAlert { data: NetworkEndian::read_u16(data) }))
                     } else {
                         Err(OptionParseErr)
                     }
@@ -1131,14 +1121,7 @@ pub mod options {
                     if data.len() > 38 {
                         Err(OptionParseErr)
                     } else {
-                        Ok(Some(Ipv4Option {
-                            copied,
-                            data: Ipv4OptionData::Unrecognized {
-                                kind,
-                                len: data.len() as u8,
-                                data,
-                            },
-                        }))
+                        Ok(Some(Ipv4Option::Unrecognized { kind, data }))
                     }
                 }
             }
@@ -1149,25 +1132,24 @@ pub mod options {
         type Layout = Ipv4OptionsImpl;
 
         fn serialized_len(&self) -> usize {
-            match self.data {
-                Ipv4OptionData::RouterAlert { .. } => OPTION_RTRALRT_LEN,
-                Ipv4OptionData::Unrecognized { len, .. } => len as usize,
+            match self {
+                Ipv4Option::RouterAlert { .. } => OPTION_RTRALRT_LEN,
+                Ipv4Option::Unrecognized { data, .. } => data.len(),
             }
         }
 
         fn option_kind(&self) -> u8 {
-            let number = match self.data {
-                Ipv4OptionData::RouterAlert { .. } => OPTION_KIND_RTRALRT,
-                Ipv4OptionData::Unrecognized { kind, .. } => kind,
-            };
-            number | ((self.copied as u8) << 7)
+            match self {
+                Ipv4Option::RouterAlert { .. } => OPTION_KIND_RTRALRT,
+                Ipv4Option::Unrecognized { kind, .. } => *kind,
+            }
         }
 
         fn serialize_into(&self, mut buffer: &mut [u8]) {
-            match self.data {
-                Ipv4OptionData::Unrecognized { data, .. } => buffer.copy_from_slice(data),
-                Ipv4OptionData::RouterAlert { data } => {
-                    (&mut buffer).write_obj_front(&U16::new(data)).unwrap()
+            match self {
+                Ipv4Option::Unrecognized { data, .. } => buffer.copy_from_slice(data),
+                Ipv4Option::RouterAlert { data } => {
+                    (&mut buffer).write_obj_front(&U16::new(*data)).unwrap()
                 }
             };
         }
@@ -1183,7 +1165,7 @@ pub mod options {
         #[test]
         fn test_serialize_router_alert() {
             let mut buffer = [0u8; 4];
-            let option = Ipv4Option { copied: true, data: Ipv4OptionData::RouterAlert { data: 0 } };
+            let option = Ipv4Option::RouterAlert { data: 0 };
             <Ipv4Option<'_> as RecordBuilder>::serialize_into(&option, &mut buffer);
             assert_eq!(buffer[0], 148);
             assert_eq!(buffer[1], 4);
@@ -1196,8 +1178,7 @@ pub mod options {
             let mut buffer: Vec<u8> = vec![148, 4, 0, 0];
             let options = Options::<_, Ipv4OptionsImpl>::parse(buffer.as_mut()).unwrap();
             let rtralt = options.iter().next().unwrap();
-            assert!(rtralt.copied);
-            assert_eq!(rtralt.data, Ipv4OptionData::RouterAlert { data: 0 });
+            assert_eq!(rtralt, Ipv4Option::RouterAlert { data: 0 });
         }
     }
 }

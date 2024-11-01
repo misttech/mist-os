@@ -382,7 +382,7 @@ mod tests {
     use super::*;
     use crate::igmp::messages::*;
     use crate::ip::Ipv4Proto;
-    use crate::ipv4::options::{Ipv4Option, Ipv4OptionData};
+    use crate::ipv4::options::Ipv4Option;
     use crate::ipv4::{Ipv4Header, Ipv4Packet, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions};
 
     fn serialize_to_bytes<
@@ -394,11 +394,9 @@ mod tests {
         dst_ip: Ipv4Addr,
     ) -> Vec<u8> {
         let ipv4 = Ipv4PacketBuilder::new(src_ip, dst_ip, 1, Ipv4Proto::Igmp);
-        let with_options = Ipv4PacketBuilderWithOptions::new(
-            ipv4,
-            &[Ipv4Option { copied: true, data: Ipv4OptionData::RouterAlert { data: 0 } }],
-        )
-        .unwrap();
+        let with_options =
+            Ipv4PacketBuilderWithOptions::new(ipv4, &[Ipv4Option::RouterAlert { data: 0 }])
+                .unwrap();
 
         igmp.builder()
             .into_serializer()
@@ -446,8 +444,7 @@ mod tests {
                 assert_eq!(ip.ttl(), 1);
                 assert_eq!(ip.iter_options().count(), 1);
                 let option = ip.iter_options().next().unwrap();
-                assert!(option.copied);
-                assert_eq!(option.data, Ipv4OptionData::RouterAlert { data: 0 });
+                assert_eq!(option, Ipv4Option::RouterAlert { data: 0 });
                 assert_eq!(ip.header_len(), 24);
                 assert_eq!(ip.src_ip(), SOURCE);
                 assert_eq!(ip.dst_ip(), MULTICAST);
@@ -467,8 +464,7 @@ mod tests {
                 assert_eq!(ip.ttl(), 1);
                 assert_eq!(ip.iter_options().count(), 1);
                 let option = ip.iter_options().next().unwrap();
-                assert!(option.copied);
-                assert_eq!(option.data, Ipv4OptionData::RouterAlert { data: 0 });
+                assert_eq!(option, Ipv4Option::RouterAlert { data: 0 });
                 assert_eq!(ip.header_len(), 24);
                 assert_eq!(ip.src_ip(), SOURCE);
                 assert_eq!(ip.dst_ip(), MULTICAST);
@@ -488,8 +484,7 @@ mod tests {
                 assert_eq!(ip.ttl(), 1);
                 assert_eq!(ip.iter_options().count(), 1);
                 let option = ip.iter_options().next().unwrap();
-                assert!(option.copied);
-                assert_eq!(option.data, Ipv4OptionData::RouterAlert { data: 0 });
+                assert_eq!(option, Ipv4Option::RouterAlert { data: 0 });
                 assert_eq!(ip.header_len(), 24);
                 assert_eq!(ip.src_ip(), SOURCE);
                 assert_eq!(ip.dst_ip(), DESTINATION);
