@@ -508,8 +508,8 @@ class DetailDiffTests(unittest.TestCase):
         self.assertTrue(
             command[0].endswith(str(remote_action._DETAIL_DIFF_SCRIPT))
         )
-        self.assertEqual(command[1], "file1.txt.filtered")
-        self.assertEqual(command[2], "file2.txt.filtered")
+        self.assertEqual(command[-2], "file1.txt.filtered")
+        self.assertEqual(command[-1], "file2.txt.filtered")
 
 
 class TextDiffTests(unittest.TestCase):
