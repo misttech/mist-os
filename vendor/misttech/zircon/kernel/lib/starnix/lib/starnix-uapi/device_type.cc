@@ -25,5 +25,6 @@ const DeviceType DeviceType::DEVICE_MAPPER = DeviceType::New(MISC_MAJOR, 236);
 const DeviceType DeviceType::LOOP_CONTROL = DeviceType::New(MISC_MAJOR, 237);
 
 const DeviceType DeviceType::FB0 = DeviceType::New(FB_MAJOR, 0);
+const DeviceType DeviceType::TUN = DeviceType::New(MISC_MAJOR, 200);
 
 }  // namespace starnix_uapi

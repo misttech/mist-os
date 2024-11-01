@@ -6,6 +6,7 @@
 #ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_DEVICE_TYPE_H_
 #define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_DEVICE_TYPE_H_
 
+#include <lib/mistos/util/range-map.h>
 #include <zircon/types.h>
 
 namespace starnix_uapi {
@@ -17,13 +18,23 @@ constexpr uint32_t MISC_MAJOR = 10;
 constexpr uint32_t INPUT_MAJOR = 13;
 constexpr uint32_t FB_MAJOR = 29;
 
-// TODO(tbodt): Use the rest of the range of majors marked as RESERVED FOR DYNAMIC ASSIGMENT in
-// devices.txt.
-constexpr uint32_t DYN_MAJOR = 234;
+// These minor device numbers in the MISC major device appear to be dynamically allocated.
+// The lower bound is taken from observing /proc/misc an Android device. The upper bound is
+// taken from the value of /dev/beep in devices.txt.
+constexpr util::Range<uint32_t> MISC_DYNANIC_MINOR_RANGE{.start = 52, .end = 128};
 
+// TODO: The range for dynamic character devices actually goes all the way to 254, but we
+// still have a few hardcoded devices registered at high numbers. We can expand this range
+// to 254 once we dynamically allocate those devices.
+constexpr util::Range<uint32_t> DYN_MAJOR_RANGE{.start = 234, .end = 251};
+
+constexpr uint32_t REMOTE_BLOCK_MAJOR = 251;
 // Unclear if this device number is assigned dynamically, but this value is what abarth observed
 // once for /dev/block/zram0.
 constexpr uint32_t ZRAM_MAJOR = 252;
+
+// This value is observed from dmsetup.
+constexpr uint32_t DEVICE_MAPPER_MAJOR = 254;
 
 class DeviceType {
  public:
@@ -51,6 +62,9 @@ class DeviceType {
   // Frame buffer
   static const DeviceType FB0;
 
+  // TUN
+  static const DeviceType TUN;
+
   DeviceType(uint64_t val) : value_(val) {}
 
   static DeviceType New(uint32_t major, uint32_t minor) {
@@ -61,9 +75,22 @@ class DeviceType {
                        ((minor & 0xffffff00ULL) << 12) | (minor & 0xffULL)));
   }
 
+  static util::Range<DeviceType> new_range(uint32_t major, util::Range<uint32_t> minor_range) {
+    return util::Range<DeviceType>{.start = New(major, minor_range.start),
+                                   .end = New(major, minor_range.end)};
+  }
+
   static DeviceType from_bits(uint64_t dev) { return DeviceType(dev); }
 
   uint64_t bits() const { return value_; }
+
+  DeviceType next_minor() const {
+    uint32_t next = minor() + 1;
+    if (next < minor()) {
+      return NONE;
+    }
+    return New(major(), next);
+  }
 
   uint32_t major() const {
     return ((value_ >> 32 & 0xfffff000ULL) | ((value_ >> 8) & 0xfffULL)) & 0xFFFFFFFF;
