@@ -185,8 +185,8 @@ closed protocol Bti {
     ///
     /// `ZX_ERR_INVALID_ARGS` *options* is 0 or contains an undefined flag, either
     /// *addrs* or *pmt* is not a valid pointer, *num_addrs* is not the same as the
-    /// number of entries that would be returned, or *offset* or *size* is not
-    /// page-aligned.
+    /// number of entries that would be returned, *num_addrs* is too large or *offset*
+    /// or *size* is not page-aligned.
     ///
     /// `ZX_ERR_OUT_OF_RANGE` `offset + size` is out of the bounds of *vmo*.
     ///
