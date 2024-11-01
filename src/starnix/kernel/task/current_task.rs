@@ -89,9 +89,9 @@ impl From<TaskBuilder> for CurrentTask {
 }
 
 impl Releasable for TaskBuilder {
-    type Context<'a> = &'a mut Locked<'a, TaskRelease>;
+    type Context<'a: 'b, 'b> = &'b mut Locked<'a, TaskRelease>;
 
-    fn release<'a>(self, locked: &'a mut Locked<'a, TaskRelease>) {
+    fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
         let context = (self.thread_state, locked);
         self.task.release(context);
     }
@@ -182,9 +182,9 @@ type SyscallRestartFunc =
     dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send + Sync;
 
 impl Releasable for CurrentTask {
-    type Context<'a> = &'a mut Locked<'a, TaskRelease>;
+    type Context<'a: 'b, 'b> = &'b mut Locked<'a, TaskRelease>;
 
-    fn release<'a>(self, locked: &'a mut Locked<'a, TaskRelease>) {
+    fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
         self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
 

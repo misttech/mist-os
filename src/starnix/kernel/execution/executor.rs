@@ -736,9 +736,9 @@ pub struct TaskInfo {
 }
 
 impl Releasable for TaskInfo {
-    type Context<'a> = ();
+    type Context<'a: 'b, 'b> = ();
 
-    fn release<'a>(self, context: Self::Context<'a>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         self.thread_group.release(context);
     }
 }

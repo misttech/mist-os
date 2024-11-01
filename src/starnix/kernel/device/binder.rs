@@ -458,9 +458,9 @@ struct ActiveTransaction {
 }
 
 impl Releasable for ActiveTransaction {
-    type Context<'a> = ();
+    type Context<'a: 'b, 'b> = ();
 
-    fn release(self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         self.state.release(context);
     }
 }
@@ -487,9 +487,9 @@ struct TransactionState {
 }
 
 impl Releasable for TransactionState {
-    type Context<'a> = ();
+    type Context<'a: 'b, 'b> = ();
 
-    fn release(self, _: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, _: Self::Context<'a, 'b>) {
         log_trace!("Releasing binder TransactionState");
         let mut drop_actions = RefCountActions::default();
         // Release the owned objects unconditionally.
@@ -552,8 +552,8 @@ struct TransientTransactionState<'a> {
 }
 
 impl<'a> Releasable for TransientTransactionState<'a> {
-    type Context<'b> = ();
-    fn release(self, _: Self::Context<'_>) {
+    type Context<'b: 'c, 'c> = ();
+    fn release<'b: 'c, 'c>(self, _: Self::Context<'b, 'c>) {
         for fd in &self.transient_fds {
             let _: Result<(), Errno> = self.accessor.close_fd(*fd);
         }
@@ -1045,9 +1045,9 @@ impl<'a> BinderProcessGuard<'a> {
 }
 
 impl Releasable for BinderProcess {
-    type Context<'a> = &'a Kernel;
+    type Context<'a: 'b, 'b> = &'a Kernel;
 
-    fn release(self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         log_trace!("Releasing BinderProcess id={}", self.identifier);
         let state = self.state.into_inner();
         // Notify any subscribers that the objects this process owned are now dead.
@@ -1365,8 +1365,8 @@ struct HandleTable {
 /// The HandleTable is released at the time the BinderProcess is released. At this moment, any
 /// reference to object owned by another BinderProcess need to be clean.
 impl Releasable for HandleTable {
-    type Context<'a> = ();
-    fn release(self, _: ()) {
+    type Context<'a: 'b, 'b> = ();
+    fn release<'a: 'b, 'b>(self, _: ()) {
         for (_, r) in self.table.into_iter() {
             let mut actions = RefCountActions::default();
             r.clean_refs(&mut actions);
@@ -1556,9 +1556,9 @@ impl DerefMut for RefCountActions {
 }
 
 impl Releasable for RefCountActions {
-    type Context<'a> = ();
+    type Context<'a: 'b, 'b> = ();
 
-    fn release(self, _context: ()) {
+    fn release<'a: 'b, 'b>(self, _context: ()) {
         for object in self.objects.into_iter() {
             object.apply_deferred_refcounts();
         }
@@ -1700,9 +1700,9 @@ impl BinderThread {
 }
 
 impl Releasable for BinderThread {
-    type Context<'a> = &'a Kernel;
+    type Context<'a: 'b, 'b> = &'a Kernel;
 
-    fn release(self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         self.state.into_inner().release(context);
     }
 }
@@ -1820,9 +1820,9 @@ impl BinderThreadState {
 }
 
 impl Releasable for BinderThreadState {
-    type Context<'a> = &'a Kernel;
+    type Context<'a: 'b, 'b> = &'a Kernel;
 
-    fn release(self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         log_trace!("Dropping BinderThreadState id={}", self.tid);
         // If there are any transactions queued, we need to tell the caller that this thread is now
         // dead.
@@ -2364,9 +2364,9 @@ struct RefGuardInner<R: RefReleaser> {
 }
 
 impl<R: RefReleaser> Releasable for RefGuardInner<R> {
-    type Context<'a> = &'a mut RefCountActions;
+    type Context<'a: 'b, 'b> = &'a mut RefCountActions;
 
-    fn release(self, context: &mut RefCountActions) {
+    fn release<'a: 'b, 'b>(self, context: &mut RefCountActions) {
         R::dec_ref(&self.binder_object, context);
     }
 }
@@ -2397,9 +2397,9 @@ impl<R: RefReleaser> RefGuard<R> {
 }
 
 impl<R: RefReleaser> Releasable for RefGuard<R> {
-    type Context<'a> = &'a mut RefCountActions;
+    type Context<'a: 'b, 'b> = &'a mut RefCountActions;
 
-    fn release(self, context: &mut RefCountActions) {
+    fn release<'a: 'b, 'b>(self, context: &mut RefCountActions) {
         self.0.release(context);
     }
 }
@@ -2621,9 +2621,9 @@ impl From<SchedulerPolicy> for SchedulerGuard {
 }
 
 impl Releasable for SchedulerGuard {
-    type Context<'a> = &'a Task;
+    type Context<'a: 'b, 'b> = &'a Task;
 
-    fn release(self, task: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, task: Self::Context<'a, 'b>) {
         if let Some(policy) = self.0 {
             let policy = ReleaseGuard::take(policy);
             if let Err(e) = task.set_scheduler_policy(policy) {
@@ -3078,9 +3078,9 @@ pub struct BinderDriver {
 }
 
 impl Releasable for BinderDriver {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a: 'b, 'b> = &'a CurrentTask;
 
-    fn release(mut self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
         for binder_process in std::mem::take(self.procs.get_mut()).into_values() {
             binder_process.release(context.kernel());
         }

@@ -2075,9 +2075,9 @@ impl FileObject {
 }
 
 impl Releasable for FileObject {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a: 'b, 'b> = &'a CurrentTask;
 
-    fn release(self, current_task: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, current_task: Self::Context<'a, 'b>) {
         // Release all wake leases associated with this file in the corresponding `WaitObject`
         // of each registered epfd.
         for epfd in self.epoll_files.lock().drain() {

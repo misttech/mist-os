@@ -1498,9 +1498,9 @@ impl Task {
 }
 
 impl Releasable for Task {
-    type Context<'a> = (ThreadState, &'a mut Locked<'a, TaskRelease>);
+    type Context<'a: 'b, 'b> = (ThreadState, &'b mut Locked<'a, TaskRelease>);
 
-    fn release(mut self, context: (ThreadState, &mut Locked<'_, TaskRelease>)) {
+    fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
         let (thread_state, _) = context;
 
         *self.proc_pid_directory_cache.get_mut() = None;

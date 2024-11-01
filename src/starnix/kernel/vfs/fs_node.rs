@@ -2417,9 +2417,9 @@ impl std::fmt::Debug for FsNode {
 }
 
 impl Releasable for FsNode {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a: 'b, 'b> = &'a CurrentTask;
 
-    fn release(self, current_task: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, current_task: Self::Context<'a, 'b>) {
         if let Some(fs) = self.fs.upgrade() {
             fs.remove_node(&self);
         }
