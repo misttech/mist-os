@@ -38,13 +38,12 @@ impl LogStreamStats {
         self.sockets_closed.add(1);
     }
 
-    pub fn increment_rolled_out(&self, msg: &StoredMessage) {
-        self.rolled_out.count(msg);
+    pub fn increment_rolled_out(&self, msg_len: usize) {
+        self.rolled_out.increment_bytes(msg_len);
     }
 
     pub fn increment_invalid(&self, bytes: usize) {
-        self.invalid.number.add(1);
-        self.invalid.bytes.add(bytes as u64);
+        self.invalid.increment_bytes(bytes);
     }
 
     pub fn ingest_message(&self, msg: &StoredMessage) {
@@ -73,5 +72,10 @@ impl LogCounter {
     fn count(&self, msg: &StoredMessage) {
         self.number.add(1);
         self.bytes.add(msg.size() as u64);
+    }
+
+    fn increment_bytes(&self, bytes: usize) {
+        self.number.add(1);
+        self.bytes.add(bytes as u64);
     }
 }

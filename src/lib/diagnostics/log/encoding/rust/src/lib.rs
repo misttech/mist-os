@@ -275,7 +275,7 @@ impl From<bool> for Value<'static> {
 }
 
 /// The tracing format supports many types of records, we're sneaking in as a log message.
-const TRACING_FORMAT_LOG_RECORD_TYPE: u8 = 9;
+pub const TRACING_FORMAT_LOG_RECORD_TYPE: u8 = 9;
 
 bitfield! {
     /// A header in the tracing format. Expected to precede every Record and Argument.
@@ -290,10 +290,10 @@ bitfield! {
     impl Debug;
 
     /// Record type.
-    u8, raw_type, set_type: 3, 0;
+    pub u8, raw_type, set_type: 3, 0;
 
     /// Record size as a multiple of 8 bytes.
-    u16, size_words, set_size_words: 15, 4;
+    pub u16, size_words, set_size_words: 15, 4;
 
     /// String ref for the associated name, if any.
     u16, name_ref, set_name_ref: 31, 16;
