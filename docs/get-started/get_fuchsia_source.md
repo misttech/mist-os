@@ -15,8 +15,8 @@ The steps are:
 
 ## 1. Install prerequisite packages {#install-prerequisite-packages}
 
-Fuchsia requires `curl`, `file`, `unzip`, and `git` to be up to date. The version
-of `git` needs to be 2.31 or higher.
+Fuchsia requires `curl`, `file`, `unzip`, and `git` to be up to date.
+The version of `git` needs to be 2.31 or higher.
 
 Install (or update) the following packages:
 
@@ -142,16 +142,23 @@ do the following:
     source ~/.bash_profile
     ```
 
-1.  Verify that you can run the following commands inside your
-    `fuchsia` directory without error:
+1.  Verify your environment setup:
 
-    ```posix-terminal
-    jiri help
-    ```
+    1. Go to your `fuchsia` directory, for example:
 
-    ```posix-terminal
-    fx help
-    ```
+       ```posix-terminal
+       cd ~/fuchsia
+       ```
+
+    2. Verify that you can run the following commands without errors:
+
+       ```posix-terminal
+       jiri help
+       ```
+
+       ```posix-terminal
+       fx help
+       ```
 
 ## 5. Configure firewall rules (Optional) {#configure-firewall-rules}
 

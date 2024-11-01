@@ -46,31 +46,31 @@ For more information on supported boards and products, see the
 (**Linux only**) Most Linux machines support VM acceleration through
 KVM, which greatly improves the performance and usability of the emulator.
 
-1. If KVM is available on your machine, add yourself to the `kvm` group on your machine:
+1. If KVM is available on your machine, add yourself to the `kvm` group
+   on your machine:
 
-      ```posix-terminal
-      sudo usermod -a -G kvm ${USER}
-      ```
+   ```posix-terminal
+   sudo usermod -a -G kvm ${USER}
+   ```
 
-1.  Log out of all desktop sessions to your machine and then log in again.
+1. Log out of all desktop sessions to your machine and then log in again.
 
-1.  To verify that KVM is configured correctly, run the following command:
+1. To verify that KVM is configured correctly, run the following command:
 
-      ```posix-terminal
-      if [[ -r /dev/kvm ]] && grep '^flags' /proc/cpuinfo | grep -qE 'vmx|svm'; then echo 'KVM is working'; else echo 'KVM not working'; fi
-      ```
+   ```posix-terminal
+   if [[ -r /dev/kvm ]] && grep '^flags' /proc/cpuinfo | grep -qE 'vmx|svm'; then echo 'KVM is working'; else echo 'KVM not working'; fi
+   ```
 
-      Verify that this command prints the following line:
+   Verify that this command prints the following line:
 
-      ```none {:.devsite-disable-click-to-copy}
-      KVM is working
-      ```
+   ```none {:.devsite-disable-click-to-copy}
+   KVM is working
+   ```
 
-      If you see `KVM not working`, you may need to reboot your machine for
-      the permission change to take effect.
+   If you see `KVM not working`, you may need to reboot your machine for
+   the permission change to take effect.
 
 ## 4. Start FEMU {#start-femu}
-
 
 ### Start the package server
 
@@ -82,53 +82,60 @@ To start the package server, run the following command:
 fx serve
 ```
 
+Once this command is run, it does not terminate and keeps the
+Fuchsia package server running on the host machine (unless the
+terminal is closed or `Ctrl+C` is pressed on the terminal,
+which kills the command).
+
 Alternatively you can background the `fx serve` process.
 
 ### Start the emulator
 
-To start the emulator on your Linux machine, do the following:
+Start the Fuchsia emulator on your Linux machine.
 
-1. Configure the upscript by running the following command:
+If your machine is behind a firewall, you may need to apply some
+additional configuration to allow the emulator to access the network.
+This is typically accomplished by running an "upscript", which sets
+up the interfaces and firewall access rules for the current process.
+If you're on a corporate network, check with your internal networking
+team to see if they have an existing upscript for you to use.
 
-     ```posix-terminal
-     ffx config set emu.upscript {{ '<var>' }}FUCHSIA_ROOT{{ '</var>' }}/scripts/start-unsecure-internet.sh
-     ```
+However, even if you're not behind a firewall, there's still some
+configuration needed to enable tun/tap networking. The example
+upscript at
+<code>{{ '<var>' }}FUCHSIA_ROOT{{ '</var>' }}/scripts/start-unsecure-internet.sh</code>
+should work for the majority of non-corporate users.
 
-     * `start-unsecure-internet.sh` is an example upscript.
-     * `FUCHSIA_ROOT` is the path to your Fuchsia directory.
+To start the emulator, do the following:
 
-     If your machine is behind a firewall, you may need to apply some additional
-     configuration to allow the emulator to access the network. This is typically
-     accomplished by running an "upscript", which sets up the interfaces and firewall
-     access rules for the current process. If you're on a corporate network, check
-     with your internal networking team to see if they have an existing upscript
-     for you to use.
+1. Start a new terminal.
 
-     If you're not behind a firewall, there's still some configuration needed to
-     enable tun/tap networking. The example upscript
-     at <code>{{ '<var>' }}FUCHSIA_ROOT{{ '</var>' }}/scripts/start-unsecure-internet.sh</code>
-     should work for the majority of non-corporate users.
+1. To configure the upscript, run the following command:
 
-1. To start the emulator with access to external networks,
-     run the following command:
+   ```posix-terminal
+   ffx config set emu.upscript {{ '<var>' }}FUCHSIA_ROOT{{ '</var>' }}/scripts/start-unsecure-internet.sh
+   ```
 
-     ```posix-terminal
-     ffx emu start --net tap
-     ```
+   * `start-unsecure-internet.sh` is an example upscript.
+   * `FUCHSIA_ROOT` is the path to your Fuchsia directory.
 
-     `--net` specifies the networking mode for the emulator. `--net tap`
-     attaches to a Tun/Tap interface.
+1. Start the emulator with access to external networks:
 
-     Or, to start the emulator without access to external networks,
-     run the following command:
+   ```posix-terminal
+   ffx emu start --net tap
+   ```
 
-     ```posix-terminal
-     ffx emu start --net none
-     ```
+   `--net` specifies the networking mode for the emulator.
+   `--net tap` attaches to a Tun/Tap interface.
 
-     Starting the emulator opens a new window with the title
-     **Fuchsia Emulator**. When the emulator is finished booting, you are
-     returned to the command prompt, and the emulator runs in the background.
+   Or, you can start the emulator without access to external networks:
+
+   ```posix-terminal
+   ffx emu start --net none
+   ```
+
+   Starting the emulator opens a new window with the title
+   **Fuchsia Emulator**.
 
 ## 5. Discover FEMU {#discover-femu}
 
@@ -143,26 +150,26 @@ This command prints output similar to the following:
 
 ```none {:.devsite-disable-click-to-copy}
 $ ffx target list
-NAME                      SERIAL       TYPE                    STATE      ADDRS/IP                            RCS
+NAME                SERIAL       TYPE                 STATE      ADDRS/IP                            RCS
 fuchsia-emulator    <unknown>    workbench_eng.x64    Product    [fe80::866a:a5ea:cd9e:69f6%qemu]    N
 ```
 
 `fuchsia-emulator` is the default node name of the Fuchsia emulator.
 
-The output of `ffx target list` is influenced by the `--net` option in the
-following ways:
+The output of `ffx target list` is influenced by the `--net` option in
+the following ways:
 
-   * `--net none` disables networking, which causes the device to be not
-   discoverable by `ffx target list`.
-   * `--net tap` and `--net user` allow the device to be discoverable
-   when running `ffx target list`.
+* `--net none` disables networking, which causes the device to be not
+  discoverable by `ffx target list`.
+
+* `--net tap` and `--net user` allow the device to be discoverable
+  when running `ffx target list`.
 
 
 ### Add target manually
 
 If no target is found after running `ffx target list`, the target may
-need to be added manually by running `ffx target add`.
-
+need to be added manually by running `ffx target add`:
 
 ```posix-terminal
 ffx target add {{ "<var>" }}device-ip{{ "</var>" }}:{{ "<var>" }}device-port{{ "</var>" }}
@@ -179,8 +186,8 @@ This section provides additional FEMU options.
 
 ### See all available flags
 
-To see a [full list][ffx-emu-reference] of the emulator's supported flags, run the
-following command:
+To see a [full list][ffx-emu-reference] of the emulator's supported flags,
+run the following command:
 
 ```posix-terminal
 ffx emu start --help
@@ -222,15 +229,15 @@ To enable networking in FEMU using
 
 1. Set up `tuntap`:
 
-     ```posix-terminal
-     sudo ip tuntap add dev qemu mode tap user $USER
-     ```
+   ```posix-terminal
+   sudo ip tuntap add dev qemu mode tap user $USER
+   ```
 
 1. Enable the network for `qemu`:
 
-     ```posix-terminal
-     sudo ip link set qemu up
-     ```
+   ```posix-terminal
+   sudo ip link set qemu up
+   ```
 
 ### Specify GPU mode for FEMU (Experimental)
 
