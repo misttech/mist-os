@@ -60,8 +60,6 @@ std::vector<std::string> CloneCategories(
 namespace trace {
 namespace internal {
 
-constexpr bool kVerboseTraceErrors = false;
-
 TraceProviderImpl::TraceProviderImpl(std::string name, async_dispatcher_t* dispatcher,
                                      fidl::ServerEnd<fuchsia_tracing_provider::Provider> server_end)
     : name_(std::move(name)), dispatcher_(dispatcher), executor_(dispatcher) {
@@ -120,8 +118,8 @@ void TraceProviderImpl::GetKnownCategories(GetKnownCategoriesCompleter::Sync& co
     return;
   }
 
-  // TODO(https://fxbug.dev/42068744): Return the trace categories that were registered with the category string
-  // literal.
+  // TODO(https://fxbug.dev/42068744): Return the trace categories that were registered with the
+  // category string literal.
   completer.Reply({});
 }
 
@@ -170,8 +168,10 @@ EXPORT trace_provider_t* trace_provider_create_with_name(zx_handle_t to_service_
           ->RegisterProvider(std::move(endpoints->client), trace::internal::GetPid(),
                              fidl::StringView::FromExternal(name));
   if (!result.ok()) {
-    if (trace::internal::kVerboseTraceErrors) {
-      fprintf(stderr, "TraceProvider: registry failed: result=%s\n",
+    // On products where trace_manager is not included, it is expected that we fail to register a
+    // provider with ZX_ERR_PEER_CLOSED
+    if (result.error().status() != ZX_ERR_PEER_CLOSED) {
+      fprintf(stderr, "TraceProvider: RegisterProvider failed: result=%s\n",
               result.FormatDescription().c_str());
     }
     return nullptr;
@@ -218,8 +218,12 @@ EXPORT trace_provider_t* trace_provider_create_synchronously(zx_handle_t to_serv
           ->RegisterProviderSynchronously(std::move(endpoints->client), trace::internal::GetPid(),
                                           fidl::StringView::FromExternal(name));
   if (!result.ok()) {
-    fprintf(stderr, "TraceProvider: RegisterProviderSynchronously failed: result=%s\n",
-            result.FormatDescription().c_str());
+    // On products where trace_manager is not included, it is expected that we fail to register a
+    // provider with ZX_ERR_PEER_CLOSED
+    if (result.error().status() != ZX_ERR_PEER_CLOSED) {
+      fprintf(stderr, "TraceProvider: RegisterProviderSynchronously failed: result=%s\n",
+              result.FormatDescription().c_str());
+    }
     return nullptr;
   }
   const fidl::WireResponse response = result.value();
