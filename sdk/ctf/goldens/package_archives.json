@@ -60,6 +60,11 @@
     "package_name": "vulkan-loader-tests"
   },
   {
+    "archive_gn_label": "//src/diagnostics/archivist/tests/integration/test_cases:pkg_archive_copy",
+    "archive_name": "archivist_integration_test_cases",
+    "package_name": "archivist_integration_test_cases"
+  },
+  {
     "archive_gn_label": "//src/sys/component_manager/tests/realm:realm_integration_tests-ctf_archive_copy",
     "archive_name": "realm_integration_tests-ctf",
     "package_name": "realm_integration_tests-ctf",

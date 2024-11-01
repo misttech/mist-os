@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
+import("//sdk/ctf/build/ctf.gni")
 import("//src/diagnostics/archivist/build/pipeline.gni")
 
 rustc_test("bin") {
@@ -16,7 +17,6 @@ rustc_test("bin") {
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
     "//sdk/rust/zx",
-    "//src/diagnostics/archivist:lib",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/diagnostics/selectors",
@@ -39,7 +39,6 @@ rustc_test("bin") {
 
   sources = [
     "src/assert.rs",
-    "src/inspect/escrow.rs",
     "src/inspect/mod.rs",
     "src/inspect/reader.rs",
     "src/inspect/recursive_glob.rs",
@@ -60,6 +59,12 @@ rustc_test("bin") {
     "src/test_topology.rs",
     "src/utils.rs",
   ]
+
+  if (current_build_target_api_level == "PLATFORM" ||
+      current_build_target_api_level == "HEAD") {
+    sources += [ "src/inspect/escrow.rs" ]
+  }
+
   inputs = [
     "test_data/unified_reader_all_golden.json",
     "test_data/pipeline_reader_all_golden.json",
@@ -78,7 +83,7 @@ fuchsia_component("archivist_integration_test_cases_component") {
   manifest = "meta/test_cases.cml"
 }
 
-fuchsia_package("pkg") {
+ctf_fuchsia_package("pkg") {
   testonly = true
   package_name = "archivist_integration_test_cases"
   deps = [ ":archivist_integration_test_cases_component" ]

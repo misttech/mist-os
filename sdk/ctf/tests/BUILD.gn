@@ -16,6 +16,7 @@ group("tests") {
     # Tests defined outside of //sdk/ctf
     "//src/connectivity/wlan/testing/hw-sim/test:ctf-tests",
     "//src/devices/tests/ctf:ctf-tests",
+    "//src/diagnostics/archivist/tests:ctf-tests",
     "//src/sys/component_manager/tests/realm:ctf-tests",
     "//src/sys/pkg/tests/pkgdir:ctf-tests",
     "//src/sys/time/timekeeper_integration:ctf-tests",
@@ -38,6 +39,7 @@ group("ctf-tests") {
 
     # Tests defined outside of //sdk/ctf
     "//src/devices/tests/ctf:ctf-tests",
+    "//src/diagnostics/archivist/tests:ctf-tests",
     "//src/sys/component_manager/tests/realm:ctf-tests",
     "//src/sys/pkg/tests/pkgdir:ctf-tests",
     "//src/sys/time/timekeeper_integration:ctf-tests",
