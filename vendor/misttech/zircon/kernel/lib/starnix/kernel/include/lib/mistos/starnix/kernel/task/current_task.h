@@ -30,8 +30,6 @@
 #include <lib/user_copy/user_ptr.h>
 #include <zircon/types.h>
 
-#include <utility>
-
 #include <fbl/array.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
@@ -82,7 +80,7 @@ class TaskBuilder {
 
 class Kernel;
 class LookupContext;
-struct NamespaceNode;
+class NamespaceNode;
 
 // The task object associated with the currently executing thread.
 //

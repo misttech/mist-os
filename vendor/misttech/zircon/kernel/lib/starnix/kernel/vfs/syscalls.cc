@@ -278,12 +278,13 @@ fit::result<Errno, size_t> sys_readlinkat(const CurrentTask& current_task, FdNum
 
   auto result = name->readlink(current_task) _EP(result);
   auto target = [&]() -> FsString {
-    return ktl::visit(
-        SymlinkTarget::overloaded{
-            [](FsString path) { return path; },
-            [&current_task](NamespaceNode node) { return node.path(*current_task.operator->()); },
-        },
-        result->variant_);
+    return ktl::visit(SymlinkTarget::overloaded{
+                          [](FsString path) { return path; },
+                          [&current_task](const NamespaceNode& node) {
+                            return node.path(*current_task.operator->());
+                          },
+                      },
+                      result->variant_);
   }();
 
   if (buffer_size == 0) {
