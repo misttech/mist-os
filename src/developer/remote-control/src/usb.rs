@@ -16,10 +16,7 @@ use {
 static USB_DEVICE_PATH: &str = "/dev/class/overnet-usb";
 
 pub async fn run_usb_links(router: Weak<Router>) -> Result<()> {
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        USB_DEVICE_PATH,
-        fio::OpenFlags::RIGHT_READABLE,
-    )?;
+    let dir = fuchsia_fs::directory::open_in_namespace(USB_DEVICE_PATH, fio::PERM_READABLE)?;
     let mut watcher = { Watcher::new(&dir).await? };
 
     while let Some(msg) = watcher.try_next().await? {
