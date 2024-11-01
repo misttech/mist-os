@@ -16,7 +16,6 @@ use fastboot::{
     download, send, send_with_listener, send_with_timeout, upload, upload_with_read_timeout,
     SendError, UploadError,
 };
-use ffx_config::get;
 use futures::io::{AsyncRead, AsyncWrite};
 use std::fmt::Debug;
 use std::fs::File;
@@ -35,9 +34,9 @@ pub struct FastbootProxy<T: AsyncRead + AsyncWrite + Unpin> {
 }
 
 /// The timeout rate in mb/s when communicating with the target device
-const FLASH_TIMEOUT_RATE: &str = "fastboot.flash.timeout_rate";
+// const FLASH_TIMEOUT_RATE: &str = "fastboot.flash.timeout_rate";
 /// The minimum flash timeout (in seconds) for flashing to a target device
-const MIN_FLASH_TIMEOUT: &str = "fastboot.flash.min_timeout_secs";
+// const MIN_FLASH_TIMEOUT: &str = "fastboot.flash.min_timeout_secs";
 
 fn handle_timeout_as_okay(r: Result<Reply>) -> Result<Reply> {
     match r {
@@ -192,6 +191,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         partition_name: &str,
         path: &str,
         listener: Sender<UploadProgress>,
+        timeout: Duration,
     ) -> Result<(), FastbootError> {
         // TODO(colnnelson): This file size could be done better.
         // The stage function could return back how many bytes were uploaded
@@ -201,14 +201,6 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         let mut file_to_flash = File::open(path).map_err(FlashError::from)?;
         let size = file_to_flash.metadata().map_err(FlashError::from)?.len();
         let size = u32::try_from(size).map_err(|e| FlashError::InvalidFileSize(e))?;
-        //timeout rate is in mb per seconds
-        let min_timeout: i64 = get(MIN_FLASH_TIMEOUT).map_err(FlashError::from)?;
-        let timeout_rate: i64 = get(FLASH_TIMEOUT_RATE).map_err(FlashError::from)?;
-        let megabytes = (size / 1000000) as i64;
-        let mut timeout = megabytes / timeout_rate;
-        timeout = std::cmp::max(timeout, min_timeout);
-        let timeout = Duration::seconds(timeout);
-        tracing::debug!("Estimated timeout: {}s for {}MB", timeout, megabytes);
         let progress_listener = ProgressListener::new(listener)?;
         let span = tracing::span!(tracing::Level::INFO, "device_flash_upload").entered();
         let upload_reply = upload_with_read_timeout(
@@ -260,17 +252,11 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
                 if let Some(ffx_err) = e.downcast_ref::<SendError>() {
                     match ffx_err {
                         SendError::Timeout => {
-                            let message = if timeout_rate == 1 {
-                                "Could not read response from device.  Reply timed out.".to_string()
-                            } else {
-                                let lowered_rate = timeout_rate - 1;
-                                format!(
-                                    "Time out while waiting on a response from the device. \n\
-                                    The current timeout rate is {} mb/s.  Try lowering the timeout rate: \n\
-                                    ffx config set \"{}\" {}",
-                                    timeout_rate, FLASH_TIMEOUT_RATE, lowered_rate
-                                )
-                            };
+                            let message = format!(
+                                "Time out while waiting on a response from the device. \n\
+                                    The current timeout is {}.  Try increacing the timeout",
+                                timeout
+                            );
                             Err(FastbootError::FlashError(FlashError::TimeoutError(message)))
                         }
                     }
@@ -1112,8 +1098,6 @@ mod test {
 
     #[fuchsia::test]
     async fn test_flash_ok() -> Result<()> {
-        let _env = ffx_config::test_init().await?;
-
         let tmpdir = TempDir::new().unwrap();
 
         // Generate a large temporary file
@@ -1140,7 +1124,9 @@ mod test {
         let (var_client, mut var_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
             mpsc::channel(3);
 
-        fastboot_client.flash("partition1", temp_path.to_str().unwrap(), var_client).await?;
+        fastboot_client
+            .flash("partition1", temp_path.to_str().unwrap(), var_client, Duration::seconds(1))
+            .await?;
 
         assert!(matches!(var_server.recv().await, Some(UploadProgress::OnStarted { size: 4096 })));
         assert!(matches!(
@@ -1179,7 +1165,7 @@ mod test {
             mpsc::channel(2);
 
         assert!(fastboot_client
-            .flash("partition1", temp_path.to_str().unwrap(), var_client)
+            .flash("partition1", temp_path.to_str().unwrap(), var_client, Duration::seconds(1))
             .await
             .is_err());
 

@@ -90,6 +90,30 @@
       "hidden": false
     },
     {
+      "kind": {
+        "Option": {
+          "arg_name": "timeout-rate"
+        }
+      },
+      "optionality": "optional",
+      "long": "--timeout-rate",
+      "short": null,
+      "description": "flash timeout rate in mb/second.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "min-timeout-secs"
+        }
+      },
+      "optionality": "optional",
+      "long": "--min-timeout-secs",
+      "short": null,
+      "description": "minimum timeout in seconds to wait while flashing per-partition",
+      "hidden": false
+    },
+    {
       "kind": "Switch",
       "optionality": "optional",
       "long": "--skip-authorized-keys",

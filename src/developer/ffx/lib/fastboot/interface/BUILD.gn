@@ -14,7 +14,6 @@ if (is_host) {
 
     deps = [
       "//src/developer/fastboot:lib",
-      "//src/developer/ffx/config:lib",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:chrono",

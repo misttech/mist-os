@@ -223,11 +223,12 @@ async fn do_flash<W: Write, F: FastbootInterface>(
     name: &str,
     fastboot_interface: &mut F,
     file_to_upload: &str,
+    timeout: Duration,
 ) -> Result<()> {
     let (prog_client, prog_server): (Sender<UploadProgress>, Receiver<UploadProgress>) =
         mpsc::channel(1);
     try_join!(
-        fastboot_interface.flash(name, file_to_upload, prog_client).map_err(|e| anyhow!(
+        fastboot_interface.flash(name, file_to_upload, prog_client, timeout).map_err(|e| anyhow!(
             "There was an error flashing \"{}\" - {}: {:?}",
             name,
             file_to_upload,
@@ -256,6 +257,7 @@ async fn flash_partition_sparse<W: Write, F: FastbootInterface>(
     file_to_upload: &str,
     fastboot_interface: &mut F,
     max_download_size: u64,
+    timeout: Duration,
 ) -> Result<()> {
     tracing::debug!("Preparing to flash {} in sparse mode", file_to_upload);
 
@@ -270,7 +272,7 @@ async fn flash_partition_sparse<W: Write, F: FastbootInterface>(
         let tmp_file_name = tmp_file_path.to_str().unwrap();
         writeln!(writer, "For partition: {}, flashing sparse image file {}", name, tmp_file_name)?;
 
-        do_flash(writer, name, fastboot_interface, tmp_file_name).await?;
+        do_flash(writer, name, fastboot_interface, tmp_file_name, timeout).await?;
     }
 
     Ok(())
@@ -283,6 +285,8 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterf
     name: &str,
     file: &str,
     fastboot_interface: &mut T,
+    min_timeout_secs: u64,
+    flash_timeout_rate_mb_per_second: u64,
 ) -> Result<()> {
     let file_to_upload =
         file_resolver.get_file(writer, file).await.context("reconciling file for upload")?;
@@ -300,6 +304,15 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterf
             anyhow!("Got error retrieving metadata for file \"{}\": {}", file_to_upload, e)
         })?
         .len();
+
+    // Calculate the flashing timeout
+    let min_timeout = min_timeout_secs;
+    let timeout_rate = flash_timeout_rate_mb_per_second;
+    let megabytes = (file_size / 1000000) as u64;
+    let mut timeout = megabytes / timeout_rate;
+    timeout = std::cmp::max(timeout, min_timeout);
+    let timeout = Duration::seconds(timeout as i64);
+    tracing::debug!("Estimated timeout: {}s for {}MB", timeout, megabytes);
 
     let max_download_size_var = fastboot_interface
         .get_var(MAX_DOWNLOAD_SIZE_VAR)
@@ -328,10 +341,11 @@ pub async fn flash_partition<W: Write, F: FileResolver + Sync, T: FastbootInterf
             &file_to_upload,
             fastboot_interface,
             max_download_size,
+            timeout,
         )
         .await;
     }
-    do_flash(writer, name, fastboot_interface, &file_to_upload).await
+    do_flash(writer, name, fastboot_interface, &file_to_upload, timeout).await
 }
 
 pub async fn verify_hardware(
@@ -465,6 +479,8 @@ pub async fn flash_partitions<
     file_resolver: &mut F,
     partitions: &Vec<P>,
     fastboot_interface: &mut T,
+    flash_timeout_rate_mb_per_second: u64,
+    min_timeout_secs: u64,
 ) -> Result<()> {
     for partition in partitions {
         match (partition.variable(), partition.variable_value()) {
@@ -476,6 +492,8 @@ pub async fn flash_partitions<
                         partition.name(),
                         partition.file(),
                         fastboot_interface,
+                        flash_timeout_rate_mb_per_second,
+                        min_timeout_secs,
                     )
                     .await?;
                 }
@@ -487,6 +505,8 @@ pub async fn flash_partitions<
                     partition.name(),
                     partition.file(),
                     fastboot_interface,
+                    flash_timeout_rate_mb_per_second,
+                    min_timeout_secs,
                 )
                 .await?
             }
@@ -538,8 +558,15 @@ where
     P: Product<Part>,
     T: FastbootInterface,
 {
-    flash_partitions(writer, file_resolver, product.bootloader_partitions(), fastboot_interface)
-        .await?;
+    flash_partitions(
+        writer,
+        file_resolver,
+        product.bootloader_partitions(),
+        fastboot_interface,
+        cmd.flash_min_timeout_seconds,
+        cmd.flash_timeout_rate_mb_per_second,
+    )
+    .await?;
     if product.bootloader_partitions().len() > 0
         && !cmd.no_bootloader_reboot
         && !is_userspace_fastboot(fastboot_interface).await?
@@ -565,7 +592,15 @@ where
     P: Product<Part>,
     T: FastbootInterface,
 {
-    flash_partitions(writer, file_resolver, product.partitions(), fastboot_interface).await?;
+    flash_partitions(
+        writer,
+        file_resolver,
+        product.partitions(),
+        fastboot_interface,
+        cmd.flash_min_timeout_seconds,
+        cmd.flash_timeout_rate_mb_per_second,
+    )
+    .await?;
     if !cmd.no_bootloader_reboot && is_userspace_fastboot(fastboot_interface).await? {
         write!(writer, "Rebooting into updated userspace fastboot...\n")?;
         reboot_bootloader(writer, fastboot_interface).await?;
