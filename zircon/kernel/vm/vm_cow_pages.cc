@@ -221,6 +221,7 @@ class BatchPQRemove {
   // Add a page to the batch set. Automatically calls |Flush| if the limit is reached.
   void Push(vm_page_t* page) {
     DEBUG_ASSERT(page);
+    ASSERT(page->object.pin_count == 0);
     DEBUG_ASSERT(count_ < kMaxPages);
     pages_[count_] = page;
     count_++;
@@ -543,10 +544,8 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
 
       __UNINITIALIZED BatchPQRemove page_remover(&list);
       // free all of the pages attached to us
-      page_list_.RemoveAllContent([&page_remover](VmPageOrMarker&& p) {
-        ASSERT(!p.IsPage() || p.Page()->object.pin_count == 0);
-        page_remover.PushContent(&p);
-      });
+      page_list_.RemoveAllContent(
+          [&page_remover](VmPageOrMarker&& p) { page_remover.PushContent(&p); });
       page_remover.Flush();
 
       FreePagesLocked(&list, /*freeing_owned_pages=*/true);
