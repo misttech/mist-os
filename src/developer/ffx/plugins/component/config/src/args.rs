@@ -22,6 +22,7 @@ pub struct ConfigComponentCommand {
 pub enum SubCommandEnum {
     Set(SetArgs),
     Unset(UnsetArgs),
+    List(ListArgs),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -79,4 +80,16 @@ pub struct UnsetArgs {
     /// if enabled, component instance will be immediately reloaded so overrides
     /// take effect.
     pub reload: bool,
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "list",
+    description = "Lists structured configuration values for the specified component"
+)]
+pub struct ListArgs {
+    #[argh(positional)]
+    /// component URL, moniker or instance ID. Partial matches allowed.
+    pub query: String,
 }

@@ -7,6 +7,7 @@ use cm_rust::{ConfigNestedValueType, ConfigValueType};
 use std::str::FromStr;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
+use crate::cli::show::config_table_print;
 use crate::config::resolve_config_capability_use_decls;
 use crate::query::get_single_instance_from_query;
 
@@ -60,6 +61,14 @@ pub async fn config_unset_cmd<W: std::io::Write>(
         reload_cmd(query, lifecycle_controller, realm_query, writer).await?;
     }
     Ok(())
+}
+
+pub async fn config_list_cmd<W: std::io::Write>(
+    query: String,
+    realm_query: fsys::RealmQueryProxy,
+    writer: W,
+) -> Result<()> {
+    config_table_print(query, realm_query, writer).await
 }
 
 fn parse_config_key_value(

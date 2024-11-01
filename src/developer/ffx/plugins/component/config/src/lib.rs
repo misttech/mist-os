@@ -3,12 +3,14 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use component_debug::cli::{config_set_cmd, config_unset_cmd};
+use component_debug::cli::{config_list_cmd, config_set_cmd, config_unset_cmd};
 use errors::FfxError;
 use ffx_component::rcs::{
     connect_to_config_override, connect_to_lifecycle_controller, connect_to_realm_query,
 };
-use ffx_component_config_args::{ConfigComponentCommand, SetArgs, SubCommandEnum, UnsetArgs};
+use ffx_component_config_args::{
+    ConfigComponentCommand, ListArgs, SetArgs, SubCommandEnum, UnsetArgs,
+};
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol as rc;
 
@@ -51,6 +53,9 @@ impl FfxMain for ConfigTool {
             )
             .await
             .map_err(|e| FfxError::Error(e, 1))?,
+            SubCommandEnum::List(ListArgs { query }) => config_list_cmd(query, realm_query, writer)
+                .await
+                .map_err(|e| FfxError::Error(e, 1))?,
         };
         Ok(())
     }
