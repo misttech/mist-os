@@ -370,7 +370,7 @@ function main {
     local rbe_wrapper=()
     if fx-rbe-enabled
     then
-      rbe_wrapper=("${RBE_WRAPPER[@]}")
+      rbe_wrapper=("${RBE_WRAPPER[@]}" -- )
     fi
 
     # It's not ideal that we resort to constructing the textproto file as a
