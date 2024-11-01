@@ -18,6 +18,7 @@ executable("gpioutil") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/lib/ddk",
+    "//src/lib/stdformat",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
@@ -42,6 +43,7 @@ test("gpioutil-test-bin") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/lib/ddk",
+    "//src/lib/stdformat",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/zx",
