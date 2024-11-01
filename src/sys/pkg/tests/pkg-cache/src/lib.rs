@@ -756,6 +756,7 @@ where
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<fidl_fuchsia_logger::LogSinkMarker>())
+                    .capability(Capability::dictionary("diagnostics"))
                     .from(Ref::parent())
                     .to(&pkg_cache)
                     .to(&service_reflector)
