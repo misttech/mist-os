@@ -1505,6 +1505,7 @@ assembly_input_bundle("core_realm_development_access") {
     {
       package = "remote-control"
       components = [
+        "fdomain_runner",
         "remote_control_runner",
         "remote_control_bin",
       ]
