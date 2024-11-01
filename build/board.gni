@@ -20,10 +20,6 @@ declare_args() {
   # board definition rather than the product definition.
   board_package_labels = []
 
-  # A list of package labels to include in the recovery package set. Used by the
-  # board definition rather than the product definition.
-  board_recovery_package_labels = []
-
   # A list of paths to the unlock credentials file necessary to unlock this
   # board's fastboot protocol.
   board_fastboot_unlock_credentials = []
