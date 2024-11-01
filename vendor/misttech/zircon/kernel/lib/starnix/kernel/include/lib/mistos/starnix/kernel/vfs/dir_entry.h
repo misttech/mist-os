@@ -29,8 +29,6 @@ bool test_tmpfs();
 
 namespace starnix {
 
-using namespace starnix_sync;
-
 class CurrentTask;
 class DirEntry;
 class FsNode;
@@ -98,7 +96,7 @@ struct Created {};
 template <typename CreateFn>
 struct Existed {
  public:
-  Existed(CreateFn&& fn) : create_fn(std::forward<CreateFn>(fn)) {}
+  explicit Existed(CreateFn&& fn) : create_fn(std::forward<CreateFn>(fn)) {}
 
   CreateFn create_fn;
 };
@@ -106,8 +104,12 @@ struct Existed {
 template <typename CreateFn>
 struct CreationResult {
  public:
-  CreationResult(const Created& c) : variant_(c) {}
-  CreationResult(CreateFn&& fn) : variant_(Existed<CreateFn>(std::forward<CreateFn>(fn))) {}
+  explicit CreationResult(const Created& c) : variant_(c) {}
+  explicit CreationResult(CreateFn&& fn)
+      : variant_(Existed<CreateFn>(std::forward<CreateFn>(fn))) {}
+
+ private:
+  friend class DirEntry;
 
   ktl::variant<Created, Existed<CreateFn>> variant_;
 };
@@ -155,7 +157,7 @@ class DirEntry
   /// The mutable state for this DirEntry.
   ///
   /// Leaf lock - do not acquire other locks while holding this one.
-  mutable RwLock<DirEntryState> state_;
+  mutable starnix_sync::RwLock<DirEntryState> state_;
 
   /// A partial cache of the children of this DirEntry.
   ///
@@ -167,7 +169,7 @@ class DirEntry
   /// Getting the ordering right on these is nearly impossible. However, we only need to lock the
   /// children map on the two parents and we don't need to lock the children map on the two
   /// children. So splitting the children out into its own lock resolves this.
-  mutable RwLock<DirEntryChildren> children_;
+  mutable starnix_sync::RwLock<DirEntryChildren> children_;
 
   /// impl DirEntry
   static DirEntryHandle New(FsNodeHandle node, ktl::optional<DirEntryHandle> parent,
@@ -180,11 +182,12 @@ class DirEntry
    private:
     DirEntryHandle entry_;
 
-    RwLock<DirEntryChildren>::RwLockWriteGuard children_;
+    starnix_sync::RwLock<DirEntryChildren>::RwLockWriteGuard children_;
 
    public:
-    DirEntryLockedChildren(DirEntryHandle entry,
-                           RwLock<DirEntry::DirEntryChildren>::RwLockWriteGuard children)
+    DirEntryLockedChildren(
+        DirEntryHandle entry,
+        starnix_sync::RwLock<DirEntry::DirEntryChildren>::RwLockWriteGuard children)
         : entry_(ktl::move(entry)), children_(ktl::move(children)) {}
 
     /// impl<'a> DirEntryLockedChildren<'a>
@@ -393,7 +396,6 @@ class DirEntry
     return fit::ok(ktl::pair(entry, exists));
   }
 
- public:
   /// This is marked as test-only (private) because it sets the owner/group to root instead of the
   /// current user to save a bit of typing in tests, but this shouldn't happen silently in
   /// production.
@@ -404,7 +406,6 @@ class DirEntry
   fit::result<Errno, DirEntryHandle> create_dir_for_testing(const CurrentTask& current_task,
                                                             const FsStr& name);
 
- public:
   template <typename CreateNodeFn>
   fit::result<Errno, ktl::pair<DirEntryHandle, bool>> get_or_create_child(
       const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
@@ -491,11 +492,7 @@ class DirEntry
               },
           },
           cr.variant_);
-    }();
-
-    if (new_result.is_error()) {
-      return result.take_error();
-    }
+    }() _EP(new_result);
 
     auto [child2, exists] = new_result.value();
     return fit::ok(ktl::pair(child2, exists));
