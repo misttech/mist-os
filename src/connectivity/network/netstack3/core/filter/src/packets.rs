@@ -509,36 +509,39 @@ impl<I: IpExt, S: TransportPacketSerializer<I>> IpPacket<I> for TxPacket<'_, I, 
 }
 
 /// An incoming IP packet that is being forwarded.
-///
-/// NB: this type implements `Serializer` by holding the parse metadata from
-/// parsing the IP header and undoing that parsing when it is serialized. This
-/// allows the buffer to be reused on the egress path in its entirety.
 #[derive(Debug, PartialEq, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct ForwardedPacket<I: IpExt, B> {
     src_addr: I::Addr,
     dst_addr: I::Addr,
     protocol: I::Proto,
-    meta: ParseMetadata,
-    body: B,
+    transport_header_offset: usize,
+    buffer: B,
 }
 
 impl<I: IpExt, B: BufferMut> ForwardedPacket<I, B> {
     /// Create a new [`ForwardedPacket`] from its IP header fields and payload.
+    ///
+    /// `meta` is used to revert `buffer` back to the IP header for further
+    /// serialization, and to mark where the transport header starts in
+    /// `buffer`. It _must_ have originated from a previously parsed IP packet
+    /// on `buffer`.
     pub fn new(
         src_addr: I::Addr,
         dst_addr: I::Addr,
         protocol: I::Proto,
         meta: ParseMetadata,
-        body: B,
+        mut buffer: B,
     ) -> Self {
-        Self { src_addr, dst_addr, protocol, meta, body }
+        let transport_header_offset = meta.header_len();
+        buffer.undo_parse(meta);
+        Self { src_addr, dst_addr, protocol, transport_header_offset, buffer }
     }
 
     /// Discard the metadata carried by the [`ForwardedPacket`] and return the
     /// inner buffer.
     pub fn into_buffer(self) -> B {
-        self.body
+        self.buffer
     }
 }
 
@@ -550,20 +553,18 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
         outer: packet::PacketConstraints,
         provider: P,
     ) -> Result<G, (packet::SerializeError<P::Error>, Self)> {
-        let Self { src_addr, dst_addr, protocol, meta, mut body } = self;
-        body.undo_parse(meta);
-        body.serialize(outer, provider)
-            .map_err(|(err, body)| (err, Self { src_addr, dst_addr, protocol, meta, body }))
+        let Self { src_addr, dst_addr, protocol, transport_header_offset, buffer } = self;
+        buffer.serialize(outer, provider).map_err(|(err, buffer)| {
+            (err, Self { src_addr, dst_addr, protocol, transport_header_offset, buffer })
+        })
     }
 
     fn serialize_new_buf<BB: packet::ReusableBuffer, A: packet::BufferAlloc<BB>>(
         &self,
-        _outer: packet::PacketConstraints,
-        _alloc: A,
+        outer: packet::PacketConstraints,
+        alloc: A,
     ) -> Result<BB, packet::SerializeError<A::Error>> {
-        // Currently `serialize_new_buf()` is called only for loopback multicast packets. It's not
-        // needed for `ForwardedPacket`.
-        unimplemented!();
+        self.buffer.serialize_new_buf(outer, alloc)
     }
 }
 
@@ -584,20 +585,16 @@ impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
     fn set_src_addr(&mut self, addr: I::Addr) {
         // Re-parse the IP header so we can modify it in place.
         I::map_ip::<_, ()>(
-            (IpInvariant(&mut self.body), addr),
-            |(IpInvariant(body), addr)| {
-                body.with_header_mut_with_meta(self.meta, |header| {
-                    let mut packet = Ipv4PacketRaw::parse_mut(SliceBufViewMut::new(header), ())
-                        .expect("ForwardedPacket must have been created from a valid IP packet");
-                    packet.set_src_ip_and_update_checksum(addr);
-                });
+            (IpInvariant(self.buffer.as_mut()), addr),
+            |(IpInvariant(buffer), addr)| {
+                let mut packet = Ipv4PacketRaw::parse_mut(SliceBufViewMut::new(buffer), ())
+                    .expect("ForwardedPacket must have been created from a valid IP packet");
+                packet.set_src_ip_and_update_checksum(addr);
             },
-            |(IpInvariant(body), addr)| {
-                body.with_header_mut_with_meta(self.meta, |header| {
-                    let mut packet = Ipv6PacketRaw::parse_mut(SliceBufViewMut::new(header), ())
-                        .expect("ForwardedPacket must have been created from a valid IP packet");
-                    packet.set_src_ip(addr);
-                });
+            |(IpInvariant(buffer), addr)| {
+                let mut packet = Ipv6PacketRaw::parse_mut(SliceBufViewMut::new(buffer), ())
+                    .expect("ForwardedPacket must have been created from a valid IP packet");
+                packet.set_src_ip(addr);
             },
         );
 
@@ -623,20 +620,16 @@ impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
     fn set_dst_addr(&mut self, addr: I::Addr) {
         // Re-parse the IP header so we can modify it in place.
         I::map_ip::<_, ()>(
-            (IpInvariant(&mut self.body), addr),
-            |(IpInvariant(body), addr)| {
-                body.with_header_mut_with_meta(self.meta, |header| {
-                    let mut packet = Ipv4PacketRaw::parse_mut(SliceBufViewMut::new(header), ())
-                        .expect("ForwardedPacket must have been created from a valid IP packet");
-                    packet.set_dst_ip_and_update_checksum(addr);
-                });
+            (IpInvariant(self.buffer.as_mut()), addr),
+            |(IpInvariant(buffer), addr)| {
+                let mut packet = Ipv4PacketRaw::parse_mut(SliceBufViewMut::new(buffer), ())
+                    .expect("ForwardedPacket must have been created from a valid IP packet");
+                packet.set_dst_ip_and_update_checksum(addr);
             },
-            |(IpInvariant(body), addr)| {
-                body.with_header_mut_with_meta(self.meta, |header| {
-                    let mut packet = Ipv6PacketRaw::parse_mut(SliceBufViewMut::new(header), ())
-                        .expect("ForwardedPacket must have been created from a valid IP packet");
-                    packet.set_dst_ip(addr);
-                });
+            |(IpInvariant(buffer), addr)| {
+                let mut packet = Ipv6PacketRaw::parse_mut(SliceBufViewMut::new(buffer), ())
+                    .expect("ForwardedPacket must have been created from a valid IP packet");
+                packet.set_dst_ip(addr);
             },
         );
 
@@ -664,24 +657,26 @@ impl<I: IpExt, B: BufferMut> IpPacket<I> for ForwardedPacket<I, B> {
     }
 
     fn transport_packet_mut(&mut self) -> Self::TransportPacketMut<'_> {
-        let ForwardedPacket { src_addr, dst_addr, protocol, body, meta: _ } = self;
+        let ForwardedPacket { src_addr, dst_addr, protocol, buffer, transport_header_offset } =
+            self;
         ParsedTransportHeaderMut::<I>::parse_in_ip_packet(
             *src_addr,
             *dst_addr,
             *protocol,
-            SliceBufViewMut::new(body.as_mut()),
+            SliceBufViewMut::new(&mut buffer.as_mut()[*transport_header_offset..]),
         )
     }
 }
 
 impl<I: IpExt, B: BufferMut> MaybeTransportPacket for ForwardedPacket<I, B> {
     fn transport_packet_data(&self) -> Option<TransportPacketData> {
-        let ForwardedPacket { protocol, body, src_addr, dst_addr, .. } = self;
+        let ForwardedPacket { protocol, buffer, src_addr, dst_addr, transport_header_offset } =
+            self;
         TransportPacketData::parse_in_ip_packet::<I, _>(
             *src_addr,
             *dst_addr,
             *protocol,
-            Buf::new(body, ..),
+            Buf::new(&buffer.as_ref()[*transport_header_offset..], ..),
         )
     }
 }
