@@ -171,7 +171,8 @@ zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uin
   // be requested_opp so we're going to go ahead and set that up front.
   *out_opp = requested_opp;
 
-  FDF_LOG(INFO, "Scaling from %u MHz %u mV to %u MHz %u mV", initial_opp.freq_hz / 1000000,
+  // TODO(b/376589801): Consider publishing this via inspect.
+  FDF_LOG(DEBUG, "Scaling from %u MHz %u mV to %u MHz %u mV", initial_opp.freq_hz / 1000000,
           initial_opp.volt_uv / 1000, target_opp.freq_hz / 1000000, target_opp.volt_uv / 1000);
 
   if (initial_opp.freq_hz == target_opp.freq_hz && initial_opp.volt_uv == target_opp.volt_uv) {
@@ -257,7 +258,7 @@ zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uin
     }
   }
 
-  FDF_LOG(INFO, "Success\n");
+  FDF_LOG(DEBUG, "switch opp from %u to %u success!\n", current_operating_point_, requested_opp);
 
   current_operating_point_ = requested_opp;
 
