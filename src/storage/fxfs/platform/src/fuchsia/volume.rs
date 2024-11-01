@@ -272,8 +272,6 @@ impl FxVolume {
     }
 
     pub async fn terminate(&self) {
-        self.dirent_cache.clear();
-
         // `NodeCache::terminate` will break any strong reference cycles contained within nodes
         // (pager registration). The only remaining nodes should be those with open FIDL
         // connections or vmo references in the process of handling the VMO_ZERO_CHILDREN signal.
@@ -285,6 +283,10 @@ impl FxVolume {
         self.scope.shutdown();
         self.cache.terminate();
         self.scope.wait().await;
+
+        // The dirent_cache must be cleared *after* shutting down the scope because there can be
+        // tasks that insert entries into the cache.
+        self.dirent_cache.clear();
 
         self.store.filesystem().graveyard().flush().await;
         let task = std::mem::replace(&mut *self.background_task.lock().unwrap(), None);
