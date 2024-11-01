@@ -1,0 +1,20 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/developer/ffx/build/ffx_plugin.gni")
+
+ffx_plugin("ffx_component_config") {
+  version = "0.1.0"
+  edition = "2021"
+  deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/plugins/component/common:ffx_component",
+    "//src/sys/lib/component_debug",
+    "//third_party/rust_crates:async-trait",
+  ]
+  args_sources = [ "src/args.rs" ]
+  sources = [ "src/lib.rs" ]
+}

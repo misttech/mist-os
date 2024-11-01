@@ -131,6 +131,7 @@ pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>)
         fcomponent::IntrospectorMarker::PROTOCOL_NAME,
         fcomponent::NamespaceMarker::PROTOCOL_NAME,
         fcomponent::RealmMarker::PROTOCOL_NAME,
+        fsys::ConfigOverrideMarker::PROTOCOL_NAME,
         fsys::LifecycleControllerMarker::PROTOCOL_NAME,
         fsys::RealmQueryMarker::PROTOCOL_NAME,
         fsys::RouteValidatorMarker::PROTOCOL_NAME,

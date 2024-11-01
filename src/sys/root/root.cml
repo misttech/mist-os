@@ -349,6 +349,12 @@
             to: "#bootstrap",
         },
         {
+            protocol: "fuchsia.sys2.ConfigOverride",
+            from: "framework",
+            as: "fuchsia.sys2.ConfigOverride.root",
+            to: "#toolbox",
+        },
+        {
             protocol: "fuchsia.sys2.RealmQuery",
             from: "framework",
             as: "fuchsia.sys2.RealmQuery.root",
