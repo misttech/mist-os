@@ -180,8 +180,7 @@ template("sdk_atom") {
   _allowed_categories = [
     # "excluded" is deprecated.
     # "experimental" is deprecated.
-    "internal",  # TODO(https://fxbug.dev/333907192): Disable once @internal_sdk
-                 # is removed.
+    # "internal" is deprecated; only specific legacy cases below are allowed.
     "cts",
     "partner_internal",
     "partner",
@@ -189,7 +188,11 @@ template("sdk_atom") {
   ]
 
   assert(
-      _allowed_categories + [ category ] - [ category ] != _allowed_categories,
+      _allowed_categories + [ category ] - [ category ] !=
+          _allowed_categories ||
+          # TODO(https://fxbug.dev/372986936): Remove once all exceptions in the
+          # assert below have been removed.
+          category == "internal",
       "'${target_name}' has unsupported SDK category '${category}'. Must be one of ${_allowed_categories}.")
 
   # "cts" is not properly implemented and should not be used. See

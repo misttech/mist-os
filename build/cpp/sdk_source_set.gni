@@ -89,26 +89,21 @@ template("sdk_source_set") {
   valid_categories = [
     # "excluded" is deprecated.
     # "experimental" is deprecated.
-    "internal",  # TODO(https://fxbug.dev/333907192): Disable once @internal_sdk
-                 # is removed.
-
+    # "internal" is deprecated; only specific legacy cases below are allowed.
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.
     "partner",
-
     # "public" is not yet implemented.
   ]
 
-  # Remove categories that should not be used in new targets.
-  valid_categories_for_error_message = valid_categories - [ "internal" ]
-
-  # TODO(https://fxbug.dev/331991540): Remove once Firmware SDK no longer uses.
-  valid_categories += [ "firmware_sdk" ]
-
   assert(
       valid_categories + [ invoker.category ] - [ invoker.category ] !=
-          valid_categories,
-      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories_for_error_message}.")
+          valid_categories ||
+          # TODO(https://fxbug.dev/372986936): Remove once all uses have been removed.
+          invoker.category == "internal" ||
+          # TODO(https://fxbug.dev/331991540): Remove once Firmware SDK no longer uses.
+          invoker.category == "firmware_sdk",
+      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories}.")
 
   is_internal = invoker.category == "internal"
 
