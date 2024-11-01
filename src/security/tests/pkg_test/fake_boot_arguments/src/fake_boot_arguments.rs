@@ -4,7 +4,6 @@
 
 use anyhow::Context as _;
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_io as fio;
 use futures::stream::{StreamExt as _, TryStreamExt as _};
 use std::sync::Arc;
 use tracing::{error, info};
@@ -32,11 +31,8 @@ async fn main() {
     info!(?args, "Initalizing fake_boot_arguments");
 
     let system_image = fuchsia_fs::file::read(
-        &fuchsia_fs::file::open_in_namespace_deprecated(
-            system_image_path.as_str(),
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap(),
+        &fuchsia_fs::file::open_in_namespace(system_image_path.as_str(), fuchsia_fs::PERM_READABLE)
+            .unwrap(),
     )
     .await
     .unwrap();

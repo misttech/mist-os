@@ -103,11 +103,7 @@ impl RequestHandler {
         path_chars.next();
         let path = path_chars.as_str();
 
-        match directory::open_file_no_describe_deprecated(
-            &self.repository_dir,
-            path,
-            fio::OpenFlags::RIGHT_READABLE,
-        ) {
+        match directory::open_file_async(&self.repository_dir, path, fio::PERM_READABLE) {
             Ok(file) => match file::read(&file).await {
                 Ok(bytes) => Self::ok(path, bytes),
                 Err(err) => Self::not_found(path, Some(err.into())),
@@ -199,11 +195,8 @@ async fn main() {
         .boxed();
 
     let make_service = make_service_fn(|_| {
-        let repository_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-            repository_path,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
+        let repository_dir =
+            fuchsia_fs::directory::open_in_namespace(repository_path, fio::PERM_READABLE).unwrap();
         async move {
             Ok::<_, Error>(service_fn(move |req: Request<Body>| {
                 let handler = RequestHandler::new(&repository_dir);

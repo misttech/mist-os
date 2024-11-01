@@ -23,10 +23,9 @@ impl ProviderServer {
             .err_into()
             .try_for_each(|ProviderRequest::RequestPersistentStorage { dir, control_handle: _ }| {
                 futures::future::ready(
-                    fuchsia_fs::directory::open_channel_in_namespace_deprecated(
+                    fuchsia_fs::directory::open_channel_in_namespace(
                         storage_dir,
-                        fuchsia_fs::OpenFlags::RIGHT_READABLE
-                            | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+                        fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
                         dir,
                     )
                     .with_context(|| {
