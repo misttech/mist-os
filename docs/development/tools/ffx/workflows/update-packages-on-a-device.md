@@ -1,5 +1,3 @@
-robots: noindex
-
 # Update Fuchsia packages on a device
 
 The [`ffx target update`][ffx-target-update] commands can check
@@ -49,6 +47,6 @@ fuchsiasamples.com
 <!-- Reference links -->
 
 [ffx-target-update]: https://fuchsia.dev/reference/tools/sdk/ffx#update_3
-[flash-fuchsia]: ./flash-a-device.md
-[start-a-package-repo]: ./create-a-package-repository.md
+[flash-fuchsia]: /docs/development/tools/ffx/workflows/flash-a-device.md
+[start-a-package-repo]: /docs/development/tools/ffx/workflows/create-a-package-repository.md
 [merkle-root]: /docs/concepts/security/merkleroot.md

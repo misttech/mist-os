@@ -1,5 +1,3 @@
-robots: noindex
-
 # Start package servers
 
 The [`ffx repository server`][ffx-repo-server] commands can start and manage

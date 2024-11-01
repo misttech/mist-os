@@ -1,5 +1,3 @@
-robots: noindex
-
 # Monitor FIDL messages on a device
 
 The [`ffx debug fidl`][ffx-debug-fidl] starts [`fidlcat`][fidlcat] (a
@@ -109,7 +107,7 @@ To exit `fidlcat`, press `Ctrl-C`.
 
 [fidl]: /docs/development/languages/fidl/README.md
 [fidlcat]: /docs/development/monitoring/fidlcat/fidlcat_usage.md
-[zxdb]: ./start-the-fuchsia-debugger.md
-[register-debug-symbols]: ./register-debug-symbols.md
+[zxdb]: /docs/development/tools/ffx/workflows/start-the-fuchsia-debugger.md
+[register-debug-symbols]: /docs/development/tools/ffx/workflows/register-debug-symbols.md
 [ffx-debug-fidl]: https://fuchsia.dev/reference/tools/sdk/ffx#fidl
 [fidl-ir]: /docs/reference/fidl/language/json-ir.md

@@ -1,5 +1,3 @@
-robots: noindex
-
 # Symbolize logs
 
 The [`ffx debug symbolize`][ffx-debug-symbolize] command processes logs
@@ -64,4 +62,4 @@ debug symbols are registered in your environment or available online
 
 [ffx-debug-symbolize]: https://fuchsia.dev/reference/tools/sdk/ffx#symbolize
 [ffx-log]: https://fuchsia.dev/reference/tools/sdk/ffx#log_2
-[register-debug-symbols]: ./register-debug-symbols.md
+[register-debug-symbols]: /docs/development/tools/ffx/workflows/register-debug-symbols.md

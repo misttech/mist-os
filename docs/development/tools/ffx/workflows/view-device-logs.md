@@ -1,5 +1,3 @@
-robots: noindex
-
 # View device logs
 
 The [`ffx log`][ffx-log] commands can monitor and filter log messages from a Fuchsia device.
@@ -180,4 +178,4 @@ $ ffx log --since "5m ago" dump
 
 [ffx-log]: https://fuchsia.dev/reference/tools/sdk/ffx#log_2
 [proactive-logging]: /docs/development/tools/ffx/commands/log.md#proactive_logging
-[symbolize-logs]: ./symbolize-logs.md
+[symbolize-logs]: /docs/development/tools/ffx/workflows/symbolize-logs.md

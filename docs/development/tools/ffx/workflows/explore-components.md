@@ -1,5 +1,3 @@
-robots: noindex
-
 # Explore components
 
 The `ffx component explore` command starts an interactive shell that lets you explore
@@ -264,5 +262,5 @@ component.
 [component-moniker]: /docs/concepts/components/v2/identifiers.md#monikers
 [component-url]: /docs/concepts/components/v2/identifiers.md#component-urls
 [instance-id]: /docs/development/components/component_id_index.md
-[ffx-component-run]: /docs/development/sdk/ffx/start-a-component-during-development.md
+[ffx-component-run]: /docs/development/tools/ffx/workflows/start-a-component-during-development.md
 [cf-tools-buganizer]: https://issues.fuchsia.dev/issues/new?component=1404287&template=0

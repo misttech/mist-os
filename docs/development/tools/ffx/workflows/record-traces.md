@@ -1,5 +1,3 @@
-robots: noindex
-
 # Record traces for performance analysis
 
 The [`ffx trace`][ffx-trace] commands can record diagnostic trace data from
@@ -454,4 +452,4 @@ to trigger the event.
 [record-a-boot-trace]: /docs/development/tracing/advanced/recording-a-boot-trace.md
 [record-a-cpu-trace]: /docs/development/tracing/advanced/recording-a-cpu-performance-trace.md
 [trace-providers]: /docs/concepts/kernel/tracing-system.md#trace-providers
-[view-device-information]: /docs/development/sdk/ffx/view-device-information.md
+[view-device-information]: /docs/development/tools/ffx/workflows/view-device-information.md

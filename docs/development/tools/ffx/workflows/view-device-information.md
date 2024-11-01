@@ -1,5 +1,3 @@
-robots: noindex
-
 # View device information
 
 The [`ffx target`][ffx-target] commands can retrieve various types of
@@ -117,4 +115,4 @@ run `ffx target snapshot --dir <PATH_TO_DIR>`.
 [ffx-target-list]: https://fuchsia.dev/reference/tools/sdk/ffx#list_17
 [ffx-target-show]: https://fuchsia.dev/reference/tools/sdk/ffx#show_8
 [ffx-target-snapshot]: https://fuchsia.dev/reference/tools/sdk/ffx#snapshot
-[ssh-connection]: ./create-ssh-keys-for-devices.md
+[ssh-connection]: /docs/development/tools/ffx/workflows/create-ssh-keys-for-devices.md

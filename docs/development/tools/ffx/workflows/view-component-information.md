@@ -1,5 +1,3 @@
-robots: noindex
-
 # View component information
 
 The [`ffx component`][ffx-component] commands can retrieve various types of

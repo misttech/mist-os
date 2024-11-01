@@ -1,5 +1,3 @@
-robots: noindex
-
 # Start the Fuchsia debugger
 
 The [`ffx debug connect`][ffx-debug-connect] command starts the Fuchsia debugger
@@ -73,5 +71,5 @@ see the [`zxdb` user guide][zxdb-user-guide].
 <!-- Reference links -->
 
 [ffx-debug-connect]: https://fuchsia.dev/reference/tools/sdk/ffx#connect
-[register-debug-symbols]: ./register-debug-symbols.md
+[register-debug-symbols]: /docs/development/tools/ffx/workflows/register-debug-symbols.md
 [zxdb-user-guide]: /docs/development/debugger/README.md

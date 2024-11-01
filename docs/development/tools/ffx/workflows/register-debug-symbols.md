@@ -1,5 +1,3 @@
-robots: noindex
-
 # Register debug symbols
 
 The [`ffx debug symbol-index`][ffx-debug-symbol-index] commands help
@@ -195,6 +193,6 @@ the global `symbol-index` configuration.
 <!-- Reference links -->
 
 [ffx-debug-symbol-index]: https://fuchsia.dev/reference/tools/sdk/ffx#symbol-index
-[symbolize-logs]: ./symbolize-logs.md
-[start-the-fuchsia-debugger]: ./start-the-fuchsia-debugger.md
-[monitor-fidl]: ./monitor-fidl-messages-on-a-device.md
+[symbolize-logs]: /docs/development/tools/ffx/workflows/symbolize-logs.md
+[start-the-fuchsia-debugger]: /docs/development/tools/ffx/workflows/start-the-fuchsia-debugger.md
+[monitor-fidl]: /docs/development/tools/ffx/workflows/monitor-fidl-messages-on-a-device.md

@@ -1,5 +1,3 @@
-robots: noindex
-
 # Flash a Fuchsia image on a device
 
 The [`ffx target flash`][ffx-target-flash] command can flash a Fuchsia image

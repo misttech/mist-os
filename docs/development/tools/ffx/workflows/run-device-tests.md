@@ -1,5 +1,3 @@
-robots: noindex
-
 # Run tests on a device
 
 The `ffx test run` command can run tests on a Fuchsia device and collect

@@ -1,5 +1,3 @@
-robots: noindex
-
 # Create a Fuchsia package repository
 
 The [`ffx repository`][ffx-repository] commands can create and manage

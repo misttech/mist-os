@@ -1,5 +1,3 @@
-robots: noindex
-
 # Copy files to and from a component
 
 The `ffx component copy` command can copy files to and from Fuchsia components running

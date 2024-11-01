@@ -1,6 +1,4 @@
-robots: noindex
-
-# SDK workflows
+# ffx workflows
 
 This section organizes `ffx`-based workflows for interacting
 with Fuchsia components, devices and systems in the Fuchsia
