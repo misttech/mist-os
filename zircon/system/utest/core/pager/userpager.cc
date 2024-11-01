@@ -141,8 +141,8 @@ void Vmo::GenerateBufferContents(void* dest_buffer, uint64_t page_count,
   }
 }
 
-std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size, uint32_t options,
-                                uint32_t map_prems) const {
+std::unique_ptr<Vmo> Vmo::CloneLocked(uint64_t offset, uint64_t size, uint32_t options,
+                                      uint32_t map_perms) const {
   zx::vmo clone;
   zx_status_t status = vmo_.create_child(options, offset, size, &clone);
   if (status != ZX_OK) {
@@ -151,7 +151,7 @@ std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size, uint32_t options
   }
 
   zx_vaddr_t addr;
-  status = zx::vmar::root_self()->map(map_prems, 0, clone, 0, size, &addr);
+  status = zx::vmar::root_self()->map(map_perms, 0, clone, 0, size, &addr);
   if (status != ZX_OK) {
     fprintf(stderr, "vmar map failed with %s\n", zx_status_get_string(status));
     return nullptr;

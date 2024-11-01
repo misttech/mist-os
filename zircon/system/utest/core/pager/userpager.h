@@ -85,16 +85,25 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
 
   std::unique_ptr<Vmo> Clone(uint32_t options = ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE |
                                                 ZX_VMO_CHILD_RESIZABLE) const {
-    // Hold the lock to read the size_ *and* use it for cloning to prevent a Resize from sneaking
-    // in mid-operation.
+    // Lock is held to read size_.
     std::lock_guard guard(mutex_);
-    return Clone(0, size_, options);
+    return CloneLocked(0, size_, options);
   }
 
   std::unique_ptr<Vmo> Clone(uint64_t offset, uint64_t size,
                              uint32_t options = ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE |
                                                 ZX_VMO_CHILD_RESIZABLE,
-                             uint32_t map_perms = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE) const;
+                             uint32_t map_perms = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE) const {
+    // Hold the lock for cloning to prevent a Resize from sneaking in mid-operation.
+    std::lock_guard guard(mutex_);
+    return CloneLocked(offset, size, options, map_perms);
+  }
+
+  std::unique_ptr<Vmo> CloneLocked(uint64_t offset, uint64_t size,
+                                   uint32_t options = ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE |
+                                                      ZX_VMO_CHILD_RESIZABLE,
+                                   uint32_t map_perms = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE) const
+      __TA_REQUIRES(&mutex_);
 
   size_t PollNumChildren(size_t expected_children) const;
 
