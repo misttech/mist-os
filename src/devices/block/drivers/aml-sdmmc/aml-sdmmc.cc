@@ -538,7 +538,7 @@ void AmlSdmmc::Serve(fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> request) {
 }
 
 zx_status_t AmlSdmmc::WaitForInterruptImpl() {
-  zx::time timestamp;
+  zx::time_boot timestamp;
   return irq_.wait(&timestamp);
 }
 

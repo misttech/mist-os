@@ -35,7 +35,7 @@ AudioStreamIn::AudioStreamIn(zx_device_t* parent) : SimpleAudioStream(parent, tr
 
 int AudioStreamIn::Thread() {
   while (1) {
-    zx::time timestamp;
+    zx::time_boot timestamp;
     irq_.wait(&timestamp);
     if (!running_.load()) {
       break;

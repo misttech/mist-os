@@ -323,7 +323,7 @@ int ClientCall(fidl::WireSyncClient<fuchsia_hardware_pin::Debug> client, GpioFun
         return -2;
       }
 
-      zx::time timestamp{};
+      zx::time_boot timestamp{};
       if (zx_status_t status = result->value()->interrupt.wait(&timestamp); status != ZX_OK) {
         fprintf(stderr, "Interrupt wait failed: %s\n", zx_status_get_string(status));
         return -2;

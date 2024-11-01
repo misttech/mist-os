@@ -327,7 +327,7 @@ int I2cHidbus::WorkerThreadNoIrq() {
       auto result = fidl::WireSendEvent(*binding_)->OnReportReceived(
           fhidbus::wire::Report::Builder(arena)
               .buf(fidl::VectorView<uint8_t>::FromExternal(buf + 2, report_len - 2))
-              .timestamp(zx_clock_get_monotonic())
+              .timestamp(zx_clock_get_boot())
               .Build());
       if (!result.ok()) {
         zxlogf(ERROR, "OnReportReceived failed %s", result.error().FormatDescription().c_str());
@@ -358,7 +358,7 @@ int I2cHidbus::WorkerThreadIrq() {
   const zx_duration_t kMinTimeBetweenWarnings = ZX_SEC(10);
 
   while (true) {
-    zx::time timestamp;
+    zx::time_boot timestamp;
     zx_status_t status = irq_.wait(&timestamp);
     if (status != ZX_OK) {
       if (status != ZX_ERR_CANCELED) {

@@ -118,7 +118,7 @@ TEST_F(AmlSaradcTest, GetResolution) {
 TEST_F(AmlSaradcTest, GetSample) {
   driver_test().RunInEnvironmentTypeContext([](AmlSaradcTestEnvironment& env) {
     env.mmio()[0].set(AO_SAR_ADC_FIFO_RD_OFFS >> 2, 0x4);
-    env.irq()->trigger(0, zx::clock::get_monotonic());
+    env.irq()->trigger(0, zx::clock::get_boot());
   });
 
   fdf::Arena arena('TEST');

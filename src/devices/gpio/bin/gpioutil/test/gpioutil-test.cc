@@ -100,7 +100,7 @@ class FakeGpio : public fidl::WireServer<Gpio>,
 
     // Trigger the interrupt before returning it so that the client's call to zx_interrupt_wait
     // completes immediately.
-    if ((status = interrupt.trigger(0, zx::clock::get_monotonic())); status != ZX_OK) {
+    if ((status = interrupt.trigger(0, zx::clock::get_boot())); status != ZX_OK) {
       return completer.ReplyError(status);
     }
 

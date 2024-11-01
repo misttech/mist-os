@@ -369,7 +369,7 @@ TEST_F(AmlTripTest, TestTripPointSuccess) {
   // interrupt is pending.
   sensor_mmio_.SetIrqStat(rise_desc->index, true);
 
-  irq_.trigger(0, zx::clock::get_monotonic());
+  irq_.trigger(0, zx::clock::get_boot());
 
   auto wait_result = client_->WaitForAnyTripPoint();
 
@@ -427,7 +427,7 @@ TEST_F(AmlTripTest, TestTwoTripPointSuccess) {
   sensor_mmio_.SetIrqStat(rise_desc->index, true);
   sensor_mmio_.SetIrqStat(fall_desc->index, true);
 
-  irq_.trigger(0, zx::clock::get_monotonic());
+  irq_.trigger(0, zx::clock::get_boot());
 
   auto first_result = client_->WaitForAnyTripPoint();
   EXPECT_TRUE(first_result.ok());
@@ -481,7 +481,7 @@ TEST_F(AmlTripTest, TestClearTripPointAfterFire) {
   // interrupt is pending.
   sensor_mmio_.SetIrqStat(rise_desc->index, true);
 
-  irq_.trigger(0, zx::clock::get_monotonic());
+  irq_.trigger(0, zx::clock::get_boot());
 
   // Clear the trip point that just fired.
   fuchsia_hardware_trippoint::wire::ClearedTripPoint cleared;

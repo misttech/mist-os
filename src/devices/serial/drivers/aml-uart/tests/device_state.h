@@ -67,7 +67,7 @@ class DeviceState {
   void Inject(const void* buffer, size_t size) {
     rx_buf_ = static_cast<const unsigned char*>(buffer);
     rx_len_ = size;
-    irq_signaller_->trigger(0, zx::time());
+    irq_signaller_->trigger(0, zx::time_boot());
   }
 
   serial::Status Status() {

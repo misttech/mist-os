@@ -272,7 +272,7 @@ bool DispatcherIrqTest(perftest::RepeatState* state, AsyncDispatcher::Type dispa
   ASSERT_OK(irq.Begin(dispatcher->async_dispatcher()));
 
   while (state->KeepRunning()) {
-    irq_object.trigger(0, zx::time());
+    irq_object.trigger(0, zx::time_boot());
     ASSERT_OK(dispatcher->RunUntilIdleIfNoThreads());
     irq_completion.Wait();
     irq_completion.Reset();

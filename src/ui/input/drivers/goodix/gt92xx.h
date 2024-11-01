@@ -129,7 +129,7 @@ class Gt92xxDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
   static constexpr uint32_t kMaxPoints = 5;
 
   struct GtInputReport {
-    zx::time event_time = zx::time(ZX_TIME_INFINITE_PAST);
+    zx::time_boot event_time = zx::time_boot(ZX_TIME_INFINITE_PAST);
     uint8_t contact_count;
     struct Contact {
       uint8_t finger_id;

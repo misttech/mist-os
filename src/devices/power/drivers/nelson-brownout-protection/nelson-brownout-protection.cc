@@ -197,7 +197,7 @@ int NelsonBrownoutProtection::Thread() {
     }
   }
 
-  zx::time timestamp = {};
+  zx::time_boot timestamp = {};
   while (run_thread_ && alert_interrupt_.wait(&timestamp) == ZX_OK) {
     {
       TRACE_DURATION("brownout-protection", "Enable AGL", "timestamp", timestamp.get());

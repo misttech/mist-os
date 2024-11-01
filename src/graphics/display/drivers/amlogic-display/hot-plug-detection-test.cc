@@ -152,7 +152,7 @@ TEST_F(HotPlugDetectionTest, NoHotplugEvents) {
 TEST_F(HotPlugDetectionTest, DisplayPlug) {
   std::unique_ptr<HotPlugDetection> hpd = CreateAndInitHotPlugDetection();
 
-  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_boot());
   pin_gpio_.SetDefaultReadResponse(zx::ok(uint8_t{1u}));
 
   runtime_.RunUntil([&] { return GetHotPlugDetectionStates().size() >= 1; });
@@ -166,13 +166,13 @@ TEST_F(HotPlugDetectionTest, DisplayPlugUnplug) {
   std::unique_ptr<HotPlugDetection> hpd = CreateAndInitHotPlugDetection();
 
   // Simulate plugging the display.
-  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_boot());
   pin_gpio_.SetDefaultReadResponse(zx::ok(uint8_t{1u}));
   runtime_.RunUntil([&] { return GetHotPlugDetectionStates().size() >= 1; });
   EXPECT_THAT(GetHotPlugDetectionStates(), testing::ElementsAre(HotPlugDetectionState::kDetected));
 
   // Simulate unplugging the display.
-  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_boot());
   pin_gpio_.SetDefaultReadResponse(zx::ok(uint8_t{0u}));
   runtime_.RunUntil([&] { return GetHotPlugDetectionStates().size() >= 2; });
   EXPECT_THAT(
@@ -190,7 +190,7 @@ TEST_F(HotPlugDetectionTest, SpuriousPlugInterrupt) {
   const size_t num_state_changes_before_hotplug_gpio_read = pin_gpio_.GetStateLog().size();
 
   std::atomic<bool> hotplug_gpio_read = false;
-  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_boot());
   pin_gpio_.PushReadCallback([&](fake_gpio::FakeGpio& gpio) {
     hotplug_gpio_read.store(true, std::memory_order_relaxed);
     return zx::ok(uint8_t{0});
@@ -212,7 +212,7 @@ TEST_F(HotPlugDetectionTest, SpuriousUnplugInterrupt) {
   std::unique_ptr<HotPlugDetection> hpd = CreateAndInitHotPlugDetection();
 
   std::atomic<bool> first_hotplug_gpio_read = false;
-  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_boot());
   pin_gpio_.PushReadCallback([&](fake_gpio::FakeGpio& gpio) {
     first_hotplug_gpio_read.store(true, std::memory_order_relaxed);
     return zx::ok(uint8_t{1});
@@ -227,7 +227,7 @@ TEST_F(HotPlugDetectionTest, SpuriousUnplugInterrupt) {
   const size_t num_state_changes_before_second_hotplug_gpio_read = pin_gpio_.GetStateLog().size();
 
   std::atomic<bool> second_hotplug_gpio_read = false;
-  pin_gpio_interrupt_.trigger(0u, zx::clock::get_monotonic());
+  pin_gpio_interrupt_.trigger(0u, zx::clock::get_boot());
   pin_gpio_.PushReadCallback([&](fake_gpio::FakeGpio& gpio) {
     second_hotplug_gpio_read.store(true, std::memory_order_relaxed);
     return zx::ok(uint8_t{1});

@@ -219,7 +219,7 @@ class Gt92xxTestDevice : public Gt92xxDevice {
 
   zx_status_t Init() { return Gt92xxDevice::Init(); }
 
-  void Trigger() { irq_.trigger(0, zx::time()); }
+  void Trigger() { irq_.trigger(0, zx::time_boot()); }
 
   zx_status_t StartThread() {
     EXPECT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
@@ -235,7 +235,7 @@ class Gt92xxTestDevice : public Gt92xxDevice {
 
   zx_status_t StopThread() {
     Running(false);
-    irq_.trigger(0, zx::time());
+    irq_.trigger(0, zx::time_boot());
     int ret = thrd_join(test_thread_, nullptr);
     return (ret == thrd_success) ? ZX_OK : ZX_ERR_BAD_STATE;
   }

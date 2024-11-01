@@ -257,11 +257,11 @@ class Dwc2 : public Dwc2Type,
   // The length of the last IN-data sent to the host.
   uint32_t last_transmission_len_;
   // Raw IRQ timestamp from kernel
-  zx::time irq_timestamp_;
+  zx::time_boot irq_timestamp_;
   // Timestamp we were dispatched at
-  zx::time irq_dispatch_timestamp_;
+  zx::time_boot irq_dispatch_timestamp_;
   // Timestamp when we started waiting for the interrupt
-  zx::time wait_start_time_;
+  zx::time_boot wait_start_time_;
   bool shutting_down_ __TA_GUARDED(lock_) = false;
 
   async_dispatcher_t* dispatcher_;

@@ -265,8 +265,8 @@ TEST_F(PciBusTests, LegacyIrqSignalTest) {
   // Here we simulate triggering the hardware vector and track it all the way to
   // the interrupt event a downstream driver bound to this device would get.
   // Timestamps of the original vector must match.
-  zx::time receive_time;
-  zx::time trigger_time = zx::clock::get_monotonic();
+  zx::time_boot receive_time;
+  zx::time_boot trigger_time = zx::clock::get_boot();
   pciroot().ecam().get({0, 0, 1}).device.set_status(PCI_STATUS_INTERRUPT);
   ASSERT_OK(interrupt.trigger(0, trigger_time));
 
@@ -319,7 +319,7 @@ TEST_F(PciBusTests, LegacyIrqNoAckTest) {
   ASSERT_OK(dev_interrupt.bind(port, 1, ZX_INTERRUPT_BIND));
   ASSERT_FALSE(check_disabled());
 
-  zx::time current_time = zx::clock::get_monotonic();
+  zx::time_boot current_time = zx::clock::get_boot();
   uint32_t irq_cnt = 0;
   zx_port_packet_t packet;
   while (irq_cnt < kMaxIrqsPerNoAckPeriod) {

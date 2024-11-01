@@ -66,13 +66,13 @@ class ZirconPlatformInterrupt : public PlatformInterrupt {
   }
 
   uint64_t GetMicrosecondsSinceLastInterrupt() override {
-    return (zx::clock::get_monotonic() - timestamp_).to_usecs();
+    return (zx::clock::get_boot() - timestamp_).to_usecs();
   }
 
  private:
   zx::interrupt handle_;
   uint64_t koid_;
-  zx::time timestamp_;
+  zx::time_boot timestamp_;
 };
 
 }  // namespace magma

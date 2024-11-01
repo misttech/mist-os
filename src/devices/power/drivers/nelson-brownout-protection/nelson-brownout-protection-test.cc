@@ -242,7 +242,7 @@ TEST_F(NelsonBrownoutProtectionTest, Test) {
   // Must be less than 11.5 to stay in the brownout state.
   power_sensor().SyncCall(&FakePowerSensor::set_voltage, 10.0f);
 
-  alert_gpio_interrupt().trigger(0, zx::clock::get_monotonic());
+  alert_gpio_interrupt().trigger(0, zx::clock::get_boot());
 
   while (!codec()->agl_enabled()) {
   }
