@@ -329,11 +329,20 @@ impl HrTimerManager {
                     }
                 }
                 Ok(Err(e)) => match e {
-                    fhrtimer::DriverError::Canceled => log_debug!(
-                        "A new HrTimer with \
+                    fhrtimer::DriverError::Canceled => {
+                        let mut guard = self.lock();
+                        if guard.timer_heap.is_empty() {
+                            // Clear the timer event if there are no more timers to start.
+                            // Event if the previous timer is an interval, it is stopped
+                            // intentionally.
+                            guard.clear_wake_proxy_signal();
+                        }
+                        log_debug!(
+                            "A new HrTimer with \
                                 an earlier deadline has been started. \
                                 This `StartAndWait` attempt is cancelled."
-                    ),
+                        )
+                    }
                     _ => log_error!("HrTimer::StartAndWait driver error: {e:?}"),
                 },
                 Err(e) => log_error!("HrTimer::StartAndWait fidl error: {e}"),
