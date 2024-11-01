@@ -5,11 +5,13 @@
 #include "aml-sdmmc.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>  // TODO(b/301003087): Needed for PDEV_DID_AMLOGIC_SDMMC_A, etc.
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 #include <lib/fit/defer.h>
@@ -294,64 +296,66 @@ zx::result<> AmlSdmmc::InitResources(
 }
 
 zx::result<> AmlSdmmc::ConfigurePowerManagement(fdf::PDev& pdev) {
-  // Get power configs from the board driver.
-  zx::result power_configs = pdev.GetPowerConfiguration();
-  if (power_configs.is_error()) {
-    FDF_LOGL(INFO, logger(), "Failed to get power configuration: %s",
-             power_configs.status_string());
-    // Some boards and/or instances (e.g., SDIO, SD) may not have power configs. Do not fail driver
-    // initialization in this case.
-    return zx::success();
-  }
+  // Retrieves our power configuration from data supplied by the board driver,
+  // registers the configuration with the power framework, and then returns the
+  // resources we need to manage the power elements.
+  fit::result<fdf_power::Error, std::vector<fdf_power::ElementDesc>> result =
+      pdev.GetAndApplyPowerConfiguration(*incoming());
 
-  if (power_configs->empty()) {
-    FDF_LOGL(INFO, logger(), "No power configs found.");
-    // Do not fail driver initialization if there aren't any power configs.
-    return zx::success();
-  }
-
-  auto power_broker = incoming()->Connect<fuchsia_power_broker::Topology>();
-  if (power_broker.is_error() || !power_broker->is_valid()) {
-    FDF_LOGL(ERROR, logger(), "Failed to connect to power broker: %s",
-             power_broker.status_string());
-    return power_broker.take_error();
-  }
-
-  // Register power configs with the Power Broker.
-  for (const auto& config : power_configs.value()) {
-    auto tokens = fdf_power::GetDependencyTokens(*incoming(), config);
-    if (tokens.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to get power dependency tokens: %u",
-               static_cast<uint8_t>(tokens.error_value()));
-      return zx::error(ZX_ERR_INTERNAL);
+  if (result.is_error()) {
+    if (result.error_value() == fdf_power::Error::CONFIGURATION_UNAVAILABLE) {
+      // Some devices (eg. SDIO, SD) may not have a power configuration, so don't
+      // fail initialization.
+      FDF_LOGL(INFO, logger(), "No power config for this device.");
+      return zx::success();
     }
 
-    fdf_power::ElementDesc description =
-        fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
-    auto result = fdf_power::AddElement(power_broker.value(), description);
-    if (result.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to add power element: %u",
-               static_cast<uint8_t>(result.error_value()));
-      return zx::error(ZX_ERR_INTERNAL);
+    FDF_LOGL(ERROR, logger(), "Failure creating power elements: %hhu", result.error_value());
+    switch (result.error_value()) {
+      case fdf_power::Error::INVALID_ARGS:
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      case fdf_power::Error::TOKEN_REQUEST:
+      case fdf_power::Error::IO:
+      case fdf_power::Error::TOPOLOGY_UNAVAILABLE:
+        return zx::error(ZX_ERR_IO);
+      case fdf_power::Error::DEPENDENCY_NOT_FOUND:
+        return zx::error(ZX_ERR_NOT_FOUND);
+      case fdf_power::Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND:
+      case fdf_power::Error::NO_TOKEN_SERVICE_INSTANCES:
+      case fdf_power::Error::ACTIVITY_GOVERNOR_UNAVAILABLE:
+        return zx::error(ZX_ERR_ACCESS_DENIED);
+      case fdf_power::Error::READ_INSTANCES:
+      case fdf_power::Error::ACTIVITY_GOVERNOR_REQUEST:
+        return zx::error(ZX_ERR_IO_REFUSED);
+      default:
+        return zx::error(ZX_ERR_INTERNAL);
     }
+  }
 
-    if (config.element.name == kHardwarePowerElementName) {
+  if (result.value().empty()) {
+    FDF_LOGL(ERROR, logger(), "Device power config is available, but empty.");
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  for (auto& config : result.value()) {
+    if (config.element_config.element.name == kHardwarePowerElementName) {
       hardware_power_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
-              std::move(description.element_control_client.value()));
+              std::move(config.element_control_client.value()));
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
-          std::move(description.lessor_client.value()));
+          std::move(config.lessor_client.value()));
       hardware_power_current_level_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(description.current_level_client.value()));
+              std::move(config.current_level_client.value()));
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-          std::move(description.required_level_client.value()), dispatcher());
-      hardware_power_assertive_token_ = std::move(description.assertive_token);
-      if (config.element.levels.size() == 3) {
+          std::move(config.required_level_client.value()), dispatcher());
+      hardware_power_assertive_token_ = std::move(config.assertive_token);
+      if (config.element_config.element.levels.size() == 3) {
         three_level_power_ = true;
       }
     } else {
-      FDF_LOGL(ERROR, logger(), "Unexpected power element: %s", config.element.name.c_str());
+      FDF_LOGL(ERROR, logger(), "Unexpected power element: %s",
+               config.element_config.element.name.c_str());
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }
