@@ -3,12 +3,14 @@
 
 use crate::{PublishOptions, Severity};
 use fidl_fuchsia_diagnostics::Interest;
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;
 use std::sync::Once;
 use thiserror::Error;
 use tracing::level_filters::LevelFilter;
+use tracing::subscriber::DefaultGuard;
 use tracing::{Event, Level, Subscriber};
 use tracing_log::{LogTracer, NormalizeEvent};
 use tracing_subscriber::fmt::format::{DefaultFields, Writer};
@@ -50,13 +52,28 @@ impl<'t> Default for PublisherOptions<'t> {
     }
 }
 
+struct SubscriberHolder {
+    inner: Cell<Option<DefaultGuard>>,
+}
+
+impl SubscriberHolder {
+    fn new() -> Self {
+        Self { inner: Cell::new(None) }
+    }
+}
+
 /// Initializes logging. This should be called only once.
 pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
-    static START: Once = Once::new();
-    START.call_once(|| {
+    thread_local! {
+        static START:SubscriberHolder = SubscriberHolder::new();
+    }
+    static LOG_TRACER: Once = Once::new();
+    START.with(|holder| {
         let subscriber = create_subscriber(&opts, std::io::stderr).expect("create subscriber");
-        tracing::subscriber::set_global_default(subscriber).expect("set global subscriber");
-        LogTracer::init().expect("ingest log events");
+        holder.inner.set(Some(tracing::subscriber::set_default(subscriber)));
+        LOG_TRACER.call_once(|| {
+            LogTracer::init().expect("ingest log events");
+        });
         if opts.install_panic_hook {
             crate::install_panic_hook(opts.panic_prefix);
         }
