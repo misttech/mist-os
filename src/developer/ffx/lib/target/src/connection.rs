@@ -171,7 +171,7 @@ impl OvernetClient {
 
 pub mod testing {
     use super::*;
-    use crate::target_connector::{OvernetConnection, TargetConnectionError};
+    use crate::target_connector::{OvernetConnection, TargetConnection, TargetConnectionError};
     use async_channel::Receiver;
     use fidl_fuchsia_developer_remotecontrol as rcs_fidl;
     use fuchsia_async::Task;
@@ -281,7 +281,7 @@ pub mod testing {
 
     impl TargetConnector for FakeOvernet {
         const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
             if let FakeOvernetBehavior::FailNonFatalOnce = self.behavior {
                 if !self.already_failed {
                     self.already_failed = true;
@@ -325,14 +325,14 @@ pub mod testing {
                 }
             });
             let (circuit_reader, circuit_writer) = tokio::io::split(circuit_socket);
-            Ok(OvernetConnection {
+            Ok(TargetConnection::Overnet(OvernetConnection {
                 output: Box::new(tokio::io::BufReader::new(circuit_reader)),
                 input: Box::new(circuit_writer),
                 errors: self.error_receiver.clone(),
                 compat: None,
                 main_task: Some(rcs_task),
                 ssh_host_address: None,
-            })
+            }))
         }
     }
 }

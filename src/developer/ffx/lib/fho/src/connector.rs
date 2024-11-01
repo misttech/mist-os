@@ -218,7 +218,7 @@ impl<T: TryFromEnvContext + TargetConnector> Overnet<T> {
 mod tests {
     use super::*;
     use ffx_target::connection::testing::{FakeOvernet, FakeOvernetBehavior};
-    use ffx_target::{OvernetConnection, TargetConnectionError};
+    use ffx_target::{TargetConnection, TargetConnectionError};
 
     // This is a bit of a hack, but there needs to be a way to set the behavior that also doesn't
     // require locking every test sequentially.
@@ -228,7 +228,7 @@ mod tests {
     impl TargetConnector for RegularFakeOvernet {
         const CONNECTION_TYPE: &'static str = "fake";
 
-        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
             self.0.connect().await
         }
     }
@@ -273,7 +273,7 @@ mod tests {
 
     impl TargetConnector for FromContextFailer {
         const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
             self.0.connect().await
         }
     }

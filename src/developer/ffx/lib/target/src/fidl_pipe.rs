@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::target_connector::{TargetConnectionError, TargetConnector};
+use crate::target_connector::{TargetConnection, TargetConnectionError, TargetConnector};
 use anyhow::Result;
 use async_channel::Receiver;
 use compat_info::CompatibilityInfo;
@@ -93,7 +93,7 @@ impl FidlPipe {
         W: AsyncWrite + Unpin + 'static,
     {
         let mut wait_duration = Duration::from_millis(50);
-        let overnet_connection = loop {
+        let target_connection = loop {
             break match connector.connect().await {
                 Ok(c) => c,
                 Err(e) => match e {
@@ -108,6 +108,10 @@ impl FidlPipe {
                     }
                 },
             };
+        };
+        let overnet_connection = match target_connection {
+            TargetConnection::Overnet(o) | TargetConnection::Both(_, o) => o,
+            TargetConnection::FDomain(_) => panic!("FDomain-only pipe not yet supported"),
         };
         let device_address = connector.device_address();
         let (error_sender, error_queue) = async_channel::unbounded();
@@ -162,7 +166,7 @@ impl Drop for FidlPipe {
 mod test {
     use super::*;
 
-    use crate::target_connector::OvernetConnection;
+    use crate::target_connector::{OvernetConnection, TargetConnection};
     use std::fmt::Debug;
     use tokio::io::BufReader;
 
@@ -174,7 +178,7 @@ mod test {
     impl TargetConnector for FailOnceThenSucceedConnector {
         const CONNECTION_TYPE: &'static str = "fake";
 
-        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
             if !self.should_succeed {
                 self.should_succeed = true;
                 return Err(TargetConnectionError::NonFatal(anyhow::anyhow!("test error")));
@@ -184,14 +188,14 @@ mod test {
             let sock2 = fidl::AsyncSocket::from_socket(sock2);
             let (_error_tx, error_rx) = async_channel::unbounded();
             let error_task = Task::local(async move {});
-            Ok(OvernetConnection {
+            Ok(TargetConnection::Overnet(OvernetConnection {
                 output: Box::new(BufReader::new(sock1)),
                 input: Box::new(sock2),
                 errors: error_rx,
                 compat: None,
                 main_task: Some(error_task),
                 ssh_host_address: None,
-            })
+            }))
         }
     }
 
@@ -200,7 +204,7 @@ mod test {
 
     impl TargetConnector for AutoFailConnector {
         const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
             let (sock1, sock2) = fidl::Socket::create_stream();
             let sock1 = fidl::AsyncSocket::from_socket(sock1);
             let sock2 = fidl::AsyncSocket::from_socket(sock2);
@@ -208,14 +212,14 @@ mod test {
             let error_task = Task::local(async move {
                 let _ = error_tx.send(anyhow::anyhow!("boom")).await;
             });
-            Ok(OvernetConnection {
+            Ok(TargetConnection::Overnet(OvernetConnection {
                 output: Box::new(BufReader::new(sock1)),
                 input: Box::new(sock2),
                 errors: error_rx,
                 compat: None,
                 main_task: Some(error_task),
                 ssh_host_address: None,
-            })
+            }))
         }
     }
 
@@ -224,20 +228,20 @@ mod test {
 
     impl TargetConnector for DoNothingConnector {
         const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
             let (sock1, sock2) = fidl::Socket::create_stream();
             let sock1 = fidl::AsyncSocket::from_socket(sock1);
             let sock2 = fidl::AsyncSocket::from_socket(sock2);
             let (_error_tx, error_rx) = async_channel::unbounded();
             let error_task = Task::local(async move {});
-            Ok(OvernetConnection {
+            Ok(TargetConnection::Overnet(OvernetConnection {
                 output: Box::new(BufReader::new(sock1)),
                 input: Box::new(sock2),
                 errors: error_rx,
                 compat: None,
                 main_task: Some(error_task),
                 ssh_host_address: None,
-            })
+            }))
         }
     }
 

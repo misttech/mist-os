@@ -26,6 +26,13 @@ pub enum TargetConnectionError {
     NonFatal(#[source] anyhow::Error),
 }
 
+/// Collection of connections established by a connector.
+pub enum TargetConnection {
+    Overnet(OvernetConnection),
+    FDomain(FDomainConnection),
+    Both(FDomainConnection, OvernetConnection),
+}
+
 pub trait TargetConnector: Debug {
     /// A debugging label for the type of connection. Intended to be for error formatting.
     const CONNECTION_TYPE: &'static str;
@@ -34,12 +41,21 @@ pub trait TargetConnector: Debug {
     /// returns a `NonFatal` error, should be capable of running again. It will
     /// be the caller's responsibility to determine whether and how often to
     /// re-attempt connecting when receiving a NonFatal error.
-    fn connect(&mut self)
-        -> impl Future<Output = Result<OvernetConnection, TargetConnectionError>>;
+    fn connect(&mut self) -> impl Future<Output = Result<TargetConnection, TargetConnectionError>>;
 
     fn device_address(&self) -> Option<std::net::SocketAddr> {
         None
     }
+}
+
+#[allow(unused)]
+pub struct FDomainConnection {
+    // Currently because of the implementation of ffx_ssh::parse::parse_ssh_output's
+    // implementation, this needs to be a buffered reader.
+    pub(crate) output: Box<dyn AsyncBufRead + Unpin>,
+    pub(crate) input: Box<dyn AsyncWrite + Unpin>,
+    pub(crate) errors: Receiver<anyhow::Error>,
+    pub(crate) main_task: Option<Task<()>>,
 }
 
 pub struct OvernetConnection {

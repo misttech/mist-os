@@ -40,7 +40,9 @@ pub use resolve::{
     get_discovery_stream, maybe_locally_resolve_target_spec, resolve_target_address,
     resolve_target_query_to_info, resolve_target_query_with, Resolution,
 };
-pub use target_connector::{OvernetConnection, TargetConnectionError, TargetConnector};
+pub use target_connector::{
+    FDomainConnection, OvernetConnection, TargetConnection, TargetConnectionError, TargetConnector,
+};
 
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
 pub use fidl_fuchsia_developer_ffx::TargetProxy;
