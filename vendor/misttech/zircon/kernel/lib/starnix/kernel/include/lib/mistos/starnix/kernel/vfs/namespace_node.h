@@ -49,15 +49,24 @@ struct Unreachable {
 
 class PathWithReachability {
  public:
-  PathWithReachability(Reachable path) : path_(path) {}
-  PathWithReachability(Unreachable path) : path_(path) {}
+  using Variant = ktl::variant<Reachable, Unreachable>;
 
+  static PathWithReachability Reachable(FsString path) {
+    struct Reachable r = {.path = ktl::move(path)};
+    return PathWithReachability(r);
+  }
+  static PathWithReachability Unreachable(FsString path) {
+    struct Unreachable r = {.path = ktl::move(path)};
+    return PathWithReachability(r);
+  }
+
+  // impl PathWithReachability
   FsString into_path() const {
     return ktl::visit(PathWithReachability::overloaded{
-                          [&](const Reachable& r) { return r.path; },
-                          [&](const Unreachable& u) { return u.path; },
+                          [&](const struct Reachable& r) { return r.path; },
+                          [&](const struct Unreachable& u) { return u.path; },
                       },
-                      path_);
+                      variant_);
   }
 
  private:
@@ -71,7 +80,9 @@ class PathWithReachability {
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
 
-  ktl::variant<Reachable, Unreachable> path_;
+  explicit PathWithReachability(Variant variant) : variant_(ktl::move(variant)) {}
+
+  Variant variant_;
 };
 
 /// A node in a mount namespace.
@@ -81,7 +92,7 @@ class PathWithReachability {
 /// These nodes are used when traversing paths in a namespace in order to
 /// present the client the directory structure that includes the mounted
 /// filesystems.
-struct NamespaceNode {
+class NamespaceNode {
  public:
   /// The mount where this namespace node is mounted.
   ///
@@ -92,9 +103,7 @@ struct NamespaceNode {
   /// The FsNode that corresponds to this namespace entry.
   DirEntryHandle entry_;
 
- public:
   // impl NamespaceNode
-
   static NamespaceNode New(MountHandle mount, DirEntryHandle dir_entry);
 
   /// Create a namespace node that is not mounted in a namespace.
@@ -153,6 +162,7 @@ struct NamespaceNode {
   /// is the root of a mount.
   ktl::optional<DirEntryHandle> parent_within_mount() const;
 
+ private:
   /// If this is a mount point, return the root of the mount. Otherwise return self.
   NamespaceNode enter_mount() const;
 
@@ -162,15 +172,18 @@ struct NamespaceNode {
   /// the mount, but then return the parent of the mount point instead of the mount point.
   NamespaceNode escape_mount() const;
 
+ public:
   /// If this node is the root of a mount, return it. Otherwise EINVAL.
   fit::result<Errno, MountHandle> mount_if_root() const;
 
+ private:
   /// Returns the mountpoint at this location in the namespace.
   ///
   /// If this node is mounted in another node, this function returns the node
   /// at which this node is mounted. Otherwise, returns None.
   ktl::optional<NamespaceNode> mountpoint() const;
 
+ public:
   /// The path from the task's root to this node.
   FsString path(const Task& task) const;
 

@@ -60,15 +60,13 @@ struct MountState {
   /// directly. Instead use upstream(), take_from_upstream(), and set_upstream().
   // upstream_ : Option<(Weak<PeerGroup>, PtrKey<Mount>)>,
 
- private:
   // impl MountState
 
- private:
   // C++
   friend class Mount;
 };
 
-enum class WhatToMountEnum {
+enum class WhatToMountEnum : uint8_t {
   Fs,
   Bind,
 };
@@ -125,12 +123,11 @@ class Mount : public fbl::RefCountedUpgradeable<Mount> {
 
   MountFlags flags() const;
 
- public:
   // C++
   ~Mount();
 
  private:
-  friend struct NamespaceNode;
+  friend class NamespaceNode;
 
   Mount(uint64_t id, MountFlags flags, DirEntryHandle root, FileSystemHandle fs);
 };
