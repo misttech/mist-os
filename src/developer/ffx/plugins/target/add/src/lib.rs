@@ -6,11 +6,12 @@ use async_trait::async_trait;
 use errors::ffx_error;
 use ffx_target::add_manual_target;
 use ffx_target_add_args::AddCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, VerifiedMachineWriter};
-use fidl_fuchsia_developer_ffx::TargetCollectionProxy;
+use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetConnectionError};
 use netext::parse_address_parts;
 use schemars::JsonSchema;
 use serde::Serialize;
+use std::io::Write;
 
 #[derive(Debug, Serialize, JsonSchema)]
 pub enum CommandStatus {
@@ -36,7 +37,7 @@ fho::embedded_plugin!(AddTool);
 impl FfxMain for AddTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        match add_impl(self.target_collection_proxy, self.cmd).await {
+        match add_impl(Some(&mut writer), self.target_collection_proxy, self.cmd).await {
             Ok(_) => {
                 writer.machine(&CommandStatus::Ok { message: None })?;
                 Ok(())
@@ -54,6 +55,7 @@ impl FfxMain for AddTool {
 }
 
 pub async fn add_impl(
+    mut writer: Option<&mut VerifiedMachineWriter<CommandStatus>>,
     target_collection_proxy: TargetCollectionProxy,
     cmd: AddCommand,
 ) -> fho::Result<()> {
@@ -72,10 +74,45 @@ pub async fn add_impl(
     } else {
         0
     };
-    add_manual_target(&target_collection_proxy, addr, scope_id, port.unwrap_or(0), !cmd.nowait)
-        .await
-        .map(Into::into)
-        .map_err(Into::into)
+    loop {
+        let res = add_manual_target(
+            &target_collection_proxy,
+            addr,
+            scope_id,
+            port.unwrap_or(0),
+            !cmd.nowait,
+        )
+        .await;
+        break match res {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                // target_connection_err @ errors::FfxError::TargetConnectionError { err, .. });
+                match e.downcast_ref::<errors::FfxError>() {
+                    Some(errors::FfxError::TargetConnectionError { err, .. }) => {
+                        // This is just copied from ffx/lib/target/src/ssh_connector.rs
+                        // This is, unfortunately, an artifact of having to convert rust errors into FIDL
+                        // for the error message response from the daemon.
+                        // LINT.IfChange
+                        use TargetConnectionError::*;
+                        match err {
+                            Timeout | ConnectionRefused | UnknownNameOrService | NoRouteToHost
+                            | NetworkUnreachable | UnknownError => {
+                                if let Some(ref mut writer) = writer {
+                                    if !writer.is_machine() {
+                                        writeln!(writer, "Non-fatal error encountered connecting. Will retry: {e}").bug()?;
+                                    }
+                                }
+                                continue;
+                            }
+                            _ => Err(e.into()),
+                        }
+                        // LINT.ThenChange(/src/developer/ffx/lib/target/src/ssh_connector.rs)
+                    }
+                    _ => Err(e.into()),
+                }
+            }
+        };
+    }
 }
 
 #[cfg(test)]
@@ -116,7 +153,7 @@ mod test {
                 })
             )
         });
-        add_impl(server, AddCommand { addr: "123.210.123.210".to_owned(), nowait: true })
+        add_impl(None, server, AddCommand { addr: "123.210.123.210".to_owned(), nowait: true })
             .await
             .unwrap();
     }
@@ -139,9 +176,13 @@ mod test {
                 })
             )
         });
-        add_impl(server, AddCommand { addr: "123.210.123.210:2310".to_owned(), nowait: true })
-            .await
-            .unwrap();
+        add_impl(
+            None,
+            server,
+            AddCommand { addr: "123.210.123.210:2310".to_owned(), nowait: true },
+        )
+        .await
+        .unwrap();
     }
 
     #[fuchsia::test]
@@ -157,7 +198,9 @@ mod test {
                 })
             )
         });
-        add_impl(server, AddCommand { addr: "f000::1".to_owned(), nowait: true }).await.unwrap();
+        add_impl(None, server, AddCommand { addr: "f000::1".to_owned(), nowait: true })
+            .await
+            .unwrap();
     }
 
     #[fuchsia::test]
@@ -174,7 +217,7 @@ mod test {
                 })
             )
         });
-        add_impl(server, AddCommand { addr: "[f000::1]:65".to_owned(), nowait: true })
+        add_impl(None, server, AddCommand { addr: "[f000::1]:65".to_owned(), nowait: true })
             .await
             .unwrap();
     }
@@ -192,7 +235,9 @@ mod test {
                 })
             )
         });
-        add_impl(server, AddCommand { addr: "f000::1%1".to_owned(), nowait: true }).await.unwrap();
+        add_impl(None, server, AddCommand { addr: "f000::1%1".to_owned(), nowait: true })
+            .await
+            .unwrap();
     }
 
     #[fuchsia::test]
@@ -209,7 +254,7 @@ mod test {
                 })
             )
         });
-        add_impl(server, AddCommand { addr: "[f000::1%1]:640".to_owned(), nowait: true })
+        add_impl(None, server, AddCommand { addr: "[f000::1%1]:640".to_owned(), nowait: true })
             .await
             .unwrap();
     }
