@@ -65,7 +65,6 @@ impl StashNode {
     }
 
     async fn children(&self) -> Result<Vec<Self>, Error> {
-        tracing::info!("DEBUG TRACE stash.children was called");
         let (local, remote) = fidl::endpoints::create_proxy::<_>()?;
         let () = self.stash.list_prefix(&self.key, remote)?;
 
@@ -124,9 +123,7 @@ impl StashStore {
         proxy.identify(id).context("failed to identify client to store")?;
         let (store_proxy, accessor_server) =
             create_proxy().context("failed to create accessor proxy")?;
-        tracing::info!("TRACE DEBUG call create accessor");
         proxy.create_accessor(false, accessor_server).context("failed to create accessor")?;
-        tracing::info!("TRACE DEBUG done with call create accessor");
 
         Ok(Self::new(store_proxy, POLICY_STASH_PREFIX))
     }
@@ -212,7 +209,6 @@ impl StashStore {
     }
 
     pub async fn load(&self) -> Result<HashMap<NetworkIdentifier, Vec<PersistentData>>, Error> {
-        tracing::info!("DEBUG TRACE stash.load was called");
         // get all the children nodes of root, which represent the unique identifiers,
         let id_nodes = self.0.children().await?;
 
