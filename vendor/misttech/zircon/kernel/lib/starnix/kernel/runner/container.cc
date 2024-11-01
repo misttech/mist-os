@@ -98,9 +98,8 @@ fit::result<Errno, Container> create_container(const Config& config) {
     return ktl::move(argv);
   }();
 
-  auto executable = system_task.open_file(argv[0], OpenFlags(OpenFlagsEnum::RDONLY));
-  if (executable.is_error())
-    return executable.take_error();
+  auto executable =
+      system_task.open_file(argv[0], OpenFlags(OpenFlagsEnum::RDONLY)) _EP(executable);
 
   ktl::string_view initial_name;
   if (!config.init.is_empty()) {
