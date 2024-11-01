@@ -7,7 +7,7 @@ use crate::util::listener;
 use anyhow::{format_err, Error};
 use fidl::epitaph::ChannelEpitaphExt;
 use futures::channel::mpsc;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::{Mutex, MutexGuard};
 use futures::sink::SinkExt;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
@@ -25,7 +25,7 @@ pub mod types;
 // servicing routines to utilize the SME.
 #[derive(Clone)]
 pub struct AccessPoint {
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     update_sender: listener::ApListenerMessageSender,
     ap_provider_lock: Arc<Mutex<()>>,
 }
@@ -39,7 +39,7 @@ impl AccessPoint {
     /// Creates a new, empty AccessPoint. The returned AccessPoint effectively represents the state
     /// in which no AP interface is available.
     pub fn new(
-        iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+        iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
         update_sender: listener::ApListenerMessageSender,
         ap_provider_lock: Arc<Mutex<()>>,
     ) -> Self {
@@ -61,7 +61,7 @@ impl AccessPoint {
         mut requests: fidl_policy::AccessPointProviderRequestStream,
     ) {
         let mut pending_response_queue =
-            FuturesUnordered::<BoxFuture<'static, Result<Response, Error>>>::new();
+            FuturesUnordered::<LocalBoxFuture<'static, Result<Response, Error>>>::new();
         let (internal_messages_sink, mut internal_messages_stream) = mpsc::channel(0);
         let mut provider_reqs = FuturesUnordered::new();
 
@@ -112,7 +112,7 @@ impl AccessPoint {
     /// Handles any incoming requests for the AccessPointProvider protocol.
     async fn handle_provider_request(
         &mut self,
-        internal_msg_sink: mpsc::Sender<BoxFuture<'static, Result<Response, Error>>>,
+        internal_msg_sink: mpsc::Sender<LocalBoxFuture<'static, Result<Response, Error>>>,
         ap_provider_guard: MutexGuard<'_, ()>,
         req: fidl_policy::AccessPointProviderRequest,
     ) -> Result<(), fidl::Error> {
@@ -143,7 +143,7 @@ impl AccessPoint {
     /// Handles all requests of the AccessPointController.
     async fn handle_ap_requests(
         &self,
-        mut internal_msg_sink: mpsc::Sender<BoxFuture<'static, Result<Response, Error>>>,
+        mut internal_msg_sink: mpsc::Sender<LocalBoxFuture<'static, Result<Response, Error>>>,
         ap_provider_guard: MutexGuard<'_, ()>,
         requests: ApRequests,
     ) -> Result<(), fidl::Error> {
@@ -373,7 +373,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl IfaceManagerApi for FakeIfaceManager {
         async fn disconnect(
             &mut self,

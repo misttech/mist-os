@@ -11,7 +11,7 @@ use crate::config_management::SavedNetworksManagerApi;
 use crate::telemetry::TelemetrySender;
 use anyhow::Error;
 use futures::channel::mpsc;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt};
@@ -103,7 +103,7 @@ pub async fn serve_local_roam_manager_requests(
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
 ) -> Result<Infallible, Error> {
     // Queue of created monitor futures.
-    let mut monitor_futs: FuturesUnordered<BoxFuture<'static, Result<(), anyhow::Error>>> =
+    let mut monitor_futs: FuturesUnordered<LocalBoxFuture<'static, Result<(), anyhow::Error>>> =
         FuturesUnordered::new();
     let past_roams = Arc::new(Mutex::new(PastRoamList::new(NUM_PLATFORM_MAX_ROAMS_PER_DAY)));
 

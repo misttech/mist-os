@@ -28,7 +28,7 @@ use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log, make_inspect_loggable};
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::{select, Future, FutureExt, StreamExt};
 use ieee80211::OuiFmt;
 use num_traits::SaturatingAdd;
@@ -496,7 +496,7 @@ pub type RecoveryOutcome = metrics::ConnectivityWlanMetricDimensionResult;
 pub type CreateMetricsLoggerFn = Box<
     dyn Fn(
         Vec<u32>,
-    ) -> BoxFuture<
+    ) -> LocalBoxFuture<
         'static,
         Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, anyhow::Error>,
     >,

@@ -28,7 +28,7 @@ pub mod recovery;
 pub const DEFECT_CHANNEL_SIZE: usize = 100;
 
 pub fn create_iface_manager(
-    phy_manager: Arc<Mutex<dyn phy_manager::PhyManagerApi + Send>>,
+    phy_manager: Arc<Mutex<dyn phy_manager::PhyManagerApi>>,
     client_update_sender: listener::ClientListenerMessageSender,
     ap_update_sender: listener::ApListenerMessageSender,
     dev_monitor_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,

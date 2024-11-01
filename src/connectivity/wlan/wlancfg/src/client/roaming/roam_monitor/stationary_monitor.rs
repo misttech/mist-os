@@ -9,6 +9,7 @@ use crate::client::types;
 use crate::config_management::SavedNetworksManagerApi;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::pseudo_energy::EwmaSignalData;
+use async_trait::async_trait;
 use futures::lock::Mutex;
 use std::sync::Arc;
 use tracing::{error, info};
@@ -170,8 +171,7 @@ impl StationaryMonitor {
     }
 }
 
-use async_trait::async_trait;
-#[async_trait]
+#[async_trait(?Send)]
 impl RoamMonitorApi for StationaryMonitor {
     async fn handle_roam_trigger_data(
         &mut self,

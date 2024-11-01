@@ -95,7 +95,7 @@ mod tests {
     use wlan_common::assert_variant;
 
     /// Holds all of the boilerplate required for testing RegulatoryManager.
-    struct TestContext<S: Stream<Item = Result<(), Error>> + Send + Unpin> {
+    struct TestContext<S: Stream<Item = Result<(), Error>> + Unpin> {
         iface_manager: Arc<Mutex<StubIfaceManager<S>>>,
         regulatory_manager: RegulatoryManager<StubIfaceManager<S>>,
         regulatory_region_requests: RegulatoryRegionWatcherRequestStream,
@@ -112,11 +112,11 @@ mod tests {
 
     impl<S> TestContext<S>
     where
-        S: Stream<Item = Result<(), Error>> + Send + Unpin,
+        S: Stream<Item = Result<(), Error>> + Unpin,
     {
         fn new(
             iface_manager: StubIfaceManager<S>,
-        ) -> TestContext<impl Stream<Item = Result<(), Error>> + Send + Unpin> {
+        ) -> TestContext<impl Stream<Item = Result<(), Error>> + Unpin> {
             let executor = fasync::TestExecutor::new();
             let (regulatory_region_proxy, regulatory_region_server_channel) =
                 create_proxy::<RegulatoryRegionWatcherMarker>()
@@ -376,7 +376,7 @@ mod tests {
         }
     }
 
-    struct StubIfaceManager<S: Stream<Item = Result<(), Error>> + Send + Unpin> {
+    struct StubIfaceManager<S: Stream<Item = Result<(), Error>> + Unpin> {
         country_code: Option<[u8; REGION_CODE_LEN]>,
         set_country_response_stream: S,
     }
@@ -385,7 +385,7 @@ mod tests {
     /// * immediately returns Ok() in response to stop_client_connections(), and
     /// * immediately returns Ok() in response to start_client_connections()
     fn make_default_stub_iface_manager(
-    ) -> StubIfaceManager<impl Stream<Item = Result<(), Error>> + Send + Unpin> {
+    ) -> StubIfaceManager<impl Stream<Item = Result<(), Error>> + Unpin> {
         StubIfaceManager {
             country_code: None,
             set_country_response_stream: stream::unfold((), |_| async { Some((Ok(()), ())) })
@@ -393,8 +393,8 @@ mod tests {
         }
     }
 
-    #[async_trait]
-    impl<S: Stream<Item = Result<(), Error>> + Send + Unpin> IfaceManagerApi for StubIfaceManager<S> {
+    #[async_trait(?Send)]
+    impl<S: Stream<Item = Result<(), Error>> + Unpin> IfaceManagerApi for StubIfaceManager<S> {
         async fn disconnect(
             &mut self,
             _network_id: client_types::NetworkIdentifier,

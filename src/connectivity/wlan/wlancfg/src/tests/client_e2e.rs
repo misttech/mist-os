@@ -27,6 +27,7 @@ use futures::task::Poll;
 use lazy_static::lazy_static;
 use std::convert::Infallible;
 use std::pin::{pin, Pin};
+use std::rc::Rc;
 use std::sync::Arc;
 use test_case::test_case;
 use tracing::{debug, info};
@@ -139,8 +140,8 @@ struct TestValues {
 struct InternalObjects {
     internal_futures: JoinAll<Pin<Box<dyn Future<Output = Result<Infallible, Error>>>>>,
     _saved_networks: Arc<dyn SavedNetworksManagerApi>,
-    phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    phy_manager: Arc<Mutex<dyn PhyManagerApi>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
 }
 
 struct ExternalInterfaces {
@@ -179,7 +180,7 @@ fn test_setup(
     let scan_requester = Arc::new(scan::ScanRequester { sender: scan_request_sender });
     let (recovery_sender, recovery_receiver) =
         mpsc::channel::<recovery::RecoverySummary>(recovery::RECOVERY_SUMMARY_CHANNEL_CAPACITY);
-    let connection_selector = Arc::new(connection_selection::ConnectionSelector::new(
+    let connection_selector = Rc::new(connection_selection::ConnectionSelector::new(
         saved_networks.clone(),
         scan_requester.clone(),
         inspect::Inspector::default().root().create_child("connection_selector"),

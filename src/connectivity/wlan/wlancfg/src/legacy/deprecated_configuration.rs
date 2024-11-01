@@ -12,11 +12,11 @@ use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct DeprecatedConfigurator {
-    phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
+    phy_manager: Arc<Mutex<dyn PhyManagerApi>>,
 }
 
 impl DeprecatedConfigurator {
-    pub fn new(phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>) -> Self {
+    pub fn new(phy_manager: Arc<Mutex<dyn PhyManagerApi>>) -> Self {
         DeprecatedConfigurator { phy_manager }
     }
 
@@ -74,7 +74,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl PhyManagerApi for StubPhyManager {
         async fn add_phy(&mut self, _phy_id: u16) -> Result<(), PhyManagerError> {
             unimplemented!();

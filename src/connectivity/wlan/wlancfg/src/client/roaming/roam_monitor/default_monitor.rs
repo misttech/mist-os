@@ -22,7 +22,7 @@ impl DefaultRoamMonitor {
 }
 
 use async_trait::async_trait;
-#[async_trait]
+#[async_trait(?Send)]
 impl RoamMonitorApi for DefaultRoamMonitor {
     async fn handle_roam_trigger_data(
         &mut self,

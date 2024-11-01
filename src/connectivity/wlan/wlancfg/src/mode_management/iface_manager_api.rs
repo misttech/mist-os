@@ -33,7 +33,7 @@ const STOP_AP_TIMEOUT: fuchsia_async::MonotonicDuration =
 const AP_STATUS_TIMEOUT: fuchsia_async::MonotonicDuration =
     fuchsia_async::MonotonicDuration::from_seconds(10);
 
-#[async_trait]
+#[async_trait(?Send)]
 pub trait IfaceManagerApi {
     /// Finds the client iface with the given network configuration, disconnects from the network,
     /// and removes the client's network configuration information.
@@ -98,7 +98,7 @@ pub struct IfaceManager {
     pub sender: mpsc::Sender<IfaceManagerRequest>,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl IfaceManagerApi for IfaceManager {
     async fn disconnect(
         &mut self,
@@ -504,7 +504,7 @@ mod tests {
     use crate::util::testing::{generate_connect_selection, poll_sme_req};
     use anyhow::format_err;
     use fidl::endpoints::{create_proxy, RequestStream};
-    use futures::future::BoxFuture;
+    use futures::future::LocalBoxFuture;
     use futures::stream::StreamFuture;
     use futures::task::Poll;
     use futures::StreamExt;
@@ -576,7 +576,7 @@ mod tests {
     fn iface_manager_api_negative_test(
         mut receiver: mpsc::Receiver<IfaceManagerRequest>,
         failure_mode: NegativeTestFailureMode,
-    ) -> BoxFuture<'static, ()> {
+    ) -> LocalBoxFuture<'static, ()> {
         if let NegativeTestFailureMode::RequestFailure = failure_mode {
             // Drop the receiver so that no requests can be made.
             drop(receiver);

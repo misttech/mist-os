@@ -167,7 +167,7 @@ impl FakeSavedNetworksManager {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl SavedNetworksManagerApi for FakeSavedNetworksManager {
     async fn remove(
         &self,
@@ -382,7 +382,7 @@ impl FakeScanRequester {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl scan::ScanRequestApi for FakeScanRequester {
     async fn perform_scan(
         &self,
@@ -418,7 +418,7 @@ impl FakeRoamMonitor {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl RoamMonitorApi for FakeRoamMonitor {
     async fn handle_roam_trigger_data(
         &mut self,

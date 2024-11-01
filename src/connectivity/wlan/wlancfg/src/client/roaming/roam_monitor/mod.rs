@@ -13,7 +13,7 @@ use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_wlan_internal as fidl_internal;
 use futures::channel::mpsc;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{select, FutureExt};
@@ -40,8 +40,8 @@ impl RoamDataSender {
     }
 }
 /// Trait for creating different roam monitors based on roaming profiles.
-#[async_trait]
-pub trait RoamMonitorApi: Send + Sync + Any {
+#[async_trait(?Send)]
+pub trait RoamMonitorApi: Any {
     // Handles trigger data and evaluates current state. Returns an outcome to be taken (e.g. if
     // roam search is warranted). All roam monitors MUST handle all trigger data types, even if
     // they always take no action.
@@ -69,7 +69,7 @@ pub async fn serve_roam_monitor(
 ) -> Result<(), anyhow::Error> {
     // Queue of initialized roam searches.
     let mut roam_search_result_futs: FuturesUnordered<
-        BoxFuture<'static, Result<types::ScannedCandidate, Error>>,
+        LocalBoxFuture<'static, Result<types::ScannedCandidate, Error>>,
     > = FuturesUnordered::new();
 
     loop {

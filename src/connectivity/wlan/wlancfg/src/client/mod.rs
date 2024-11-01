@@ -40,7 +40,7 @@ type SavedNetworksPtr = Arc<dyn SavedNetworksManagerApi>;
 /// Only one ClientController can be active. Additional requests to register ClientControllers
 /// will result in their channel being immediately closed.
 pub async fn serve_provider_requests(
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     update_sender: listener::ClientListenerMessageSender,
     saved_networks: SavedNetworksPtr,
     scan_requester: Arc<dyn scan::ScanRequestApi>,
@@ -92,7 +92,7 @@ pub async fn serve_listener_requests(
 
 /// Handle inbound requests to acquire a new ClientController.
 async fn handle_provider_request(
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     update_sender: listener::ClientListenerMessageSender,
     saved_networks: SavedNetworksPtr,
     scan_requester: Arc<dyn scan::ScanRequestApi>,
@@ -137,7 +137,7 @@ fn log_client_request(request: &fidl_policy::ClientControllerRequest) {
 
 /// Handles all incoming requests from a ClientController.
 async fn handle_client_requests(
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     scan_requester: Arc<dyn scan::ScanRequestApi>,
     saved_networks: SavedNetworksPtr,
     client_provider_guard: MutexGuard<'_, ()>,
@@ -178,7 +178,7 @@ async fn handle_client_requests(
                 );
                 // The scan handler is infallible and should not block handling of further request.
                 // Detach the future here so we continue responding to other requests.
-                fuchsia_async::Task::spawn(fut).detach();
+                fuchsia_async::Task::local(fut).detach();
             }
             fidl_policy::ClientControllerRequest::SaveNetwork { config, responder } => {
                 // If there is an error saving the network, log it and convert to a FIDL value.
@@ -217,7 +217,7 @@ async fn handle_client_requests(
 /// Attempts to issue a new connect request to the currently active Client.
 /// The network's configuration must have been stored before issuing a connect request.
 async fn handle_client_request_connect(
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     saved_networks: SavedNetworksPtr,
     network: &fidl_policy::NetworkIdentifier,
 ) -> fidl_policy::RequestStatus {
@@ -321,7 +321,7 @@ async fn handle_client_request_scan(
 async fn handle_client_request_save_network(
     saved_networks: SavedNetworksPtr,
     network_config: fidl_policy::NetworkConfig,
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
 ) -> Result<(), NetworkConfigError> {
     // The FIDL network config fields are defined as Options, and we consider it an error if either
     // field is missing (ie None) here.
@@ -373,7 +373,7 @@ async fn handle_client_request_save_network(
 async fn handle_client_request_remove_network(
     saved_networks: SavedNetworksPtr,
     network_config: fidl_policy::NetworkConfig,
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
 ) -> Result<(), NetworkConfigError> {
     // The FIDL network config fields are defined as Options, and we consider it an error if either
     // field is missing (ie None) here.
@@ -470,7 +470,7 @@ fn reject_provider_request(req: fidl_policy::ClientProviderRequest) -> Result<()
 
 /// Allows client operations to be performed.
 async fn handle_client_request_start_client_connections(
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
 ) -> fidl_policy::RequestStatus {
     let mut iface_manager = iface_manager.lock().await;
     if let Err(e) = iface_manager.start_client_connections().await {
@@ -481,7 +481,7 @@ async fn handle_client_request_start_client_connections(
 
 /// Stops all active client connections and disallows future client operations.
 async fn handle_client_request_stop_client_connections(
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
 ) -> fidl_policy::RequestStatus {
     let mut iface_manager = iface_manager.lock().await;
     if let Err(e) = iface_manager
@@ -559,7 +559,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl IfaceManagerApi for FakeIfaceManager {
         async fn disconnect(
             &mut self,
@@ -672,7 +672,7 @@ mod tests {
         net_id_wpa2_w_psk: fidl_policy::NetworkIdentifier,
         provider: fidl_policy::ClientProviderProxy,
         requests: fidl_policy::ClientProviderRequestStream,
-        iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+        iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
         iface_mgr_req_recvr: mpsc::Receiver<IfaceManagerRequest>,
         scan_requester: Arc<FakeScanRequester>,
         update_sender: mpsc::UnboundedSender<listener::ClientListenerMessage>,
@@ -916,8 +916,7 @@ mod tests {
             .expect("failed to create ClientSmeProxy");
         let (req_sender, _req_recvr) = mpsc::channel(1);
         let iface_manager = FakeIfaceManager::new_without_wpa3(proxy.clone(), req_sender);
-        let iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>> =
-            Arc::new(Mutex::new(iface_manager));
+        let iface_manager: Arc<Mutex<dyn IfaceManagerApi>> = Arc::new(Mutex::new(iface_manager));
 
         let serve_fut = serve_provider_requests(
             iface_manager,
@@ -1699,7 +1698,7 @@ mod tests {
 
     struct FakeIfaceManagerNoIfaces {}
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl IfaceManagerApi for FakeIfaceManagerNoIfaces {
         async fn disconnect(
             &mut self,
@@ -1954,8 +1953,7 @@ mod tests {
         // Setup the IfaceManager to succeed or fail depending on the test configuration.
         iface_manager.start_client_connections_succeeds = start_client_connections_succeeds;
 
-        let iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>> =
-            Arc::new(Mutex::new(iface_manager));
+        let iface_manager: Arc<Mutex<dyn IfaceManagerApi>> = Arc::new(Mutex::new(iface_manager));
 
         // Regardless of what the IfaceManager is actually able to do, we expect the response to
         // simply ack the caller.
@@ -1980,8 +1978,7 @@ mod tests {
         // Setup the IfaceManager to succeed or fail depending on the test configuration.
         iface_manager.stop_client_connections_succeeds = stop_client_connections_succeeds;
 
-        let iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>> =
-            Arc::new(Mutex::new(iface_manager));
+        let iface_manager: Arc<Mutex<dyn IfaceManagerApi>> = Arc::new(Mutex::new(iface_manager));
 
         // Regardless of what the IfaceManager is actually able to do, we expect the response to
         // simply ack the caller.

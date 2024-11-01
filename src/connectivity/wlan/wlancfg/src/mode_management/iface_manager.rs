@@ -23,7 +23,7 @@ use fuchsia_inspect_contrib::log::InspectListClosure;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
 use futures::channel::{mpsc, oneshot};
-use futures::future::{ready, BoxFuture, Fuse};
+use futures::future::{ready, Fuse, LocalBoxFuture};
 use futures::lock::Mutex;
 use futures::stream::FuturesUnordered;
 use futures::{select, FutureExt, StreamExt};
@@ -58,7 +58,7 @@ struct ClientIfaceContainer {
     iface_id: u16,
     sme_proxy: SmeForClientStateMachine,
     config: Option<ap_types::NetworkIdentifier>,
-    client_state_machine: Option<Box<dyn client_fsm::ClientApi + Send>>,
+    client_state_machine: Option<Box<dyn client_fsm::ClientApi>>,
     security_support: fidl_common::SecuritySupport,
     /// The time of the last scan for roaming or new connection on this iface.
     last_roam_time: fasync::MonotonicInstant,
@@ -68,7 +68,7 @@ struct ClientIfaceContainer {
 pub(crate) struct ApIfaceContainer {
     pub iface_id: u16,
     pub config: Option<ap_fsm::ApConfig>,
-    pub ap_state_machine: Box<dyn AccessPointApi + Send + Sync>,
+    pub ap_state_machine: Box<dyn AccessPointApi>,
     enabled_time: Option<zx::MonotonicInstant>,
     status: StateMachineStatusReader<ap_fsm::Status>,
 }
@@ -90,7 +90,7 @@ async fn create_client_state_machine(
     roam_manager: RoamManager,
 ) -> Result<
     (
-        Box<dyn client_fsm::ClientApi + Send>,
+        Box<dyn client_fsm::ClientApi>,
         future_with_metadata::FutureWithMetadata<(), StateMachineMetadata>,
         StateMachineStatusReader<client_fsm::Status>,
     ),
@@ -139,7 +139,7 @@ async fn create_client_state_machine(
 /// Accounts for WLAN interfaces that are present and utilizes them to service requests that are
 /// made of the policy layer.
 pub(crate) struct IfaceManagerService {
-    phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
+    phy_manager: Arc<Mutex<dyn PhyManagerApi>>,
     client_update_sender: listener::ClientListenerMessageSender,
     ap_update_sender: listener::ApListenerMessageSender,
     dev_monitor_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
@@ -150,8 +150,9 @@ pub(crate) struct IfaceManagerService {
     roam_manager: RoamManager,
     fsm_futures:
         FuturesUnordered<future_with_metadata::FutureWithMetadata<(), StateMachineMetadata>>,
-    connection_selection_futures:
-        FuturesUnordered<BoxFuture<'static, Result<ConnectionSelectionResponse, anyhow::Error>>>,
+    connection_selection_futures: FuturesUnordered<
+        LocalBoxFuture<'static, Result<ConnectionSelectionResponse, anyhow::Error>>,
+    >,
     telemetry_sender: TelemetrySender,
     // A sender to be cloned for state machines to report defects to the IfaceManager.
     defect_sender: mpsc::Sender<Defect>,
@@ -161,7 +162,7 @@ pub(crate) struct IfaceManagerService {
 
 impl IfaceManagerService {
     pub fn new(
-        phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
+        phy_manager: Arc<Mutex<dyn PhyManagerApi>>,
         client_update_sender: listener::ClientListenerMessageSender,
         ap_update_sender: listener::ApListenerMessageSender,
         dev_monitor_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
@@ -355,7 +356,7 @@ impl IfaceManagerService {
             self.defect_sender.clone(),
             publisher,
         )
-        .boxed();
+        .boxed_local();
 
         // Begin running and monitoring the AP state machine future.
         let metadata =
@@ -374,7 +375,7 @@ impl IfaceManagerService {
 
     /// Attempts to stop the AP and then exit the AP state machine.
     async fn stop_and_exit_ap_state_machine(
-        mut ap_state_machine: Box<dyn AccessPointApi + Send + Sync>,
+        mut ap_state_machine: Box<dyn AccessPointApi>,
     ) -> Result<(), Error> {
         let (sender, receiver) = oneshot::channel();
         ap_state_machine.stop(sender)?;
@@ -391,7 +392,7 @@ impl IfaceManagerService {
         &mut self,
         network_id: ap_types::NetworkIdentifier,
         reason: client_types::DisconnectReason,
-    ) -> BoxFuture<'static, Result<(), Error>> {
+    ) -> LocalBoxFuture<'static, Result<(), Error>> {
         // Cancel any ongoing network selection, since a disconnect makes it invalid.
         if !self.connection_selection_futures.is_empty() {
             info!("Disconnect requested, ignoring results from ongoing connection selections.");
@@ -451,7 +452,7 @@ impl IfaceManagerService {
                 }
             }
         };
-        return fut.boxed();
+        return fut.boxed_local();
     }
 
     async fn handle_connect_request(
@@ -748,7 +749,7 @@ impl IfaceManagerService {
     fn stop_client_connections(
         &mut self,
         reason: client_types::DisconnectReason,
-    ) -> BoxFuture<'static, Result<(), Error>> {
+    ) -> LocalBoxFuture<'static, Result<(), Error>> {
         self.telemetry_sender.send(TelemetryEvent::ClearEstablishConnectionStartTime);
 
         let client_ifaces: Vec<ClientIfaceContainer> = self.clients.drain(..).collect();
@@ -790,7 +791,7 @@ impl IfaceManagerService {
             Ok(())
         };
 
-        fut.boxed()
+        fut.boxed_local()
     }
 
     async fn start_client_connections(&mut self) -> Result<(), Error> {
@@ -846,7 +847,7 @@ impl IfaceManagerService {
         &mut self,
         ssid: ap_types::Ssid,
         credential: Vec<u8>,
-    ) -> BoxFuture<'static, Result<(), Error>> {
+    ) -> LocalBoxFuture<'static, Result<(), Error>> {
         if let Some(removal_index) =
             self.aps.iter().position(|ap_container| match ap_container.config.as_ref() {
                 Some(config) => config.id.ssid == ssid && config.credential == credential,
@@ -873,14 +874,14 @@ impl IfaceManagerService {
                 Ok(())
             };
 
-            return fut.boxed();
+            return fut.boxed_local();
         }
 
         return ready(Ok(())).boxed();
     }
 
     // Stop all APs, exit all of the state machines, and destroy all AP ifaces.
-    fn stop_all_aps(&mut self) -> BoxFuture<'static, Result<(), Error>> {
+    fn stop_all_aps(&mut self) -> LocalBoxFuture<'static, Result<(), Error>> {
         let mut aps: Vec<ApIfaceContainer> = self.aps.drain(..).collect();
         let phy_manager = self.phy_manager.clone();
 
@@ -921,7 +922,7 @@ impl IfaceManagerService {
             }
         };
 
-        fut.boxed()
+        fut.boxed_local()
     }
 
     /// Returns whether or not there is a client interface that is WPA3 capable, in other words
@@ -962,7 +963,7 @@ async fn initiate_automatic_connection_selection(iface_manager: &mut IfaceManage
                 .map_err(|e| format_err!("Error sending connection selection request: {}.", e))
                 .map(ConnectionSelectionResponse::Autoconnect)
         };
-        iface_manager.connection_selection_futures.push(fut.boxed());
+        iface_manager.connection_selection_futures.push(fut.boxed_local());
     }
 }
 
@@ -984,7 +985,7 @@ async fn initiate_connection_selection_for_connect_request(
         info!("Connect request received, ignoring results from ongoing connection selections.");
         iface_manager.connection_selection_futures.clear();
     }
-    iface_manager.connection_selection_futures.push(fut.boxed());
+    iface_manager.connection_selection_futures.push(fut.boxed_local());
     Ok(())
 }
 
@@ -1107,7 +1108,7 @@ async fn handle_terminated_state_machine(
 fn initiate_set_country(
     iface_manager: &mut IfaceManagerService,
     req: SetCountryRequest,
-) -> BoxFuture<'static, IfaceManagerOperation> {
+) -> LocalBoxFuture<'static, IfaceManagerOperation> {
     // Store the initial AP configs so that they can be started later.
     let initial_ap_configs =
         iface_manager.aps.iter().filter_map(|container| container.config.clone()).collect();
@@ -1148,7 +1149,7 @@ fn initiate_set_country(
         // Return all information required to resume to the old state.
         IfaceManagerOperation::SetCountry(result)
     };
-    regulatory_fut.boxed()
+    regulatory_fut.boxed_local()
 }
 
 async fn restore_state_after_setting_country_code(
@@ -1183,32 +1184,32 @@ async fn restore_state_after_setting_country_code(
 // This function allows the defect recording to run in parallel with the regulatory region setting
 // routine.  For full context, see https://fxbug.dev/42063961.
 fn initiate_record_defect(
-    phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
+    phy_manager: Arc<Mutex<dyn PhyManagerApi>>,
     defect: Defect,
-) -> BoxFuture<'static, IfaceManagerOperation> {
+) -> LocalBoxFuture<'static, IfaceManagerOperation> {
     let fut = async move {
         let mut phy_manager = phy_manager.lock().await;
         phy_manager.record_defect(defect);
         IfaceManagerOperation::ReportDefect
     };
-    fut.boxed()
+    fut.boxed_local()
 }
 
 fn initiate_recovery(
-    phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
+    phy_manager: Arc<Mutex<dyn PhyManagerApi>>,
     summary: recovery::RecoverySummary,
-) -> BoxFuture<'static, IfaceManagerOperation> {
+) -> LocalBoxFuture<'static, IfaceManagerOperation> {
     let fut = async move {
         let mut phy_manager = phy_manager.lock().await;
         phy_manager.perform_recovery(summary).await;
         IfaceManagerOperation::PerformRecovery
     };
-    fut.boxed()
+    fut.boxed_local()
 }
 
 async fn handle_iface_manager_request(
     iface_manager: &mut IfaceManagerService,
-    operation_futures: &mut FuturesUnordered<BoxFuture<'static, IfaceManagerOperation>>,
+    operation_futures: &mut FuturesUnordered<LocalBoxFuture<'static, IfaceManagerOperation>>,
     token: atomic_oneshot_stream::Token,
     request: IfaceManagerRequest,
 ) {
@@ -1279,7 +1280,7 @@ async fn handle_iface_manager_request(
                         }
                         IfaceManagerOperation::ConfigureStateMachine
                     };
-                    disconnect_fut.boxed()
+                    disconnect_fut.boxed_local()
                 }
                 AtomicOperation::StopClientConnections(StopClientConnectionsRequest {
                     reason,
@@ -1292,7 +1293,7 @@ async fn handle_iface_manager_request(
                         }
                         IfaceManagerOperation::ConfigureStateMachine
                     };
-                    stop_client_connections_fut.boxed()
+                    stop_client_connections_fut.boxed_local()
                 }
                 AtomicOperation::StopAp(StopApRequest { ssid, password, responder }) => {
                     let stop_ap_fut = iface_manager.stop_ap(ssid, password);
@@ -1302,7 +1303,7 @@ async fn handle_iface_manager_request(
                         }
                         IfaceManagerOperation::ConfigureStateMachine
                     };
-                    stop_ap_fut.boxed()
+                    stop_ap_fut.boxed_local()
                 }
                 AtomicOperation::StopAllAps(StopAllApsRequest { responder }) => {
                     let stop_all_aps_fut = iface_manager.stop_all_aps();
@@ -1312,11 +1313,11 @@ async fn handle_iface_manager_request(
                         }
                         IfaceManagerOperation::ConfigureStateMachine
                     };
-                    stop_all_aps_fut.boxed()
+                    stop_all_aps_fut.boxed_local()
                 }
                 AtomicOperation::SetCountry(req) => {
                     let regulatory_fut = initiate_set_country(iface_manager, req);
-                    regulatory_fut.boxed()
+                    regulatory_fut.boxed_local()
                 }
             };
 
@@ -1329,9 +1330,9 @@ async fn handle_iface_manager_request(
 // Bundle the operations of running the caller's future with dropping of the `AtomicOneshotStream`
 // `Token`
 fn attempt_atomic_operation<T: 'static>(
-    fut: BoxFuture<'static, T>,
+    fut: LocalBoxFuture<'static, T>,
     token: atomic_oneshot_stream::Token,
-) -> BoxFuture<'static, T> {
+) -> LocalBoxFuture<'static, T> {
     Box::pin(async move {
         let result = fut.await;
         drop(token);
@@ -1344,7 +1345,7 @@ async fn serve_iface_functionality(
     requests: &mut atomic_oneshot_stream::AtomicOneshotStream<mpsc::Receiver<IfaceManagerRequest>>,
     reconnect_monitor_interval: &mut i64,
     connectivity_monitor_timer: &mut fasync::Interval,
-    operation_futures: &mut FuturesUnordered<BoxFuture<'static, IfaceManagerOperation>>,
+    operation_futures: &mut FuturesUnordered<LocalBoxFuture<'static, IfaceManagerOperation>>,
     defect_receiver: &mut mpsc::Receiver<Defect>,
     recovery_action_receiver: &mut recovery::RecoveryActionReceiver,
     recovery_in_progress: &mut bool,
@@ -1638,7 +1639,7 @@ mod tests {
         node: inspect::Node,
         telemetry_sender: TelemetrySender,
         recovery_sender: recovery::RecoveryActionSender,
-    ) -> Arc<Mutex<dyn PhyManagerApi + Send>> {
+    ) -> Arc<Mutex<dyn PhyManagerApi>> {
         Arc::new(Mutex::new(phy_manager::PhyManager::new(
             monitor_service,
             recovery::lookup_recovery_profile(""),
@@ -1662,7 +1663,7 @@ mod tests {
         recovery_sender: Option<mpsc::Sender<(RecoverySummary, oneshot::Sender<()>)>>,
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl PhyManagerApi for FakePhyManager {
         async fn add_phy(&mut self, _phy_id: u16) -> Result<(), PhyManagerError> {
             unimplemented!()
@@ -1788,7 +1789,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl client_fsm::ClientApi for FakeClient {
         fn connect(&mut self, selection: client_types::ConnectSelection) -> Result<(), Error> {
             assert_eq!(Some(selection), self.expected_connect_selection);
@@ -1817,7 +1818,7 @@ mod tests {
         exit_succeeds: bool,
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl AccessPointApi for FakeAp {
         fn start(
             &mut self,
