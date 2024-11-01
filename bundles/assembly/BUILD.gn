@@ -419,12 +419,33 @@ assembly_input_bundle("bootstrap_userdebug") {
 #
 assembly_input_bundle("embeddable_eng") {
   testonly = true
-  bootfs_files_labels = [
-    # tools
-    "//src/bringup/bin/bootpkg:bootfs",
-    "//src/devices/bin/driver_tools:bootfs",
-    "//src/devices/bin/lsdev:bootfs",
-    "//src/diagnostics/iquery:bootfs",
+  bootfs_packages = [
+    "//src/bringup/bin/bootpkg:package",
+    "//src/devices/bin/driver_tools:package",
+    "//src/devices/bin/lsdev:package",
+    "//src/diagnostics/iquery:package",
+  ]
+  shell_commands = [
+    {
+      bootfs_package = true
+      package = "bootpkg"
+      components = [ "bootpkg" ]
+    },
+    {
+      bootfs_package = true
+      package = "driver"
+      components = [ "driver" ]
+    },
+    {
+      bootfs_package = true
+      package = "lsdev"
+      components = [ "lsdev" ]
+    },
+    {
+      bootfs_package = true
+      package = "iquery"
+      components = [ "iquery" ]
+    },
   ]
 }
 
