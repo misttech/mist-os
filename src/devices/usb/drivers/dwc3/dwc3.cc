@@ -20,7 +20,6 @@
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/designware/platform/cpp/bind.h>
-#include <fbl/auto_lock.h>
 #include <usb/usb.h>
 
 #include "src/devices/usb/drivers/dwc3/dwc3-regs.h"
@@ -156,7 +155,7 @@ zx_status_t Dwc3::Init() {
   // that we know it is in a good state.
   uint32_t ep_count{0};
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
 
     // Now that we have our registers, check to make sure that we are running on
     // a version of the hardware that we support.
@@ -216,7 +215,7 @@ zx_status_t Dwc3::Init() {
   has_pinned_memory_ = true;
 
   {
-    fbl::AutoLock lock(&ep0_.lock);
+    std::lock_guard<std::mutex> lock(ep0_.lock);
     zx_status_t status =
         dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEp0BufferSize, 12, &ep0_.buffer);
     if (status != ZX_OK) {
@@ -247,7 +246,7 @@ void Dwc3::ReleaseResources() {
   }
 
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     // If we managed to get our registers mapped, place the device into reset so
     // we are certain that there is no DMA going on in the background.
     if (mmio_.has_value()) {
@@ -273,7 +272,7 @@ void Dwc3::ReleaseResources() {
 
   // Now go ahead and release any buffers we may have pinned.
   {
-    fbl::AutoLock lock(&ep0_.lock);
+    std::lock_guard<std::mutex> lock(ep0_.lock);
     ep0_.out.enabled = false;
     ep0_.in.enabled = false;
     ep0_.buffer.reset();
@@ -281,7 +280,7 @@ void Dwc3::ReleaseResources() {
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.ep.lock);
+    std::lock_guard<std::mutex> lock(uep.ep.lock);
     uep.fifo.Release();
     uep.ep.enabled = false;
   }
@@ -354,7 +353,7 @@ void Dwc3::SetDeviceAddress(uint32_t address) {
 
 void Dwc3::StartPeripheralMode() {
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     auto* mmio = get_mmio();
 
     // configure and enable PHYs
@@ -389,7 +388,7 @@ void Dwc3::StartPeripheralMode() {
 
   {
     // Set the run/stop bit to start the controller
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     auto* mmio = get_mmio();
     DCTL::Get().FromValue(0).set_RUN_STOP(1).WriteTo(mmio);
   }
@@ -397,14 +396,14 @@ void Dwc3::StartPeripheralMode() {
 
 void Dwc3::ResetConfiguration() {
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     auto* mmio = get_mmio();
     // disable all endpoints except EP0_OUT and EP0_IN
     DALEPENA::Get().FromValue(0).EnableEp(kEp0Out).EnableEp(kEp0In).WriteTo(mmio);
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.ep.lock);
+    std::lock_guard<std::mutex> lock(uep.ep.lock);
     EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
   }
@@ -416,20 +415,20 @@ void Dwc3::HandleResetEvent() {
   Ep0Reset();
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.ep.lock);
+    std::lock_guard<std::mutex> lock(uep.ep.lock);
     EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
   }
 
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     SetDeviceAddress(0);
   }
 
   Ep0Start();
 
   {
-    fbl::AutoLock lock(&dci_lock_);
+    std::lock_guard<std::mutex> lock(dci_lock_);
     if (dci_intf_.is_valid()) {
       DciIntfSetConnected(true);
     }
@@ -441,7 +440,7 @@ void Dwc3::HandleConnectionDoneEvent() {
   fdescriptor::wire::UsbSpeed new_speed{fdescriptor::UsbSpeed::kUndefined};
 
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard<std::mutex> lock(lock_);
     auto* mmio = get_mmio();
 
     uint32_t speed = DSTS::Get().ReadFrom(mmio).CONNECTSPD();
@@ -470,7 +469,7 @@ void Dwc3::HandleConnectionDoneEvent() {
   }
 
   if (ep0_max_packet) {
-    fbl::AutoLock lock(&ep0_.lock);
+    std::lock_guard<std::mutex> lock(ep0_.lock);
 
     std::array eps{&ep0_.out, &ep0_.in};
     for (Endpoint* ep : eps) {
@@ -483,7 +482,7 @@ void Dwc3::HandleConnectionDoneEvent() {
   }
 
   {
-    fbl::AutoLock lock(&dci_lock_);
+    std::lock_guard<std::mutex> lock(dci_lock_);
     if (dci_intf_.is_valid()) {
       DciIntfSetSpeed(new_speed);
     }
@@ -494,20 +493,20 @@ void Dwc3::HandleDisconnectedEvent() {
   FDF_LOG(INFO, "Dwc3::HandleDisconnectedEvent");
 
   {
-    fbl::AutoLock ep0_lock(&ep0_.lock);
+    std::lock_guard<std::mutex> ep0_lock(ep0_.lock);
     CmdEpEndTransfer(ep0_.out);
     ep0_.state = Ep0::State::None;
   }
 
   {
-    fbl::AutoLock lock(&dci_lock_);
+    std::lock_guard<std::mutex> lock(dci_lock_);
     if (dci_intf_.is_valid()) {
       DciIntfSetConnected(false);
     }
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.ep.lock);
+    std::lock_guard<std::mutex> lock(uep.ep.lock);
     EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
   }
@@ -546,7 +545,7 @@ void Dwc3::ConnectToEndpoint(ConnectToEndpointRequest& request,
 }
 
 void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) {
-  fbl::AutoLock lock(&dci_lock_);
+  std::lock_guard<std::mutex> lock(dci_lock_);
 
   if (dci_intf_.is_valid()) {
     FDF_LOG(ERROR, "%s: DCI Interface already set", __func__);
@@ -589,7 +588,7 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
     return;
   }
 
-  fbl::AutoLock lock(&uep->ep.lock);
+  std::lock_guard<std::mutex> lock(uep->ep.lock);
 
   if (zx_status_t status = uep->fifo.Init(bti_); status != ZX_OK) {
     FDF_LOG(ERROR, "fifo init failed %s", zx_status_get_string(status));
@@ -625,7 +624,7 @@ void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
 
   FidlRequestQueue to_complete;
   {
-    fbl::AutoLock lock(&uep->ep.lock);
+    std::lock_guard<std::mutex> lock(uep->ep.lock);
     to_complete = UserEpCancelAllLocked(*uep);
     uep->fifo.Release();
     uep->ep.enabled = false;
@@ -645,7 +644,7 @@ void Dwc3::EndpointSetStall(EndpointSetStallRequest& request,
     return;
   }
 
-  fbl::AutoLock lock(&uep->ep.lock);
+  std::lock_guard<std::mutex> lock(uep->ep.lock);
   if (zx_status_t status = EpSetStall(uep->ep, true); status != ZX_OK) {
     completer.Reply(zx::error(status));
   } else {
@@ -663,7 +662,7 @@ void Dwc3::EndpointClearStall(EndpointClearStallRequest& request,
     return;
   }
 
-  fbl::AutoLock lock(&uep->ep.lock);
+  std::lock_guard<std::mutex> lock(uep->ep.lock);
   if (zx_status_t status = EpSetStall(uep->ep, false); status != ZX_OK) {
     completer.Reply(zx::error(status));
   } else {
@@ -782,7 +781,7 @@ void Dwc3::EpServer::GetInfo(GetInfoCompleter::Sync& completer) {
 void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
                                    QueueRequestsCompleter::Sync& completer) {
   for (auto& req : request.req()) {
-    fbl::AutoLock lock(&uep_->ep.lock);
+    std::lock_guard<std::mutex> lock(uep_->ep.lock);
 
     usb::FidlRequest freq{std::move(req)};
 
