@@ -34,20 +34,19 @@ class SimpleDirectory : public FsNodeOps {
 
  public:
   /// Adds a child entry to this directory.
-  fit::result<Errno> add_entry(const FsStr name, FsNodeHandle, bool overwrite = false);
+  fit::result<Errno> add_entry(FsStr name, FsNodeHandle, bool overwrite = false);
 
- public:
   SimpleDirectory() = default;
 
   /// impl FsNodeOps
   fs_node_impl_dir_readonly();
 
-  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
-      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
-      OpenFlags flags) final;
+  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
+                                                               const CurrentTask& current_task,
+                                                               OpenFlags flags) const final;
 
   fit::result<Errno, FsNodeHandle> lookup(const FsNode& node, const CurrentTask& current_task,
-                                          const FsStr& name) final;
+                                          const FsStr& name) const final;
 };
 
 }  // namespace starnix

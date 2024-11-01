@@ -19,21 +19,23 @@ class SyslogFile : public FileOps {
  public:
   static FileHandle new_file(const CurrentTask& current_task);
 
+  // impl FileOps for SyslogFile
   fileops_impl_nonseekable();
   fileops_impl_noop_sync();
 
   fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task,
-                                   size_t offset, InputBuffer* data) final;
+                                   size_t offset, InputBuffer* data) const final;
 
   fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask& current_task,
-                                  size_t offset, OutputBuffer* data) final {
+                                  size_t offset, OutputBuffer* data) const final {
     DEBUG_ASSERT(offset == 0);
     return fit::ok(0);
   }
 
   fit::result<Errno, starnix_syscalls::SyscallResult> ioctl(const FileObject& file,
                                                             const CurrentTask& current_task,
-                                                            uint32_t request, long arg) final {
+                                                            uint32_t request,
+                                                            long arg) const final {
     return default_ioctl(file, current_task, request, arg);
   }
 };

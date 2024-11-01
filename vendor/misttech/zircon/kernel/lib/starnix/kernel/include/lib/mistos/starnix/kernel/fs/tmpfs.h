@@ -48,7 +48,6 @@ class TmpFs : public FileSystemOps {
 class TmpfsDirectory : public FsNodeOps {
  private:
   MemoryXattrStorage xattrs_;
-
   mutable starnix_sync::StarnixMutex<uint32_t> child_count_;
 
  public:
@@ -58,31 +57,35 @@ class TmpfsDirectory : public FsNodeOps {
   /// impl FsNodeOps
   fs_node_impl_xattr_delegate(xattrs_);
 
-  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
-      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
-      OpenFlags flags) final;
+  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
+                                                               const CurrentTask& current_task,
+                                                               OpenFlags flags) const final;
 
   fit::result<Errno, FsNodeHandle> mkdir(const FsNode& node, const CurrentTask& current_task,
-                                         const FsStr& name, FileMode mode, FsCred owner) final;
+                                         const FsStr& name, FileMode mode,
+                                         FsCred owner) const final;
 
   fit::result<Errno, FsNodeHandle> mknod(const FsNode& node, const CurrentTask& current_task,
                                          const FsStr& name, FileMode mode, DeviceType dev,
-                                         FsCred owner) final;
+                                         FsCred owner) const final;
 
   fit::result<Errno, FsNodeHandle> create_symlink(const FsNode& node,
                                                   const CurrentTask& current_task,
                                                   const FsStr& name, const FsStr& target,
-                                                  FsCred owner) final;
+                                                  FsCred owner) const final;
 
   fit::result<Errno, FsNodeHandle> create_tmpfile(const FsNode& node,
                                                   const CurrentTask& current_task, FileMode mode,
-                                                  FsCred owner) final;
+                                                  FsCred owner) const final;
 
   fit::result<Errno> link(const FsNode& node, const CurrentTask& current_task, const FsStr& name,
-                          const FsNodeHandle& child) final;
+                          const FsNodeHandle& child) const final;
 
   fit::result<Errno> unlink(const FsNode& node, const CurrentTask& current_task, const FsStr& name,
-                            const FsNodeHandle& child) final;
+                            const FsNodeHandle& child) const final;
+
+ private:
+  TmpfsDirectory();
 };
 
 fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_task,

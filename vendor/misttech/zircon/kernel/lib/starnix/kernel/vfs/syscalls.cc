@@ -283,7 +283,7 @@ fit::result<Errno, size_t> sys_readlinkat(const CurrentTask& current_task, FdNum
             [](FsString path) { return path; },
             [&current_task](NamespaceNode node) { return node.path(*current_task.operator->()); },
         },
-        result->value);
+        result->variant_);
   }();
 
   if (buffer_size == 0) {

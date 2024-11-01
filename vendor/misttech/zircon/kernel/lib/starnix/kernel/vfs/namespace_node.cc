@@ -170,9 +170,7 @@ fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask&
               return fit::error(errno(ELOOP));
             }
             context.remaining_follows -= 1;
-            auto readlink_result = child.readlink(current_task);
-            if (readlink_result.is_error())
-              return readlink_result.take_error();
+            auto readlink_result = child.readlink(current_task) _EP(readlink_result);
             auto child_syslink_target = readlink_result.value();
 
             auto node = ktl::visit(
@@ -204,7 +202,7 @@ fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask&
                       return fit::ok(node);
                     },
                 },
-                readlink_result->value);
+                readlink_result->variant_);
           }
         };
       }
@@ -334,9 +332,11 @@ fit::result<Errno> NamespaceNode::truncate(const CurrentTask& current_task, uint
   return fit::error(errno(ENOTSUP));
 }
 
-SymlinkTarget::SymlinkTarget(const FsString& path) : value(path) {}
+SymlinkTarget::SymlinkTarget(Variant variant) : variant_(ktl::move(variant)) {}
 
-SymlinkTarget::SymlinkTarget(NamespaceNode node) : value(node) {}
+SymlinkTarget SymlinkTarget::Path(const FsString& path) { return SymlinkTarget(path); }
+
+SymlinkTarget SymlinkTarget::Node(NamespaceNode node) { return SymlinkTarget(node); }
 
 SymlinkTarget::~SymlinkTarget() = default;
 

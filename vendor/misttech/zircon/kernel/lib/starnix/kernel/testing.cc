@@ -16,6 +16,7 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
+#include <lib/mistos/starnix/kernel/vfs/file_system.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
@@ -143,6 +144,19 @@ UserAddress map_memory_with_flags(CurrentTask& current_task, UserAddress address
                         FdNumber::from_raw(-1), 0);
   ASSERT_MSG(result.is_ok(), "Could not map memory");
   return result.value();
+}
+
+FileSystemHandle create_fs(fbl::RefPtr<starnix::Kernel>& kernel, FsNodeOps* ops) {
+  fbl::AllocChecker ac;
+  auto ptr = new (&ac) TestFs();
+  ZX_ASSERT(ac.check());
+
+  auto test_fs =
+      FileSystem::New(kernel, {.type = CacheModeType::Uncached}, ptr, FileSystemOptions());
+  ZX_ASSERT_MSG(test_fs, "testfs constructed with valid options");
+  auto bus_dir_node = FsNode::new_root(ops);
+  test_fs->set_root_node(bus_dir_node);
+  return test_fs;
 }
 
 }  // namespace starnix::testing

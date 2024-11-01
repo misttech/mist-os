@@ -42,11 +42,11 @@ fit::result<Errno, SyscallResult> default_ioctl(const FileObject&, const Current
 class FileOps {
  public:
   /// Called when the FileObject is closed.
-  virtual void close(const FileObject& file, const CurrentTask& current_task) {}
+  virtual void close(const FileObject& file, const CurrentTask& current_task) const {}
 
   /// Called every time close() is called on this file, even if the file is not ready to be
   /// released.
-  virtual void flush(const FileObject& file, const CurrentTask& current_task) {}
+  virtual void flush(const FileObject& file, const CurrentTask& current_task) const {}
 
   /// Returns whether the file has meaningful seek offsets. Returning `false` is only
   /// optimization and will makes `FileObject` never hold the offset lock when calling `read` and
@@ -63,28 +63,30 @@ class FileOps {
   /// directly, or because it is not seekable), offset will be 0 and can be ignored.
   /// Returns the number of bytes read.
   virtual fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask& current_task,
-                                          size_t offset, OutputBuffer* data) = 0;
+                                          size_t offset, OutputBuffer* data) const = 0;
 
   /// Write to the file with an offset. If the file does not have persistent offsets (either
   /// directly, or because it is not seekable), offset will be 0 and can be ignored.
   /// Returns the number of bytes written.
   virtual fit::result<Errno, size_t> write(/*Locked<WriteOps>& locked,*/ const FileObject& file,
                                            const CurrentTask& current_task, size_t offset,
-                                           InputBuffer* data) = 0;
+                                           InputBuffer* data) const = 0;
 
   /// Adjust the `current_offset` if the file is seekable.
   virtual fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task,
-                                         off_t current_offset, SeekTarget target) = 0;
+                                         off_t current_offset, SeekTarget target) const = 0;
 
   /// Syncs cached state associated with the file descriptor to persistent storage.
   ///
   /// The method blocks until the synchronization is complete.
-  virtual fit::result<Errno> sync(const FileObject& file, const CurrentTask& current_task) = 0;
+  virtual fit::result<Errno> sync(const FileObject& file,
+                                  const CurrentTask& current_task) const = 0;
 
   /// Syncs cached data, and only enough metadata to retrieve said data, to persistent storage.
   ///
   /// The method blocks until the synchronization is complete.
-  virtual fit::result<Errno> data_sync(const FileObject& file, const CurrentTask& current_task) {
+  virtual fit::result<Errno> data_sync(const FileObject& file,
+                                       const CurrentTask& current_task) const {
     return sync(file, current_task);
   }
 
@@ -117,7 +119,7 @@ class FileOps {
   /// The `file.offset` lock will be held while entering this method. The implementation must look
   /// at `sink.offset()` to read the current offset into the file.
   virtual fit::result<Errno> readdir(const FileObject& file, const CurrentTask& current_task,
-                                     DirentSink* sink) {
+                                     DirentSink* sink) const {
     return fit::error(errno(ENOTDIR));
   }
 
@@ -150,15 +152,15 @@ class FileOps {
   }
 #endif
 
-  virtual fit::result<Errno, SyscallResult> ioctl(
-      /*Locked<FileOpsCore>& locked,*/ const FileObject& file, const CurrentTask& current_task,
-      uint32_t request, long arg) {
+  virtual fit::result<Errno, SyscallResult> ioctl(const FileObject& file,
+                                                  const CurrentTask& current_task, uint32_t request,
+                                                  long arg) const {
     return default_ioctl(file, current_task, request, arg);
   }
 
   virtual fit::result<Errno, SyscallResult> fcntl(const FileObject& file,
                                                   const CurrentTask& current_task, uint32_t cmd,
-                                                  uint64_t arg) {
+                                                  uint64_t arg) const {
     return default_fcntl(cmd);
   }
 
@@ -182,7 +184,7 @@ class FileOps {
   }
 
   virtual fit::result<Errno> readahead(const FileObject& file, const CurrentTask& current_task,
-                                       size_t offset, size_t length) {
+                                       size_t offset, size_t length) const {
     return fit::error(errno(EINVAL));
   }
 
@@ -267,12 +269,12 @@ fit::result<Errno, off_t> unbounded_seek(off_t current_offset, SeekTarget target
                                                                                            \
   fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file, \
                                   const CurrentTask& current_task, size_t offset,          \
-                                  OutputBuffer* data) final {                              \
+                                  OutputBuffer* data) const final {                        \
     return (delegate).read(locked, file, current_task, offset, data);                      \
   }                                                                                        \
                                                                                            \
   fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task,  \
-                                 off_t current_offset, SeekTarget target) final {          \
+                                 off_t current_offset, SeekTarget target) const final {    \
     return (delegate).seek(file, current_task, current_offset, target);                    \
   }                                                                                        \
   using __fileops_impl_delegate_read_and_seek_force_semicolon = int
@@ -282,12 +284,9 @@ fit::result<Errno, off_t> unbounded_seek(off_t current_offset, SeekTarget target
   bool is_seekable() const final { return true; }                                                \
                                                                                                  \
   fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task,        \
-                                 off_t current_offset, SeekTarget target) final {                \
+                                 off_t current_offset, SeekTarget target) const final {          \
     return default_seek(current_offset, target, [&](off_t offset) -> fit::result<Errno, off_t> { \
-      auto result = default_eof_offset(file, current_task);                                      \
-      if (result.is_error())                                                                     \
-        return result.take_error();                                                              \
-                                                                                                 \
+      auto result = default_eof_offset(file, current_task) _EP(result);                          \
       auto eof_offset = result.value();                                                          \
       auto offset_opt = mtl::checked_add(offset, eof_offset);                                    \
       if (!offset_opt.has_value())                                                               \
@@ -302,7 +301,7 @@ fit::result<Errno, off_t> unbounded_seek(off_t current_offset, SeekTarget target
   bool is_seekable() const final { return false; }                                        \
                                                                                           \
   fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task, \
-                                 off_t current_offset, SeekTarget target) final {         \
+                                 off_t current_offset, SeekTarget target) const final {   \
     return fit::error(errno(ESPIPE));                                                     \
   }                                                                                       \
   using __fileops_impl_nonseekable_force_semicolon = int
@@ -315,48 +314,44 @@ fit::result<Errno, off_t> unbounded_seek(off_t current_offset, SeekTarget target
   bool is_seekable() const final { return true; }                                         \
                                                                                           \
   fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task, \
-                                 off_t current_offset, SeekTarget target) final {         \
+                                 off_t current_offset, SeekTarget target) const final {   \
     return fit::ok(0);                                                                    \
   }                                                                                       \
   using __fileops_impl_seekless_force_semicolon = int
 
-#define fileops_impl_dataless()                                                            \
-  fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file, \
-                                  const CurrentTask& current_task, size_t offset,          \
-                                  OutputBuffer* data) final {                              \
-    return fit::error(errno(EINVAL));                                                      \
-  }                                                                                        \
-                                                                                           \
-  fit::result<Errno, size_t> write(/*Locked<WriteOps>& locked,*/ const FileObject& file,   \
-                                   const CurrentTask& current_task, size_t offset,         \
-                                   InputBuffer* data) final {                              \
-    return fit::error(errno(EINVAL));                                                      \
-  }                                                                                        \
+#define fileops_impl_dataless()                                                             \
+  fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask& current_task,  \
+                                  size_t offset, OutputBuffer* data) const final {          \
+    return fit::error(errno(EINVAL));                                                       \
+  }                                                                                         \
+                                                                                            \
+  fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task, \
+                                   size_t offset, InputBuffer* data) const final {          \
+    return fit::error(errno(EINVAL));                                                       \
+  }                                                                                         \
   using __fileops_impl_dataless_force_semicolon = int
 
-#define fileops_impl_directory()                                                           \
-  bool is_seekable() const final { return true; }                                          \
-                                                                                           \
-  fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file, \
-                                  const CurrentTask& current_task, size_t offset,          \
-                                  OutputBuffer* data) final {                              \
-    return fit::error(errno(EISDIR));                                                      \
-  }                                                                                        \
-                                                                                           \
-  fit::result<Errno, size_t> write(/*Locked<WriteOps>& locked,*/ const FileObject& file,   \
-                                   const CurrentTask& current_task, size_t offset,         \
-                                   InputBuffer* data) final {                              \
-    return fit::error(errno(EISDIR));                                                      \
-  }                                                                                        \
+#define fileops_impl_directory()                                                            \
+  bool is_seekable() const final { return true; }                                           \
+                                                                                            \
+  fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask& current_task,  \
+                                  size_t offset, OutputBuffer* data) const final {          \
+    return fit::error(errno(EISDIR));                                                       \
+  }                                                                                         \
+                                                                                            \
+  fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task, \
+                                   size_t offset, InputBuffer* data) const final {          \
+    return fit::error(errno(EISDIR));                                                       \
+  }                                                                                         \
   using __fileops_impl_directory_force_semicolon = int
 
-#define fileops_impl_noop_sync()                                                           \
-  fit::result<Errno> sync(const FileObject& file, const CurrentTask& current_task) final { \
-    if (!file.node()->is_reg() && !file.node()->is_dir()) {                                \
-      return fit::error(errno(EINVAL));                                                    \
-    }                                                                                      \
-    return fit::ok();                                                                      \
-  }                                                                                        \
+#define fileops_impl_noop_sync()                                                                 \
+  fit::result<Errno> sync(const FileObject& file, const CurrentTask& current_task) const final { \
+    if (!file.node()->is_reg() && !file.node()->is_dir()) {                                      \
+      return fit::error(errno(EINVAL));                                                          \
+    }                                                                                            \
+    return fit::ok();                                                                            \
+  }                                                                                              \
   using __fileops_impl_noop_sync_force_semicolon = int
 
 struct OPathOps : FileOps {
@@ -371,17 +366,17 @@ struct OPathOps : FileOps {
   bool is_seekable() const final { return true; }
 
   fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask& current_task,
-                                  size_t offset, OutputBuffer* data) final {
+                                  size_t offset, OutputBuffer* data) const final {
     return fit::error(errno(EBADF));
   }
 
   fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task,
-                                   size_t offset, InputBuffer* data) final {
+                                   size_t offset, InputBuffer* data) const final {
     return fit::error(errno(EBADF));
   }
 
   fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task,
-                                 off_t current_offset, SeekTarget target) final {
+                                 off_t current_offset, SeekTarget target) const final {
     return fit::error(errno(EBADF));
   }
 
@@ -393,12 +388,12 @@ struct OPathOps : FileOps {
   }
 
   fit::result<Errno> readdir(const FileObject& file, const CurrentTask& current_task,
-                             DirentSink* sink) final {
+                             DirentSink* sink) const final {
     return fit::error(errno(EBADF));
   }
 
   fit::result<Errno, SyscallResult> ioctl(const FileObject& file, const CurrentTask& current_task,
-                                          uint32_t request, long arg) final {
+                                          uint32_t request, long arg) const final {
     return fit::error(errno(EBADF));
   }
 };

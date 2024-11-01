@@ -11,10 +11,10 @@
 #include <lib/mistos/starnix/kernel/vfs/mount_info.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/util/error_propagation.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 
-#include <functional>
 #include <utility>
 
 #include <fbl/ref_counted_upgradeable.h>
@@ -280,9 +280,7 @@ class DirEntry
   };
 
  private:
-  DirEntryLockedChildren lock_children() {
-    return DirEntryLockedChildren(fbl::RefPtr<DirEntry>(this), ktl::move(children_.Write()));
-  }
+  DirEntryLockedChildren lock_children();
 
  public:
   /// The name that this node's parent calls this node.
@@ -301,10 +299,7 @@ class DirEntry
   /// in another file system. For that reason, consider walking the
   /// NamespaceNode tree (which understands mounts) rather than the DirEntry
   /// tree.
-  DirEntryHandle parent_or_self() {
-    auto parent = state_.Read()->parent;
-    return parent ? parent.value() : fbl::RefPtr<DirEntry>(this);
-  }
+  DirEntryHandle parent_or_self();
 
   /// Whether this directory entry has been removed from the tree.
   bool is_dead() const { return state_.Read()->is_dead; }

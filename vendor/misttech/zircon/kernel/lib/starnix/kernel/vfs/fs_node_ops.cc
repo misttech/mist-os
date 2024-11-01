@@ -18,7 +18,7 @@ namespace starnix {
 
 fit::result<Errno, FsNodeHandle> FsNodeOps::lookup(const FsNode& node,
                                                    const CurrentTask& current_task,
-                                                   const FsStr& name) {
+                                                   const FsStr& name) const {
   // The default implementation here is suitable for filesystems that have permanent entries;
   // entries that already exist will get found in the cache and shouldn't get this far.
   LTRACEF("ENOENT name=[%.*s]\n", static_cast<int>(name.length()), name.data());
@@ -27,7 +27,7 @@ fit::result<Errno, FsNodeHandle> FsNodeOps::lookup(const FsNode& node,
 
 fit::result<Errno, FsNodeHandle> FsNodeOps::create_tmpfile(const FsNode& node,
                                                            const CurrentTask& current_task,
-                                                           FileMode mode, FsCred owner) {
+                                                           FileMode mode, FsCred owner) const {
   return fit::error(errno(EOPNOTSUPP));
 }
 

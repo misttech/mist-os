@@ -22,8 +22,6 @@
 #include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
-#include <functional>
-
 #include <fbl/intrusive_single_list.h>
 #include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
@@ -43,7 +41,7 @@ using starnix_uapi::Credentials;
 
 class FsNode final
     : public fbl::SinglyLinkedListable<util::WeakPtr<FsNode>, fbl::NodeOptions::AllowClearUnsafe>,
-      private fbl::RefCountedUpgradeable<FsNode> {
+      public fbl::RefCountedUpgradeable<FsNode> {
  public:
   /// Weak reference to the `FsNodeHandle` of this `FsNode`. This allows to retrieve the
   /// `FsNodeHandle` from a `FsNode`.
@@ -222,7 +220,7 @@ class FsNode final
   starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info() const { return info_.Read(); }
 
   /// Refreshes the `FsNodeInfo` if necessary and returns a read lock.
-  fit::result<Errno, FsNodeInfo> refresh_info(const CurrentTask& current_task) const;
+  fit::result<Errno, FsNodeInfo> fetch_and_refresh_info(const CurrentTask& current_task) const;
 
   template <typename T, typename F>
   T update_info(F&& mutator) const {
@@ -230,12 +228,7 @@ class FsNode final
     return mutator(*_info);
   }
 
- public:
   // C++
-  using fbl::RefCountedUpgradeable<FsNode>::AddRef;
-  using fbl::RefCountedUpgradeable<FsNode>::Release;
-  using fbl::RefCountedUpgradeable<FsNode>::Adopt;
-  using fbl::RefCountedUpgradeable<FsNode>::AddRefMaybeInDestructor;
 
   // Required to instantiate fbl::DefaultKeyedObjectTraits.
   ino_t GetKey() const { return node_id_; }

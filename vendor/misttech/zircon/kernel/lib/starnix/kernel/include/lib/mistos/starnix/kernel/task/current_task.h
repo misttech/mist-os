@@ -81,7 +81,7 @@ class TaskBuilder {
 };
 
 class Kernel;
-struct LookupContext;
+class LookupContext;
 struct NamespaceNode;
 
 // The task object associated with the currently executing thread.

@@ -29,27 +29,31 @@ namespace starnix {
 
 namespace {
 
-struct TmpfsSpecialNode : public FsNodeOps {
-  MemoryXattrStorage xattrs;
+class TmpfsSpecialNode : public FsNodeOps {
+ private:
+  MemoryXattrStorage xattrs_;
 
+ public:
   /// impl TmpfsSpecialNode
   static TmpfsSpecialNode* New() {
     fbl::AllocChecker ac;
-    auto node = new (&ac) TmpfsSpecialNode();
+    auto ptr = new (&ac) TmpfsSpecialNode();
     ZX_ASSERT(ac.check());
-    return node;
+    return ptr;
   }
 
   /// impl FsNodeOps
-  fs_node_impl_dir_readonly;
+  fs_node_impl_not_dir();
+  fs_node_impl_xattr_delegate(xattrs_);
 
-  fs_node_impl_xattr_delegate(xattrs);
-
-  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(
-      /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task,
-      OpenFlags flags) final {
+  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
+                                                               const CurrentTask& current_task,
+                                                               OpenFlags flags) const final {
     panic("Special nodes cannot be opened.\n");
   }
+
+ private:
+  TmpfsSpecialNode() : xattrs_(MemoryXattrStorage::Default()) {}
 };
 
 }  // namespace
@@ -70,7 +74,7 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
     return fit::error(errno(ENOMEM));
   }
 
-  auto fs = FileSystem::New(kernel, {.type=CacheModeType::Permanent}, ktl::move(tmpfs), options);
+  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, ktl::move(tmpfs), options);
   auto mount_options = fs->options().params;
 
   auto result = [&]() -> fit::result<Errno, FileMode> {
@@ -149,6 +153,8 @@ const FsStr& TmpFs::name() { return name_; }
 
 TmpFs::~TmpFs() = default;
 
+TmpfsDirectory::TmpfsDirectory() : xattrs_(MemoryXattrStorage::Default()) {}
+
 TmpfsDirectory* TmpfsDirectory::New() {
   fbl::AllocChecker ac;
   auto dir = new (&ac) TmpfsDirectory();
@@ -157,14 +163,14 @@ TmpfsDirectory* TmpfsDirectory::New() {
 }
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> TmpfsDirectory::create_file_ops(
-    /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task, OpenFlags flags) {
+    const FsNode& node, const CurrentTask& current_task, OpenFlags flags) const {
   return fit::error(errno(ENOTSUP));
 }
 
 fit::result<Errno, FsNodeHandle> TmpfsDirectory::mkdir(const FsNode& node,
                                                        const CurrentTask& current_task,
                                                        const FsStr& name, FileMode mode,
-                                                       FsCred owner) {
+                                                       FsCred owner) const {
   node.update_info<void>([](FsNodeInfo& info) { info.link_count += 1; });
 
   {
@@ -180,7 +186,7 @@ fit::result<Errno, FsNodeHandle> TmpfsDirectory::mkdir(const FsNode& node,
 fit::result<Errno, FsNodeHandle> TmpfsDirectory::mknod(const FsNode& node,
                                                        const CurrentTask& current_task,
                                                        const FsStr& name, FileMode mode,
-                                                       DeviceType dev, FsCred owner) {
+                                                       DeviceType dev, FsCred owner) const {
   auto child_result = create_child_node(current_task, node, mode, dev, owner);
   if (child_result.is_error())
     return child_result.take_error();
@@ -196,23 +202,24 @@ fit::result<Errno, FsNodeHandle> TmpfsDirectory::mknod(const FsNode& node,
 fit::result<Errno, FsNodeHandle> TmpfsDirectory::create_symlink(const FsNode& node,
                                                                 const CurrentTask& current_task,
                                                                 const FsStr& name,
-                                                                const FsStr& target, FsCred owner) {
+                                                                const FsStr& target,
+                                                                FsCred owner) const {
   return fit::error(errno(ENOTSUP));
 }
 
 fit::result<Errno, FsNodeHandle> TmpfsDirectory::create_tmpfile(const FsNode& node,
                                                                 const CurrentTask& current_task,
-                                                                FileMode mode, FsCred owner) {
+                                                                FileMode mode, FsCred owner) const {
   return fit::error(errno(ENOTSUP));
 }
 
 fit::result<Errno> TmpfsDirectory::link(const FsNode& node, const CurrentTask& current_task,
-                                        const FsStr& name, const FsNodeHandle& child) {
+                                        const FsStr& name, const FsNodeHandle& child) const {
   return fit::error(errno(ENOTSUP));
 }
 
 fit::result<Errno> TmpfsDirectory::unlink(const FsNode& node, const CurrentTask& current_task,
-                                          const FsStr& name, const FsNodeHandle& child) {
+                                          const FsStr& name, const FsNodeHandle& child) const {
   return fit::error(errno(ENOTSUP));
 }
 
