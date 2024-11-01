@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::overnet_connector::{
-    OvernetConnection, OvernetConnectionError, OvernetConnector, BUFFER_SIZE,
+use crate::target_connector::{
+    OvernetConnection, TargetConnectionError, TargetConnector, BUFFER_SIZE,
 };
 use anyhow::Result;
 use ffx_command::FfxContext;
@@ -21,21 +21,21 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
 
-impl From<SshError> for OvernetConnectionError {
+impl From<SshError> for TargetConnectionError {
     fn from(ssh_err: SshError) -> Self {
         use SshError::*;
         match &ssh_err {
             // These errors are considered potentially recoverable, as they can often surface when
             // a device is actively rebooting while trying to reconnect to it.
             Unknown(_) | Timeout | ConnectionRefused | UnknownNameOrService | NoRouteToHost
-            | NetworkUnreachable => OvernetConnectionError::NonFatal(ssh_err.into()),
+            | NetworkUnreachable => TargetConnectionError::NonFatal(ssh_err.into()),
             // These errors are unrecoverable, as they are fundamental errors in an existing
             // configuration.
             PermissionDenied
             | KeyVerificationFailure
             | InvalidArgument
             | TargetIncompatible
-            | ConnectionClosedByRemoteHost => OvernetConnectionError::Fatal(ssh_err.into()),
+            | ConnectionClosedByRemoteHost => TargetConnectionError::Fatal(ssh_err.into()),
         }
     }
 }
@@ -97,10 +97,10 @@ async fn try_ssh_cmd_cleanup(mut cmd: Child) -> Result<()> {
     Ok(())
 }
 
-impl OvernetConnector for SshConnector {
+impl TargetConnector for SshConnector {
     const CONNECTION_TYPE: &'static str = "ssh";
 
-    async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
+    async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
         self.cmd = Some(start_ssh_command(self.target, &self.env_context).await?);
         let cmd = self.cmd.as_mut().unwrap();
         let mut stdout = BufReader::with_capacity(
@@ -189,26 +189,26 @@ mod test {
     fn test_ssh_error_conversion() {
         use SshError::*;
         let err = Unknown("foobar".to_string());
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = PermissionDenied;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::Fatal(_)));
         let err = ConnectionRefused;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = UnknownNameOrService;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = KeyVerificationFailure;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::Fatal(_)));
         let err = NoRouteToHost;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = NetworkUnreachable;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = InvalidArgument;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::Fatal(_)));
         let err = TargetIncompatible;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::Fatal(_)));
         let err = Timeout;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::NonFatal(_)));
         let err = ConnectionClosedByRemoteHost;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
+        assert!(matches!(TargetConnectionError::from(err), TargetConnectionError::Fatal(_)));
     }
 }

@@ -15,7 +15,7 @@ use tokio::io::{AsyncBufRead, AsyncRead, AsyncWrite, BufReader};
 pub(crate) const BUFFER_SIZE: usize = 65536;
 
 #[derive(thiserror::Error, Debug)]
-pub enum OvernetConnectionError {
+pub enum TargetConnectionError {
     /// A non-recoverable error. Any errors converted via From<> trait are automatically converted
     /// to this value.
     #[error("encountered fatal error during connect {0}")]
@@ -26,17 +26,16 @@ pub enum OvernetConnectionError {
     NonFatal(#[source] anyhow::Error),
 }
 
-pub trait OvernetConnector: Debug {
+pub trait TargetConnector: Debug {
     /// A debugging label for the type of connection. Intended to be for error formatting.
     const CONNECTION_TYPE: &'static str;
 
-    /// Attempts a connection to an Overnet device. This function, if it fails and returns a
-    /// `NonFatal` error, should be capable of running again. It will be the caller's responsibility
-    /// to determine whether and how often to re-attempt connecting when receiving a NonFatal
-    /// error.
-    fn connect(
-        &mut self,
-    ) -> impl Future<Output = Result<OvernetConnection, OvernetConnectionError>>;
+    /// Attempts a connection to a target. This function, if it fails and
+    /// returns a `NonFatal` error, should be capable of running again. It will
+    /// be the caller's responsibility to determine whether and how often to
+    /// re-attempt connecting when receiving a NonFatal error.
+    fn connect(&mut self)
+        -> impl Future<Output = Result<OvernetConnection, TargetConnectionError>>;
 
     fn device_address(&self) -> Option<std::net::SocketAddr> {
         None

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::overnet_connector::{OvernetConnectionError, OvernetConnector};
+use crate::target_connector::{TargetConnectionError, TargetConnector};
 use anyhow::Result;
 use async_channel::Receiver;
 use compat_info::CompatibilityInfo;
@@ -88,7 +88,7 @@ impl FidlPipe {
         mut connector: C,
     ) -> Result<Self>
     where
-        C: OvernetConnector + 'static,
+        C: TargetConnector + 'static,
         R: AsyncRead + Unpin + 'static,
         W: AsyncWrite + Unpin + 'static,
     {
@@ -97,8 +97,8 @@ impl FidlPipe {
             break match connector.connect().await {
                 Ok(c) => c,
                 Err(e) => match e {
-                    OvernetConnectionError::Fatal(e) => return Err(e),
-                    OvernetConnectionError::NonFatal(e) => {
+                    TargetConnectionError::Fatal(e) => return Err(e),
+                    TargetConnectionError::NonFatal(e) => {
                         let error = format!("non-fatal error connecting to device. Retrying again after {wait_duration:?}: {e:?}");
                         tracing::debug!(error);
                         eprintln!("{}", error);
@@ -162,7 +162,7 @@ impl Drop for FidlPipe {
 mod test {
     use super::*;
 
-    use crate::overnet_connector::OvernetConnection;
+    use crate::target_connector::OvernetConnection;
     use std::fmt::Debug;
     use tokio::io::BufReader;
 
@@ -171,13 +171,13 @@ mod test {
         should_succeed: bool,
     }
 
-    impl OvernetConnector for FailOnceThenSucceedConnector {
+    impl TargetConnector for FailOnceThenSucceedConnector {
         const CONNECTION_TYPE: &'static str = "fake";
 
-        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
+        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
             if !self.should_succeed {
                 self.should_succeed = true;
-                return Err(OvernetConnectionError::NonFatal(anyhow::anyhow!("test error")));
+                return Err(TargetConnectionError::NonFatal(anyhow::anyhow!("test error")));
             }
             let (sock1, sock2) = fidl::Socket::create_stream();
             let sock1 = fidl::AsyncSocket::from_socket(sock1);
@@ -198,9 +198,9 @@ mod test {
     #[derive(Debug)]
     struct AutoFailConnector;
 
-    impl OvernetConnector for AutoFailConnector {
+    impl TargetConnector for AutoFailConnector {
         const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
+        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
             let (sock1, sock2) = fidl::Socket::create_stream();
             let sock1 = fidl::AsyncSocket::from_socket(sock1);
             let sock2 = fidl::AsyncSocket::from_socket(sock2);
@@ -222,9 +222,9 @@ mod test {
     #[derive(Debug)]
     struct DoNothingConnector;
 
-    impl OvernetConnector for DoNothingConnector {
+    impl TargetConnector for DoNothingConnector {
         const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
+        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
             let (sock1, sock2) = fidl::Socket::create_stream();
             let sock1 = fidl::AsyncSocket::from_socket(sock1);
             let sock2 = fidl::AsyncSocket::from_socket(sock2);

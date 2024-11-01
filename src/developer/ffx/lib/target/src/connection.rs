@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::fidl_pipe::{create_overnet_socket, FidlPipe};
-use crate::overnet_connector::OvernetConnector;
+use crate::target_connector::TargetConnector;
 use anyhow::Result;
 use async_lock::Mutex;
 use compat_info::CompatibilityInfo;
@@ -53,7 +53,7 @@ impl Connection {
     /// This function will only ever return a `ConnectionStartError` or `InternalError`, both of
     /// which are considered fatal (e.g. there is no means to reattempt connecting to the device).
     #[tracing::instrument(level = "debug")]
-    pub async fn new(connector: impl OvernetConnector + 'static) -> Result<Self, ConnectionError> {
+    pub async fn new(connector: impl TargetConnector + 'static) -> Result<Self, ConnectionError> {
         let node = overnet_core::Router::new(None)?;
         let socket = create_overnet_socket(node.clone())
             .map_err(|e| ConnectionError::InternalError(e.into()))?;
@@ -171,7 +171,7 @@ impl OvernetClient {
 
 pub mod testing {
     use super::*;
-    use crate::overnet_connector::{OvernetConnection, OvernetConnectionError};
+    use crate::target_connector::{OvernetConnection, TargetConnectionError};
     use async_channel::Receiver;
     use fidl_fuchsia_developer_remotecontrol as rcs_fidl;
     use fuchsia_async::Task;
@@ -279,14 +279,14 @@ pub mod testing {
         }
     }
 
-    impl OvernetConnector for FakeOvernet {
+    impl TargetConnector for FakeOvernet {
         const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
+        async fn connect(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
             if let FakeOvernetBehavior::FailNonFatalOnce = self.behavior {
                 if !self.already_failed {
                     self.already_failed = true;
                     async_io::Timer::after(Duration::from_secs(5)).await;
-                    return Err(OvernetConnectionError::NonFatal(anyhow::anyhow!(
+                    return Err(TargetConnectionError::NonFatal(anyhow::anyhow!(
                         "awww, we have to try again (for testing, of course)!"
                     )));
                 }
