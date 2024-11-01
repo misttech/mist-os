@@ -16,10 +16,6 @@ group("blackout_all") {
     ":blackout_emulator_stable",
     ":blackout_emulator_unstable",
     ":blackout_fail",
-    ":blackout_starnix_arm64_stable",
-    ":blackout_starnix_arm64_unstable",
-    ":blackout_starnix_vim3_stable",
-    ":blackout_starnix_vim3_unstable",
     ":blackout_workbench_vim3_stable",
     ":blackout_workbench_vim3_unstable",
   ]
