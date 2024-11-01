@@ -123,8 +123,11 @@ TEST(Timer, Restart) {
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_MONOTONIC, &timer));
 
   zx_signals_t pending;
+  // The timer deadline is set for one year in the future, and therefore should never race
+  // with the wait_one call below.
+  const zx::duration relative_deadline = zx::sec(60 * 60 * 24 * 365);
   for (int ix = 0; ix != 10; ++ix) {
-    const zx::time deadline_timer = zx::deadline_after(zx::msec(500));
+    const zx::time deadline_timer = zx::deadline_after(relative_deadline);
     const zx::time deadline_wait = zx::deadline_after(zx::msec(1));
     // Setting a timer already running is equivalent to a cancel + set.
     ASSERT_OK(timer.set(deadline_timer, zx::nsec(0)));
