@@ -109,9 +109,9 @@ impl SuiteServer for TestServer {
 
             // Even if `serve_test_suite` failed, clean local data directory as these files are no
             // longer needed and they are consuming space.
-            let test_data_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+            let test_data_dir = fuchsia_fs::directory::open_in_namespace(
                 &test_data_parent,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .expect("Cannot open data directory");
             if let Err(e) =
@@ -630,9 +630,9 @@ mod tests {
         }
 
         fn proxy(&self) -> Result<fio::DirectoryProxy, Error> {
-            fuchsia_fs::directory::open_in_namespace_deprecated(
+            fuchsia_fs::directory::open_in_namespace(
                 &self.dir_name,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .context("Cannot open test data directory")
         }

@@ -88,9 +88,9 @@ fn get_new_test_server() -> TestServer {
 
     // TODO(https://fxbug.dev/42122426): use async lib.
     fs::create_dir(&test_data_path).expect("cannot create test output directory.");
-    let test_data_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+    let test_data_dir = fuchsia_fs::directory::open_in_namespace(
         &test_data_path,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
     )
     .expect("Cannot open data directory");
 

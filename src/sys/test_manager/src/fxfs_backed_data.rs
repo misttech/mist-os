@@ -23,9 +23,9 @@ async fn main() -> Result<(), Error> {
 
     // back /data provided to test using fx_fs
     std::fs::create_dir(DATA_FOR_TESTS_PATH).context("Create data for test directory")?;
-    let data_directory = fuchsia_fs::directory::open_in_namespace_deprecated(
+    let data_directory = fuchsia_fs::directory::open_in_namespace(
         DATA_FOR_TESTS_PATH,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
     )?;
     fs.add_remote(DATA_FOR_TEST_DIR_NAME, data_directory);
     fs.take_and_serve_directory_handle()?;

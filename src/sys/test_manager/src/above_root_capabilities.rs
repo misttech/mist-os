@@ -35,10 +35,7 @@ pub struct AboveRootCapabilitiesForTest {
 impl AboveRootCapabilitiesForTest {
     pub async fn new(manifest_name: &str) -> Result<Self, Error> {
         let path = format!("/pkg/meta/{}", manifest_name);
-        let file_proxy = fuchsia_fs::file::open_in_namespace_deprecated(
-            &path,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )?;
+        let file_proxy = fuchsia_fs::file::open_in_namespace(&path, fuchsia_fs::PERM_READABLE)?;
         let component_decl = fuchsia_fs::file::read_fidl::<fdecl::Component>(&file_proxy).await?;
         let collection_data = Self::load(component_decl);
         Ok(Self { collection_data })

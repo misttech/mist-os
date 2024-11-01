@@ -19,9 +19,9 @@ pub(crate) async fn send_kernel_debug_data(
     iterator: ftest_manager::DebugDataIteratorRequestStream,
 ) -> Result<(), Error> {
     tracing::info!("Serving kernel debug data");
-    let directory = fuchsia_fs::directory::open_in_namespace_deprecated(
+    let directory = fuchsia_fs::directory::open_in_namespace(
         EARLY_BOOT_DEBUG_DATA_PATH,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        fuchsia_fs::PERM_READABLE,
     )?;
 
     serve_iterator(EARLY_BOOT_DEBUG_DATA_PATH, directory, iterator).await
@@ -81,10 +81,7 @@ pub(crate) async fn serve_directory(
     dir_path: &str,
     mut event_sender: mpsc::Sender<RunEvent>,
 ) -> Result<(), Error> {
-    let directory = fuchsia_fs::directory::open_in_namespace_deprecated(
-        dir_path,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )?;
+    let directory = fuchsia_fs::directory::open_in_namespace(dir_path, fuchsia_fs::PERM_READABLE)?;
     {
         let file_stream = fuchsia_fs::directory::readdir_recursive(
             &directory,
@@ -111,10 +108,7 @@ pub(crate) async fn serve_directory_for_suite(
     dir_path: &str,
     mut event_sender: mpsc::Sender<Result<SuiteEvents, ftest_manager::LaunchError>>,
 ) -> Result<(), Error> {
-    let directory = fuchsia_fs::directory::open_in_namespace_deprecated(
-        dir_path,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )?;
+    let directory = fuchsia_fs::directory::open_in_namespace(dir_path, fuchsia_fs::PERM_READABLE)?;
     {
         let file_stream = fuchsia_fs::directory::readdir_recursive(
             &directory,
