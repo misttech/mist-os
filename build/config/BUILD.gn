@@ -818,9 +818,15 @@ config("default_warnings") {
     ]
   }
 
-  # TODO(https://fxbug.dev/331282813): Disable "-Wdeprecated-pragma" which
-  # warns for deprecated std::errc constants.
-  configs = [ ":Wno-deprecated-pragma" ]
+  configs = [
+    # TODO(https://fxbug.dev/331282813): Disable "-Wdeprecated-pragma" which
+    # warns for deprecated std::errc constants.
+    ":Wno-deprecated-pragma",
+
+    # TODO(https://fxbug.dev/376323001): Disable "-Wnontrivial-memaccess" until
+    # all instances are fixed.
+    ":Wno-nontrivial-memaccess",
+  ]
 }
 
 # Code that goes into the SDK or otherwise contributes to the SDK surface area
@@ -1556,6 +1562,14 @@ config("no-tlsdesc") {
 config("Wno-deprecated-pragma") {
   if (!is_gcc) {
     cflags = [ "-Wno-deprecated-pragma" ]
+  }
+}
+
+# TODO(https://fxbug.dev/376323001): Disable "-Wnontrivial-memaccess" until
+# all instances are fixed.
+config("Wno-nontrivial-memaccess") {
+  if (!is_gcc) {
+    cflags = [ "-Wno-nontrivial-memaccess" ]
   }
 }
 
