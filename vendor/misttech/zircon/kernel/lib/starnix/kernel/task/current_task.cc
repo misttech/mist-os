@@ -205,8 +205,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task(const fbl::RefPtr<Kerne
 
 template <typename TaskInfoFactory>
 fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
-    const fbl::RefPtr<Kernel>& kernel, RwLock<PidTable>::RwLockWriteGuard& pids, pid_t pid,
-    const ktl::string_view& initial_name, fbl::RefPtr<FsContext> root_fs,
+    const fbl::RefPtr<Kernel>& kernel, starnix_sync::RwLock<PidTable>::RwLockWriteGuard& pids,
+    pid_t pid, const ktl::string_view& initial_name, fbl::RefPtr<FsContext> root_fs,
     TaskInfoFactory&& task_info_factory, Credentials creds,
     fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits) {
   LTRACE;

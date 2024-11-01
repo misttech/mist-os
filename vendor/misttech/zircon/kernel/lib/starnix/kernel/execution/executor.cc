@@ -42,8 +42,8 @@ namespace starnix {
 
 fit::result<Errno, TaskInfo> create_zircon_process(
     fbl::RefPtr<Kernel> kernel,
-    ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent, pid_t pid,
-    fbl::RefPtr<ProcessGroup> process_group, fbl::RefPtr<SignalActions> signal_actions,
+    ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
+    pid_t pid, fbl::RefPtr<ProcessGroup> process_group, fbl::RefPtr<SignalActions> signal_actions,
     const ktl::string_view& name) {
   LTRACE;
   auto process_dispatcher =
