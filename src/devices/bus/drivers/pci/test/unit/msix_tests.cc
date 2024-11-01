@@ -5,7 +5,7 @@
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/vmo/types.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
+#include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/zx/vmo.h>
 #include <zircon/hw/pci.h>
 #include <zircon/limits.h>
@@ -16,18 +16,19 @@
 
 #include <fbl/hard_int.h>
 #include <fbl/ref_ptr.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/bus/drivers/pci/capabilities/msix.h"
 #include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_allocator.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_config.h"
 #include "src/devices/lib/mmio/test-helper.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace pci {
 
 namespace {
-class PciCapabilityTests : public zxtest::Test {
+class PciCapabilityTests : public ::testing::Test {
  public:
   PciCapabilityTests() = default;
   fdf::MmioBuffer& mmio() { return *mmio_; }
@@ -80,7 +81,7 @@ TEST_F(PciCapabilityTests, FixtureTest) {
   zx_paddr_t toffset = 0x4000;
   zx_paddr_t poffset = 0x8000;
   ConfigureMsixCapability(cfg, tbar, pbar, toffset, poffset, vectors);
-  ASSERT_EQ(mmio().Read16(MsixCapability::kMsixControlRegisterOffset), vectors - 1);
+  ASSERT_EQ(mmio().Read16(MsixCapability::kMsixControlRegisterOffset), vectors - 1u);
   ASSERT_EQ(mmio().Read32(MsixCapability::kMsixTableRegisterOffset), toffset | tbar);
   ASSERT_EQ(mmio().Read32(MsixCapability::kMsixPbaRegisterOffset), poffset | pbar);
 }
@@ -105,7 +106,7 @@ TEST_F(PciCapabilityTests, MsixBarAccessTest) {
     ConfigureMsixCapability(cfg, 1, 1, 0x2000, 0x3000);
     MsixCapability msix(cfg, 0);
     ASSERT_OK(msix.Init(bar1, bar1));
-    ASSERT_EQ(0x2000, msix.GetBarDataSize(bar1).value());
+    ASSERT_EQ(0x2000u, msix.GetBarDataSize(bar1).value());
   }
 
   // Swap tbar and pbar to ensure the ordering check is correct.
@@ -113,7 +114,7 @@ TEST_F(PciCapabilityTests, MsixBarAccessTest) {
     ConfigureMsixCapability(cfg, 1, 1, 0x3000, 0x2000);
     MsixCapability msix(cfg, 0);
     ASSERT_OK(msix.Init(bar1, bar1));
-    ASSERT_EQ(0x2000, msix.GetBarDataSize(bar1).value());
+    ASSERT_EQ(0x2000u, msix.GetBarDataSize(bar1).value());
   }
 
   // Different bars, Tbar should work but Pbar will be denied.
@@ -121,7 +122,7 @@ TEST_F(PciCapabilityTests, MsixBarAccessTest) {
     ConfigureMsixCapability(cfg, 1, 2, 0x1000, 0x0);
     MsixCapability msix(cfg, 0);
     ASSERT_OK(msix.Init(bar1, bar2));
-    ASSERT_EQ(0x1000, msix.GetBarDataSize(bar1).value());
+    ASSERT_EQ(0x1000u, msix.GetBarDataSize(bar1).value());
     ASSERT_STATUS(ZX_ERR_ACCESS_DENIED, msix.GetBarDataSize(bar2).status_value());
   }
 

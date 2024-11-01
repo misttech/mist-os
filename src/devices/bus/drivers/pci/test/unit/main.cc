@@ -4,9 +4,10 @@
 
 #include <cstring>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 // This simple main allows for a test to be built that checks for a single '-v'
 // argument to turn on a driver's zxlogf levels.

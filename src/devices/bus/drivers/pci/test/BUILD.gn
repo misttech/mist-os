@@ -26,14 +26,16 @@ test("pci-unit") {
   ]
 
   deps = [
-    "//sdk/lib/inspect/testing/cpp:zxtest",
+    "//sdk/lib/inspect/testing/cpp",
     "//src/devices/bus/drivers/pci:user_pci",
     "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-msi",
     "//src/devices/testing/mock-ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/zxtest",
   ]
 
   public_deps = [ "//src/devices/testing/fake-resource" ]

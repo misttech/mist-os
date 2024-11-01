@@ -5,9 +5,10 @@
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/vmo/types.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
+#include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
+#include <unistd.h>
 #include <zircon/limits.h>
 #include <zircon/syscalls/object.h>
 
@@ -15,7 +16,7 @@
 #include <utility>
 
 #include <fbl/ref_ptr.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/bus/drivers/pci/capabilities.h"
 #include "src/devices/bus/drivers/pci/capabilities/power_management.h"
@@ -27,12 +28,13 @@
 #include "src/devices/bus/drivers/pci/test/fakes/fake_upstream_node.h"
 #include "src/devices/bus/drivers/pci/test/fakes/test_device.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
-
+#include "src/lib/testing/predicates/status.h"
+#include "test_helpers.h"
 namespace pci {
 
 // Creates a test device with a given device config using test defaults)
 
-class PciDeviceTests : protected inspect::InspectTestHelper, public zxtest::Test {
+class PciDeviceTests : protected ::pci_testing::InspectHelper, public ::testing::Test {
  public:
   static constexpr char kTestNodeName[] = "Test";
   FakePciroot& pciroot_proto() { return pciroot_; }
@@ -134,34 +136,34 @@ TEST_F(PciDeviceTests, CreationTest) {
   ASSERT_NO_FATAL_FAILURE(ReadInspect(inspect_vmo()));
   // We primed the MMIO allocators to fail the first round for BAR 0 so it
   // should have a 5th inspect entry for the failed allocation.
-  EXPECT_EQ(5, hierarchy()
-                   .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "0"})
-                   ->node()
-                   .properties()
-                   .size());
-  EXPECT_EQ(4, hierarchy()
-                   .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "1"})
-                   ->node()
-                   .properties()
-                   .size());
-  EXPECT_EQ(4, hierarchy()
-                   .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "2"})
-                   ->node()
-                   .properties()
-                   .size());
-  EXPECT_EQ(4, hierarchy()
-                   .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "3"})
-                   ->node()
-                   .properties()
-                   .size());
+  EXPECT_EQ(5u, hierarchy()
+                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "0"})
+                    ->node()
+                    .properties()
+                    .size());
+  EXPECT_EQ(4u, hierarchy()
+                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "1"})
+                    ->node()
+                    .properties()
+                    .size());
+  EXPECT_EQ(4u, hierarchy()
+                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "2"})
+                    ->node()
+                    .properties()
+                    .size());
+  EXPECT_EQ(4u, hierarchy()
+                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "3"})
+                    ->node()
+                    .properties()
+                    .size());
   // There should be no BAR 4, so no node at this path.
   EXPECT_EQ(nullptr,
             hierarchy().GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "4"}));
-  EXPECT_EQ(4, hierarchy()
-                   .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "5"})
-                   ->node()
-                   .properties()
-                   .size());
+  EXPECT_EQ(4u, hierarchy()
+                    .GetByPath({kTestNodeName, pci::Device::Inspect::kInspectHeaderBars, "5"})
+                    ->node()
+                    .properties()
+                    .size());
 }
 
 // Test a normal capability chain
@@ -177,8 +179,8 @@ TEST_F(PciDeviceTests, StdCapabilityTest) {
   auto& dev = bus().get_device(default_bdf());
 
   // Ensure our faked Keyboard exists.
-  ASSERT_EQ(0x1af4, dev.vendor_id());
-  ASSERT_EQ(0x1052, dev.device_id());
+  ASSERT_EQ(0x1af4u, dev.vendor_id());
+  ASSERT_EQ(0x1052u, dev.device_id());
 
   // Since this is a dump of an emulated device we know it has a single MSI-X
   // capability followed by five Vendor capabilities.
@@ -201,7 +203,7 @@ TEST_F(PciDeviceTests, StdCapabilityTest) {
 TEST_F(PciDeviceTests, ExtendedCapabilityTest) {
   auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
                                kFakeQuadroDeviceConfig.max_size());
-  ASSERT_EQ(false, CURRENT_TEST_HAS_FAILURES());
+  ASSERT_EQ(false, HasNonfatalFailure());
 
   // Since this is a dump of an emulated device we that it should have:
   //
@@ -330,14 +332,14 @@ TEST_F(PciDeviceTests, DuplicateFixedCapabilityTest) {
 TEST_F(PciDeviceTests, MsiCapabilityTest) {
   auto& dev = CreateTestDevice(parent(), kFakeQuadroDeviceConfig.data(),
                                kFakeQuadroDeviceConfig.max_size());
-  ASSERT_EQ(false, CURRENT_TEST_HAS_FAILURES());
+  ASSERT_EQ(false, HasNonfatalFailure());
   ASSERT_NE(nullptr, dev.capabilities().msi);
 
   auto& msi = *dev.capabilities().msi;
-  EXPECT_EQ(0x68, msi.base());
+  EXPECT_EQ(0x68u, msi.base());
   EXPECT_EQ(static_cast<uint8_t>(Capability::Id::kMsi), msi.id());
   EXPECT_EQ(true, msi.is_64bit());
-  EXPECT_EQ(4, msi.vectors_avail());
+  EXPECT_EQ(4u, msi.vectors_avail());
   EXPECT_EQ(false, msi.supports_pvm());
 
   // MSI should be disabled by Device initialization.
@@ -349,21 +351,21 @@ TEST_F(PciDeviceTests, MsiCapabilityTest) {
 TEST_F(PciDeviceTests, MsixCapabilityTest) {
   auto& dev = CreateTestDevice(parent(), kFakeVirtioInputDeviceConfig.data(),
                                kFakeVirtioInputDeviceConfig.max_size());
-  ASSERT_EQ(false, CURRENT_TEST_HAS_FAILURES());
+  ASSERT_EQ(false, HasNonfatalFailure());
   ASSERT_NE(nullptr, dev.capabilities().msix);
 
   auto& msix = *dev.capabilities().msix;
-  EXPECT_EQ(0x98, msix.base());
+  EXPECT_EQ(0x98u, msix.base());
   EXPECT_EQ(static_cast<uint8_t>(Capability::Id::kMsiX), msix.id());
-  EXPECT_EQ(1, msix.table_bar());
-  EXPECT_EQ(0, msix.table_offset());
-  EXPECT_EQ(2, msix.table_size());
-  EXPECT_EQ(1, msix.pba_bar());
-  EXPECT_EQ(0x800, msix.pba_offset());
+  EXPECT_EQ(1u, msix.table_bar());
+  EXPECT_EQ(0u, msix.table_offset());
+  EXPECT_EQ(2u, msix.table_size());
+  EXPECT_EQ(1u, msix.pba_bar());
+  EXPECT_EQ(0x800u, msix.pba_offset());
 
   // MSI-X should be disabled by Device initialization.
   const MsixControlReg ctrl = {.value = dev.config()->Read(msix.ctrl())};
-  EXPECT_EQ(0, ctrl.enable());
+  EXPECT_EQ(0u, ctrl.enable());
 }
 
 TEST_F(PciDeviceTests, InspectIrqMode) {

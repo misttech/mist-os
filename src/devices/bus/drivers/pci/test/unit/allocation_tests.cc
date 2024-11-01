@@ -9,11 +9,12 @@
 
 #include <optional>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/bus/drivers/pci/allocation.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_allocator.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_pciroot.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace pci {
 namespace {
@@ -35,10 +36,10 @@ TEST(PciAllocationTest, BalancedAllocation) {
   {
     auto alloc1 = root_alloc.Allocate(std::nullopt, zx_system_get_page_size());
     EXPECT_TRUE(alloc1.is_ok());
-    EXPECT_EQ(1, fake_impl->allocation_eps().size());
-    auto alloc2 = root_alloc.Allocate(1024, zx_system_get_page_size());
+    EXPECT_EQ(1u, fake_impl->allocation_eps().size());
+    auto alloc2 = root_alloc.Allocate(1024u, zx_system_get_page_size());
     EXPECT_TRUE(alloc2.is_ok());
-    EXPECT_EQ(2, fake_impl->allocation_eps().size());
+    EXPECT_EQ(2u, fake_impl->allocation_eps().size());
   }
 
   // TODO(https://fxbug.dev/42108122): Rework this with the new eventpair model of GetAddressSpace
@@ -71,21 +72,23 @@ void AllocationTypeHelper(pci_address_space_t type) {
   size_t page_size = zx_system_get_page_size();
   auto root_result = root_allocator.Allocate(std::nullopt, page_size * 4);
   ASSERT_OK(root_result.status_value());
-  EXPECT_EQ(root_result->type(), type);
+  ASSERT_EQ(root_result->type(), type);
 
   PciRegionAllocator region_allocator;
   ASSERT_OK(region_allocator.SetParentAllocation(std::move(root_result.value())));
-  EXPECT_EQ(region_allocator.type(), type);
+  ASSERT_EQ(region_allocator.type(), type);
 
   auto region_allocator_result = region_allocator.Allocate(std::nullopt, page_size);
   ASSERT_OK(region_allocator_result.status_value());
-  EXPECT_EQ(region_allocator_result->type(), type);
+  ASSERT_EQ(region_allocator_result->type(), type);
 }
 
-TEST(PciAllocationTest, IoType) { ASSERT_NO_FAILURES(AllocationTypeHelper(PCI_ADDRESS_SPACE_IO)); }
+TEST(PciAllocationTest, IoType) {
+  EXPECT_NO_FATAL_FAILURE(AllocationTypeHelper(PCI_ADDRESS_SPACE_IO));
+}
 
 TEST(PciAllocationTest, MmioType) {
-  ASSERT_NO_FAILURES(AllocationTypeHelper(PCI_ADDRESS_SPACE_MEMORY));
+  EXPECT_NO_FATAL_FAILURE(AllocationTypeHelper(PCI_ADDRESS_SPACE_MEMORY));
 }
 
 // A PciRegionAllocator has no type until it is given a backing allocation and should assert.

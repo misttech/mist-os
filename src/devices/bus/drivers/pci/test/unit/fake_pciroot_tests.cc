@@ -10,24 +10,23 @@
 #include <zircon/limits.h>
 #include <zircon/syscalls/resource.h>
 
-#include <memory>
-
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/bus/drivers/pci/test/fakes/fake_pciroot.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace pci {
 
-class FakePcirootTests : public zxtest::Test {
+class FakePcirootTests : public ::testing::Test {
  protected:
   void SetUp() final { pciroot_ = FakePciroot(0, 1); }
-  auto& pciroot() { return pciroot_; }
+  FakePciroot& pciroot() { return pciroot_; }
 
  private:
   FakePciroot pciroot_;
 };
 
-TEST(FakePcirootTests, Constructor) {
+TEST_F(FakePcirootTests, Constructor) {
   uint8_t bus_start = 0;
   uint8_t bus_end = 1;
   FakePciroot pciroot(bus_start, bus_end);
@@ -93,7 +92,7 @@ TEST_F(FakePcirootTests, AllocateMsi) {
   zx_info_msi_t info{};
   ASSERT_OK(msi.get_info(ZX_INFO_MSI, &info, sizeof(info), nullptr, nullptr));
   ASSERT_EQ(info.num_irq, msi_count);
-  ASSERT_EQ(info.interrupt_count, 0);
+  ASSERT_EQ(info.interrupt_count, 0u);
   pciroot().enable_allocate_msi(false);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, pciroot().PcirootAllocateMsi(msi_count, false, &msi));
 }
