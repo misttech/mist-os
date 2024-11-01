@@ -21,7 +21,7 @@ use fuchsia_inspect::{
     ArrayProperty, InspectType, Inspector, LazyNode, Node as InspectNode, NumericProperty,
     Property, UintProperty,
 };
-use fuchsia_inspect_contrib::auto_persist::{self, AutoPersist};
+use fuchsia_inspect_auto_persist::{self as auto_persist, AutoPersist};
 use fuchsia_inspect_contrib::inspectable::{InspectableBool, InspectableU64};
 use fuchsia_inspect_contrib::log::{InspectBytes, InspectList};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 use anyhow::{format_err, Context as _, Error};
 use fuchsia_inspect::Node as InspectNode;
-use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::mpsc;
 use futures::{future, select, Future, StreamExt, TryFutureExt};
 use std::boxed::Box;
@@ -13,7 +12,7 @@ use wlan_common::bss::BssDescription;
 use {
     fidl_fuchsia_diagnostics_persist, fidl_fuchsia_metrics,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync, fuchsia_component,
-    wlan_legacy_metrics_registry as metrics,
+    fuchsia_inspect_auto_persist as auto_persist, wlan_legacy_metrics_registry as metrics,
 };
 
 mod processors;

@@ -14,7 +14,7 @@ use crate::telemetry::{self, TelemetryEvent, TelemetrySender};
 use anyhow::format_err;
 use async_trait::async_trait;
 use fuchsia_inspect::{Node as InspectNode, StringReference};
-use fuchsia_inspect_contrib::auto_persist::{self, AutoPersist};
+use fuchsia_inspect_auto_persist::{self as auto_persist, AutoPersist};
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use fuchsia_inspect_contrib::nodes::BoundedListNode as InspectBoundedListNode;

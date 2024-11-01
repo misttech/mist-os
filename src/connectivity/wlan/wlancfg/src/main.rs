@@ -13,7 +13,6 @@ use fidl_fuchsia_wlan_device_service::DeviceMonitorMarker;
 use fuchsia_async::DurationExt;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
-use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::{mpsc, oneshot};
 use futures::future::OptionFuture;
 use futures::lock::Mutex;
@@ -47,7 +46,8 @@ use wlancfg_lib::telemetry::{
 use wlancfg_lib::util;
 use {
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync,
-    fuchsia_trace_provider as ftrace_provider, wlan_trace as wtrace,
+    fuchsia_inspect_auto_persist as auto_persist, fuchsia_trace_provider as ftrace_provider,
+    wlan_trace as wtrace,
 };
 
 const REGULATORY_LISTENER_TIMEOUT_SEC: i64 = 30;

@@ -6,7 +6,6 @@ use anyhow::{format_err, Error};
 use fidl::endpoints::{ProtocolMarker, Proxy};
 use fuchsia_async::{MonotonicDuration, Task};
 use fuchsia_inspect::{Inspector, Node as InspectNode};
-use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::mpsc;
 use futures::channel::oneshot::{self, Canceled};
 use futures::{Future, FutureExt, StreamExt};
@@ -20,7 +19,8 @@ use wlan_mlme::{DriverEvent, DriverEventSink};
 use wlan_sme::serve::create_sme;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_sme as fidl_sme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, wlan_trace as wtrace,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_inspect_auto_persist as auto_persist,
+    wlan_trace as wtrace,
 };
 
 const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;

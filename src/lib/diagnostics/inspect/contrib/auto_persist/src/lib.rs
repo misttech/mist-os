@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_diagnostics_persist::PersistResult;
-
 use futures::channel::mpsc;
 use futures::{Future, StreamExt};
 use injectable_time::{MonotonicInstant, TimeSource};

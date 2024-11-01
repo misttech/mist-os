@@ -13,7 +13,6 @@ use crate::device::DeviceOps;
 use crate::mlme_main_loop::create_mlme_main_loop;
 use anyhow::bail;
 use fuchsia_inspect::Inspector;
-use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::{mpsc, oneshot};
 use futures::future::BoxFuture;
 use futures::StreamExt;
@@ -24,7 +23,7 @@ use wlan_sme::serve::create_sme;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async as fasync,
+    fuchsia_async as fasync, fuchsia_inspect_auto_persist as auto_persist,
 };
 
 #[derive(thiserror::Error, Debug)]

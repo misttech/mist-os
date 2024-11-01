@@ -5,6 +5,7 @@
 group("tests") {
   testonly = true
   deps = [
+    "auto_persist:tests",
     "rust:tests",
     "self_profiles_report:tests",
   ]
