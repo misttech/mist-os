@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use crate::TimeoutExt;
-use futures::lock::Mutex;
 use futures::prelude::*;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(target_os = "fuchsia")]
-use std::{pin::pin, task::Poll};
+use std::task::Poll;
+use std::time::Duration;
 
 // Apply the timeout from config to test
 // Ideally this would be a function like Config::with_timeout, but we need to handle Send and !Send
@@ -35,17 +34,20 @@ macro_rules! apply_timeout {
 pub trait TestResult: Sized {
     /// How to repeatedly run a test with this result in a single threaded executor.
     fn run_singlethreaded(
-        test: Arc<dyn Send + Sync + Fn(usize) -> Pin<Box<dyn Future<Output = Self>>>>,
+        test: &(dyn Sync + Fn(usize) -> Pin<Box<dyn Future<Output = Self>>>),
         cfg: Config,
     ) -> Self;
 
     /// Similarly, but use run_until_stalled
     #[cfg(target_os = "fuchsia")]
-    fn run_until_stalled<F: 'static + Fn(usize) -> Fut, Fut: 'static + Future<Output = Self>>(
-        executor: &mut crate::TestExecutor,
+    fn run_until_stalled<
+        F: 'static + Sync + Fn(usize) -> Fut,
+        Fut: 'static + Future<Output = Self>,
+    >(
+        fake_time: bool,
         test: F,
         cfg: Config,
-    ) -> Poll<Self>;
+    ) -> Self;
 
     /// Whether the result is successful.
     fn is_ok(&self) -> bool;
@@ -54,7 +56,7 @@ pub trait TestResult: Sized {
 /// Defines how to compose multiple test runs for a kind of test result in a multithreaded executor.
 pub trait MultithreadedTestResult: Sized {
     /// How to repeatedly run a test with this result in a multi threaded executor.
-    fn run<F: 'static + Send + Fn(usize) -> Fut, Fut: 'static + Send + Future<Output = Self>>(
+    fn run<F: 'static + Sync + Fn(usize) -> Fut, Fut: 'static + Send + Future<Output = Self>>(
         test: F,
         threads: usize,
         cfg: Config,
@@ -64,38 +66,38 @@ pub trait MultithreadedTestResult: Sized {
     fn is_ok(&self) -> bool;
 }
 
-impl<E: 'static + std::fmt::Debug> TestResult for Result<(), E> {
+impl<E: Send + 'static + std::fmt::Debug> TestResult for Result<(), E> {
     fn run_singlethreaded(
-        test: Arc<dyn Send + Sync + Fn(usize) -> Pin<Box<dyn Future<Output = Self>>>>,
+        test: &(dyn Sync + Fn(usize) -> Pin<Box<dyn Future<Output = Self>>>),
         cfg: Config,
     ) -> Self {
-        let run_stream = Arc::new(Mutex::new(stream::iter(0..cfg.repeat_count).fuse()));
-        let test = apply_timeout!(cfg, test);
-        cfg.in_parallel(Arc::new(move || {
-            let run_stream = run_stream.clone();
-            let test = test.clone();
-            crate::LocalExecutor::new().run_singlethreaded(async move {
-                while let Some(run) = run_stream.lock().await.next().await {
-                    if let Err(e) = test(run).await {
-                        panic!("run {} failed with error {:?}", run, e)
-                    }
-                }
-            })
-        }));
-        Ok(())
+        cfg.run(1, |run| crate::LocalExecutor::new().run_singlethreaded(test(run)))
     }
 
     #[cfg(target_os = "fuchsia")]
-    fn run_until_stalled<F: 'static + Fn(usize) -> Fut, Fut: 'static + Future<Output = Self>>(
-        executor: &mut crate::TestExecutor,
+    fn run_until_stalled<
+        F: 'static + Sync + Fn(usize) -> Fut,
+        Fut: 'static + Future<Output = Self>,
+    >(
+        fake_time: bool,
         test: F,
         cfg: Config,
-    ) -> Poll<Self> {
-        executor.run_until_stalled(
-            &mut stream::iter(0..cfg.repeat_count)
-                .map(Ok)
-                .try_for_each_concurrent(cfg.max_concurrency, apply_timeout!(cfg, test)),
-        )
+    ) -> Self {
+        let test = apply_timeout!(cfg, |run| test(run));
+        cfg.run(1, |run| {
+            let mut executor = if fake_time {
+                crate::TestExecutor::new_with_fake_time()
+            } else {
+                crate::TestExecutor::new()
+            };
+            match executor.run_until_stalled(&mut std::pin::pin!(test(run))) {
+                Poll::Ready(result) => result,
+                Poll::Pending => panic!(
+                    "Stalled without completing. Consider using \"run_singlethreaded\", or check \
+                     for a deadlock."
+                ),
+            }
+        })
     }
 
     fn is_ok(&self) -> bool {
@@ -104,16 +106,15 @@ impl<E: 'static + std::fmt::Debug> TestResult for Result<(), E> {
 }
 
 impl<E: 'static + Send> MultithreadedTestResult for Result<(), E> {
-    fn run<F: 'static + Send + Fn(usize) -> Fut, Fut: 'static + Send + Future<Output = Self>>(
+    fn run<F: 'static + Sync + Fn(usize) -> Fut, Fut: 'static + Send + Future<Output = Self>>(
         test: F,
         threads: usize,
         cfg: Config,
     ) -> Self {
-        crate::SendExecutor::new(cfg.scale_threads(threads)).run(
-            stream::iter(0..cfg.repeat_count)
-                .map(Ok)
-                .try_for_each_concurrent(cfg.max_concurrency, apply_timeout!(cfg, test)),
-        )
+        let test = apply_timeout!(cfg, |run| test(run));
+        // Fuchsia's SendExecutor actually uses an extra thread, but it doesn't do anything, so we
+        // don't count it.
+        cfg.run(threads, |run| crate::SendExecutor::new(threads).run(test(run)))
     }
 
     fn is_ok(&self) -> bool {
@@ -123,38 +124,35 @@ impl<E: 'static + Send> MultithreadedTestResult for Result<(), E> {
 
 impl TestResult for () {
     fn run_singlethreaded(
-        test: Arc<dyn Send + Sync + Fn(usize) -> Pin<Box<dyn Future<Output = Self>>>>,
+        test: &(dyn Sync + Fn(usize) -> Pin<Box<dyn Future<Output = Self>>>),
         cfg: Config,
     ) -> Self {
-        let run_stream = Arc::new(Mutex::new(stream::iter(0..cfg.repeat_count).fuse()));
-        let test = apply_timeout!(cfg, Arc::new(test));
-        cfg.in_parallel(Arc::new(move || {
-            let run_stream = run_stream.clone();
-            let test = test.clone();
-            crate::LocalExecutor::new().run_singlethreaded(async move {
-                while let Some(run) = run_stream.lock().await.next().await {
-                    test(run).await;
-                }
-            })
-        }));
+        let _ = cfg.run(1, |run| {
+            crate::LocalExecutor::new().run_singlethreaded(test(run));
+            Ok::<(), ()>(())
+        });
     }
 
     #[cfg(target_os = "fuchsia")]
-    fn run_until_stalled<F: 'static + Fn(usize) -> Fut, Fut: 'static + Future<Output = Self>>(
-        executor: &mut crate::TestExecutor,
+    fn run_until_stalled<
+        F: Sync + 'static + Fn(usize) -> Fut,
+        Fut: 'static + Future<Output = Self>,
+    >(
+        fake_time: bool,
         test: F,
         cfg: Config,
-    ) -> Poll<Self> {
-        // TODO(ctiller): figure out why this is necessary and unify the loops
-        if cfg.repeat_count == 1 {
-            let mut test = pin!(test(1));
-            executor.run_until_stalled(&mut test)
-        } else {
-            executor.run_until_stalled(
-                &mut stream::iter(0..cfg.repeat_count)
-                    .for_each_concurrent(cfg.max_concurrency, apply_timeout!(cfg, test)),
-            )
-        }
+    ) -> Self {
+        let _ = TestResult::run_until_stalled(
+            fake_time,
+            move |run| {
+                let test = test(run);
+                async move {
+                    test.await;
+                    Ok::<(), ()>(())
+                }
+            },
+            cfg,
+        );
     }
 
     fn is_ok(&self) -> bool {
@@ -163,15 +161,17 @@ impl TestResult for () {
 }
 
 impl MultithreadedTestResult for () {
-    fn run<F: 'static + Send + Fn(usize) -> Fut, Fut: 'static + Send + Future<Output = Self>>(
+    fn run<F: 'static + Sync + Fn(usize) -> Fut, Fut: 'static + Send + Future<Output = Self>>(
         test: F,
         threads: usize,
         cfg: Config,
     ) -> Self {
-        crate::SendExecutor::new(cfg.scale_threads(threads)).run(
-            stream::iter(0..cfg.repeat_count)
-                .for_each_concurrent(cfg.max_concurrency, apply_timeout!(cfg, test)),
-        )
+        // Fuchsia's SendExecutor actually uses an extra thread, but it doesn't do anything, so we
+        // don't count it.
+        let _ = cfg.run(threads, |run| {
+            crate::SendExecutor::new(threads).run(test(run));
+            Ok::<(), ()>(())
+        });
     }
 
     fn is_ok(&self) -> bool {
@@ -203,72 +203,84 @@ impl Config {
         Self { repeat_count, max_concurrency, max_threads, timeout }
     }
 
-    // Scale a hard-coded thread count by some factor to account for increased concurrency in the config.
-    fn scale_threads(&self, test_threads: usize) -> usize {
-        // We try to scale up by the maximum concurrency we'll see.
-        let scale = if self.max_concurrency == 0 {
-            // If concurrency is unbounded, we'll see a maximum of the test repetitions.
-            self.repeat_count
-        } else {
-            // Otherwise the maximum concurrency will be the lower of repeat count and the concurrency cap.
-            std::cmp::min(self.repeat_count, self.max_concurrency)
-        };
-        // Without resource constraints, we'd like to run with our test threads scaled up by the cooncurrency.
-        let desired_threads = test_threads * scale;
-        // Account for resource constraints
-        let capped_threads = if self.max_threads == 0 {
-            desired_threads
-        } else {
-            std::cmp::min(desired_threads, self.max_threads)
-        };
-        // Always run *AT LEAST* the typed in number of threads in the test definition.
-        std::cmp::max(capped_threads, test_threads)
+    fn in_parallel<E: Send>(
+        &self,
+        threads: usize,
+        f: impl Fn() -> Result<(), E> + Sync,
+    ) -> Result<(), E> {
+        std::thread::scope(|s| {
+            let mut join_handles = Vec::new();
+            for _ in 1..threads {
+                join_handles.push(s.spawn(&f));
+            }
+            let result = f();
+            if result.is_err() {
+                return result;
+            }
+            for h in join_handles {
+                match h.join() {
+                    Ok(result @ Err(_)) => return result,
+                    _ => {}
+                }
+            }
+            Ok(())
+        })
     }
 
-    fn in_parallel(&self, f: Arc<dyn 'static + Send + Sync + Fn()>) {
-        // N-1 background threads...
-        let threads: Vec<_> = std::iter::repeat_with(|| {
-            let f = f.clone();
-            std::thread::spawn(move || f())
+    fn run<E: Send>(
+        &self,
+        test_threads: usize,
+        f: impl Fn(usize) -> Result<(), E> + Sync,
+    ) -> Result<(), E> {
+        // max_concurrency is the maximum number of runs of the same test to run in parallel, but
+        // each test can run multiple threads.  max_threads is the maximum number of threads.
+        let mut threads = std::cmp::min(std::cmp::max(self.repeat_count, 1), self.max_concurrency);
+        if self.max_threads != 0 {
+            threads = std::cmp::min(threads, std::cmp::max(self.max_threads / test_threads, 1));
+        }
+        let run = AtomicUsize::new(0);
+        self.in_parallel(threads, || {
+            loop {
+                let this_run = run.fetch_add(1, Ordering::Relaxed);
+                if this_run >= self.repeat_count {
+                    return Ok(());
+                }
+                let result = f(this_run);
+                if result.is_err() {
+                    // Prevent any more runs from starting.
+                    run.store(self.repeat_count, Ordering::Relaxed);
+                    return result;
+                }
+            }
         })
-        .take(self.scale_threads(1) - 1)
-        .collect();
-        // ... and we'll consume this thread to get to N.
-        f();
-        threads.into_iter().for_each(|t| t.join().expect("worker threads should be joinable"));
     }
 }
 
 /// Runs a test in an executor, potentially repeatedly and concurrently
 pub fn run_singlethreaded_test<F, Fut, R>(test: F) -> R
 where
-    F: 'static + Send + Sync + Fn(usize) -> Fut,
+    F: 'static + Sync + Fn(usize) -> Fut,
     Fut: 'static + Future<Output = R>,
     R: TestResult,
 {
-    TestResult::run_singlethreaded(Arc::new(move |run| test(run).boxed_local()), Config::get())
+    TestResult::run_singlethreaded(&|run| test(run).boxed_local(), Config::get())
 }
 
 /// Runs a test in an executor until it's stalled
 #[cfg(target_os = "fuchsia")]
-pub fn run_until_stalled_test<F, Fut, R>(executor: &mut crate::TestExecutor, test: F) -> R
+pub fn run_until_stalled_test<F, Fut, R>(fake_time: bool, test: F) -> R
 where
-    F: 'static + Fn(usize) -> Fut,
+    F: 'static + Sync + Fn(usize) -> Fut,
     Fut: 'static + Future<Output = R>,
     R: TestResult,
 {
-    match TestResult::run_until_stalled(executor, test, Config::get()) {
-        Poll::Ready(result) => result,
-        _ => panic!(
-            "Stalled without completing. Consider using \"run_singlethreaded\", or check for a deadlock."
-        ),
-    }
+    TestResult::run_until_stalled(fake_time, test, Config::get())
 }
 
 /// Runs a test in an executor, potentially repeatedly and concurrently
 pub fn run_test<F, Fut, R>(test: F, threads: usize) -> R
 where
-    F: 'static + Send + Fn(usize) -> Fut,
+    F: 'static + Sync + Fn(usize) -> Fut,
     Fut: 'static + Send + Future<Output = R>,
     R: MultithreadedTestResult,
 {
@@ -285,26 +297,6 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn scale_threads() {
-        let cfg = |repeat_count, max_concurrency, max_threads| Config {
-            repeat_count,
-            max_concurrency,
-            max_threads,
-            timeout: None,
-        };
-        // Unbounded work should look like tests_per_thread * repeat_count
-        assert_eq!(cfg(1, 0, 0).scale_threads(1), 1);
-        assert_eq!(cfg(1, 0, 0).scale_threads(20), 20);
-        assert_eq!(cfg(30, 0, 0).scale_threads(1), 30);
-        assert_eq!(cfg(30, 0, 0).scale_threads(20), 600);
-        // Max concurrency should affect repetition count
-        assert_eq!(cfg(30, 1, 0).scale_threads(20), 20);
-        // Capping thread count should not decrease programmatic maximum
-        assert_eq!(cfg(1, 0, 5).scale_threads(10), 10);
-        assert_eq!(cfg(1, 0, 15).scale_threads(10), 10);
-    }
-
-    #[test]
     fn run_singlethreaded() {
         const REPEAT_COUNT: usize = 1000;
         const MAX_THREADS: usize = 10;
@@ -312,13 +304,13 @@ mod tests {
             Arc::new(Mutex::new((0..REPEAT_COUNT).collect()));
         let pending_runs_child = pending_runs.clone();
         TestResult::run_singlethreaded(
-            Arc::new(move |i| {
+            &move |i| {
                 let pending_runs_child = pending_runs_child.clone();
                 async move {
                     assert!(pending_runs_child.lock().await.remove(&i));
                 }
                 .boxed_local()
-            }),
+            },
             Config {
                 repeat_count: REPEAT_COUNT,
                 max_concurrency: 0,
@@ -335,12 +327,12 @@ mod tests {
     #[should_panic]
     fn run_singlethreaded_with_timeout() {
         TestResult::run_singlethreaded(
-            Arc::new(move |_| {
+            &move |_| {
                 async move {
                     futures::future::pending::<()>().await;
                 }
                 .boxed_local()
-            }),
+            },
             Config {
                 repeat_count: 1,
                 max_concurrency: 0,
@@ -357,8 +349,8 @@ mod tests {
         let pending_runs: Arc<Mutex<HashSet<_>>> =
             Arc::new(Mutex::new((0..REPEAT_COUNT).collect()));
         let pending_runs_child = pending_runs.clone();
-        match TestResult::run_until_stalled(
-            &mut crate::TestExecutor::new(),
+        TestResult::run_until_stalled(
+            false,
             move |i| {
                 let pending_runs_child = pending_runs_child.clone();
                 async move {
@@ -371,10 +363,7 @@ mod tests {
                 max_threads: 1,
                 timeout: None,
             },
-        ) {
-            std::task::Poll::Ready(()) => (),
-            _ => panic!("Expected everything stalled"),
-        }
+        );
         assert!(pending_runs.try_lock().unwrap().is_empty());
     }
 
