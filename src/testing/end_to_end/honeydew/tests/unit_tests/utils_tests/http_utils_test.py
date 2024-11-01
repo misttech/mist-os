@@ -89,6 +89,24 @@ class HttpUtilsTests(unittest.TestCase):
             ),
             (
                 {
+                    "label": "no_data",
+                    "url": _PARAMS["url"],
+                    "optional_params": {},
+                    "urlopen_resp": _MOCK_ARGS["urlopen_resp"],
+                },
+            ),
+            (
+                {
+                    "label": "skip_ssl_cert_check",
+                    "url": _PARAMS["url"],
+                    "optional_params": {
+                        "verify_ssl": False,
+                    },
+                    "urlopen_resp": _MOCK_ARGS["urlopen_resp"],
+                },
+            ),
+            (
+                {
                     "label": "all_optional_params",
                     "url": _PARAMS["url"],
                     "optional_params": {
@@ -98,6 +116,7 @@ class HttpUtilsTests(unittest.TestCase):
                         "attempts": _PARAMS["attempts"],
                         "interval": _PARAMS["interval"],
                         "exceptions_to_skip": _PARAMS["exceptions_to_skip"],
+                        "verify_ssl": False,
                     },
                     "urlopen_resp": _MOCK_ARGS["urlopen_resp"],
                 },
