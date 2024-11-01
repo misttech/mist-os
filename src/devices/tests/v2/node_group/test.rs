@@ -55,9 +55,9 @@ async fn test_nodegroup() -> Result<()> {
     let (offers_client, offers_server) = create_endpoints();
     let (pkg_client, pkg_server) = create_endpoints();
 
-    fuchsia_fs::directory::open_channel_in_namespace_deprecated(
+    fuchsia_fs::directory::open_channel_in_namespace(
         "/pkg",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         pkg_server,
     )
     .expect("Could not open /pkg");

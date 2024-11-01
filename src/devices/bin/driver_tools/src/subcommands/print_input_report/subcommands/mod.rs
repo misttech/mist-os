@@ -33,12 +33,9 @@ async fn get_all_input_device_paths(
     dev: &fio::DirectoryProxy,
 ) -> Result<impl Stream<Item = Result<PathBuf>>> {
     const INPUT_DEVICE_DIR: &str = "class/input-report";
-    let input_device_dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
-        &dev,
-        INPUT_DEVICE_DIR,
-        fio::OpenFlags::empty(),
-    )
-    .with_context(|| format!("Failed to open {}", INPUT_DEVICE_DIR))?;
+    let input_device_dir =
+        fuchsia_fs::directory::open_directory_async(&dev, INPUT_DEVICE_DIR, fio::Flags::empty())
+            .with_context(|| format!("Failed to open {}", INPUT_DEVICE_DIR))?;
     let input_device_paths = device_watcher::watch_for_files(&input_device_dir)
         .await
         .context("Failed to watch for input device /dev files")?;

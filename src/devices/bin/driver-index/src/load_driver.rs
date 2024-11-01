@@ -103,15 +103,11 @@ mod tests {
     async fn test_load_fallback_driver() {
         const DRIVER_URL: &str = "fuchsia-boot:///#meta/test-fallback-component.cm";
         let driver_url = cm_types::Url::new(DRIVER_URL).unwrap();
-        let pkg = fuchsia_fs::directory::open_in_namespace_deprecated(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
-        let manifest = fuchsia_fs::directory::open_file_deprecated(
+        let pkg = fuchsia_fs::directory::open_in_namespace("/pkg", fio::PERM_READABLE).unwrap();
+        let manifest = fuchsia_fs::directory::open_file(
             &pkg,
             "meta/test-fallback-component.cm",
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .await
         .unwrap();

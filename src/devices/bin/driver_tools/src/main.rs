@@ -33,7 +33,7 @@ impl driver_connector::DriverConnector for DriverConnector {
         if select {
             anyhow::bail!("The 'driver' tool cannot use the select flag. Please use 'ffx driver' in order to select a component.");
         }
-        fuchsia_fs::directory::open_in_namespace_deprecated("/dev", fuchsia_fs::OpenFlags::empty())
+        fuchsia_fs::directory::open_in_namespace("/dev", fuchsia_fs::Flags::empty())
             .map_err(Into::into)
     }
 

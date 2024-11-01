@@ -6,8 +6,8 @@
 // https://pcisig.com/specifications/conventional/
 use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_hardware_pci::{Address, BusMarker, BusProxy, HeaderType};
-use fuchsia_fs::directory::{dir_contains, open_in_namespace_deprecated, readdir, DirentKind};
-use fuchsia_fs::OpenFlags;
+use fuchsia_fs::directory::{dir_contains, open_in_namespace, readdir, DirentKind};
+use fuchsia_fs::PERM_READABLE;
 use lspci::bridge::Bridge;
 use lspci::device::Device;
 use lspci::filter::Filter;
@@ -128,14 +128,14 @@ async fn find_bus_containing_bdf<'a>(
 // Find 'bus' entries that correspond to fuchsia.hardware.pci services.
 async fn find_buses(path: &str) -> Result<Vec<BusProxy>, Error> {
     let mut proxies = Vec::new();
-    for dir in readdir(&open_in_namespace_deprecated(path, OpenFlags::RIGHT_READABLE)?)
+    for dir in readdir(&open_in_namespace(path, PERM_READABLE)?)
         .await?
         .into_iter()
         .filter(|entry| entry.kind == DirentKind::Directory)
     {
         let dir_name = format!("{}/{}", path, dir.name);
         let bus_name = format!("{}/bus", dir_name);
-        let dir_proxy = open_in_namespace_deprecated(&dir_name, OpenFlags::RIGHT_READABLE)?;
+        let dir_proxy = open_in_namespace(&dir_name, PERM_READABLE)?;
         if dir_contains(&dir_proxy, "bus").await? {
             let (proxy, server) = fidl::endpoints::create_proxy::<BusMarker>()?;
             match fdio::service_connect(&bus_name, server.into_channel()) {
