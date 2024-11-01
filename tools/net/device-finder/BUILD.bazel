@@ -1,0 +1,46 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+
+go_library(
+    name = "lib",
+    srcs = [
+        "cmd/common.go",
+        "cmd/dnssderrors.go",
+        "cmd/dnssdfinder.go",
+        "cmd/dnssdfinder.h",
+        "cmd/dnssdfinder_c.c",
+        "cmd/finders.go",
+        "cmd/list.go",
+        "cmd/main.go",
+        "cmd/resolve.go",
+    ],
+    cgo = True,
+    deps = [
+        "//third_party/golibs/vendor/github.com/google/subcommands",
+        "//tools/lib/color",
+        "//tools/lib/logger",
+        "//tools/net/mdns",
+        "//tools/net/netboot",
+    ],
+)
+
+go_binary(
+    name = "main",
+    embed = [":lib"],
+)
+
+go_test(
+    name = "dev_finder_tests",
+    srcs = [
+        "cmd/dev_finder_test.go",
+    ],
+    embed = [
+        ":lib",
+    ],
+    deps = [
+        "//third_party/golibs/vendor/github.com/google/go-cmp/cmp",
+    ],
+)
