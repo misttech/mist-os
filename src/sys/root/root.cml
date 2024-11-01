@@ -102,6 +102,7 @@
                 "fuchsia.sysmem.FixedProtectedMemorySize",
                 "fuchsia.sysmem.PercentContiguousMemorySize",
                 "fuchsia.sysmem.PercentProtectedMemorySize",
+                "fuchsia.ui.VisualDebuggingLevel",
                 "fuchsia.virtcon.BootAnimation",
                 "fuchsia.virtcon.BufferCount",
                 "fuchsia.virtcon.ColorScheme",

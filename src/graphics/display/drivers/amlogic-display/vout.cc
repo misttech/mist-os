@@ -64,11 +64,12 @@ Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock, 
   node_.RecordInt("vout_type", static_cast<int>(type()));
 }
 
-Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node)
+Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node, uint8_t visual_debug_level)
     : type_(VoutType::kHdmi),
       supports_hpd_(kHdmiSupportedFeatures.hpd),
       node_(std::move(node)),
-      hdmi_{.hdmi_host = std::move(hdmi_host)} {
+      hdmi_{.hdmi_host = std::move(hdmi_host)},
+      visual_debug_level_(visual_debug_level) {
   node_.RecordInt("vout_type", static_cast<int>(type()));
 }
 
@@ -142,8 +143,8 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
   return zx::ok(std::move(vout));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(fdf::Namespace& incoming,
-                                                       inspect::Node node) {
+zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(fdf::Namespace& incoming, inspect::Node node,
+                                                       uint8_t visual_debug_level) {
   zx::result<std::unique_ptr<HdmiHost>> hdmi_host_result = HdmiHost::Create(incoming);
   if (hdmi_host_result.is_error()) {
     FDF_LOG(ERROR, "Could not create HDMI host: %s", hdmi_host_result.status_string());
@@ -152,7 +153,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(fdf::Namespace& incoming,
 
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(
-      &alloc_checker, std::move(hdmi_host_result).value(), std::move(node));
+      &alloc_checker, std::move(hdmi_host_result).value(), std::move(node), visual_debug_level);
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -274,7 +275,29 @@ zx::result<> Vout::SetFrameVisibility(bool frame_visible) {
       // On HDMI video output, when the frames are invisible, the encoder
       // outputs a **green** background indicating that the display engine
       // front end is idle.
-      hdmi_.hdmi_host->ReplaceEncoderPixelColorWithGreen(!frame_visible);
+      static constexpr uint8_t kVisualDebugLevelInfoProduct = 1;
+
+      // The following values are calculated using the conversion formulas defined
+      // in the following standards:
+      //
+      // Rec. ITU-R BT.709-6, Parameter values for the HDTV1 standards for
+      // production and international programme exchange, June 2015.
+      // - Section 3 "Signal format", item 3.4 "Quantization of RGB, luminance
+      //   and colour-difference signals", page 4.
+      // - Section 3 "Signal format", item 3.5 "Derivation of luminance and
+      //   colour difference signals via quantized RGB signals", page 4.
+
+      // Black (R = 0, G = 0, B = 0) is (Y = 0, Cb = 512, Cr = 512) in YCbCr.
+      static constexpr YCbCrColor kBlack = {.y = 0, .cb = 512, .cr = 512};
+
+      // Green (R = 0, G = 128, B = 0) is (Y = 378, Cb = 339, Cr = 308) in YCbCr.
+      static constexpr YCbCrColor kGreen = {.y = 378, .cb = 339, .cr = 308};
+
+      if (visual_debug_level_ >= kVisualDebugLevelInfoProduct) {
+        hdmi_.hdmi_host->ReplaceEncoderPixelColorWithColor(!frame_visible, kGreen);
+      } else {
+        hdmi_.hdmi_host->ReplaceEncoderPixelColorWithColor(!frame_visible, kBlack);
+      }
       return zx::ok();
   }
 }

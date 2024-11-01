@@ -26,6 +26,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
+#include "src/graphics/display/drivers/amlogic-display/structured_config.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -379,7 +380,7 @@ class FakeSysmemTest : public testing::Test {
 
     InitializeTestEnvironment();
 
-    display_engine_ = std::make_unique<DisplayEngine>(incoming_);
+    display_engine_ = std::make_unique<DisplayEngine>(incoming_, structured_config::Config());
     display_engine_->SetFormatSupportCheck([](auto) { return true; });
     display_engine_->SetCanvasForTesting(std::move(endpoints.client));
 

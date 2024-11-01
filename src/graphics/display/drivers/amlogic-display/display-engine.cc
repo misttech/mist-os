@@ -1068,8 +1068,8 @@ zx_status_t DisplayEngine::SetupHotplugDisplayDetection() {
 zx_status_t DisplayEngine::InitializeHdmiVout() {
   ZX_DEBUG_ASSERT(vout_ == nullptr);
 
-  zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result =
-      Vout::CreateHdmiVout(*incoming_, root_node_.CreateChild("vout"));
+  zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result = Vout::CreateHdmiVout(
+      *incoming_, root_node_.CreateChild("vout"), structured_config_.visual_debugging_level());
   if (!create_hdmi_vout_result.is_ok()) {
     FDF_LOG(ERROR, "Failed to initialize HDMI Vout device: %s",
             create_hdmi_vout_result.status_string());
@@ -1291,18 +1291,19 @@ zx_status_t DisplayEngine::Initialize() {
   return ZX_OK;
 }
 
-DisplayEngine::DisplayEngine(std::shared_ptr<fdf::Namespace> incoming)
-    : incoming_(std::move(incoming)) {
+DisplayEngine::DisplayEngine(std::shared_ptr<fdf::Namespace> incoming,
+                             structured_config::Config structured_config)
+    : incoming_(std::move(incoming)), structured_config_(structured_config) {
   ZX_DEBUG_ASSERT(incoming_ != nullptr);
 }
 DisplayEngine::~DisplayEngine() {}
 
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
-    std::shared_ptr<fdf::Namespace> incoming) {
+    std::shared_ptr<fdf::Namespace> incoming, structured_config::Config structured_config) {
   fbl::AllocChecker alloc_checker;
-  auto display_engine =
-      fbl::make_unique_checked<DisplayEngine>(&alloc_checker, std::move(incoming));
+  auto display_engine = fbl::make_unique_checked<DisplayEngine>(&alloc_checker, std::move(incoming),
+                                                                structured_config);
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);

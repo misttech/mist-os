@@ -483,41 +483,22 @@ bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) co
   return true;
 }
 
-void HdmiHost::ReplaceEncoderPixelColorWithGreen(bool enabled) {
+void HdmiHost::ReplaceEncoderPixelColorWithColor(bool enabled, YCbCrColor color) {
   if (enabled) {
     EncoderBuiltInSelfTestModeSelection::Get()
         .FromValue(0)
         .set_mode(EncoderBuiltInSelfTestMode::kFixedColor)
         .WriteTo(&vpu_mmio_);
 
-    // Sets the 10-bit YCbCr color value that replaces the Video Input Unit
-    // output.
-    //
-    // Green (R = 0, G = 128, B = 0) is (Y = 378, Cb = 339, Cr = 308) in YCbCr.
-    //
-    // This is derived using the conversion formulas in the following standards:
-    //
-    // Rec. ITU-R BT.709-6, Parameter values for the HDTV1 standards for
-    // production and international programme exchange, June 2015.
-    // - Section 3 "Signal format", item 3.4 "Quantization of RGB, luminance
-    //   and colour-difference signals", page 4.
-    // - Section 3 "Signal format", item 3.5 "Derivation of luminance and
-    //   colour difference signals via quantized RGB signals", page 4.
-
-    static constexpr int kGreenLuminance = 378;
-    static constexpr int kGreenChrominanceBlue = 339;
-    static constexpr int kGreenChrominanceRed = 308;
-    EncoderBuiltInSelfTestFixedColorLuminance::Get()
-        .FromValue(0)
-        .set_luminance(kGreenLuminance)
-        .WriteTo(&vpu_mmio_);
+    EncoderBuiltInSelfTestFixedColorLuminance::Get().FromValue(0).set_luminance(color.y).WriteTo(
+        &vpu_mmio_);
     EncoderBuiltInSelfTestFixedColorChrominanceBlue::Get()
         .FromValue(0)
-        .set_chrominance_blue(kGreenChrominanceBlue)
+        .set_chrominance_blue(color.cb)
         .WriteTo(&vpu_mmio_);
     EncoderBuiltInSelfTestFixedColorChrominanceRed::Get()
         .FromValue(0)
-        .set_chrominance_red(kGreenChrominanceRed)
+        .set_chrominance_red(color.cr)
         .WriteTo(&vpu_mmio_);
   }
 

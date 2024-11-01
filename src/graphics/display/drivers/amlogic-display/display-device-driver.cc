@@ -29,6 +29,7 @@
 
 #include "fidl/fuchsia.driver.framework/cpp/natural_types.h"
 #include "src/graphics/display/drivers/amlogic-display/display-engine.h"
+#include "src/graphics/display/drivers/amlogic-display/structured_config.h"
 
 namespace amlogic_display {
 
@@ -61,8 +62,10 @@ DisplayDeviceDriver::CreateComponentInspector(inspect::Inspector inspector) {
 }
 
 zx::result<> DisplayDeviceDriver::Start() {
+  auto config = take_config<structured_config::Config>();
+
   zx::result<std::unique_ptr<DisplayEngine>> create_display_engine_result =
-      DisplayEngine::Create(incoming());
+      DisplayEngine::Create(incoming(), config);
   if (create_display_engine_result.is_error()) {
     FDF_LOG(ERROR, "Failed to create DisplayEngine: %s",
             create_display_engine_result.status_string());
@@ -71,6 +74,9 @@ zx::result<> DisplayDeviceDriver::Start() {
   display_engine_ = std::move(create_display_engine_result).value();
 
   InitInspectorExactlyOnce(display_engine_->inspector());
+
+  inspect::Node config_node = display_engine_->inspector().GetRoot().CreateChild("config");
+  config.RecordInspect(&config_node);
 
   // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
   // over the compatibility server.

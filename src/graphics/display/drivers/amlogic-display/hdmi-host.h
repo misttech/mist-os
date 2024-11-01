@@ -44,6 +44,13 @@ struct pll_param {
   int32_t enci_clock_divider;
 };
 
+// 10-bit YCbCr value of a color in the Rec. ITU-R BT.709-6 color space.
+struct YCbCrColor {
+  int16_t y;
+  int16_t cb;
+  int16_t cr;
+};
+
 // HdmiHost has access to the amlogic/designware HDMI block and controls its
 // operation. It also handles functions and keeps track of data that the
 // amlogic/designware block does not need to know about, including clock
@@ -90,7 +97,7 @@ class HdmiHost {
 
   // Configures the video encoder to replace the output pixels of the Video
   // Input Unit (VIU) with black pixels iff `enabled` is true.
-  void ReplaceEncoderPixelColorWithGreen(bool enabled);
+  void ReplaceEncoderPixelColorWithColor(bool enabled, YCbCrColor color);
 
  private:
   void ConfigurePll(const pll_param& pll_params);

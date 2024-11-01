@@ -20,5 +20,13 @@
         { service: "fuchsia.hardware.amlogiccanvas.Service" },
         { service: "fuchsia.hardware.gpio.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        {
+            config: "fuchsia.display.VisualDebuggingLevel",
+            from: "parent",
+            key: "visual_debugging_level",
+            type: "uint8",
+            availability: "optional",
+            default: 0,
+        },
     ],
 }
