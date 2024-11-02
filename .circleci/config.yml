@@ -5,103 +5,60 @@
 version: 2.1
 
 jobs:
-  setup:
-    docker:
-      - image: cimg/base:current
-    steps:
-      - run: sudo apt-get update && sudo apt-get install -y rsync
-      - run:
-          command: |
-            curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s .
-            export PATH=$PWD/.jiri_root/bin:$PATH
-            jiri init -analytics-opt=true
-            jiri import -name=integration flower https://github.com/misttech/integration
-            jiri -v -vv update -fetch-packages=false
-      - restore_cache:
-          name: Restore Jiri Cache
-          keys:
-            - &jiri-cache jiri-{{ checksum "integration/jiri.lock" }}
-      - run:
-          command: |
-            export PATH=$PWD/.jiri_root/bin:$PATH
-            jiri -v -vv update
-            git checkout $CIRCLE_BRANCH
-            jiri project-config --no-update=true --no-rebase=true
-      - save_cache:
-          name: Save Jiri Package Cache
-          key: *jiri-cache
-          paths:
-            - .cipd
-            - .git/jiri
-            - .jiri_root
-            - .jiri_manifest
-            - prebuilt
-      - persist_to_workspace:
-          root: .
-          paths:
-            - integration/jiri.lock
-
   build:
     docker:
       - image: cimg/base:current
 
     steps:
       - checkout
-      - attach_workspace:
-          at: .
+      - run:
+          name: Update apt
+          command: sudo apt-get update && sudo apt-get install -y rsync
+      - run:
+          name: Bootstrap Jiri
+          command: |
+            curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s .
+            export PATH=$PWD/.jiri_root/bin:$PATH
+            jiri init -analytics-opt=true
+            jiri import -name=integration flower https://github.com/misttech/integration
+      - run:
+          name: Retrieve integration/jiri.lock
+          command: |
+            mkdir -p integration
+            curl -o integration/jiri.lock "https://raw.githubusercontent.com/misttech/integration/refs/heads/main/jiri.lock"
       - restore_cache:
           name: Restore Jiri Cache
           keys:
-            - jiri-{{ checksum "integration/jiri.lock" }}
+            - &jiri-cache-v1 jiri-{{ checksum "integration/jiri.lock" }}
+            - jiri
       - run:
+          name: Update Jiri
           command: |
             export PATH=$PWD/.jiri_root/bin:$PATH
-            rm -rf integration
-            jiri import -name=integration flower https://github.com/misttech/integration
-            jiri -v -vv project-config
-            jiri -v -vv update -fetch-packages=false
+            jiri update
+            git checkout $CIRCLE_BRANCH
+          # why???
+          #jiri project-config --no-update=true --no-rebase=true
+      - save_cache:
+          name: Save Jiri Cache
+          key: *jiri-cache-v1
+          paths:
+            - .cipd
+            - .git/jiri
+            - .jiri_root
+            - .jiri_manifest
+            - prebuilt
       - run:
+          name: Build
           command: |
-            git checkout "$CIRCLE_BRANCH" 
-            echo -n "submodules=false" > build/checkout.gni
             make args gen
             NOECHO= make kernel_unit_test
-      - persist_to_workspace:
-          root: .
-          paths:
-            - out
-  test:
-    docker:
-      - image: cimg/base:current
-
-    steps:
-      - checkout
-      - attach_workspace:
-          at: .
-      - restore_cache:
-          name: Restore Jiri Cache
-          keys:
-            - jiri-{{ checksum "integration/jiri.lock" }}
       - run:
-          command: |
-            export PATH=$PWD/.jiri_root/bin:$PATH
-            rm -rf integration
-            jiri import -name=integration flower https://github.com/misttech/integration
-            jiri -v -vv update -fetch-packages=false
-      - run:
-          command: |
-            git checkout "$CIRCLE_BRANCH" 
-            NOECHO= make run_kernel_unit_test
+          name: Test
+          command: NOECHO= make kernel_unit_test
 
 workflows:
   version: 2
   build-and-test:
     jobs:
-      - setup
-      - build:
-          requires:
-            - setup
-      - test:
-          requires:
-            - setup
-            - build
+      - build
