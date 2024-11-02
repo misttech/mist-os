@@ -4,13 +4,13 @@
 
 use super::types::*;
 use super::MetadataValue;
-use crate::nodes::BoundedListNode;
+use crate::inspect_log;
+use crate::nodes::{BoundedListNode, NodeTimeExt};
 use fuchsia_inspect::{self as inspect, InspectTypeReparentable};
 use fuchsia_sync::Mutex;
-use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 pub struct MetaEventNode(inspect::Node);
 
@@ -31,89 +31,24 @@ impl Deref for MetaEventNode {
     }
 }
 
-// Data container for stats tracking of events in GraphEventsTracker.inner.buffer.
-#[derive(Debug)]
-pub struct ShadowEvent {
-    time: zx::BootInstant,
-}
-
-// Aggregate for stats tracking of events in GraphEventsTracker.inner.buffer.
-#[derive(Debug)]
-pub struct ShadowBuffer {
-    buffer: VecDeque<ShadowEvent>,
-    capacity: usize,
-}
-
-impl ShadowBuffer {
-    pub fn new(capacity: usize) -> Self {
-        Self { buffer: VecDeque::with_capacity(capacity), capacity }
-    }
-    // Add to internal vector, first trimming if it exceeds capacity.
-    pub fn add_entry(&mut self, shadow_event: ShadowEvent) {
-        if self.buffer.len() >= self.capacity {
-            self.buffer.pop_front();
-        }
-        self.buffer.push_back(shadow_event);
-    }
-    // Report history duration.
-    pub fn history_duration(&self) -> zx::BootDuration {
-        if self.buffer.len() < 2 {
-            return zx::BootDuration::ZERO;
-        }
-        self.buffer.back().unwrap().time - self.buffer.front().unwrap().time
-    }
-}
-
-// Simple container to share a mutex.
-#[derive(Debug)]
-pub struct Inner {
-    // List of events in chronological order.
-    buffer: BoundedListNode,
-    // Matching list of shadow data for each event in the write-only buffer.
-    // Digraph reads `shadow` to create lazy stats over `buffer`.
-    shadow: ShadowBuffer,
-}
-
 #[derive(Debug)]
 pub struct GraphEventsTracker {
-    // Write-only event list, and its "shadow" metadata for computing stats.
-    inner: Arc<Mutex<Inner>>,
+    buffer: Arc<Mutex<BoundedListNode>>,
 }
 
 impl GraphEventsTracker {
     pub fn new(list_node: inspect::Node, max_events: usize) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(Inner {
-                buffer: BoundedListNode::new(list_node, max_events),
-                shadow: ShadowBuffer::new(max_events),
-            })),
-        }
+        Self { buffer: Arc::new(Mutex::new(BoundedListNode::new(list_node, max_events))) }
     }
 
     pub fn for_vertex<I>(&self) -> GraphObjectEventTracker<VertexMarker<I>> {
-        GraphObjectEventTracker { inner: self.inner.clone(), _phantom: PhantomData }
-    }
-
-    // Allows closure-capture of weak reference for lazy node pattern.
-    pub fn history_duration_accessor(&self) -> HistoryDurationAccessor {
-        HistoryDurationAccessor(Arc::downgrade(&self.inner))
-    }
-}
-
-#[derive(Clone)]
-pub struct HistoryDurationAccessor(Weak<Mutex<Inner>>);
-
-impl HistoryDurationAccessor {
-    pub fn history_duration(&self) -> zx::BootDuration {
-        self.0
-            .upgrade()
-            .map_or(zx::BootDuration::ZERO, |inner| inner.lock().shadow.history_duration())
+        GraphObjectEventTracker { buffer: self.buffer.clone(), _phantom: PhantomData }
     }
 }
 
 #[derive(Debug)]
 pub struct GraphObjectEventTracker<T> {
-    inner: Arc<Mutex<Inner>>,
+    buffer: Arc<Mutex<BoundedListNode>>,
     _phantom: PhantomData<T>,
 }
 
@@ -122,42 +57,35 @@ where
     I: VertexId,
 {
     pub fn for_edge(&self) -> GraphObjectEventTracker<EdgeMarker> {
-        GraphObjectEventTracker { inner: self.inner.clone(), _phantom: PhantomData }
+        GraphObjectEventTracker { buffer: self.buffer.clone(), _phantom: PhantomData }
     }
 
     pub fn record_added(&self, id: &I, meta_event_node: MetaEventNode) {
         let meta_event_node = meta_event_node.take_node();
-        let instant = zx::BootInstant::get();
-        let mut inner = self.inner.lock();
-        inner.buffer.add_entry(|node| {
-            node.record_int("@time", instant.into_nanos());
+        self.buffer.lock().add_entry(|node| {
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "add_vertex");
             node.record_string("vertex_id", id.get_id().as_ref());
             let _ = meta_event_node.reparent(node);
             node.record(meta_event_node);
         });
-        inner.shadow.add_entry(ShadowEvent { time: instant });
     }
 
     pub fn record_removed(&self, id: &str) {
-        let instant = zx::BootInstant::get();
-        let mut inner = self.inner.lock();
-        inner.buffer.add_entry(|node| {
-            node.record_int("@time", instant.into_nanos());
-            node.record_string("event", "remove_vertex");
-            node.record_string("vertex_id", id.get_id().as_ref());
+        let mut buffer = self.buffer.lock();
+        inspect_log!(buffer, {
+            event: "remove_vertex",
+            vertex_id: id,
         });
-        inner.shadow.add_entry(ShadowEvent { time: instant });
     }
 }
 
 impl GraphObjectEventTracker<EdgeMarker> {
     pub fn record_added(&self, from: &str, to: &str, id: u64, meta_event_node: MetaEventNode) {
+        let mut buffer = self.buffer.lock();
         let meta_event_node = meta_event_node.take_node();
-        let instant = zx::BootInstant::get();
-        let mut inner = self.inner.lock();
-        inner.buffer.add_entry(|node| {
-            node.record_int("@time", instant.into_nanos());
+        buffer.add_entry(|node| {
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "add_edge");
             node.record_string("from", from);
             node.record_string("to", to);
@@ -165,18 +93,14 @@ impl GraphObjectEventTracker<EdgeMarker> {
             let _ = meta_event_node.reparent(node);
             node.record(meta_event_node);
         });
-        inner.shadow.add_entry(ShadowEvent { time: instant });
     }
 
     pub fn record_removed(&self, id: u64) {
-        let instant = zx::BootInstant::get();
-        let mut inner = self.inner.lock();
-        inner.buffer.add_entry(|node| {
-            node.record_int("@time", instant.into_nanos());
-            node.record_string("event", "remove_edge");
-            node.record_uint("edge_id", id);
+        let mut buffer = self.buffer.lock();
+        inspect_log!(buffer, {
+            event: "remove_edge",
+            edge_id: id,
         });
-        inner.shadow.add_entry(ShadowEvent { time: instant });
     }
 }
 
@@ -185,28 +109,24 @@ where
     T: GraphObject,
 {
     pub fn metadata_updated(&self, id: &T::Id, key: &str, value: &MetadataValue<'_>) {
-        let instant = zx::BootInstant::get();
-        let mut inner = self.inner.lock();
-        inner.buffer.add_entry(|node| {
-            node.record_int("@time", instant.into_nanos());
+        let mut buffer = self.buffer.lock();
+        buffer.add_entry(|node| {
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "update_key");
             node.record_string("key", key);
             value.record_inspect(node, "update");
             T::write_to_node(node, id);
         });
-        inner.shadow.add_entry(ShadowEvent { time: instant });
     }
 
     pub fn metadata_dropped(&self, id: &T::Id, key: &str) {
-        let instant = zx::BootInstant::get();
-        let mut inner = self.inner.lock();
-        inner.buffer.add_entry(|node| {
-            node.record_int("@time", instant.into_nanos());
+        let mut buffer = self.buffer.lock();
+        buffer.add_entry(|node| {
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "drop_key");
             node.record_string("key", key);
             T::write_to_node(node, id);
         });
-        inner.shadow.add_entry(ShadowEvent { time: instant });
     }
 }
 
@@ -214,34 +134,14 @@ where
 mod tests {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use fuchsia_inspect::DiagnosticsHierarchyGetter;
-
-    impl GraphEventsTracker {
-        fn shadow_buffer_len(&self) -> usize {
-            self.inner.lock().shadow.buffer.len()
-        }
-        fn shadow_time_of(&self, index: usize) -> zx::BootInstant {
-            self.inner.lock().shadow.buffer.get(index).unwrap().time
-        }
-    }
 
     #[test]
     fn tracker_starts_empty() {
         let inspector = inspect::Inspector::default();
-        let tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
+        let _tracker = GraphEventsTracker::new(inspector.root().create_child("events"), 1);
         assert_data_tree!(inspector, root: {
             events: {}
         });
-        assert_eq!(tracker.shadow_buffer_len(), 0);
-    }
-
-    fn get_time(inspector: &inspect::Inspector, path: &[&str]) -> zx::BootInstant {
-        let instant = inspector
-            .get_diagnostics_hierarchy()
-            .get_property_by_path(path)
-            .and_then(|p| p.int())
-            .unwrap();
-        zx::BootInstant::from_nanos(instant)
     }
 
     #[fuchsia::test]
@@ -264,8 +164,6 @@ mod tests {
                 }
             }
         });
-        assert_eq!(tracker.shadow_buffer_len(), 1);
-        assert_eq!(get_time(&inspector, &["events", "0", "@time"]), tracker.shadow_time_of(0));
     }
 
     #[fuchsia::test]
@@ -283,8 +181,6 @@ mod tests {
                 }
             }
         });
-        assert_eq!(tracker.shadow_buffer_len(), 1);
-        assert_eq!(get_time(&inspector, &["events", "0", "@time"]), tracker.shadow_time_of(0));
     }
 
     #[fuchsia::test]
@@ -304,8 +200,6 @@ mod tests {
                 }
             }
         });
-        assert_eq!(tracker.shadow_buffer_len(), 1);
-        assert_eq!(get_time(&inspector, &["events", "0", "@time"]), tracker.shadow_time_of(0));
     }
 
     #[fuchsia::test]
@@ -332,9 +226,6 @@ mod tests {
                 }
             }
         });
-        assert_eq!(tracker.shadow_buffer_len(), 2);
-        assert_eq!(get_time(&inspector, &["events", "0", "@time"]), tracker.shadow_time_of(0));
-        assert_eq!(get_time(&inspector, &["events", "1", "@time"]), tracker.shadow_time_of(1));
     }
 
     #[fuchsia::test]
@@ -360,8 +251,6 @@ mod tests {
                 }
             }
         });
-        assert_eq!(tracker.shadow_buffer_len(), 1);
-        assert_eq!(get_time(&inspector, &["events", "0", "@time"]), tracker.shadow_time_of(0));
     }
 
     #[fuchsia::test]
@@ -380,8 +269,6 @@ mod tests {
                 }
             }
         });
-        assert_eq!(tracker.shadow_buffer_len(), 1);
-        assert_eq!(get_time(&inspector, &["events", "0", "@time"]), tracker.shadow_time_of(0));
     }
 
     #[fuchsia::test]
@@ -402,8 +289,6 @@ mod tests {
                 }
             }
         });
-        assert_eq!(tracker.shadow_buffer_len(), 1);
-        assert_eq!(get_time(&inspector, &["events", "0", "@time"]), tracker.shadow_time_of(0));
     }
 
     #[fuchsia::test]
@@ -428,8 +313,5 @@ mod tests {
                 }
             }
         });
-        assert_eq!(tracker.shadow_buffer_len(), 2);
-        assert_eq!(get_time(&inspector, &["events", "1", "@time"]), tracker.shadow_time_of(0));
-        assert_eq!(get_time(&inspector, &["events", "2", "@time"]), tracker.shadow_time_of(1));
     }
 }

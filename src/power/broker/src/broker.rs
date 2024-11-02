@@ -2279,7 +2279,6 @@ mod tests {
                                 update: 5u64,
                             },
                         },
-                        stats: contains {},
         }}}});
     }
 
@@ -2398,7 +2397,6 @@ mod tests {
                                 update: 0u64,
                             },
                         },
-                        stats: contains {},
         }}}});
     }
 
@@ -2446,8 +2444,7 @@ mod tests {
                                 relationships: {},
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
+                        "events": contains {},
                     },
                 },
         }});
@@ -2524,8 +2521,7 @@ mod tests {
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
+                        "events": contains {},
         }}}});
 
         // Unregister token_mithril, then try to add again, which should fail.
@@ -2623,7 +2619,6 @@ mod tests {
                                 update: OFF.level as u64,
                             },
                         },
-                        stats: contains {},
                     },
         }}});
 
@@ -2685,7 +2680,6 @@ mod tests {
                                 event: "remove_vertex",
                             },
                         },
-                        stats: contains {},
         }}}});
     }
 
@@ -2922,7 +2916,6 @@ mod tests {
                             },
                         },
                         events: contains {},
-                        stats: contains {},
                     },
         }}});
 
@@ -3042,7 +3035,6 @@ mod tests {
                             }
                         },
                         */
-                        stats: contains {},
                     },
         }}});
 
@@ -3593,8 +3585,7 @@ mod tests {
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
+                        "events": contains {},
         }}}});
 
         // Drop Lease on B.
@@ -3689,8 +3680,7 @@ mod tests {
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
+                        "events": contains {},
         }}}});
     }
 
@@ -7069,8 +7059,7 @@ mod tests {
                                 },
                             },
                         },
-                        events: contains {},
-                        stats: contains {},
+                        "events": contains {},
         }}}});
     }
 
