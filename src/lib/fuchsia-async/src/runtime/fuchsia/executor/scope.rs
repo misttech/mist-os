@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/339724492): Make this API available for general use.
-#![doc(hidden)]
-
 use super::super::task::JoinHandle;
 use super::common::{Executor, Task};
 use crate::atomic_future::{AtomicFuture, CancelAndDetachResult};
@@ -27,9 +24,25 @@ use std::{fmt, hash};
 // # Public API
 //
 
-/// A unique handle to a scope.
+/// A unique handle to a task scope. Cancels the scope on drop.
 ///
-/// When this handle is dropped, the scope is cancelled.
+/// Scopes are how fuchsia-async implements [structured concurrency][sc]. Every
+/// task is spawned on a scope, and runs until either the task completes or the
+/// scope is cancelled. In addition to owning tasks, scopes may own child
+/// scopes, forming a nested structure.
+///
+/// Scopes are usually joined or cancelled when the owning code is done with
+/// them. This makes it easier to reason about when a background task might
+/// still be running. Note that in multithreaded contexts it is safer to cancel
+/// and await a scope explicitly than to drop it, because the destructor is not
+/// synchronized with other threads that might be running a task.
+///
+/// [`Task::spawn`][crate::Task::spawn] and related APIs spawn on the root scope
+/// of the executor. New code is encouraged to spawn directly on scopes instead,
+/// passing their handles as a way of documenting when a function might spawn
+/// tasks that run in the background and reasoning about their side effects.
+///
+/// [sc]: https://en.wikipedia.org/wiki/Structured_concurrency
 #[must_use]
 pub struct Scope {
     // LINT.IfChange
@@ -38,30 +51,51 @@ pub struct Scope {
 }
 
 impl Scope {
-    /// Returns a new scope that is a child of the root scope of the executor.
+    /// Return a new scope that is a child of the root scope of the executor.
     pub fn new() -> Scope {
         EHandle::local().root_scope().new_child()
     }
 
-    /// Creates a child scope.
+    /// Create a child scope.
     pub fn new_child(&self) -> Scope {
         self.inner.new_child()
     }
 
-    /// Creates a [`ScopeRef`] to this scope.
+    /// Create a [`ScopeRef`] that may be used to spawn tasks on this scope.
     pub fn make_ref(&self) -> ScopeRef {
         self.inner.clone()
     }
 
+    /// Wait for all tasks in the scope and its children to complete.
+    ///
+    /// Note that you can await a scope directly. `scope.join().await` is a more
+    /// explicit form of `scope.await`.
     pub fn join(self) -> Join {
         Join::new(self)
     }
 
+    /// Cancel all tasks in the scope and its children recursively.
+    ///
+    /// Once the returned future resolves, no task on the scope will be polled
+    /// again.
+    ///
+    /// When a scope is cancelled it immediately stops accepting tasks. Handles
+    /// of tasks spawned on the scope will pend forever.
+    ///
+    /// Dropping the `Scope` object is equivalent to calling this method and
+    /// discarding the returned future. Awaiting the future is preferred because
+    /// it eliminates the possibility of a task poll completing on another
+    /// thread after the scope object has been dropped, which can sometimes
+    /// result in surprising behavior.
     pub fn cancel(self) -> Join {
-        self.inner.cancel_all_tasks();
-        Join::new(self)
+        Join::new(self).cancel()
     }
 
+    /// Detach the scope, allowing its tasks to continue running in the
+    /// background.
+    ///
+    /// Tasks of a detached scope are still subject to join and cancel
+    /// operations on parent scopes.
     pub fn detach(self) {
         // Use ManuallyDrop to destructure self, because Rust doesn't allow this
         // for types which implement Drop.
@@ -71,6 +105,8 @@ impl Scope {
     }
 }
 
+/// Cancel the scope and all of its tasks. Prefer using the [`Scope::cancel`]
+/// or [`Scope::join`] methods.
 impl Drop for Scope {
     fn drop(&mut self) {
         // Cancel all tasks in the scope. Each task has a strong reference to the ScopeState,
@@ -86,6 +122,16 @@ impl Drop for Scope {
 }
 
 pin_project! {
+    /// Join handle for a [`Scope`].
+    ///
+    /// This is a future that resolves when all tasks on the scope are complete
+    /// or have been cancelled. It also provides access to the [`ScopeRef`]
+    /// methods, which allows spawning additional tasks on the scope. Note that
+    /// you cannot spawn tasks on a scope once [`Scope::cancel`] has been
+    /// called.
+    ///
+    /// When this object is dropped, the scope and all tasks in it are
+    /// cancelled.
     pub struct Join {
         scope: Scope,
         #[pin]
@@ -93,9 +139,27 @@ pin_project! {
     }
 }
 
+// Yes, this is functionally equivalent to a `Scope` except it is about 40 bytes larger.
 impl Join {
     fn new(scope: Scope) -> Self {
         Self { scope, waker_entry: WakerEntry::new() }
+    }
+
+    /// Cancel the scope. The future will resolve when all tasks have finished
+    /// polling.
+    ///
+    /// See [`Scope::cancel`] for more details.
+    pub fn cancel(self) -> Self {
+        self.scope.inner.cancel_all_tasks();
+        self
+    }
+
+    /// Detach the scope, allowing its tasks to continue running in the
+    /// background.
+    ///
+    /// See [`Scope::detach`] for more details.
+    pub fn detach(self) {
+        self.scope.detach();
     }
 }
 
@@ -187,7 +251,7 @@ impl ScopeRef {
         }
     }
 
-    /// Creates a child scope.
+    /// Create a child scope.
     pub fn new_child(&self) -> Scope {
         let mut state = self.lock();
         let child = ScopeRef {
@@ -201,12 +265,12 @@ impl ScopeRef {
         Scope { inner: child }
     }
 
-    /// Creates a [`WeakScopeRef`] for this scope.
+    /// Create a [`WeakScopeRef`] for this scope.
     pub fn downgrade(&self) -> WeakScopeRef {
         WeakScopeRef { inner: Arc::downgrade(&self.inner) }
     }
 
-    /// Waits for there to be no tasks.  This is racy: as soon as this returns it is possible for
+    /// Wait for there to be no tasks. This is racy: as soon as this returns it is possible for
     /// another task to have been spawned on this scope.
     pub async fn on_no_tasks(&self) {
         self.inner
@@ -215,7 +279,7 @@ impl ScopeRef {
             .await;
     }
 
-    /// Wakes all the scope's tasks so their futures will be polled again.
+    /// Wake all the scope's tasks so their futures will be polled again.
     pub fn wake_all(&self) {
         self.lock().wake_all();
     }

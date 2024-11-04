@@ -128,7 +128,7 @@ impl Task<()> {
 }
 
 impl<T: Send + 'static> Task<T> {
-    /// Spawn a new task on the current executor.
+    /// Spawn a new task on the root scope of the current executor.
     ///
     /// The task may be executed on any thread(s) owned by the current executor.
     /// See [`Task::local`] for an equivalent that ensures locality.
@@ -150,7 +150,7 @@ impl<T: Send + 'static> Task<T> {
 }
 
 impl<T: 'static> Task<T> {
-    /// Spawn a new task on the thread local executor.
+    /// Spawn a new task on the root scope of the thread local executor.
     ///
     /// The passed future will live until either (a) the future completes,
     /// (b) the returned [`Task`] is dropped while the executor is running, or

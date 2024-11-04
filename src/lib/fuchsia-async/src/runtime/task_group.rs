@@ -21,6 +21,8 @@ enum Error {
 ///
 /// Tasks can be added to this group using [`TaskGroup::add`].
 /// All pending tasks in the group can be awaited using [`TaskGroup::join`].
+///
+/// New code should prefer to use [`Scope`] instead.
 pub struct TaskGroup {
     scope: Scope,
 }

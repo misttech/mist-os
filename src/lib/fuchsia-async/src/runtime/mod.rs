@@ -36,8 +36,9 @@ pub use self::fuchsia::{
     timer::Interval,
 };
 
-// TODO(https://fxbug.dev/339724492): Make this API available for general use.
-#[doc(hidden)]
+/// Structured concurrency API for fuchsia-async.
+///
+/// See the [`Scope`] documentation for details.
 pub mod scope {
     pub use super::implementation::scope::{Scope, ScopeRef, WeakScopeRef};
 

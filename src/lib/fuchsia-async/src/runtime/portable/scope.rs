@@ -5,9 +5,6 @@
 // This implements a *very* limited version of the fuchsia Scope API.  More can be added
 // as needed.
 
-// Refer to the documentation for the fuchsia implementation.
-#![doc(hidden)]
-
 use crate::condition::Condition;
 use std::collections::HashMap;
 use std::future::{poll_fn, Future};
@@ -18,9 +15,14 @@ use std::task::{Poll, Waker};
 use std::{fmt, hash};
 use tokio::task::AbortHandle;
 
-/// A unique handle to a scope.
+/// A unique handle to a scope. When this handle is dropped, the scope is
+/// cancelled.
 ///
-/// When this handle is dropped, the scope is cancelled.
+/// See the [Fuchsia target documentation on this type][docs] for more
+/// information about scopes. This version of the Scope API is a limited subset
+/// of that API.
+///
+/// [docs]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Scope.html
 pub struct Scope {
     inner: ScopeRef,
 }

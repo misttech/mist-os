@@ -570,6 +570,9 @@ impl EHandle {
     ///
     /// This can be used to spawn tasks that live as long as the executor, and
     /// to create shorter-lived child scopes.
+    ///
+    /// Most users should create an owned scope with
+    /// [`Scope::new`][crate::Scope::new] instead of using this method.
     pub fn root_scope(&self) -> &ScopeRef {
         &self.root_scope
     }
