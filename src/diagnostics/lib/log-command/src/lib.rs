@@ -378,6 +378,8 @@ pub enum LogError {
     FidlError(#[from] fidl::Error),
     #[error(transparent)]
     FormatterError(#[from] FormatterError),
+    #[error("Deprecated flag: `{flag}`, use: `{new_flag}`")]
+    DeprecatedFlag { flag: &'static str, new_flag: &'static str },
 }
 
 /// Trait used to get available instances given a moniker query.
@@ -462,16 +464,15 @@ impl LogCommand {
         &self,
         log_settings_client: &LogSettingsProxy,
         realm_query: &impl InstanceGetter,
-        error_writer: &mut impl Write,
     ) -> Result<(), LogError> {
         if !self.select.is_empty() {
-            writeln!(error_writer, "DEPRECATED: use --set-severity instead of --select")?;
+            return Err(LogError::DeprecatedFlag { flag: "--select", new_flag: "--set-severity" });
         }
         if self.force_select {
-            writeln!(
-                error_writer,
-                "DEPRECATED: use --force-set-severity instead of --force-select"
-            )?;
+            return Err(LogError::DeprecatedFlag {
+                flag: "--force-select",
+                new_flag: "--force-set-severity",
+            });
         }
         let all_selectors = self
             .select
@@ -592,8 +593,7 @@ mod test {
 
         let mut scheduler = FuturesUnordered::new();
         scheduler.push(Either::Left(async {
-            set_interest_result =
-                Some(cmd.maybe_set_interest(&settings_proxy, &getter, &mut vec![]).await);
+            set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
@@ -637,8 +637,7 @@ ffx log --force-set-severity.
         let mut scheduler = FuturesUnordered::new();
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
         scheduler.push(Either::Left(async {
-            set_interest_result =
-                Some(cmd.maybe_set_interest(&settings_proxy, &getter, &mut vec![]).await);
+            set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
@@ -678,8 +677,7 @@ ffx log --force-set-severity.
         let mut scheduler = FuturesUnordered::new();
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
         scheduler.push(Either::Left(async {
-            set_interest_result =
-                Some(cmd.maybe_set_interest(&settings_proxy, &getter, &mut vec![]).await);
+            set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {
@@ -719,8 +717,7 @@ ffx log --force-set-severity.
         let mut scheduler = FuturesUnordered::new();
         let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>().unwrap();
         scheduler.push(Either::Left(async {
-            set_interest_result =
-                Some(cmd.maybe_set_interest(&settings_proxy, &getter, &mut vec![]).await);
+            set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
             drop(settings_proxy);
         }));
         scheduler.push(Either::Right(async {

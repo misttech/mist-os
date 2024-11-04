@@ -10,8 +10,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum LogError {
-    #[error("Failed to identify host: {:?}", error)]
-    IdentifyHostError { error: IdentifyHostError },
+    #[error("Failed to identify host: {0:?}")]
+    IdentifyHostError(IdentifyHostError),
     #[error(transparent)]
     UnknownError(#[from] anyhow::Error),
     #[error(transparent)]
@@ -26,20 +26,20 @@ pub enum LogError {
         "SDK not available, please use --symbolize off to disable symbolization. Reason: {msg}"
     )]
     SdkNotAvailable { msg: &'static str },
-    #[error("failed to connect: {:?}", error)]
-    ConnectCapabilityError { error: ConnectCapabilityError },
+    #[error("failed to connect: {0:?}")]
+    ConnectCapabilityError(ConnectCapabilityError),
     #[error(transparent)]
     IOError(#[from] std::io::Error),
     #[error("Cannot use dump with --since now")]
     DumpWithSinceNow,
     #[error("No symbolizer configuration provided")]
     NoSymbolizerConfig,
-    #[error("failed to connect to RealmQuery: {:?}", error)]
-    RealmQueryConnectionFailed { error: i32 },
     #[error(transparent)]
     SymbolizerError(#[from] ReadError),
     #[error("Daemon connection was lost and retries are disabled.")]
     DaemonRetriesDisabled,
+    #[error(transparent)]
+    LogCommand(fho::Error),
     #[error(transparent)]
     Internal(#[from] fho::Error),
 }
@@ -47,17 +47,18 @@ pub enum LogError {
 impl From<log_command::LogError> for LogError {
     fn from(value: log_command::LogError) -> Self {
         use log_command::LogError::*;
-        match value {
-            UnknownError(err) => Self::UnknownError(err),
-            NoBootTimestamp => Self::NoBootTimestamp,
-            IOError(err) => Self::IOError(err),
-            DumpWithSinceNow => Self::DumpWithSinceNow,
-            NoSymbolizerConfig => Self::NoSymbolizerConfig,
-            FfxError(err) => Self::UnknownError(err.into()),
-            Utf8Error(err) => Self::UnknownError(err.into()),
-            FidlError(err) => Self::UnknownError(err.into()),
-            FormatterError(err) => Self::FormatterError(err),
-        }
+        let err: fho::Error = match value {
+            UnknownError(err) => err.into(),
+            DumpWithSinceNow | NoBootTimestamp | NoSymbolizerConfig | DeprecatedFlag { .. } => {
+                fho::Error::User(value.into())
+            }
+            IOError(err) => fho::Error::Unexpected(err.into()),
+            FfxError(err) => err.into(),
+            Utf8Error(err) => fho::Error::Unexpected(err.into()),
+            FidlError(err) => fho::Error::Unexpected(err.into()),
+            FormatterError(err) => fho::Error::Unexpected(err.into()),
+        };
+        Self::LogCommand(err)
     }
 }
 
@@ -71,7 +72,6 @@ impl From<LogError> for fho::Error {
             DumpWithSinceNow
             | NoBootTimestamp
             | NoSymbolizerConfig
-            | RealmQueryConnectionFailed { .. }
             | IdentifyHostError { .. }
             | SdkNotAvailable { .. }
             | ConnectCapabilityError { .. } => fho::Error::User(value.into()),
@@ -82,25 +82,19 @@ impl From<LogError> for fho::Error {
             SymbolizerError(err) => fho::Error::Unexpected(err.into()),
             DaemonRetriesDisabled => fho::Error::Unexpected(value.into()),
             FormatterError(error) => fho::Error::Unexpected(error.into()),
-            Internal(error) => error,
+            Internal(error) | LogCommand(error) => error,
         }
-    }
-}
-
-impl From<i32> for LogError {
-    fn from(error: i32) -> Self {
-        Self::RealmQueryConnectionFailed { error }
     }
 }
 
 impl From<ConnectCapabilityError> for LogError {
     fn from(error: ConnectCapabilityError) -> Self {
-        Self::ConnectCapabilityError { error }
+        Self::ConnectCapabilityError(error)
     }
 }
 
 impl From<IdentifyHostError> for LogError {
     fn from(error: IdentifyHostError) -> Self {
-        LogError::IdentifyHostError { error }
+        LogError::IdentifyHostError(error)
     }
 }
