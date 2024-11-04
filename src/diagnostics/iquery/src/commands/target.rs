@@ -46,6 +46,10 @@ impl DiagnosticsProvider for ArchiveAccessorProvider {
         let realm_query_proxy = connect_realm_query().await?;
         get_accessor_selectors(&realm_query_proxy).await
     }
+
+    async fn connect_realm_query(&self) -> Result<fsys2::RealmQueryProxy, Error> {
+        crate::commands::connect_realm_query().await
+    }
 }
 
 /// Helper method to connect to both the `RealmQuery` and the `RealmExplorer`.
@@ -187,7 +191,7 @@ pub async fn connect_to_archivist(
         &directory_proxy,
         &target_property,
     )
-    .map_err(|e| Error::ConnectToArchivist(anyhow!("{:?}", e)))?;
+    .map_err(|e| Error::ConnectToProtocol("ArchiveAccessor".to_string(), anyhow!("{:?}", e)))?;
 
     Ok(proxy)
 }

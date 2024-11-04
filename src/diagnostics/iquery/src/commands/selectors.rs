@@ -29,15 +29,10 @@ pub struct SelectorsCommand {
     pub selectors: Vec<String>,
 
     #[argh(option)]
-    /// A selector specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
+    /// A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
+    /// This can be copied from the output of `ffx inspect list-accessors`.
     /// The selector will be in the form of:
     /// <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName
-    ///
-    /// Typically this is the output of `iquery list-accessors`.
-    ///
-    /// For example: `bootstrap/archivist:expose:fuchsia.diagnostics.FeedbackArchiveAccessor`
-    /// means that the command will connect to the `FeedbackArchiveAccecssor`
-    /// exposed by `bootstrap/archivist`.
     pub accessor: Option<String>,
 }
 
@@ -48,13 +43,14 @@ impl Command for SelectorsCommand {
         if self.selectors.is_empty() && self.manifest.is_none() {
             return Err(Error::invalid_arguments("Expected 1 or more selectors. Got zero."));
         }
-        let selectors = utils::get_selectors_for_manifest(
-            &self.manifest,
-            self.selectors,
-            &self.accessor,
-            provider,
-        )
-        .await?;
+
+        let selectors = if let Some(manifest) = self.manifest {
+            utils::get_selectors_for_manifest(manifest, self.selectors, &self.accessor, provider)
+                .await?
+        } else {
+            utils::process_fuzzy_inputs(self.selectors, provider).await?
+        };
+
         let selectors = utils::expand_selectors(selectors, None)?;
 
         let mut results =

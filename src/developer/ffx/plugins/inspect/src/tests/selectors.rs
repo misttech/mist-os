@@ -28,7 +28,7 @@ async fn test_selectors_no_parameters() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand { manifest: None, selectors: vec![], accessor: None };
     assert!(run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),
@@ -60,7 +60,7 @@ async fn test_selectors_with_unknown_manifest() {
         accessor: None,
     };
     assert!(run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),
@@ -99,7 +99,7 @@ async fn test_selectors_with_manifest_that_exists() {
         inspects,
     );
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec!["test/moniker1"]),
         setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         SelectorsCommand::from(cmd),
         &mut writer,
@@ -138,7 +138,7 @@ async fn test_selectors_with_selectors() {
         inspects,
     );
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         SelectorsCommand::from(cmd),
         &mut writer,

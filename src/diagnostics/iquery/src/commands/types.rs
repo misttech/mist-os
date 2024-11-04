@@ -5,6 +5,7 @@
 use crate::types::Error;
 use diagnostics_data::{Data, DiagnosticsData};
 use fidl_fuchsia_diagnostics::Selector;
+use fidl_fuchsia_sys2 as fsys2;
 use serde::Serialize;
 use std::fmt::Display;
 use std::future::Future;
@@ -26,4 +27,7 @@ pub trait DiagnosticsProvider: Send + Sync {
 
     /// Lists all ArchiveAccessor selectors.
     fn get_accessor_paths(&self) -> impl Future<Output = Result<Vec<String>, Error>>;
+
+    /// Connect to a RealmQueryProxy for component discovery for fuzzy matching components
+    fn connect_realm_query(&self) -> impl Future<Output = Result<fsys2::RealmQueryProxy, Error>>;
 }

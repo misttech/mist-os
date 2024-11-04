@@ -238,8 +238,8 @@ pub fn sanitize_string_for_selectors(node: &str) -> Cow<'_, str> {
 /// Monikers have a restricted set of characters `a-z`, `0-9`, `_`, `.`, `-`.
 /// Each moniker segment is separated by a `\`. Segments for collections also contain `:`.
 /// That `:` will be escaped.
-pub fn sanitize_moniker_for_selectors(moniker: &str) -> String {
-    moniker.replace(":", "\\:")
+pub fn sanitize_moniker_for_selectors(moniker: impl AsRef<str>) -> String {
+    moniker.as_ref().replace(":", "\\:")
 }
 
 fn match_moniker_against_component_selector<I, S>(

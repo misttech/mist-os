@@ -29,7 +29,7 @@ async fn test_list_empty() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),
@@ -60,7 +60,7 @@ async fn test_list_with_data() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ListCommand { manifest: None, with_url: false, accessor: None };
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),
@@ -94,7 +94,7 @@ async fn test_list_with_data_with_url() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ListCommand { manifest: None, with_url: true, accessor: None };
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
             params,
             expected_responses.clone(),

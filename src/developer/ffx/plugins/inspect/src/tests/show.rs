@@ -21,7 +21,7 @@ async fn test_show_no_parameters() {
     let inspect_data =
         inspect_accessor_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
@@ -53,7 +53,7 @@ async fn test_show_unknown_manifest() {
     let inspect_data =
         inspect_accessor_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
     assert!(run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         ShowCommand::from(cmd),
         &mut writer
@@ -90,7 +90,7 @@ async fn test_show_with_manifest_that_exists() {
         inspects.clone(),
     );
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec!["test/moniker1"]),
         setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
@@ -125,7 +125,7 @@ async fn test_show_with_selectors_with_no_data() {
         vec![],
     );
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,
@@ -160,7 +160,7 @@ async fn test_show_with_selectors_with_data() {
         inspects.clone(),
     );
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![lifecycle_data, inspect_data]),
         ShowCommand::from(cmd),
         &mut writer,

@@ -166,17 +166,13 @@ impl DiagnosticsProvider for HostArchiveReader {
     }
 
     async fn get_accessor_paths(&self) -> Result<Vec<String>, Error> {
-        let query_proxy = connect_realm_query(&self.rcs_proxy).await?;
+        let query_proxy = self.connect_realm_query().await?;
         get_accessor_selectors(&query_proxy).await
     }
-}
 
-/// Connect to Root `RealmExplorer` and Root `RealmQuery` with the provided `RemoteControlProxy`.
-async fn connect_realm_query(
-    rcs_proxy: &RemoteControlProxy,
-) -> Result<fsys2::RealmQueryProxy, Error> {
-    let realm_query_proxy = rcs::root_realm_query(rcs_proxy, std::time::Duration::from_secs(15))
-        .await
-        .map_err(|e| Error::IOError("create realm query proxy".into(), e.into()))?;
-    Ok(realm_query_proxy)
+    async fn connect_realm_query(&self) -> Result<fsys2::RealmQueryProxy, Error> {
+        rcs::root_realm_query(&self.rcs_proxy, std::time::Duration::from_secs(15))
+            .await
+            .map_err(|e| Error::ConnectToProtocol("RemoteControlProxy (host)".to_string(), e))
+    }
 }

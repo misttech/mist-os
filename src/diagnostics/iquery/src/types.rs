@@ -33,14 +33,17 @@ pub enum Error {
     #[error("Error while communicating with {0}: {1}")]
     CommunicatingWith(String, #[source] anyhow::Error),
 
-    #[error("Failed to connect to archivst: {0}")]
-    ConnectToArchivist(#[source] anyhow::Error),
+    #[error("Failed to connect to {0}: {1}")]
+    ConnectToProtocol(String, #[source] anyhow::Error),
 
     #[error("IO error. Failed to {0}: {1}")]
     IOError(String, #[source] anyhow::Error),
 
     #[error("No running component was found whose URL contains the given string: {0}")]
     ManifestNotFound(String),
+
+    #[error("No running components were found matching {0}")]
+    SearchParameterNotFound(String),
 
     #[error("Invalid selector: {0}")]
     InvalidSelector(String),
@@ -71,6 +74,19 @@ pub enum Error {
 
     #[error("Must be exact protocol (protocol cannot contain wildcards)")]
     MustBeExactProtocol,
+
+    #[error(transparent)]
+    FuzzyMatchRealmQuery(anyhow::Error),
+
+    #[error(
+        "Fuzzy matching failed due to too many matches, please re-try with one of these: {0:?}"
+    )]
+    FuzzyMatchTooManyMatches(Vec<String>),
+
+    #[error(
+        "hint: selectors paired with --manifest must not include component selector segment: {0}"
+    )]
+    PartialSelectorHint(#[source] selectors::Error),
 }
 
 impl From<ConnectCapabilityError> for Error {
