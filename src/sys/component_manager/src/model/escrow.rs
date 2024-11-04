@@ -5,7 +5,8 @@
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use fasync::{Task, TaskGroup};
+use cm_util::TaskGroup;
+use fasync::Task;
 use fidl::endpoints::{create_proxy, ServerEnd};
 use futures::channel::{mpsc, oneshot};
 use futures::{select, FutureExt, StreamExt};
@@ -76,7 +77,7 @@ impl Actor {
     ///
     /// Also returns a task owning and running the actor. The task should
     /// typically be run in a non-blocking task group of the component.
-    pub fn new(starter: impl Start + Send + Sync + 'static) -> (Actor, fasync::Task<()>) {
+    pub fn new(scope: &TaskGroup, starter: impl Start + Send + Sync + 'static) -> Actor {
         let (sender, receiver) = mpsc::unbounded();
         let (client, server) = create_proxy::<fio::DirectoryMarker>().unwrap();
         let escrow = EscrowedState { outgoing_dir: server, escrowed_dictionary: None };
@@ -86,9 +87,9 @@ impl Actor {
             outgoing_dir: outgoing_dir.clone(),
             nonblocking_start_task: TaskGroup::new(),
         };
-        let task = fasync::Task::spawn(actor.run(escrow, receiver));
+        scope.spawn(actor.run(escrow, receiver));
         let handle = Actor { sender, outgoing_dir };
-        (handle, task)
+        handle
     }
 
     /// Stores some state on behalf of the component and starts the component if
@@ -284,8 +285,9 @@ mod tests {
 
     use assert_matches::assert_matches;
     use async_trait::async_trait;
+    use cm_util::TaskGroup;
     use fidl_fuchsia_io as fio;
-    use fuchsia_async::{self as fasync, TaskGroup, TestExecutor};
+    use fuchsia_async::{self as fasync, TestExecutor};
     use futures::channel::mpsc;
     use futures::lock::Mutex;
     use futures::StreamExt;
@@ -319,9 +321,8 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     #[should_panic(expected = "double start")]
     async fn double_start() {
-        let mut task_group = TaskGroup::new();
-        let (actor, task) = Actor::new(MustNotStart);
-        task_group.add(task);
+        let task_group = TaskGroup::new();
+        let actor = Actor::new(&task_group, MustNotStart);
 
         _ = actor.will_start().await;
         _ = actor.will_start().await;
@@ -331,9 +332,8 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     #[should_panic(expected = "double stop")]
     async fn double_stop() {
-        let mut task_group = TaskGroup::new();
-        let (actor, task) = Actor::new(MustNotStart);
-        task_group.add(task);
+        let task_group = TaskGroup::new();
+        let actor = Actor::new(&task_group, MustNotStart);
 
         _ = actor.will_start().await;
         _ = actor.did_stop(None);
@@ -348,14 +348,15 @@ mod tests {
 
     /// Creates an `Actor` that owns a `MockStart` and uses it to start the component.
     fn new_mock_start_actor(
+        task_group: &TaskGroup,
         start_tx: mpsc::UnboundedSender<(StartReason, EscrowedState)>,
-    ) -> (fasync::Task<()>, Arc<Actor>) {
+    ) -> Arc<Actor> {
         let mock_start = MockStart { start_tx, actor: Mutex::new(None) };
         let mock_start = Arc::new(mock_start);
-        let (actor, task) = Actor::new(mock_start.clone());
+        let actor = Actor::new(task_group, mock_start.clone());
         let actor = Arc::new(actor);
         *mock_start.actor.try_lock().unwrap() = Some(Arc::downgrade(&actor));
-        (task, actor)
+        actor
     }
 
     #[async_trait]
@@ -375,10 +376,9 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn open_outgoing_while_stopped() {
-        let mut task_group = TaskGroup::new();
+        let task_group = TaskGroup::new();
         let (start_tx, mut start_rx) = mpsc::unbounded();
-        let (task, actor) = new_mock_start_actor(start_tx);
-        task_group.add(task);
+        let actor = new_mock_start_actor(&task_group, start_tx);
 
         let (_, server_end) = zx::Channel::create();
 
@@ -407,10 +407,9 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn open_outgoing_while_running() {
-        let mut task_group = TaskGroup::new();
+        let task_group = TaskGroup::new();
         let (start_tx, mut start_rx) = mpsc::unbounded();
-        let (task, actor) = new_mock_start_actor(start_tx);
-        task_group.add(task);
+        let actor = new_mock_start_actor(&task_group, start_tx);
 
         let escrow = actor.will_start().await;
         assert!(escrow.is_some());
@@ -442,10 +441,9 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn open_outgoing_before_stopped() {
-        let mut task_group = TaskGroup::new();
+        let task_group = TaskGroup::new();
         let (start_tx, mut start_rx) = mpsc::unbounded();
-        let (task, actor) = new_mock_start_actor(start_tx);
-        task_group.add(task);
+        let actor = new_mock_start_actor(&task_group, start_tx);
 
         let escrow = actor.will_start().await;
         assert!(escrow.is_some());
@@ -478,10 +476,9 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn open_outgoing_after_stopped() {
-        let mut task_group = TaskGroup::new();
+        let task_group = TaskGroup::new();
         let (start_tx, mut start_rx) = mpsc::unbounded();
-        let (task, actor) = new_mock_start_actor(start_tx);
-        task_group.add(task);
+        let actor = new_mock_start_actor(&task_group, start_tx);
 
         let escrow = actor.will_start().await;
         assert!(escrow.is_some());
@@ -512,9 +509,8 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn stop_without_escrow() {
-        let mut task_group = TaskGroup::new();
-        let (actor, task) = Actor::new(MustNotStart);
-        task_group.add(task);
+        let task_group = TaskGroup::new();
+        let actor = Actor::new(&task_group, MustNotStart);
 
         let escrow = actor.will_start().await;
         let (client_end, server_end) = zx::Channel::create();
@@ -578,12 +574,11 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn start_failed_before_reaping_escrow() {
-        let mut task_group = TaskGroup::new();
+        let task_group = TaskGroup::new();
         let (start_tx, mut start_rx) = mpsc::unbounded();
         let (result_tx, result_rx) = mpsc::unbounded();
-        let (actor, task) =
-            Actor::new(BlockingStart { start_tx, result_rx: Mutex::new(result_rx) });
-        task_group.add(task);
+        let actor =
+            Actor::new(&task_group, BlockingStart { start_tx, result_rx: Mutex::new(result_rx) });
 
         let (client_end, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
@@ -615,12 +610,11 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn start_failed_after_reaping_escrow() {
-        let mut task_group = TaskGroup::new();
+        let task_group = TaskGroup::new();
         let (start_tx, mut start_rx) = mpsc::unbounded();
         let (result_tx, result_rx) = mpsc::unbounded();
-        let (actor, task) =
-            Actor::new(BlockingStart { start_tx, result_rx: Mutex::new(result_rx) });
-        task_group.add(task);
+        let actor =
+            Actor::new(&task_group, BlockingStart { start_tx, result_rx: Mutex::new(result_rx) });
 
         let (_, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();

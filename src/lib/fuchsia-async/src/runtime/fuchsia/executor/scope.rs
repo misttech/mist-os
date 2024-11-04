@@ -141,11 +141,19 @@ pub struct ScopeRef {
 }
 
 impl ScopeRef {
-    /// Spawns a task on the scope.
+    /// Spawn a new task on the scope.
     // This does not have the must_use attribute because it's common to detach and the lifetime of
     // the task is bound to the scope: when the scope is dropped, the task will be cancelled.
     pub fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
         JoinHandle::new(self.clone(), self.executor().spawn(self, AtomicFuture::new(future, false)))
+    }
+
+    /// Spawn a new task on the scope of a thread local executor.
+    ///
+    /// NOTE: This is not supported with a [`SendExecutor`][crate::SendExecutor]
+    /// and will cause a runtime panic. Use [`ScopeRef::spawn`] instead.
+    pub fn spawn_local(&self, future: impl Future<Output = ()> + 'static) -> JoinHandle<()> {
+        JoinHandle::new(self.clone(), self.executor().spawn_local(self, future, false))
     }
 
     /// Like `spawn`, but for tasks that return a result.  NOTE: Unlike `spawn`, when tasks are
@@ -156,6 +164,18 @@ impl ScopeRef {
     ) -> crate::Task<T> {
         JoinHandle::new(self.clone(), self.executor().spawn(self, AtomicFuture::new(future, false)))
             .into()
+    }
+
+    /// Like `spawn`, but for tasks that return a result.  NOTE: Unlike `spawn`, when tasks are
+    /// dropped, the future will be *cancelled*.
+    ///
+    /// NOTE: This is not supported with a [`SendExecutor`][crate::SendExecutor]
+    /// and will cause a runtime panic. Use [`ScopeRef::spawn`] instead.
+    pub fn compute_local<T: 'static>(
+        &self,
+        future: impl Future<Output = T> + 'static,
+    ) -> crate::Task<T> {
+        JoinHandle::new(self.clone(), self.executor().spawn_local(self, future, false)).into()
     }
 
     pub(super) fn root(executor: Arc<Executor>) -> ScopeRef {

@@ -273,7 +273,7 @@ fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
                 } => {
                     assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
                     let state_clone = state.clone();
-                    task_group.add(fasync::Task::local(async move {
+                    task_group.local(async move {
                         handle_open_capability(
                             &moniker,
                             &capability_name,
@@ -281,7 +281,7 @@ fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
                             state_clone,
                         )
                         .await
-                    }));
+                    });
                     responder.send(Ok(())).unwrap();
                 }
                 RemoteControlRequest::IdentifyHost { responder } => {

@@ -416,12 +416,7 @@ pub fn run_proxy_thread(
             while let Ok((proxy, events)) = new_proxies.recv().await {
                 let bytes_clone = bounce_bytes.clone();
                 let handles_clone = bounce_handles.clone();
-                tasks.add(fasync::Task::local(start_proxy(
-                    proxy,
-                    events,
-                    bytes_clone,
-                    handles_clone,
-                )));
+                tasks.local(start_proxy(proxy, events, bytes_clone, handles_clone));
             }
         });
     });
