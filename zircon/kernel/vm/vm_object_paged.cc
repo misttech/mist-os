@@ -63,6 +63,10 @@ VmObjectPaged::~VmObjectPaged() {
     return;
   }
 
+  DestructorHelper();
+}
+
+void VmObjectPaged::DestructorHelper() {
   RemoveFromGlobalList();
 
   if (options_ & kAlwaysPinned) {
@@ -85,6 +89,7 @@ VmObjectPaged::~VmObjectPaged() {
     // a reference.
     DEBUG_ASSERT(root_ref);
     if (likely(root_ref != this)) {
+      AssertHeld(root_ref->lock_ref());
       VmObjectPaged* removed = root_ref->reference_list_.erase(*this);
       DEBUG_ASSERT(removed == this);
     } else {
@@ -108,6 +113,7 @@ VmObjectPaged::~VmObjectPaged() {
     DEBUG_ASSERT(cow_pages_locked()->get_paged_backlink_locked() == nullptr);
     VmObjectPaged* paged_backlink = reference_list_.pop_front();
     cow_pages_locked()->set_paged_backlink_locked(paged_backlink);
+    AssertHeld(paged_backlink->lock_ref());
     paged_backlink->reference_list_.splice(paged_backlink->reference_list_.end(), reference_list_);
   }
   DEBUG_ASSERT(reference_list_.is_empty());
@@ -118,8 +124,10 @@ VmObjectPaged::~VmObjectPaged() {
     VmObject* c = &children_list_.front();
     children_list_.pop_front();
     VmObjectPaged* child = reinterpret_cast<VmObjectPaged*>(c);
+    AssertHeld(child->lock_ref());
     child->parent_ = parent_;
     if (parent_) {
+      AssertHeld(parent_->lock_ref());
       // Ignore the return since 'this' is a child so we know we are not transitioning from 0->1
       // children.
       [[maybe_unused]] bool notify = parent_->AddChildLocked(child);
@@ -128,13 +136,14 @@ VmObjectPaged::~VmObjectPaged() {
   }
 
   if (parent_) {
+    AssertHeld(parent_->lock_ref());
     // As parent_ is a raw pointer we must ensure that if we call a method on it that it lives long
     // enough. To do so we attempt to upgrade it to a refptr, which could fail if it's already
     // slated for deletion.
     fbl::RefPtr<VmObjectPaged> parent = fbl::MakeRefPtrUpgradeFromRaw(parent_, guard);
     if (parent) {
       // Holding refptr, can safely pass in the guard to RemoveChild.
-      parent->RemoveChild(this, guard.take());
+      parent_->RemoveChild(this, guard.take());
       // As we constructed a RefPtr to our parent, and we are in our own destructor, there is now
       // the potential for recursive destruction if we need to delete the parent due to holding the
       // last ref, hit this same path, etc.
