@@ -131,7 +131,7 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
         properties.emplace_back(fdf::MakeProperty(arena, key, value.data.enum_val));
         break;
       default:
-        FDF_LOGL(ERROR, logger, "Unsupported property type, key: %s", key);
+        logger.log(fdf::ERROR, "Unsupported property type, key: {}", key);
         break;
     }
   }
@@ -182,8 +182,8 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
 
 Device::~Device() {
   if (!children_.empty()) {
-    FDF_LOGL(WARNING, *logger_, "%s: Destructing device, but still had %lu children", Name(),
-             children_.size());
+    logger_->log(fdf::WARN, "{}: Destructing device, but still had {} children", Name(),
+                 children_.size());
     // Ensure we do not get use-after-free from calling child_pre_release
     // on a destructed parent device.
     children_.clear();
@@ -414,14 +414,14 @@ zx_status_t Device::ExportAfterInit() {
   }
   if (zx_status_t status = device_server_.Serve(dispatcher_, &driver()->outgoing());
       status != ZX_OK) {
-    FDF_LOGL(INFO, *logger_, "Device %s failed to add to outgoing directory: %s",
-             OutgoingName().c_str(), zx_status_get_string(status));
+    logger_->log(fdf::INFO, "Device {} failed to add to outgoing directory: {}", OutgoingName(),
+                 zx::make_result(status));
     return status;
   }
 
   if (zx_status_t status = CreateNode(); status != ZX_OK) {
-    FDF_LOGL(ERROR, *logger_, "Device %s: failed to create node: %s", OutgoingName().c_str(),
-             zx_status_get_string(status));
+    logger_->log(fdf::ERROR, "Device {}: failed to create node: {}", OutgoingName(),
+                 zx::make_result(status));
     return status;
   }
 
@@ -487,8 +487,8 @@ zx_status_t Device::CreateNode() {
             // TODO(https://fxbug.dev/42051188): We currently do not remove the DFv1 child
             // if the NodeController is removed but the driver didn't ask to be
             // removed. We need to investigate the correct behavior here.
-            FDF_LOGL(INFO, ptr->logger(), "Device %s has its NodeController unexpectedly removed",
-                     (ptr)->OutgoingName().c_str());
+            ptr->logger().log(fdf::INFO, "Device {} has its NodeController unexpectedly removed",
+                              (ptr)->OutgoingName());
           }
         }
         completer.complete_ok();
@@ -507,11 +507,11 @@ zx_status_t Device::CreateNode() {
 
   if (!parent_.value()->node_.is_valid()) {
     if (parent_.value()->device_flags_ & DEVICE_ADD_NON_BINDABLE) {
-      FDF_LOGL(ERROR, *logger_, "Cannot add device, as parent '%s' does not have a valid node",
-               (*parent_)->OutgoingName().c_str());
+      logger_->log(fdf::ERROR, "Cannot add device, as parent '{}' does not have a valid node",
+                   (*parent_)->OutgoingName());
     } else {
-      FDF_LOGL(ERROR, *logger_, "Cannot add device, as parent '%s' is not marked NON_BINDABLE.",
-               (*parent_)->OutgoingName().c_str());
+      logger_->log(fdf::ERROR, "Cannot add device, as parent '{}' is not marked NON_BINDABLE.",
+                   (*parent_)->OutgoingName());
     }
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -519,8 +519,8 @@ zx_status_t Device::CreateNode() {
   // Set up devfs information.
   {
     if (!devfs_connector_.has_value() || !devfs_controller_connector_.has_value()) {
-      FDF_LOGL(ERROR, *logger_, "Device %s failed to add to devfs: no devfs_connector",
-               OutgoingName().c_str());
+      logger_->log(fdf::ERROR, "Device {} failed to add to devfs: no devfs_connector",
+                   OutgoingName());
       return ZX_ERR_INTERNAL;
     }
 
@@ -534,15 +534,15 @@ zx_status_t Device::CreateNode() {
 
     zx::result connector = devfs_connector_.value().Bind(dispatcher());
     if (connector.is_error()) {
-      FDF_LOGL(ERROR, *logger_, "Device %s failed to create devfs connector: %s",
-               OutgoingName().c_str(), connector.status_string());
+      logger_->log(fdf::ERROR, "Device {} failed to create devfs connector: {}", OutgoingName(),
+                   connector);
       return connector.error_value();
     }
 
     zx::result controller_connector = devfs_controller_connector_.value().Bind(dispatcher());
     if (controller_connector.is_error()) {
-      FDF_LOGL(ERROR, *logger_, "Device %s failed to create devfs controller_connector: %s",
-               OutgoingName().c_str(), controller_connector.status_string());
+      logger_->log(fdf::ERROR, "Device {} failed to create devfs controller_connector: {}",
+                   OutgoingName(), controller_connector);
       return controller_connector.error_value();
     }
     auto devfs_args = fdf::wire::DevfsAddArgs::Builder(arena)
@@ -560,8 +560,7 @@ zx_status_t Device::CreateNode() {
       zx::vmo inspect;
       zx_status_t status = inspect_vmo_->duplicate(ZX_RIGHT_SAME_RIGHTS, &inspect);
       if (status != ZX_OK) {
-        FDF_LOGL(ERROR, *logger_, "Failed to duplicate inspect vmo: %s",
-                 zx_status_get_string(status));
+        logger_->log(fdf::ERROR, "Failed to duplicate inspect vmo: {}", zx::make_result(status));
       } else {
         devfs_args.inspect(std::move(inspect));
       }
@@ -600,20 +599,20 @@ zx_status_t Device::CreateNode() {
             if (auto error = std::get_if<zx_status_t>(&result.error()); error) {
               if (*error == ZX_ERR_PEER_CLOSED) {
                 // This is a warning because it can happen during shutdown.
-                FDF_LOGL(WARNING, *logger_, "%s: Node channel closed while adding device", Name());
+                logger_->log(fdf::WARN, "{}: Node channel closed while adding device", Name());
               } else {
-                FDF_LOGL(ERROR, *logger_, "Failed to add device: %s: status: %s", Name(),
-                         zx_status_get_string(*error));
+                logger_->log(fdf::ERROR, "Failed to add device: {}: status: {}", Name(),
+                             zx::make_result(*error));
               }
             } else if (auto error = std::get_if<fdf::NodeError>(&result.error()); error) {
               if (*error == fdf::NodeError::kNodeRemoved) {
                 // This is a warning because it can happen if the parent driver is unbound while we
                 // are still setting up.
-                FDF_LOGL(WARNING, *logger_, "Failed to add device '%s' while parent was removed",
-                         Name());
+                logger_->log(fdf::WARN, "Failed to add device '{}' while parent was removed",
+                             Name());
               } else {
-                FDF_LOGL(ERROR, *logger_, "Failed to add device: NodeError: '%s': %u", Name(),
-                         static_cast<unsigned int>(*error));
+                logger_->log(fdf::ERROR, "Failed to add device: NodeError: '{}': {}", Name(),
+                             static_cast<unsigned int>(*error));
               }
             }
           })
@@ -699,8 +698,8 @@ fpromise::promise<void> Device::Remove() {
         // to the protocol, because that means we are already in the process
         // of shutting down.
         if (!result.ok() && !result.is_canceled()) {
-          FDF_LOGL(ERROR, *device->logger_, "Failed to remove device '%s': %s", device->Name(),
-                   result.FormatDescription().data());
+          device->logger_->log(fdf::ERROR, "Failed to remove device '{}': {}", device->Name(),
+                               result.error());
         }
       }));
   return finished_bridge.consumer.promise();
@@ -781,7 +780,7 @@ zx_status_t Device::GetProtocol(uint32_t proto_id, void* out) const {
 
   if (!device_server_.has_banjo_config()) {
     if (driver_ == nullptr) {
-      FDF_LOGL(ERROR, *logger_, "Driver is null");
+      logger_->log(fdf::ERROR, "Driver is null");
       return ZX_ERR_BAD_STATE;
     }
 
@@ -811,7 +810,7 @@ zx_status_t Device::GetProtocol(uint32_t proto_id, void* out) const {
 
 zx_status_t Device::GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out) {
   if (driver() == nullptr) {
-    FDF_LOGL(ERROR, *logger_, "Driver is null");
+    logger_->log(fdf::ERROR, "Driver is null");
     return ZX_ERR_BAD_STATE;
   }
 
@@ -856,8 +855,8 @@ void Device::InitReply(zx_status_t status) {
             // exported.
             status = ExportAfterInit();
             if (status != ZX_OK) {
-              FDF_LOGL(WARNING, *logger_, "Device %s failed to create node: %s",
-                       OutgoingName().c_str(), zx_status_get_string(status));
+              logger_->log(fdf::WARN, "Device {} failed to create node: {}", OutgoingName(),
+                           zx::make_result(status));
             }
           }
 
@@ -919,9 +918,9 @@ zx_status_t Device::ConnectFragmentFidl(const char* fragment_name, const char* s
       }
     }
     if (!fragment_exists) {
-      FDF_LOGL(ERROR, *logger_,
-               "Tried to connect to fragment '%s' but it's not in the fragment list",
-               fragment_name);
+      logger_->log(fdf::ERROR,
+                   "Tried to connect to fragment '{}' but it's not in the fragment list",
+                   fragment_name);
       return ZX_ERR_NOT_FOUND;
     }
   }
@@ -932,7 +931,7 @@ zx_status_t Device::ConnectFragmentFidl(const char* fragment_name, const char* s
   auto result = component::internal::ConnectAtRaw(driver_->driver_namespace().svc_dir(),
                                                   std::move(request), protocol_path.c_str());
   if (result.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Error connecting: %s", result.status_string());
+    logger_->log(fdf::ERROR, "Error connecting: {}", result);
     return result.status_value();
   }
 
@@ -951,7 +950,7 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
   auto composite_node_manager =
       driver_->driver_namespace().Connect<fuchsia_driver_framework::CompositeNodeManager>();
   if (composite_node_manager.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Error connecting: %s", composite_node_manager.status_string());
+    logger_->log(fdf::ERROR, "Error connecting: {}", composite_node_manager);
     return composite_node_manager.status_value();
   }
 
@@ -972,7 +971,7 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
 
   auto result = fidl::WireCall(*composite_node_manager)->AddSpec(std::move(fidl_spec));
   if (result.status() != ZX_OK) {
-    FDF_LOGL(ERROR, *logger_, "Error calling connect fidl: %s", result.status_string());
+    logger_->log(fdf::ERROR, "Error calling connect fidl: {}", result.error());
     return result.status();
   }
 
@@ -1005,7 +1004,7 @@ zx_status_t Device::PublishInspect(zx::vmo inspect_vmo) {
   zx::vmo publishable;
   auto status = inspect_vmo_->duplicate(ZX_RIGHT_SAME_RIGHTS, &publishable);
   if (status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Device %s failed to duplicate vmo", OutgoingName().c_str());
+    logger_->log(fdf::ERROR, "Device {} failed to duplicate vmo", OutgoingName());
     return status;
   }
 
@@ -1025,7 +1024,7 @@ void Device::AddDelayedChildReleaseOp(std::unique_ptr<DelayedReleaseOp> op) {
 }
 
 void Device::LogError(const char* error) {
-  FDF_LOGL(ERROR, *logger_, "%s: %s", OutgoingName().c_str(), error);
+  logger_->log(fdf::ERROR, "{}: {}", OutgoingName(), error);
 }
 bool Device::IsUnbound() { return pending_removal_; }
 

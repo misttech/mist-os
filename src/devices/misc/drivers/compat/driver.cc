@@ -355,14 +355,14 @@ Driver::~Driver() {
 void Driver::Start(fdf::StartCompleter completer) {
   zx::result loader_vmo = LoadVmo(*incoming(), kLibDriverPath, kOpenFlags);
   if (loader_vmo.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Failed to open loader vmo: %s", loader_vmo.status_string());
+    logger_->log(fdf::ERROR, "Failed to open loader vmo: {}", loader_vmo);
     completer(loader_vmo.take_error());
     return;
   }
 
   zx::result driver_vmo = LoadVmo(*incoming(), driver_path_.c_str(), kOpenFlags);
   if (driver_vmo.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Failed to open driver vmo: %s", driver_vmo.status_string());
+    logger_->log(fdf::ERROR, "Failed to open driver vmo: {}", driver_vmo);
     completer(driver_vmo.take_error());
     return;
   }
@@ -371,14 +371,13 @@ void Driver::Start(fdf::StartCompleter completer) {
   std::string_view vmo_name = GetFilename(driver_path_);
   if (zx_status_t status = driver_vmo->set_property(ZX_PROP_NAME, vmo_name.data(), vmo_name.size());
       status != ZX_OK) {
-    LOGF(ERROR, "Failed to name driver's DFv1 vmo '%s': %s", std::string(vmo_name).c_str(),
-         zx_status_get_string(status));
+    LOGF(ERROR, "Failed to name driver's DFv1 vmo '{}': {}", vmo_name, zx::make_result(status));
     // We don't need to exit on this error, there will just be less debugging information.
   }
 
   if (zx::result result = LoadDriver(std::move(loader_vmo.value()), std::move(driver_vmo.value()));
       result.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Failed to load driver: %s", result.status_string());
+    logger_->log(fdf::ERROR, "Failed to load driver: {}", result);
     completer(result.take_error());
     return;
   }
@@ -393,12 +392,11 @@ void Driver::Start(fdf::StartCompleter completer) {
           .and_then(fit::bind_member<&Driver::GetDeviceInfo>(this))
           .then([this](result<void, zx_status_t>& result) -> fpromise::result<void, zx_status_t> {
             if (result.is_error()) {
-              FDF_LOGL(WARNING, *logger_, "Getting DeviceInfo failed with: %s",
-                       zx_status_get_string(result.error()));
+              logger_->log(fdf::WARN, "Getting DeviceInfo failed with: {}",
+                           zx::make_result(result.error()));
             }
             if (zx::result result = StartDriver(); result.is_error()) {
-              FDF_LOGL(ERROR, *logger_, "Failed to start driver '%s': %s", url().value().data(),
-                       result.status_string());
+              logger_->log(fdf::ERROR, "Failed to start driver '{}': {}", url().value(), result);
               device_.Unbind();
               CompleteStart(result.take_error());
               return error(result.error_value());
@@ -417,7 +415,7 @@ zx_handle_t Driver::GetMmioResource() {
     if (resource.is_ok()) {
       mmio_resource_ = std::move(resource.value());
     } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get mmio_resource '%s'", resource.status_string());
+      logger_->log(fdf::WARN, "Failed to get mmio_resource '{}'", resource);
     }
   }
   return mmio_resource_.get();
@@ -429,7 +427,7 @@ zx_handle_t Driver::GetMsiResource() {
     if (resource.is_ok()) {
       msi_resource_ = std::move(resource.value());
     } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get msi_resource '%s'", resource.status_string());
+      logger_->log(fdf::WARN, "Failed to get msi_resource '{}'", resource);
     }
   }
   return msi_resource_.get();
@@ -441,7 +439,7 @@ zx_handle_t Driver::GetPowerResource() {
     if (resource.is_ok()) {
       power_resource_ = std::move(resource.value());
     } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get power_resource '%s'", resource.status_string());
+      logger_->log(fdf::WARN, "Failed to get power_resource '{}'", resource);
     }
   }
   return power_resource_.get();
@@ -453,7 +451,7 @@ zx_handle_t Driver::GetIommuResource() {
     if (resource.is_ok()) {
       iommu_resource_ = std::move(resource.value());
     } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get iommu_resource '%s'", resource.status_string());
+      logger_->log(fdf::WARN, "Failed to get iommu_resource '{}'", resource);
     }
   }
   return iommu_resource_.get();
@@ -465,8 +463,7 @@ zx_handle_t Driver::GetFramebufferResource() {
     if (resource.is_ok()) {
       framebuffer_resource_ = std::move(resource.value());
     } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get framebuffer_resource '%s'",
-               resource.status_string());
+      logger_->log(fdf::WARN, "Failed to get framebuffer_resource '{}'", resource);
     }
   }
   return framebuffer_resource_.get();
@@ -478,7 +475,7 @@ zx_handle_t Driver::GetIoportResource() {
     if (resource.is_ok()) {
       ioport_resource_ = std::move(resource.value());
     } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get ioport_resource '%s'", resource.status_string());
+      logger_->log(fdf::WARN, "Failed to get ioport_resource '{}'", resource);
     }
   }
   return ioport_resource_.get();
@@ -490,7 +487,7 @@ zx_handle_t Driver::GetIrqResource() {
     if (resource.is_ok()) {
       irq_resource_ = std::move(resource.value());
     } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get irq_resource '%s'", resource.status_string());
+      logger_->log(fdf::WARN, "Failed to get irq_resource '{}'", resource);
     }
   }
   return irq_resource_.get();
@@ -502,7 +499,7 @@ zx_handle_t Driver::GetSmcResource() {
     if (resource.is_ok()) {
       smc_resource_ = std::move(resource.value());
     } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get smc_resource '%s'", resource.status_string());
+      logger_->log(fdf::WARN, "Failed to get smc_resource '{}'", resource);
     }
   }
   return smc_resource_.get();
@@ -538,8 +535,8 @@ zx_status_t Driver::GetProperties(device_props_args_t* out_args,
         out_value.data.enum_val = value.enum_value()->data();
         break;
       default:
-        FDF_LOGL(ERROR, *logger_, "Unsupported property type, value: %lu",
-                 static_cast<fidl_xunion_tag_t>(value.Which()));
+        logger_->log(fdf::ERROR, "Unsupported property type, value: %lu",
+                     static_cast<fidl_xunion_tag_t>(value.Which()));
         break;
     }
     return out_value;
@@ -550,8 +547,8 @@ zx_status_t Driver::GetProperties(device_props_args_t* out_args,
   for (auto& prop : props) {
     switch (prop.key().Which()) {
       case fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue:
-        FDF_LOGL(WARNING, *logger_, "Found key '%u'. Integer-based keys are no longer supported",
-                 prop.key().int_value().value());
+        logger_->log(fdf::WARN, "Found key '%u'. Integer-based keys are no longer supported",
+                     prop.key().int_value().value());
         break;
       case fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue:
         if (str_prop_count >= out_args->str_prop_count) {
@@ -574,7 +571,7 @@ zx_handle_t Driver::GetInfoResource() {
     if (resource.is_ok()) {
       info_resource_ = std::move(resource.value());
     } else {
-      FDF_LOGL(WARNING, *logger_, "Failed to get info_resource '%s'", resource.status_string());
+      logger_->log(fdf::WARN, "Failed to get info_resource '{}'", resource);
     }
   }
   return info_resource_.get();
@@ -616,14 +613,14 @@ zx_status_t Driver::RunOnDispatcher(fit::callback<zx_status_t()> task) {
 void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
   zx::result client = this->incoming()->Connect<fuchsia_system_state::SystemStateTransition>();
   if (client.is_error()) {
-    FDF_LOGL(ERROR, *logger_, "failed to connect to fuchsia.system.state/SystemStateTransition: %s",
-             client.status_string());
+    logger_->log(fdf::ERROR, "failed to connect to fuchsia.system.state/SystemStateTransition: {}",
+                 client);
     completer(client.take_error());
     return;
   }
   fidl::WireResult result = fidl::WireCall(client.value())->GetTerminationSystemState();
   if (!result.ok()) {
-    FDF_LOGL(ERROR, *logger_, "failed to get termination state: %s", client.status_string());
+    logger_->log(fdf::ERROR, "failed to get termination state: {}", client);
     completer(zx::error(result.error().status()));
     return;
   }
@@ -638,7 +635,7 @@ void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
 }
 
 zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
-  const std::string& url_str = url().value();
+  std::string_view url_str = url().value();
 
   // Replace loader service to load the DFv1 driver, load the driver,
   // then place the original loader service back.
@@ -659,9 +656,9 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
     async::Loop loader_loop(&kAsyncLoopConfigNeverAttachToThread);
     zx_status_t status = loader_loop.StartThread("loader-loop");
     if (status != ZX_OK) {
-      FDF_LOGL(ERROR, *logger_,
-               "Failed to load driver '%s', could not start thread for loader loop: %s",
-               url_str.data(), zx_status_get_string(status));
+      logger_->log(fdf::ERROR,
+                   "Failed to load driver '{}', could not start thread for loader loop: {}",
+                   url_str, zx::make_result(status));
       return zx::error(status);
     }
     Loader loader(loader_loop.dispatcher(), original_loader.borrow(), std::move(loader_vmo));
@@ -669,11 +666,9 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
 
     auto result = driver_symbols::FindRestrictedSymbols(driver_vmo, url_str);
     if (result.is_error()) {
-      LOGF(WARNING, "Driver '%s' failed to validate as ELF: %s", url_str.c_str(),
-           result.status_value());
+      LOGF(WARNING, "Driver '{}' failed to validate as ELF: {}", url_str, result.status_value());
     } else if (result->size() > 0) {
-      LOGF(ERROR, "Driver '%s' referenced %lu restricted libc symbols: ", url_str.c_str(),
-           result->size());
+      LOGF(ERROR, "Driver '{}' referenced {} restricted libc symbols: ", url_str, result->size());
       for (auto& str : *result) {
         LOGF(ERROR, str.c_str());
       }
@@ -683,8 +678,8 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
     // Open driver.
     library_ = dlopen_vmo(driver_vmo.get(), RTLD_NOW);
     if (library_ == nullptr) {
-      FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', could not load library: %s",
-               url_str.data(), dlerror());
+      logger_->log(fdf::ERROR, "Failed to load driver '{}', could not load library: {}", url_str,
+                   dlerror());
       return zx::error(ZX_ERR_INTERNAL);
     }
   }
@@ -692,34 +687,32 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
   // Load and verify symbols.
   auto note = static_cast<const zircon_driver_note_t*>(dlsym(library_, "__zircon_driver_note__"));
   if (note == nullptr) {
-    FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', driver note not found", url_str.data());
+    logger_->log(fdf::ERROR, "Failed to load driver '{}', driver note not found", url_str);
     return zx::error(ZX_ERR_BAD_STATE);
   }
   driver_name_ = note->payload.name;
-  FDF_LOGL(INFO, *logger_, "Loaded driver '%s'", note->payload.name);
+  logger_->log(fdf::INFO, "Loaded driver '{}'", note->payload.name);
   record_ = static_cast<zx_driver_rec_t*>(dlsym(library_, "__zircon_driver_rec__"));
   if (record_ == nullptr) {
-    FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', driver record not found",
-             url_str.data());
+    logger_->log(fdf::ERROR, "Failed to load driver '{}', driver record not found", url_str);
     return zx::error(ZX_ERR_BAD_STATE);
   }
   if (record_->ops == nullptr) {
-    FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', missing driver ops", url_str.data());
+    logger_->log(fdf::ERROR, "Failed to load driver '{}', missing driver ops", url_str);
     return zx::error(ZX_ERR_BAD_STATE);
   }
   if (record_->ops->version != DRIVER_OPS_VERSION) {
-    FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', incorrect driver version",
-             url_str.data());
+    logger_->log(fdf::ERROR, "Failed to load driver '{}', incorrect driver version", url_str);
     return zx::error(ZX_ERR_WRONG_TYPE);
   }
   if (record_->ops->bind == nullptr && record_->ops->create == nullptr) {
-    FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', missing '%s'", url_str.data(),
-             (record_->ops->bind == nullptr ? "bind" : "create"));
+    logger_->log(fdf::ERROR, "Failed to load driver '{}', missing '{}'", url_str,
+                 (record_->ops->bind == nullptr ? "bind" : "create"));
     return zx::error(ZX_ERR_BAD_STATE);
   }
   if (record_->ops->bind != nullptr && record_->ops->create != nullptr) {
-    FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', both 'bind' and 'create' are defined",
-             url_str.data());
+    logger_->log(fdf::ERROR, "Failed to load driver '{}', both 'bind' and 'create' are defined",
+                 url_str);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -762,22 +755,22 @@ zx::result<> Driver::TryRunUnitTests() {
     bool tests_passed =
         record_->ops->run_unit_tests(context_, device_.ZxDevice(), test_input.release());
     if (!tests_passed) {
-      FDF_LOGL(ERROR, *logger_, "[  FAILED  ] %s", driver_path().c_str());
+      logger_->log(fdf::ERROR, "[  FAILED  ] {}", driver_path());
       return zx::error(ZX_ERR_BAD_STATE);
     }
-    FDF_LOGL(INFO, *logger_, "[  PASSED  ] %s", driver_path().c_str());
+    logger_->log(fdf::INFO, "[  PASSED  ] {}", driver_path());
   }
   return zx::ok();
 }
 
 zx::result<> Driver::StartDriver() {
-  const std::string& url_str = url().value();
+  std::string_view url_str = url().value();
   if (record_->ops->init != nullptr) {
     // If provided, run init.
     zx_status_t status = record_->ops->init(&context_);
     if (status != ZX_OK) {
-      FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', 'init' failed: %s", url_str.data(),
-               zx_status_get_string(status));
+      logger_->log(fdf::ERROR, "Failed to load driver '{}', 'init' failed: {}", url_str,
+                   zx::make_result(status));
       return zx::error(status);
     }
   }
@@ -791,8 +784,8 @@ zx::result<> Driver::StartDriver() {
     // If provided, run bind and return.
     zx_status_t status = record_->ops->bind(context_, device_.ZxDevice());
     if (status != ZX_OK) {
-      FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', 'bind' failed: %s", url_str.data(),
-               zx_status_get_string(status));
+      logger_->log(fdf::ERROR, "Failed to load driver '{}', 'bind' failed: {}", url_str,
+                   zx::make_result(status));
       return zx::error(status);
     }
   } else {
@@ -804,13 +797,13 @@ zx::result<> Driver::StartDriver() {
     zx_status_t status = record_->ops->create(context_, device_.ZxDevice(), "proxy",
                                               client_end->channel().release());
     if (status != ZX_OK) {
-      FDF_LOGL(ERROR, *logger_, "Failed to load driver '%s', 'create' failed: %s", url_str.data(),
-               zx_status_get_string(status));
+      logger_->log(fdf::ERROR, "Failed to load driver '{}', 'create' failed: {}", url_str,
+                   zx::make_result(status));
       return zx::error(status);
     }
   }
   if (!device_.HasChildren()) {
-    FDF_LOGL(ERROR, *logger_, "Driver '%s' did not add a child device", url_str.data());
+    logger_->log(fdf::ERROR, "Driver '{}' did not add a child device", url_str);
     return zx::error(ZX_ERR_BAD_STATE);
   }
   return zx::ok();
@@ -918,8 +911,7 @@ zx_status_t Driver::AddDevice(Device* parent, device_add_args_t* args, zx_device
     zx_device_t* child;
     zx_status_t status = parent->Add(args, &child);
     if (status != ZX_OK) {
-      FDF_LOGL(ERROR, *logger_, "Failed to add device %s: %s", args->name,
-               zx_status_get_string(status));
+      logger_->log(fdf::ERROR, "Failed to add device {}: {}", args->name, zx::make_result(status));
       return status;
     }
     if (out) {
@@ -973,12 +965,12 @@ zx::result<std::string> Driver::GetVariable(const char* name) {
 
 zx_status_t Driver::GetProtocol(uint32_t proto_id, void* out) {
   if (!parent_client_) {
-    FDF_LOGL(WARNING, *logger_,
-             "Invalid fuchsia.driver.compat.Device client. Failed to retrieve Banjo protocol.");
+    logger_->log(fdf::WARN,
+                 "Invalid fuchsia.driver.compat.Device client. Failed to retrieve Banjo protocol.");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  return RunOnDispatcher([proto_id, out, &client = parent_client_, &logger = logger_]() {
+  return RunOnDispatcher([proto_id, out, &client = parent_client_, &logger = *logger_]() {
     static uint64_t process_koid = []() {
       zx_info_handle_basic_t basic;
       ZX_ASSERT(zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &basic, sizeof(basic), nullptr,
@@ -988,13 +980,12 @@ zx_status_t Driver::GetProtocol(uint32_t proto_id, void* out) {
 
     fidl::WireResult result = client.sync()->GetBanjoProtocol(proto_id, process_koid);
     if (!result.ok()) {
-      FDF_LOGL(ERROR, *logger, "Failed to send request to get banjo protocol: %s",
-               result.status_string());
+      logger.log(fdf::ERROR, "Failed to send request to get banjo protocol: {}", result.error());
       return result.status();
     }
     if (result->is_error()) {
-      FDF_LOGL(DEBUG, *logger, "Failed to get banjo protocol: %s",
-               zx_status_get_string(result->error_value()));
+      logger.log(fdf::DEBUG, "Failed to get banjo protocol: {}",
+                 zx::make_result(result->error_value()));
       return result->error_value();
     }
 
@@ -1013,7 +1004,7 @@ zx_status_t Driver::GetProtocol(uint32_t proto_id, void* out) {
 zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out) {
   auto iter = parent_clients_.find(fragment);
   if (iter == parent_clients_.end()) {
-    FDF_LOGL(ERROR, *logger_, "Failed to find compat client of fragment");
+    logger_->log(fdf::ERROR, "Failed to find compat client of fragment");
     return ZX_ERR_NOT_FOUND;
   }
   fidl::WireClient<fuchsia_driver_compat::Device>& client = iter->second;
@@ -1027,13 +1018,12 @@ zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id,
 
   fidl::WireResult result = client.sync()->GetBanjoProtocol(proto_id, process_koid);
   if (!result.ok()) {
-    FDF_LOGL(ERROR, *logger_, "Failed to send request to get banjo protocol: %s",
-             result.status_string());
+    logger_->log(fdf::ERROR, "Failed to send request to get banjo protocol: {}", result.error());
     return result.status();
   }
   if (result->is_error()) {
-    FDF_LOGL(DEBUG, *logger_, "Failed to get banjo protocol: %s",
-             zx_status_get_string(result->error_value()));
+    logger_->log(fdf::DEBUG, "Failed to get banjo protocol: {}",
+                 zx::make_result(result->error_value()));
     return result->error_value();
   }
 
@@ -1060,9 +1050,9 @@ void Driver::CompleteStart(zx::result<> result) {
     // returned an error already to the start completer, we can just log it.
     //
     // TODO(https://fxbug.dev/323581670): Improve the compat driver state flow so this isn't needed.
-    FDF_LOGL(INFO, *logger_,
-             "Called Driver::CompleteStart with %s, but start completer has already been used.",
-             result.status_string());
+    logger_->log(fdf::INFO,
+                 "Called Driver::CompleteStart with {}, but start completer has already been used.",
+                 result);
   }
 }
 
