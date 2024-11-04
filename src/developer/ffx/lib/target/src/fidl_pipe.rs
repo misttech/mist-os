@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::target_connector::{TargetConnection, TargetConnectionError, TargetConnector};
+use crate::ConnectionError;
 use anyhow::Result;
 use async_channel::Receiver;
 use compat_info::CompatibilityInfo;
@@ -14,7 +15,6 @@ use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncRead, AsyncWrite};
 
 /// Represents a FIDL-piping connection to a Fuchsia target.
 ///
@@ -82,16 +82,17 @@ impl FidlPipe {
     /// as the error is not fatal (using an exponential backoff of `t**(2n)` where `t` is the
     /// initial time and `n` is the number of iterations). Any error returned from this function,
     /// therefore, should be interpreted as a non-recoverable error.
-    pub(crate) async fn start_internal<C, W, R>(
-        overnet_reader: R,
-        overnet_writer: W,
+    pub(crate) async fn start_internal<C>(
         mut connector: C,
-    ) -> Result<Self>
+    ) -> Result<(Self, Arc<overnet_core::Router>)>
     where
         C: TargetConnector + 'static,
-        R: AsyncRead + Unpin + 'static,
-        W: AsyncWrite + Unpin + 'static,
     {
+        let node = overnet_core::Router::new(None)?;
+        let socket = create_overnet_socket(node.clone())
+            .map_err(|e| ConnectionError::InternalError(e.into()))?;
+        let (overnet_reader, overnet_writer) = tokio::io::split(socket);
+
         let mut wait_duration = Duration::from_millis(50);
         let target_connection = loop {
             break match connector.connect().await {
@@ -122,13 +123,16 @@ impl FidlPipe {
             // Explicit drop to force the struct into the closure.
             drop(connector);
         };
-        Ok(Self {
-            task: Some(Task::local(main_task)),
-            error_queue,
-            compat,
-            device_address,
-            host_ssh_address,
-        })
+        Ok((
+            Self {
+                task: Some(Task::local(main_task)),
+                error_queue,
+                compat,
+                device_address,
+                host_ssh_address,
+            },
+            node,
+        ))
     }
 
     pub fn error_stream(&self) -> Receiver<anyhow::Error> {
@@ -248,10 +252,7 @@ mod test {
     #[fuchsia::test]
     async fn test_error_queue() {
         // These sockets will do nothing of import.
-        let (local_socket, _remote_socket) = fidl::Socket::create_stream();
-        let local_socket = fidl::AsyncSocket::from_socket(local_socket);
-        let (reader, writer) = tokio::io::split(local_socket);
-        let fidl_pipe = FidlPipe::start_internal(reader, writer, AutoFailConnector).await.unwrap();
+        let (fidl_pipe, _node) = FidlPipe::start_internal(AutoFailConnector).await.unwrap();
         let mut errors = fidl_pipe.error_stream();
         let err = errors.next().await.unwrap();
         assert_eq!(anyhow::anyhow!("boom").to_string(), err.to_string());
@@ -259,26 +260,17 @@ mod test {
 
     #[fuchsia::test]
     async fn test_retry() {
-        let (local_socket, _remote_socket) = fidl::Socket::create_stream();
-        let local_socket = fidl::AsyncSocket::from_socket(local_socket);
-        let (reader, writer) = tokio::io::split(local_socket);
-        let fidl_pipe = FidlPipe::start_internal(
-            reader,
-            writer,
-            FailOnceThenSucceedConnector { should_succeed: false },
-        )
-        .await
-        .unwrap();
+        let (fidl_pipe, _node) =
+            FidlPipe::start_internal(FailOnceThenSucceedConnector { should_succeed: false })
+                .await
+                .unwrap();
         let errs = fidl_pipe.try_drain_errors();
         assert!(errs.is_none());
     }
 
     #[fuchsia::test]
     async fn test_empty_error_queue() {
-        let (local_socket, _remote_socket) = fidl::Socket::create_stream();
-        let local_socket = fidl::AsyncSocket::from_socket(local_socket);
-        let (reader, writer) = tokio::io::split(local_socket);
-        let fidl_pipe = FidlPipe::start_internal(reader, writer, DoNothingConnector).await.unwrap();
+        let (fidl_pipe, _node) = FidlPipe::start_internal(DoNothingConnector).await.unwrap();
         // So, this DoNothingConnector is going to ensure no errors are placed onto the queue,
         // however, even if AutoFailConnector was used here it still wouldn't work, since there is
         // no polling happening between the creation of FidlPipe and the attempt to drain errors

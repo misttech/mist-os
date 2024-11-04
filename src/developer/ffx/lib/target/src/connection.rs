@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fidl_pipe::{create_overnet_socket, FidlPipe};
+use crate::fidl_pipe::FidlPipe;
 use crate::target_connector::TargetConnector;
 use anyhow::Result;
 use async_lock::Mutex;
@@ -54,15 +54,10 @@ impl Connection {
     /// which are considered fatal (e.g. there is no means to reattempt connecting to the device).
     #[tracing::instrument(level = "debug")]
     pub async fn new(connector: impl TargetConnector + 'static) -> Result<Self, ConnectionError> {
-        let node = overnet_core::Router::new(None)?;
-        let socket = create_overnet_socket(node.clone())
-            .map_err(|e| ConnectionError::InternalError(e.into()))?;
-        let (overnet_reader, overnet_writer) = tokio::io::split(socket);
         let connector_debug_string = format!("{connector:?}");
-        let fidl_pipe =
-            FidlPipe::start_internal(overnet_reader, overnet_writer, connector).await.map_err(
-                |e| ConnectionError::ConnectionStartError(connector_debug_string, e.to_string()),
-            )?;
+        let (fidl_pipe, node) = FidlPipe::start_internal(connector).await.map_err(|e| {
+            ConnectionError::ConnectionStartError(connector_debug_string, e.to_string())
+        })?;
         Ok(Self { overnet: OvernetClient { node }, fidl_pipe, rcs_info: Default::default() })
     }
 
