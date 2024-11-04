@@ -2,14 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/cpp/sdk_source_set.gni")
-
 # This library contains helper classes used by both the debug_agent and zxdb
 # but that aren't directly related to the protocol.
-sdk_source_set("shared") {
-  category = "internal"
-  build_as_static = true
-
+static_library("shared") {
   sources = [
     "address_range.cc",
     "address_range.h",
@@ -22,7 +17,6 @@ sdk_source_set("shared") {
     "buffered_bidi_pipe.h",
     "buffered_fd.cc",
     "buffered_fd.h",
-    "buffered_stream.h",
     "handle_info.cc",
     "handle_info.h",
     "largest_less_or_equal.h",

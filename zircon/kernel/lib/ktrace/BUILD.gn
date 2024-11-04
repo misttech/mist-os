@@ -48,7 +48,6 @@ config("suppress-warning.config") {
     "//third_party/zstd/*",
     "//vendor/google/*",
     "//zircon/kernel/*",
-    "//zircon/system/public/*",
     "//zircon/system/ulib/*",
     "//zircon/third_party/lib/*",
     "//zircon/third_party/ulib/*",

@@ -4,12 +4,7 @@
 
 # This library is shared between the client and agent code.
 
-import("//build/cpp/sdk_source_set.gni")
-
-sdk_source_set("ipc") {
-  category = "internal"
-  build_as_static = true
-
+static_library("ipc") {
   sources = [
     "automation_instruction.cc",
     "automation_instruction.h",
