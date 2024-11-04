@@ -16112,6 +16112,7 @@ rust_library("tokio-v1_32_1") {
       "--cfg=feature=\"socket2\"",
       "--cfg=feature=\"sync\"",
       "--cfg=feature=\"time\"",
+      "--cfg=tokio_unstable",
     ]
   }
 

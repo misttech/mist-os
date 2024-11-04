@@ -976,6 +976,7 @@ rustflags = [
   "--cfg=feature=\\\"socket2\\\"",
   "--cfg=feature=\\\"sync\\\"",
   "--cfg=feature=\\\"time\\\"",
+  "--cfg=tokio_unstable",
 ]
 
 # TODO(https://fxbug.dev/106164) This manual configuration enables the "log" so that
