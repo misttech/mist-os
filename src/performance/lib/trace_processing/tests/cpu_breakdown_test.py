@@ -262,7 +262,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         processor = cpu.CpuMetricsProcessor()
         name, breakdown = processor.process_freeform_metrics(model)
-        self.assertEqual(name, processor.FREEFORM_METRICS_FILE_NAME)
+        self.assertEqual(name, processor.FREEFORM_METRICS_FILENAME)
 
         self.assertEqual(len(breakdown), 5)
 
@@ -325,7 +325,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         processor = cpu.CpuMetricsProcessor()
         name, breakdown = processor.process_freeform_metrics(model)
-        self.assertEqual(name, processor.FREEFORM_METRICS_FILE_NAME)
+        self.assertEqual(name, processor.FREEFORM_METRICS_FILENAME)
         consolidated_breakdown = cpu.group_by_process_name(breakdown)
         self.assertEqual(len(consolidated_breakdown), 4)
 
@@ -375,7 +375,7 @@ class CpuBreakdownTest(unittest.TestCase):
         with self.assertLogs(cpu._LOGGER, level="WARNING") as context_manager:
             processor = cpu.CpuMetricsProcessor()
             name, breakdown = processor.process_freeform_metrics(model)
-            self.assertEqual(name, processor.FREEFORM_METRICS_FILE_NAME)
+            self.assertEqual(name, processor.FREEFORM_METRICS_FILENAME)
 
         self.assertEqual(len(breakdown), 2)
 

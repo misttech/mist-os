@@ -29,7 +29,7 @@ class AggregateRecord(TypedDict):
     percent: float
 
 
-def record_from_dict(t: dict[str, trace_metrics.JsonType]) -> Record:
+def record_from_dict(t: dict[str, trace_metrics.JSON]) -> Record:
     record: dict[str, Any] = {}
     for key, key_type in Record.__annotations__.items():
         assert key in t and isinstance(

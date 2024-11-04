@@ -57,7 +57,7 @@ class MemoryTest(unittest.TestCase):
         name, metrics = processor.process_freeform_metrics(
             self.construct_trace_model()
         )
-        self.assertEqual(name, processor.FREEFORM_METRICS_FILE_NAME)
+        self.assertEqual(name, processor.FREEFORM_METRICS_FILENAME)
         self.assertEqual(
             metrics,
             {

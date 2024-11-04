@@ -15,13 +15,13 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 _CPU_USAGE_EVENT_NAME = "cpu_usage"
 _DEFAULT_PERCENT_CUTOFF = 0.0
 
-Breakdown: TypeAlias = list[dict[str, trace_metrics.JsonType]]
+Breakdown: TypeAlias = list[dict[str, trace_metrics.JSON]]
 
 
 class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
     """Computes CPU utilization metrics, both structured and freeform."""
 
-    FREEFORM_METRICS_FILE_NAME = "cpu_breakdown"
+    FREEFORM_METRICS_FILENAME = "cpu_breakdown"
 
     def __init__(
         self,
@@ -114,7 +114,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
             Breakdown: Per-process, per-thread CPU usage breakdown.
         """
         (breakdown, _) = self.process_metrics_and_get_total_time(model)
-        return self.FREEFORM_METRICS_FILE_NAME, breakdown
+        return self.FREEFORM_METRICS_FILENAME, breakdown
 
     def process_metrics_and_get_total_time(
         self, model: trace_model.Model
@@ -148,7 +148,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
         # compared to the total CPU duration.
         # If the percent spent is at or above our cutoff, add metric to
         # breakdown.
-        full_breakdown: list[dict[str, trace_metrics.JsonType]] = []
+        full_breakdown: list[dict[str, trace_metrics.JSON]] = []
         for tid, breakdown in durations.tid_to_durations.items():
             if tid in tid_to_thread_name:
                 for cpu, duration in breakdown.items():
@@ -156,7 +156,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
                         duration / durations.cpu_to_total_duration[cpu] * 100
                     )
                     if percent >= self._percent_cutoff:
-                        metric: dict[str, trace_metrics.JsonType] = {
+                        metric: dict[str, trace_metrics.JSON] = {
                             "process_name": tid_to_process_name[tid],
                             "thread_name": tid_to_thread_name[tid],
                             "tid": tid,

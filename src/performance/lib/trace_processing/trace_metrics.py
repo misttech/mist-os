@@ -20,14 +20,8 @@ from typing import Any, Iterable, Mapping, Sequence, TypeAlias
 
 from trace_processing import trace_model
 
-JsonType: TypeAlias = (
-    Mapping[str, "JsonType"]
-    | Sequence["JsonType"]
-    | str
-    | int
-    | float
-    | bool
-    | None
+JSON: TypeAlias = (
+    Mapping[str, "JSON"] | Sequence["JSON"] | str | int | float | bool | None
 )
 
 _LOGGER: logging.Logger = logging.getLogger("Performance")
@@ -149,14 +143,14 @@ class MetricsProcessor(abc.ABC):
 
     def process_freeform_metrics(
         self, model: trace_model.Model
-    ) -> tuple[str, JsonType]:
+    ) -> tuple[str, JSON]:
         """Computes freeform metrics as JSON.
 
         This can output structured data, as opposite to `process_metrics` which return as list.
         These metrics are in addition to those produced by process_metrics()
 
-        This method returns a tuple of (filename, JsonType) so that processors can provide an
-        identifier more stable than its own classname for use when filing  freeform metrics. Since
+        This method returns a tuple of (filename, JSON) so that processors can provide an
+        identifier more stable than its own classname for use when filing freeform metrics. Since
         filenames are included when freeform metrics are ingested into the metrics backend, basing
         that name on a class name would mean that a refactor could unintentionally break downstream
         consumers of metrics.
@@ -166,31 +160,33 @@ class MetricsProcessor(abc.ABC):
 
         Returns:
             str: stable identifier to use in freeform metrics file name.
-            JsonType: structure holding aggregated metrics, or None if not supported.
+            JSON: structure holding aggregated metrics, or None if not supported.
         """
-        return self.name, None
+        return (self.name, None)
 
 
 class ConstantMetricsProcessor(MetricsProcessor):
-    """A metrics processor that returns constant results."""
+    """A metrics processor that returns constant results.
 
-    FREEFORM_METRICS_FILE_NAME = "constant"
+    Enables publishing of metrics gathered via means other than trace processing.
+    """
 
-    # TODO(b/373899149): rename `result` into metrics.
+    # TODO(b/376922110): Remove `results` arg once callers are updated.
     def __init__(
         self,
+        metrics: Sequence[TestCaseResult] = (),
         results: Sequence[TestCaseResult] = (),
-        freeform_metrics: JsonType = None,
+        freeform_metrics: tuple[str, JSON] = ("", None),
     ):
-        self.results = results
+        self.metrics = metrics or results
         self.freeform_metrics = freeform_metrics
 
     def process_metrics(
         self, model: trace_model.Model
     ) -> Sequence[TestCaseResult]:
-        return self.results
+        return self.metrics
 
     def process_freeform_metrics(
         self, model: trace_model.Model
-    ) -> tuple[str, JsonType]:
-        return self.FREEFORM_METRICS_FILE_NAME, self.freeform_metrics
+    ) -> tuple[str, JSON]:
+        return self.freeform_metrics
