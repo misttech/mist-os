@@ -48,6 +48,11 @@ namespace {
 void SetupCommandLineOptions(const CommandLineOptions& options, zxdb::MapSettingStore& settings) {
   using Settings = zxdb::ClientSettings;
 
+  const char* symbol_index_from_env = getenv("SYMBOL_INDEX_INCLUDE");
+  if (symbol_index_from_env) {
+    settings.SetList(Settings::System::kSymbolIndexInclude, {symbol_index_from_env});
+  }
+
   if (options.symbol_cache) {
     settings.SetString(Settings::System::kSymbolCache, *options.symbol_cache);
   }

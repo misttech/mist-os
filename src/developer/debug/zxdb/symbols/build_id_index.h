@@ -9,8 +9,11 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
+
+#include <rapidjson/document.h>
 
 #include "lib/fit/function.h"
 #include "src/developer/debug/zxdb/common/cache_dir.h"
@@ -119,6 +122,10 @@ class BuildIDIndex {
   //     ~/.fuchsia/debug/symbol-index.json.
   void AddSymbolIndexFile(const std::string& path);
 
+  // Add symbol-index configuration from a JSON string. Paths in the top-level contents
+  // are resolved relative to the provided argument.
+  void AddSymbolIndex(const std::string& contents, const std::filesystem::path& relative_to);
+
   // Adds a file or directory to the symbol search index. If the path is a file this class will try
   // to parse it as an ELF file and add it to the index if it is. If the path is a directory, all
   // files in that directory will be indexed.
@@ -151,9 +158,17 @@ class BuildIDIndex {
   // Adds all the mappings from the given ids.txt to the index.
   void LoadIdsTxt(const IdsTxt& ids_txt);
 
-  // Populates build_id_dirs_, ids_txts_ and symbol_servers_ with the content of symbol-index.json
-  // file.
-  void LoadSymbolIndexFile(const std::string& file_name);
+  // Populates build_id_dirs_, ids_txts_ and symbol_servers_ with the content of a single
+  // symbol-index.json file, adding any included files to the queue for further processing. The
+  // file's parent directory must be provided to help resolve relative paths.
+  void LoadSymbolIndexDocument(const rapidjson::Document& document,
+                               const std::filesystem::path& relative_to,
+                               std::vector<std::filesystem::path>& queue);
+
+  // Populates build_id_dirs, ids_txts_ and symbol_servers_ with the contents of symbol-index.json
+  // files listed in files_to_load.
+  void LoadIndexFilesFromQueue(std::vector<std::filesystem::path>& files_to_load,
+                               std::set<std::filesystem::path>& visited);
 
   // Adds all the mappings from the given file or directory to the index.
   void IndexSourcePath(const std::string& path);

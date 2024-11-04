@@ -5,6 +5,7 @@
 #include "src/developer/debug/zxdb/symbols/build_id_index.h"
 
 #include <filesystem>
+#include <fstream>
 
 #include <gtest/gtest.h>
 
@@ -67,9 +68,30 @@ TEST(BuildIDIndex, IndexBuildIdDir) {
             index.EntryForBuildID(TestSymbolModule::kCheckedInBuildId).debug_info);
 }
 
-TEST(BuildIDIndex, ReadFromSymbolIndex) {
+TEST(BuildIDIndex, ReadFromSymbolIndexFile) {
   BuildIDIndex index;
   index.AddSymbolIndexFile(GetTestDataDir() / "symbol-index.json");
+
+  EXPECT_EQ(2ul, index.build_id_dirs().size());
+  EXPECT_EQ(GetTestDataDir().parent_path(), index.build_id_dirs()[0].path);
+  EXPECT_EQ(GetTestDataDir().parent_path() / "build", index.build_id_dirs()[0].build_dir);
+  EXPECT_EQ("/", index.build_id_dirs()[1].path);
+  EXPECT_EQ("", index.build_id_dirs()[1].build_dir);
+  EXPECT_EQ(2ul, index.symbol_servers().size());
+  EXPECT_EQ("gs://bucket", index.symbol_servers()[0].url);
+  EXPECT_EQ(false, index.symbol_servers()[0].require_authentication);
+  EXPECT_EQ("gs://another-bucket", index.symbol_servers()[1].url);
+  EXPECT_EQ(true, index.symbol_servers()[1].require_authentication);
+}
+
+TEST(BuildIDIndex, ReadFromSymbolIndexString) {
+  std::filesystem::path path = GetTestDataDir() / "symbol-index.json";
+  std::ifstream input(path.string());
+  std::stringstream buffer;
+  buffer << input.rdbuf();
+
+  BuildIDIndex index;
+  index.AddSymbolIndex(buffer.str(), GetTestDataDir());
 
   EXPECT_EQ(2ul, index.build_id_dirs().size());
   EXPECT_EQ(GetTestDataDir().parent_path(), index.build_id_dirs()[0].path);
