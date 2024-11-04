@@ -436,23 +436,6 @@ pub fn check_signal_access(
     })
 }
 
-/// Checks if sending a signal is allowed.
-pub fn check_signal_access_tg(
-    source: &CurrentTask,
-    target: &Task,
-    signal: Signal,
-) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_signal_access_tg");
-    if_selinux_else_default_ok(source, |security_server| {
-        selinux_hooks::task::check_signal_access(
-            &security_server.as_permission_check(),
-            &source,
-            &target,
-            signal,
-        )
-    })
-}
-
 // Checks whether the `parent_tracer_task` is allowed to trace the `current_task`.
 pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
     profile_duration!("security.hooks.ptrace_traceme");

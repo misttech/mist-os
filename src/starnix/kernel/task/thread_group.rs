@@ -1438,7 +1438,7 @@ impl ThreadGroup {
         }
 
         let signal = Signal::try_from(unchecked_signal)?;
-        security::check_signal_access_tg(current_task, &target_task, signal)?;
+        security::check_signal_access(current_task, &target_task, signal)?;
 
         Ok(Some(signal))
     }
