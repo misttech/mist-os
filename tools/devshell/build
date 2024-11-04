@@ -120,12 +120,6 @@ function main {
   local log_file is_logging fint_params_path
   local has_ninja_options no_checks
   local verbose
-
-  # When tracing, increase verbosity.
-  if [[ -o xtrace ]]; then
-    verbose="true"
-  fi
-
   is_logging=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -332,13 +326,8 @@ function main {
     fx-gen || return "$?"
   elif [[ -z "${no_checks}" ]]; then
     # We have a build directory, execute force clean checker, usually a no-op
-    _verbose_opt=()
-    if [[ -n "$verbose" ]]; then
-      _verbose_opt=(--verbose)
-    fi
     "$FUCHSIA_DIR/scripts/fuchsia-vendored-python" \
       "$FUCHSIA_DIR/build/force_clean/force_clean_if_needed.py" \
-      "${_verbose_opt[@]}" \
       --gn-bin "$PREBUILT_GN" \
       --checkout-dir "$FUCHSIA_DIR" \
       --build-dir "$FUCHSIA_BUILD_DIR"
