@@ -1555,7 +1555,10 @@ assembly_input_bundle("core_realm_development_access_eng") {
 }
 
 assembly_input_bundle("bootstrap_realm_development_access") {
-  bootfs_packages = [ "//src/sys/process-resolver" ]
+  bootfs_packages = [
+    "//src/sys/process-resolver",
+    "//src/sys/tools/debug-dash-launcher",
+  ]
   compiled_packages = [
     {
       bootfs_package = true
@@ -1563,7 +1566,10 @@ assembly_input_bundle("bootstrap_realm_development_access") {
       components = [
         {
           component_name = "bootstrap"
-          shards = [ "//src/sys/process-resolver/meta/process_resolver.bootstrap_shard.cml" ]
+          shards = [
+            "//src/sys/process-resolver/meta/process_resolver.bootstrap_shard.cml",
+            "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.bootstrap_shard.cml",
+          ]
         },
       ]
     },
@@ -1575,7 +1581,18 @@ assembly_input_bundle("bootstrap_realm_development_access") {
           component_name = "root"
           shards = [
             "//src/sys/process-resolver/meta/process_resolver.root_shard.cml",
+            "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.root_shard.cml",
           ]
+        },
+      ]
+    },
+    {
+      bootfs_package = true
+      name = "toolbox"
+      components = [
+        {
+          component_name = "toolbox"
+          shards = [ "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.toolbox_shard.cml" ]
         },
       ]
     },

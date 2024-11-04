@@ -16,6 +16,7 @@ clock
 ?console-launcher
 ?cpu-manager
 critical-services
+?debug-dash-launcher
 devfs
 device-name-provider
 display-coordinator

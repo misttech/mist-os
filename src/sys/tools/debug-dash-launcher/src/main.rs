@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
+use debug_dash_launcher_config::Config;
 use fidl::endpoints::{ControlHandle, Responder};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
@@ -28,6 +29,8 @@ async fn main() -> Result<(), anyhow::Error> {
     // Initialize inspect.
     component::health().set_starting_up();
 
+    let config = Config::take_from_startup_handle();
+    let tools_pkg_url = config.tools_pkg_url.as_str();
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Launcher);
 
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
@@ -46,11 +49,12 @@ async fn main() -> Result<(), anyhow::Error> {
                     fdash::LauncherRequest::ExploreComponentOverPty {
                         moniker,
                         pty,
-                        tool_urls,
+                        mut tool_urls,
                         command,
                         ns_layout,
                         responder,
                     } => {
+                        tool_urls.push(tools_pkg_url.to_string());
                         let result = crate::launch::component::explore_over_pty(
                             &moniker, pty, tool_urls, command, ns_layout,
                         )
@@ -64,11 +68,12 @@ async fn main() -> Result<(), anyhow::Error> {
                     fdash::LauncherRequest::ExploreComponentOverSocket {
                         moniker,
                         socket,
-                        tool_urls,
+                        mut tool_urls,
                         command,
                         ns_layout,
                         responder,
                     } => {
+                        tool_urls.push(tools_pkg_url.to_string());
                         let result = crate::launch::component::explore_over_socket(
                             &moniker, socket, tool_urls, command, ns_layout,
                         )
@@ -83,10 +88,11 @@ async fn main() -> Result<(), anyhow::Error> {
                         url,
                         subpackages,
                         socket,
-                        tool_urls,
+                        mut tool_urls,
                         command,
                         responder,
                     } => {
+                        tool_urls.push(tools_pkg_url.to_string());
                         let result = crate::launch::package::explore_over_socket(
                             fdash::FuchsiaPkgResolver::Full,
                             &url,
@@ -107,10 +113,11 @@ async fn main() -> Result<(), anyhow::Error> {
                         url,
                         subpackages,
                         socket,
-                        tool_urls,
+                        mut tool_urls,
                         command,
                         responder,
                     } => {
+                        tool_urls.push(tools_pkg_url.to_string());
                         let result = crate::launch::package::explore_over_socket(
                             fuchsia_pkg_resolver,
                             &url,

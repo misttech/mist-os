@@ -24,15 +24,12 @@ async fn explore_over_handles(
     stdin: zx::Handle,
     stdout: zx::Handle,
     stderr: zx::Handle,
-    mut tool_urls: Vec<String>,
+    tool_urls: Vec<String>,
     command: Option<String>,
     mut name_infos: Vec<fproc::NameInfo>,
     process_name: String,
     package_resolver: &mut crate::package_resolver::PackageResolver,
 ) -> Result<zx::Process, LauncherError> {
-    // In addition to tools binaries requested by the user, add the built-in binaries of the
-    // debug-dash-launcher package, creating `#!resolve` trampolines for all.
-    tool_urls.push("fuchsia-pkg://fuchsia.com/debug-dash-launcher".into());
     let (tools_pkg_dir, tools_path) =
         trampoline::create_trampolines_from_packages(package_resolver, tool_urls).await?;
     layout::add_tools_to_name_infos(tools_pkg_dir, &mut name_infos);

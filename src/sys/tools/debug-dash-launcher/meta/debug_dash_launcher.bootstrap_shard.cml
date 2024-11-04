@@ -1,15 +1,11 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
     children: [
         {
-            name: "process_resolver",
-            url: "fuchsia-pkg://fuchsia.com/process-resolver#meta/process_resolver.cm",
-        },
-        {
             name: "debug-dash-launcher",
-            url: "fuchsia-pkg://fuchsia.com/debug-dash-launcher#meta/debug-dash-launcher.cm",
+            url: "fuchsia-boot:///debug-dash-launcher#meta/debug-dash-launcher.cm",
         },
     ],
     capabilities: [
@@ -17,13 +13,21 @@
             config: "fuchsia.debug.ToolsPkgUrl",
             type: "string",
             max_size: 100,
-            value: "fuchsia-pkg://fuchsia.com/debug-dash-launcher",
+            value: "fuchsia-boot:///debug-dash-launcher",
         },
     ],
     offer: [
         {
             config: "fuchsia.debug.ToolsPkgUrl",
             from: "self",
+            to: "#debug-dash-launcher",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
             to: "#debug-dash-launcher",
         },
         {
@@ -38,19 +42,17 @@
         },
         {
             protocol: "fuchsia.hardware.pty.Device",
-            from: "parent",
+            from: "#ptysvc",
             to: "#debug-dash-launcher",
         },
         {
-            protocol: "fuchsia.pkg.PackageResolver",
-            from: "#pkg-resolver",
-            as: "fuchsia.pkg.PackageResolver-full",
+            protocol: [
+                "fuchsia.pkg.PackageResolver-base",
+                "fuchsia.pkg.PackageResolver-full",
+            ],
+            from: "void",
             to: "#debug-dash-launcher",
-        },
-        {
-            protocol: "fuchsia.pkg.PackageResolver-base",
-            from: "parent",
-            to: "#debug-dash-launcher",
+            availability: "optional",
         },
         {
             protocol: "fuchsia.pkg.PackageResolver-boot",
@@ -67,6 +69,11 @@
             from: "parent",
             as: "fuchsia.sys2.RealmQuery",
             to: "#debug-dash-launcher",
+        },
+        {
+            protocol: "fuchsia.dash.Launcher",
+            from: "#debug-dash-launcher",
+            to: "self/toolbox",
         },
     ],
 }

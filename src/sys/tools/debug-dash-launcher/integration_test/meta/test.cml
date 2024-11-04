@@ -13,7 +13,7 @@
     children: [
         {
             name: "debug-dash-launcher",
-            url: "#meta/debug_dash_launcher.cm",
+            url: "#meta/debug-dash-launcher.cm",
         },
         {
             name: "ptysvc",
@@ -24,13 +24,27 @@
             url: "#meta/mock_resolver.cm",
         },
     ],
+    capabilities: [
+        {
+            config: "fuchsia.debug.ToolsPkgUrl",
+            type: "string",
+            max_size: 100,
+            value: "fuchsia-pkg://fuchsia.com/debug-dash-launcher-test",
+        },
+    ],
     use: [
         {
             protocol: "fuchsia.dash.Launcher",
             from: "#debug-dash-launcher",
+            dependency: "weak",
         },
     ],
     offer: [
+        {
+            config: "fuchsia.debug.ToolsPkgUrl",
+            from: "self",
+            to: "#debug-dash-launcher",
+        },
         {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#mock-resolver",
