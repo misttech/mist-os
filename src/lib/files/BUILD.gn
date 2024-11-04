@@ -2,12 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/cpp/sdk_source_set.gni")
 import("//build/testing/cc_test_executable.gni")
 
-sdk_source_set("files") {
-  category = "internal"
-
+source_set("files") {
   sources = [
     "directory.cc",
     "directory.h",
