@@ -183,7 +183,7 @@ class SystemMetricsDaemon {
   fuchsia::metrics::MetricEventLoggerFactorySyncPtr factory_;
   fuchsia::metrics::MetricEventLoggerSyncPtr logger_fidl_proxy_;
   fuchsia::metrics::MetricEventLogger_Sync* logger_;
-  zx::time_monotonic start_time_;
+  zx::time_boot start_time_;
   std::unique_ptr<timekeeper::Clock> clock_;
   std::unique_ptr<cobalt::CpuStatsFetcher> cpu_stats_fetcher_;
   std::unique_ptr<cobalt::ActivityListener> activity_listener_;
@@ -201,7 +201,7 @@ class SystemMetricsDaemon {
   double cpu_usage_max_ = 0;
   size_t cpu_array_index_ = 0;
 
-  zx::time_monotonic active_start_time_;
+  zx::time_boot active_start_time_;
   zx::duration unlogged_active_duration_;
   std::mutex active_time_mutex_;
 

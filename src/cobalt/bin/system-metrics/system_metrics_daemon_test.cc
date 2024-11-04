@@ -156,23 +156,22 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
   void DoFuchsiaUptimeTest(zx::duration now_seconds, zx::duration expected_sleep_seconds,
                            uint32_t expected_event_code, int64_t expected_up_hours) {
     stub_logger_.reset();
-    SetClockToDaemonStartTime();
-    IncrementMonotonicTime(now_seconds);
+    SetBootClockToDaemonStartTime();
+
+    // Do not increment the monotonic clock. Uptime should be logged in terms of the boot clock.
+    IncrementBootTime(now_seconds);
     EXPECT_EQ(expected_sleep_seconds, LogFuchsiaUptime());
     CheckUptimeValues(1u, {expected_event_code}, expected_up_hours);
   }
 
-  // This method is used by the test of the method
-  // RepeatedlyLogUpPing(). It advances our two fake clocks
-  // (one used by the SystemMetricDaemon, one used by the MessageLoop) by the
-  // specified amount, and then checks to make sure that
-  // RepeatedlyLogUpPing() was executed and did the expected thing.
+  // Advances our two fake clocks (one used by the SystemMetricDaemon, one used by the MessageLoop)
+  // by the specified amount, and then checks to make sure that the expected metric was logged.
   void AdvanceTimeAndCheck(
       zx::duration advance_time_seconds, size_t expected_call_count, uint32_t expected_metric_id,
       std::vector<uint32_t> expected_last_event_codes,
       LogMetricMethod expected_log_method_invoked = cobalt::LogMetricMethod::kDefault) {
     bool expected_activity = (expected_call_count != 0);
-    IncrementMonotonicTime(advance_time_seconds);
+    IncrementMonotonicAndBootTime(advance_time_seconds);
     EXPECT_EQ(expected_activity, RunLoopFor(advance_time_seconds));
     expected_log_method_invoked = (expected_call_count == 0 ? cobalt::LogMetricMethod::kDefault
                                                             : expected_log_method_invoked);
@@ -189,7 +188,7 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
                              std::vector<uint32_t> expected_last_event_codes,
                              int64_t expected_last_up_hours) {
     bool expected_activity = (expected_call_count != 0);
-    IncrementMonotonicTime(advance_time_seconds);
+    IncrementMonotonicAndBootTime(advance_time_seconds);
     EXPECT_EQ(expected_activity, RunLoopFor(advance_time_seconds));
     if (expected_activity) {
       CheckUptimeValues(expected_call_count, std::move(expected_last_event_codes),
@@ -201,7 +200,7 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
   void AdvanceAndCheckActiveTime(zx::duration advance_time_seconds, size_t expected_call_count,
                                  zx::duration expected_active_time_seconds) {
     bool expected_activity = (expected_call_count != 0);
-    IncrementMonotonicTime(advance_time_seconds);
+    IncrementMonotonicAndBootTime(advance_time_seconds);
     EXPECT_EQ(expected_activity, RunLoopFor(advance_time_seconds));
     if (expected_activity) {
       CheckActiveTimeValues(expected_call_count, expected_active_time_seconds);
@@ -209,11 +208,17 @@ class SystemMetricsDaemonTest : public gtest::TestLoopFixture {
     stub_logger_.reset();
   }
 
-  // Rewinds the SystemMetricsDaemon's clock back to the daemon's startup time.
-  void SetClockToDaemonStartTime() { fake_clock_->SetMonotonic(daemon_->start_time_); }
+  // Rewinds the SystemMetricsDaemon's boot clock back to the daemon's startup time.
+  void SetBootClockToDaemonStartTime() { fake_clock_->SetBoot(daemon_->start_time_); }
 
-  void IncrementMonotonicTime(const zx::duration duration) {
+  // The monotonic clock will never tick without the boot clock also ticking.
+  void IncrementMonotonicAndBootTime(const zx::duration duration) {
     fake_clock_->SetMonotonic(fake_clock_->MonotonicNow() + duration);
+    IncrementBootTime(duration);
+  }
+
+  void IncrementBootTime(const zx::duration duration) {
+    fake_clock_->SetBoot(fake_clock_->BootNow() + duration);
   }
 
  protected:
@@ -391,35 +396,35 @@ TEST_F(SystemMetricsDaemonTest, LogActiveTime) {
   // Set ACTIVE for 1 minute.
   stub_logger_.reset();
   UpdateState(fuchsia::ui::activity::State::ACTIVE);
-  IncrementMonotonicTime(one_minute);
+  IncrementBootTime(one_minute);
   LogActiveTime();
   CheckActiveTimeValues(1, one_minute);
 
   // Continue Active for 1 minute.
   stub_logger_.reset();
-  IncrementMonotonicTime(one_minute);
+  IncrementBootTime(one_minute);
   LogActiveTime();
   CheckActiveTimeValues(1, one_minute);
 
   // Continue for 1 minute, then set to IDLE and continue for another minute
   stub_logger_.reset();
-  IncrementMonotonicTime(one_minute);
+  IncrementBootTime(one_minute);
   UpdateState(fuchsia::ui::activity::State::IDLE);
-  IncrementMonotonicTime(one_minute);
+  IncrementBootTime(one_minute);
   LogActiveTime();
   CheckActiveTimeValues(1, one_minute);
 
   // Set ACTIVE and IDLE alternatively and confirm that 2 minutes active time acrues.
   stub_logger_.reset();
-  IncrementMonotonicTime(one_minute);
+  IncrementBootTime(one_minute);
   UpdateState(fuchsia::ui::activity::State::ACTIVE);
-  IncrementMonotonicTime(one_minute);
+  IncrementBootTime(one_minute);
   UpdateState(fuchsia::ui::activity::State::IDLE);
-  IncrementMonotonicTime(one_minute);
+  IncrementBootTime(one_minute);
   UpdateState(fuchsia::ui::activity::State::ACTIVE);
-  IncrementMonotonicTime(one_minute);
+  IncrementBootTime(one_minute);
   UpdateState(fuchsia::ui::activity::State::IDLE);
-  IncrementMonotonicTime(one_minute);
+  IncrementBootTime(one_minute);
   LogActiveTime();
   CheckActiveTimeValues(1, one_minute * 2);
 }
@@ -476,6 +481,22 @@ TEST_F(SystemMetricsDaemonTest, RepeatedlyLogActiveTime) {
 
   UpdateState(fuchsia::ui::activity::State::IDLE);
   AdvanceAndCheckActiveTime(seconds_to_wait - run_time, 1, 2 * five_seconds);
+}
+
+// Tests that RepeatedlyLogActiveTime() computes durations using the boot clock but sleeps based on
+// the monotonic clock.
+TEST_F(SystemMetricsDaemonTest, RepeatedlyLogActiveTimeLogsBootTime) {
+  const zx::duration seconds_to_wait = LogActiveTime();
+  UpdateState(fuchsia::ui::activity::State::ACTIVE);
+  RepeatedlyLogActiveTime();
+  RunLoopUntilIdle();
+
+  stub_logger_.reset();
+  IncrementBootTime(seconds_to_wait);
+  EXPECT_FALSE(RunLoopUntilIdle());
+
+  AdvanceAndCheckActiveTime(/*advance_time_seconds=*/seconds_to_wait, /*expected_call_count=*/1,
+                            /*expected_active_time_seconds=*/2 * seconds_to_wait);
 }
 
 // Tests the method LogFuchsiaLifetimeEventActivation(). Uses a local FakeLogger_Sync
@@ -537,6 +558,34 @@ TEST_F(SystemMetricsDaemonTest, RepeatedlyLogUptime) {
   AdvanceAndCheckUptime(zx::sec(kWeek), 168, {UptimeRange::TwoWeeksOrMore}, 361);
 }
 
+// Tests that RepeatedlyLogUptime() logs values from the boot clock but sleeps based on the
+// monotonic clock.
+TEST_F(SystemMetricsDaemonTest, RepeatedlyLogUptimeLogsBootTime) {
+  RunLoopUntilIdle();
+
+  // Invoke the method under test. This should cause the uptime to be logged
+  // once, and schedules the next run for approximately 1 hour in the future.
+  // (More precisely, the next run should occur in 1 hour minus the amount of
+  // time after the daemon's start time which this method is invoked.)
+  RepeatedlyLogUptime();
+
+  // The first event should have been logged, with an uptime of 0 hours.
+  CheckUptimeValues(/*expected_call_count=*/1u, {UptimeRange::LessThanTwoWeeks},
+                    /*expected_last_up_hours=*/0);
+  stub_logger_.reset();
+
+  // Advance the boot clock by 1 hour. Nothing should have happened.
+  IncrementBootTime(zx::hour(1));
+  EXPECT_FALSE(RunLoopUntilIdle());
+
+  // Advance the monotonic and boot clocks by 1 hour. The system metrics daemon has been up for 2
+  // hours, so 1 event with an uptime of 2 hours should have been logged.
+  IncrementMonotonicAndBootTime(zx::hour(1));
+  EXPECT_TRUE(RunLoopFor(zx::hour(1)));
+  CheckUptimeValues(/*expected_call_count=*/1u, {UptimeRange::LessThanTwoWeeks},
+                    /*expected_last_up_hours=*/2);
+}
+
 // Tests the method RepeatedlyLogUpPing(). This test differs
 // from the previous ones because it makes use of the message loop in order to
 // schedule future runs of work. Uses a local FakeLogger_Sync and does not use
@@ -593,6 +642,29 @@ TEST_F(SystemMetricsDaemonTest, RepeatedlyLogUpPing) {
   // |UpOneHour|.
   AdvanceTimeAndCheck(zx::sec(5), 4, fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId,
                       {FuchsiaUpPingMigratedMetricDimensionUptime::UpOneHour},
+                      cobalt::LogMetricMethod::kLogOccurrence);
+}
+
+// Tests that RepeatedlyLogUpPing() logs values from the boot clock but sleeps based on the
+// monotonic clock.
+TEST_F(SystemMetricsDaemonTest, RepeatedlyLogUpPingLogsBootTime) {
+  // Invoke the method under test. This kicks of the first run and schedules
+  // the second run for 1 minute plus 5 seconds in the future.
+  RepeatedlyLogUpPing();
+
+  // The initial event should have been logged.
+  CheckValues(cobalt::LogMetricMethod::kLogOccurrence, /*expected_call_count=*/1,
+              fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId,
+              {FuchsiaUpPingMigratedMetricDimensionUptime::Up});
+  stub_logger_.reset();
+
+  // Advance the monotonic clock by 65 seconds, but the boot clock by an extra 10 minutes. Expect
+  // the second batch of work to occur. This consists of three events the last of which is
+  // |UpTenMinutes|.
+  IncrementBootTime(zx::min(10));
+  AdvanceTimeAndCheck(zx::sec(65), /*expected_call_count=*/3,
+                      fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId,
+                      {FuchsiaUpPingMigratedMetricDimensionUptime::UpTenMinutes},
                       cobalt::LogMetricMethod::kLogOccurrence);
 }
 

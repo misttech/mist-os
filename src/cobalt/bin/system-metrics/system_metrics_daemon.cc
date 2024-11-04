@@ -74,7 +74,7 @@ SystemMetricsDaemon::SystemMetricsDaemon(
     : dispatcher_(dispatcher),
       context_(context),
       logger_(logger),
-      start_time_(clock->MonotonicNow()),
+      start_time_(clock->BootNow()),
       clock_(std::move(clock)),
       cpu_stats_fetcher_(std::move(cpu_stats_fetcher)),
       activity_listener_(std::move(activity_listener)),
@@ -162,7 +162,7 @@ zx::duration SystemMetricsDaemon::GetUpTime() {
   // as a proxy for the system start time. This is fine as long as we don't
   // start seeing systematic restarts of the SystemMetricsDaemon. If that
   // starts happening we should look into how to capture actual boot time.
-  return clock_->MonotonicNow() - start_time_;
+  return clock_->BootNow() - start_time_;
 }
 
 zx::duration SystemMetricsDaemon::LogFuchsiaUpPing(zx::duration uptime) {
@@ -408,7 +408,7 @@ zx::duration SystemMetricsDaemon::LogActiveTime() {
     InitializeLogger();
     return zx::min(1);
   }
-  const zx::time_monotonic now = clock_->MonotonicNow();
+  const zx::time_boot now = clock_->BootNow();
   if (current_state_ == fuchsia::ui::activity::State::ACTIVE) {
     unlogged_active_duration_ += (now - active_start_time_);
     active_start_time_ = now;
@@ -487,10 +487,10 @@ void SystemMetricsDaemon::UpdateState(fuchsia::ui::activity::State state) {
     return;
   }
   if (state == fuchsia::ui::activity::State::ACTIVE) {
-    active_start_time_ = clock_->MonotonicNow();
+    active_start_time_ = clock_->BootNow();
   } else {
-    unlogged_active_duration_ += (clock_->MonotonicNow() - active_start_time_);
-    active_start_time_ = zx::time_monotonic(0);
+    unlogged_active_duration_ += (clock_->BootNow() - active_start_time_);
+    active_start_time_ = zx::time_boot(0);
   }
   current_state_ = state;
 }
