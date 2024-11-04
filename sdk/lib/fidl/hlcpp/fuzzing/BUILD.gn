@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
 source_set("fuzzing") {

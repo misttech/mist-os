@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/cpp/sdk_source_set.gni")
-
 group("tests") {
   testonly = true
 
@@ -14,11 +12,7 @@ config("config") {
   include_dirs = [ "include" ]
 }
 
-sdk_source_set("fuchsia-mem-ext") {
-  category = "internal"
-
-  sdk_name = "fuchsia-mem-ext"
-
+source_set("fuchsia-mem-ext") {
   public = [ "include/lib/fuchsia-mem-ext/fuchsia-mem-ext.h" ]
 
   public_deps = [

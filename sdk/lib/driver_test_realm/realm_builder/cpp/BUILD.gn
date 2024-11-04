@@ -5,8 +5,9 @@
 import("//build/cpp/sdk_source_set.gni")
 
 sdk_source_set("cpp") {
-  sdk_name = "driver_test_realm_builder"
+  # TODO(https://fxbug.dev/343059325): Promote to "partner" with devicetree.
   category = "internal"
+  sdk_name = "driver_test_realm_builder"
   sources = [ "lib.cc" ]
   public = [ "lib.h" ]
   include_base = "//sdk"

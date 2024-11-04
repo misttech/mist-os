@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/cpp/sdk_source_set.gni")
 import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
@@ -11,17 +10,13 @@ group("tests") {
   deps = [ ":file-lock-unittest-package" ]
 }
 
-sdk_source_set("cpp") {
-  sdk_name = "file-lock"
-  category = "internal"
+source_set("cpp") {
   sources = [
     "file-lock.cc",
     "file-lock.h",
   ]
 
   deps = [ "//sdk/lib/fit" ]
-
-  include_base = "//sdk"
 
   public_configs = [ "//sdk/config" ]
 }
