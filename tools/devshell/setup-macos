@@ -33,7 +33,6 @@ FIREWALL_TOOLS=(
   pm
   scrutiny
   sockscripter
-  traceutil
   triage
   whereiscl
   zxdb

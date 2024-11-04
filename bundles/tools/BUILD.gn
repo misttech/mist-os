@@ -58,7 +58,6 @@ group("host_tools") {
     "//build/tools/formatjson5:install($host_toolchain)",
     "//src/diagnostics/triage:install($host_toolchain)",
     "//src/performance/trace2json($host_toolchain)",
-    "//src/performance/traceutil($host_toolchain)",
     "//src/sys/pkg/bin/far:host($host_toolchain)",
     "//src/sys/pkg/bin/pm:host($host_toolchain)",
     "//tools/check-licenses:host($host_toolchain)",

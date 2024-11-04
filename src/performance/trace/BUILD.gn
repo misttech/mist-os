@@ -58,11 +58,5 @@ source_set("options") {
 }
 
 fuchsia_package("trace") {
-  deps = [
-    ":bin",
-
-    # If your build includes the target trace tool, your $host_tools_dir
-    # contains the utilities to work with traces copied from the target.
-    "//src/performance/traceutil",
-  ]
+  deps = [ ":bin" ]
 }
