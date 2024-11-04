@@ -4714,12 +4714,12 @@ mod tests {
                         "to": "self/dict",
                     },
                     {
-                        "directory": "B",
+                        "runner": "B",
                         "from": "#child",
                         "to": "self/dict",
                     },
                     {
-                        "service": "B",
+                        "config": "B",
                         "from": "parent/dict/2",
                         "to": "self/dict",
                         "as": "C",
@@ -4754,8 +4754,8 @@ mod tests {
                             ..Default::default()
                         }
                     ),
-                    fdecl::Offer::Directory (
-                        fdecl::OfferDirectory {
+                    fdecl::Offer::Runner (
+                        fdecl::OfferRunner {
                             source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                                 name: "child".into(),
                                 collection: None,
@@ -4765,13 +4765,11 @@ mod tests {
                                 name: "dict".to_string(),
                             })),
                             target_name: Some("B".into()),
-                            dependency_type: Some(fdecl::DependencyType::Strong),
-                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
-                    fdecl::Offer::Service (
-                        fdecl::OfferService {
+                    fdecl::Offer::Config (
+                        fdecl::OfferConfiguration {
                             source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             #[cfg(fuchsia_api_level_at_least = "HEAD")]
                             source_dictionary: Some("dict/2".into()),
@@ -4781,7 +4779,6 @@ mod tests {
                             })),
                             target_name: Some("C".into()),
                             availability: Some(fdecl::Availability::Required),
-                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),

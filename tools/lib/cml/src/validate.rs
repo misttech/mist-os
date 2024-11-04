@@ -910,6 +910,36 @@ which is almost certainly a mistake: {}",
                     to_target
                 }
                 OfferToRef::OwnDictionary(ref to_target) => {
+                    if let Ok(capability_ids) = CapabilityId::from_offer_expose(offer) {
+                        for id in capability_ids {
+                            match &id {
+                                CapabilityId::Protocol(_)
+                                | CapabilityId::Dictionary(_)
+                                | CapabilityId::Runner(_)
+                                | CapabilityId::Resolver(_)
+                                | CapabilityId::Configuration(_) => {}
+                                CapabilityId::Directory(_)
+                                | CapabilityId::Service(_)
+                                | CapabilityId::Storage(_)
+                                | CapabilityId::EventStream(_) => {
+                                    let type_name = id.type_str();
+                                    return Err(Error::validate(format!(
+                                        "\"offer\" to dictionary \"{to}\" for \"{type_name}\" but \
+                                        dictionaries do not support this type yet."
+                                    )));
+                                }
+                                CapabilityId::UsedService(_)
+                                | CapabilityId::UsedProtocol(_)
+                                | CapabilityId::UsedDirectory(_)
+                                | CapabilityId::UsedStorage(_)
+                                | CapabilityId::UsedEventStream(_)
+                                | CapabilityId::UsedRunner(_)
+                                | CapabilityId::UsedConfiguration(_) => {
+                                    unreachable!("this is not a use")
+                                }
+                            }
+                        }
+                    }
                     // Check that any referenced child actually exists.
                     let Some(d) = self.all_dictionaries.get(&to_target) else {
                         return Err(Error::validate(format!(
@@ -7107,6 +7137,24 @@ mod tests {
                 ],
             }),
             Err(Error::RestrictedFeature(s)) if s == "dynamic_dictionaries"
+        ),
+        test_cml_offer_to_dictionary_unsupported(
+            json!({
+                "offer": [
+                    {
+                        "event_stream": "p",
+                        "from": "parent",
+                        "to": "self/dict",
+                    },
+                ],
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "\"offer\" to dictionary \
+            \"self/dict\" for \"event_stream\" but dictionaries do not support this type yet."
         ),
     }}
 
