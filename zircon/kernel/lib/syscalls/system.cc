@@ -776,8 +776,8 @@ zx_status_t sys_system_set_processor_power_domain(
   }
 
   auto model =
-      power_management::PowerModel::Create(ktl::span(levels.get(), num_power_levels),
-                                           ktl::span(sparse_transitions.get(), num_transitions));
+      power_management::EnergyModel::Create(ktl::span(levels.get(), num_power_levels),
+                                            ktl::span(sparse_transitions.get(), num_transitions));
   if (model.is_error()) {
     return model.error_value();
   }

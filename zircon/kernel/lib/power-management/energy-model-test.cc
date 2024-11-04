@@ -22,9 +22,9 @@
 
 namespace {
 
+using power_management::EnergyModel;
 using power_management::PowerDomain;
 using power_management::PowerDomainRegistry;
-using power_management::PowerModel;
 
 TEST(PowerLevelTest, Ctor) {
   constexpr zx_processor_power_level_t kLevel = {
@@ -211,8 +211,8 @@ TEST(PowerModelTest, Create) {
       },
   });
 
-  auto power_model = PowerModel::Create(kPowerLevels, kTransitions);
-  ASSERT_TRUE(power_model.is_ok());
+  auto energy_model = EnergyModel::Create(kPowerLevels, kTransitions);
+  ASSERT_TRUE(energy_model.is_ok());
 
   // Proper transformation of the model and the transition table.
   auto check_level = [](const power_management::PowerLevel& actual,
@@ -228,8 +228,8 @@ TEST(PowerModelTest, Create) {
     EXPECT_EQ(actual.TargetsPowerDomain(), expected.TargetsPowerDomain());
   };
 
-  ASSERT_EQ(power_model->levels().size(), 4u);
-  auto levels = power_model->levels();
+  ASSERT_EQ(energy_model->levels().size(), 4u);
+  auto levels = energy_model->levels();
   for (size_t i = 0; i < levels.size() - 1; ++i) {
     size_t j = i + 1;
     EXPECT_LE(levels[i].processing_rate(), levels[i].processing_rate());
@@ -253,7 +253,7 @@ TEST(PowerModelTest, Create) {
     return power_management::PowerLevelTransition::Invalid();
   };
 
-  auto transitions = power_model->transitions();
+  auto transitions = energy_model->transitions();
   for (size_t i = 0; i < levels.size(); ++i) {
     for (size_t j = 0; j < levels.size(); ++j) {
       auto transition = transitions[i][j];
@@ -264,22 +264,22 @@ TEST(PowerModelTest, Create) {
   }
 
   // Properly partitioned.
-  ASSERT_EQ(power_model->idle_levels().size(), 2u);
-  EXPECT_EQ(power_model->idle_levels()[0].level(), 0u);
-  EXPECT_EQ(power_model->idle_levels()[1].level(), 2u);
+  ASSERT_EQ(energy_model->idle_levels().size(), 2u);
+  EXPECT_EQ(energy_model->idle_levels()[0].level(), 0u);
+  EXPECT_EQ(energy_model->idle_levels()[1].level(), 2u);
 
-  ASSERT_EQ(power_model->active_levels().size(), 2u);
-  EXPECT_EQ(power_model->active_levels()[0].level(), 1u);
-  EXPECT_EQ(power_model->active_levels()[1].level(), 3u);
+  ASSERT_EQ(energy_model->active_levels().size(), 2u);
+  EXPECT_EQ(energy_model->active_levels()[0].level(), 1u);
+  EXPECT_EQ(energy_model->active_levels()[1].level(), 3u);
 
   // Sorter by tuple <Control Interface, Control Argument>
   for (size_t i = 0; i < levels.size(); ++i) {
     auto& level = levels[i];
-    EXPECT_EQ(power_model->FindPowerLevel(level.control(), level.control_argument()), i);
+    EXPECT_EQ(energy_model->FindPowerLevel(level.control(), level.control_argument()), i);
   }
-  EXPECT_FALSE(power_model->FindPowerLevel(power_management::ControlInterface::kArmPsci, 495));
+  EXPECT_FALSE(energy_model->FindPowerLevel(power_management::ControlInterface::kArmPsci, 495));
   EXPECT_FALSE(
-      power_model->FindPowerLevel(static_cast<power_management::ControlInterface>(495), 0));
+      energy_model->FindPowerLevel(static_cast<power_management::ControlInterface>(495), 0));
 }
 
 TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
@@ -318,8 +318,8 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
       },
   });
 
-  auto power_model = PowerModel::Create(kPowerLevels, {});
-  ASSERT_TRUE(power_model.is_ok());
+  auto energy_model = EnergyModel::Create(kPowerLevels, {});
+  ASSERT_TRUE(energy_model.is_ok());
 
   // Proper transformation of the model and the transition table.
   auto check_level = [](const power_management::PowerLevel& actual,
@@ -335,8 +335,8 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
     EXPECT_EQ(actual.TargetsPowerDomain(), expected.TargetsPowerDomain());
   };
 
-  ASSERT_EQ(power_model->levels().size(), 4u);
-  auto levels = power_model->levels();
+  ASSERT_EQ(energy_model->levels().size(), 4u);
+  auto levels = energy_model->levels();
   for (size_t i = 0; i < levels.size() - 1; ++i) {
     size_t j = i + 1;
     EXPECT_LE(levels[i].processing_rate(), levels[i].processing_rate());
@@ -349,32 +349,32 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
                 power_management::PowerLevel(levels[j].level(), kPowerLevels[levels[j].level()]));
   }
 
-  for (size_t row = 0; row < power_model->levels().size(); ++row) {
-    for (size_t column = 0; column < power_model->levels().size(); ++column) {
+  for (size_t row = 0; row < energy_model->levels().size(); ++row) {
+    for (size_t column = 0; column < energy_model->levels().size(); ++column) {
       const power_management::PowerLevelTransition& transition =
-          power_model->transitions()[row][column];
+          energy_model->transitions()[row][column];
       EXPECT_EQ(transition.energy_cost_nj(),
                 power_management::PowerLevelTransition::Zero().energy_cost_nj());
       EXPECT_EQ(transition.latency(), power_management::PowerLevelTransition::Zero().latency());
     }
   }
 
-  ASSERT_EQ(power_model->idle_levels().size(), 2u);
-  EXPECT_EQ(power_model->idle_levels()[0].level(), 0u);
-  EXPECT_EQ(power_model->idle_levels()[1].level(), 2u);
+  ASSERT_EQ(energy_model->idle_levels().size(), 2u);
+  EXPECT_EQ(energy_model->idle_levels()[0].level(), 0u);
+  EXPECT_EQ(energy_model->idle_levels()[1].level(), 2u);
 
-  ASSERT_EQ(power_model->active_levels().size(), 2u);
-  EXPECT_EQ(power_model->active_levels()[0].level(), 1u);
-  EXPECT_EQ(power_model->active_levels()[1].level(), 3u);
+  ASSERT_EQ(energy_model->active_levels().size(), 2u);
+  EXPECT_EQ(energy_model->active_levels()[0].level(), 1u);
+  EXPECT_EQ(energy_model->active_levels()[1].level(), 3u);
 
   // Sorter by tuple <Control Interface, Control Argument>
   for (size_t i = 0; i < levels.size(); ++i) {
     auto& level = levels[i];
-    EXPECT_EQ(power_model->FindPowerLevel(level.control(), level.control_argument()), i);
+    EXPECT_EQ(energy_model->FindPowerLevel(level.control(), level.control_argument()), i);
   }
-  EXPECT_FALSE(power_model->FindPowerLevel(power_management::ControlInterface::kArmPsci, 495));
+  EXPECT_FALSE(energy_model->FindPowerLevel(power_management::ControlInterface::kArmPsci, 495));
   EXPECT_FALSE(
-      power_model->FindPowerLevel(static_cast<power_management::ControlInterface>(495), 0));
+      energy_model->FindPowerLevel(static_cast<power_management::ControlInterface>(495), 0));
 }
 
 TEST(PowerDomainRegistryTest, RegisterUniquePowerDomains) {
