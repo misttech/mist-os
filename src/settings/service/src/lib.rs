@@ -19,8 +19,6 @@ use fuchsia_component::client::connect_to_protocol;
 #[cfg(test)]
 use fuchsia_component::server::ProtocolConnector;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
-#[cfg(test)]
-use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
 use futures::StreamExt;
@@ -200,9 +198,9 @@ impl Environment {
 #[cfg(test)]
 fn init_storage_dir() -> DirectoryProxy {
     let tempdir = tempfile::tempdir().expect("failed to create tempdir");
-    fuchsia_fs::directory::open_in_namespace_deprecated(
+    fuchsia_fs::directory::open_in_namespace(
         tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+        fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
     )
     .expect("failed to open connection to tempdir")
 }

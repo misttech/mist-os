@@ -22,7 +22,7 @@ use fidl_fuchsia_io::{DirectoryProxy, FileProxy, UnlinkOptions};
 use fuchsia_fs::directory::{readdir, DirEntry, DirentKind};
 use fuchsia_fs::file::WriteError;
 use fuchsia_fs::node::{OpenError, RenameError};
-use fuchsia_fs::OpenFlags;
+use fuchsia_fs::Flags;
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -105,10 +105,10 @@ impl MigrationManager {
         mut self,
     ) -> Result<Option<LastMigration>, (Option<LastMigration>, MigrationError)> {
         let last_migration = {
-            let migration_file = fuchsia_fs::directory::open_file_deprecated(
+            let migration_file = fuchsia_fs::directory::open_file(
                 &self.dir_proxy,
                 MIGRATION_FILE_NAME,
-                OpenFlags::NOT_DIRECTORY | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+                fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
             )
             .await;
             match migration_file {
@@ -242,13 +242,10 @@ impl MigrationManager {
         // Scope is important. tmp_migration_file needs to be out of scope when the file is
         // renamed.
         {
-            let tmp_migration_file = fuchsia_fs::directory::open_file_deprecated(
+            let tmp_migration_file = fuchsia_fs::directory::open_file(
                 dir_proxy,
                 TMP_MIGRATION_FILE_NAME,
-                OpenFlags::NOT_DIRECTORY
-                    | OpenFlags::CREATE
-                    | OpenFlags::RIGHT_READABLE
-                    | OpenFlags::RIGHT_WRITABLE,
+                Flags::FLAG_MAYBE_CREATE | fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
             )
             .await
             .context("unable to create migrations file")?;
@@ -387,10 +384,10 @@ impl FileGenerator {
     ) -> Result<FileProxy, OpenError> {
         let file_name = file_name.as_ref();
         let id = self.new_id;
-        fuchsia_fs::directory::open_file_deprecated(
+        fuchsia_fs::directory::open_file(
             &self.dir_proxy,
             &format!("{file_name}_{id}.pfidl"),
-            OpenFlags::NOT_DIRECTORY | OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .await
     }
@@ -401,13 +398,10 @@ impl FileGenerator {
     ) -> Result<FileProxy, OpenError> {
         let file_name = file_name.as_ref();
         let id = self.new_id;
-        fuchsia_fs::directory::open_file_deprecated(
+        fuchsia_fs::directory::open_file(
             &self.dir_proxy,
             &format!("{file_name}_{id}.pfidl"),
-            OpenFlags::NOT_DIRECTORY
-                | OpenFlags::CREATE
-                | OpenFlags::RIGHT_READABLE
-                | OpenFlags::RIGHT_WRITABLE,
+            Flags::FLAG_MAYBE_CREATE | fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
         )
         .await
     }
@@ -483,9 +477,9 @@ mod tests {
     }
 
     fn open_tempdir(tempdir: &tempfile::TempDir) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_in_namespace_deprecated(
+        fuchsia_fs::directory::open_in_namespace(
             tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .expect("failed to open connection to tempdir")
     }
@@ -522,10 +516,10 @@ mod tests {
             result,
             Ok(Some(LastMigration { migration_id: id })) if id == ID
         );
-        let migration_file = fuchsia_fs::directory::open_file_deprecated(
+        let migration_file = fuchsia_fs::directory::open_file(
             &directory,
             MIGRATION_FILE_NAME,
-            OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .await
         .expect("migration file should exist");
@@ -568,10 +562,10 @@ mod tests {
             result,
             Ok(Some(LastMigration { migration_id: id })) if id == ID
         );
-        let migration_file = fuchsia_fs::directory::open_file_deprecated(
+        let migration_file = fuchsia_fs::directory::open_file(
             &directory,
             MIGRATION_FILE_NAME,
-            OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .await
         .expect("migration file should exist");
@@ -592,10 +586,10 @@ mod tests {
 
         let result = migration_manager.run_migrations().await;
         assert_matches!(result, Ok(None));
-        let open_result = fuchsia_fs::directory::open_file_deprecated(
+        let open_result = fuchsia_fs::directory::open_file(
             &directory,
             MIGRATION_FILE_NAME,
-            OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .await;
         assert_matches!(
@@ -808,10 +802,10 @@ mod tests {
             Ok(Some(LastMigration { migration_id: id })) if id == ID2
         );
 
-        let migration_file = fuchsia_fs::directory::open_file_deprecated(
+        let migration_file = fuchsia_fs::directory::open_file(
             &directory,
             MIGRATION_FILE_NAME,
-            OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .await
         .expect("migration file should exist");
@@ -822,10 +816,10 @@ mod tests {
             .expect("should be a number");
         assert_eq!(migration_number, ID2);
 
-        let data_file = fuchsia_fs::directory::open_file_deprecated(
+        let data_file = fuchsia_fs::directory::open_file(
             &directory,
             &format!("test_{ID2}.pfidl"),
-            OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .await
         .expect("migration file should exist");
@@ -870,10 +864,10 @@ mod tests {
                 }), MigrationError::Unrecoverable(_)))
             if migration_id == LIGHT_MIGRATION);
 
-        let migration_file = fuchsia_fs::directory::open_file_deprecated(
+        let migration_file = fuchsia_fs::directory::open_file(
             &directory,
             MIGRATION_FILE_NAME,
-            OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .await
         .expect("migration file should exist");

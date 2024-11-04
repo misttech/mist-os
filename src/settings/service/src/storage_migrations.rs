@@ -31,7 +31,7 @@ pub(crate) fn register_migrations(
 mod tests {
     use super::*;
     use fidl::endpoints::create_proxy;
-    use fidl_fuchsia_io::{DirectoryMarker, OpenFlags};
+    use fidl_fuchsia_io::DirectoryMarker;
     use fidl_fuchsia_stash::StoreMarker;
     use fuchsia_async as fasync;
 
@@ -62,9 +62,9 @@ mod tests {
 
     // Opens a FIDL connection to a `TempDir`.
     pub(crate) fn open_tempdir(tempdir: &tempfile::TempDir) -> DirectoryProxy {
-        fuchsia_fs::directory::open_in_namespace_deprecated(
+        fuchsia_fs::directory::open_in_namespace(
             tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
         )
         .expect("failed to open connection to tempdir")
     }

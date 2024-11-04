@@ -11,7 +11,7 @@ use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async::{MonotonicInstant, Task, Timer};
 use fuchsia_fs::file::ReadError;
 use fuchsia_fs::node::OpenError;
-use fuchsia_fs::OpenFlags;
+use fuchsia_fs::Flags;
 
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::future::OptionFuture;
@@ -95,13 +95,13 @@ impl CachedStorage {
     async fn sync(&mut self, storage_dir: &DirectoryProxy) -> Result<(), Error> {
         // Scope is important. file_proxy needs to be out-of-scope when the directory is renamed.
         {
-            let file_proxy = fuchsia_fs::directory::open_file_deprecated(
+            let file_proxy = fuchsia_fs::directory::open_file(
                 storage_dir,
                 &self.temp_file_path,
-                OpenFlags::CREATE
-                    | OpenFlags::TRUNCATE
-                    | OpenFlags::RIGHT_READABLE
-                    | OpenFlags::RIGHT_WRITABLE,
+                Flags::FLAG_MUST_CREATE
+                    | Flags::FILE_TRUNCATE
+                    | fuchsia_fs::PERM_READABLE
+                    | fuchsia_fs::PERM_WRITABLE,
             )
             .await
             .with_context(|| format!("unable to open {:?} for writing", self.temp_file_path))?;
@@ -303,10 +303,10 @@ impl FidlStorage {
         let cached_value = match cached_storage.current_data.as_ref() {
             Some(cached_value) => Some(cached_value),
             None => {
-                let file_proxy = fuchsia_fs::directory::open_file_deprecated(
+                let file_proxy = fuchsia_fs::directory::open_file(
                     &self.storage_dir,
                     &cached_storage.file_path,
-                    OpenFlags::RIGHT_READABLE,
+                    fuchsia_fs::PERM_READABLE,
                 )
                 .await;
                 bytes = match file_proxy {
@@ -363,10 +363,10 @@ impl FidlStorage {
             .unwrap_or_else(|| panic!("Invalid data keyed by {key}"));
         let mut cached_storage = typed_storage.cached_storage.lock().await;
         if cached_storage.current_data.is_none() || !self.caching_enabled {
-            if let Some(file_proxy) = match fuchsia_fs::directory::open_file_deprecated(
+            if let Some(file_proxy) = match fuchsia_fs::directory::open_file(
                 &self.storage_dir,
                 &cached_storage.file_path,
-                OpenFlags::RIGHT_READABLE,
+                fuchsia_fs::PERM_READABLE,
             )
             .await
             {
@@ -483,9 +483,9 @@ mod tests {
     }
 
     fn open_tempdir(tempdir: &tempfile::TempDir) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_in_namespace_deprecated(
+        fuchsia_fs::directory::open_in_namespace(
             tempdir.path().to_str().expect("tempdir path is not valid UTF-8"),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
         )
         .expect("failed to open connection to tempdir")
     }
@@ -682,11 +682,8 @@ mod tests {
         directory: &fio::DirectoryProxy,
         file_name: &str,
     ) {
-        let open_fut = fuchsia_fs::directory::open_file_deprecated(
-            directory,
-            file_name,
-            OpenFlags::RIGHT_READABLE,
-        );
+        let open_fut =
+            fuchsia_fs::directory::open_file(directory, file_name, fuchsia_fs::PERM_READABLE);
         let result = run_until_ready(executor, open_fut);
         assert_matches!(result, Result::Err(e) if e.is_not_found_error());
     }

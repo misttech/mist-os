@@ -24,7 +24,6 @@ use crate::tests::scaffold::workload::channel;
 use crate::{service, Environment, EnvironmentBuilder};
 use ::fidl::endpoints::create_proxy_and_stream;
 use assert_matches::assert_matches;
-use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_stash::StoreMarker;
 use fuchsia_async as fasync;
 use fuchsia_inspect::component;
@@ -179,9 +178,9 @@ async fn migration_error_does_not_cause_early_exit() {
     let fs = tempfile::tempdir().expect("failed to create tempdir");
     std::fs::write(fs.path().join(MIGRATION_FILE_NAME), UNKNOWN_ID.to_string())
         .expect("failed to write migration file");
-    let directory = fuchsia_fs::directory::open_in_namespace_deprecated(
+    let directory = fuchsia_fs::directory::open_in_namespace(
         fs.path().to_str().expect("tempdir path is not valid UTF-8"),
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+        fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
     )
     .expect("failed to open connection to tempdir");
     let (store_proxy, mut request_stream) =
