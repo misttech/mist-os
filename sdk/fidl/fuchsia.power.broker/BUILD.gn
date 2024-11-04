@@ -34,7 +34,7 @@ fidl("fuchsia.power.broker") {
     "//src/power/broker/*:*",
     "//src/power/shutdown-shim/*:*",
     "//src/power/system-activity-governor/*:*",
-    "//src/power/testing/client:*",
+    "//src/power/testing/client/*:*",
     "//src/power/testing/fake-broker/*:*",
     "//src/power/testing/fake-hrtimer/*:*",
     "//src/power/testing/system-integration/msd-arm-mali/test:*",

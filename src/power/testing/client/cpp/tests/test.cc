@@ -13,12 +13,11 @@ TEST(SystemActivityGovernor, ConnectTest) {
                             fuchsia_hardware_suspend::SuspendState{{.resume_latency = 100}},
                         }}}});
 
-  ASSERT_EQ(true, set_result.is_ok());
+  ASSERT_EQ(true, set_result.is_ok()) << set_result.error_value();
 
-  auto governor_result = client.ConnectGovernor();
-  auto power_elements_result = fidl::Call(*governor_result)->GetPowerElements();
-  ASSERT_EQ(true, power_elements_result.is_ok());
+  auto power_elements_result = fidl::Call(*client.ConnectGovernor())->GetPowerElements();
+  ASSERT_EQ(true, power_elements_result.is_ok()) << power_elements_result.error_value();
 
   auto suspend_states = fidl::Call(*client.ConnectSuspender())->GetSuspendStates();
-  ASSERT_EQ(true, suspend_states.is_ok());
+  ASSERT_EQ(true, suspend_states.is_ok()) << suspend_states.error_value();
 }

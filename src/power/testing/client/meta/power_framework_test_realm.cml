@@ -15,11 +15,11 @@
         },
         {
             name: "test-power-broker",
-            url: "#meta/power-broker.cm",
+            url: "power-broker#meta/power-broker.cm",
         },
         {
             name: "test-suspend",
-            url: "#meta/fake-suspend.cm",
+            url: "fake-suspend-pkg#meta/fake-suspend.cm",
         },
     ],
     offer: [
@@ -42,6 +42,7 @@
     expose: [
         {
             protocol: [
+                "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
                 "test.sagcontrol.State",
             ],

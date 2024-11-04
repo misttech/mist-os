@@ -18,7 +18,7 @@ namespace test_client {
 
 class PowerTestingClient {
  public:
-  PowerTestingClient() { root_.emplace(realm_builder_.Build()); }
+  PowerTestingClient();
 
   zx::result<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> ConnectGovernor();
 
@@ -34,9 +34,7 @@ class PowerTestingClient {
 
  private:
   async::Loop loop{&kAsyncLoopConfigAttachToCurrentThread};
-  component_testing::RealmBuilder realm_builder_ =
-      component_testing::RealmBuilder::CreateFromRelativeUrl("#meta/realm_base.cm");
-  std::optional<component_testing::RealmRoot> root_;
+  component_testing::RealmRoot root_;
 };
 
 zx::result<> Init();

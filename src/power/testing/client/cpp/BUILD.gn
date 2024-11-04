@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 source_set("cpp") {
+  testonly = true
   sources = [
     "client.cc",
     "client.h",
@@ -13,11 +14,8 @@ source_set("cpp") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//src/power/broker:component",
     "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_cpp",
     "//src/power/testing/client:client_includes",
-    "//src/power/testing/client:realm_base_manifest",
-    "//src/power/testing/fake-suspend",
     "//src/power/testing/fake-suspend:test.suspendcontrol_cpp",
   ]
   deps = [ "//sdk/lib/component/incoming/cpp" ]
