@@ -55,6 +55,12 @@
     },
     {
         "kind": "union/member",
+        "name": "fuchsia.component.decl/Capability.dictionary",
+        "ordinal": "9",
+        "type": "fuchsia.component.decl/Dictionary"
+    },
+    {
+        "kind": "union/member",
         "name": "fuchsia.component.decl/Capability.directory",
         "ordinal": "3",
         "type": "fuchsia.component.decl/Directory"
@@ -700,6 +706,34 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/Dictionary.name",
+        "ordinal": "1",
+        "type": "string:100"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/Dictionary.source",
+        "ordinal": "2",
+        "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/Dictionary.source_dictionary",
+        "ordinal": "3",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/Dictionary.source_path",
+        "ordinal": "4",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.component.decl/Dictionary"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/Directory.name",
         "ordinal": "1",
         "type": "string:100"
@@ -820,6 +854,12 @@
     },
     {
         "kind": "union/member",
+        "name": "fuchsia.component.decl/Expose.dictionary",
+        "ordinal": "7",
+        "type": "fuchsia.component.decl/ExposeDictionary"
+    },
+    {
+        "kind": "union/member",
         "name": "fuchsia.component.decl/Expose.directory",
         "ordinal": "3",
         "type": "fuchsia.component.decl/ExposeDirectory"
@@ -867,6 +907,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeConfiguration.source_dictionary",
+        "ordinal": "6",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/ExposeConfiguration.source_name",
         "ordinal": "2",
         "type": "string:100"
@@ -889,6 +935,46 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeDictionary.availability",
+        "ordinal": "5",
+        "type": "fuchsia.component.decl/Availability"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeDictionary.source",
+        "ordinal": "1",
+        "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeDictionary.source_dictionary",
+        "ordinal": "6",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeDictionary.source_name",
+        "ordinal": "2",
+        "type": "string:100"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeDictionary.target",
+        "ordinal": "3",
+        "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeDictionary.target_name",
+        "ordinal": "4",
+        "type": "string:100"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.component.decl/ExposeDictionary"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/ExposeDirectory.availability",
         "ordinal": "7",
         "type": "fuchsia.component.decl/Availability"
@@ -904,6 +990,12 @@
         "name": "fuchsia.component.decl/ExposeDirectory.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeDirectory.source_dictionary",
+        "ordinal": "8",
+        "type": "string:1024"
     },
     {
         "kind": "table/member",
@@ -947,6 +1039,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeProtocol.source_dictionary",
+        "ordinal": "6",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/ExposeProtocol.source_name",
         "ordinal": "2",
         "type": "string:100"
@@ -975,6 +1073,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeResolver.source_dictionary",
+        "ordinal": "6",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/ExposeResolver.source_name",
         "ordinal": "2",
         "type": "string:100"
@@ -1000,6 +1104,12 @@
         "name": "fuchsia.component.decl/ExposeRunner.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeRunner.source_dictionary",
+        "ordinal": "6",
+        "type": "string:1024"
     },
     {
         "kind": "table/member",
@@ -1034,6 +1144,12 @@
         "name": "fuchsia.component.decl/ExposeService.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/ExposeService.source_dictionary",
+        "ordinal": "6",
+        "type": "string:1024"
     },
     {
         "kind": "table/member",
@@ -1143,6 +1259,12 @@
     },
     {
         "kind": "union/member",
+        "name": "fuchsia.component.decl/Offer.dictionary",
+        "ordinal": "9",
+        "type": "fuchsia.component.decl/OfferDictionary"
+    },
+    {
+        "kind": "union/member",
         "name": "fuchsia.component.decl/Offer.directory",
         "ordinal": "3",
         "type": "fuchsia.component.decl/OfferDirectory"
@@ -1202,6 +1324,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferConfiguration.source_dictionary",
+        "ordinal": "6",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/OfferConfiguration.source_name",
         "ordinal": "2",
         "type": "string:100"
@@ -1221,6 +1349,52 @@
     {
         "kind": "table",
         "name": "fuchsia.component.decl/OfferConfiguration"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferDictionary.availability",
+        "ordinal": "6",
+        "type": "fuchsia.component.decl/Availability"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferDictionary.dependency_type",
+        "ordinal": "5",
+        "type": "fuchsia.component.decl/DependencyType"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferDictionary.source",
+        "ordinal": "1",
+        "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferDictionary.source_dictionary",
+        "ordinal": "7",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferDictionary.source_name",
+        "ordinal": "2",
+        "type": "string:100"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferDictionary.target",
+        "ordinal": "3",
+        "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferDictionary.target_name",
+        "ordinal": "4",
+        "type": "string:100"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.component.decl/OfferDictionary"
     },
     {
         "kind": "table/member",
@@ -1245,6 +1419,12 @@
         "name": "fuchsia.component.decl/OfferDirectory.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferDirectory.source_dictionary",
+        "ordinal": "9",
+        "type": "string:1024"
     },
     {
         "kind": "table/member",
@@ -1334,6 +1514,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferProtocol.source_dictionary",
+        "ordinal": "7",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/OfferProtocol.source_name",
         "ordinal": "2",
         "type": "string:100"
@@ -1362,6 +1548,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferResolver.source_dictionary",
+        "ordinal": "5",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/OfferResolver.source_name",
         "ordinal": "2",
         "type": "string:100"
@@ -1387,6 +1579,12 @@
         "name": "fuchsia.component.decl/OfferRunner.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferRunner.source_dictionary",
+        "ordinal": "5",
+        "type": "string:1024"
     },
     {
         "kind": "table/member",
@@ -1427,6 +1625,12 @@
         "name": "fuchsia.component.decl/OfferService.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/OfferService.source_dictionary",
+        "ordinal": "8",
+        "type": "string:1024"
     },
     {
         "kind": "table/member",
@@ -1850,6 +2054,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/UseConfiguration.source_dictionary",
+        "ordinal": "7",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/UseConfiguration.source_name",
         "ordinal": "2",
         "type": "string:100"
@@ -1893,6 +2103,12 @@
         "name": "fuchsia.component.decl/UseDirectory.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/UseDirectory.source_dictionary",
+        "ordinal": "8",
+        "type": "string:1024"
     },
     {
         "kind": "table/member",
@@ -1976,6 +2192,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component.decl/UseProtocol.source_dictionary",
+        "ordinal": "6",
+        "type": "string:1024"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component.decl/UseProtocol.source_name",
         "ordinal": "2",
         "type": "string:100"
@@ -2007,6 +2229,12 @@
         "name": "fuchsia.component.decl/UseService.source",
         "ordinal": "1",
         "type": "fuchsia.component.decl/Ref"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.component.decl/UseService.source_dictionary",
+        "ordinal": "6",
+        "type": "string:1024"
     },
     {
         "kind": "table/member",

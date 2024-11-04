@@ -11,7 +11,7 @@ use cm_rust::{
     SourceName, UseDecl, UseProtocolDecl, UseSource,
 };
 use cm_types::Path;
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
 use cm_types::RelativePath;
 use component_events::events::Started;
 use component_events::matcher::EventMatcher;
@@ -706,7 +706,7 @@ impl DictionaryCapability {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
+#[cfg(fuchsia_api_level_at_least = "NEXT")]
 impl Into<ftest::Capability> for DictionaryCapability {
     fn into(self) -> ftest::Capability {
         ftest::Capability::Dictionary(ftest::Dictionary {
@@ -1243,7 +1243,7 @@ impl RealmBuilder {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
                 }
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
                 d @ ExposeDecl::Dictionary(_) => {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
@@ -1256,7 +1256,7 @@ impl RealmBuilder {
                     let expose = ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: decl.target_name.clone(),
-                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                        #[cfg(fuchsia_api_level_at_least = "NEXT")]
                         source_dictionary: Default::default(),
                         target: ExposeTarget::Parent,
                         target_name: decl.target_name.clone(),
@@ -1268,7 +1268,7 @@ impl RealmBuilder {
                     let expose = ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: decl.target_name.clone(),
-                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                        #[cfg(fuchsia_api_level_at_least = "NEXT")]
                         source_dictionary: Default::default(),
                         target: ExposeTarget::Parent,
                         target_name: decl.target_name.clone(),
@@ -1285,7 +1285,7 @@ impl RealmBuilder {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
                 }
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
                 d @ ExposeDecl::Dictionary(_) => {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
@@ -1303,7 +1303,7 @@ impl RealmBuilder {
                 .expect("unable to create path from capability name"),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::default(),
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
                 source_dictionary: RelativePath::dot(),
             })
             .map(|d| UseDecl::Protocol(d))
@@ -1795,7 +1795,7 @@ impl SubRealmBuilder {
 
     /// Adds a route between components within the realm
     pub async fn add_route(&self, route: Route) -> Result<(), Error> {
-        #[allow(unused_mut)] // Mutable not needed if not at API level HEAD
+        #[allow(unused_mut)] // Mutable not needed if not at API level NEXT
         let mut capabilities = route.capabilities;
         if let Some(source) = &route.from {
             source.check_scope(&self.realm_path)?;
@@ -1803,7 +1803,7 @@ impl SubRealmBuilder {
         for target in &route.to {
             target.check_scope(&self.realm_path)?;
         }
-        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
         if let Some(from_dictionary) = route.from_dictionary {
             for c in &mut capabilities {
                 match c {

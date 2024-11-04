@@ -182,7 +182,7 @@ type Capability = flexible union {
     6: event_stream EventStream;
     @available(added=20)
     7: config Config;
-    @available(added=HEAD)
+    @available(added=NEXT)
     8: dictionary Dictionary;
     @available(added=24)
     9: resolver Resolver;
@@ -220,7 +220,7 @@ type Protocol = table {
 
     /// Optional. If set, the path to the dictionary routed by `from` which contains
     /// the capability.
-    @available(added=HEAD)
+    @available(added=NEXT)
     6: from_dictionary string:MAX;
 };
 
@@ -261,7 +261,7 @@ type Directory = table {
 
     /// Optional. If set, the path to the dictionary routed by `from` which contains
     /// the capability.
-    @available(added=HEAD)
+    @available(added=NEXT)
     8: from_dictionary string:MAX;
 };
 
@@ -311,7 +311,7 @@ type Service = table {
 
     /// Optional. If set, the path to the dictionary routed by `from` which contains
     /// the capability.
-    @available(added=HEAD)
+    @available(added=NEXT)
     5: from_dictionary string:MAX;
 };
 
@@ -370,7 +370,7 @@ type Config = table {
 };
 
 /// A dictionary capability
-@available(added=HEAD)
+@available(added=NEXT)
 type Dictionary = table {
     /// The name of the dictionary.
     1: name fuchsia.component.name;
@@ -411,7 +411,7 @@ type Resolver = table {
 
     /// Optional. If set, the path to the dictionary routed by `from` which contains
     /// the capability.
-    @available(added=HEAD)
+    @available(added=NEXT)
     4: from_dictionary string:MAX;
 };
 
@@ -433,7 +433,7 @@ type Runner = table {
 
     /// Optional. If set, the path to the dictionary routed by `from` which contains
     /// the capability.
-    @available(added=HEAD)
+    @available(added=NEXT)
     4: from_dictionary string:MAX;
 };
 
