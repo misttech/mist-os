@@ -7,7 +7,7 @@ pub mod args;
 use anyhow::{format_err, Result};
 use args::DumpCommand;
 use fidl_fuchsia_driver_development as fdd;
-use fuchsia_driver_dev::{DFv1Device, DFv2Node, Device};
+use fuchsia_driver_dev::Device;
 use std::collections::{BTreeMap, VecDeque};
 use std::io::Write;
 
@@ -20,43 +20,7 @@ trait NodeInfoPrinter {
     fn print_graph_edge(&self, writer: &mut dyn Write, child: &fdd::NodeInfo) -> Result<()>;
 }
 
-impl NodeInfoPrinter for DFv1Device {
-    fn print(&self, writer: &mut dyn Write, indent_level: usize) -> Result<()> {
-        let bound_driver_libname = self.get_v1_info()?.bound_driver_libname.clone();
-        writeln!(
-            writer,
-            "{:indent$}[{}] pid={} {}",
-            "",
-            self.extract_name()?,
-            self.0.driver_host_koid.as_ref().ok_or(format_err!("Missing driver host KOID"))?,
-            bound_driver_libname.ok_or(format_err!("Missing driver libname"))?,
-            indent = indent_level * INDENT_SIZE,
-        )?;
-        Ok(())
-    }
-
-    fn print_graph_node(&self, writer: &mut dyn Write) -> Result<()> {
-        writeln!(
-            writer,
-            "     \"{}\" [label=\"{}\"]",
-            self.0.id.as_ref().ok_or(format_err!("Device missing id"))?,
-            self.extract_name()?,
-        )?;
-        Ok(())
-    }
-
-    fn print_graph_edge(&self, writer: &mut dyn Write, child: &fdd::NodeInfo) -> Result<()> {
-        writeln!(
-            writer,
-            "     \"{}\" -> \"{}\"",
-            self.0.id.as_ref().ok_or(format_err!("Device missing id"))?,
-            child.id.as_ref().ok_or(format_err!("Child device missing id"))?,
-        )?;
-        Ok(())
-    }
-}
-
-impl NodeInfoPrinter for DFv2Node {
+impl NodeInfoPrinter for Device {
     fn print(&self, writer: &mut dyn Write, indent_level: usize) -> Result<()> {
         let koid_str = match &self.0.driver_host_koid {
             Some(koid) => format!("{}", koid),
@@ -96,29 +60,6 @@ impl NodeInfoPrinter for DFv2Node {
     }
 }
 
-impl NodeInfoPrinter for Device {
-    fn print(&self, writer: &mut dyn Write, indent_level: usize) -> Result<()> {
-        match self {
-            Device::V1(device) => device.print(writer, indent_level),
-            Device::V2(device) => device.print(writer, indent_level),
-        }
-    }
-
-    fn print_graph_node(&self, writer: &mut dyn Write) -> Result<()> {
-        match self {
-            Device::V1(device) => device.print_graph_node(writer),
-            Device::V2(node) => node.print_graph_node(writer),
-        }
-    }
-
-    fn print_graph_edge(&self, writer: &mut dyn Write, child: &fdd::NodeInfo) -> Result<()> {
-        match self {
-            Device::V1(device) => device.print_graph_edge(writer, child),
-            Device::V2(node) => node.print_graph_edge(writer, child),
-        }
-    }
-}
-
 fn print_tree(
     writer: &mut dyn Write,
     root: &Device,
@@ -128,7 +69,7 @@ fn print_tree(
     stack.push_front((root, 0));
     while let Some((device, indent_level)) = stack.pop_front() {
         device.print(writer, indent_level)?;
-        if let Some(child_ids) = &device.get_device_info().child_ids {
+        if let Some(child_ids) = &device.0.child_ids {
             for id in child_ids.iter().rev() {
                 if let Some(child) = device_map.get(id) {
                     stack.push_front((child, indent_level + 1));
@@ -157,8 +98,7 @@ pub async fn dump(
     let device_map = devices
         .iter()
         .map(|device| {
-            let device_info = device.get_device_info();
-            if let Some(id) = device_info.id {
+            if let Some(id) = device.0.id {
                 Ok((id, device))
             } else {
                 Err(format_err!("Missing device id"))
@@ -177,10 +117,10 @@ pub async fn dump(
         }
 
         for device in devices.iter() {
-            if let Some(child_ids) = &device.get_device_info().child_ids {
+            if let Some(child_ids) = &device.0.child_ids {
                 for id in child_ids.iter().rev() {
                     let child = &device_map[&id];
-                    device.print_graph_edge(writer, child.get_device_info())?;
+                    device.print_graph_edge(writer, &child.0)?;
                 }
             }
         }
@@ -192,8 +132,7 @@ pub async fn dump(
                 let name = device.extract_name().unwrap_or("");
                 name == node_filter
             } else {
-                let device_info = device.get_device_info();
-                if let Some(parent_ids) = device_info.parent_ids.as_ref() {
+                if let Some(parent_ids) = device.0.parent_ids.as_ref() {
                     for parent_id in parent_ids.iter() {
                         if device_map.contains_key(parent_id) {
                             return false;
@@ -296,15 +235,7 @@ mod tests {
                                 bound_driver_url: Some(String::from(
                                     "fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm",
                                 )),
-                                versioned_info: Some(fdd::VersionedNodeInfo::V1(
-                                    fdd::V1DeviceInfo {
-                                        topological_path: Some(String::from(
-                                            "/dev/sys/platform/foo",
-                                        )),
-                                        bound_driver_libname: Some(String::from("foo.so")),
-                                        ..Default::default()
-                                    },
-                                )),
+                                moniker: Some(String::from("foo")),
                                 ..Default::default()
                             },
                             fdd::NodeInfo {
@@ -315,15 +246,7 @@ mod tests {
                                 bound_driver_url: Some(String::from(
                                     "fuchsia-pkg://fuchsia.com/bar-package#meta/bar.cm",
                                 )),
-                                versioned_info: Some(fdd::VersionedNodeInfo::V1(
-                                    fdd::V1DeviceInfo {
-                                        topological_path: Some(String::from(
-                                            "/dev/sys/platform/foo/bar",
-                                        )),
-                                        bound_driver_libname: Some(String::from("bar.so")),
-                                        ..Default::default()
-                                    },
-                                )),
+                                moniker: Some(String::from("foo.bar")),
                                 ..Default::default()
                             },
                         ],
@@ -339,7 +262,12 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(output, "[foo] pid=0 foo.so\n  [bar] pid=0 bar.so\n");
+        assert_eq!(
+            output,
+            r#"[foo] pid=0 fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm
+  [bar] pid=0 fuchsia-pkg://fuchsia.com/bar-package#meta/bar.cm
+"#
+        );
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -367,11 +295,11 @@ mod tests {
 
         assert_eq!(
             output,
-            r#"[platform] pid=0 root.so
-  [parent] pid=0 parent.so
-    [child] pid=0 child.so
-[parent] pid=0 parent.so
-  [child] pid=0 child.so
+            r#"[platform] pid=0 fuchsia-pkg://fuchsia.com/root-package#meta/root.cm
+  [parent] pid=0 fuchsia-pkg://fuchsia.com/parent-package#meta/parent.cm
+    [child] pid=0 fuchsia-pkg://fuchsia.com/child-package#meta/child.cm
+[parent] pid=0 fuchsia-pkg://fuchsia.com/parent-package#meta/parent.cm
+  [child] pid=0 fuchsia-pkg://fuchsia.com/child-package#meta/child.cm
 "#
         );
     }
@@ -401,8 +329,8 @@ mod tests {
 
         assert_eq!(
             output,
-            r#"[parent] pid=0 parent.so
-  [child] pid=0 child.so
+            r#"[parent] pid=0 fuchsia-pkg://fuchsia.com/parent-package#meta/parent.cm
+  [child] pid=0 fuchsia-pkg://fuchsia.com/child-package#meta/child.cm
 "#
         );
     }
@@ -422,11 +350,7 @@ mod tests {
                 bound_driver_url: Some(String::from(
                     "fuchsia-pkg://fuchsia.com/root-package#meta/root.cm",
                 )),
-                versioned_info: Some(fdd::VersionedNodeInfo::V1(fdd::V1DeviceInfo {
-                    topological_path: Some(String::from("/dev/sys/platform")),
-                    bound_driver_libname: Some(String::from("root.so")),
-                    ..Default::default()
-                })),
+                moniker: Some(String::from("sys.platform")),
                 ..Default::default()
             },
             // Composite parent
@@ -438,11 +362,7 @@ mod tests {
                 bound_driver_url: Some(String::from(
                     "fuchsia-pkg://fuchsia.com/parent-package#meta/parent.cm",
                 )),
-                versioned_info: Some(fdd::VersionedNodeInfo::V1(fdd::V1DeviceInfo {
-                    topological_path: Some(String::from("/dev/parent")),
-                    bound_driver_libname: Some(String::from("parent.so")),
-                    ..Default::default()
-                })),
+                moniker: Some(String::from("parent")),
                 ..Default::default()
             },
             // Composite child
@@ -454,11 +374,7 @@ mod tests {
                 bound_driver_url: Some(String::from(
                     "fuchsia-pkg://fuchsia.com/child-package#meta/child.cm",
                 )),
-                versioned_info: Some(fdd::VersionedNodeInfo::V1(fdd::V1DeviceInfo {
-                    topological_path: Some(String::from("/dev/parent/child")),
-                    bound_driver_libname: Some(String::from("child.so")),
-                    ..Default::default()
-                })),
+                moniker: Some(String::from("parent.child")),
                 ..Default::default()
             },
         ]
