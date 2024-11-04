@@ -498,6 +498,12 @@ impl ClientInner {
 /// on a Fuchsia device.
 pub struct Client(Mutex<ClientInner>);
 
+impl std::fmt::Debug for Client {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Client").field(&"...").finish()
+    }
+}
+
 impl Client {
     /// Create a new FDomain client. The `transport` argument should contain the
     /// established connection to the target, ready to communicate the FDomain
