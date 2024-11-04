@@ -46,10 +46,9 @@ pub enum KillSessionResult {
 
 #[derive(Deserialize, Default, Debug)]
 pub struct StartBasemgrRequest {
-    pub session: Option<SessionArgs>,
     /// `session_url` is an optional component URL for a session to launch
     /// instead of starting basemgr as a legacy component.
-    pub session_url: Option<String>,
+    pub session_url: String,
 }
 
 #[derive(Deserialize, Default, Debug)]
