@@ -4239,6 +4239,7 @@ impl BinderDriver {
             0,
             length,
             prot_flags,
+            prot_flags.to_access(),
             mapping_options,
             MappingName::File(filename.into_active()),
             FileWriteGuardRef(None),

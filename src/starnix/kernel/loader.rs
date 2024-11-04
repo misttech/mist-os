@@ -170,6 +170,20 @@ fn elf_load_error_to_errno(err: elf_load::ElfLoadError) -> Errno {
     errno!(EINVAL)
 }
 
+fn access_from_vmar_flags(vmar_flags: zx::VmarFlags) -> Access {
+    let mut access = Access::empty();
+    if vmar_flags.contains(zx::VmarFlags::PERM_READ) {
+        access |= Access::READ;
+    }
+    if vmar_flags.contains(zx::VmarFlags::PERM_WRITE) {
+        access |= Access::WRITE;
+    }
+    if vmar_flags.contains(zx::VmarFlags::PERM_EXECUTE) {
+        access |= Access::EXEC;
+    }
+    access
+}
+
 struct Mapper<'a> {
     file: &'a FileHandle,
     mm: &'a Arc<MemoryManager>,
@@ -201,6 +215,7 @@ impl elf_load::Mapper for Mapper<'_> {
                 vmo_offset,
                 length,
                 ProtectionFlags::from_vmar_flags(vmar_flags),
+                access_from_vmar_flags(vmar_flags),
                 MappingOptions::ELF_BINARY,
                 MappingName::File(self.file.name.clone()),
                 self.file_write_guard.clone(),
@@ -519,9 +534,11 @@ pub fn load_executable(
 
     let vdso_size = vdso_memory.get_size();
     const VDSO_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ.union(ProtectionFlags::EXEC);
+    const VDSO_MAX_ACCESS: Access = Access::READ.union(Access::EXEC);
 
     let vvar_size = vvar_memory.get_size();
     const VVAR_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ;
+    const VVAR_MAX_ACCESS: Access = Access::READ;
 
     // Map the time values VMO used by libfasttime. We map this right behind the vvar so that
     // userspace sees this as one big vvar block in memory.
@@ -532,6 +549,7 @@ pub fn load_executable(
         0,
         (time_values_size as usize) + (vvar_size as usize) + (vdso_size as usize),
         VVAR_PROT_FLAGS,
+        VVAR_MAX_ACCESS,
         MappingOptions::empty(),
         MappingName::Vvar,
         FileWriteGuardRef(None),
@@ -555,6 +573,7 @@ pub fn load_executable(
         0,
         vvar_size as usize,
         VVAR_PROT_FLAGS,
+        VVAR_MAX_ACCESS,
         MappingOptions::empty(),
         MappingName::Vvar,
         FileWriteGuardRef(None),
@@ -567,6 +586,7 @@ pub fn load_executable(
         0,
         vdso_size as usize,
         VDSO_PROT_FLAGS,
+        VDSO_MAX_ACCESS,
         MappingOptions::DONT_SPLIT,
         MappingName::Vdso,
         FileWriteGuardRef(None),

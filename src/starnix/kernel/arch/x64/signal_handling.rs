@@ -252,6 +252,7 @@ mod tests {
     use crate::testing::*;
     use crate::vfs::FileWriteGuardRef;
     use starnix_uapi::errors::{EINTR, ERESTARTSYS};
+    use starnix_uapi::file_mode::Access;
     use starnix_uapi::signals::{SIGUSR1, SIGUSR2};
     use starnix_uapi::{__NR_rt_sigreturn, SA_RESTART, SA_RESTORER, SA_SIGINFO, SI_USER};
 
@@ -553,6 +554,7 @@ mod tests {
                 0,
                 STACK_SIZE,
                 prot_flags,
+                Access::rwx(),
                 MappingOptions::empty(),
                 MappingName::Stack,
                 FileWriteGuardRef(None),

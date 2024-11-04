@@ -38,6 +38,7 @@ use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::CAP_FOWNER;
 use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
 use starnix_uapi::file_lease::FileLeaseType;
+use starnix_uapi::file_mode::Access;
 use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::seal_flags::SealFlags;
@@ -335,6 +336,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             memory_offset,
             length,
             prot_flags,
+            file.max_access_for_memory_mapping(),
             options,
             MappingName::File(filename.into_active()),
             file_write_guard,
@@ -1556,6 +1558,18 @@ impl FileObject {
         // TODO: Consider caching the access mode outside of this lock
         // because it cannot change.
         self.flags.lock().can_write()
+    }
+
+    pub fn max_access_for_memory_mapping(&self) -> Access {
+        let mut access = Access::EXEC;
+        let flags = self.flags.lock();
+        if flags.can_read() {
+            access |= Access::READ;
+        }
+        if flags.can_write() {
+            access |= Access::WRITE;
+        }
+        access
     }
 
     pub fn ops(&self) -> &dyn FileOps {
