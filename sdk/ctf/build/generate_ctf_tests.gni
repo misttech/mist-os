@@ -215,45 +215,21 @@ template("generate_fuchsia-intl-tests") {
 
 template("generate_timekeeper-integration") {
   forward_variables_from(invoker, [ "test_info" ])
-  fuchsia_package_with_test(target_name) {
-    test_component = "//src/sys/time/timekeeper_integration:timekeeper-integration-test-root-component"
-    test_component_name = "timekeeper-integration-test-root-component.cm"
-    subpackages = [
-      test_info.target_label,
-      "//src/sys/time/testing/realm-proxy:pkg",
-    ]
-    test_specs = {
-      environments = [
-        nuc7_env,
-        nuc11_env,
-      ]
-      log_settings = {
-        # Some tests produce "error" level logs as part of the test execution.
-        max_severity = "ERROR"
-      }
-    }
+
+  # TODO: b/365558387 - This CTF test should be completely
+  # retracted.
+  not_needed([ "test_info" ])
+  group(target_name) {
   }
 }
 
 template("generate_faketime-integration") {
   forward_variables_from(invoker, [ "test_info" ])
-  fuchsia_package_with_test(target_name) {
-    test_component = "//src/sys/time/timekeeper_integration:faketime-integration-test-root-component"
-    test_component_name = "faketime-integration-test-root-component.cm"
-    subpackages = [
-      test_info.target_label,
-      "//src/sys/time/testing/realm-proxy:pkg",
-    ]
-    test_specs = {
-      environments = [
-        nuc7_env,
-        nuc11_env,
-      ]
-      log_settings = {
-        # Some tests produce "error" level logs as part of the test execution.
-        max_severity = "ERROR"
-      }
-    }
+
+  # TODO: b/365558387 - This CTF test should be completely
+  # retracted.
+  not_needed([ "test_info" ])
+  group(target_name) {
   }
 }
 
