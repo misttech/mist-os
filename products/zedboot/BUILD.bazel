@@ -80,8 +80,10 @@ fuchsia_product_configuration(
     product_config = "//products/zedboot:zedboot",
 ) for board in [
     "x64",
+    "x64_reduced_perf_variation",
     "arm64",
     "vim3",
+    "vim3_reduced_perf_variation",
     "riscv64",
 ]]
 

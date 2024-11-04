@@ -217,6 +217,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//products/microfuchsia:*",
     "//products/minimal:*",
+    "//products/terminal:*",
     "//products/workbench:*",
     "//src/power/testing/system-integration/*",
   ]

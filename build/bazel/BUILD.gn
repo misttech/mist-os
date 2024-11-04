@@ -268,6 +268,7 @@ group("bazel_action_allowlist") {
   visibility = [
     "//products/microfuchsia:*",
     "//products/minimal:*",
+    "//products/terminal:*",
     "//products/workbench:*",
     "//products/zedboot:*",
   ]

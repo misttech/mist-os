@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
@@ -60,6 +61,10 @@ fuchsia_package("intl_property_manager") {
     ":intl_property_manager_component",
     ":intl_property_manager_without_flags_component",
   ]
+}
+
+export_fuchsia_package_to_bazel("intl_property_manager.bazel_input") {
+  package = ":intl_property_manager"
 }
 
 fuchsia_component("intl_property_manager_tests_component") {
