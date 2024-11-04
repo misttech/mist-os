@@ -4,8 +4,9 @@
 
 use crate::diagnostics::TRACE_CATEGORY;
 use crate::identity::ComponentIdentity;
+use crate::logs::budget::BudgetHandle;
+use crate::logs::buffer::{ArcList, LazyItem};
 use crate::logs::multiplex::PinStream;
-use crate::logs::shared_buffer::{ContainerBuffer, LazyItem};
 use crate::logs::socket::{Encoding, LogMessageSocket};
 use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
@@ -20,6 +21,7 @@ use fidl_fuchsia_logger::{
     LogSinkWaitForInterestChangeResponder,
 };
 use fuchsia_async::Task;
+use fuchsia_inspect_derive::WithInspect;
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
@@ -29,9 +31,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tracing::{debug, error, warn};
-use {fuchsia_async as fasync, fuchsia_trace as ftrace};
-
-pub type OnInactive = Box<dyn Fn(&LogsArtifactsContainer) + Send + Sync>;
+use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace};
 
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -42,9 +42,13 @@ pub struct LogsArtifactsContainer {
     /// Inspect instrumentation.
     pub stats: Arc<LogStreamStats>,
 
+    /// Our handle to the budget manager, used to request space in the overall budget before storing
+    /// messages in our cache.
+    budget: BudgetHandle,
+
     /// Buffer for all log messages.
     #[derivative(Debug = "ignore")]
-    buffer: ContainerBuffer,
+    buffer: ArcList<StoredMessage>,
 
     /// Mutable state for the container.
     state: Arc<Mutex<ContainerState>>,
@@ -55,11 +59,6 @@ pub struct LogsArtifactsContainer {
 
     /// Mechanism for a test to retrieve the internal hanging get state.
     hanging_get_test_state: Arc<Mutex<TestState>>,
-
-    /// A callback which is called when the container is inactive i.e. has no channels, sockets or
-    /// stored logs.
-    #[derivative(Debug = "ignore")]
-    on_inactive: Option<OnInactive>,
 }
 
 #[derive(PartialEq, Debug)]
@@ -94,17 +93,21 @@ impl LogsArtifactsContainer {
         identity: Arc<ComponentIdentity>,
         interest_selectors: impl Iterator<Item = &'a LogInterestSelector>,
         initial_interest: Option<FidlSeverity>,
-        stats: Arc<LogStreamStats>,
-        buffer: ContainerBuffer,
-        on_inactive: Option<OnInactive>,
+        parent_node: &inspect::Node,
+        budget: BudgetHandle,
     ) -> Self {
+        let stats = LogStreamStats::default()
+            .with_inspect(parent_node, identity.moniker.to_string())
+            .expect("failed to attach component log stats");
+        stats.set_url(&identity.url);
         let mut interests = BTreeMap::new();
         if let Some(severity) = initial_interest {
             interests.insert(Interest::from(severity), 1);
         }
         let new = Self {
             identity,
-            buffer,
+            budget,
+            buffer: Default::default(),
             state: Arc::new(Mutex::new(ContainerState {
                 num_active_channels: 0,
                 num_active_sockets: 0,
@@ -112,10 +115,9 @@ impl LogsArtifactsContainer {
                 hanging_gets: BTreeMap::new(),
                 is_initializing: true,
             })),
-            stats,
+            stats: Arc::new(stats),
             next_hanging_get_id: AtomicUsize::new(0),
             hanging_get_test_state: Arc::new(Mutex::new(TestState::NoRequest)),
-            on_inactive,
         };
 
         // there are no control handles so this won't notify anyone
@@ -140,16 +142,15 @@ impl LogsArtifactsContainer {
         mode: StreamMode,
         parent_trace_id: ftrace::Id,
     ) -> PinStream<Arc<LogsData>> {
-        let Some(buffer_cursor) = self.buffer.cursor(mode) else {
-            return Box::pin(futures::stream::empty());
-        };
-
         let identity = Arc::clone(&self.identity);
+        let earliest_timestamp =
+            self.buffer.peek_front().map(|f| f.timestamp()).unwrap_or(zx::BootInstant::ZERO);
         Box::pin(
-            buffer_cursor
+            self.buffer
+                .cursor(mode)
                 .enumerate()
                 .scan(
-                    (zx::BootInstant::ZERO, 0u64),
+                    (earliest_timestamp, 0u64),
                     move |(last_timestamp, rolled_out_messages), (i, item)| {
                         futures::future::ready(match item {
                             LazyItem::Next(m) => {
@@ -189,11 +190,10 @@ impl LogsArtifactsContainer {
                                     }
                                 }
                             }
-                            LazyItem::ItemsRolledOut(rolled_out_count, timestamp) => {
+                            LazyItem::ItemsRolledOut(rolled_out_count) => {
                                 if i > 0 {
                                     *rolled_out_messages += rolled_out_count;
                                 }
-                                *last_timestamp = timestamp;
                                 Some(None)
                             }
                         })
@@ -287,7 +287,6 @@ impl LogsArtifactsContainer {
         }
         debug!(%self.identity, "LogSink channel closed.");
         self.state.lock().num_active_channels -= 1;
-        self.check_inactive();
     }
 
     async fn wait_for_interest_change_async(
@@ -371,13 +370,13 @@ impl LogsArtifactsContainer {
         }
         debug!(%self.identity, "Socket closed.");
         self.state.lock().num_active_sockets -= 1;
-        self.check_inactive();
     }
 
     /// Updates log stats in inspect and push the message onto the container's buffer.
     pub fn ingest_message(&self, message: StoredMessage) {
+        self.budget.allocate(message.size());
         self.stats.ingest_message(&message);
-        self.buffer.push_back(message.bytes());
+        self.buffer.push_back(message);
     }
 
     /// Set the `Interest` for this component, notifying all active `LogSink/WaitForInterestChange`
@@ -468,9 +467,14 @@ impl LogsArtifactsContainer {
         }
     }
 
-    /// Returns `true` if this container corresponds to a running component, or still has pending
-    /// objects to drain.
-    pub fn is_active(&self) -> bool {
+    /// Remove the oldest message from this buffer, returning it.
+    pub fn pop(&self) -> Option<Arc<StoredMessage>> {
+        self.buffer.pop_front()
+    }
+
+    /// Returns `true` if this container corresponds to a running component, still has log messages
+    /// or still has pending objects to drain.
+    pub fn should_retain(&self) -> bool {
         let state = self.state.lock();
         state.is_initializing
             || state.num_active_sockets > 0
@@ -478,13 +482,9 @@ impl LogsArtifactsContainer {
             || !self.buffer.is_empty()
     }
 
-    /// Called whenever there's a transition that means the component might no longer be active.
-    fn check_inactive(&self) {
-        if !self.is_active() {
-            if let Some(on_inactive) = &self.on_inactive {
-                on_inactive(self);
-            }
-        }
+    /// Returns the timestamp of the earliest log message in this container's buffer, if any.
+    pub fn oldest_timestamp(&self) -> Option<zx::BootInstant> {
+        self.buffer.peek_front().map(|m| m.timestamp())
     }
 
     /// Stop accepting new messages, ensuring that pending Cursors return Poll::Ready(None) after
@@ -494,9 +494,13 @@ impl LogsArtifactsContainer {
     }
 
     #[cfg(test)]
+    pub fn buffer(&self) -> &ArcList<StoredMessage> {
+        &self.buffer
+    }
+
+    #[cfg(test)]
     pub fn mark_stopped(&self) {
         self.state.lock().is_initializing = false;
-        self.check_inactive();
     }
 }
 
@@ -617,35 +621,28 @@ fn compare_fidl_interest(a: &FidlInterest, b: &FidlInterest) -> Ordering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::shared_buffer::SharedBuffer;
+    use crate::logs::budget::BudgetManager;
     use fidl_fuchsia_diagnostics::{ComponentSelector, Severity, StringSelector};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
     use fuchsia_async::MonotonicDuration;
-    use fuchsia_inspect as inspect;
-    use fuchsia_inspect_derive::WithInspect;
     use futures::channel::mpsc::UnboundedReceiver;
     use moniker::ExtendedMoniker;
 
     fn initialize_container(
         severity: Option<Severity>,
     ) -> (Arc<LogsArtifactsContainer>, LogSinkProxy, UnboundedReceiver<Task<()>>) {
-        let identity = Arc::new(ComponentIdentity::new(
-            ExtendedMoniker::parse_str("/foo/bar").unwrap(),
-            "fuchsia-pkg://test",
-        ));
-        let stats = Arc::new(
-            LogStreamStats::default()
-                .with_inspect(inspect::component::inspector().root(), identity.moniker.to_string())
-                .expect("failed to attach component log stats"),
-        );
-        let buffer = Arc::new(SharedBuffer::new(1024 * 1024, Box::new(|_| {})));
+        // Initialize container
+        let (snd, _rcv) = mpsc::unbounded();
+        let budget_manager = BudgetManager::new(0, snd);
         let container = Arc::new(LogsArtifactsContainer::new(
-            identity,
+            Arc::new(ComponentIdentity::new(
+                ExtendedMoniker::parse_str("/foo/bar").unwrap(),
+                "fuchsia-pkg://test",
+            )),
             std::iter::empty(),
             severity,
-            Arc::clone(&stats),
-            buffer.new_container_buffer(Arc::new(vec!["a"].into()), stats),
-            None,
+            inspect::component::inspector().root(),
+            budget_manager.handle(),
         ));
         // Connect out LogSink under test and take its events channel.
         let (sender, _recv) = mpsc::unbounded();

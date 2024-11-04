@@ -80,7 +80,6 @@ rustc_library("lib") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-subscriber",
-    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [
@@ -118,6 +117,9 @@ rustc_library("lib") {
     "src/inspect/servers/inspect_sink.rs",
     "src/inspect/servers/mod.rs",
     "src/lib.rs",
+    "src/logs/budget.rs",
+    "src/logs/buffer.rs",
+    "src/logs/buffer/arc_list.rs",
     "src/logs/container.rs",
     "src/logs/debuglog.rs",
     "src/logs/error.rs",
@@ -130,7 +132,6 @@ rustc_library("lib") {
     "src/logs/servers/log.rs",
     "src/logs/servers/log_settings.rs",
     "src/logs/servers/mod.rs",
-    "src/logs/shared_buffer.rs",
     "src/logs/socket.rs",
     "src/logs/stats.rs",
     "src/logs/stored_message.rs",
