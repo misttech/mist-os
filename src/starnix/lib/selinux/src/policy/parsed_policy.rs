@@ -17,7 +17,10 @@ use super::symbols::{
     find_class_by_name, find_class_permission_by_name, Category, Class, Classes, CommonSymbol,
     CommonSymbols, ConditionalBoolean, Permission, Role, Sensitivity, SymbolList, Type, User,
 };
-use super::{AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, UserId, Validate};
+use super::{
+    AccessDecision, AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, UserId,
+    Validate, SELINUX_AVD_FLAGS_PERMISSIVE,
+};
 
 use anyhow::Context as _;
 use std::collections::HashSet;
@@ -200,10 +203,16 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         source_type_name: TypeId,
         target_type_name: TypeId,
         target_class_name: &str,
-    ) -> Result<AccessVector, QueryError> {
-        let target_class = find_class_by_name(self.classes(), target_class_name)
-            .ok_or_else(|| QueryError::UnknownClass { class_name: target_class_name.to_owned() })?;
-        Ok(self.compute_explicitly_allowed(source_type_name, target_type_name, target_class))
+    ) -> AccessDecision {
+        if let Some(target_class) = find_class_by_name(self.classes(), target_class_name) {
+            self.compute_explicitly_allowed(source_type_name, target_type_name, target_class)
+        } else {
+            AccessDecision::allow(if self.handle_unknown() == HandleUnknown::Allow {
+                AccessVector::ALL
+            } else {
+                AccessVector::NONE
+            })
+        }
     }
 
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
@@ -214,7 +223,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         source_type: TypeId,
         target_type: TypeId,
         target_class: &Class<PS>,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         let target_class_id = target_class.id();
 
         let mut computed_access_vector = AccessVector::NONE;
@@ -258,7 +267,17 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             }
         }
 
-        computed_access_vector
+        // TODO: https://fxbug.dev/362706116 - Collate the auditallow & auditdeny sets.
+        let mut flags = 0;
+        if self.permissive_types().is_set(source_type.0.get()) {
+            flags |= SELINUX_AVD_FLAGS_PERMISSIVE;
+        }
+        AccessDecision {
+            allow: computed_access_vector,
+            auditallow: AccessVector::NONE,
+            auditdeny: AccessVector::ALL,
+            flags,
+        }
     }
 
     /// Returns the policy entry for the specified initial Security Context.

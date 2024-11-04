@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::policy::AccessVector;
+use crate::policy::AccessDecision;
 use crate::sync::Mutex;
 use crate::{AbstractObjectClass, SecurityId};
 
@@ -19,11 +19,7 @@ pub trait Query {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector;
-
-    /// Returns true if permission checks for the specified `source_sid` should be permissive,
-    /// such that denials are logged, but not enforced.
-    fn is_permissive(&self, source_sid: SecurityId) -> bool;
+    ) -> AccessDecision;
 }
 
 /// An interface for computing the rights permitted to a source accessing a target of a particular
@@ -36,11 +32,7 @@ pub trait QueryMut {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector;
-
-    /// Returns true if permission checks for the specified `source_sid` should be permissive,
-    /// such that denials are logged, but not enforced.
-    fn is_permissive(&mut self, source_sid: SecurityId) -> bool;
+    ) -> AccessDecision;
 }
 
 impl<Q: Query> QueryMut for Q {
@@ -49,12 +41,8 @@ impl<Q: Query> QueryMut for Q {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         (self as &dyn Query).query(source_sid, target_sid, target_class)
-    }
-
-    fn is_permissive(&mut self, source_sid: SecurityId) -> bool {
-        (self as &dyn Query).is_permissive(source_sid)
     }
 }
 
@@ -93,12 +81,8 @@ impl Query for DenyAll {
         _source_sid: SecurityId,
         _target_sid: SecurityId,
         _target_class: AbstractObjectClass,
-    ) -> AccessVector {
-        AccessVector::NONE
-    }
-
-    fn is_permissive(&self, _source_sid: SecurityId) -> bool {
-        false
+    ) -> AccessDecision {
+        AccessDecision::default()
     }
 }
 
@@ -115,7 +99,7 @@ struct QueryAndResult {
     source_sid: SecurityId,
     target_sid: SecurityId,
     target_class: AbstractObjectClass,
-    access_vector: AccessVector,
+    access_decision: AccessDecision,
 }
 
 /// An empty access vector cache that delegates to an [`AccessQueryable`].
@@ -140,12 +124,8 @@ impl<D: QueryMut> QueryMut for Empty<D> {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         self.delegate.query(source_sid, target_sid, target_class)
-    }
-
-    fn is_permissive(&mut self, source_sid: SecurityId) -> bool {
-        self.delegate.is_permissive(source_sid)
     }
 }
 
@@ -209,7 +189,7 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         if !self.is_empty() {
             let mut index = if self.next_index == 0 { SIZE - 1 } else { self.next_index - 1 };
             loop {
@@ -221,7 +201,7 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
                     && &target_sid == &query_and_result.target_sid
                     && &target_class == &query_and_result.target_class
                 {
-                    return query_and_result.access_vector;
+                    return query_and_result.access_decision.clone();
                 }
 
                 if index == self.next_index || (index == 0 && !self.is_full) {
@@ -232,14 +212,16 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
             }
         }
 
-        let access_vector = self.delegate.query(source_sid, target_sid, target_class.clone());
+        let access_decision = self.delegate.query(source_sid, target_sid, target_class.clone());
 
-        self.insert(QueryAndResult { source_sid, target_sid, target_class, access_vector });
+        self.insert(QueryAndResult {
+            source_sid,
+            target_sid,
+            target_class,
+            access_decision: access_decision.clone(),
+        });
 
-        access_vector
-    }
-    fn is_permissive(&mut self, source_sid: SecurityId) -> bool {
-        self.delegate.is_permissive(source_sid)
+        access_decision
     }
 }
 
@@ -285,12 +267,8 @@ impl<D: QueryMut> Query for Locked<D> {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         self.delegate.lock().query(source_sid, target_sid, target_class)
-    }
-
-    fn is_permissive(&self, source_sid: SecurityId) -> bool {
-        self.delegate.lock().is_permissive(source_sid)
     }
 }
 
@@ -339,12 +317,8 @@ impl<Q: Query> Query for Arc<Q> {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         self.as_ref().query(source_sid, target_sid, target_class)
-    }
-
-    fn is_permissive(&self, source_sid: SecurityId) -> bool {
-        self.as_ref().is_permissive(source_sid)
     }
 }
 
@@ -360,14 +334,8 @@ impl<Q: Query> Query for Weak<Q> {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
-        self.upgrade()
-            .map(|q| q.query(source_sid, target_sid, target_class))
-            .unwrap_or(AccessVector::NONE)
-    }
-
-    fn is_permissive(&self, source_sid: SecurityId) -> bool {
-        self.upgrade().map(|q| q.is_permissive(source_sid)).unwrap_or(false)
+    ) -> AccessDecision {
+        self.upgrade().map(|q| q.query(source_sid, target_sid, target_class)).unwrap_or_default()
     }
 }
 
@@ -407,7 +375,7 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         let version = self.active_version.as_ref().version();
         if self.current_version != version {
             self.current_version = version;
@@ -416,10 +384,6 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
 
         // Allow `self.delegate` to implement caching strategy and prepare response.
         self.delegate.query(source_sid, target_sid, target_class)
-    }
-
-    fn is_permissive(&mut self, source_sid: SecurityId) -> bool {
-        self.delegate.is_permissive(source_sid)
     }
 }
 
@@ -527,6 +491,7 @@ mod testing {
 mod tests {
     use super::testing::*;
     use super::*;
+    use crate::policy::AccessVector;
     use crate::ObjectClass;
 
     use std::sync::atomic::AtomicUsize;
@@ -554,13 +519,9 @@ mod tests {
             source_sid: SecurityId,
             target_sid: SecurityId,
             target_class: AbstractObjectClass,
-        ) -> AccessVector {
+        ) -> AccessDecision {
             self.query_count.fetch_add(1, Ordering::Relaxed);
             self.delegate.query(source_sid, target_sid, target_class)
-        }
-
-        fn is_permissive(&self, source_sid: SecurityId) -> bool {
-            self.delegate.is_permissive(source_sid)
         }
     }
 
@@ -577,7 +538,7 @@ mod tests {
         let mut avc = Empty::<DenyAll>::default();
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into())
+            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
         );
     }
 
@@ -587,12 +548,12 @@ mod tests {
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into())
+            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into())
+            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(1, avc.next_index);
@@ -610,7 +571,7 @@ mod tests {
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
             AccessVector::NONE,
-            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into())
+            avc.query(A_TEST_SID.clone(), A_TEST_SID.clone(), ObjectClass::Process.into()).allow
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(1, avc.next_index);
@@ -701,6 +662,7 @@ mod starnix_tests {
     use super::testing::*;
     use super::*;
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
+    use crate::policy::AccessVector;
     use crate::ObjectClass;
 
     use rand::distributions::Uniform;
@@ -713,8 +675,8 @@ mod starnix_tests {
     const READ_RIGHTS: u32 = 1;
     const WRITE_RIGHTS: u32 = 2;
 
-    const ACCESS_VECTOR_READ: AccessVector = ACCESS_VECTOR_0001;
-    const ACCESS_VECTOR_WRITE: AccessVector = ACCESS_VECTOR_0010;
+    const ACCESS_VECTOR_READ: AccessDecision = AccessDecision::allow(ACCESS_VECTOR_0001);
+    const ACCESS_VECTOR_WRITE: AccessDecision = AccessDecision::allow(ACCESS_VECTOR_0010);
 
     struct PolicyServer {
         policy: Arc<AtomicU32>,
@@ -735,10 +697,10 @@ mod starnix_tests {
             _source_sid: SecurityId,
             _target_sid: SecurityId,
             _target_class: AbstractObjectClass,
-        ) -> AccessVector {
+        ) -> AccessDecision {
             let policy = self.policy.as_ref().load(Ordering::Relaxed);
             if policy == NO_RIGHTS {
-                AccessVector::NONE
+                AccessDecision::default()
             } else if policy == READ_RIGHTS {
                 ACCESS_VECTOR_READ
             } else if policy == WRITE_RIGHTS {
@@ -746,10 +708,6 @@ mod starnix_tests {
             } else {
                 panic!("query found invalid policy: {}", policy);
             }
-        }
-
-        fn is_permissive(&self, _source_sid: SecurityId) -> bool {
-            false
         }
     }
 
@@ -816,13 +774,13 @@ mod starnix_tests {
         let mut observed_rights: HashSet<AccessVector> = Default::default();
         let mut prev_rights = AccessVector::NONE;
         for (i, rights) in trace.into_iter().enumerate() {
-            if i != 0 && rights != prev_rights {
+            if i != 0 && rights.allow != prev_rights {
                 // Return-to-previous-rights => cache incoherence!
-                assert!(!observed_rights.contains(&rights));
-                observed_rights.insert(rights);
+                assert!(!observed_rights.contains(&rights.allow));
+                observed_rights.insert(rights.allow);
             }
 
-            prev_rights = rights;
+            prev_rights = rights.allow;
         }
     }
 
@@ -905,7 +863,7 @@ mod starnix_tests {
             //
 
             for item in avc_for_query_1.delegate.lock().cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
             }
         });
 
@@ -950,7 +908,7 @@ mod starnix_tests {
             //
 
             for item in avc_for_query_2.delegate.lock().cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
             }
         });
 
@@ -1015,8 +973,8 @@ mod starnix_tests {
 
         for trace in [trace_1, trace_2] {
             let mut trace_by_sid = HashMap::<SecurityId, Vec<AccessVector>>::new();
-            for (sid, access_vector) in trace {
-                trace_by_sid.entry(sid).or_insert(vec![]).push(access_vector);
+            for (sid, access_decision) in trace {
+                trace_by_sid.entry(sid).or_insert(vec![]).push(access_decision.allow);
             }
             for access_vectors in trace_by_sid.values() {
                 let initial_rights = AccessVector::NONE;
@@ -1047,10 +1005,10 @@ mod starnix_tests {
             _source_sid: SecurityId,
             _target_sid: SecurityId,
             _target_class: AbstractObjectClass,
-        ) -> AccessVector {
+        ) -> AccessDecision {
             let policy = self.policy.as_ref().load(Ordering::Relaxed);
             if policy == NO_RIGHTS {
-                AccessVector::NONE
+                AccessDecision::default()
             } else if policy == READ_RIGHTS {
                 ACCESS_VECTOR_READ
             } else if policy == WRITE_RIGHTS {
@@ -1058,10 +1016,6 @@ mod starnix_tests {
             } else {
                 panic!("query found invalid policy: {}", policy);
             }
-        }
-
-        fn is_permissive(&self, _source_sid: SecurityId) -> bool {
-            false
         }
     }
 
@@ -1173,7 +1127,7 @@ mod starnix_tests {
             //
 
             for item in avc_for_query_1.delegate.cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
             }
         });
 
@@ -1218,7 +1172,7 @@ mod starnix_tests {
             //
 
             for item in avc_for_query_2.delegate.cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
             }
         });
 
@@ -1287,8 +1241,8 @@ mod starnix_tests {
 
         for trace in [trace_1, trace_2] {
             let mut trace_by_sid = HashMap::<SecurityId, Vec<AccessVector>>::new();
-            for (sid, access_vector) in trace {
-                trace_by_sid.entry(sid).or_insert(vec![]).push(access_vector);
+            for (sid, access_decision) in trace {
+                trace_by_sid.entry(sid).or_insert(vec![]).push(access_decision.allow);
             }
             for access_vectors in trace_by_sid.values() {
                 let initial_rights = AccessVector::NONE;
@@ -1304,13 +1258,13 @@ mod starnix_tests {
         let shared_cache = security_server.manager().shared_cache.delegate.lock();
         if shared_cache.is_full {
             for item in shared_cache.cache.iter() {
-                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.as_ref().unwrap().access_decision);
             }
         } else {
             for i in 0..shared_cache.next_index {
                 assert_eq!(
                     ACCESS_VECTOR_WRITE,
-                    shared_cache.cache[i].as_ref().unwrap().access_vector
+                    shared_cache.cache[i].as_ref().unwrap().access_decision
                 );
             }
         }

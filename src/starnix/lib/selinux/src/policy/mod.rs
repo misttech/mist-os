@@ -19,7 +19,7 @@ pub use security_context::{SecurityContext, SecurityContextError};
 
 use crate::{self as sc, FileClass, NullessByteStr, ObjectClass};
 use anyhow::Context as _;
-use error::{ParseError, QueryError};
+use error::ParseError;
 use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
@@ -65,6 +65,34 @@ impl Into<u32> for ClassId {
         self.0.into()
     }
 }
+
+/// Encapsulates the result of a permissions calculation, between source & target domains, for a
+/// specific class. Decisions describe which permissions are allowed, and whether permissions should
+/// be audit-logged when allowed, and when denied.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AccessDecision {
+    pub allow: AccessVector,
+    pub auditallow: AccessVector,
+    pub auditdeny: AccessVector,
+    pub flags: u32,
+}
+
+impl Default for AccessDecision {
+    fn default() -> Self {
+        Self::allow(AccessVector::NONE)
+    }
+}
+
+impl AccessDecision {
+    /// Returns an [`AccessDecision`] with the specified permissions to `allow`, and default audit
+    /// behaviour.
+    pub(super) const fn allow(allow: AccessVector) -> Self {
+        Self { allow, auditallow: AccessVector::NONE, auditdeny: AccessVector::ALL, flags: 0 }
+    }
+}
+
+/// [`AccessDecision::flags`] value indicating that the policy marks the source domain permissive.
+pub(super) const SELINUX_AVD_FLAGS_PERMISSIVE: u32 = 1;
 
 /// The set of permissions that may be granted to sources accessing targets of a particular class,
 /// as defined in an SELinux policy.
@@ -311,7 +339,7 @@ impl<PS: ParseStrategy> Policy<PS> {
         source_type: TypeId,
         target_type: TypeId,
         object_class: sc::ObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         if let Some(target_class) = self.0.class(&object_class) {
             self.0.parsed_policy().compute_explicitly_allowed(
                 source_type,
@@ -319,7 +347,7 @@ impl<PS: ParseStrategy> Policy<PS> {
                 target_class,
             )
         } else {
-            AccessVector::NONE
+            AccessDecision::allow(AccessVector::NONE)
         }
     }
 
@@ -333,7 +361,7 @@ impl<PS: ParseStrategy> Policy<PS> {
         source_type: TypeId,
         target_type: TypeId,
         target_class_name: &str,
-    ) -> Result<AccessVector, QueryError> {
+    ) -> AccessDecision {
         self.0.parsed_policy().compute_explicitly_allowed_custom(
             source_type,
             target_type,
@@ -782,6 +810,7 @@ pub(super) mod testing {
 pub(super) mod tests {
     use super::*;
 
+    use crate::policy::error::QueryError;
     use crate::policy::metadata::HandleUnknown;
     use crate::policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
     use crate::{
@@ -1037,10 +1066,8 @@ pub(super) mod tests {
 
         let a_t = type_id_by_name(parsed_policy, "a_t");
 
-        let raw_access_vector = parsed_policy
-            .compute_explicitly_allowed_custom(a_t, a_t, "class0")
-            .expect("well-formed query")
-            .0;
+        let raw_access_vector =
+            parsed_policy.compute_explicitly_allowed_custom(a_t, a_t, "class0").allow.0;
 
         // Two separate attributes are each allowed one permission on `[attr] self:class0`. Both
         // attributes are associated with "a_t". No other `allow` statements appear in the policy

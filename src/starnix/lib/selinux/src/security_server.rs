@@ -7,8 +7,8 @@ use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
 use crate::policy::{
-    parse_policy_by_value, AccessVector, AccessVectorComputer, ClassId, FsUseLabelAndType,
-    FsUseType, Policy, SecurityContext,
+    parse_policy_by_value, AccessDecision, AccessVector, AccessVectorComputer, ClassId,
+    FsUseLabelAndType, FsUseType, Policy, SecurityContext,
 };
 use crate::sync::Mutex;
 use crate::{
@@ -440,13 +440,13 @@ impl SecurityServer {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         let state = self.state.lock();
 
         let policy = match &state.policy {
             Some(policy) => policy,
-            // Policy is "allow all" when no policy is loaded, regardless of enforcing state.
-            None => return AccessVector::ALL,
+            // All permissions are allowed when no policy is loaded, regardless of enforcing state.
+            None => return AccessDecision::allow(AccessVector::ALL),
         };
 
         // Policy is loaded, so `sid_to_security_context()` will not panic.
@@ -456,8 +456,6 @@ impl SecurityServer {
         // Access decisions are currently based solely on explicit "allow" rules.
         // TODO: https://fxbug.dev/372400976 - Include permissions from matched "constraints"
         // rules in the policy.
-        // TODO: https://fxbug.dev/372401676 - Include permissions from "attribute"s associated
-        // with the source & target types via "typeattribute" rules.
         // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules are respected.
         match target_class {
             AbstractObjectClass::System(target_class) => policy.parsed.compute_explicitly_allowed(
@@ -465,16 +463,15 @@ impl SecurityServer {
                 target_context.type_(),
                 target_class,
             ),
-            AbstractObjectClass::Custom(target_class) => policy
-                .parsed
-                .compute_explicitly_allowed_custom(
+            AbstractObjectClass::Custom(target_class) => {
+                policy.parsed.compute_explicitly_allowed_custom(
                     source_context.type_(),
                     target_context.type_(),
                     &target_class,
                 )
-                .unwrap_or(AccessVector::NONE),
+            }
             // No meaningful policy can be determined without target class.
-            _ => AccessVector::NONE,
+            _ => AccessDecision::allow(AccessVector::NONE),
         }
     }
 
@@ -588,20 +585,8 @@ impl Query for SecurityServer {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         self.compute_access_vector(source_sid, target_sid, target_class)
-    }
-
-    fn is_permissive(&self, source_sid: SecurityId) -> bool {
-        let state = self.state.lock();
-        if !state.enforcing {
-            true
-        } else if let Some(policy) = &state.policy {
-            let source_context = state.sid_to_security_context(source_sid);
-            policy.parsed.is_permissive(source_context.type_())
-        } else {
-            true
-        }
     }
 }
 
@@ -643,7 +628,8 @@ fn sid_from_mount_option(
 mod tests {
     use super::*;
 
-    use crate::ProcessPermission;
+    use crate::permission_check::PermissionCheckResult;
+    use crate::{CommonFilePermission, ProcessPermission};
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const TESTS_BINARY_POLICY: &[u8] =
@@ -717,7 +703,7 @@ mod tests {
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
-            security_server.compute_access_vector(sid1, sid2, ObjectClass::Process.into()),
+            security_server.compute_access_vector(sid1, sid2, ObjectClass::Process.into()).allow,
             AccessVector::ALL
         );
     }
@@ -1097,11 +1083,31 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
+        // Since the permission is granted by policy, the check will not be audit logged.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::Fork),
+            PermissionCheckResult { permit: true, audit: false }
+        );
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself, but
-        // the security server is configured to be permissive.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
+        // the security server is configured to be permissive. Because the permission was not
+        // granted by the policy, the check will be audit logged.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit),
+            PermissionCheckResult { permit: true, audit: true }
+        );
+
+        // Test policy is built with "deny unknown" behaviour, and has no "blk_file" class defined.
+        // This permission should be treated like a defined permission that is not allowed to the
+        // source, and both allowed and audited here.
+        assert_eq!(
+            permission_check.has_permission(
+                sid,
+                sid,
+                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+            ),
+            PermissionCheckResult { permit: true, audit: true }
+        );
     }
 
     #[test]
@@ -1115,10 +1121,28 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::Fork),
+            PermissionCheckResult { permit: true, audit: false }
+        );
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself.
-        assert!(!permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
+        // Permission denials are audit logged in enforcing mode.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit),
+            PermissionCheckResult { permit: false, audit: true }
+        );
+
+        // Test policy is built with "deny unknown" behaviour, and has no "blk_file" class defined.
+        // This permission should therefore be denied, and the denial audited.
+        assert_eq!(
+            permission_check.has_permission(
+                sid,
+                sid,
+                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+            ),
+            PermissionCheckResult { permit: false, audit: true }
+        );
     }
 
     #[test]
@@ -1137,28 +1161,61 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants process-getsched permission to both of the test domains.
-        assert!(
-            permission_check
-                .has_permission(permissive_sid, permissive_sid, ProcessPermission::GetSched)
-                .permit
+        assert_eq!(
+            permission_check.has_permission(
+                permissive_sid,
+                permissive_sid,
+                ProcessPermission::GetSched
+            ),
+            PermissionCheckResult { permit: true, audit: false }
         );
-        assert!(
-            permission_check
-                .has_permission(non_permissive_sid, non_permissive_sid, ProcessPermission::GetSched)
-                .permit
+        assert_eq!(
+            permission_check.has_permission(
+                non_permissive_sid,
+                non_permissive_sid,
+                ProcessPermission::GetSched
+            ),
+            PermissionCheckResult { permit: true, audit: false }
         );
 
         // Test policy does not grant process-getsched permission to the test domains on one another.
         // The permissive domain will be granted the permission, since it is marked permissive.
-        assert!(
-            permission_check
-                .has_permission(permissive_sid, non_permissive_sid, ProcessPermission::GetSched)
-                .permit
+        assert_eq!(
+            permission_check.has_permission(
+                permissive_sid,
+                non_permissive_sid,
+                ProcessPermission::GetSched
+            ),
+            PermissionCheckResult { permit: true, audit: true }
         );
-        assert!(
-            !permission_check
-                .has_permission(non_permissive_sid, permissive_sid, ProcessPermission::GetSched)
-                .permit
+        assert_eq!(
+            permission_check.has_permission(
+                non_permissive_sid,
+                permissive_sid,
+                ProcessPermission::GetSched
+            ),
+            PermissionCheckResult { permit: false, audit: true }
+        );
+
+        // Test policy has "deny unknown" behaviour and does not define the "blk_file" class, so
+        // access to a permission on it will depend on whether the source is permissive.
+        // The target domain is irrelevant, since the class/permission do not exist, so the non-
+        // permissive SID is used for both checks.
+        assert_eq!(
+            permission_check.has_permission(
+                permissive_sid,
+                non_permissive_sid,
+                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+            ),
+            PermissionCheckResult { permit: true, audit: true }
+        );
+        assert_eq!(
+            permission_check.has_permission(
+                non_permissive_sid,
+                non_permissive_sid,
+                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+            ),
+            PermissionCheckResult { permit: false, audit: true }
         );
     }
 }
