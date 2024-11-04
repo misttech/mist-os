@@ -4039,25 +4039,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   // more consistent.
   IncrementHierarchyGenerationCountLocked();
 
-  // If we're zeroing at the end of our parent range we can update to reflect this similar to a
-  // resize. This does not work if we are a slice, but we checked for that earlier. Whilst this does
-  // not actually zero the range in question, it makes future zeroing of the range far more
-  // efficient, which is why we do it first.
-  if (start < parent_limit_ && end >= parent_limit_) {
-    if (is_parent_hidden_locked()) {
-      __UNINITIALIZED BatchPQRemove page_remover(&ancestor_freed_list);
-      ReleaseCowParentPagesLocked(start, parent_limit_, &page_remover);
-      page_remover.Flush();
-    } else {
-      parent_limit_ = start;
-    }
-
-    // The node's updated parent limit must now lie at the beginning of the range that we zeroed.
-    // As the node must be visible its start limit must be 0.
-    DEBUG_ASSERT(parent_start_limit_ == 0);
-    DEBUG_ASSERT(parent_limit_ == start);
-  }
-
   // Helper lambda to determine if this VMO can see parent contents at offset, or if a length is
   // specified as well in the range [offset, offset + length).
   auto can_see_parent = [this](uint64_t offset, uint64_t length = PAGE_SIZE) TA_REQ(lock()) {
