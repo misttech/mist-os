@@ -40,7 +40,6 @@ fuchsia_unittest_package("dictionaries_route_to_all_test_root") {
     "//src/sys/component_manager/tests/collections:trigger_a",
     "//src/sys/component_manager/tests/collections:trigger_b",
   ]
-  restricted_features = [ "dictionaries" ]
 }
 
 fuchsia_component("dictionaries_route_to_all_test") {

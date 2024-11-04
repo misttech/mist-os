@@ -1490,9 +1490,6 @@ fn extract_use_source(
             }
         }
         Some(UseFromRef::Dictionary(d)) => {
-            if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
-                return Err(Error::validate("dictionaries are not enabled"));
-            }
             return dictionary_ref_to_source(&d);
         }
         None => fdecl::Ref::Parent(fdecl::ParentRef {}), // Default value.
@@ -1574,9 +1571,6 @@ fn expose_source_from_ref(
         ExposeFromRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
         ExposeFromRef::Void => fdecl::Ref::VoidType(fdecl::VoidRef {}),
         ExposeFromRef::Dictionary(d) => {
-            if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
-                return Err(Error::validate("dictionaries are not enabled"));
-            }
             return dictionary_ref_to_source(&d);
         }
     };
@@ -1692,9 +1686,6 @@ fn translate_target_ref(
             Ok(fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.clone().into() }))
         }
         AnyRef::OwnDictionary(name) if all_capabilities.contains(name) => {
-            if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
-                return Err(Error::validate("dictionaries are not enabled"));
-            }
             #[cfg(fuchsia_api_level_at_least = "NEXT")]
             return Ok(fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.clone().into() }));
             #[cfg(fuchsia_api_level_less_than = "NEXT")]
@@ -2093,9 +2084,6 @@ pub fn any_ref_to_decl(
         AnyRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
         AnyRef::Void => fdecl::Ref::VoidType(fdecl::VoidRef {}),
         AnyRef::Dictionary(d) => {
-            if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
-                return Err(Error::validate("dictionaries are not enabled"));
-            }
             return dictionary_ref_to_source(&d);
         }
         AnyRef::OwnDictionary(name) => {
@@ -3043,7 +3031,6 @@ mod tests {
         },
 
         test_compile_use => {
-            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "use": [
                     {
@@ -3308,7 +3295,6 @@ mod tests {
         },
 
         test_compile_expose => {
-            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "expose": [
                     {
@@ -3858,7 +3844,6 @@ mod tests {
         },
 
         test_compile_expose_source_availability_unknown => {
-            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "expose": [
                     {
@@ -3939,7 +3924,6 @@ mod tests {
         },
 
         test_compile_offer_source_availability_unknown => {
-            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "offer": [
                     {
@@ -4045,7 +4029,6 @@ mod tests {
         },
 
         test_compile_offer => {
-            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "offer": [
                     {
@@ -4718,7 +4701,6 @@ mod tests {
         },
 
         test_compile_offer_route_to_dictionary => {
-            features = FeatureSet::from(vec![Feature::Dictionaries]),
             input = json!({
                 "offer": [
                     {
@@ -4937,7 +4919,7 @@ mod tests {
         },
 
         test_compile_capabilities => {
-            features = FeatureSet::from(vec![Feature::Dictionaries, Feature::DynamicDictionaries]),
+            features = FeatureSet::from(vec![Feature::DynamicDictionaries]),
             input = json!({
                 "capabilities": [
                     {
@@ -5329,7 +5311,6 @@ mod tests {
 
 
         test_compile_configuration_capability => {
-            features = FeatureSet::from(vec![]),
             input = json!({
                 "capabilities": [
                     {

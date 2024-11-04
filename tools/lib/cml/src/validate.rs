@@ -424,8 +424,6 @@ which is almost certainly a mistake: {}",
         }
 
         if let Some(name) = capability.dictionary.as_ref() {
-            self.features.check(Feature::Dictionaries)?;
-
             if capability.path.is_some() {
                 self.features.check(Feature::DynamicDictionaries)?;
                 // If `path` is set that means the dictionary is provided by the program,
@@ -676,10 +674,6 @@ which is almost certainly a mistake: {}",
             }
         }
 
-        if matches!(expose.dictionary, Some(_)) {
-            self.features.check(Feature::Dictionaries)?;
-        }
-
         if let Some(event_stream) = &expose.event_stream {
             if event_stream.iter().len() > 1 && expose.r#as.is_some() {
                 return Err(Error::validate(format!(
@@ -806,10 +800,6 @@ which is almost certainly a mistake: {}",
                     "Storage \"{}\" is offered from a child, but storage capabilities cannot be exposed", storage)));
                 }
             }
-        }
-
-        if matches!(offer.dictionary, Some(_)) {
-            self.features.check(Feature::Dictionaries)?;
         }
 
         for ref_ in offer.from.iter() {
@@ -7126,18 +7116,7 @@ mod tests {
         ),
     }}
 
-    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::Dictionaries]), {
-        test_cml_dictionary_dynamic_disabled(
-            json!({
-                "capabilities": [
-                    {
-                        "dictionary": "dict",
-                        "path": "/some/dir",
-                    },
-                ],
-            }),
-            Err(Error::RestrictedFeature(s)) if s == "dynamic_dictionaries"
-        ),
+    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::DynamicDictionaries]), {
         test_cml_offer_to_dictionary_unsupported(
             json!({
                 "offer": [
@@ -7156,9 +7135,6 @@ mod tests {
             Err(Error::Validate { err, .. }) if &err == "\"offer\" to dictionary \
             \"self/dict\" for \"event_stream\" but dictionaries do not support this type yet."
         ),
-    }}
-
-    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::Dictionaries, Feature::DynamicDictionaries]), {
         test_cml_dictionary_ref(
             json!({
                 "use": [

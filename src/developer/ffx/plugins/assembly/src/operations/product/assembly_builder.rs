@@ -1928,7 +1928,6 @@ mod tests {
                     "args": [
                         "compile",
                         "--features=allow_long_names",
-                        "--features=dictionaries",
                         "--config-package-path",
                         "meta/component1.cvf",
                         "-o",
@@ -1951,7 +1950,6 @@ mod tests {
                     "args": [
                         "compile",
                         "--features=allow_long_names",
-                        "--features=dictionaries",
                         "--config-package-path",
                         "meta/component2.cvf",
                         "-o",

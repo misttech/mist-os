@@ -201,7 +201,6 @@ fn canonicalize_include(
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use cml::features::Feature;
     use serde_json::json;
     use std::fmt::Display;
     use std::fs::File;
@@ -273,22 +272,6 @@ mod tests {
                 &self.root_path,
                 true,
                 &FeatureSet::empty(),
-            )
-        }
-
-        fn merge_includes_with_features(
-            &self,
-            file: &PathBuf,
-            features: &FeatureSet,
-        ) -> Result<(), Error> {
-            super::merge_includes(
-                file,
-                Some(&self.output),
-                Some(&self.depfile),
-                &self.include_path,
-                &self.root_path,
-                true,
-                features,
             )
         }
 
@@ -391,7 +374,7 @@ mod tests {
                 ]
             }),
         );
-        ctx.merge_includes_with_features(&cml_path, &vec![Feature::Dictionaries].into()).unwrap();
+        ctx.merge_includes(&cml_path).unwrap();
 
         ctx.assert_output_eq(json!({
             "program": {

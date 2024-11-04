@@ -41,7 +41,8 @@ impl From<Vec<Feature>> for FeatureSet {
 /// A feature that can be enabled/opt-into.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Feature {
-    /// Allows `dictionary` capabilities to be used
+    /// Allows `dictionary` capabilities to be used.
+    /// This is unused, and will be deleted in a followup
     Dictionaries,
 
     /// Allows `dictionary` capabilities with `extends: program/...` to be defined (a.k.a.
