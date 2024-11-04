@@ -3,16 +3,11 @@
 # found in the LICENSE file.
 
 import("//build/cpp/library_headers.gni")
-import("//build/cpp/sdk_source_set.gni")
 
 library_headers("sdmmc_headers") {
   headers = [ "lib/sdmmc/hw.h" ]
 }
 
-sdk_source_set("sdmmc") {
-  category = "internal"
-  sdk_name = "sdmmc"
-  include_base = "include"
-  public = [ "include/lib/sdmmc/hw.h" ]
-  non_sdk_deps = [ ":sdmmc_headers" ]
+source_set("sdmmc") {
+  public_deps = [ ":sdmmc_headers" ]
 }
