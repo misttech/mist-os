@@ -85,7 +85,12 @@ pub trait DirEntryOps: Send + Sync + 'static {
     ///
     /// Returns `Ok(valid)` where `valid` indicates if the `DirEntry` is still valid,
     /// or an error.
-    fn revalidate(&self, _: &CurrentTask, _: &DirEntry) -> Result<bool, Errno> {
+    fn revalidate(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _: &CurrentTask,
+        _: &DirEntry,
+    ) -> Result<bool, Errno> {
         Ok(true)
     }
 }
@@ -843,7 +848,11 @@ impl DirEntry {
         let (child, exists) = match create_result {
             CreationResult::Created => (child, false),
             CreationResult::Existed { create_fn } => {
-                if child.ops.revalidate(current_task, &child)? {
+                if child.ops.revalidate(
+                    &mut locked.cast_locked::<FileOpsCore>(),
+                    current_task,
+                    &child,
+                )? {
                     (child, true)
                 } else {
                     self.internal_remove_child(&child);

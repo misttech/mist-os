@@ -1021,7 +1021,12 @@ impl Default for FuseDirEntry {
 }
 
 impl DirEntryOps for FuseDirEntry {
-    fn revalidate(&self, current_task: &CurrentTask, dir_entry: &DirEntry) -> Result<bool, Errno> {
+    fn revalidate(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        current_task: &CurrentTask,
+        dir_entry: &DirEntry,
+    ) -> Result<bool, Errno> {
         // Relaxed because the attributes valid until atomic is not used to synchronize
         // anything.
         const VALID_UNTIL_ORDERING: Ordering = Ordering::Relaxed;
