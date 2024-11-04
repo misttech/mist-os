@@ -313,7 +313,7 @@ function main {
         echo -e "\\n------ RUNNING gn gen ------"
       fi
       echo >&2 "Re-running gn gen first ($mine changed)"
-      fx-gen || return
+      fx-gen || return "$?"
       break
     fi
   done
@@ -323,7 +323,7 @@ function main {
       echo -e "\\n------ RUNNING gn gen ------"
     fi
     echo >&2 "Re-running gn gen first (missing $FUCHSIA_BUILD_DIR)"
-    fx-gen || return
+    fx-gen || return "$?"
   elif [[ -z "${no_checks}" ]]; then
     # We have a build directory, execute force clean checker, usually a no-op
     "$FUCHSIA_DIR/scripts/fuchsia-vendored-python" \
