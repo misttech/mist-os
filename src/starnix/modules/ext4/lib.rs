@@ -5,6 +5,7 @@
 use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
 use ext4_read_only::readers::VmoReader;
 use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
+use starnix_sync::Unlocked;
 
 use once_cell::sync::OnceCell;
 use starnix_core::mm::memory::MemoryObject;
@@ -18,7 +19,7 @@ use starnix_core::vfs::{
     MemoryFileObject, SeekTarget, SymlinkTarget, XattrOp, XattrStorage,
 };
 use starnix_logging::{impossible_error, track_stub};
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
@@ -60,16 +61,11 @@ struct ExtNode {
 }
 
 impl ExtFilesystem {
-    pub fn new_fs<L>(
-        locked: &mut Locked<'_, L>,
+    pub fn new_fs(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-    {
+    ) -> Result<FileSystemHandle, Errno> {
         let mut open_flags = OpenFlags::RDWR;
         let mut prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE | ProtectionFlags::EXEC;
         if options.flags.contains(MountFlags::RDONLY) {

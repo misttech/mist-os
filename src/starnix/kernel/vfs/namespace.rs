@@ -19,8 +19,7 @@ use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex,
-    RwLock, Unlocked,
+    BeforeFsNodeAppend, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, RwLock, Unlocked,
 };
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
@@ -1023,17 +1022,13 @@ impl NamespaceNode {
     /// This function is the primary way of instantiating FileObjects. Each
     /// FileObject records the NamespaceNode that created it in order to
     /// remember its path in the Namespace.
-    pub fn open<L>(
+    pub fn open(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         flags: OpenFlags,
         access_check: AccessCheck,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         FileObject::new(
             current_task,
             self.entry.node.open(locked, current_task, &self.mount, flags, access_check)?,

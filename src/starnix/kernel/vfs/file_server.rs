@@ -15,7 +15,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_runtime::UtcInstant;
 use futures::future::BoxFuture;
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_types::convert::{FromFidl as _, IntoFidl as _};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -159,16 +159,12 @@ impl StarnixNodeConnection {
 
     /// Reopen the current `StarnixNodeConnection` with the given `OpenFlags`. The new file will not share
     /// state. It is equivalent to opening the same file, not dup'ing the file descriptor.
-    fn reopen<L>(
+    fn reopen(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         flags: &impl ProtocolsExt,
-    ) -> Result<Arc<Self>, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<Arc<Self>, Errno> {
         let file = self.file.name.open(
             locked,
             current_task,

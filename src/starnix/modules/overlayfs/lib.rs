@@ -21,8 +21,8 @@ use starnix_core::vfs::{
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore,
-    Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
+    BeforeFsNodeAppend, FileOpsCore, FsNodeAppend, LockEqualOrBefore, Locked, RwLock,
+    RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -1065,16 +1065,11 @@ pub struct OverlayStack {
 }
 
 impl OverlayStack {
-    fn new_fs<L>(
-        locked: &mut Locked<'_, L>,
+    fn new_fs(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-    {
+    ) -> Result<FileSystemHandle, Errno> {
         match options.params.get("redirect_dir".as_bytes()) {
             None => (),
             Some(o) if o == "off" => (),
@@ -1286,17 +1281,12 @@ impl FileSystemOps for OverlayFs {
 /// Helper used to resolve directories passed in mount options. The directory is resolved in the
 /// namespace of the calling process, but only `DirEntry` is returned (detached from the
 /// namespace). The corresponding file systems may be unmounted before overlayfs that uses them.
-fn resolve_dir_param<L>(
-    locked: &mut Locked<'_, L>,
+fn resolve_dir_param(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     params: &MountParams,
     name: &FsStr,
-) -> Result<ActiveEntry, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ActiveEntry, Errno> {
     let path = params.get(&**name).ok_or_else(|| {
         log_error!("overlayfs: {name} was not specified");
         errno!(EINVAL)

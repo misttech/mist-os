@@ -34,7 +34,7 @@ use starnix_modules::{init_common_devices, register_common_file_systems};
 use starnix_modules_layeredfs::LayeredFs;
 use starnix_modules_magma::get_magma_params;
 use starnix_modules_overlayfs::OverlayStack;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -722,15 +722,11 @@ fn mount_filesystems(
     Ok(())
 }
 
-fn init_remote_block_devices<L>(
-    locked: &mut Locked<'_, L>,
+fn init_remote_block_devices(
+    locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
     config: &Config,
-) -> Result<(), Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-{
+) -> Result<(), Error> {
     let devices_iter = config.remote_block_devices.iter();
     for device_spec in devices_iter {
         create_remote_block_device_from_spec(locked, system_task, device_spec)
@@ -758,15 +754,11 @@ fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
         .and_then(|val| multiplier.checked_mul(val).ok_or(anyhow!("Block size overflow")))
 }
 
-fn create_remote_block_device_from_spec<'a, L>(
-    locked: &mut Locked<'_, L>,
+fn create_remote_block_device_from_spec<'a>(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     spec: &'a str,
-) -> Result<(), Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-{
+) -> Result<(), Error> {
     let mut iter = spec.splitn(2, ':');
     let device_name =
         iter.next().ok_or_else(|| anyhow!("remoteblk name is missing from {:?}", spec))?;

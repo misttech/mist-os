@@ -13,9 +13,8 @@ use crate::vfs::{
     FsNodeOps, FsString, MemoryXattrStorage, MountInfo, NamespaceNode, XattrStorage as _,
     MAX_LFS_FILESIZE,
 };
-
 use starnix_logging::{impossible_error, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, AccessCheck};
@@ -400,17 +399,13 @@ impl FileOps for MemoryFileObject {
     }
 }
 
-pub fn new_memfd<L>(
-    locked: &mut Locked<'_, L>,
+pub fn new_memfd(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     mut name: FsString,
     seals: SealFlags,
     flags: OpenFlags,
-) -> Result<FileHandle, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-{
+) -> Result<FileHandle, Errno> {
     let fs = anon_fs(current_task.kernel());
     let node = fs.create_node(
         current_task,

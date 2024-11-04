@@ -7067,14 +7067,11 @@ pub mod tests {
 
     // Open the binder device, which creates an instance of the binder device associated with
     // the process.
-    fn open_binder_fd<L>(
-        locked: &mut Locked<'_, L>,
+    fn open_binder_fd(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         binder_driver: &BinderDevice,
-    ) -> FileHandle
-    where
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
         let node = fs.create_node(
             &current_task,

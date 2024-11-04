@@ -13,7 +13,7 @@ use crate::vdso::vdso_loader::ZX_TIME_VALUES_MEMORY;
 use crate::vfs::{FdNumber, FileHandle, FileWriteGuardMode, FileWriteGuardRef};
 use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::time::SCHEDULER_CLOCK_HZ;
 use starnix_uapi::errors::Errno;
@@ -291,27 +291,22 @@ const MAX_RECURSION_DEPTH: usize = 5;
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
 /// recursion depth. `argv` may change due to script interpreter logic.
-pub fn resolve_executable<L>(
-    locked: &mut Locked<'_, L>,
+pub fn resolve_executable(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     file: FileHandle,
     path: CString,
     argv: Vec<CString>,
     environ: Vec<CString>,
     security_state: security::ResolvedElfState,
-) -> Result<ResolvedElf, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ResolvedElf, Errno> {
     resolve_executable_impl(locked, current_task, file, path, argv, environ, 0, security_state)
 }
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
 /// recursion depth.
-fn resolve_executable_impl<L>(
-    locked: &mut Locked<'_, L>,
+fn resolve_executable_impl(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     file: FileHandle,
     path: CString,
@@ -319,12 +314,7 @@ fn resolve_executable_impl<L>(
     environ: Vec<CString>,
     recursion_depth: usize,
     security_state: security::ResolvedElfState,
-) -> Result<ResolvedElf, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ResolvedElf, Errno> {
     if recursion_depth > MAX_RECURSION_DEPTH {
         return error!(ELOOP);
     }
@@ -355,8 +345,8 @@ where
 }
 
 /// Resolves a #! script file into a validated executable ELF.
-fn resolve_script<L>(
-    locked: &mut Locked<'_, L>,
+fn resolve_script(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     memory: Arc<MemoryObject>,
     path: CString,
@@ -364,12 +354,7 @@ fn resolve_script<L>(
     environ: Vec<CString>,
     recursion_depth: usize,
     security_state: security::ResolvedElfState,
-) -> Result<ResolvedElf, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ResolvedElf, Errno> {
     // All VMOs have sizes in multiple of the system page size, so as long as we only read a page or
     // less, we should never read past the end of the VMO.
     // Since Linux 5.1, the max length of the interpreter following the #! is 255.
@@ -448,20 +433,15 @@ fn parse_interpreter_line(line: &[u8]) -> Result<Vec<CString>, Errno> {
 }
 
 /// Resolves a file handle into a validated executable ELF.
-fn resolve_elf<L>(
-    locked: &mut Locked<'_, L>,
+fn resolve_elf(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     file: FileHandle,
     memory: Arc<MemoryObject>,
     argv: Vec<CString>,
     environ: Vec<CString>,
     security_state: security::ResolvedElfState,
-) -> Result<ResolvedElf, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ResolvedElf, Errno> {
     let vmo = memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
     let elf_headers = elf_parse::Elf64Headers::from_vmo(vmo).map_err(elf_parse_error_to_errno)?;
     let interp = if let Some(interp_hdr) = elf_headers
@@ -658,7 +638,6 @@ mod tests {
     use super::*;
     use crate::testing::*;
     use assert_matches::assert_matches;
-    use starnix_sync::MmDumpable;
     use std::mem::MaybeUninit;
 
     const TEST_STACK_ADDR: UserAddress = UserAddress::const_from(0x3000_0000);
@@ -752,16 +731,10 @@ mod tests {
         assert_eq!(stack_start_addr, original_stack_start_addr - payload_size);
     }
 
-    fn exec_hello_starnix<L>(
-        locked: &mut Locked<'_, L>,
+    fn exec_hello_starnix(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &mut CurrentTask,
-    ) -> Result<(), Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-        L: LockBefore<MmDumpable>,
-    {
+    ) -> Result<(), Errno> {
         let argv = vec![CString::new("data/tests/hello_starnix").unwrap()];
         let executable =
             current_task.open_file(locked, argv[0].as_bytes().into(), OpenFlags::RDONLY)?;

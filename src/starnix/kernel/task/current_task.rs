@@ -23,13 +23,13 @@ use crate::vfs::{
 };
 use extended_pstate::ExtendedPstateState;
 use fuchsia_inspect_contrib::profile_duration;
-use starnix_sync::LockEqualOrBefore;
+use starnix_sync::{LockEqualOrBefore, Unlocked};
 use zx::sys::zx_thread_state_general_regs_t;
 
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable,
-    ProcessGroupState, RwLockWriteGuard, TaskRelease, WakeReason,
+    EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable, ProcessGroupState,
+    RwLockWriteGuard, TaskRelease, WakeReason,
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
@@ -438,17 +438,12 @@ impl CurrentTask {
     ///
     /// Returns a FileHandle but does not install the FileHandle in the FdTable
     /// for this task.
-    pub fn open_file<L>(
+    pub fn open_file(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         path: &FsStr,
         flags: OpenFlags,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-    {
+    ) -> Result<FileHandle, Errno> {
         if flags.contains(OpenFlags::CREAT) {
             // In order to support OpenFlags::CREAT we would need to take a
             // FileMode argument.
@@ -595,21 +590,16 @@ impl CurrentTask {
     ///
     /// Returns a FileHandle but does not install the FileHandle in the FdTable
     /// for this task.
-    pub fn open_file_at<L>(
+    pub fn open_file_at(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         dir_fd: FdNumber,
         path: &FsStr,
         flags: OpenFlags,
         mode: FileMode,
         resolve_flags: ResolveFlags,
         access_check: AccessCheck,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<BeforeFsNodeAppend>,
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         if path.is_empty() {
             return error!(ENOENT);
         }
@@ -618,21 +608,16 @@ impl CurrentTask {
         self.open_namespace_node_at(locked, dir, path, flags, mode, resolve_flags, access_check)
     }
 
-    pub fn open_namespace_node_at<L>(
+    pub fn open_namespace_node_at(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         dir: NamespaceNode,
         path: &FsStr,
         flags: OpenFlags,
         mode: FileMode,
         mut resolve_flags: ResolveFlags,
         access_check: AccessCheck,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<BeforeFsNodeAppend>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         // 64-bit kernels force the O_LARGEFILE flag to be on.
         let mut flags = flags | OpenFlags::LARGEFILE;
         let opath = flags.contains(OpenFlags::PATH);
@@ -843,20 +828,14 @@ impl CurrentTask {
         self.lookup_path(locked, &mut context, self.fs().root(), path)
     }
 
-    pub fn exec<L>(
+    pub fn exec(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         executable: FileHandle,
         path: CString,
         argv: Vec<CString>,
         environ: Vec<CString>,
-    ) -> Result<(), Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-        L: LockBefore<MmDumpable>,
-    {
+    ) -> Result<(), Errno> {
         // Executable must be a regular file
         if !executable.name.entry.node.is_reg() {
             return error!(EACCES);

@@ -23,11 +23,9 @@ use fuchsia_runtime::UtcInstant;
 use linux_uapi::XATTR_SECURITY_PREFIX;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, track_stub};
-#[cfg(any(test, debug_assertions))]
-use starnix_sync::Unlocked;
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore,
-    Locked, Mutex, RwLock, RwLockReadGuard,
+    BeforeFsNodeAppend, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore, Locked, Mutex,
+    RwLock, RwLockReadGuard, Unlocked,
 };
 use starnix_types::ownership::Releasable;
 use starnix_types::time::{timespec_from_time, NANOS_PER_SECOND};
@@ -1319,18 +1317,14 @@ impl FsNode {
         self.ops().create_file_ops(&mut locked, self, current_task, flags)
     }
 
-    pub fn open<L>(
+    pub fn open(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         flags: OpenFlags,
         access_check: AccessCheck,
-    ) -> Result<Box<dyn FileOps>, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<Box<dyn FileOps>, Errno> {
         // If O_PATH is set, there is no need to create a real FileOps because
         // most file operations are disabled.
         if flags.contains(OpenFlags::PATH) {

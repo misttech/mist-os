@@ -20,7 +20,7 @@ use starnix_core::vfs::file_server::serve_file_at;
 use starnix_core::vfs::socket::VsockSocket;
 use starnix_core::vfs::{FdFlags, FileHandle};
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::uapi;
@@ -35,16 +35,11 @@ use {
 
 use super::start_component;
 
-pub fn expose_root<L>(
-    locked: &mut Locked<'_, L>,
+pub fn expose_root(
+    locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
     server_end: ServerEnd<fio::DirectoryMarker>,
-) -> Result<(), Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<(), Error> {
     let root_file = system_task.open_file(locked, "/".into(), OpenFlags::RDONLY)?;
     serve_file_at(server_end.into_channel().into(), system_task, &root_file)?;
     Ok(())

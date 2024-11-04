@@ -16,9 +16,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
 };
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked,
-};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
@@ -82,16 +80,11 @@ fn ensure_devpts(
 /// This function assumes that `/dev/ptmx` is the `DevPtmxFile` and that devpts
 /// is mounted at `/dev/pts`. These assumptions are necessary so that the
 /// `FileHandle` objects returned have appropriate `NamespaceNode` objects.
-pub fn create_main_and_replica<L>(
-    locked: &mut Locked<'_, L>,
+pub fn create_main_and_replica(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     window_size: uapi::winsize,
-) -> Result<(FileHandle, FileHandle), Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<(FileHandle, FileHandle), Errno> {
     let pty_file = current_task.open_file(locked, "/dev/ptmx".into(), OpenFlags::RDWR)?;
     let pty = pty_file.downcast_file::<DevPtmxFile>().ok_or_else(|| errno!(ENOTTY))?;
     {
@@ -992,31 +985,23 @@ mod tests {
         root.lookup_child(locked, task, &mut Default::default(), name)
     }
 
-    fn open_file_with_flags<L>(
-        locked: &mut Locked<'_, L>,
+    fn open_file_with_flags(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
         flags: OpenFlags,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         let node = lookup_node(locked, current_task, fs, name)?;
         node.open(locked, current_task, flags, AccessCheck::default())
     }
 
-    fn open_file<L>(
-        locked: &mut Locked<'_, L>,
+    fn open_file(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         open_file_with_flags(locked, current_task, fs, name, OpenFlags::RDWR | OpenFlags::NOCTTY)
     }
 
