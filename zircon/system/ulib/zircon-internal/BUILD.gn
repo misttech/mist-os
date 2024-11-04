@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/cpp/library_headers.gni")
-import("//build/cpp/sdk_source_set.gni")
 
 library_headers("headers") {
   headers = [
@@ -27,31 +26,9 @@ library_headers("headers") {
   ]
 }
 
-sdk_source_set("zircon-internal") {
-  category = "internal"
-  sdk_name = "zircon-internal"
-  public = [
-    "include/lib/zircon-internal/align.h",
-    "include/lib/zircon-internal/default_stack_size.h",
-    "include/lib/zircon-internal/device/cpu-trace/goldmont-pm-events.inc",
-    "include/lib/zircon-internal/device/cpu-trace/intel-pm-events.inc",
-    "include/lib/zircon-internal/device/cpu-trace/intel-pm.h",
-    "include/lib/zircon-internal/device/cpu-trace/perf-mon.h",
-    "include/lib/zircon-internal/device/cpu-trace/skylake-misc-events.inc",
-    "include/lib/zircon-internal/device/cpu-trace/skylake-pm-events.inc",
-    "include/lib/zircon-internal/e820.h",
-    "include/lib/zircon-internal/fnv1hash.h",
-    "include/lib/zircon-internal/ktrace.h",
-    "include/lib/zircon-internal/macros.h",
-    "include/lib/zircon-internal/mtrace.h",
-    "include/lib/zircon-internal/paths.h",
-    "include/lib/zircon-internal/thread_annotations.h",
-    "include/lib/zircon-internal/unique-backtrace.h",
-    "include/lib/zircon-internal/xorshiftrand.h",
-  ]
-  include_base = "include"
-  non_sdk_deps = [ ":headers" ]
-  deps = [ "//zircon/system/public" ]
+source_set("zircon-internal") {
+  sources = []
+  public_deps = [ ":headers" ]
 }
 
 if (!is_kernel) {
