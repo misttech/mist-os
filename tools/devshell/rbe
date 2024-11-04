@@ -134,9 +134,12 @@ function setup_bazel_workspace() {
 function test_bazel_rbe() {
   setup_bazel_workspace
   # Test authentication to RBE and BES (both share the same gcloud auth).
+  # Shutdown any bazel server each time to prevent it from caching
+  # stale credentials, and force it to refresh.
   # Limit the number of upload retries to make this operation fail-fast.
   (
     cd "$BAZEL_TEST_DIR/workspace" &&
+      ../bazel shutdown && \
       ../bazel --nohome_rc \
           test \
           --config=remote \
