@@ -7,7 +7,7 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 namespace driver_transport {
 
@@ -19,7 +19,7 @@ zx::result<> ParentTransportDriver::Start() {
   });
   zx::result result = outgoing()->AddService<fuchsia_hardware_i2cimpl::Service>(std::move(handler));
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
+    fdf::error("Failed to add service: {}", result);
     return result.take_error();
   }
 
@@ -55,8 +55,7 @@ void ParentTransportDriver::Transact(TransactRequestView request, fdf::Arena& ar
 void ParentTransportDriver::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_i2cimpl::Device> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(
-      ERROR,
+  fdf::error(
       "Unknown method in fuchsia.hardware.i2cimpl Device protocol, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }

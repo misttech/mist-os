@@ -6,7 +6,7 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 #include <bind/fuchsia/test/cpp/bind.h>
 
@@ -15,24 +15,22 @@ namespace simple {
 SimpleDriver::SimpleDriver(fdf::DriverStartArgs start_args,
                            fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : DriverBase("simple_driver", std::move(start_args), std::move(driver_dispatcher)) {
-  FDF_LOG(
-      INFO,
+  fdf::info(
       "SimpleDriver constructor invoked. This constructor is only implemented to"
       "demonstrate the driver lifecycle. Drivers are not expected to add implementation in the constructor");
 }
 
 SimpleDriver::~SimpleDriver() {
-  FDF_LOG(
-      INFO,
+  fdf::info(
       "SimpleDriver destructor invoked after PrepareStop() and Stop() are called. "
       "This is only implemented to demonstrate the driver lifecycle. Drivers should avoid implementing the "
       "destructor and perform clean up in PrepareStop() and Stop() functions");
 }
 
 zx::result<> SimpleDriver::Start() {
-  FDF_LOG(INFO,
-          "SimpleDriver::Start() invoked. In this function, perform the driver "
-          "initialization, such as adding children and setting up the compat server.");
+  fdf::info(
+      "SimpleDriver::Start() invoked. In this function, perform the driver "
+      "initialization, such as adding children and setting up the compat server.");
 
   auto child_name = "simple_child";
 

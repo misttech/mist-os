@@ -5,15 +5,14 @@
 #include "examples/drivers/transport/zircon/v2/child-driver.h"
 
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 namespace zircon_transport {
 
 zx::result<> ChildZirconTransportDriver::Start() {
   zx::result connect_result = incoming()->Connect<fuchsia_hardware_i2c::Service::Device>();
   if (connect_result.is_error() || !connect_result->is_valid()) {
-    FDF_LOG(ERROR, "Failed to connect to fuchsia.hardware.i2c service: %s",
-            connect_result.status_string());
+    fdf::error("Failed to connect to fuchsia.hardware.i2c service: {}", connect_result);
     return connect_result.take_error();
   }
 
@@ -36,16 +35,16 @@ zx::result<> ChildZirconTransportDriver::QueryParent(
   // Query and store the i2c name.
   auto name_result = fidl::WireCall(client_end)->GetName();
   if (!name_result.ok()) {
-    FDF_SLOG(ERROR, "Failed to request name.", KV("status", name_result.status_string()));
+    fdf::error("Failed to request name: {}", name_result.error());
     return zx::error(name_result.status());
   }
   if (name_result->is_error()) {
-    FDF_SLOG(ERROR, "Name request returned an error.", KV("status", name_result->error_value()));
+    fdf::error("Name request returned an error: ", name_result->error_value());
     return name_result->take_error();
   }
 
   name_ = std::string(name_result.value()->name.get());
-  FDF_LOG(INFO, "I2C name: %s", name_.c_str());
+  fdf::info("I2C name: {}", name_);
 
   // Transfer and read from the i2c server.
   fidl::Arena arena;
@@ -57,11 +56,11 @@ zx::result<> ChildZirconTransportDriver::QueryParent(
 
   auto transfer_result = fidl::WireCall(client_end)->Transfer(i2c_transactions);
   if (!transfer_result.ok()) {
-    FDF_SLOG(ERROR, "Failed to request transfer.", KV("status", transfer_result.status_string()));
+    fdf::error("Failed to request transfer: {}", transfer_result.error());
     return zx::error(transfer_result.status());
   }
   if (transfer_result->is_error()) {
-    FDF_SLOG(ERROR, "Transfer returned an error.", KV("status", transfer_result->error_value()));
+    fdf::error("Transfer returned an error: ", transfer_result->error_value());
     return transfer_result->take_error();
   }
 

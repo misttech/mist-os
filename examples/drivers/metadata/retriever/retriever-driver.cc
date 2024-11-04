@@ -4,7 +4,7 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 #include "examples/drivers/metadata/fuchsia.examples.metadata/metadata.h"
 
@@ -23,7 +23,7 @@ class RetrieverDriver final : public fdf::DriverBase,
   zx::result<> Start() override {
     zx_status_t status = AddDevfsChild();
     if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to add child.", KV("status", zx_status_get_string(status)));
+      fdf::error("Failed to add child: {}", zx::make_result(status));
       return zx::error(status);
     }
 
@@ -35,7 +35,7 @@ class RetrieverDriver final : public fdf::DriverBase,
     zx::result metadata =
         fdf_metadata::GetMetadata<fuchsia_examples_metadata::Metadata>(incoming());
     if (metadata.is_error()) {
-      FDF_SLOG(ERROR, "Failed to get metadata.", KV("status", metadata.status_string()));
+      fdf::error("Failed to get metadata: {}", metadata);
       completer.Reply(fit::error(metadata.status_value()));
       return;
     }
@@ -51,13 +51,13 @@ class RetrieverDriver final : public fdf::DriverBase,
   // Add child that has a devfs connection in order for tests to communicate with this driver.
   zx_status_t AddDevfsChild() {
     if (child_node_.has_value()) {
-      FDF_LOG(ERROR, "Child node already created.");
+      fdf::error("Child node already created.");
       return ZX_ERR_BAD_STATE;
     }
 
     zx::result connector = devfs_connector_.Bind(dispatcher());
     if (connector.is_error()) {
-      FDF_SLOG(ERROR, "Failed to bind devfs connector.", KV("status", connector.status_string()));
+      fdf::error("Failed to bind devfs connector: {}", connector);
       return connector.status_value();
     }
 

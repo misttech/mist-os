@@ -6,7 +6,7 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 namespace zircon_transport {
 
@@ -17,7 +17,7 @@ zx::result<> ParentZirconTransportDriver::Start() {
   });
   auto result = outgoing()->AddService<fuchsia_hardware_i2c::Service>(std::move(handler));
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add protocol", KV("status", result.status_string()));
+    fdf::error("Failed to add protocol: {}", result);
     return result.take_error();
   }
 

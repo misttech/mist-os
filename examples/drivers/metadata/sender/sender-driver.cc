@@ -4,7 +4,7 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 #include <bind/fuchsia_examples_metadata_bind_library/cpp/bind.h>
 
@@ -26,13 +26,13 @@ class SenderDriver final : public fdf::DriverBase,
     // Serve the metadata to the driver's child nodes.
     zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
     if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
+      fdf::error("Failed to serve metadata: {}", zx::make_result(status));
       return zx::error(status);
     }
 
     status = AddForwarderChild();
     if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to add forwarder child.", KV("status", zx_status_get_string(status)));
+      fdf::error("Failed to add forwarder child: {}", zx::make_result(status));
       return zx::error(status);
     }
 
@@ -43,7 +43,7 @@ class SenderDriver final : public fdf::DriverBase,
   void SetMetadata(SetMetadataRequest& request, SetMetadataCompleter::Sync& completer) override {
     zx_status_t status = metadata_server_.SetMetadata(request.metadata());
     if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", zx_status_get_string(status)));
+      fdf::error("Failed to set metadata: {}", zx::make_result(status));
       completer.Reply(fit::error(status));
     }
     completer.Reply(fit::ok());
@@ -60,7 +60,7 @@ class SenderDriver final : public fdf::DriverBase,
 
     zx::result connector = devfs_connector_.Bind(dispatcher());
     if (connector.is_error()) {
-      FDF_SLOG(ERROR, "Failed to bind devfs connector.", KV("status", connector.status_string()));
+      fdf::error("Failed to bind devfs connector: {}", connector);
       return connector.error_value();
     }
 
@@ -75,7 +75,7 @@ class SenderDriver final : public fdf::DriverBase,
 
     zx::result controller = AddChild("sender", devfs_args, kProperties, offers);
     if (controller.is_error()) {
-      FDF_SLOG(ERROR, "Failed to add child.", KV("status", controller.status_string()));
+      fdf::error("Failed to add child: {}", controller);
       return controller.error_value();
     }
 
