@@ -21,10 +21,10 @@ use crate::task::{
 use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    BinderDriverReleaser, CacheMode, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
-    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
-    VecDirectory, VecDirectoryEntry,
+    BinderDriverReleaser, CacheMode, CurrentTaskAndLocked, DirectoryEntryType, FdFlags, FdNumber,
+    FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FileWriteGuardRef, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+    FsString, NamespaceNode, SpecialNode, VecDirectory, VecDirectoryEntry,
 };
 use bitflags::bitflags;
 use fidl::endpoints::ClientEnd;
@@ -176,7 +176,12 @@ impl FileOps for BinderConnection {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         self.close(current_task.kernel());
     }
 
@@ -316,7 +321,12 @@ impl FileOps for BinderConnection {
         error!(EOPNOTSUPP)
     }
 
-    fn flush(&self, _file: &FileObject, current_task: &CurrentTask) {
+    fn flush(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         // Errors are not meaningful on flush.
         let Ok(binder_process) = self.proc(current_task) else { return };
         release_after!(binder_process, current_task.kernel(), {
@@ -3078,11 +3088,12 @@ pub struct BinderDriver {
 }
 
 impl Releasable for BinderDriver {
-    type Context<'a: 'b, 'b> = &'a CurrentTask;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
 
     fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
+        let (_locked, current_task) = context;
         for binder_process in std::mem::take(self.procs.get_mut()).into_values() {
-            binder_process.release(context.kernel());
+            binder_process.release(current_task.kernel());
         }
     }
 }
@@ -7107,7 +7118,7 @@ pub mod tests {
 
             // Close the file descriptor.
             std::mem::drop(binder_fd);
-            current_task.trigger_delayed_releaser();
+            current_task.trigger_delayed_releaser(&mut locked);
 
             // Verify that the process state no longer exists.
             binder_driver.find_process(identifier).expect_err("process was not cleaned up");

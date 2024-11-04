@@ -111,7 +111,12 @@ impl FileOps for RemoteBinderFileOps {
         Ok(FdEvents::empty())
     }
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         self.0.close();
     }
 

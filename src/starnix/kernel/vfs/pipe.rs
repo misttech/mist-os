@@ -438,7 +438,12 @@ impl FileOps for PipeFileObject {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         self.on_close(file.flags());
     }
 

@@ -25,6 +25,8 @@ lock_ordering! {
     FileOpsCore => UninterruptibleLock,
     // Artificial lock level for {Task, CurrentTask}.release()
     Unlocked => TaskRelease,
+    // During task release, file must be closed.
+    TaskRelease => FileOpsCore,
     // Kernel.iptables
     UninterruptibleLock => KernelIpTables,
     // Kernel.swap_files

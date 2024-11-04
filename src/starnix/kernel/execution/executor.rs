@@ -778,7 +778,7 @@ pub fn execute_syscall(
             dispatch_syscall(locked, current_task, &syscall)
         };
 
-    current_task.trigger_delayed_releaser();
+    current_task.trigger_delayed_releaser(locked);
 
     let return_value = match result {
         Ok(return_value) => {

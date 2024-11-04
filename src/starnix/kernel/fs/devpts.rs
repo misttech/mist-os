@@ -374,7 +374,12 @@ impl FileOps for DevPtmxFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         self.terminal.main_close();
         let id = FsString::from(self.terminal.id.to_string());
         self.dev_pts_root.remove_child(id.as_ref(), &current_task.kernel().mounts);
@@ -485,7 +490,12 @@ impl FileOps for DevPtsFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         self.terminal.replica_close();
     }
 
@@ -1037,7 +1047,7 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         let _pts = open_file(&mut locked, &task, &fs, "0".into()).expect("open file");
         std::mem::drop(ptmx);
-        task.trigger_delayed_releaser();
+        task.trigger_delayed_releaser(&mut locked);
         lookup_node(&mut locked, &task, &fs, "0".into()).unwrap_err();
     }
 
@@ -1056,7 +1066,7 @@ mod tests {
         lookup_node(&mut locked, &task, &fs, "2".into()).expect("component_lookup");
 
         std::mem::drop(_ptmx1);
-        task.trigger_delayed_releaser();
+        task.trigger_delayed_releaser(&mut locked);
 
         lookup_node(&mut locked, &task, &fs, "1".into()).unwrap_err();
 

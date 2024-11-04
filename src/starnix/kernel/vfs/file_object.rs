@@ -15,9 +15,9 @@ use crate::vfs::fsverity::{
     FsVerityState, {self},
 };
 use crate::vfs::{
-    ActiveNamespaceNode, DirentSink, EpollFileObject, EpollKey, FallocMode, FdNumber, FdTableId,
-    FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef,
-    FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
+    ActiveNamespaceNode, CurrentTaskAndLocked, DirentSink, EpollFileObject, EpollKey, FallocMode,
+    FdNumber, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
+    FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
 use fidl::HandleBased;
 use fidl_fuchsia_fxfs::CryptManagementMarker;
@@ -156,11 +156,23 @@ fn derive_wrapping_key(
 /// Corresponds to struct file_operations in Linux, plus any filesystem-specific data.
 pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Called when the FileObject is closed.
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {}
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
+    }
 
     /// Called every time close() is called on this file, even if the file is not ready to be
     /// released.
-    fn flush(&self, _file: &FileObject, _current_task: &CurrentTask) {}
+    fn flush(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
+    }
 
     /// Returns whether the file has meaningful seek offsets. Returning `false` is only
     /// optimization and will makes `FileObject` never hold the offset lock when calling `read` and
@@ -429,12 +441,22 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 }
 
 impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
-    fn close(&self, file: &FileObject, current_task: &CurrentTask) {
-        self.deref().close(file, current_task)
+    fn close(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
+        self.deref().close(locked, file, current_task)
     }
 
-    fn flush(&self, file: &FileObject, current_task: &CurrentTask) {
-        self.deref().flush(file, current_task)
+    fn flush(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
+        self.deref().flush(locked, file, current_task)
     }
 
     fn has_persistent_offsets(&self) -> bool {
@@ -1237,8 +1259,6 @@ macro_rules! delegate {
 impl FileOps for ProxyFileOps {
     delegate! {
         self.0;
-        fn close(&self, file: &FileObject, current_task: &CurrentTask);
-        fn flush(&self, file: &FileObject, current_task: &CurrentTask);
         fn seek(
             &self,
             file: &FileObject,
@@ -1266,6 +1286,22 @@ impl FileOps for ProxyFileOps {
         self.0.ops().is_seekable()
     }
     // These take &mut Locked<'_, L> as a second argument
+    fn close(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
+        self.0.ops().close(locked, &self.0, current_task);
+    }
+    fn flush(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
+        self.0.ops().close(locked, &self.0, current_task);
+    }
     fn wait_async(
         &self,
         locked: &mut Locked<'_, FileOpsCore>,
@@ -2033,9 +2069,12 @@ impl FileObject {
         self.node().record_lock(current_task, self, cmd, flock)
     }
 
-    pub fn flush(&self, current_task: &CurrentTask, id: FdTableId) {
+    pub fn flush<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask, id: FdTableId)
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.name.entry.node.record_lock_release(RecordLockOwner::FdTable(id));
-        self.ops().flush(self, current_task)
+        self.ops().flush(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
     // Notifies watchers on the current node and its parent about an event.
@@ -2075,9 +2114,10 @@ impl FileObject {
 }
 
 impl Releasable for FileObject {
-    type Context<'a: 'b, 'b> = &'a CurrentTask;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
 
-    fn release<'a: 'b, 'b>(self, current_task: Self::Context<'a, 'b>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+        let (locked, current_task) = context;
         // Release all wake leases associated with this file in the corresponding `WaitObject`
         // of each registered epfd.
         for epfd in self.epoll_files.lock().drain() {
@@ -2090,7 +2130,8 @@ impl Releasable for FileObject {
                 }
             }
         }
-        self.ops().close(&self, current_task);
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().close(&mut locked, &self, current_task);
         self.name.entry.node.on_file_closed(&self);
         let event =
             if self.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };

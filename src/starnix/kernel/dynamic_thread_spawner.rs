@@ -165,7 +165,7 @@ impl RunningThread {
                             while let Ok(f) = receiver.recv() {
                                 f(locked, &current_task);
                                 // Apply any delayed releasers.
-                                current_task.trigger_delayed_releaser();
+                                current_task.trigger_delayed_releaser(locked);
                                 let mut state = state.lock();
                                 state.idle_threads += 1;
                                 if state.idle_threads > state.max_idle_threads {
@@ -224,7 +224,7 @@ impl RunningThread {
                             f(&mut locked, &current_task);
 
                             // Apply any delayed releasers.
-                            current_task.trigger_delayed_releaser();
+                            current_task.trigger_delayed_releaser(&mut locked);
                         }
                     });
                 })

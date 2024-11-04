@@ -13,10 +13,10 @@ use crate::vfs::pipe::{Pipe, PipeHandle};
 use crate::vfs::rw_queue::{RwQueue, RwQueueReadGuard};
 use crate::vfs::socket::SocketHandle;
 use crate::vfs::{
-    checked_add_offset_and_length, inotify, DefaultDirEntryOps, DirEntryOps, FileObject, FileOps,
-    FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardState,
-    FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps, RecordLockCommand,
-    RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
+    checked_add_offset_and_length, inotify, CurrentTaskAndLocked, DefaultDirEntryOps, DirEntryOps,
+    FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
+    FileWriteGuardState, FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps,
+    RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
 };
 use bitflags::bitflags;
 use fuchsia_runtime::UtcInstant;
@@ -2411,9 +2411,10 @@ impl std::fmt::Debug for FsNode {
 }
 
 impl Releasable for FsNode {
-    type Context<'a: 'b, 'b> = &'a CurrentTask;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
 
-    fn release<'a: 'b, 'b>(self, current_task: Self::Context<'a, 'b>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+        let (_locked, current_task) = context;
         if let Some(fs) = self.fs.upgrade() {
             fs.remove_node(&self);
         }

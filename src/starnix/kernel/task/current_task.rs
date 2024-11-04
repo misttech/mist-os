@@ -216,8 +216,12 @@ impl CurrentTask {
         Self { task, thread_state, _local_marker: Default::default() }
     }
 
-    pub fn trigger_delayed_releaser(&self) {
-        self.kernel().delayed_releaser.apply(self);
+    pub fn trigger_delayed_releaser<L>(&self, locked: &mut Locked<'_, L>)
+    where
+        L: LockEqualOrBefore<TaskRelease>,
+    {
+        let mut locked = locked.cast_locked::<TaskRelease>();
+        self.kernel().delayed_releaser.apply(&mut locked, self);
     }
 
     pub fn weak_task(&self) -> WeakRef<Task> {

@@ -7,10 +7,9 @@ use crate::task::CurrentTask;
 use crate::vfs::FdNumber;
 use fidl::AsHandleRef as _;
 use fuchsia_inspect_contrib::profile_duration;
-
 use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
 use starnix_sync::{
-    EventWaitGuard, InterruptibleEvent, Mutex, NotifyKind, PortEvent, PortWaitResult,
+    EventWaitGuard, InterruptibleEvent, Mutex, NotifyKind, PortEvent, PortWaitResult, Unlocked,
 };
 use starnix_types::ownership::debug_assert_no_local_temp_ref;
 use starnix_uapi::error;
@@ -495,7 +494,9 @@ impl PortWaiter {
         };
 
         // Trigger delayed releaser before blocking.
-        current_task.trigger_delayed_releaser();
+        // TODO(https://fxbug.dev/377266796): Pass a lock level to this method
+        let mut locked = Unlocked::new();
+        current_task.trigger_delayed_releaser(&mut locked);
 
         if is_waiting {
             current_task.run_in_state(RunState::Waiter(WaiterRef::from_port(self)), callback)

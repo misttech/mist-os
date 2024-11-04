@@ -417,7 +417,12 @@ impl FileOps for DmDeviceFile {
         }
     }
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         let mut state = self.device.state.lock();
         state.open_count -= 1;
     }

@@ -525,7 +525,12 @@ impl FileOps for FunctionFsControlEndpoint {
     fileops_impl_seekless!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         let rootdir = FunctionFsRootDir::from_file(file);
         rootdir.on_control_closed();
     }

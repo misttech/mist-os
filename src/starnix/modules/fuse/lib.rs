@@ -78,7 +78,12 @@ impl FileOps for DevFuse {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         self.connection.lock().disconnect();
     }
 
@@ -690,7 +695,12 @@ impl FuseFileObject {
 }
 
 impl FileOps for FuseFileObject {
-    fn close(&self, file: &FileObject, current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         let node = Self::get_fuse_node(file);
         let is_dir = file.node().is_dir();
         {
@@ -710,7 +720,12 @@ impl FileOps for FuseFileObject {
         }
     }
 
-    fn flush(&self, file: &FileObject, current_task: &CurrentTask) {
+    fn flush(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         let node = Self::get_fuse_node(file);
         if let Err(e) = self.connection.lock().execute_operation(
             current_task,
