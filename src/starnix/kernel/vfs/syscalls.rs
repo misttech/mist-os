@@ -150,14 +150,14 @@ pub fn sys_close_range(
 }
 
 pub fn sys_lseek(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     offset: off_t,
     whence: u32,
 ) -> Result<off_t, Errno> {
     let file = current_task.files.get(fd)?;
-    file.seek(current_task, SeekTarget::from_raw(whence, offset)?)
+    file.seek(locked, current_task, SeekTarget::from_raw(whence, offset)?)
 }
 
 pub fn sys_fcntl(

@@ -280,6 +280,7 @@ impl FileOps for DevKmsg {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &crate::vfs::FileObject,
         current_task: &crate::task::CurrentTask,
         _current_offset: starnix_uapi::off_t,

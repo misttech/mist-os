@@ -128,12 +128,13 @@ impl FileOps for TaskDirectory {
 
     fn seek(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        self.file_ops.seek(file, current_task, current_offset, target)
+        self.file_ops.seek(locked, file, current_task, current_offset, target)
     }
 
     fn readdir(
@@ -863,6 +864,7 @@ impl FileOps for MemFile {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,

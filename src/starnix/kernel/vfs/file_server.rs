@@ -243,15 +243,19 @@ impl StarnixNodeConnection {
                 return Ok((directory::traversal_position::TraversalPosition::End, sink.seal()));
             }
         };
+        let kernel = self.kernel().unwrap().clone();
         if *self.file.offset.lock() != offset {
-            self.file.seek(&current_task, SeekTarget::Set(offset))?;
+            self.file.seek(
+                kernel.kthreads.unlocked_for_async().deref_mut(),
+                &current_task,
+                SeekTarget::Set(offset),
+            )?;
         }
         let mut file_offset = self.file.offset.lock();
         let mut dirent_sink = DirentSinkAdapter {
             sink: Some(directory::dirents_sink::AppendResult::Ok(sink)),
             offset: &mut file_offset,
         };
-        let kernel = self.kernel().unwrap().clone();
         self.file.readdir(
             kernel.kthreads.unlocked_for_async().deref_mut(),
             &current_task,
@@ -668,12 +672,18 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
     }
 
     async fn seek(&self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
+        let kernel = self.kernel()?;
         let target = match origin {
             fio::SeekOrigin::Start => SeekTarget::Set(offset),
             fio::SeekOrigin::Current => SeekTarget::Cur(offset),
             fio::SeekOrigin::End => SeekTarget::End(offset),
         };
-        Ok(self.file.seek(&*self.task()?, target)? as u64)
+        let seek_result = self.file.seek(
+            kernel.kthreads.unlocked_for_async().deref_mut(),
+            &*self.task()?,
+            target,
+        )?;
+        Ok(seek_result as u64)
     }
 
     fn update_flags(&self, flags: fio::OpenFlags) -> zx::Status {

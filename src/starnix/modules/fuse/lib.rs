@@ -822,6 +822,7 @@ impl FileOps for FuseFileObject {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,

@@ -114,6 +114,7 @@ impl FileOps for LayeredFileOps {
 
     fn seek(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
@@ -123,7 +124,11 @@ impl FileOps for LayeredFileOps {
         if new_offset >= self.fs.mappings.len() as off_t {
             new_offset = self
                 .root_file
-                .seek(current_task, SeekTarget::Set(new_offset - self.fs.mappings.len() as off_t))?
+                .seek(
+                    locked,
+                    current_task,
+                    SeekTarget::Set(new_offset - self.fs.mappings.len() as off_t),
+                )?
                 .checked_add(self.fs.mappings.len() as off_t)
                 .ok_or_else(|| errno!(EINVAL))?;
         }

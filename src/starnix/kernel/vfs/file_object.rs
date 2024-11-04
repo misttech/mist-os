@@ -215,6 +215,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Adjust the `current_offset` if the file is seekable.
     fn seek(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
@@ -495,12 +496,13 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn seek(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        self.deref().seek(file, current_task, current_offset, target)
+        self.deref().seek(locked, file, current_task, current_offset, target)
     }
 
     fn sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno> {
@@ -703,12 +705,13 @@ macro_rules! fileops_impl_delegate_read_and_seek {
 
         fn seek(
             &$self,
+        locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             file: &FileObject,
             current_task: &starnix_core::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
             target: starnix_core::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
-            $delegate.seek(file, current_task, current_offset, target)
+            $delegate.seek(locked, file, current_task, current_offset, target)
         }
     };
 }
@@ -723,6 +726,7 @@ macro_rules! fileops_impl_seekable {
 
         fn seek(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             file: &starnix_core::vfs::FileObject,
             current_task: &starnix_core::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
@@ -746,6 +750,7 @@ macro_rules! fileops_impl_nonseekable {
 
         fn seek(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _file: &starnix_core::vfs::FileObject,
             _current_task: &starnix_core::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
@@ -771,6 +776,7 @@ macro_rules! fileops_impl_seekless {
 
         fn seek(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _file: &starnix_core::vfs::FileObject,
             _current_task: &starnix_core::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
@@ -1200,6 +1206,7 @@ impl FileOps for OPathOps {
     }
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _current_offset: off_t,
@@ -1259,13 +1266,6 @@ macro_rules! delegate {
 impl FileOps for ProxyFileOps {
     delegate! {
         self.0;
-        fn seek(
-            &self,
-            file: &FileObject,
-            current_task: &CurrentTask,
-            offset: off_t,
-            target: SeekTarget,
-        ) -> Result<off_t, Errno>;
         fn fcntl(
             &self,
             file: &FileObject,
@@ -1393,6 +1393,16 @@ impl FileOps for ProxyFileOps {
             options,
             filename,
         )
+    }
+    fn seek(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: off_t,
+        target: SeekTarget,
+    ) -> Result<off_t, Errno> {
+        self.0.ops.seek(locked, &self.0, current_task, offset, target)
     }
 }
 
@@ -1742,7 +1752,13 @@ impl FileObject {
             let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
                 let (_guard, mut locked) =
                     self.node().append_lock.write_and(&mut locked, current_task)?;
-                *offset = self.ops().seek(self, current_task, *offset, SeekTarget::End(0))?;
+                *offset = self.ops().seek(
+                    &mut locked.cast_locked::<FileOpsCore>(),
+                    self,
+                    current_task,
+                    *offset,
+                    SeekTarget::End(0),
+                )?;
                 self.write_common(&mut locked, current_task, *offset as usize, data)
             } else {
                 let (_guard, mut locked) =
@@ -1790,17 +1806,28 @@ impl FileObject {
         })
     }
 
-    pub fn seek(&self, current_task: &CurrentTask, target: SeekTarget) -> Result<off_t, Errno> {
+    pub fn seek<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        target: SeekTarget,
+    ) -> Result<off_t, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = &mut locked;
+
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
 
         if !self.ops().has_persistent_offsets() {
-            return self.ops().seek(self, current_task, 0, target);
+            return self.ops().seek(locked, self, current_task, 0, target);
         }
 
         let mut offset_guard = self.offset.lock();
-        let new_offset = self.ops().seek(self, current_task, *offset_guard, target)?;
+        let new_offset = self.ops().seek(locked, self, current_task, *offset_guard, target)?;
         *offset_guard = new_offset;
         Ok(new_offset)
     }
