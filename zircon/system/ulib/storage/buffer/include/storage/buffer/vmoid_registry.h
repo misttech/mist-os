@@ -33,7 +33,7 @@ class Vmoid {
     return *this;
   }
 
-  ~Vmoid() { ZX_DEBUG_ASSERT_MSG(vmoid_ == BLOCK_VMOID_INVALID, "%u", vmoid_); }
+  ~Vmoid() { ZX_DEBUG_ASSERT_MSG(vmoid_ == BLOCK_VMOID_INVALID, " (%u)", vmoid_); }
 
   vmoid_t get() const { return vmoid_; }
   bool IsAttached() const { return vmoid_ != BLOCK_VMOID_INVALID; }

@@ -55,6 +55,7 @@ struct PartitionInfo {
   uint8_t type_guid[16];
   uint8_t instance_guid[16];
   const char *name;
+  uint64_t flags;
 };
 
 using RequestId = uint64_t;
@@ -106,8 +107,9 @@ struct Callbacks {
   void *context;
   void (*start_thread)(void *context, const void *arg);
   void (*on_new_session)(void *context, const Session *session);
-  void (*on_requests)(void *context, const Session *session, const Request *requests,
+  void (*on_requests)(void *context, const Session *session, Request *requests,
                       uintptr_t request_count);
+  void (*log)(void *, const char *, uintptr_t);
 };
 
 using ShutdownCallback = void (*)(void *);

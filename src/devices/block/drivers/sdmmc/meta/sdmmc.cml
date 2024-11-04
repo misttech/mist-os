@@ -15,6 +15,7 @@
         colocate: "true",
     },
     capabilities: [
+        { service: "fuchsia.hardware.block.volume.Service" },
         { service: "fuchsia.hardware.rpmb.Service" },
         { service: "fuchsia.hardware.sdio.Service" },
         { service: "fuchsia.hardware.sdio.DriverService" },
@@ -45,15 +46,12 @@
     ],
     expose: [
         {
-            service: "fuchsia.hardware.rpmb.Service",
-            from: "self",
-        },
-        {
-            service: "fuchsia.hardware.sdio.Service",
-            from: "self",
-        },
-        {
-            service: "fuchsia.hardware.sdio.DriverService",
+            service: [
+                "fuchsia.hardware.block.volume.Service",
+                "fuchsia.hardware.rpmb.Service",
+                "fuchsia.hardware.sdio.DriverService",
+                "fuchsia.hardware.sdio.Service",
+            ],
             from: "self",
         },
     ],

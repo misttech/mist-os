@@ -52,8 +52,8 @@ class Ramdisk : public fidl::WireServer<fuchsia_hardware_ramdisk::Ramdisk>,
 
   void StartThread(block_server::Thread thread) override;
   void OnNewSession(block_server::Session) override;
-  void OnRequests(block_server::Session& session,
-                  cpp20::span<const block_server::Request>) override;
+  void OnRequests(const block_server::Session& session,
+                  cpp20::span<block_server::Request>) override;
 
   // Reads or writes `block_count` blocks (it ignores the count in `request`) at
   // `request_block_offset` blocks relative to the request.

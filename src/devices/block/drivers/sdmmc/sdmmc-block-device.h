@@ -150,7 +150,7 @@ class SdmmcBlockDevice : public block_server::Interface {
   }
   const std::unique_ptr<RpmbDevice>& child_rpmb_device() const { return child_rpmb_device_; }
 
-  fdf::Logger& logger();
+  fdf::Logger& logger() const;
 
  private:
   // An arbitrary limit to prevent RPMB clients from flooding us with requests.
@@ -230,7 +230,10 @@ class SdmmcBlockDevice : public block_server::Interface {
   // block_server::Interface
   void StartThread(block_server::Thread) override;
   void OnNewSession(block_server::Session) override;
-  void OnRequests(block_server::Session&, cpp20::span<const block_server::Request>) override;
+  void OnRequests(const block_server::Session&, cpp20::span<block_server::Request>) override;
+  void Log(std::string_view msg) const override {
+    FDF_LOGL(INFO, logger(), "%.*s", static_cast<int>(msg.size()), msg.data());
+  }
 
   SdmmcRootDevice* const parent_;
   // Only accessed by ProbeSd, ProbeMmc, SuspendPower, ResumePower, and WorkerLoop.
