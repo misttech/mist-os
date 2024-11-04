@@ -194,12 +194,6 @@ set_defaults("fuchsia_cc_driver") {
   # Sets the default configs for fuchsia_driver, which can be modified later
   # by the invoker. This overrides the loadable_module default.
   configs = default_shared_library_configs
-
-  # Drivers cannot dynamically link against the C++ standard library. This config
-  # tells the linker to link against it statically. This is safe for drivers which
-  # don't depend on the standard library as well as the linker will not have any
-  # symbols to resolve.
-  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }
 
 # Define a fuchsia driver built as a loadable module (deprecated: b/370513425)
@@ -239,12 +233,6 @@ set_defaults("fuchsia_driver") {
   # Sets the default configs for fuchsia_driver, which can be modified later
   # by the invoker. This overrides the loadable_module default.
   configs = default_shared_library_configs
-
-  # Drivers cannot dynamically link against the C++ standard library. This config
-  # tells the linker to link against it statically. This is safe for drivers which
-  # don't depend on the standard library as well as the linker will not have any
-  # symbols to resolve.
-  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }
 
 # Define a fuchsia driver built as a rust cdylib.
