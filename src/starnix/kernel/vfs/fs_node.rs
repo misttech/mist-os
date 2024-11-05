@@ -1471,7 +1471,7 @@ impl FsNode {
             self.ops().mknod(&mut locked, self, current_task, name, mode, dev, owner)?
         };
 
-        self.init_new_node_security_on_create(current_task, &new_node)?;
+        self.init_new_node_security_on_create(locked, current_task, &new_node)?;
 
         Ok(new_node)
     }
@@ -1500,7 +1500,7 @@ impl FsNode {
         let new_node =
             self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)?;
 
-        self.init_new_node_security_on_create(current_task, &new_node)?;
+        self.init_new_node_security_on_create(&mut locked, current_task, &new_node)?;
 
         Ok(new_node)
     }
@@ -1509,14 +1509,20 @@ impl FsNode {
     /// an extended attribute to write to the file to persist it.  If no LSM is enabled, no extended
     /// attribute returned, or if the filesystem does not support extended attributes, then the call
     /// returns success. All other failure modes return an `Errno` that should be early-returned.
-    fn init_new_node_security_on_create(
+    fn init_new_node_security_on_create<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         new_node: &FsNode,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         security::fs_node_init_on_create(current_task, &new_node, self)?
             .map(|xattr| {
                 match new_node.ops().set_xattr(
+                    &mut locked,
                     &new_node,
                     current_task,
                     xattr.name,
