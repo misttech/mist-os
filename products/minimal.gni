@@ -39,9 +39,6 @@ discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
 # Bazel assebmly to make sure they can be built for CIPD uploads.
 extra_bazel_assembly_targets = [ "//build/images/fuchsia:assembly_inputs" ]
 
-# List all artifacts to upload to CIPD.
-cipd_assembly_artifact_targets = [ "//products/minimal:devicetree" ]
-
 use_bazel_images_only = true
 assembly_board_configs = [ "//boards" ]
 assembly_partitions_configs = [ "//boards/partitions" ]
