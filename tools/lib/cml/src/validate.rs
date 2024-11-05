@@ -458,6 +458,7 @@ which is almost certainly a mistake: {}",
         use_: &'a Use,
         used_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
+        use_.capability_type()?;
         for checker in [
             self.service_from_self_checker(use_),
             self.protocol_from_self_checker(use_),
@@ -632,6 +633,7 @@ which is almost certainly a mistake: {}",
         expose: &'a Expose,
         used_ids: &mut HashMap<String, CapabilityId<'a>>,
     ) -> Result<(), Error> {
+        expose.capability_type()?;
         for checker in [
             self.service_from_self_checker(expose),
             self.protocol_from_self_checker(expose),
@@ -755,6 +757,7 @@ which is almost certainly a mistake: {}",
         used_ids: &mut HashMap<Name, HashMap<String, CapabilityId<'a>>>,
         protocols_offered_to_all: &[&'a Offer],
     ) -> Result<(), Error> {
+        offer.capability_type()?;
         for checker in [
             self.service_from_self_checker(offer),
             self.protocol_from_self_checker(offer),
@@ -1182,7 +1185,7 @@ which is almost certainly a mistake: {}",
         if cap.service().is_none() && from.is_many() {
             return Err(Error::validate(format!(
                 "\"{}\" capabilities cannot have multiple \"from\" clauses",
-                cap.capability_type()
+                cap.capability_type().unwrap()
             )));
         }
 
@@ -7588,6 +7591,42 @@ mod tests {
         }
     }),
     Ok(())
+        ),
+    test_cml_use_two_types_bad(
+        json!({"use": [
+            {
+                "protocol": "fuchsia.protocol.MyProtocol",
+                "service": "fuchsia.service.MyService",
+            },
+        ],
+    }),
+        Err(Error::Validate {err, ..})
+        if &err == "use declaration has multiple capability types defined: [\"service\", \"protocol\"]"
+        ),
+    test_cml_offer_two_types_bad(
+        json!({"offer": [
+            {
+                "protocol": "fuchsia.protocol.MyProtocol",
+                "service": "fuchsia.service.MyService",
+                "from": "self",
+                "to" : "#child",
+            },
+        ],
+    }),
+        Err(Error::Validate {err, ..})
+        if &err == "offer declaration has multiple capability types defined: [\"service\", \"protocol\"]"
+        ),
+    test_cml_expose_two_types_bad(
+        json!({"expose": [
+            {
+                "protocol": "fuchsia.protocol.MyProtocol",
+                "service": "fuchsia.service.MyService",
+                "from" : "self",
+            },
+        ],
+    }),
+        Err(Error::Validate {err, ..})
+        if &err == "expose declaration has multiple capability types defined: [\"service\", \"protocol\"]"
         ),
     }
 }
