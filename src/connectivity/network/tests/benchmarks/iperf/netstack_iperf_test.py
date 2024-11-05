@@ -283,15 +283,10 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         results: list[dict[str, Any]] = []
         for message_size in [64, 1024, 1400]:
             for flows in [1, 2, 4]:
-                # Disable the ethernet_udp_recv 64-byte multi-flow test cases because (as of
-                # writing) they are very flaky, most likely due to the netstack or network driver
-                # dropping packets under high load (see https://fxbug.dev/42085351).
-                if (
-                    self._protocol == Protocol.UDP
-                    and self._direction == Direction.HOST_TO_DEVICE
-                    and message_size == 64
-                    and flows > 1
-                ):
+                # Disable the multi-flow ethernet tests cases because they make up a large share
+                # of overall runtime for this benchmark and do not provide much useful signal
+                # over the multi-flow loopback tests (see https://fxbug.dev/370786547).
+                if self._direction != Direction.LOOPBACK and flows > 1:
                     continue
 
                 dir = pathlib.Path(self.test_case_path) / (
