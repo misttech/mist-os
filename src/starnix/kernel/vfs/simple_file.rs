@@ -58,6 +58,7 @@ where
 
     fn check_access(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,

@@ -661,8 +661,12 @@ where
     log_trace!(%dir_fd, %path, "lookup_at");
     if path.is_empty() {
         if options.allow_empty_path {
-            let (node, _) =
-                current_task.resolve_dir_fd(dir_fd, path.as_ref(), ResolveFlags::empty())?;
+            let (node, _) = current_task.resolve_dir_fd(
+                locked,
+                dir_fd,
+                path.as_ref(),
+                ResolveFlags::empty(),
+            )?;
             return Ok(node);
         }
         return error!(ENOENT);
@@ -783,7 +787,7 @@ pub fn sys_faccessat2(
     let mode = Access::from_bits(mode).ok_or_else(|| errno!(EINVAL))?;
     let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
     let name = lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?;
-    name.check_access(current_task, mode, CheckAccessReason::Access)
+    name.check_access(locked, current_task, mode, CheckAccessReason::Access)
 }
 
 pub fn sys_getdents64(
@@ -811,7 +815,7 @@ pub fn sys_chroot(
         return error!(ENOTDIR);
     }
 
-    current_task.fs().chroot(current_task, name)?;
+    current_task.fs().chroot(locked, current_task, name)?;
     Ok(())
 }
 
@@ -825,11 +829,11 @@ pub fn sys_chdir(
     if !name.entry.node.is_dir() {
         return error!(ENOTDIR);
     }
-    current_task.fs().chdir(current_task, name)
+    current_task.fs().chdir(locked, current_task, name)
 }
 
 pub fn sys_fchdir(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
 ) -> Result<(), Errno> {
@@ -843,7 +847,7 @@ pub fn sys_fchdir(
     if !file.name.entry.node.is_dir() {
         return error!(ENOTDIR);
     }
-    current_task.fs().chdir(current_task, file.name.to_passive())
+    current_task.fs().chdir(locked, current_task, file.name.to_passive())
 }
 
 pub fn sys_fstat(
@@ -2801,8 +2805,12 @@ pub fn sys_utimensat(
         if dir_fd == FdNumber::AT_FDCWD {
             return error!(EFAULT);
         }
-        let (node, _) =
-            current_task.resolve_dir_fd(dir_fd, Default::default(), ResolveFlags::empty())?;
+        let (node, _) = current_task.resolve_dir_fd(
+            locked,
+            dir_fd,
+            Default::default(),
+            ResolveFlags::empty(),
+        )?;
         node
     } else {
         let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;

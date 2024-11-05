@@ -569,6 +569,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Delegate the access check to the node.
     fn check_access(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
@@ -1346,6 +1347,7 @@ impl FsNode {
             }
 
             self.check_access(
+                locked,
                 current_task,
                 mount,
                 access,
@@ -1405,6 +1407,7 @@ impl FsNode {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::EXEC,
@@ -1429,6 +1432,7 @@ impl FsNode {
     {
         assert!(mode & FileMode::IFMT != FileMode::EMPTY, "mknod called without node type.");
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -1489,6 +1493,7 @@ impl FsNode {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -1544,15 +1549,20 @@ impl FsNode {
             .unwrap_or_else(|| Ok(()))
     }
 
-    pub fn create_tmpfile(
+    pub fn create_tmpfile<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         mut mode: FileMode,
         mut owner: FsCred,
         link_behavior: FsNodeLinkBehavior,
-    ) -> Result<FsNodeHandle, Errno> {
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -1583,6 +1593,7 @@ impl FsNode {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -1616,6 +1627,7 @@ impl FsNode {
             // access to the existing file.
             child
                 .check_access(
+                    locked,
                     current_task,
                     mount,
                     Access::READ | Access::WRITE,
@@ -1663,6 +1675,7 @@ impl FsNode {
     {
         // The user must be able to search and write to the directory.
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::EXEC | Access::WRITE,
@@ -1709,12 +1722,16 @@ impl FsNode {
             return error!(EISDIR);
         }
 
-        self.check_access(
-            current_task,
-            mount,
-            Access::WRITE,
-            CheckAccessReason::InternalPermissionChecks,
-        )?;
+        {
+            let mut locked = locked.cast_locked::<M>();
+            self.check_access(
+                &mut locked,
+                current_task,
+                mount,
+                Access::WRITE,
+                CheckAccessReason::InternalPermissionChecks,
+            )?;
+        }
 
         self.truncate_common(locked, strategy, current_task, length)
     }
@@ -1912,20 +1929,31 @@ impl FsNode {
     /// Check whether the node can be accessed in the current context with the specified access
     /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
     /// owner or is in the file's group.
-    pub fn check_access(
+    pub fn check_access<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         access: Access,
         reason: CheckAccessReason,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if access.contains(Access::WRITE) {
             mount.check_readonly_filesystem()?;
         }
         if access.contains(Access::EXEC) && !self.is_dir() {
             mount.check_noexec_filesystem()?;
         }
-        self.ops.check_access(self, current_task, access, &self.info, reason)
+        self.ops.check_access(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            access,
+            &self.info,
+            reason,
+        )
     }
 
     /// Check whether the stick bit, `S_ISVTX`, forbids the `current_task` from removing the given
@@ -2258,6 +2286,7 @@ impl FsNode {
         }
         security::check_fs_node_getxattr_access(current_task, self, name)?;
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::READ,
@@ -2293,6 +2322,7 @@ impl FsNode {
         }
         security::check_fs_node_setxattr_access(current_task, self, name, value, op)?;
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -2322,6 +2352,7 @@ impl FsNode {
         // TODO: Is removing security.* xattrs allowed at all?
         security::check_fs_node_removexattr_access(current_task, self, name)?;
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -2444,6 +2475,7 @@ impl FsNode {
         if !has_owner_priviledge {
             if set_current_time {
                 self.check_access(
+                    locked,
                     current_task,
                     mount,
                     Access::WRITE,
@@ -2639,13 +2671,18 @@ mod tests {
             .expect("create_node")
             .entry
             .node;
-        let check_access = |uid: uid_t, gid: gid_t, perm: u32, access: Access| {
+        let check_access = |locked: &mut Locked<'_, Unlocked>,
+                            uid: uid_t,
+                            gid: gid_t,
+                            perm: u32,
+                            access: Access| {
             node.update_info(|info| {
                 info.mode = mode!(IFREG, perm);
                 info.uid = uid;
                 info.gid = gid;
             });
             node.check_access(
+                locked,
                 &current_task,
                 &MountInfo::detached(),
                 access,
@@ -2653,45 +2690,45 @@ mod tests {
             )
         };
 
-        assert_eq!(check_access(0, 0, 0o700, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(0, 0, 0o700, Access::READ), error!(EACCES));
-        assert_eq!(check_access(0, 0, 0o700, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o700, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o700, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o700, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(0, 0, 0o070, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(0, 0, 0o070, Access::READ), error!(EACCES));
-        assert_eq!(check_access(0, 0, 0o070, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o070, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o070, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o070, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(0, 0, 0o007, Access::EXEC), Ok(()));
-        assert_eq!(check_access(0, 0, 0o007, Access::READ), Ok(()));
-        assert_eq!(check_access(0, 0, 0o007, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o007, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o007, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o007, Access::WRITE), Ok(()));
 
-        assert_eq!(check_access(1, 0, 0o700, Access::EXEC), Ok(()));
-        assert_eq!(check_access(1, 0, 0o700, Access::READ), Ok(()));
-        assert_eq!(check_access(1, 0, 0o700, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o700, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o700, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o700, Access::WRITE), Ok(()));
 
-        assert_eq!(check_access(1, 0, 0o100, Access::EXEC), Ok(()));
-        assert_eq!(check_access(1, 0, 0o100, Access::READ), error!(EACCES));
-        assert_eq!(check_access(1, 0, 0o100, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o100, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o100, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o100, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(1, 0, 0o200, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(1, 0, 0o200, Access::READ), error!(EACCES));
-        assert_eq!(check_access(1, 0, 0o200, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o200, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o200, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o200, Access::WRITE), Ok(()));
 
-        assert_eq!(check_access(1, 0, 0o400, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(1, 0, 0o400, Access::READ), Ok(()));
-        assert_eq!(check_access(1, 0, 0o400, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o400, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o400, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o400, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(0, 2, 0o700, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(0, 2, 0o700, Access::READ), error!(EACCES));
-        assert_eq!(check_access(0, 2, 0o700, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o700, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o700, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o700, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(0, 2, 0o070, Access::EXEC), Ok(()));
-        assert_eq!(check_access(0, 2, 0o070, Access::READ), Ok(()));
-        assert_eq!(check_access(0, 2, 0o070, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o070, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o070, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o070, Access::WRITE), Ok(()));
 
-        assert_eq!(check_access(0, 3, 0o070, Access::EXEC), Ok(()));
-        assert_eq!(check_access(0, 3, 0o070, Access::READ), Ok(()));
-        assert_eq!(check_access(0, 3, 0o070, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 3, 0o070, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 3, 0o070, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 3, 0o070, Access::WRITE), Ok(()));
     }
 
     #[::fuchsia::test]

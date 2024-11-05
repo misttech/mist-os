@@ -955,6 +955,7 @@ where
                 }
             })?;
         name.check_access(
+            locked,
             current_task,
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,

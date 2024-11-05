@@ -198,7 +198,7 @@ pub async fn start_component(
                     current_task.fs().root(),
                     cwd_path.as_ref(),
                 )?;
-                current_task.fs().chdir(current_task, cwd)?;
+                current_task.fs().chdir(locked, current_task, cwd)?;
 
                 current_task.set_creds(credentials);
 

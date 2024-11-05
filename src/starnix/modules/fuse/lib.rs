@@ -1107,6 +1107,7 @@ const DEFAULT_PERMISSIONS_ATOMIC_ORDERING: Ordering = Ordering::Relaxed;
 impl FsNodeOps for FuseNode {
     fn check_access(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,

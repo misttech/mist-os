@@ -397,12 +397,16 @@ impl CurrentTask {
     /// Determine namespace node indicated by the dir_fd.
     ///
     /// Returns the namespace node and the path to use relative to that node.
-    pub fn resolve_dir_fd<'a>(
+    pub fn resolve_dir_fd<'a, L>(
         &self,
+        locked: &mut Locked<'_, L>,
         dir_fd: FdNumber,
         mut path: &'a FsStr,
         flags: ResolveFlags,
-    ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
+    ) -> Result<(NamespaceNode, &'a FsStr), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let path_is_absolute = path.starts_with(b"/");
         if path_is_absolute {
             if flags.contains(ResolveFlags::BENEATH) {
@@ -433,7 +437,12 @@ impl CurrentTask {
             if !dir.entry.node.is_dir() {
                 return error!(ENOTDIR);
             }
-            dir.check_access(self, Access::EXEC, CheckAccessReason::InternalPermissionChecks)?;
+            dir.check_access(
+                locked,
+                self,
+                Access::EXEC,
+                CheckAccessReason::InternalPermissionChecks,
+            )?;
         }
         Ok((dir, path.into()))
     }
@@ -608,7 +617,7 @@ impl CurrentTask {
             return error!(ENOENT);
         }
 
-        let (dir, path) = self.resolve_dir_fd(dir_fd, path, resolve_flags)?;
+        let (dir, path) = self.resolve_dir_fd(locked, dir_fd, path, resolve_flags)?;
         self.open_namespace_node_at(locked, dir, path, flags, mode, resolve_flags, access_check)
     }
 
@@ -683,7 +692,7 @@ impl CurrentTask {
             };
 
         let name = if flags.contains(OpenFlags::TMPFILE) {
-            name.create_tmpfile(self, mode.with_type(FileMode::IFREG), flags)?
+            name.create_tmpfile(locked, self, mode.with_type(FileMode::IFREG), flags)?
         } else {
             let mode = name.entry.node.info().mode;
 
@@ -756,7 +765,7 @@ impl CurrentTask {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let (dir, path) = self.resolve_dir_fd(dir_fd, path, ResolveFlags::empty())?;
+        let (dir, path) = self.resolve_dir_fd(locked, dir_fd, path, ResolveFlags::empty())?;
         self.lookup_parent(locked, context, &dir, path)
     }
 
@@ -849,6 +858,7 @@ impl CurrentTask {
         // Note that the ability to execute a file is unrelated to the flags
         // used in the `open` call.
         executable.name.check_access(
+            locked,
             self,
             Access::EXEC,
             CheckAccessReason::InternalPermissionChecks,

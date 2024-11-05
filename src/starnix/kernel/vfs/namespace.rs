@@ -1133,15 +1133,20 @@ impl NamespaceNode {
     /// The FileMode::IFMT of the FileMode is always FileMode::IFREG.
     ///
     /// Used by O_TMPFILE.
-    pub fn create_tmpfile(
+    pub fn create_tmpfile<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mode: FileMode,
         flags: OpenFlags,
-    ) -> Result<NamespaceNode, Errno> {
+    ) -> Result<NamespaceNode, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
         Ok(self.with_new_entry(self.entry.create_tmpfile(
+            locked,
             current_task,
             &self.mount,
             mode,
@@ -1549,13 +1554,17 @@ impl NamespaceNode {
     /// Check whether the node can be accessed in the current context with the specified access
     /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
     /// owner or is in the file's group.
-    pub fn check_access(
+    pub fn check_access<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         access: Access,
         reason: CheckAccessReason,
-    ) -> Result<(), Errno> {
-        self.entry.node.check_access(current_task, &self.mount, access, reason)
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.entry.node.check_access(locked, current_task, &self.mount, access, reason)
     }
 
     /// Checks if O_NOATIME is allowed,
