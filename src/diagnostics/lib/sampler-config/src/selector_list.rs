@@ -83,7 +83,7 @@ pub enum Error {
     ParseError(#[from] selectors::Error),
 }
 
-const DRIVER_COLLECTION_SEGMENT: &str = r"*-drivers\:*";
+const DRIVER_COLLECTION_SEGMENT: &str = "*-drivers:*";
 const BOOTSTRAP_SEGMENT: &str = "bootstrap";
 
 // `selector` must be validated.

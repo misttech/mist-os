@@ -299,7 +299,7 @@ mod tests {
                 "a/*/c",
                 vec![
                     Segment::ExactMatch("a".into()),
-                    Segment::Pattern("*"),
+                    Segment::Pattern("*".into()),
                     Segment::ExactMatch("c".into()),
                 ],
             ),
@@ -307,7 +307,7 @@ mod tests {
                 "a/b*/c",
                 vec![
                     Segment::ExactMatch("a".into()),
-                    Segment::Pattern("b*"),
+                    Segment::Pattern("b*".into()),
                     Segment::ExactMatch("c".into()),
                 ],
             ),
@@ -316,7 +316,7 @@ mod tests {
                 vec![
                     Segment::ExactMatch("a".into()),
                     Segment::ExactMatch("b".into()),
-                    Segment::Pattern("**"),
+                    Segment::Pattern("**".into()),
                 ],
             ),
             (
@@ -333,9 +333,9 @@ mod tests {
                 r#"a/*/b/**"#,
                 vec![
                     Segment::ExactMatch("a".into()),
-                    Segment::Pattern("*"),
+                    Segment::Pattern("*".into()),
                     Segment::ExactMatch("b".into()),
-                    Segment::Pattern("**"),
+                    Segment::Pattern("**".into()),
                 ],
             ),
         ];
@@ -454,14 +454,14 @@ mod tests {
             ),
             (
                 "a/*:c",
-                vec![Segment::ExactMatch("a".into()), Segment::Pattern("*")],
+                vec![Segment::ExactMatch("a".into()), Segment::Pattern("*".into())],
                 Some(Segment::ExactMatch("c".into())),
                 None,
             ),
             (
                 "a/b:*",
                 vec![Segment::ExactMatch("a".into()), Segment::ExactMatch("b".into())],
-                Some(Segment::Pattern("*")),
+                Some(Segment::Pattern("*".into())),
                 None,
             ),
             (
@@ -536,7 +536,11 @@ mod tests {
                 vec![Segment::ExactMatch("ab".into()), Segment::ExactMatch(" d".into())],
                 Some(Segment::ExactMatch("c ".into())),
             ),
-            ("a\\\t*b:c", vec![Segment::Pattern("a\\\t*b")], Some(Segment::ExactMatch("c".into()))),
+            (
+                "a\\\t*b:c",
+                vec![Segment::Pattern("a\t*b".into())],
+                Some(Segment::ExactMatch("c".into())),
+            ),
             (
                 r#"a\ "x":c"#,
                 vec![Segment::ExactMatch(r#"a "x""#.into())],
@@ -565,10 +569,16 @@ mod tests {
             selector::<VerboseError>("core/**:some-node/he*re:prop").unwrap(),
             Selector {
                 component: ComponentSelector {
-                    segments: vec![Segment::ExactMatch("core".into()), Segment::Pattern("**"),],
+                    segments: vec![
+                        Segment::ExactMatch("core".into()),
+                        Segment::Pattern("**".into()),
+                    ],
                 },
                 tree: TreeSelector {
-                    node: vec![Segment::ExactMatch("some-node".into()), Segment::Pattern("he*re"),],
+                    node: vec![
+                        Segment::ExactMatch("some-node".into()),
+                        Segment::Pattern("he*re".into()),
+                    ],
                     property: Some(Segment::ExactMatch("prop".into())),
                     tree_names: None,
                 },
@@ -594,10 +604,16 @@ mod tests {
                 .unwrap(),
             Selector {
                 component: ComponentSelector {
-                    segments: vec![Segment::ExactMatch("core".into()), Segment::Pattern("**"),],
+                    segments: vec![
+                        Segment::ExactMatch("core".into()),
+                        Segment::Pattern("**".into()),
+                    ],
                 },
                 tree: TreeSelector {
-                    node: vec![Segment::ExactMatch("some-node".into()), Segment::Pattern("he*re"),],
+                    node: vec![
+                        Segment::ExactMatch("some-node".into()),
+                        Segment::Pattern("he*re".into()),
+                    ],
                     property: Some(Segment::ExactMatch("prop".into())),
                     tree_names: Some(vec!["foo", r"bar*"].into()),
                 },
@@ -625,7 +641,10 @@ mod tests {
                     ],
                 },
                 tree: TreeSelector {
-                    node: vec![Segment::ExactMatch("some node".into()), Segment::Pattern("*"),],
+                    node: vec![
+                        Segment::ExactMatch("some node".into()),
+                        Segment::Pattern("*".into()),
+                    ],
                     property: Some(Segment::ExactMatch("prop".into())),
                     tree_names: None,
                 },

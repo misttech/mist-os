@@ -1091,7 +1091,7 @@ a:b:c
                 tree_selector: Some(TreeSelector::PropertySelector(PropertySelector {
                     node_path: vec![
                         StringSelector::ExactMatch("bar baz".into()),
-                        StringSelector::StringPattern("a*\\ b".into()),
+                        StringSelector::StringPattern("a* b".into()),
                     ],
                     target_properties: StringSelector::ExactMatch("quux".into())
                 })),

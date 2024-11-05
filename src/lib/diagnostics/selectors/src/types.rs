@@ -9,14 +9,14 @@ use std::fmt::Debug;
 #[derive(Debug, Eq, PartialEq)]
 pub enum Segment<'a> {
     ExactMatch(Cow<'a, str>),
-    Pattern(&'a str),
+    Pattern(Cow<'a, str>),
 }
 
-fn contains_unescaped_wildcard(s: &str) -> bool {
+fn contains_unescaped(s: &str, unescaped_char: char) -> bool {
     let mut iter = s.chars();
     while let Some(c) = iter.next() {
         match c {
-            '*' => return true,
+            c2 if c2 == unescaped_char => return true,
             '\\' => {
                 // skip escaped characters
                 let _ = iter.next();
@@ -29,13 +29,13 @@ fn contains_unescaped_wildcard(s: &str) -> bool {
 
 impl<'a> From<&'a str> for Segment<'a> {
     fn from(s: &'a str) -> Segment<'a> {
-        if contains_unescaped_wildcard(s) {
-            return Segment::Pattern(s);
+        if contains_unescaped(s, '*') {
+            return Segment::Pattern(Cow::Owned(unescape(s, &['*'])));
         }
         if !s.contains('\\') {
             return Segment::ExactMatch(Cow::from(s));
         }
-        Segment::ExactMatch(Cow::Owned(unescape(s)))
+        Segment::ExactMatch(Cow::Owned(unescape(s, &[])))
     }
 }
 
@@ -50,7 +50,7 @@ impl<'a> From<Vec<&'a str>> for TreeNames<'a> {
         let mut payload = vec![];
         for name in vec {
             if name.contains('\\') {
-                payload.push(Cow::Owned(unescape(name)));
+                payload.push(Cow::Owned(unescape(name, &[])));
             } else {
                 payload.push(Cow::Borrowed(name));
             }
@@ -60,8 +60,8 @@ impl<'a> From<Vec<&'a str>> for TreeNames<'a> {
 }
 
 // Given a escaped string, removes all the escaped characters (`\\`) and returns a new string
-// without them.
-fn unescape(value: &str) -> String {
+// without them. It'll keep characters present in the `except` list escaped.
+fn unescape(value: &str, except: &[char]) -> String {
     let mut result = String::with_capacity(value.len());
     let mut iter = value.chars();
     while let Some(c) = iter.next() {
@@ -69,6 +69,9 @@ fn unescape(value: &str) -> String {
             '\\' => {
                 // push unescaped character since we are constructing an exact match.
                 if let Some(c) = iter.next() {
+                    if except.contains(&c) {
+                        result.push('\\')
+                    }
                     result.push(c);
                 }
             }
@@ -151,7 +154,7 @@ impl From<Segment<'_>> for fdiagnostics::StringSelector {
     fn from(segment: Segment<'_>) -> fdiagnostics::StringSelector {
         match segment {
             Segment::ExactMatch(s) => fdiagnostics::StringSelector::ExactMatch(s.into_owned()),
-            Segment::Pattern(s) => fdiagnostics::StringSelector::StringPattern(s.to_owned()),
+            Segment::Pattern(s) => fdiagnostics::StringSelector::StringPattern(s.into_owned()),
         }
     }
 }
@@ -163,8 +166,8 @@ mod tests {
     #[fuchsia::test]
     fn convert_string_to_segment() {
         assert_eq!(Segment::ExactMatch(Cow::Borrowed("abc")), "abc".into());
-        assert_eq!(Segment::Pattern("a*c"), "a*c".into());
+        assert_eq!(Segment::Pattern("a*c".into()), "a*c".into());
         assert_eq!(Segment::ExactMatch(Cow::Owned("ac*".into())), "ac\\*".into());
-        assert_eq!(Segment::Pattern("a\\*c*"), "a\\*c*".into());
+        assert_eq!(Segment::Pattern("a\\*c*".into()), "a\\*c*".into());
     }
 }
