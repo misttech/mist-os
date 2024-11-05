@@ -4,8 +4,9 @@
 
 use super::common::{EHandle, Executor, ExecutorTime, MAIN_TASK_ID};
 use super::scope::ScopeRef;
-use super::time::MonotonicInstant;
+use super::time::{BootInstant, MonotonicInstant};
 use crate::atomic_future::AtomicFuture;
+use zx::BootDuration;
 
 use futures::future::{self, Either};
 use futures::task::AtomicWaker;
@@ -149,9 +150,10 @@ impl TestExecutor {
     /// Create a new single-threaded executor running with fake time.
     pub fn new_with_fake_time() -> Self {
         let inner = Arc::new(Executor::new(
-            ExecutorTime::FakeTime(AtomicI64::new(
-                zx::MonotonicInstant::INFINITE_PAST.into_nanos(),
-            )),
+            ExecutorTime::FakeTime {
+                mono_reading_ns: AtomicI64::new(zx::MonotonicInstant::INFINITE_PAST.into_nanos()),
+                mono_to_boot_offset_ns: AtomicI64::new(0),
+            },
             /* is_local */ true,
             /* num_threads */ 1,
         ));
@@ -165,13 +167,32 @@ impl TestExecutor {
         self.local.ehandle.inner().now()
     }
 
+    /// Return the current time on the boot timeline, according to the executor.
+    pub fn boot_now(&self) -> BootInstant {
+        self.local.ehandle.inner().boot_now()
+    }
+
     /// Set the fake time to a given value.
     ///
     /// # Panics
     ///
-    /// If the executor was not created with fake time
+    /// If the executor was not created with fake time.
     pub fn set_fake_time(&self, t: MonotonicInstant) {
         self.local.ehandle.inner().set_fake_time(t)
+    }
+
+    /// Sets the offset between the reading of the monotonic and the boot
+    /// clocks.
+    ///
+    /// This is useful to test the situations in which the boot and monotonic
+    /// offsets diverge.  In realistic scenarios, the offset can only grow,
+    /// and testers should keep that in view when setting duration.
+    ///
+    /// # Panics
+    ///
+    /// If the executor was not created with fake time.
+    pub fn set_fake_boot_to_mono_offset(&self, d: BootDuration) {
+        self.local.ehandle.inner().set_fake_boot_to_mono_offset(d)
     }
 
     #[doc(hidden)]
@@ -241,8 +262,11 @@ impl TestExecutor {
     /// Wake all tasks waiting for expired timers, and return `true` if any task was woken.
     ///
     /// This is intended for use in test code in conjunction with fake time.
+    ///
+    /// The wake will have effect on both the monotonic and the boot timers.
     pub fn wake_expired_timers(&mut self) -> bool {
         self.local.ehandle.inner().monotonic_timers().wake_timers()
+            || self.local.ehandle.inner().boot_timers().wake_timers()
     }
 
     /// Wake up the next task waiting for a timer, if any, and return the time for which the
@@ -261,9 +285,20 @@ impl TestExecutor {
         self.local.ehandle.inner().monotonic_timers().wake_next_timer()
     }
 
+    /// Similar to [wake_next_timer], but operates on the timers on the boot
+    /// timeline.
+    pub fn wake_next_boot_timer(&mut self) -> Option<BootInstant> {
+        self.local.ehandle.inner().boot_timers().wake_next_timer()
+    }
+
     /// Returns the deadline for the next timer due to expire.
     pub fn next_timer() -> Option<MonotonicInstant> {
         EHandle::local().inner().monotonic_timers().next_timer()
+    }
+
+    /// Returns the deadline for the next boot timeline timer due to expire.
+    pub fn next_boot_timer() -> Option<BootInstant> {
+        EHandle::local().inner().boot_timers().next_timer()
     }
 
     /// Advances fake time to the specified time.  This will only work if the executor is being run
@@ -380,7 +415,7 @@ fn with_data<R>(f: impl Fn(&mut UntilStalledData) -> R) -> R {
 mod tests {
     use super::*;
     use crate::handle::on_signals::OnSignals;
-    use crate::{Interval, Timer};
+    use crate::{Interval, Timer, WakeupTime};
     use assert_matches::assert_matches;
     use futures::StreamExt;
     use std::cell::{Cell, RefCell};
@@ -546,6 +581,44 @@ mod tests {
     }
 
     #[test]
+    fn time_now_fake_time_boot() {
+        let executor = TestExecutor::new_with_fake_time();
+        let t1 = MonotonicInstant::from_zx(zx::MonotonicInstant::from_nanos(0));
+        executor.set_fake_time(t1);
+        assert_eq!(MonotonicInstant::now(), t1);
+        assert_eq!(BootInstant::now().into_nanos(), t1.into_nanos());
+
+        let t2 = MonotonicInstant::from_zx(zx::MonotonicInstant::from_nanos(1000));
+        executor.set_fake_time(t2);
+        assert_eq!(MonotonicInstant::now(), t2);
+        assert_eq!(BootInstant::now().into_nanos(), t2.into_nanos());
+
+        const TEST_BOOT_OFFSET: i64 = 42;
+
+        executor.set_fake_boot_to_mono_offset(zx::BootDuration::from_nanos(TEST_BOOT_OFFSET));
+        assert_eq!(BootInstant::now().into_nanos(), t2.into_nanos() + TEST_BOOT_OFFSET);
+    }
+
+    #[test]
+    fn time_boot_now() {
+        let executor = TestExecutor::new_with_fake_time();
+        let t1 = MonotonicInstant::from_zx(zx::MonotonicInstant::from_nanos(0));
+        executor.set_fake_time(t1);
+        assert_eq!(MonotonicInstant::now(), t1);
+        assert_eq!(BootInstant::now().into_nanos(), t1.into_nanos());
+
+        let t2 = MonotonicInstant::from_zx(zx::MonotonicInstant::from_nanos(1000));
+        executor.set_fake_time(t2);
+        assert_eq!(MonotonicInstant::now(), t2);
+        assert_eq!(BootInstant::now().into_nanos(), t2.into_nanos());
+
+        const TEST_BOOT_OFFSET: i64 = 42;
+
+        executor.set_fake_boot_to_mono_offset(zx::BootDuration::from_nanos(TEST_BOOT_OFFSET));
+        assert_eq!(BootInstant::now().into_nanos(), t2.into_nanos() + TEST_BOOT_OFFSET);
+    }
+
+    #[test]
     fn time_after_overflow() {
         let executor = TestExecutor::new_with_fake_time();
 
@@ -580,6 +653,26 @@ mod tests {
         .await;
     }
 
+    #[test]
+    fn test_boot_time_tracks_mono_time() {
+        const FAKE_TIME: i64 = 42;
+        let executor = TestExecutor::new_with_fake_time();
+        executor.set_fake_time(MonotonicInstant::from_nanos(FAKE_TIME));
+        assert_eq!(
+            BootInstant::from_nanos(FAKE_TIME),
+            executor.boot_now(),
+            "boot time should have advanced"
+        );
+
+        // Now advance boot without mono.
+        executor.set_fake_boot_to_mono_offset(BootDuration::from_nanos(FAKE_TIME));
+        assert_eq!(
+            BootInstant::from_nanos(2 * FAKE_TIME),
+            executor.boot_now(),
+            "boot time should have advanced again"
+        );
+    }
+
     // Ensure that a large amount of wakeups does not exhaust kernel resources,
     // such as the zx port queue limit.
     #[test]
@@ -588,8 +681,7 @@ mod tests {
         executor.run_singlethreaded(multi_wake(4096 * 2));
     }
 
-    #[test]
-    fn test_advance_to() {
+    fn advance_to_with(timer_duration: impl WakeupTime) {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
@@ -597,10 +689,12 @@ mod tests {
             let timer_fired = Arc::new(AtomicBool::new(false));
             futures::join!(
                 async {
-                    Timer::new(zx::MonotonicDuration::from_seconds(1)).await;
+                    // Oneshot timer.
+                    Timer::new(timer_duration).await;
                     timer_fired.store(true, Ordering::SeqCst);
                 },
                 async {
+                    // Interval timer, fires periodically.
                     let mut fired = 0;
                     let mut interval = pin!(Interval::new(zx::MonotonicDuration::from_seconds(1)));
                     while let Some(_) = interval.next().await {
@@ -609,23 +703,31 @@ mod tests {
                             break;
                         }
                     }
-                    assert_eq!(fired, 3);
+                    assert_eq!(fired, 3, "interval timer should have fired multiple times.");
                 },
                 async {
-                    assert!(!timer_fired.load(Ordering::SeqCst));
+                    assert!(
+                        !timer_fired.load(Ordering::SeqCst),
+                        "the oneshot timer shouldn't be fired"
+                    );
                     TestExecutor::advance_to(MonotonicInstant::after(
                         zx::MonotonicDuration::from_millis(500),
                     ))
                     .await;
                     // Timer still shouldn't be fired.
-                    assert!(!timer_fired.load(Ordering::SeqCst));
+                    assert!(
+                        !timer_fired.load(Ordering::SeqCst),
+                        "the oneshot timer shouldn't be fired"
+                    );
                     TestExecutor::advance_to(MonotonicInstant::after(
                         zx::MonotonicDuration::from_millis(500),
                     ))
                     .await;
 
-                    // The timer should have fired.
-                    assert!(timer_fired.load(Ordering::SeqCst));
+                    assert!(
+                        timer_fired.load(Ordering::SeqCst),
+                        "the oneshot timer should have fired"
+                    );
 
                     // The interval timer should have fired once.  Make it fire twice more.
                     TestExecutor::advance_to(MonotonicInstant::after(
@@ -636,5 +738,15 @@ mod tests {
             )
         });
         assert!(executor.run_until_stalled(&mut fut).is_ready());
+    }
+
+    #[test]
+    fn test_advance_to() {
+        advance_to_with(zx::MonotonicDuration::from_seconds(1));
+    }
+
+    #[test]
+    fn test_advance_to_boot() {
+        advance_to_with(zx::BootDuration::from_seconds(1));
     }
 }

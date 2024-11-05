@@ -92,6 +92,13 @@ impl WakeupTime for MonotonicDuration {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl WakeupTime for zx::BootDuration {
+    fn into_timer(self) -> Timer {
+        EHandle::local().boot_timers().new_timer(BootInstant::after(self))
+    }
+}
+
 impl DurationExt for std::time::Duration {
     fn after_now(self) -> MonotonicInstant {
         MonotonicInstant::now() + self.into()
