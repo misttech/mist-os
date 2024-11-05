@@ -78,15 +78,32 @@ pub enum Error {
     #[error(transparent)]
     FuzzyMatchRealmQuery(anyhow::Error),
 
-    #[error(
-        "Fuzzy matching failed due to too many matches, please re-try with one of these: {0:?}"
-    )]
-    FuzzyMatchTooManyMatches(Vec<String>),
+    #[error("Fuzzy matching failed due to too many matches, please re-try with one of these:\n{0}")]
+    FuzzyMatchTooManyMatches(FuzzyMatchErrorWrapper),
 
     #[error(
         "hint: selectors paired with --component must not include component selector segment: {0}"
     )]
     PartialSelectorHint(#[source] selectors::Error),
+}
+
+#[derive(Debug)]
+pub struct FuzzyMatchErrorWrapper(Vec<String>);
+
+impl std::iter::FromIterator<String> for FuzzyMatchErrorWrapper {
+    fn from_iter<I: IntoIterator<Item = String>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl std::fmt::Display for FuzzyMatchErrorWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        for component in &self.0 {
+            writeln!(f, "{component}")?;
+        }
+
+        Ok(())
+    }
 }
 
 impl From<ConnectCapabilityError> for Error {

@@ -93,7 +93,9 @@ impl Command for ShowCommand {
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
         if self.manifest.is_some() {
-            eprintln!("WARNING: option `--manifest` is deprecated, please use `--component` instead");
+            eprintln!(
+                "WARNING: option `--manifest` is deprecated, please use `--component` instead"
+            );
         }
         let selectors = if let Some(component) = self.component {
             utils::process_component_query_with_partial_selectors(
