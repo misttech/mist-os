@@ -191,26 +191,16 @@ local_repository(
     path = "build/bazel_sdk/bazel_rules_fuchsia",
 )
 
-# googletest is a dependency from @fuchsia_sdk amd requires a local
-# patch for now for Fuchsia support, which is handled by a repository rule.
-#
-# local_repository(
-#    name = "com_google_googletest",
-#    path = "third_party/googletest/src",
-# )
-# buildifier: disable=load-on-top
-load(
-    "//:build/bazel/repository_rules.bzl",
-    "boringssl_repository",
-    "fuchsia_build_info_repository",
-    "gn_targets_repository",
-    "googletest_repository",
-)
-
 # com_google_absl is a dependency of com_google_googletest
 local_repository(
     name = "com_google_absl",
     path = "third_party/abseil-cpp",
+)
+
+# buildifier: disable=load-on-top
+load(
+    "//:build/bazel/repository_rules/fuchsia_build_info_repository.bzl",
+    "fuchsia_build_info_repository",
 )
 
 fuchsia_build_info_repository(
@@ -220,6 +210,12 @@ fuchsia_build_info_repository(
     # LINT.ThenChange(scripts/update_workspace.py)
 )
 
+# googletest is a dependency from @fuchsia_sdk amd requires a local
+# patch for now for Fuchsia support, which is handled by a repository rule.
+
+# buildifier: disable=load-on-top
+load("//:build/bazel/repository_rules/googletest_repository.bzl", "googletest_repository")
+
 googletest_repository(
     name = "com_google_googletest",
     # LINT.IfChange
@@ -227,10 +223,18 @@ googletest_repository(
     # LINT.ThenChange(scripts/update_workspace.py)
 )
 
+# buildifier: disable=load-on-top
+load("//:build/bazel/repository_rules/boringssl_repository.bzl", "boringssl_repository")
+
 boringssl_repository(
     name = "boringssl",
+    # LINT.IfChange
     content_hash_file = "fuchsia_build_generated/boringssl.hash",
+    # LINT.ThenChange(scripts/update_workspace.py)
 )
+
+# buildifier: disable=load-on-top
+load("//:build/bazel/repository_rules/gn_targets_repository.bzl", "gn_targets_repository")
 
 gn_targets_repository(
     name = "gn_targets",
