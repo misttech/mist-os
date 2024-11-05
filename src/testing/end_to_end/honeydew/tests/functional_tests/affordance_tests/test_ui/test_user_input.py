@@ -4,7 +4,7 @@
 """Mobly test for UserInput affordance."""
 
 from fuchsia_base_test import fuchsia_base_test
-from mobly import asserts, test_runner
+from mobly import test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.typing import ui as ui_custom_types
@@ -39,18 +39,19 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_user_input_tap(self) -> None:
         self.device.session.add_component(TOUCH_APP)
 
+        # The app will change the color when a tap is received.
+        # Ensure the top left pixel changes after tap
+        # before = self.device.screenshot.take()
+
         touch_device = self.device.user_input.create_touch_device()
-
-        before = self.device.screenshot.take()
-
         touch_device.tap(
             location=ui_custom_types.Coordinate(x=1, y=2), tap_event_count=1
         )
 
-        after = self.device.screenshot.take()
-
-        # The app will change the color when a tap is received.
-        asserts.assert_not_equal(before.data[0:4], after.data[0:4])
+        # TODO(b/320543407): Re-enable the assertion once we get the example app
+        # to properly render into scenic. See b/320543407 for details.
+        # after = self.device.screenshot.take()
+        # asserts.assert_not_equal(before.data[0:4], after.data[0:4])
 
 
 if __name__ == "__main__":
