@@ -318,6 +318,15 @@ void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutpu
       module = &prev;
     }
   }
+  // Also check for negative loads which can happen on zircon on x64.
+  // When this happens, the module will have a base address of 0.
+  if (!module && address_to_module_id_.contains(0)) {
+    uint64_t module_id = address_to_module_id_[0];
+    const auto& mod = modules_[module_id];
+    if (address - mod.base <= mod.size) {
+      module = &mod;
+    }
+  }
 
   if (!module) {
     analytics_builder_.IncreaseNumberOfFramesInvalid();
