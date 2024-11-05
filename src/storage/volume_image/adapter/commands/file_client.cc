@@ -9,10 +9,9 @@
 
 zx::result<fidl::ClientEnd<fuchsia_io::File>> OpenFile(const char* path) {
   auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
-  return zx::make_result(
-      fdio_open(path,
-                static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |
-                                      fuchsia_io::wire::OpenFlags::kNotDirectory),
-                server.TakeChannel().release()),
-      std::move(client));
+  return zx::make_result(fdio_open3(path,
+                                    static_cast<uint64_t>(fuchsia_io::wire::kPermReadable |
+                                                          fuchsia_io::wire::Flags::kProtocolFile),
+                                    server.TakeChannel().release()),
+                         std::move(client));
 }

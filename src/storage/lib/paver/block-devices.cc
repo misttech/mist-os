@@ -142,10 +142,10 @@ zx::result<BlockDevices> BlockDevices::Create(fbl::unique_fd devfs_root,
   if (!partitions_root) {
     // It's OK to swallow errors here, /partitions isn't always available.
     [[maybe_unused]]
-    zx_status_t status = fdio_open_fd("/partitions", 0, partitions_root.reset_and_get_address());
+    zx_status_t status = fdio_open3_fd("/partitions", 0, partitions_root.reset_and_get_address());
   }
   if (!devfs_root) {
-    if (zx_status_t status = fdio_open_fd("/dev", 0, devfs_root.reset_and_get_address());
+    if (zx_status_t status = fdio_open3_fd("/dev", 0, devfs_root.reset_and_get_address());
         status != ZX_OK) {
       ERROR("Failed to open /dev: %s\n", zx_status_get_string(status));
       return zx::error(status);
@@ -279,9 +279,9 @@ zx::result<std::unique_ptr<VolumeConnector>> BlockDevices::WaitForPartition(
     dir_fd = partitions_root_.duplicate();
   } else {
     if (zx_status_t status =
-            fdio_open_fd_at(devfs_root_.get(), devfs_suffix,
-                            static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                            dir_fd.reset_and_get_address());
+            fdio_open3_fd_at(devfs_root_.get(), devfs_suffix,
+                             static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
+                             dir_fd.reset_and_get_address());
         status != ZX_OK) {
       ERROR("Failed to open /dev/%s: %s\n", devfs_suffix, zx_status_get_string(status));
       return zx::error(status);

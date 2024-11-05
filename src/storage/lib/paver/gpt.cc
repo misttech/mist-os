@@ -100,7 +100,7 @@ zx::result<std::vector<GptDevicePartitioner::GptClients>> GptDevicePartitioner::
     const fbl::unique_fd& devfs_root) {
   fbl::unique_fd block_fd;
   if (zx_status_t status =
-          fdio_open_fd_at(devfs_root.get(), "class/block", 0, block_fd.reset_and_get_address());
+          fdio_open3_fd_at(devfs_root.get(), "class/block", 0, block_fd.reset_and_get_address());
       status != ZX_OK) {
     ERROR("Cannot inspect block devices: %s\n", zx_status_get_string(status));
     return zx::error(status);

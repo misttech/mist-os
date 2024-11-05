@@ -151,7 +151,7 @@ class FvmTest : public zxtest::Test {
   zx::result<fbl::unique_fd> fvm_device_fd() const {
     fbl::unique_fd fd;
     zx_status_t status =
-        fdio_open_fd_at(devfs_root_fd().get(), fvm_path().c_str(), 0, fd.reset_and_get_address());
+        fdio_open3_fd_at(devfs_root_fd().get(), fvm_path().c_str(), 0, fd.reset_and_get_address());
     return zx::make_result(status, std::move(fd));
   }
 
@@ -2376,8 +2376,8 @@ TEST_F(FvmTest, TestMounting) {
 
   // Verify that the mount was successful.
   fbl::unique_fd rootfd;
-  ASSERT_OK(fdio_open_fd(kMountPath, static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                         rootfd.reset_and_get_address()));
+  ASSERT_OK(fdio_open3_fd(kMountPath, static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
+                          rootfd.reset_and_get_address()));
   fdio_cpp::FdioCaller caller(std::move(rootfd));
   auto result = fidl::WireCall(caller.directory())->QueryFilesystem();
   ASSERT_TRUE(result.ok());
@@ -2480,8 +2480,8 @@ TEST_F(FvmTest, TestMkfs) {
 
   // Verify that the mount was successful.
   fbl::unique_fd rootfd;
-  ASSERT_OK(fdio_open_fd(kMountPath, static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                         rootfd.reset_and_get_address()));
+  ASSERT_OK(fdio_open3_fd(kMountPath, static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
+                          rootfd.reset_and_get_address()));
   ASSERT_TRUE(rootfd);
   fdio_cpp::FdioCaller caller(std::move(rootfd));
   auto result = fidl::WireCall(caller.directory())->QueryFilesystem();

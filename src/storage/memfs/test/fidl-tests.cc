@@ -94,9 +94,8 @@ TEST(FidlTests, TestFidlOpenReadOnly) {
   fd.reset();
 
   auto endpoints = fidl::Endpoints<fio::Node>::Create();
-  ASSERT_OK(fdio_open("/fidltmp-ro/file-ro",
-                      static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable),
-                      endpoints.server.TakeChannel().release()));
+  ASSERT_OK(fdio_open3("/fidltmp-ro/file-ro", static_cast<uint64_t>(fio::wire::kPermReadable),
+                       endpoints.server.TakeChannel().release()));
 
   auto result = fidl::WireCall(endpoints.client)->GetFlags();
   ASSERT_OK(result.status());
