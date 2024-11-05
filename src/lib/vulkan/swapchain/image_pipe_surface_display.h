@@ -9,7 +9,12 @@
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <zircon/compiler.h>
 
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <queue>
 #include <unordered_set>
 
 #include "src/lib/vulkan/swapchain/display_coordinator_listener.h"
@@ -23,6 +28,8 @@ class ImagePipeSurfaceDisplay final
       public fidl::AsyncEventHandler<fuchsia_hardware_display::Coordinator> {
  public:
   ImagePipeSurfaceDisplay();
+
+  ~ImagePipeSurfaceDisplay() override;
 
   bool Init() override;
 
@@ -47,28 +54,57 @@ class ImagePipeSurfaceDisplay final
   void on_fidl_error(fidl::UnbindInfo error) override;
 
  private:
+  // `release_fence` will be signaled when a vsync is received with a larger/later config stamp.
+  struct ReleaseFenceEntry {
+    fuchsia_hardware_display_types::ConfigStamp config_stamp;
+    zx::event release_fence;
+  };
+
   void ControllerOnDisplaysChanged(std::vector<fuchsia_hardware_display::Info>,
                                    std::vector<fuchsia_hardware_display_types::DisplayId>);
+  void ControllerOnVsync(fuchsia_hardware_display_types::DisplayId, zx::time timestamp,
+                         fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+                         fuchsia_hardware_display::VsyncAckCookie cookie);
 
+  // TODO(https://fxbug.dev/377322342): consider making `display_coordinator_` a sync client,
+  // so that it isn't necessary to call `WaitForAsyncMessage()`.
   bool WaitForAsyncMessage();
+
+  fuchsia_hardware_display_types::ConfigStamp NextConfigStamp() {
+    return fuchsia_hardware_display_types::ConfigStamp(++last_applied_config_stamp_);
+  }
 
   // This loop is manually pumped in method calls and doesn't have its own
   // thread.
-  async::Loop loop_;
+  async::Loop client_loop_;
+  async::Loop listener_loop_;
+
   std::unordered_set<uint64_t> image_ids;
 
   bool display_connection_exited_ = false;
   bool got_message_response_ = false;
-  bool have_display_ = false;
+  std::atomic_bool have_display_ = false;
   uint32_t width_ = 0;
   uint32_t height_ = 0;
+
+  // ID of the first display returned, whenever the displays are updated.
   fuchsia_hardware_display_types::DisplayId display_id_ = {
       fuchsia_hardware_display_types::kInvalidDispId};
+
+  // Initialized in `CreateImage()`; doesn't change.
   fuchsia_hardware_display::LayerId layer_id_{fuchsia_hardware_display_types::kInvalidDispId};
-  fidl::Client<fuchsia_hardware_display::Coordinator> display_coordinator_;
+
+  std::atomic_uint64_t last_applied_config_stamp_ =
+      fuchsia_hardware_display_types::kInvalidConfigStampValue;
+  std::queue<ReleaseFenceEntry> pending_release_fences_ __TA_GUARDED(mutex_);
+  bool receiving_vsyncs_ __TA_GUARDED(mutex_) = false;
+
+  fidl::SharedClient<fuchsia_hardware_display::Coordinator> display_coordinator_;
   std::unique_ptr<DisplayCoordinatorListener> display_coordinator_listener_;
   fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_allocator_;
   SupportedImageProperties supported_image_properties_;
+
+  std::mutex mutex_;
 };
 
 }  // namespace image_pipe_swapchain
