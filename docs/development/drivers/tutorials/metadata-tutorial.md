@@ -51,6 +51,10 @@ In order to both send and receive metadata using the
 class like so:
 
 ```cpp
+// Defines `fdf_metadata::ObjectDetails`.
+#include <lib/driver/metadata/cpp/metadata.h>
+
+// Defines the fuchsia.examples.metadata types in C++.
 #include <fidl/fuchsia.examples.metadata/cpp/fidl.h>
 
 // `ObjectDetails` must be specialized within the `fdf_metadata` namespace.
@@ -100,6 +104,7 @@ FUCHSIA_DRIVER_EXPORT(Sender);
 ```
 
 It's component manifest is the following:
+
 ```
 {
     include: [
@@ -112,10 +117,10 @@ It's component manifest is the following:
         bind: "meta/bind/parent.bindbc",
     },
 }
-
 ```
 
 It's build targets are defined as follows:
+
 ```
 fuchsia_cc_driver("driver") {
   testonly = true
