@@ -337,9 +337,6 @@ template("sdk_static_library") {
                                "source_dir",
                                "testonly",
                              ])
-      if (!defined(all_headers)) {
-        all_headers = []
-      }
       all_deps = build_deps
       file_base = sdk_root_path
       if (!defined(all_headers)) {
