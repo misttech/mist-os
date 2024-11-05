@@ -142,11 +142,6 @@ config("bootfs") {
     # See: https://fxbug.dev/42160867
     # See: https://fxbug.dev/42172876
     configs = [ "//build/config/lto:thinlto" ]
-
-    # Multiple codegen units on vim3 with debug push bootfs over the limit.
-    if (board_name == "vim3") {
-      configs += [ ":one_codegen_unit" ]
-    }
   }
 }
 
