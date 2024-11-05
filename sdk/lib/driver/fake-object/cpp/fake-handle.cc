@@ -3,7 +3,6 @@
 // found in the LICENSE file
 
 #include <lib/driver/fake-object/cpp/fake-object.h>
-#include <lib/driver/fake-object/cpp/internal.h>
 #include <lib/zx/result.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls.h>
@@ -11,6 +10,8 @@
 
 #include <memory>
 #include <mutex>
+
+#include "internal.h"
 
 namespace fdf_fake_object {
 

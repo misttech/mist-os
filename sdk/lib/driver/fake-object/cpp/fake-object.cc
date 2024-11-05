@@ -4,7 +4,6 @@
 
 #include <dlfcn.h>
 #include <lib/driver/fake-object/cpp/fake-object.h>
-#include <lib/driver/fake-object/cpp/internal.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
@@ -12,6 +11,8 @@
 #include <zircon/types.h>
 
 #include <memory>
+
+#include "internal.h"
 
 namespace fdf_fake_object {
 
