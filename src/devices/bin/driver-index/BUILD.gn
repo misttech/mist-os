@@ -104,7 +104,7 @@ fuchsia_package("package") {
   deps = [ ":component" ]
 }
 
-fuchsia_driver("fake-driver") {
+fuchsia_cc_driver("fake-driver") {
 }
 
 driver_bind_rules("test-bind") {
@@ -120,7 +120,7 @@ fuchsia_driver_component("test-bind-component") {
   manifest = "meta/test-bind-component.cml"
 }
 
-fuchsia_driver("fake-driver2") {
+fuchsia_cc_driver("fake-driver2") {
 }
 
 driver_bind_rules("test-bind2") {
@@ -136,7 +136,7 @@ fuchsia_driver_component("test-bind2-component") {
   manifest = "meta/test-bind2-component.cml"
 }
 
-fuchsia_driver("fake-fallback-driver") {
+fuchsia_cc_driver("fake-fallback-driver") {
 }
 
 driver_bind_rules("test-fallback-bind") {

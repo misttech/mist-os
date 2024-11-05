@@ -54,7 +54,7 @@ _common_deps = [
   "//zircon/third_party/ulib/safemath",
 ]
 
-fuchsia_driver("ufs-driver") {
+fuchsia_cc_driver("ufs-driver") {
   output_name = "ufs"
   configs += [ "//build/config:all_source" ]
   sources = [

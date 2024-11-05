@@ -9,7 +9,7 @@ driver_bind_rules("bind") {
   bind_output = "crasher.bindbc"
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "restart_on_crash_driver"
   sources = [ "driver.cc" ]

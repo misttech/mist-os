@@ -18,7 +18,7 @@ driver_bind_rules("bind") {
   deps = [ "//src/devices/tests/v2/compat/bind:fuchsia.compat" ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "leaf"
   sources = [ "leaf.cc" ]

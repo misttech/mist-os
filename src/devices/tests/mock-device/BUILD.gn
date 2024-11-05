@@ -11,7 +11,7 @@ driver_bind_rules("mock-device-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("mock-device-driver") {
+fuchsia_cc_driver("mock-device-driver") {
   output_name = "mock-device"
   testonly = true
   sources = [

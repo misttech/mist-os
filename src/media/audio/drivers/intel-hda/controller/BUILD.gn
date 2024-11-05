@@ -108,7 +108,7 @@ resource("firmware") {
   outputs = [ "lib/firmware/$firmware_path" ]
 }
 
-fuchsia_driver("intel-hda-driver") {
+fuchsia_cc_driver("intel-hda-driver") {
   output_name = "intel-hda"
   defines = [ "ADSP_FIRMWARE_PATH=\"$firmware_path\"" ]
   configs += [

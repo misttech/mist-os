@@ -17,7 +17,7 @@ group("tests") {
   deps = [ ":usb_harriet_bind_test" ]
 }
 
-fuchsia_driver("usb-harriet-driver") {
+fuchsia_cc_driver("usb-harriet-driver") {
   output_name = "usb-harriet"
   configs += [
     "//build/config:all_source",

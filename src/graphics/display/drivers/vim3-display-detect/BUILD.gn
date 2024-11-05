@@ -15,7 +15,7 @@ driver_bind_rules("vim3-display-detect-bind") {
   ]
 }
 
-fuchsia_driver("vim3-display-detect-driver") {
+fuchsia_cc_driver("vim3-display-detect-driver") {
   output_name = "vim3-display-detect"
   sources = [ "vim3-display-detect.cc" ]
   deps = [

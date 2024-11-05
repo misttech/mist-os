@@ -57,7 +57,7 @@ source_set("dwc3-common") {
   ]
 }
 
-fuchsia_driver("dwc3-driver") {
+fuchsia_cc_driver("dwc3-driver") {
   output_name = "dwc3"
   configs += [
     "//build/config:all_source",

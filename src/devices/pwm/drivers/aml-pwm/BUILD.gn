@@ -18,7 +18,7 @@ driver_bind_rules("aml-pwm-bind") {
   ]
 }
 
-fuchsia_driver("aml-pwm-driver") {
+fuchsia_cc_driver("aml-pwm-driver") {
   output_name = "aml-pwm"
   configs += [
     "//build/config:all_source",

@@ -72,7 +72,7 @@ driver_bind_rules("parent-driver-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("parent-driver-driver") {
+fuchsia_cc_driver("parent-driver-driver") {
   output_name = "bindlib-codegen-parent"
   configs += [
     "//build/config:all_source",
@@ -105,7 +105,7 @@ driver_bind_rules("child-driver-bind") {
   ]
 }
 
-fuchsia_driver("child-driver-driver") {
+fuchsia_cc_driver("child-driver-driver") {
   output_name = "bindlib-codegen-child"
   configs += [
     "//build/config:all_source",

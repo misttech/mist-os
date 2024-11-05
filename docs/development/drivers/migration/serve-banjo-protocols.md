@@ -60,7 +60,7 @@ To set up the `Misc` Banjo protocol in a DFv2 driver, do the following:
   `fuchsia_driver` target, for example:
 
    ```gn {:.devsite-disable-click-to-copy}
-   fuchsia_driver("parent_driver") {
+   fuchsia_cc_driver("parent_driver") {
      output_name = "banjo_transport_parent"
      sources = [ "parent-driver.cc" ]
      deps = [
@@ -259,7 +259,7 @@ To connect the child driver to the parent driver, do the following:
    a dependency in the `fuchsia_driver` target, for example:
 
    ```gn {:.devsite-disable-click-to-copy}
-   fuchsia_driver("child_driver") {
+   fuchsia_cc_driver("child_driver") {
      output_name = "banjo_transport_child"
      sources = [ "child-driver.cc" ]
      deps = [
@@ -289,7 +289,7 @@ To connect the child driver to the parent driver, do the following:
    library as a dependency in the `fuchsia_driver` target, for example:
 
    ```gn {:.devsite-disable-click-to-copy}
-   fuchsia_driver("child_driver") {
+   fuchsia_cc_driver("child_driver") {
      output_name = "banjo_transport_child"
      sources = [ "child-driver.cc" ]
      deps = [

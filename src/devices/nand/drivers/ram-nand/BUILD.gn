@@ -13,7 +13,7 @@ driver_bind_rules("ram-nand-bind") {
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
 
-fuchsia_driver("ram-nand-driver") {
+fuchsia_cc_driver("ram-nand-driver") {
   output_name = "ram-nand"
   configs += [
     "//build/config:all_source",

@@ -18,7 +18,7 @@ driver_bind_rules("bt_transport_usb_bind") {
   ]
 }
 
-fuchsia_driver("bt-transport-usb-driver") {
+fuchsia_cc_driver("bt-transport-usb-driver") {
   output_name = "bt-transport-usb"
   configs += [
     "//build/config:all_source",

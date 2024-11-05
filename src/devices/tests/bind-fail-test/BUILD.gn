@@ -11,7 +11,7 @@ driver_bind_rules("bind-fail-test-bind") {
   rules = "meta/bind-fail.bind"
 }
 
-fuchsia_driver("fuchsia_driver") {
+fuchsia_cc_driver("fuchsia_driver") {
   output_name = "bind-fail-test-driver"
 
   configs += [

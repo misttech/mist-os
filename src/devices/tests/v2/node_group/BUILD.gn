@@ -34,7 +34,7 @@ driver_bind_rules("root_bind") {
   bind_output = "root.bindbc"
 }
 
-fuchsia_driver("root_driver") {
+fuchsia_cc_driver("root_driver") {
   testonly = true
   output_name = "nodegroup_root"
   sources = [ "root_driver.cc" ]
@@ -62,7 +62,7 @@ driver_bind_rules("nodegroup_leaf_bind") {
   deps = [ ":fuchsia.nodegroupbind.test" ]
 }
 
-fuchsia_driver("leaf_driver") {
+fuchsia_cc_driver("leaf_driver") {
   testonly = true
   output_name = "nodegroup_leaf"
   sources = [ "leaf_driver.cc" ]

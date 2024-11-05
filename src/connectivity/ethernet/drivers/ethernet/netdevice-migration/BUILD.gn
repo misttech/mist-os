@@ -41,7 +41,7 @@ source_set("src") {
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
-fuchsia_driver("netdevice-migration-driver") {
+fuchsia_cc_driver("netdevice-migration-driver") {
   output_name = "netdevice-migration"
   deps = [
     ":netdevice-migration-bind",

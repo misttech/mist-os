@@ -19,7 +19,7 @@ driver_bind_rules("tcs3400_light_bind") {
   ]
 }
 
-fuchsia_driver("ams-light-driver") {
+fuchsia_cc_driver("ams-light-driver") {
   output_name = "ams-light"
   configs += [
     "//build/config:all_source",

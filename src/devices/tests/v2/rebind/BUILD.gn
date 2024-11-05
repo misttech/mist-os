@@ -20,7 +20,7 @@ driver_bind_rules("child_bind") {
   bind_output = "rebind_child.bindbc"
 }
 
-fuchsia_driver("child_driver") {
+fuchsia_cc_driver("child_driver") {
   testonly = true
   output_name = "rebind_child"
   sources = [ "rebind_child.cc" ]
@@ -51,7 +51,7 @@ driver_bind_rules("parent_bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("parent_driver") {
+fuchsia_cc_driver("parent_driver") {
   testonly = true
   output_name = "rebind_parent"
   sources = [ "rebind_parent.cc" ]

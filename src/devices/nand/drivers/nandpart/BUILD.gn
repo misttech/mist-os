@@ -14,7 +14,7 @@ driver_bind_rules("nandpart-bind") {
   deps = [ "//src/devices/bind/fuchsia.nand" ]
 }
 
-fuchsia_driver("nandpart-driver") {
+fuchsia_cc_driver("nandpart-driver") {
   output_name = "nandpart"
   configs += [
     "//build/config:all_source",

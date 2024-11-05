@@ -20,7 +20,7 @@ group("tests") {
   deps = [ ":usb_ums_bind_test" ]
 }
 
-fuchsia_driver("ums-function-driver") {
+fuchsia_cc_driver("ums-function-driver") {
   output_name = "ums-function"
   configs += [
     "//build/config:all_source",

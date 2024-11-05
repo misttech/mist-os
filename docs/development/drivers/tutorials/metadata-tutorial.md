@@ -117,7 +117,7 @@ It's component manifest is the following:
 
 It's build targets are defined as follows:
 ```
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "parent"
   sources = [
@@ -186,7 +186,7 @@ before it attempts to retrieve the metadata.
 
 The `driver` build target will need to be updated:
 ```
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "parent"
   sources = [
@@ -276,7 +276,7 @@ It's component manifest is the following:
 It's build targets are defined as follows:
 
 ```
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "child"
   sources = [
@@ -326,7 +326,7 @@ class Retriever : public fdf::DriverBase {
 The `driver` build target will need to be updated:
 
 ```
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "child"
   sources = [
@@ -396,7 +396,7 @@ It's component manifest is the following:
 It's build targets are defined as follows:
 
 ```
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "forward_driver"
   sources = [
@@ -463,7 +463,7 @@ order to incorporate the change.
 The `driver` build target will need to be updated:
 
 ```
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "forward_driver"
   sources = [

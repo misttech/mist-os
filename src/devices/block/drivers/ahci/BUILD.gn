@@ -18,7 +18,7 @@ driver_bind_rules("ahci_bind") {
   ]
 }
 
-fuchsia_driver("ahci-driver") {
+fuchsia_cc_driver("ahci-driver") {
   output_name = "ahci"
   configs += [
     "//build/config:all_source",

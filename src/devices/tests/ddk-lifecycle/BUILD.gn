@@ -20,7 +20,7 @@ driver_bind_rules("test-lifecycle-bind") {
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
-fuchsia_driver("ddk-lifecycle-test-driver") {
+fuchsia_cc_driver("ddk-lifecycle-test-driver") {
   testonly = true
   output_name = "ddk-lifecycle-test"
   configs += [

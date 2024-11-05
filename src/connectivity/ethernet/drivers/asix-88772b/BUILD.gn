@@ -12,7 +12,7 @@ driver_bind_rules("ethernet_ax88772b_bind") {
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 
-fuchsia_driver("asix-88772b-driver") {
+fuchsia_cc_driver("asix-88772b-driver") {
   output_name = "asix-88772b"
   configs += [
     "//build/config:all_source",

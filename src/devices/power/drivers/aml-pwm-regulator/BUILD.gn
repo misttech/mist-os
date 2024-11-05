@@ -36,7 +36,7 @@ group("common") {
   ]
 }
 
-fuchsia_driver("aml-pwm-regulator-driver") {
+fuchsia_cc_driver("aml-pwm-regulator-driver") {
   output_name = "aml-pwm-regulator"
   sources = [ "aml-pwm-regulator.cc" ]
   deps = [ ":common" ]

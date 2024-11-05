@@ -20,7 +20,7 @@ driver_bind_rules("ftl_bind") {
   deps = [ "//src/devices/bind/fuchsia.nand" ]
 }
 
-fuchsia_driver("ftl-driver") {
+fuchsia_cc_driver("ftl-driver") {
   output_name = "ftl"
   configs += [
     "//build/config:all_source",

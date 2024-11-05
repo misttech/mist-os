@@ -36,7 +36,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("nand-driver") {
+fuchsia_cc_driver("nand-driver") {
   output_name = "nand"
   deps = [
     ":common",

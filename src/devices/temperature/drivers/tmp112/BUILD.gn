@@ -16,7 +16,7 @@ driver_bind_rules("tmp112-bind") {
   ]
 }
 
-fuchsia_driver("tmp112-driver") {
+fuchsia_cc_driver("tmp112-driver") {
   output_name = "tmp112"
   configs += [
     "//build/config:all_source",

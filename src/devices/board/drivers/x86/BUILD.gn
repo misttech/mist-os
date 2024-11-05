@@ -39,7 +39,7 @@ driver_bind_rules("x64-bind") {
   ]
 }
 
-fuchsia_driver("platform-bus-x86-driver") {
+fuchsia_cc_driver("platform-bus-x86-driver") {
   output_name = "platform-bus-x86"
   configs += [
     "//build/config:all_source",

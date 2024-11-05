@@ -10,7 +10,7 @@ driver_bind_rules("bind") {
   bind_output = "left_parent.bindbc"
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "reload_test_left_parent_driver"
   sources = [ "left_parent_driver.cc" ]

@@ -39,7 +39,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("virtio_socket-driver") {
+fuchsia_cc_driver("virtio_socket-driver") {
   output_name = "virtio_socket"
   sources = [ "socket_driver.cc" ]
   deps = [

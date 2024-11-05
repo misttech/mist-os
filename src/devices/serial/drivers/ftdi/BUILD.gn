@@ -12,7 +12,7 @@ driver_bind_rules("ftdi_bind") {
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 
-fuchsia_driver("ftdi-driver") {
+fuchsia_cc_driver("ftdi-driver") {
   output_name = "ftdi"
   configs += [
     "//build/config:all_source",
@@ -69,7 +69,7 @@ driver_bind_rules("ftdi_function_bind") {
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 
-fuchsia_driver("ftdi-fake-usb-driver") {
+fuchsia_cc_driver("ftdi-fake-usb-driver") {
   output_name = "ftdi-fake-usb"
   configs += [
     "//build/config:all_source",

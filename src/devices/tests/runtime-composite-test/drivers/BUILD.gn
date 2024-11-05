@@ -32,7 +32,7 @@ driver_bind_rules("root-driver-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("root-driver") {
+fuchsia_cc_driver("root-driver") {
   output_name = "runtime-composite-root-driver"
   sources = [ "root-driver.cc" ]
   deps = [
@@ -62,7 +62,7 @@ driver_bind_rules("leaf-driver-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("leaf-driver") {
+fuchsia_cc_driver("leaf-driver") {
   output_name = "runtime-composite-leaf-driver"
   sources = [ "leaf-driver.cc" ]
   deps = [
@@ -91,7 +91,7 @@ driver_bind_rules("composite-bind") {
   deps = [ ":composite.test.lib" ]
 }
 
-fuchsia_driver("composite-driver") {
+fuchsia_cc_driver("composite-driver") {
   output_name = "runtime-composite-composite-driver"
   sources = [ "composite-driver.cc" ]
   deps = [

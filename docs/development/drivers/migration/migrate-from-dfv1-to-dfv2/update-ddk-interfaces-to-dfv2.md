@@ -558,7 +558,7 @@ The `TRACE_DURATION()` method is available for both DFv1 and DFv2.
   And add the following line to the build dependencies:
 
   ```cpp
-  fuchsia_driver("i2c-driver") {
+  fuchsia_cc_driver("i2c-driver") {
     ...
     deps = [
       ...

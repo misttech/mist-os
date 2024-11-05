@@ -18,7 +18,7 @@ driver_bind_rules("aml-trip-bind") {
   ]
 }
 
-fuchsia_driver("aml-trip-driver") {
+fuchsia_cc_driver("aml-trip-driver") {
   output_name = "aml-trip"
 
   sources = [

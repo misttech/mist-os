@@ -17,7 +17,7 @@ driver_bind_rules("usb_mass_storage_bind") {
   ]
 }
 
-fuchsia_driver("usb-mass-storage-driver") {
+fuchsia_cc_driver("usb-mass-storage-driver") {
   output_name = "usb-mass-storage"
   configs += [
     "//build/config:all_source",

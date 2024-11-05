@@ -35,7 +35,7 @@ source_set("driver-internals") {
   ]
 }
 
-fuchsia_driver("hid-driver") {
+fuchsia_cc_driver("hid-driver") {
   output_name = "hid"
   configs += [
     "//build/config:all_source",

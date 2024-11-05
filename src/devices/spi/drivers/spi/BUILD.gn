@@ -44,7 +44,7 @@ group("common") {
   ]
 }
 
-fuchsia_driver("spi-driver") {
+fuchsia_cc_driver("spi-driver") {
   output_name = "spi"
   configs += [
     "//build/config:all_source",

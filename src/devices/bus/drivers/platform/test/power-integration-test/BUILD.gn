@@ -22,7 +22,7 @@ power_config("power-config") {
   value_file = "power_config.json5"
 }
 
-fuchsia_driver("test-power-integration-board-driver") {
+fuchsia_cc_driver("test-power-integration-board-driver") {
   output_name = "power-integration-board"
   sources = [ "test-power-integration-board.cc" ]
   deps = [
@@ -50,7 +50,7 @@ driver_bind_rules("test-power-parent-bind") {
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
-fuchsia_driver("test-power-parent-driver") {
+fuchsia_cc_driver("test-power-parent-driver") {
   output_name = "test-power-parent"
   sources = [ "test-power-parent-device.cc" ]
   deps = [
@@ -76,7 +76,7 @@ driver_bind_rules("test-power-child-bind") {
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
-fuchsia_driver("test-power-child-driver") {
+fuchsia_cc_driver("test-power-child-driver") {
   output_name = "test-power-child"
   sources = [ "test-power-child-device.cc" ]
   deps = [

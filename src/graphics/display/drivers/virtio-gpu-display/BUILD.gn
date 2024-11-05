@@ -100,7 +100,7 @@ test("virtio-gpu-display-test") {
   ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",

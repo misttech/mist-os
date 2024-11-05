@@ -18,7 +18,7 @@ group("tests") {
   deps = [ ":wlantapctl_bind_test" ]
 }
 
-fuchsia_driver("wlantap_driver-driver") {
+fuchsia_cc_driver("wlantap_driver-driver") {
   output_name = "wlantap"
 
   sources = [

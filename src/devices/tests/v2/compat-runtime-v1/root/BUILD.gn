@@ -14,7 +14,7 @@ driver_bind_rules("bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "compat-runtime-v1-root"
   sources = [ "root.cc" ]

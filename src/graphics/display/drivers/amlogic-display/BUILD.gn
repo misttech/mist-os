@@ -133,7 +133,7 @@ source_set("common_srcs") {
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
-fuchsia_driver("amlogic-display-driver") {
+fuchsia_cc_driver("amlogic-display-driver") {
   output_name = "amlogic-display"
   sources = [
     "display-device-driver.cc",

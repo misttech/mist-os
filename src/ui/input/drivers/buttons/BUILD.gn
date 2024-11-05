@@ -19,7 +19,7 @@ driver_bind_rules("buttons-bind") {
   ]
 }
 
-fuchsia_driver("buttons-driver") {
+fuchsia_cc_driver("buttons-driver") {
   output_name = "buttons"
   deps = [
     ":buttons-bind",

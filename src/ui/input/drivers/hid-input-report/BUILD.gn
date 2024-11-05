@@ -60,7 +60,7 @@ fuchsia_driver_package("package") {
   driver_components = [ ":hid-input-report" ]
 }
 
-fuchsia_driver("hid-input-report-driver") {
+fuchsia_cc_driver("hid-input-report-driver") {
   output_name = "hid-input-report"
   sources = [ "driver.cc" ]
   deps = [

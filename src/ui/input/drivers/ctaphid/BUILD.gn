@@ -39,7 +39,7 @@ source_set("driver-internals") {
   ]
 }
 
-fuchsia_driver("ctaphid-driver") {
+fuchsia_cc_driver("ctaphid-driver") {
   output_name = "ctaphid"
   deps = [
     ":driver-internals",

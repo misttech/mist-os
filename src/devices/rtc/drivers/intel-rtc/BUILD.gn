@@ -30,7 +30,7 @@ common_deps = [
   "//zircon/third_party/ulib/safemath",
 ]
 
-fuchsia_driver("intel-rtc-driver") {
+fuchsia_cc_driver("intel-rtc-driver") {
   output_name = "intel-rtc"
   sources = [ "intel-rtc.cc" ]
   deps = common_deps

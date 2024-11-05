@@ -30,7 +30,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("ti-tca6408a-driver") {
+fuchsia_cc_driver("ti-tca6408a-driver") {
   output_name = "ti-tca6408a"
   sources = [ "ti-tca6408a.cc" ]
   deps = [

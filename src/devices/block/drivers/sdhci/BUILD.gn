@@ -64,7 +64,7 @@ source_set("sdhci-driver-source") {
   ]
 }
 
-fuchsia_driver("sdhci-driver") {
+fuchsia_cc_driver("sdhci-driver") {
   output_name = "sdhci"
   sources = [ "export.cc" ]
   deps = [ ":sdhci-driver-source" ]

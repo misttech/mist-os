@@ -15,7 +15,7 @@ group("realtek") {
   deps = [ ":realtek-audio-codec" ]
 }
 
-fuchsia_driver("realtek-audio-codec-driver") {
+fuchsia_cc_driver("realtek-audio-codec-driver") {
   output_name = "realtek-audio-codec"
   configs += [
     "//build/config:all_source",

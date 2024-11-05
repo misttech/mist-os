@@ -18,7 +18,7 @@ driver_bind_rules("test-driver-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("ddk-fallback-test-driver-module") {
+fuchsia_cc_driver("ddk-fallback-test-driver-module") {
   sources = [ "test-driver.cc" ]
   deps = [
     ":test-driver-bind",

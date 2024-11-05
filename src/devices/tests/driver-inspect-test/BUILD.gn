@@ -20,7 +20,7 @@ driver_bind_rules("inspect-test-bind") {
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
-fuchsia_driver("fuchsia_driver") {
+fuchsia_cc_driver("fuchsia_driver") {
   output_name = "inspect-test"
   testonly = true
 

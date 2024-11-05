@@ -17,7 +17,7 @@ driver_bind_rules("aml_dsp_bind") {
   ]
 }
 
-fuchsia_driver("aml-dsp-driver") {
+fuchsia_cc_driver("aml-dsp-driver") {
   output_name = "aml-dsp"
   configs += [
     "//build/config:all_source",

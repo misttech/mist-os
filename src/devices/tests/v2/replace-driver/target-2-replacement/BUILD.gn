@@ -10,7 +10,7 @@ driver_bind_rules("bind") {
   bind_output = "target_2.bindbc"
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "replace_test_target_2_driver"
   sources = [ "target_2_driver.cc" ]

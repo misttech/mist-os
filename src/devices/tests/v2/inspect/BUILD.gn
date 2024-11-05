@@ -29,7 +29,7 @@ driver_bind_rules("bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("root-driver") {
+fuchsia_cc_driver("root-driver") {
   testonly = true
   output_name = "inspect-root"
   sources = [ "root-driver.cc" ]

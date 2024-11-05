@@ -38,7 +38,7 @@ common_deps = [
   "//zircon/third_party/ulib/chromiumos-platform-ec",
 ]
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "chromiumos-ec-lpc"
   sources = [ "chromiumos_ec_lpc.cc" ]
   deps = common_deps

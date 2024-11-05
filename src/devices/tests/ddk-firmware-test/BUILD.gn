@@ -28,7 +28,7 @@ driver_bind_rules("ddk-firmware-test-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("ddk-firmware-test") {
+fuchsia_cc_driver("ddk-firmware-test") {
   testonly = true
   configs += [
     "//build/config:all_source",

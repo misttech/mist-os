@@ -60,7 +60,7 @@ source_set("lib") {
   ]
 }
 
-fuchsia_driver("fuchsia_driver") {
+fuchsia_cc_driver("fuchsia_driver") {
   output_name = "usb_video"
   deps = [ ":lib" ]
 }

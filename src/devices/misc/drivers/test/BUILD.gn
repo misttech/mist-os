@@ -19,7 +19,7 @@ group("tests") {
   deps = [ ":test_bind_test" ]
 }
 
-fuchsia_driver("test-driver") {
+fuchsia_cc_driver("test-driver") {
   output_name = "test"
   configs += [
     "//build/config:all_source",

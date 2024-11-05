@@ -52,7 +52,7 @@ driver_bind_rules("wlanif_bind") {
   deps = [ "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_bindlib" ]
 }
 
-fuchsia_driver("wlanif_driver-driver") {
+fuchsia_cc_driver("wlanif_driver-driver") {
   output_name = "wlanif"
 
   deps = [ ":lib_source" ]

@@ -33,7 +33,7 @@ group("tests") {
   deps = [ ":intel_i2c_bind_test" ]
 }
 
-fuchsia_driver("intel-i2c-driver") {
+fuchsia_cc_driver("intel-i2c-driver") {
   output_name = "intel-i2c"
   configs += [
     "//build/config:all_source",

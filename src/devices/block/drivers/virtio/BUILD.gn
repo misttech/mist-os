@@ -17,7 +17,7 @@ driver_bind_rules("virtio_block_bind") {
   ]
 }
 
-fuchsia_driver("virtio_block-driver") {
+fuchsia_cc_driver("virtio_block-driver") {
   output_name = "virtio_block"
   configs += [
     "//build/config:all_source",
@@ -87,7 +87,7 @@ driver_bind_rules("virtio_scsi_bind") {
   ]
 }
 
-fuchsia_driver("virtio_scsi-driver") {
+fuchsia_cc_driver("virtio_scsi-driver") {
   output_name = "virtio_scsi"
   configs += [
     "//build/config:all_source",

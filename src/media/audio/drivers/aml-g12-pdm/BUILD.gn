@@ -19,7 +19,7 @@ driver_bind_rules("aml_g12_pdm_bind") {
   ]
 }
 
-fuchsia_driver("aml-g12-pdm-driver") {
+fuchsia_cc_driver("aml-g12-pdm-driver") {
   output_name = "aml-g12-pdm"
   configs += [
     "//build/config:all_source",

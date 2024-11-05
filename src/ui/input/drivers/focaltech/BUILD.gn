@@ -54,7 +54,7 @@ group("common") {
   ]
 }
 
-fuchsia_driver("focaltech-driver") {
+fuchsia_cc_driver("focaltech-driver") {
   output_name = "focaltech"
   configs += [
     "//build/config:all_source",
@@ -80,7 +80,7 @@ fuchsia_driver_package("package") {
   driver_components = [ ":focaltech" ]
 }
 
-fuchsia_driver("focaltech-sherlock-driver") {
+fuchsia_cc_driver("focaltech-sherlock-driver") {
   output_name = "focaltech-sherlock"
   configs += [
     "//build/config:all_source",

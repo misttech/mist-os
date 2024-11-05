@@ -89,7 +89,7 @@ group("tests") {
   ]
 }
 
-fuchsia_driver("aml-spi-driver") {
+fuchsia_cc_driver("aml-spi-driver") {
   output_name = "aml-spi"
   configs += [
     "//build/config:all_source",

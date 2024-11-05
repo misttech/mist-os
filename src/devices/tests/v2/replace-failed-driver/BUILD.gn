@@ -18,7 +18,7 @@ driver_bind_rules("replacement-bind") {
   bind_output = "failer-replacement.bindbc"
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "fail-to-start-driver"
   sources = [ "driver.cc" ]
@@ -28,7 +28,7 @@ fuchsia_driver("driver") {
   ]
 }
 
-fuchsia_driver("replacement-driver") {
+fuchsia_cc_driver("replacement-driver") {
   testonly = true
   output_name = "fail-to-start-replacement-driver"
   sources = [ "replacement-driver.cc" ]

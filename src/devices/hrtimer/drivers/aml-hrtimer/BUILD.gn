@@ -22,7 +22,7 @@ driver_bind_rules("aml-hrtimer-bind") {
   ]
 }
 
-fuchsia_driver("aml-hrtimer-driver") {
+fuchsia_cc_driver("aml-hrtimer-driver") {
   output_name = "aml-hrtimer"
   deps = [
     ":aml-hrtimer-bind",

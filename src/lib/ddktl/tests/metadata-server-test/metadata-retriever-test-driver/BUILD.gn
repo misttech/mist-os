@@ -13,7 +13,7 @@ driver_bind_rules("bind") {
   deps = [ "//src/lib/ddktl/tests/metadata-server-test:metadata_server_test_bind_library" ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "metadata_retriever_test_driver"
   sources = [

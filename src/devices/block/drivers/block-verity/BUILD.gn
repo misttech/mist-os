@@ -127,7 +127,7 @@ bind_test("block-verity-bind-test") {
   deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
-fuchsia_driver("block-verity-driver") {
+fuchsia_cc_driver("block-verity-driver") {
   output_name = "block-verity"
 
   sources = [

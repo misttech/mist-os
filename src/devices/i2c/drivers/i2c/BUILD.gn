@@ -15,7 +15,7 @@ driver_bind_rules("i2c_bind") {
       [ "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_bindlib" ]
 }
 
-fuchsia_driver("i2c-driver") {
+fuchsia_cc_driver("i2c-driver") {
   output_name = "i2c"
   configs += [
     "//build/config:all_source",

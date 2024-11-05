@@ -49,7 +49,7 @@ source_set("overnet-usb-lib") {
   ]
 }
 
-fuchsia_driver("overnet-usb-driver") {
+fuchsia_cc_driver("overnet-usb-driver") {
   output_name = "overnet-usb"
 
   configs += [

@@ -68,7 +68,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("fuchsia_driver") {
+fuchsia_cc_driver("fuchsia_driver") {
   output_name = "bt-hci-intel"
   deps = [ ":common" ]
 }

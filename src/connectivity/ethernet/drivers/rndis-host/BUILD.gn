@@ -15,7 +15,7 @@ driver_bind_rules("rndishost_bind") {
   ]
 }
 
-fuchsia_driver("fuchsia_driver") {
+fuchsia_cc_driver("fuchsia_driver") {
   visibility = [
     ":*",
     "//src/connectivity/ethernet:drivers",

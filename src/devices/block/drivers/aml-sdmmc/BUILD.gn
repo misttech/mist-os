@@ -72,7 +72,7 @@ source_set("aml-sdmmc-driver-source") {
   ]
 }
 
-fuchsia_driver("aml-sdmmc-driver") {
+fuchsia_cc_driver("aml-sdmmc-driver") {
   output_name = "aml-sdmmc"
   sources = [ "aml-sdmmc-with-banjo-export.cc" ]
   deps = [ ":aml-sdmmc-driver-source" ]

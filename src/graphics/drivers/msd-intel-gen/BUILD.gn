@@ -7,7 +7,7 @@ import("//build/drivers.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 # The gpu device
-fuchsia_driver("msd_intel-driver") {
+fuchsia_cc_driver("msd_intel-driver") {
   output_name = "libmsd_intel"
 
   deps = [
@@ -27,7 +27,7 @@ fuchsia_driver_component("msd_intel") {
 }
 
 # The gpu device; runs gtests at startup
-fuchsia_driver("msd_intel_test-driver") {
+fuchsia_cc_driver("msd_intel_test-driver") {
   testonly = true
 
   output_name = "libmsd_intel_test"

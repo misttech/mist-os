@@ -133,7 +133,7 @@ source_set("common_srcs") {
   ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "intel-display"
   deps = [ ":common_srcs" ]
 }

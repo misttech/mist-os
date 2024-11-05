@@ -26,7 +26,7 @@ fuchsia_structured_config_cpp_elf_lib("platform-bus-config") {
   cm_label = ":manifest"
 }
 
-fuchsia_driver("platform-bus-driver") {
+fuchsia_cc_driver("platform-bus-driver") {
   output_name = "platform-bus"
   sources = [
     "node-util.cc",

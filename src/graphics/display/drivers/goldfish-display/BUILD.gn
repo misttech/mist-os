@@ -13,7 +13,7 @@ driver_bind_rules("goldfish-display-bind") {
   deps = [ "//src/devices/bind/fuchsia.goldfish.platform" ]
 }
 
-fuchsia_driver("goldfish-display-driver") {
+fuchsia_cc_driver("goldfish-display-driver") {
   output_name = "goldfish-display"
   configs += [
     "//build/config:all_source",

@@ -13,7 +13,7 @@ driver_bind_rules("bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "driver-test-realm-fake-driver"
   sources = [ "fake_driver.cc" ]
   deps = [

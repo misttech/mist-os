@@ -36,7 +36,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("adc-driver") {
+fuchsia_cc_driver("adc-driver") {
   output_name = "adc"
   deps = [
     ":common",

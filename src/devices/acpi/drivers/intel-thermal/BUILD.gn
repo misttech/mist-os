@@ -33,7 +33,7 @@ common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "intel-thermal"
   sources = [ "intel_thermal.cc" ]
   deps = common_deps + [ "//src/devices/lib/driver" ]

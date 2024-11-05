@@ -34,7 +34,7 @@ driver_bind_rules("bind-to-temp") {
   deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
 }
 
-fuchsia_driver("fake-temperature") {
+fuchsia_cc_driver("fake-temperature") {
   output_name = "fake-temperature"
   sources = [ "temperature_driver.cc" ]
 
@@ -53,7 +53,7 @@ fuchsia_driver_component("component") {
 }
 
 # this binds to sys/temp
-fuchsia_driver("fake-temperature2") {
+fuchsia_cc_driver("fake-temperature2") {
   output_name = "fake-temperature2"
   sources = [ "temperature_driver.cc" ]
 
@@ -71,7 +71,7 @@ fuchsia_driver_component("component2") {
   info = "meta/power-manager-fake-driver.json"
 }
 
-fuchsia_driver("fake-cpu-ctrl") {
+fuchsia_cc_driver("fake-cpu-ctrl") {
   output_name = "fake-cpu-ctrl"
   sources = [ "cpu_ctrl_driver.cc" ]
 
@@ -89,7 +89,7 @@ fuchsia_driver_component("fake-cpu-ctrl-component") {
   info = "meta/power-manager-fake-driver.json"
 }
 
-fuchsia_driver("nelson-fake-driver") {
+fuchsia_cc_driver("nelson-fake-driver") {
   output_name = "nelson-fake-driver"
   sources = [ "nelson_driver.cc" ]
 

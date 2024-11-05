@@ -61,7 +61,7 @@ source_set("common-dfv1") {
   ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "da7219"
   sources = []
   deps = [ ":common-dfv1" ]
@@ -131,7 +131,7 @@ source_set("common-dfv2") {
   ]
 }
 
-fuchsia_driver("driver-dfv2") {
+fuchsia_cc_driver("driver-dfv2") {
   output_name = "da7219-dfv2"
   sources = []
   deps = [ ":common-dfv2" ]

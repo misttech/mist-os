@@ -40,7 +40,7 @@ common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "chromeos-acpi"
   sources = [ "chromeos_acpi.cc" ]
   deps = common_deps

@@ -36,7 +36,7 @@ driver_bind_rules("wlanphy_bind") {
   deps = [ "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib" ]
 }
 
-fuchsia_driver("wlanphy_driver-driver") {
+fuchsia_cc_driver("wlanphy_driver-driver") {
   output_name = "wlanphy"
   sources = wlanphy_sources
 

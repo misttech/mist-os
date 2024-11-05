@@ -39,7 +39,7 @@ driver_bind_rules("nelson-bind") {
   ]
 }
 
-fuchsia_driver("nelson-module-driver") {
+fuchsia_cc_driver("nelson-module-driver") {
   output_name = "nelson-module"
   configs += [
     "//build/config:all_source",

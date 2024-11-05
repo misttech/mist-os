@@ -108,7 +108,7 @@ foreach(variant, e1000_variants) {
   }
 }
 
-fuchsia_driver("e1000-driver") {
+fuchsia_cc_driver("e1000-driver") {
   output_name = "e1000"
   deps = [
     ":e1000_core",

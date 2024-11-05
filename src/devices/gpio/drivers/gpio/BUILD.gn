@@ -15,7 +15,7 @@ driver_bind_rules("gpio_bind") {
       [ "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_bindlib" ]
 }
 
-fuchsia_driver("gpio-driver") {
+fuchsia_cc_driver("gpio-driver") {
   output_name = "gpio"
   configs += [
     "//build/config:all_source",
