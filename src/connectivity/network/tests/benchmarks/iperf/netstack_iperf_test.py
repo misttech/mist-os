@@ -264,8 +264,9 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                 directory=self.test_case_path,
                 trace_file="trace.fxt",
             ):
-                # Do nothing for sometime to let system_metrics to be logged.
-                time.sleep(10)
+                # Record a 1-second trace session to give the system metrics daemon a chance to
+                # emit CPU usage trace event(s), which it typically does every second.
+                time.sleep(1)
             cpu_results = self._get_cpu_results(
                 os.path.join(self.test_case_path, "trace.fxt")
             )
