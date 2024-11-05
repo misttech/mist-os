@@ -1629,11 +1629,9 @@ mod test {
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     fn open_pkg() -> fio::DirectorySynchronousProxy {
-        let pkg_proxy = directory::open_in_namespace_deprecated(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .expect("failed to open /pkg");
+        let pkg_proxy =
+            directory::open_in_namespace("/pkg", fio::PERM_READABLE | fio::PERM_EXECUTABLE)
+                .expect("failed to open /pkg");
         fio::DirectorySynchronousProxy::new(
             pkg_proxy
                 .into_channel()
@@ -1709,11 +1707,9 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_directory_open_zxio_async() -> Result<(), Error> {
-        let pkg_proxy = directory::open_in_namespace_deprecated(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .expect("failed to open /pkg");
+        let pkg_proxy =
+            directory::open_in_namespace("/pkg", fio::PERM_READABLE | fio::PERM_EXECUTABLE)
+                .expect("failed to open /pkg");
         let zx_channel = pkg_proxy
             .into_channel()
             .expect("failed to convert proxy into channel")
@@ -1734,15 +1730,13 @@ mod test {
 
     #[fuchsia::test]
     async fn test_directory_enumerate() -> Result<(), Error> {
-        let pkg_dir_handle = directory::open_in_namespace_deprecated(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .expect("failed to open /pkg")
-        .into_channel()
-        .expect("could not unwrap channel")
-        .into_zx_channel()
-        .into();
+        let pkg_dir_handle =
+            directory::open_in_namespace("/pkg", fio::PERM_READABLE | fio::PERM_EXECUTABLE)
+                .expect("failed to open /pkg")
+                .into_channel()
+                .expect("could not unwrap channel")
+                .into_zx_channel()
+                .into();
 
         let io: Zxio = Zxio::create(pkg_dir_handle)?;
         let iter = io.create_dirent_iterator().expect("failed to create iterator");

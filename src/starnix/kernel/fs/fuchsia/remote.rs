@@ -1641,14 +1641,12 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_directory() {
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
-        let pkg_channel: zx::Channel = directory::open_in_namespace_deprecated(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .expect("failed to open /pkg")
-        .into_channel()
-        .expect("into_channel")
-        .into();
+        let pkg_channel: zx::Channel =
+            directory::open_in_namespace("/pkg", fio::PERM_READABLE | fio::PERM_EXECUTABLE)
+                .expect("failed to open /pkg")
+                .into_channel()
+                .expect("into_channel")
+                .into();
 
         let fd = new_remote_file(&current_task, pkg_channel.into(), OpenFlags::RDWR)
             .expect("new_remote_file");
@@ -1659,14 +1657,12 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_file() {
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
-        let content_channel: zx::Channel = file::open_in_namespace_deprecated(
-            "/pkg/meta/contents",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .expect("failed to open /pkg/meta/contents")
-        .into_channel()
-        .expect("into_channel")
-        .into();
+        let content_channel: zx::Channel =
+            file::open_in_namespace("/pkg/meta/contents", fio::PERM_READABLE)
+                .expect("failed to open /pkg/meta/contents")
+                .into_channel()
+                .expect("into_channel")
+                .into();
 
         let fd = new_remote_file(&current_task, content_channel.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
