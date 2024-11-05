@@ -40,7 +40,12 @@ template("fshost_cml") {
         ]
       } else if (options.data_filesystem_format == "minfs") {
         if (defined(options.storage_host) && options.storage_host) {
-          sources += [ "//src/storage/fshost/meta/storage_host_minfs.cml" ]
+          if (invoker.testonly) {
+            sources +=
+                [ "//src/storage/fshost/meta/storage_host_minfs_test.cml" ]
+          } else {
+            sources += [ "//src/storage/fshost/meta/storage_host_minfs.cml" ]
+          }
         } else {
           sources += [
             "//src/storage/fshost/meta/blobfs_fshost_test.cml",

@@ -276,6 +276,11 @@ fuchsia_component("fvm-component") {
   ]
 }
 
+fuchsia_package("package") {
+  package_name = "fvm2"
+  deps = [ ":fvm-component" ]
+}
+
 resource("golden") {
   sources = [ "golden-fvm.blk" ]
   outputs = [ "data/{{source_file_part}}" ]

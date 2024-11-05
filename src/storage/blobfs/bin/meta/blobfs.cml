@@ -65,12 +65,6 @@
             protocol: "fuchsia.blobfs.internal.DecompressorCreator",
             from: "#decompressor",
         },
-        {
-            directory: "dev-topological",
-            from: "parent",
-            rights: [ "r*" ],
-            path: "/dev",
-        },
     ],
     offer: [
         {

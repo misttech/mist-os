@@ -146,29 +146,50 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 }
             }
             VolumeConfig::Fvm(FvmVolumeConfig { blob, data, .. }) => {
-                if let Some(blob) = blob {
-                    builder.platform_bundle("fshost_fvm");
-                    blob_deprecated_padded = blob.blob_layout == BlobfsLayout::DeprecatedPadded;
-                }
-                if let Some(DataFvmVolumeConfig {
-                    use_disk_based_minfs_migration,
-                    data_filesystem_format,
-                }) = data
+                // Special case for storage host, with blobfs and minfs:
+                if storage_config.storage_host_enabled
+                    && blob.is_some()
+                    && matches!(
+                        data,
+                        Some(DataFvmVolumeConfig {
+                            data_filesystem_format: DataFilesystemFormat::Minfs,
+                            ..
+                        })
+                    )
                 {
+                    builder.platform_bundle("fshost_storage_host_fvm_minfs");
+                    storage_host = true;
+                    blob_deprecated_padded =
+                        blob.as_ref().unwrap().blob_layout == BlobfsLayout::DeprecatedPadded;
                     has_data = true;
-                    match data_filesystem_format {
-                        DataFilesystemFormat::Fxfs => builder.platform_bundle("fshost_fvm_fxfs"),
-                        DataFilesystemFormat::F2fs => {
-                            data_filesystem_format_str = "f2fs";
-                            builder.platform_bundle("fshost_fvm_f2fs");
-                        }
-                        DataFilesystemFormat::Minfs => {
-                            data_filesystem_format_str = "minfs";
-                            if *use_disk_based_minfs_migration {
-                                use_disk_migration = true;
-                                builder.platform_bundle("fshost_fvm_minfs_migration");
-                            } else {
-                                builder.platform_bundle("fshost_fvm_minfs");
+                    data_filesystem_format_str = "minfs";
+                } else {
+                    if let Some(blob) = blob {
+                        builder.platform_bundle("fshost_fvm");
+                        blob_deprecated_padded = blob.blob_layout == BlobfsLayout::DeprecatedPadded;
+                    }
+                    if let Some(DataFvmVolumeConfig {
+                        use_disk_based_minfs_migration,
+                        data_filesystem_format,
+                    }) = data
+                    {
+                        has_data = true;
+                        match data_filesystem_format {
+                            DataFilesystemFormat::Fxfs => {
+                                builder.platform_bundle("fshost_fvm_fxfs")
+                            }
+                            DataFilesystemFormat::F2fs => {
+                                data_filesystem_format_str = "f2fs";
+                                builder.platform_bundle("fshost_fvm_f2fs");
+                            }
+                            DataFilesystemFormat::Minfs => {
+                                data_filesystem_format_str = "minfs";
+                                if *use_disk_based_minfs_migration {
+                                    use_disk_migration = true;
+                                    builder.platform_bundle("fshost_fvm_minfs_migration");
+                                } else {
+                                    builder.platform_bundle("fshost_fvm_minfs");
+                                }
                             }
                         }
                     }

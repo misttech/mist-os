@@ -3,14 +3,22 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/trace/client.shard.cml",
         "//src/storage/lib/fs_management/client.shard.cml",
+        "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
+        "syslog/offer.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
         binary: "bin/fvm",
     },
+    collections: [
+        {
+            name: "blobfs-collection",
+            durability: "transient",
+        },
+    ],
     capabilities: [
         {
             directory: "volumes",
@@ -22,6 +30,27 @@
                 "fuchsia.fs.startup.Startup",
                 "fuchsia.fs.startup.Volumes",
             ],
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.scheduler.RoleManager",
+            ],
+            from: "parent",
+            to: "#blobfs-collection",
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#blobfs-collection",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "parent",
+            to: "#fs-collection",
         },
     ],
     expose: [
