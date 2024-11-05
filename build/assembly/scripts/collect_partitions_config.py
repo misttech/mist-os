@@ -46,13 +46,20 @@ def collect_partitions_config(
         rel_dest = os.path.join(category, os.path.basename(file))
         dest = os.path.join(root_dir, rel_dest)
         target = os.path.realpath(file)
-        inputs.append(dest)
-        if os.path.islink(dest) and os.path.realpath(dest) != target:
+
+        # If the existing destination file isn't a symlink pointing to
+        # the origin file's real path, then remove the existing
+        # destination file
+        if os.path.lexists(dest) and os.path.realpath(dest) != target:
             os.unlink(dest)
+
+        # If the destination file doesn't exist (or has been deleted)
+        # then make it a symlink to the the origin file.
         if not os.path.exists(dest):
             os.makedirs(os.path.dirname(dest), exist_ok=True)
             os.symlink(target, dest)
-            outputs.append(file)
+        inputs.append(file)
+        outputs.append(dest)
         return rel_dest
 
     for partition in config["bootloader_partitions"]:
