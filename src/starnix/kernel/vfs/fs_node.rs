@@ -35,7 +35,7 @@ use starnix_uapi::auth::{
     CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::errors::{Errno, EACCES};
+use starnix_uapi::errors::{Errno, EACCES, ENOTSUP};
 use starnix_uapi::file_mode::{mode, Access, AccessCheck, FileMode};
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
@@ -1462,7 +1462,9 @@ impl FsNode {
             let mut locked = locked.cast_locked::<FileOpsCore>();
             self.ops().mknod(&mut locked, self, current_task, name, mode, dev, owner)?
         };
-        security::fs_node_init_on_create(current_task, &new_node, self)?;
+
+        self.init_new_node_security_on_create(current_task, &new_node)?;
+
         Ok(new_node)
     }
 
@@ -1489,8 +1491,43 @@ impl FsNode {
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let new_node =
             self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)?;
-        security::fs_node_init_on_create(current_task, &new_node, self)?;
+
+        self.init_new_node_security_on_create(current_task, &new_node)?;
+
         Ok(new_node)
+    }
+
+    /// Requests that the LSM initialise a security label for the `new_node`, and optionally provide
+    /// an extended attribute to write to the file to persist it.  If no LSM is enabled, no extended
+    /// attribute returned, or if the filesystem does not support extended attributes, then the call
+    /// returns success. All other failure modes return an `Errno` that should be early-returned.
+    fn init_new_node_security_on_create(
+        &self,
+        current_task: &CurrentTask,
+        new_node: &FsNode,
+    ) -> Result<(), Errno> {
+        security::fs_node_init_on_create(current_task, &new_node, self)?
+            .map(|xattr| {
+                match new_node.ops().set_xattr(
+                    &new_node,
+                    current_task,
+                    xattr.name,
+                    xattr.value.as_slice().into(),
+                    XattrOp::Create,
+                ) {
+                    Err(e) => {
+                        if e.code == ENOTSUP {
+                            // This should only occur if a task has an "fscreate" context set, and
+                            // creates a new file in a filesystem that does not support xattrs.
+                            Ok(())
+                        } else {
+                            Err(e)
+                        }
+                    }
+                    result => result,
+                }
+            })
+            .unwrap_or_else(|| Ok(()))
     }
 
     pub fn create_tmpfile(
