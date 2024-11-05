@@ -238,17 +238,6 @@ group("partner_idk_versioned_static_libraries") {
   visibility = [ ":*" ]
   testonly = false
   deps = _partner_idk_versioned_static_libraries_list
-
-  # magma_client depends indirectly on a `bind_library`, which depends on a host
-  # tool that uses fuchsia.driver.legacy, which was added at 17. This fails on
-  # the bots covered by https://fxbug.dev/330709069 because they do not set
-  # `host_tools_base_path_override` and thus attempt to build the host tool.
-  # TODO(https://fxbug.dev/330709069): Remove this and the `//build/host.gni`
-  # import when either those bots are turned down or API level 16 is retired.
-  if (current_build_target_api_level == 16 &&
-      host_tools_base_path_override == "") {
-    deps -= [ "//sdk/lib/magma_client:magma_client" ]
-  }
 }
 
 # All `sdk_static_library()` targets in the partner category depend on this

@@ -12,12 +12,6 @@
         "type": "fuchsia.driver.framework/CompositeInfo"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.driver.development/CompositeInfo.legacy_composite",
-        "ordinal": "1",
-        "type": "fuchsia.driver.legacy/CompositeInfo"
-    },
-    {
         "kind": "union",
         "name": "fuchsia.driver.development/CompositeInfo",
         "strictness": "strict"
@@ -402,12 +396,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.driver.development/NodeBindingInfo.legacy_composite_parents",
-        "ordinal": "4",
-        "type": "vector<fuchsia.driver.legacy/CompositeParent>"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.driver.development/NodeBindingInfo.node_name",
         "ordinal": "1",
         "type": "string:1024"
@@ -502,11 +490,6 @@
         "kind": "bits/member",
         "name": "fuchsia.driver.development/RestartRematchFlags.COMPOSITE_SPEC",
         "value": "8"
-    },
-    {
-        "kind": "bits/member",
-        "name": "fuchsia.driver.development/RestartRematchFlags.LEGACY_COMPOSITE",
-        "value": "4"
     },
     {
         "kind": "bits/member",

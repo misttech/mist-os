@@ -23,7 +23,6 @@ class BindResultTracker {
   void ReportSuccessfulBind(const std::string_view& node_name, const std::string_view& driver);
   void ReportSuccessfulBind(
       const std::string_view& node_name,
-      const std::vector<fuchsia_driver_legacy::CompositeParent>& legacy_composite_parents,
       const std::vector<fuchsia_driver_framework::CompositeParent>& composite_parents);
   void ReportNoBind();
 

@@ -4,14 +4,10 @@
 
 pub mod args;
 
-use crate::common::write_node_properties;
 use anyhow::{Context, Result};
 use args::ListCompositesCommand;
 use std::io::Write;
-use {
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
-    fidl_fuchsia_driver_legacy as fdl,
-};
+use {fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf};
 
 pub async fn list_composites(
     cmd: ListCompositesCommand,
@@ -32,15 +28,6 @@ pub async fn list_composites(
 
         for composite_node in composite_list {
             match composite_node.composite {
-                Some(fdd::CompositeInfo::LegacyComposite(info)) => {
-                    write_legacy_composite(
-                        writer,
-                        info,
-                        composite_node.parent_topological_paths.unwrap(),
-                        composite_node.topological_path,
-                        cmd.verbose,
-                    )?;
-                }
                 Some(fdd::CompositeInfo::Composite(info)) => {
                     write_composite(
                         writer,
@@ -96,68 +83,6 @@ fn write_composite(
     Ok(())
 }
 
-fn write_legacy_composite(
-    writer: &mut dyn Write,
-    composite: fdl::CompositeInfo,
-    parent_topological_paths: Vec<Option<String>>,
-    topological_path: Option<String>,
-    verbose: bool,
-) -> Result<()> {
-    let driver_match = composite.matched_driver.unwrap_or_default();
-    if !verbose {
-        writeln!(writer, "{}", composite.name.unwrap_or("".to_string()))?;
-        return Ok(());
-    }
-
-    writeln!(writer, "{0: <9}: {1}", "Name", composite.name.unwrap_or("".to_string()))?;
-    writeln!(writer, "{0: <9}: {1}", "Driver", driver_match.url.unwrap_or("N/A".to_string()))?;
-    writeln!(writer, "{0: <9}: {1}", "Device", topological_path.unwrap_or("N/A".to_string()))?;
-
-    write_legacy_composite_node_info(
-        writer,
-        composite.primary_fragment_index.unwrap_or(0) as usize,
-        composite.fragments.unwrap_or_default(),
-        composite.properties.unwrap_or_default(),
-        parent_topological_paths,
-    )?;
-
-    writeln!(writer)?;
-    Ok(())
-}
-
-fn write_legacy_composite_node_info(
-    writer: &mut dyn Write,
-    primary_fragment_index: usize,
-    fragments: Vec<fdl::CompositeFragmentInfo>,
-    properties: Vec<fdf::NodeProperty>,
-    parent_topological_paths: Vec<Option<String>>,
-) -> Result<()> {
-    write_node_properties(&properties, writer)?;
-    writeln!(writer, "{0: <10}: {1}", "Fragments", fragments.len())?;
-
-    for (i, fragment) in fragments.into_iter().enumerate() {
-        let primary_tag = if i == primary_fragment_index { "(Primary)" } else { "" };
-        let topo_path = parent_topological_paths[i].clone();
-        writeln!(
-            writer,
-            "{0: <1} {1} : {2} {3}",
-            "Fragment",
-            i,
-            fragment.name.unwrap_or("".to_string()),
-            primary_tag
-        )?;
-
-        writeln!(writer, "   {0: <1} : {1}", "Device", topo_path.unwrap_or("Unbound".to_string()))?;
-
-        writeln!(writer, "   {0: <1} :", "Bind rules")?;
-        let bind_rules = fragment.bind_rules.unwrap_or(vec![]);
-        for rule in bind_rules {
-            writeln!(writer, "     {:?}", rule)?;
-        }
-    }
-    Ok(())
-}
-
 fn write_parent_nodes_info(
     writer: &mut dyn Write,
     primary_index: Option<u32>,
@@ -182,7 +107,6 @@ fn write_parent_nodes_info(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fidl_fuchsia_driver_legacy::BindInstruction;
     use fuchsia_async as fasync;
     use std::io::Error;
 
@@ -198,51 +122,6 @@ mod tests {
 
         fn flush(&mut self) -> Result<(), Error> {
             Ok(())
-        }
-    }
-
-    fn gen_composite_property_data() -> Vec<fdf::NodeProperty> {
-        vec![
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("avocet".to_string()),
-                value: fdf::NodePropertyValue::IntValue(10),
-            },
-            fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("stilt".to_string()),
-                value: fdf::NodePropertyValue::BoolValue(false),
-            },
-        ]
-    }
-
-    fn gen_legacy_composite_data() -> fdl::CompositeInfo {
-        let test_fragments = vec![
-            fdl::CompositeFragmentInfo {
-                name: Some("sysmem".to_string()),
-                bind_rules: Some(vec![BindInstruction { op: 1, arg: 30, debug: 0 }]),
-                ..Default::default()
-            },
-            fdl::CompositeFragmentInfo {
-                name: Some("acpi".to_string()),
-                bind_rules: Some(vec![
-                    BindInstruction { op: 2, arg: 50, debug: 0 },
-                    BindInstruction { op: 1, arg: 30, debug: 0 },
-                ]),
-                ..Default::default()
-            },
-        ];
-
-        let driver_match = fdf::DriverInfo {
-            url: Some("fuchsia-boot:///#meta/waxwing.cm".to_string()),
-            ..Default::default()
-        };
-
-        fdl::CompositeInfo {
-            name: Some("composite_dev".to_string()),
-            fragments: Some(test_fragments),
-            properties: Some(gen_composite_property_data()),
-            matched_driver: Some(driver_match),
-            primary_fragment_index: Some(1),
-            ..Default::default()
         }
     }
 
@@ -319,81 +198,6 @@ mod tests {
 
         assert_eq!(
             include_str!("../../../tests/golden/list_composites_verbose_empty_fields"),
-            test_write_buffer.content
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_legacy_composite_verbose() {
-        let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
-        write_legacy_composite(
-            &mut test_write_buffer,
-            gen_legacy_composite_data(),
-            vec![Some("sysmem_dev".to_string()), Some("acpi_dev".to_string())],
-            Some("dev/sys/composite_dev".to_string()),
-            true,
-        )
-        .unwrap();
-        assert_eq!(
-            include_str!("../../../tests/golden/list_legacy_composites_verbose"),
-            test_write_buffer.content
-        );
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_legacy_composite_nonverbose() {
-        let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
-        write_legacy_composite(
-            &mut test_write_buffer,
-            gen_legacy_composite_data(),
-            vec![Some("sysmem_dev".to_string()), Some("acpi_dev".to_string())],
-            Some("dev/sys/composite_dev".to_string()),
-            false,
-        )
-        .unwrap();
-
-        let expected_output = "composite_dev\n";
-        assert_eq!(expected_output, test_write_buffer.content);
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_composite_empty_fields() {
-        let test_fragments = vec![
-            fdl::CompositeFragmentInfo {
-                name: Some("sysmem".to_string()),
-                bind_rules: Some(vec![BindInstruction { op: 1, arg: 30, debug: 0 }]),
-                ..Default::default()
-            },
-            fdl::CompositeFragmentInfo {
-                name: Some("acpi".to_string()),
-                bind_rules: Some(vec![
-                    BindInstruction { op: 2, arg: 50, debug: 0 },
-                    BindInstruction { op: 1, arg: 30, debug: 0 },
-                ]),
-                ..Default::default()
-            },
-        ];
-
-        let test_composite = fdl::CompositeInfo {
-            name: Some("composite_dev".to_string()),
-            fragments: Some(test_fragments),
-            properties: Some(gen_composite_property_data()),
-            matched_driver: None,
-            primary_fragment_index: Some(1),
-            ..Default::default()
-        };
-
-        let mut test_write_buffer = TestWriteBuffer { content: "".to_string() };
-        write_legacy_composite(
-            &mut test_write_buffer,
-            test_composite,
-            vec![None, None],
-            None,
-            true,
-        )
-        .unwrap();
-        assert_eq!(
-            include_str!("../../../tests/golden/list_legacy_composites_verbose_empty_fields"),
             test_write_buffer.content
         );
     }

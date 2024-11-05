@@ -8,7 +8,6 @@
 
 namespace fdd = fuchsia_driver_development;
 namespace fdi = fuchsia_driver_index;
-namespace fdl = fuchsia_driver_legacy;
 
 namespace driver_manager {
 
@@ -178,7 +177,7 @@ void BindManager::OnMatchDriverCallback(
       if (bind_result.is_driver_url()) {
         request.tracker->ReportSuccessfulBind(node_moniker, bind_result.driver_url());
       } else if (bind_result.is_composite_parents()) {
-        request.tracker->ReportSuccessfulBind(node_moniker, {}, bind_result.composite_parents());
+        request.tracker->ReportSuccessfulBind(node_moniker, bind_result.composite_parents());
       } else {
         LOGF(ERROR, "Unknown bind result type for %s.", node_moniker.c_str());
       }

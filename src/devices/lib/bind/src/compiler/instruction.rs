@@ -20,12 +20,6 @@ impl fmt::Display for DeviceProperty {
     }
 }
 
-impl From<fidl_fuchsia_driver_legacy::DeviceProperty> for DeviceProperty {
-    fn from(property: fidl_fuchsia_driver_legacy::DeviceProperty) -> Self {
-        DeviceProperty { key: property.id as u32, value: property.value }
-    }
-}
-
 /// For all conditions (except Always), the operands to the condition
 /// are (parameter_b, value) pairs in the final encoding.
 #[derive(Clone, PartialEq, Eq)]

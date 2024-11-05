@@ -44,19 +44,16 @@ void BindResultTracker::ReportSuccessfulBind(const std::string_view& node_name,
 
 void BindResultTracker::ReportSuccessfulBind(
     const std::string_view& node_name,
-    const std::vector<fuchsia_driver_legacy::CompositeParent>& legacy_composite_parents,
     const std::vector<fuchsia_driver_framework::CompositeParent>& composite_parents) {
   size_t current;
   {
     std::scoped_lock guard(lock_);
     currently_reported_++;
 
-    auto node_binding_info =
-        fuchsia_driver_development::wire::NodeBindingInfo::Builder(arena_)
-            .node_name(node_name)
-            .legacy_composite_parents(fidl::ToWire(arena_, legacy_composite_parents))
-            .composite_parents(fidl::ToWire(arena_, composite_parents))
-            .Build();
+    auto node_binding_info = fuchsia_driver_development::wire::NodeBindingInfo::Builder(arena_)
+                                 .node_name(node_name)
+                                 .composite_parents(fidl::ToWire(arena_, composite_parents))
+                                 .Build();
     results_.emplace_back(node_binding_info);
     current = currently_reported_;
   }

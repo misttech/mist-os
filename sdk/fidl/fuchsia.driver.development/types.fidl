@@ -5,7 +5,6 @@ library fuchsia.driver.development;
 
 using fuchsia.component.decl;
 using fuchsia.driver.framework;
-using fuchsia.driver.legacy;
 using fuchsia.url;
 using zx;
 
@@ -51,19 +50,15 @@ type NodeBindingInfo = table {
     /// Full topological name of the node.
     1: node_name string:NODE_MONIKER_MAX;
     /// This is the component url for the driver that bound to the node.
-    /// If this is present, then |composite_parents| and |legacy_composite_parents| must not be.
+    /// If this is present, then |composite_parents| must not be.
     2: driver_url fuchsia.url.Url;
     /// The composite parents that this node binded to.
-    /// Can be present alongside |legacy_composite_parents|, but not |driver_url|.
+    /// If this is present, then |driver_url| must not be.
     3: composite_parents vector<fuchsia.driver.framework.CompositeParent>:MAX;
-    /// The legacy composite parents that this node binded to.
-    /// Can be present alongside |composite_parents|, but not |driver_url|.
-    4: legacy_composite_parents vector<fuchsia.driver.legacy.CompositeParent>:MAX;
 };
 
-/// Contains information for either a composite or legacy composite.
+/// Contains information for a composite.
 type CompositeInfo = strict union {
-    1: legacy_composite fuchsia.driver.legacy.CompositeInfo;
     2: composite fuchsia.driver.framework.CompositeInfo;
 };
 
@@ -99,8 +94,6 @@ type RestartRematchFlags = flexible bits : uint32 {
     /// are nodes that are affected by the restart of the requested driver, for example when
     /// it is a colocated parent.
     NON_REQUESTED = 0x0002;
-    /// Rematch nodes that are legacy composite nodes.
-    LEGACY_COMPOSITE = 0x0004;
     /// Rematch nodes that are created as part of a completed composite spec.
     COMPOSITE_SPEC = 0x0008;
 };
