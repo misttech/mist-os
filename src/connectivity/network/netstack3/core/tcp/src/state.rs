@@ -1075,6 +1075,34 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             }
             None => {}
         };
+
+        // If there's an empty advertised window but we want to send data, we
+        // need to start Zero Window Probing, overwriting any previous timer.
+        if *snd_wnd == WindowSize::ZERO && readable_bytes > 0 {
+            match timer {
+                Some(SendTimer::ZeroWindowProbe(_)) => {}
+                _ => {
+                    let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
+                    *timer = Some(SendTimer::ZeroWindowProbe(RetransTimer::new(
+                        now,
+                        rtt_estimator.rto(),
+                        user_timeout,
+                        DEFAULT_MAX_RETRIES,
+                    )));
+
+                    // RFC 9293 3.8.6.1:
+                    //   The transmitting host SHOULD send the first zero-window
+                    //   probe when a zero window has existed for the
+                    //   retransmission timeout period (SHLD-29)
+                    //
+                    // We'll only end up here if the peer sent a zero window
+                    // advertisement. In that case, we have not yet waited, and
+                    // so should immedaitely return.
+                    return None;
+                }
+            }
+        }
+
         // Find the sequence number for the next segment, we start with snd_nxt
         // unless a fast retransmit is needed.
         let next_seg = match congestion_control.fast_retransmit() {
@@ -1105,15 +1133,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         if can_send == 0 {
             if available == 0 && offset == 0 && timer.is_none() && keep_alive.enabled {
                 *timer = Some(SendTimer::KeepAlive(KeepAliveTimer::idle(now, keep_alive)));
-            }
-            if available != 0 && offset == 0 && timer.is_none() && *snd_wnd == WindowSize::ZERO {
-                let user_timeout = user_timeout.get_or_default(DEFAULT_USER_TIMEOUT);
-                *timer = Some(SendTimer::ZeroWindowProbe(RetransTimer::new(
-                    now,
-                    rtt_estimator.rto(),
-                    user_timeout,
-                    DEFAULT_MAX_RETRIES,
-                )))
             }
             return None;
         }
@@ -6795,6 +6814,95 @@ mod test {
                 FragmentedPayload::new_contiguous(&TEST_BYTES[1..4]),
             ))
         );
+    }
+
+    #[test]
+    fn snd_enter_zwp_on_negative_window_update() {
+        const CAP: usize = TEST_BYTES.len() * 2;
+        let mut snd: Send<FakeInstant, RingBuffer, false> = Send {
+            nxt: ISS_1 + 1,
+            max: ISS_1 + 1,
+            una: ISS_1 + 1,
+            wnd: WindowSize::new(CAP).unwrap(),
+            wnd_scale: WindowScale::default(),
+            wnd_max: WindowSize::DEFAULT,
+            wl1: ISS_1,
+            wl2: ISS_2,
+            buffer: RingBuffer::new(CAP),
+            last_seq_ts: None,
+            rtt_estimator: Estimator::default(),
+            timer: None,
+            congestion_control: CongestionControl::cubic_with_mss(Mss(NonZeroU16::new(
+                TEST_BYTES.len() as u16,
+            )
+            .unwrap())),
+        };
+
+        let clock = FakeInstantCtx::default();
+        let counters = TcpCountersInner::default();
+
+        // We enqueue two copies of TEST_BYTES.
+        assert_eq!(snd.buffer.enqueue_data(TEST_BYTES), TEST_BYTES.len());
+        assert_eq!(snd.buffer.enqueue_data(TEST_BYTES), TEST_BYTES.len());
+
+        // The first copy should be sent out since the receiver has the space.
+        assert_eq!(
+            snd.poll_send(
+                &counters,
+                ISS_2 + 1,
+                WindowSize::DEFAULT >> WindowScale::ZERO,
+                u32::MAX,
+                clock.now(),
+                &SocketOptions::default(),
+            ),
+            Some(Segment::data(
+                ISS_1 + 1,
+                ISS_2 + 1,
+                UnscaledWindowSize::from(u16::MAX),
+                FragmentedPayload::new_contiguous(TEST_BYTES),
+            )),
+        );
+
+        // We've sent some data, but haven't received an ACK, so the retransmit
+        // timer should be set.
+        assert_matches!(snd.timer, Some(SendTimer::Retrans(_)));
+
+        // Send an ACK segment that doesn't ACK any data, but does close the
+        // window. This is strongly discouraged, but technically allowed by RFC
+        // 9293:
+        //   A TCP receiver SHOULD NOT shrink the window, i.e., move the right
+        //   window edge to the left (SHLD-14). However, a sending TCP peer MUST
+        //   be robust against window shrinking, which may cause the "usable
+        //   window" (see Section 3.8.6.2.1) to become negative (MUST-34).
+        assert_eq!(
+            snd.process_ack(
+                &counters,
+                ISS_2 + 1,
+                ISS_1 + 1 + TEST_BYTES.len(),
+                UnscaledWindowSize::from(0),
+                true,
+                ISS_2 + 1,
+                WindowSize::DEFAULT,
+                clock.now(),
+                &KeepAlive::default(),
+            ),
+            (None, DataAcked::Yes)
+        );
+
+        // Trying to send more data should result in no segment being sent, but
+        // instead setting up the ZWP timr.
+        assert_eq!(
+            snd.poll_send(
+                &counters,
+                ISS_2 + 1,
+                WindowSize::DEFAULT >> WindowScale::ZERO,
+                u32::MAX,
+                clock.now(),
+                &SocketOptions::default(),
+            ),
+            None,
+        );
+        assert_matches!(snd.timer, Some(SendTimer::ZeroWindowProbe(_)));
     }
 
     #[test]
