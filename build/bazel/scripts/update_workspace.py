@@ -1067,6 +1067,12 @@ common --enable_bzlmod=false
     # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
+    generated_repositories_inputs[
+        "fuchsia_internal_only_idk"
+    ] = all_internal_only_idk_metas
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
+
+    # LINT.IfChange
     generated_repositories_inputs["bazel_rules_fuchsia"] = list(
         rules_fuchsia_files
     )
