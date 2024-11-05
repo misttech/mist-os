@@ -5,7 +5,7 @@
 #include "lib/svc/dir.h"
 
 #include <fcntl.h>
-#include <fuchsia/io/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -21,6 +21,8 @@
 
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
+
+namespace fio = fuchsia_io;
 
 namespace svc {
 namespace {
@@ -241,15 +243,12 @@ TEST_F(ServiceTest, AddSubdDirByPath) {
               }
               return ZX_OK;
             })));
-    zx::channel server_end, client_end;
-    ASSERT_OK(zx::channel::create(0, &server_end, &client_end));
-    ASSERT_OK(subdir->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                fuchsia::io::OpenFlags::RIGHT_WRITABLE |
-                                fuchsia::io::OpenFlags::DIRECTORY,
-                            std::move(server_end), dispatcher()));
+    auto [client_end, server_end] = fidl::Endpoints<fio::Directory>::Create();
+    constexpr auto kServeFlags = static_cast<fio::Flags>(static_cast<uint64_t>(fio::kRwStarDir));
+    ASSERT_OK(subdir->Serve(kServeFlags, std::move(server_end), dispatcher()));
 
-    ASSERT_OK(
-        svc_directory_add_directory_unsized(dir, kTestPath, kTestDirectory, client_end.release()));
+    ASSERT_OK(svc_directory_add_directory_unsized(dir, kTestPath, kTestDirectory,
+                                                  client_end.TakeChannel().release()));
 
     RunLoop();
 
@@ -374,11 +373,8 @@ TEST_F(ServiceTest, Rights) {
 
   // Verify that we can open the directory with rx permissions.
   fbl::unique_fd new_fd;
-  ASSERT_OK(fdio_open_fd_at(root_fd.get(), ".",
-                            static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                                  fuchsia::io::OpenFlags::RIGHT_EXECUTABLE |
-                                                  fuchsia::io::OpenFlags::DIRECTORY),
-                            new_fd.reset_and_get_address()));
+  ASSERT_OK(fdio_open3_fd_at(root_fd.get(), ".", static_cast<uint64_t>(fio::kRxStarDir),
+                             new_fd.reset_and_get_address()));
 
   // Shutdown the service thread.
   QuitLoop();
