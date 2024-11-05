@@ -1,5 +1,3 @@
-robots: noindex
-
 # SDK workflows
 
 This section organizes `ffx`-based workflows for interacting

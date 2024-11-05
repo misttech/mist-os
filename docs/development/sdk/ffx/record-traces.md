@@ -1,5 +1,3 @@
-robots: noindex
-
 # Record traces for performance analysis
 
 The [`ffx trace`][ffx-trace] commands can record diagnostic trace data from

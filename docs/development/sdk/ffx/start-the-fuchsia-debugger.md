@@ -1,5 +1,3 @@
-robots: noindex
-
 # Start the Fuchsia debugger
 
 The [`ffx debug connect`][ffx-debug-connect] command starts the Fuchsia debugger

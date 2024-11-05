@@ -1,5 +1,3 @@
-robots: noindex
-
 # View device logs
 
 The [`ffx log`][ffx-log] commands can monitor and filter log messages from a Fuchsia device.

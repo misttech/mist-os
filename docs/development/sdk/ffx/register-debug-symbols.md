@@ -1,5 +1,3 @@
-robots: noindex
-
 # Register debug symbols
 
 The [`ffx debug symbol-index`][ffx-debug-symbol-index] commands help

@@ -1,5 +1,3 @@
-robots: noindex
-
 # View driver information
 
 The `ffx driver` command can retrieve various types of information about drivers

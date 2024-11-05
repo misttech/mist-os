@@ -1,5 +1,3 @@
-robots: noindex
-
 # Update Fuchsia packages on a device
 
 The [`ffx target update`][ffx-target-update] commands can check

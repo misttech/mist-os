@@ -1,5 +1,3 @@
-robots: noindex
-
 # Explore components
 
 The `ffx component explore` command starts an interactive shell that lets you explore
