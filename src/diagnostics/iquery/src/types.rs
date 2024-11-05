@@ -84,7 +84,7 @@ pub enum Error {
     FuzzyMatchTooManyMatches(Vec<String>),
 
     #[error(
-        "hint: selectors paired with --manifest must not include component selector segment: {0}"
+        "hint: selectors paired with --component must not include component selector segment: {0}"
     )]
     PartialSelectorHint(#[source] selectors::Error),
 }

@@ -17,16 +17,21 @@ use std::fmt;
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "selectors")]
 pub struct SelectorsCommand {
-    #[argh(option)]
-    /// the name of the manifest file that we are interested in. If this is provided, the output
-    /// will only contain monikers for components whose url contains the provided name.
-    pub manifest: Option<String>,
-
     #[argh(positional)]
-    /// selectors for which the selectors should be queried. Minimum: 1 unless `--manifest` is set.
-    /// When `--manifest` is provided then the selectors should be tree selectors, otherwise
+    /// selectors for which the selectors should be queried. Minimum: 1 unless `--component` is set.
+    /// When `--component` is provided then the selectors should be tree selectors, otherwise
     /// they can be component selectors or full selectors.
     pub selectors: Vec<String>,
+
+    #[argh(option)]
+    /// DEPRECATED: use `--component` instead.
+    pub manifest: Option<String>,
+
+    #[argh(option)]
+    /// a fuzzy-search query. May include URL, moniker, or manifest fragments. No selector-escaping
+    /// for moniker is needed in this query. Selectors following --component should omit the
+    /// component selector, as they will be spliced together by the tool with the correct escaping.
+    pub component: Option<String>,
 
     #[argh(option)]
     /// A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
@@ -40,11 +45,22 @@ impl Command for SelectorsCommand {
     type Result = SelectorsResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        if self.selectors.is_empty() && self.manifest.is_none() {
+        if self.manifest.is_some() {
+            eprintln!("WARNING: option `--manifest` is deprecated, please use `--component` instead");
+        }
+
+        if self.selectors.is_empty() && self.component.is_none() && self.manifest.is_none() {
             return Err(Error::invalid_arguments("Expected 1 or more selectors. Got zero."));
         }
 
-        let selectors = if let Some(manifest) = self.manifest {
+        let selectors = if let Some(component) = self.component {
+            utils::process_component_query_with_partial_selectors(
+                component,
+                self.selectors.into_iter(),
+                provider,
+            )
+            .await?
+        } else if let Some(manifest) = self.manifest {
             utils::get_selectors_for_manifest(manifest, self.selectors, &self.accessor, provider)
                 .await?
         } else {

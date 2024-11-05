@@ -65,10 +65,14 @@ pub struct ShowCommand {
     pub selectors: Vec<String>,
 
     #[argh(option)]
-    /// the name of the manifest file that we are interested in. If this is provided, any
-    /// additional selectors should omit the component selector, and the output
-    /// will only contain monikers for components whose url contains the provided name.
+    /// DEPRECATED: use `--component` instead.
     pub manifest: Option<String>,
+
+    #[argh(option)]
+    /// a fuzzy-search query. May include URL, moniker, or manifest fragments. No selector-escaping
+    /// for moniker is needed in this query. Selectors following --component should omit the
+    /// component selector, as they will be spliced together by the tool with the correct escaping.
+    pub component: Option<String>,
 
     #[argh(option)]
     /// A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
@@ -88,7 +92,17 @@ impl Command for ShowCommand {
     type Result = ShowResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        let selectors = if let Some(manifest) = self.manifest {
+        if self.manifest.is_some() {
+            eprintln!("WARNING: option `--manifest` is deprecated, please use `--component` instead");
+        }
+        let selectors = if let Some(component) = self.component {
+            utils::process_component_query_with_partial_selectors(
+                component,
+                self.selectors.into_iter(),
+                provider,
+            )
+            .await?
+        } else if let Some(manifest) = self.manifest {
             utils::get_selectors_for_manifest(manifest, self.selectors, &self.accessor, provider)
                 .await?
         } else {

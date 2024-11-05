@@ -156,7 +156,7 @@ locations. Then, `iquery` is ran on one of the output to
 recursively list data in the matching locations. You may instead write:
 
 ```
-$ fx iquery show --manifest component_name
+$ fx iquery show --component component_name
 ```
 
 ### Archivist {#archivist}

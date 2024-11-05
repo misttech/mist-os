@@ -423,7 +423,7 @@ Now that you have added Inspect to your component, you can read what it says:
 
       ```
       $ ffx inspect show 'core/ffx-laboratory\:client_part_1/reverser'
-      # or `ffx inspect show --manifest inspect_cpp_codelab`
+      # or `ffx inspect show --component inspect_cpp_codelab`
       metadata:
         filename = fuchsia.inspect.Tree
         component_url = fuchsia-pkg://fuchsia.com/inspect_cpp_codelab#meta/part_1.cm
@@ -437,7 +437,7 @@ Now that you have added Inspect to your component, you can read what it says:
 
       ```
       $ ffx inspect show 'core/ffx-laboratory\:client_part_1/reverser'
-      # or `ffx inspect show --manifest inspect_rust_codelab`
+      # or `ffx inspect show --component inspect_rust_codelab`
       metadata:
         filename = fuchsia.inspect.Tree
         component_url = fuchsia-pkg://fuchsia.com/inspect_rust_codelab#meta/part_1.cm
@@ -580,13 +580,13 @@ is even being handled by your component.
    * {C++}
 
       ```
-      $ ffx --machine json-pretty inspect show --manifest inspect_cpp_codelab
+      $ ffx --machine json-pretty inspect show --component inspect_cpp_codelab
       ```
 
    * {Rust}
 
       ```
-      $ ffx --machine json-pretty inspect show --manifest inspect_rust_codelab
+      $ ffx --machine json-pretty inspect show --component inspect_rust_codelab
       ```
 
    You should now see:
