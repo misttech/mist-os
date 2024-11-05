@@ -6,13 +6,8 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pty/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/common_types.h>
-#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
-#include <lib/fit/defer.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
 #include <lib/zxio/null.h>
 #include <lib/zxio/ops.h>
@@ -32,7 +27,6 @@
 #include "sdk/lib/zxio/private.h"
 #include "sdk/lib/zxio/vector.h"
 
-namespace fdevice = fuchsia_device;
 namespace fio = fuchsia_io;
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
@@ -40,7 +34,119 @@ namespace fio = fuchsia_io;
 static_assert(ZXIO_SELINUX_CONTEXT_MAX_ATTR_LEN == fio::wire::kMaxSelinuxContextAttributeLen);
 #endif
 
+zx_status_t RemoteReadv(const fidl::UnownedClientEnd<fio::Readable>& client_end,
+                        const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
+                        size_t* out_actual) {
+  return zxio_chunked_do_vector<fio::wire::kMaxBuf>(
+      vector, vector_count, flags, out_actual,
+      [&client_end](uint8_t* buffer, size_t capacity, size_t* out_actual) {
+        // Explicitly allocating message buffers to avoid heap allocation.
+        fidl::SyncClientBuffer<fio::Readable::Read> fidl_buffer;
+        const auto result = fidl::WireCall(client_end).buffer(fidl_buffer.view())->Read(capacity);
+        if (!result.ok()) {
+          return result.status();
+        }
+        const auto& response = result.value();
+        if (response.is_error()) {
+          return response.error_value();
+        }
+        const fidl::VectorView data = response.value()->data;
+        const size_t actual = data.count();
+        if (actual > capacity) {
+          return ZX_ERR_IO;
+        }
+        memcpy(buffer, data.begin(), actual);
+        *out_actual = actual;
+        return ZX_OK;
+      });
+}
+
+zx_status_t RemoteWritev(const fidl::UnownedClientEnd<fio::Writable>& client_end,
+                         const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
+                         size_t* out_actual) {
+  return zxio_chunked_do_vector<fio::wire::kMaxBuf>(
+      vector, vector_count, flags, out_actual,
+      [&client_end](uint8_t* buffer, size_t capacity, size_t* out_actual) {
+        // Explicitly allocating message buffers to avoid heap allocation.
+        fidl::SyncClientBuffer<fio::File::Write> fidl_buffer;
+        const fidl::WireUnownedResult result =
+            fidl::WireCall(client_end)
+                .buffer(fidl_buffer.view())
+                ->Write(fidl::VectorView<uint8_t>::FromExternal(buffer, capacity));
+        if (!result.ok()) {
+          return result.status();
+        }
+        const auto& response = result.value();
+        if (response.is_error()) {
+          return response.error_value();
+        }
+        const size_t actual = response.value()->actual_count;
+        if (actual > capacity) {
+          return ZX_ERR_IO;
+        }
+        *out_actual = actual;
+        return ZX_OK;
+      });
+}
+
 namespace {
+
+zx_status_t FileReadvAt(const fidl::WireSyncClient<fio::File>& client, zx_off_t offset,
+                        const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
+                        size_t* out_actual) {
+  return zxio_chunked_do_vector<fio::wire::kMaxBuf>(
+      vector, vector_count, flags, out_actual,
+      [&client, &offset](uint8_t* buffer, size_t capacity, size_t* out_actual) {
+        // Explicitly allocating message buffers to avoid heap allocation.
+        fidl::SyncClientBuffer<fio::File::ReadAt> fidl_buffer;
+        const fidl::WireUnownedResult result =
+            client.buffer(fidl_buffer.view())->ReadAt(capacity, offset);
+        if (!result.ok()) {
+          return result.status();
+        }
+        const auto& response = result.value();
+        if (response.is_error()) {
+          return response.error_value();
+        }
+        const fidl::VectorView data = response.value()->data;
+        const size_t actual = data.count();
+        if (actual > capacity) {
+          return ZX_ERR_IO;
+        }
+        offset += actual;
+        memcpy(buffer, data.begin(), actual);
+        *out_actual = actual;
+        return ZX_OK;
+      });
+}
+
+zx_status_t FileWritevAt(const fidl::WireSyncClient<fio::File>& client, zx_off_t offset,
+                         const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
+                         size_t* out_actual) {
+  return zxio_chunked_do_vector<fio::wire::kMaxBuf>(
+      vector, vector_count, flags, out_actual,
+      [&client, &offset](uint8_t* buffer, size_t capacity, size_t* out_actual) {
+        // Explicitly allocating message buffers to avoid heap allocation.
+        fidl::SyncClientBuffer<fio::File::WriteAt> fidl_buffer;
+        const fidl::WireUnownedResult result =
+            client.buffer(fidl_buffer.view())
+                ->WriteAt(fidl::VectorView<uint8_t>::FromExternal(buffer, capacity), offset);
+        if (!result.ok()) {
+          return result.status();
+        }
+        const auto& response = result.value();
+        if (response.is_error()) {
+          return response.error_value();
+        }
+        const size_t actual = response.value()->actual_count;
+        if (actual > capacity) {
+          return ZX_ERR_IO;
+        }
+        offset += actual;
+        *out_actual = actual;
+        return ZX_OK;
+      });
+}
 
 class Directory;
 
@@ -394,18 +500,6 @@ class Remote : public HasIo {
 
   zx_status_t AdvisoryLock(advisory_lock_req* req);
 
-  zx_status_t Readv(const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
-                    size_t* out_actual);
-
-  zx_status_t ReadvAt(zx_off_t offset, const zx_iovec_t* vector, size_t vector_count,
-                      zxio_flags_t flags, size_t* out_actual);
-
-  zx_status_t Writev(const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
-                     size_t* out_actual);
-
-  zx_status_t WritevAt(zx_off_t offset, const zx_iovec_t* vector, size_t vector_count,
-                       zxio_flags_t flags, size_t* out_actual);
-
   zx_status_t Seek(zxio_seek_origin_t start, int64_t offset, size_t* out_offset);
 
   zx_status_t Truncate(uint64_t length);
@@ -442,10 +536,6 @@ class Remote : public HasIo {
   zx_status_t DirentIteratorRewind(zxio_dirent_iterator_t* iterator);
 
   void DirentIteratorDestroy(zxio_dirent_iterator_t* iterator);
-
-  zx_status_t GetWindowSize(uint32_t* width, uint32_t* height);
-
-  zx_status_t SetWindowSize(uint32_t width, uint32_t height);
 
   zx_status_t XattrList(void (*callback)(void* context, const uint8_t* name, size_t name_len),
                         void* context);
@@ -504,99 +594,6 @@ zx_status_t Remote<Protocol, kObjectType>::Close(zxio_t* zxio, const bool should
   instance.~T();
   return status;
 }
-
-class Pty : public Remote<fuchsia_hardware_pty::Device, ZXIO_OBJECT_TYPE_TTY> {
- public:
-  Pty(fidl::ClientEnd<fuchsia_hardware_pty::Device> client_end, zx::eventpair event)
-      : Remote(std::move(client_end), kOps), event_(std::move(event)) {}
-
-  zx_status_t Clone(zx_handle_t* out_handle) {
-    auto [client_end, server_end] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
-    const fidl::Status result = client()->Clone2(std::move(server_end));
-    if (!result.ok()) {
-      return result.status();
-    }
-    *out_handle = client_end.TakeChannel().release();
-    return ZX_OK;
-  }
-
-  void WaitBegin(zxio_signals_t zxio_signals, zx_handle_t* out_handle,
-                 zx_signals_t* out_zx_signals) {
-    *out_handle = event_.get();
-
-    zx_signals_t zx_signals = ZX_SIGNAL_NONE;
-    zx_signals |= [zxio_signals]() {
-      fdevice::wire::DeviceSignal signals;
-      if (zxio_signals & ZXIO_SIGNAL_READABLE) {
-        signals |= fdevice::wire::DeviceSignal::kReadable;
-      }
-      if (zxio_signals & ZXIO_SIGNAL_OUT_OF_BAND) {
-        signals |= fdevice::wire::DeviceSignal::kOob;
-      }
-      if (zxio_signals & ZXIO_SIGNAL_WRITABLE) {
-        signals |= fdevice::wire::DeviceSignal::kWritable;
-      }
-      if (zxio_signals & ZXIO_SIGNAL_ERROR) {
-        signals |= fdevice::wire::DeviceSignal::kError;
-      }
-      if (zxio_signals & ZXIO_SIGNAL_PEER_CLOSED) {
-        signals |= fdevice::wire::DeviceSignal::kHangup;
-      }
-      return static_cast<zx_signals_t>(signals);
-    }();
-    if (zxio_signals & ZXIO_SIGNAL_READ_DISABLED) {
-      zx_signals |= ZX_CHANNEL_PEER_CLOSED;
-    }
-    *out_zx_signals = zx_signals;
-  }
-
-  void WaitEnd(zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals) {
-    zxio_signals_t zxio_signals = ZXIO_SIGNAL_NONE;
-    [&zxio_signals, signals = fdevice::wire::DeviceSignal::TruncatingUnknown(zx_signals)]() {
-      if (signals & fdevice::wire::DeviceSignal::kReadable) {
-        zxio_signals |= ZXIO_SIGNAL_READABLE;
-      }
-      if (signals & fdevice::wire::DeviceSignal::kOob) {
-        zxio_signals |= ZXIO_SIGNAL_OUT_OF_BAND;
-      }
-      if (signals & fdevice::wire::DeviceSignal::kWritable) {
-        zxio_signals |= ZXIO_SIGNAL_WRITABLE;
-      }
-      if (signals & fdevice::wire::DeviceSignal::kError) {
-        zxio_signals |= ZXIO_SIGNAL_ERROR;
-      }
-      if (signals & fdevice::wire::DeviceSignal::kHangup) {
-        zxio_signals |= ZXIO_SIGNAL_PEER_CLOSED;
-      }
-    }();
-    if (zx_signals & ZX_CHANNEL_PEER_CLOSED) {
-      zxio_signals |= ZXIO_SIGNAL_READ_DISABLED;
-    }
-    *out_zxio_signals = zxio_signals;
-  }
-
-  zx_status_t IsAtty(bool* tty);
-
- private:
-  static const zxio_ops_t kOps;
-
-  const zx::eventpair event_;
-};
-
-constexpr zxio_ops_t Pty::kOps = ([]() {
-  zxio_ops_t ops = CommonRemoteOps<Pty>();
-
-  using Adaptor = Adaptor<Pty>;
-  ops.wait_begin = Adaptor::From<&Pty::WaitBegin>;
-  ops.wait_end = Adaptor::From<&Pty::WaitEnd>;
-  ops.readv = Adaptor::From<&Pty::Readv>;
-  ops.writev = Adaptor::From<&Pty::Writev>;
-
-  ops.isatty = Adaptor::From<&Pty::IsAtty>;
-  ops.get_window_size = Adaptor::From<&Pty::GetWindowSize>;
-  ops.set_window_size = Adaptor::From<&Pty::SetWindowSize>;
-  return ops;
-})();
 
 template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::Sync() {
@@ -910,166 +907,6 @@ zx_status_t Remote<Protocol, kObjectType>::AdvisoryLock(advisory_lock_req* req) 
   return ZX_OK;
 }
 
-template <typename F>
-zx_status_t zxio_remote_do_vector(const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
-                                  size_t* out_actual, F fn) {
-  return zxio_stream_do_vector(vector, vector_count, out_actual,
-                               [&](void* data, size_t capacity, size_t* out_actual) {
-                                 auto buffer = static_cast<uint8_t*>(data);
-                                 size_t total = 0;
-                                 while (capacity > 0) {
-                                   const size_t chunk = std::min(capacity, fio::wire::kMaxBuf);
-                                   size_t actual;
-                                   const zx_status_t status = fn(buffer, chunk, &actual);
-                                   if (status != ZX_OK) {
-                                     if (total > 0) {
-                                       break;
-                                     }
-                                     return status;
-                                   }
-                                   total += actual;
-                                   if (actual != chunk) {
-                                     break;
-                                   }
-                                   buffer += actual;
-                                   capacity -= actual;
-                                 }
-                                 *out_actual = total;
-                                 return ZX_OK;
-                               });
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Readv(const zx_iovec_t* vector, size_t vector_count,
-                                                 zxio_flags_t flags, size_t* out_actual) {
-  if (flags) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  return zxio_remote_do_vector(vector, vector_count, flags, out_actual,
-                               [this](uint8_t* buffer, size_t capacity, size_t* out_actual) {
-                                 // Explicitly allocating message buffers to avoid heap allocation.
-                                 fidl::SyncClientBuffer<fio::File::Read> fidl_buffer;
-                                 const fidl::WireUnownedResult result =
-                                     client().buffer(fidl_buffer.view())->Read(capacity);
-                                 if (!result.ok()) {
-                                   return result.status();
-                                 }
-                                 const auto& response = result.value();
-                                 if (response.is_error()) {
-                                   return response.error_value();
-                                 }
-                                 const fidl::VectorView data = response.value()->data;
-                                 const size_t actual = data.count();
-                                 if (actual > capacity) {
-                                   return ZX_ERR_IO;
-                                 }
-                                 memcpy(buffer, data.begin(), actual);
-                                 *out_actual = actual;
-                                 return ZX_OK;
-                               });
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::ReadvAt(zx_off_t offset, const zx_iovec_t* vector,
-                                                   size_t vector_count, zxio_flags_t flags,
-                                                   size_t* out_actual) {
-  if (flags) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  return zxio_remote_do_vector(
-      vector, vector_count, flags, out_actual,
-      [this, &offset](uint8_t* buffer, size_t capacity, size_t* out_actual) {
-        // Explicitly allocating message buffers to avoid heap allocation.
-        fidl::SyncClientBuffer<fio::File::ReadAt> fidl_buffer;
-        const fidl::WireUnownedResult result =
-            client().buffer(fidl_buffer.view())->ReadAt(capacity, offset);
-        if (!result.ok()) {
-          return result.status();
-        }
-        const auto& response = result.value();
-        if (response.is_error()) {
-          return response.error_value();
-        }
-        const fidl::VectorView data = response.value()->data;
-        const size_t actual = data.count();
-        if (actual > capacity) {
-          return ZX_ERR_IO;
-        }
-        offset += actual;
-        memcpy(buffer, data.begin(), actual);
-        *out_actual = actual;
-        return ZX_OK;
-      });
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Writev(const zx_iovec_t* vector, size_t vector_count,
-                                                  zxio_flags_t flags, size_t* out_actual) {
-  if (flags) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  return zxio_remote_do_vector(
-      vector, vector_count, flags, out_actual,
-      [this](uint8_t* buffer, size_t capacity, size_t* out_actual) {
-        // Explicitly allocating message buffers to avoid heap allocation.
-        fidl::SyncClientBuffer<fio::File::Write> fidl_buffer;
-        const fidl::WireUnownedResult result =
-            client()
-                .buffer(fidl_buffer.view())
-                ->Write(fidl::VectorView<uint8_t>::FromExternal(buffer, capacity));
-        if (!result.ok()) {
-          return result.status();
-        }
-        const auto& response = result.value();
-        if (response.is_error()) {
-          return response.error_value();
-        }
-        const size_t actual = response.value()->actual_count;
-        if (actual > capacity) {
-          return ZX_ERR_IO;
-        }
-        *out_actual = actual;
-        return ZX_OK;
-      });
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::WritevAt(zx_off_t offset, const zx_iovec_t* vector,
-                                                    size_t vector_count, zxio_flags_t flags,
-                                                    size_t* out_actual) {
-  if (flags) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  return zxio_remote_do_vector(
-      vector, vector_count, flags, out_actual,
-      [this, &offset](uint8_t* buffer, size_t capacity, size_t* out_actual) {
-        // Explicitly allocating message buffers to avoid heap allocation.
-        fidl::SyncClientBuffer<fio::File::WriteAt> fidl_buffer;
-        const fidl::WireUnownedResult result =
-            client()
-                .buffer(fidl_buffer.view())
-                ->WriteAt(fidl::VectorView<uint8_t>::FromExternal(buffer, capacity), offset);
-        if (!result.ok()) {
-          return result.status();
-        }
-        const auto& response = result.value();
-        if (response.is_error()) {
-          return response.error_value();
-        }
-        const size_t actual = response.value()->actual_count;
-        if (actual > capacity) {
-          return ZX_ERR_IO;
-        }
-        offset += actual;
-        *out_actual = actual;
-        return ZX_OK;
-      });
-}
-
 template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::Seek(zxio_seek_origin_t start, int64_t offset,
                                                 size_t* out_offset) {
@@ -1338,52 +1175,6 @@ zx_status_t Remote<Protocol, kObjectType>::DirentIteratorRewind(zxio_dirent_iter
 template <typename Protocol, zxio_object_type_t kObjectType>
 void Remote<Protocol, kObjectType>::DirentIteratorDestroy(zxio_dirent_iterator_t* iterator) {
   reinterpret_cast<DirentIteratorImpl*>(iterator)->~DirentIteratorImpl();
-}
-
-zx_status_t Pty::IsAtty(bool* tty) {
-  *tty = true;
-  return ZX_OK;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::GetWindowSize(uint32_t* width, uint32_t* height) {
-  if (!client().is_valid()) {
-    return ZX_ERR_BAD_STATE;
-  }
-  const fidl::WireResult result = client()->GetWindowSize();
-  if (!result.ok()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  const auto& response = result.value();
-  if (response.status != ZX_OK) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  *width = response.size.width;
-  *height = response.size.height;
-  return ZX_OK;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::SetWindowSize(uint32_t width, uint32_t height) {
-  if (!client().is_valid()) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  const fuchsia_hardware_pty::wire::WindowSize size = {
-      .width = width,
-      .height = height,
-  };
-
-  const fidl::WireResult result = client()->SetWindowSize(size);
-  if (!result.ok()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  const auto& response = result.value();
-  if (response.status != ZX_OK) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  return ZX_OK;
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
@@ -1894,7 +1685,10 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     if (stream_.is_valid()) {
       return map_status(stream_.readv(0, vector, vector_count, out_actual));
     }
-    return Remote::Readv(vector, vector_count, flags, out_actual);
+
+    // Fallback to fuchsia.io/Readable.Read (File composes Readable).
+    fidl::UnownedClientEnd<fio::Readable> readable_client(client().client_end().handle());
+    return RemoteReadv(readable_client, vector, vector_count, flags, out_actual);
   }
 
   zx_status_t ReadvAt(zx_off_t offset, const zx_iovec_t* vector, size_t vector_count,
@@ -1906,7 +1700,9 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     if (stream_.is_valid()) {
       return map_status(stream_.readv_at(0, offset, vector, vector_count, out_actual));
     }
-    return Remote::ReadvAt(offset, vector, vector_count, flags, out_actual);
+
+    // Fallback to fuchsia.io/File.ReadAt.
+    return FileReadvAt(client(), offset, vector, vector_count, flags, out_actual);
   }
 
   zx_status_t Writev(const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
@@ -1918,7 +1714,10 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     if (stream_.is_valid()) {
       return map_status(stream_.writev(0, vector, vector_count, out_actual));
     }
-    return Remote::Writev(vector, vector_count, flags, out_actual);
+
+    // Fallback to fuchsia.io/Writable.Write (File composes Writable).
+    fidl::UnownedClientEnd<fio::Writable> writable_client(client().client_end().handle());
+    return RemoteWritev(writable_client, vector, vector_count, flags, out_actual);
   }
 
   zx_status_t WritevAt(zx_off_t offset, const zx_iovec_t* vector, size_t vector_count,
@@ -1930,7 +1729,9 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     if (stream_.is_valid()) {
       return map_status(stream_.writev_at(0, offset, vector, vector_count, out_actual));
     }
-    return Remote::WritevAt(offset, vector, vector_count, flags, out_actual);
+
+    // Fallback to fuchsia.io/File.WriteAt.
+    return FileWritevAt(client(), offset, vector, vector_count, flags, out_actual);
   }
 
   zx_status_t Seek(zxio_seek_origin_t start, int64_t offset, size_t* out_offset) {
@@ -2029,12 +1830,6 @@ zx_status_t zxio_file_init(zxio_storage_t* storage, zx::event event, zx::stream 
 
 zx_status_t zxio_node_init(zxio_storage_t* storage, fidl::ClientEnd<fio::Node> client) {
   new (storage) Node(std::move(client));
-  return ZX_OK;
-}
-
-zx_status_t zxio_pty_init(zxio_storage_t* storage, zx::eventpair event,
-                          fidl::ClientEnd<fuchsia_hardware_pty::Device> client) {
-  new (storage) Pty(std::move(client), std::move(event));
   return ZX_OK;
 }
 

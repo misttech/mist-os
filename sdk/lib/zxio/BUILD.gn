@@ -75,6 +75,7 @@ source_set("zxio") {
     "inception.cc",
     "null.cc",
     "pipe.cc",
+    "pty.cc",
     "remote.cc",
     "socket.cc",
     "socket_address.cc",
