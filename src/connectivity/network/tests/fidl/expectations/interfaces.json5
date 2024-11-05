@@ -9,13 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure",
-            matchers: [
-                // TODO(https://fxbug.dev/42063946): Standardize behavior when handling
-                // v6 LL addresses between NS2 and NS3.
-                "watcher_ns3",
-            ],
-        },
     ],
 }
