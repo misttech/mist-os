@@ -34,9 +34,4 @@ if (is_host) {
     testonly = true
     deps = [ "tests:host_tests" ]
   }
-} else if (is_fuchsia) {
-  group("package_deps_for_host_tests") {
-    testonly = true
-    deps = [ "tests:package_deps_for_host_tests" ]
-  }
 }

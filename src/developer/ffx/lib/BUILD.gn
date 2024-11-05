@@ -59,11 +59,6 @@ if (is_host) {
       deps += [ lib ]
     }
   }
-} else if (is_fuchsia) {
-  group("package_deps_for_host_tests") {
-    testonly = true
-    deps = [ "symbolize:package_deps_for_host_tests" ]
-  }
 }
 
 group("host_tests") {
