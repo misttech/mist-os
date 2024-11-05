@@ -56,7 +56,7 @@ static int proc_elist(FTLN ftl) {
     }
 
     // Check block's wear count.
-    if ((wc > ftl->high_wc) || (ftl->high_wc - wc > 0xFF))
+    if (wc > ftl->high_wc)
       return NDM_PAGE_INVALID;
 
     // Skip the elist block itself. It is definitely not erased.
@@ -85,9 +85,9 @@ static int proc_elist(FTLN ftl) {
       if (!IS_FREE(ftl->bdata[b]))
         ++ftl->num_free_blks;
 
-      // Set block's state and wear count lag.
+      // Set block's state and wear count.
       ftl->bdata[b] = FREE_BLK_FLAG | ERASED_BLK_FLAG;
-      ftl->blk_wc_lag[b] = (uint8_t)(ftl->high_wc - wc);
+      ftl->blk_wc[b] = wc;
     }
   } while (lp < (ui32*)(ftl->main_buf + ftl->page_size));
 
@@ -553,48 +553,25 @@ static int build_map(FTLN ftl) {
   return 0;
 }
 
-//  set_wc_lag: Set block's wear count lag and possibly adjust the
-//              highest/lowest overall wear counts
+//  set_wc: Set block's wear count adjust the highest/lowest
+//          overall wear counts
 //
 //      Inputs: ftl = pointer to FTL control block
 //              b = block number
 //              wc = wear count for block
-//         I/O: *low_wc = lowest wear count encountered so far
 //
-static void set_wc_lag(FTLN ftl, ui32 b, ui32 wc, ui32* low_wc) {
-  // If this block has lowest wear count, update lowest.
-  if (*low_wc > wc)
-    *low_wc = wc;
+static void set_wc(FTLN ftl, ui32 b, ui32 wc) {
+  if (ftl->low_wc > wc) {
+    ftl->low_wc = wc;
+  }
 
-  // If it has highest wear count, update highest and also update wear
-  // count offsets of all used (not free) blocks below it.
+  // If it has highest wear count, update highest.
   if (wc > ftl->high_wc) {
-    ui32 lb, increase = wc - ftl->high_wc;
-
-    // Loop over all lower numbered blocks.
-    for (lb = 0; lb < b; ++lb) {
-      // Skip blocks that don't have a valid wear count value.
-      if (GET_RC(ftl->bdata[lb]) == 100)
-        continue;
-
-      // Update previously set wear count lags, avoiding ui8 overflow.
-      if (ftl->blk_wc_lag[lb] + increase > 0xFF) {
-        ftl->blk_wc_lag[lb] = 0xFF;
-        ++ftl->wear_data.max_wc_over;
-      } else
-        ftl->blk_wc_lag[lb] += increase;
-    }
-
-    // Remember new high wear count.
     ftl->high_wc = wc;
   }
 
-  // Set block wear count lag, avoiding ui8 overflow.
-  if (ftl->high_wc - wc > 0xFF) {
-    ftl->blk_wc_lag[b] = 0xFF;
-    ++ftl->wear_data.max_wc_over;
-  } else
-    ftl->blk_wc_lag[b] = (uint8_t)(ftl->high_wc - wc);
+  // Set block wear count.
+  ftl->blk_wc[b] = wc;
 }
 
 // format_status: Check if FTL volume is formatted
@@ -604,7 +581,7 @@ static void set_wc_lag(FTLN ftl, ui32 b, ui32 wc, ui32* low_wc) {
 //     Returns: TRUE if formatted, FALSE if unformatted, -1 if error
 //
 static int format_status(FTLN ftl) {
-  ui32 b, n, avg_lag, pn, bc, wc, low_wc = (ui32)-1;
+  ui32 b, n, avg_wear, pn, bc, wc = (ui32)-1;
   int rc, formatted = FALSE;
 
   // Scan first page on all blocks to determine block status.
@@ -637,8 +614,8 @@ static int format_status(FTLN ftl) {
       // Else classify as volume block.
       else {
         // If its wear count is in expected range, record it.
-        if ((wc <= ftl->high_wc + 32) && ((wc + 32 >= low_wc) || (low_wc == (ui32)-1)))
-          set_wc_lag(ftl, b, wc, &low_wc);
+        if ((wc <= ftl->high_wc + 32) && ((wc + 32 >= ftl->low_wc) || (ftl->low_wc == (ui32)-1)))
+          set_wc(ftl, b, wc);
 
         // Else only use wear count if block has other non-empty pages
         // with same BC/wear, to discard partially written counts.
@@ -655,11 +632,11 @@ static int format_status(FTLN ftl) {
               return FtlnFatErr(ftl);
             }
 
-            // If read good and counts match, set block wear count lag.
+            // If read good and counts match, set block wear count.
             bc2 = GET_SA_BC(ftl->spare_buf);
             wc2 = GET_SA_WC(ftl->spare_buf);
             if ((rc == 0) && (bc == bc2) && (wc == wc2)) {
-              set_wc_lag(ftl, b, wc, &low_wc);
+              set_wc(ftl, b, wc);
               break;
             }
 
@@ -703,8 +680,8 @@ static int format_status(FTLN ftl) {
         continue;
       }
 
-      // Set block wear count lag.
-      set_wc_lag(ftl, b, wc, &low_wc);
+      // Set block wear count.
+      set_wc(ftl, b, wc);
 
       // Search for copy-end page, indicating the 'copy to' finished.
       for (n = 1; n < ftl->pgs_per_blk; ++n) {
@@ -813,8 +790,8 @@ static int format_status(FTLN ftl) {
         formatted = TRUE;
         SET_MAP_BLK(ftl->bdata[b]);  // clear used/read pages cnt
 
-        // Set block wear count lag.
-        set_wc_lag(ftl, b, wc, &low_wc);
+        // Set block wear count.
+        set_wc(ftl, b, wc);
 
         // If this is the highest block count so far, remember it.
         if (ftl->high_bc < bc) {
@@ -833,7 +810,7 @@ static int format_status(FTLN ftl) {
           }
 
           // Erase block that was destination of interrupted transfer.
-          if (ftl->blk_wc_lag[b] > ftl->blk_wc_lag[ftl->high_bc_mblk]) {
+          if (ftl->blk_wc[b] < ftl->blk_wc[ftl->high_bc_mblk]) {
             rc = FtlnEraseBlk(ftl, ftl->high_bc_mblk);
             ftl->high_bc_mblk = b;
           } else
@@ -852,32 +829,35 @@ static int format_status(FTLN ftl) {
   }
 
   // Compute the average 'high_wc' lag.
-  for (avg_lag = n = b = 0; b < ftl->num_blks; ++b)
+  uint64_t lag_sum = 0;
+  for (n = b = 0; b < ftl->num_blks; ++b)
     if (GET_RC(ftl->bdata[b]) != 100) {
-      avg_lag += ftl->blk_wc_lag[b];
+      lag_sum += ftl->high_wc - ftl->blk_wc[b];
       ++n;
     }
   if (n)
-    avg_lag = (avg_lag + n / 2) / n;
+    avg_wear = (ui32)((lag_sum + n / 2) / n);
 
-  int wear_lag_histogram[256] = {0};
+  ui32 wear_lag_histogram[256] = {0};
   int set_to_avg = 0;
 
   // Apply average wear offset to every block marked as needing it.
   for (b = 0; b < ftl->num_blks; ++b) {
     if ((ftl->bdata[b] & RC_MASK) == 100) {
       ftl->bdata[b] &= ~RC_MASK;
-      ftl->blk_wc_lag[b] = (uint8_t)avg_lag;
+      ftl->blk_wc[b] = avg_wear;
       ++set_to_avg;
     }
-    ++wear_lag_histogram[ftl->blk_wc_lag[b]];
+    ui32 lag = ftl->high_wc - ftl->blk_wc[b];
+    if (lag > 255) {
+      lag = 255;
+    }
+    ++wear_lag_histogram[lag];
   }
 
   ftl->logger.info(__FILE__, __LINE__, "High block count %u", ftl->high_bc);
-  ftl->logger.info(__FILE__, __LINE__, "Wear Count Range [%u, %u]", low_wc, ftl->high_wc);
-  ftl->logger.info(__FILE__, __LINE__, "Wear Count Average %u", ftl->high_wc - avg_lag);
-  ftl->logger.info(__FILE__, __LINE__, "Blocks with Wear Count[=%u]: %u", ftl->high_wc - 255,
-                   ftl->wear_data.max_wc_over);
+  ftl->logger.info(__FILE__, __LINE__, "Wear Count Range [%u, %u]", ftl->low_wc, ftl->high_wc);
+  ftl->logger.info(__FILE__, __LINE__, "Wear Count Average %u", avg_wear);
   ftl->logger.info(__FILE__, __LINE__, "Blocks with estimated wear count: %u", set_to_avg);
   ftl->logger.info(__FILE__, __LINE__, "Wear Lag Histogram: ");
 
@@ -975,13 +955,11 @@ static int copy_end_mark(CFTLN ftl, ui32 b) {
 //
 static int resume_copy(FTLN ftl, ui32 src_b, ui32 dst_b, ui32 bc) {
   int rc;
-  ui32 po, vpn, wc;
+  ui32 po, vpn;
   ui32 src_pg0 = ftl->start_pn + src_b * ftl->pgs_per_blk;
   ui32 dst_pg0 = ftl->start_pn + dst_b * ftl->pgs_per_blk;
 
-  // Get the wear count of the source block.
-  wc = ftl->high_wc - ftl->blk_wc_lag[src_b];
-  PfAssert((int)wc > 0);
+  PfAssert(ftl->blk_wc[src_b] > 0);
 
   // Copy all used pages from selected volume block to free block.
   for (po = 0; po <= ftl->resume_po; ++po) {
@@ -1006,7 +984,7 @@ static int resume_copy(FTLN ftl, ui32 src_b, ui32 dst_b, ui32 bc) {
     memset(ftl->spare_buf, 0xFF, ftl->eb_size);
     SET_SA_VPN(vpn, ftl->spare_buf);
     SET_SA_BC(bc, ftl->spare_buf);
-    SET_SA_WC(wc, ftl->spare_buf);
+    SET_SA_WC(ftl->blk_wc[src_b], ftl->spare_buf);
 
     // Invoke page transfer routine. If error, return -1.
     ++ftl->stats.transfer_page;
@@ -1038,7 +1016,6 @@ static int init_ftln(FTLN ftl) {
     return -1;
   }
 
-  // If unformatted, blocks are free w/zero 'high_wc' lag.
   if (formatted == FALSE) {
     // Return if doing a read-only initialization.
     if (ftl->flags & FSF_READ_ONLY_INIT) {
@@ -1046,9 +1023,9 @@ static int init_ftln(FTLN ftl) {
       return FsError2(FTL_NO_MAP_BLKS, EINVAL);
     }
 
-    // Record all blocks as free with zero 'high_wc' lag.
+    // Record all blocks as free with 'high_wc' wear.
     for (b = 0; b < ftl->num_blks; ++b) {
-      ftl->blk_wc_lag[b] = 0;
+      ftl->blk_wc[b] = ftl->high_wc;
       ftl->bdata[b] = FREE_BLK_FLAG;
     }
     ftl->num_free_blks = ftl->num_blks;
@@ -1238,14 +1215,7 @@ static int init_ftln(FTLN ftl) {
       // Set wear count of copy to be one higher than source block. This ensures
       // that the source and destination blocks can be differentiated from one
       // another.
-      if (ftl->blk_wc_lag[ftl->high_bc_mblk])
-        ftl->blk_wc_lag[b] = ftl->blk_wc_lag[ftl->high_bc_mblk] - 1;
-      else {
-        // We don't care about tracking low count here, we're setting to the
-        // highest anyways.
-        ui32 dummy_low_cnt = 0;
-        set_wc_lag(ftl, b, ftl->high_wc + 1, &dummy_low_cnt);
-      }
+      set_wc(ftl, b, ftl->blk_wc[ftl->high_bc_mblk] + 1);
 
       // Copy the used pages to a free block, then erase the original.
       if (FtlnRecycleMapBlk(ftl, ftl->high_bc_mblk)) {
@@ -1283,8 +1253,8 @@ static void free_ftl(void* vol) {
   // Free FTL memory allocations.
   if (ftl->bdata)
     FsFree(ftl->bdata);
-  if (ftl->blk_wc_lag)
-    FsFree(ftl->blk_wc_lag);
+  if (ftl->blk_wc)
+    FsFree(ftl->blk_wc);
   if (ftl->mpns)
     FsFree(ftl->mpns);
   if (ftl->main_buf)
@@ -1524,7 +1494,7 @@ void* FtlnAddVol(FtlNdmVol* ftl_cfg, XfsVol* xfs, CircLink* vols) {
   ftl->main_buf = buf;
   ftl->spare_buf = buf + ftl->page_size;
 
-  // Allocate memory for the block data and wear count lag arrays.
+  // Allocate memory for the block data and wear count arrays.
   ftl->bdata = FsCalloc(ftl->num_blks, sizeof(ui32));
   if (ftl->bdata == NULL) {
     ftl_cfg->logger.error(__FILE__, __LINE__, "Failed to allocated memory for FTL at %s:%d",
@@ -1532,8 +1502,8 @@ void* FtlnAddVol(FtlNdmVol* ftl_cfg, XfsVol* xfs, CircLink* vols) {
     FsError2(FTL_ENOMEM, ENOMEM);
     goto FtlnAddV_err;
   }
-  ftl->blk_wc_lag = FsCalloc(ftl->num_blks, sizeof(ui8));
-  if (ftl->blk_wc_lag == NULL) {
+  ftl->blk_wc = FsCalloc(ftl->num_blks, sizeof(ui32));
+  if (ftl->blk_wc == NULL) {
     ftl_cfg->logger.error(__FILE__, __LINE__, "Failed to allocated memory for FTL at %s:%d",
                           __FILE_NAME__, __LINE__);
     FsError2(FTL_ENOMEM, ENOMEM);
@@ -1595,18 +1565,6 @@ void* FtlnAddVol(FtlNdmVol* ftl_cfg, XfsVol* xfs, CircLink* vols) {
   // Initialize the NAND FTL.
   if (init_ftln(ftl))
     goto FtlnAddV_err;
-
-  // For recycle limit, get sum, average, and max of wear count lag.
-  ftl->wear_data.cur_max_lag = ftl->wc_lag_sum = 0;
-  for (n = 0; n < ftl->num_blks; ++n) {
-    ui32 wc_lag = ftl->blk_wc_lag[n];
-
-    ftl->wc_lag_sum += wc_lag;
-    if (ftl->wear_data.cur_max_lag < wc_lag)
-      ftl->wear_data.cur_max_lag = (uint8_t)wc_lag;
-  }
-  ftl->wear_data.lft_max_lag = ftl->wear_data.cur_max_lag;
-  ftl->wear_data.avg_wc_lag = ftl->wc_lag_sum / ftl->num_blks;
 
   if (ftln_debug() > 1) {
     // Display FTL statistics.
