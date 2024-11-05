@@ -20,20 +20,18 @@ using ::testing::_;
 
 class MockSymbolizer : public Symbolizer {
  public:
-  MOCK_METHOD(void, Reset, (bool symbolizing_dart, ResetType type, OutputFn output), (override));
-  MOCK_METHOD(void, Module,
-              (uint64_t id, std::string_view name, std::string_view build_id, OutputFn output),
+  MOCK_METHOD(void, Reset, (bool symbolizing_dart, ResetType type), (override));
+  MOCK_METHOD(void, Module, (uint64_t id, std::string_view name, std::string_view build_id),
               (override));
   MOCK_METHOD(void, MMap,
               (uint64_t address, uint64_t size, uint64_t module_id, std::string_view flags,
-               uint64_t module_offset, OutputFn output),
+               uint64_t module_offset, StringOutputFn output),
               (override));
   MOCK_METHOD(void, Backtrace,
               (uint64_t frame_id, uint64_t address, AddressType type, std::string_view message,
-               OutputFn output),
+               StringOutputFn output),
               (override));
-  MOCK_METHOD(void, DumpFile, (std::string_view type, std::string_view name, OutputFn output),
-              (override));
+  MOCK_METHOD(void, DumpFile, (std::string_view type, std::string_view name), (override));
 };
 
 class LogParserTest : public ::testing::Test {
@@ -60,17 +58,17 @@ TEST_F(LogParserTest, NoMarkup) {
 }
 
 TEST_F(LogParserTest, ResetWithContext) {
-  EXPECT_CALL(symbolizer_, Reset(false, Symbolizer::ResetType::kUnknown, _)).Times(1);
+  EXPECT_CALL(symbolizer_, Reset(false, Symbolizer::ResetType::kUnknown)).Times(1);
   ProcessOneLine("prefix {{{reset}}} suffix");
   ASSERT_EQ(output_.str(), "");
 }
 
 TEST_F(LogParserTest, Module) {
-  EXPECT_CALL(symbolizer_, Module(0, "libc.so", "8ce60b", _));
+  EXPECT_CALL(symbolizer_, Module(0, "libc.so", "8ce60b"));
   ProcessOneLine("context1: {{{module:0x0:libc.so:elf:8ce60b}}}");
-  EXPECT_CALL(symbolizer_, Module(5, "libc.so", "8ce60b", _));
+  EXPECT_CALL(symbolizer_, Module(5, "libc.so", "8ce60b"));
   ProcessOneLine("context2: {{{module:0x5:libc.so:elf:8ce60b:unnecessary_content}}}");
-  EXPECT_CALL(symbolizer_, Module(3, "", "8ce60b", _));
+  EXPECT_CALL(symbolizer_, Module(3, "", "8ce60b"));
   ProcessOneLine("context3: {{{module:0x3::elf:8ce60b}}}");
   ASSERT_EQ(output_.str(), "");
   EXPECT_CALL(symbolizer_, Module).Times(0);
@@ -99,14 +97,14 @@ TEST_F(LogParserTest, Backtrace) {
 }
 
 TEST_F(LogParserTest, DumpFile) {
-  EXPECT_CALL(symbolizer_, DumpFile("type", "name", _));
+  EXPECT_CALL(symbolizer_, DumpFile("type", "name"));
   ProcessOneLine("{{{dumpfile:type:name}}}");
   ASSERT_EQ(output_.str(), "");
 }
 
 TEST_F(LogParserTest, Dart) {
   {
-    EXPECT_CALL(symbolizer_, Reset(true, Symbolizer::ResetType::kUnknown, _));
+    EXPECT_CALL(symbolizer_, Reset(true, Symbolizer::ResetType::kUnknown));
     ProcessOneLine("*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***");
     EXPECT_FALSE(output_.str().empty());
     output_.clear();
@@ -115,7 +113,7 @@ TEST_F(LogParserTest, Dart) {
     output_.clear();
   }
   {
-    EXPECT_CALL(symbolizer_, Module(0, "some.ui", "0123456789abcdef", _));
+    EXPECT_CALL(symbolizer_, Module(0, "some.ui", "0123456789abcdef"));
     ProcessOneLine("build_id: '0123456789abcdef'");
     EXPECT_FALSE(output_.str().empty());
     output_.clear();

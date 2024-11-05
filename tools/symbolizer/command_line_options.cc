@@ -6,6 +6,7 @@
 
 #include <lib/cmdline/args_parser.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 
@@ -134,18 +135,23 @@ Error ParseCommandLine(int argc, const char* argv[], CommandLineOptions* options
     return kHelpIntro + parser.GetHelp();
   }
 
+  options->SetupDefaultsFromEnvironment();
+  return Error();
+}
+
+void CommandLineOptions::SetupDefaultsFromEnvironment() {
   // Setup default values.
   if (const char* home = std::getenv("HOME"); home) {
     std::string home_str = home;
-    if (!options->symbol_cache) {
-      options->symbol_cache = home_str + "/.fuchsia/debug/symbol-cache";
+    if (!this->symbol_cache) {
+      this->symbol_cache = home_str + "/.fuchsia/debug/symbol-cache";
     }
-    if (options->symbol_index_files.empty()) {
+    if (this->symbol_index_files.empty()) {
       for (const auto& path : {home_str + "/.fuchsia/debug/symbol-index.json",
                                home_str + "/.fuchsia/debug/symbol-index"}) {
         std::error_code ec;
         if (std::filesystem::exists(path, ec)) {
-          options->symbol_index_files.push_back(path);
+          this->symbol_index_files.push_back(path);
         }
       }
     }
@@ -155,15 +161,13 @@ Error ParseCommandLine(int argc, const char* argv[], CommandLineOptions* options
     if (std::istringstream urls(raw_urls); !urls.str().empty()) {
       std::string url;
       while (std::getline(urls, url, ' ')) {
-        if (std::find(options->public_symbol_servers.begin(), options->public_symbol_servers.end(),
-                      url) == options->public_symbol_servers.end()) {
-          options->public_symbol_servers.push_back(url);
+        if (std::find(this->public_symbol_servers.begin(), this->public_symbol_servers.end(),
+                      url) == this->public_symbol_servers.end()) {
+          this->public_symbol_servers.push_back(url);
         }
       }
     }
   }
-
-  return Error();
 }
 
 }  // namespace symbolizer

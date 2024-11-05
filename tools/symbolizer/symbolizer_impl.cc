@@ -157,7 +157,7 @@ SymbolizerImpl::~SymbolizerImpl() {
   }
 }
 
-void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type, OutputFn output) {
+void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type) {
   // We got a reset:begin before a previous begin tag had a corresponding end tag. For instance,
   // this can happen when many rust components crash at the same time, with each panic handler
   // outputting the respective process' backtrace. If they become interleaved in the log, then
@@ -198,8 +198,7 @@ void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type, OutputFn outpu
   in_batch_mode_ = type == Symbolizer::ResetType::kBegin;
 }
 
-void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view build_id,
-                            OutputFn output) {
+void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view build_id) {
   if (!frames_in_batch_mode_.empty()) {
     FlushBufferedFramesWithContext("got a module tag, expected bt");
   }
@@ -217,54 +216,42 @@ void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view
   }
 }
 
-void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
-                          std::string_view flags, uint64_t module_offset, OutputFn output) {
+SymbolizerImpl::MMapStatus SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
+                                                std::string_view flags, uint64_t module_offset) {
   if (!frames_in_batch_mode_.empty()) {
     FlushBufferedFramesWithContext("got a mmap tag, expected bt");
   }
 
-  if (modules_.find(module_id) == modules_.end()) {
+  if (!modules_.contains(module_id)) {
     analytics_builder_.SetAtLeastOneInvalidInput();
-    output("symbolizer: Invalid module id.");
-    return;
+    return MMapStatus::kInvalidModuleId;
   }
 
   ModuleInfo& module = modules_[module_id];
   uint64_t base = address - module_offset;
 
+  bool inconsistent_base_address = false;
   if (address < module_offset) {
     // Negative load address. This happens for zircon on x64.
     if (module.printed) {
       if (module.base != 0 || module.negative_base != module_offset - address) {
-        analytics_builder_.SetAtLeastOneInvalidInput();
-        output("symbolizer: Inconsistent base address.");
+        inconsistent_base_address = true;
       }
     } else {
       base = address;  // for printing only
       module.base = 0;
       module.negative_base = module_offset - address;
     }
-    if (module.size < address + size) {
-      module.size = address + size;
-    }
+    module.size = std::max(module.size, address + size);
   } else {
     if (module.printed) {
       if (module.base != base) {
-        analytics_builder_.SetAtLeastOneInvalidInput();
-        output("symbolizer: Inconsistent base address.");
+        inconsistent_base_address = true;
       }
     } else {
       module.base = base;
     }
-    if (module.size < size + module_offset) {
-      module.size = size + module_offset;
-    }
-  }
-
-  if (!omit_module_lines_ && !symbolizing_dart_ && !module.printed) {
-    output(fxl::StringPrintf("[[[ELF module #0x%" PRIx64 " \"%s\" BuildID=%s 0x%" PRIx64 "]]]",
-                             module_id, module.name.c_str(), module.build_id.c_str(), base));
-    module.printed = true;
+    module.size = std::max(module.size, size + module_offset);
   }
 
   // Support for dumpfile
@@ -277,18 +264,46 @@ void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
     segment.AddMember("mod_rel_addr", module_offset, dumpfile_document_.GetAllocator());
     dumpfile_current_object_["segments"].PushBack(segment, dumpfile_document_.GetAllocator());
   }
+
+  if (inconsistent_base_address) {
+    analytics_builder_.SetAtLeastOneInvalidInput();
+    return MMapStatus::kInconsistentBaseAddress;
+  }
+  return MMapStatus::kOk;
 }
 
-void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType type,
-                               std::string_view message, OutputFn output) {
-  if (prettify_enabled_ && in_batch_mode_) {
-    if (frame_id < frames_in_batch_mode_.size()) {
-      OutputBatchedBacktrace();
-    }
-    frames_in_batch_mode_.push_back(Frame{address, type, std::move(output)});
-    return;
+void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
+                          std::string_view flags, uint64_t module_offset, StringOutputFn output) {
+  if (!frames_in_batch_mode_.empty()) {
+    FlushBufferedFramesWithContext("got a mmap tag, expected bt");
   }
 
+  auto status = MMap(address, size, module_id, flags, module_offset);
+  switch (status) {
+    case MMapStatus::kOk:
+      break;
+    case MMapStatus::kInconsistentBaseAddress:
+      output("symbolizer: Inconsistent base address.");
+      break;
+    case MMapStatus::kInvalidModuleId:
+      output("symbolizer: Invalid module id.");
+      return;
+    default:
+      output("symbolizer: Unknown error state.");
+      return;
+  }
+
+  // We only continue from the above switch/case block if module_id is valid.
+  ModuleInfo& module = modules_[module_id];
+
+  if (!omit_module_lines_ && !symbolizing_dart_ && !module.printed) {
+    output(fxl::StringPrintf("[[[ELF module #0x%" PRIx64 " \"%s\" BuildID=%s 0x%" PRIx64 "]]]",
+                             module_id, module.name.c_str(), module.build_id.c_str(), module.base));
+    module.printed = true;
+  }
+}
+
+void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutputFn output) {
   InitProcess();
   analytics_builder_.IncreaseNumberOfFrames();
 
@@ -305,14 +320,9 @@ void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType 
   }
 
   if (!module) {
-    std::string out =
-        FormatFrameIdAndAddress(frame_id, 0, address) + " is not covered by any module";
-    if (!message.empty()) {
-      out += " " + std::string(message);
-    }
     analytics_builder_.IncreaseNumberOfFramesInvalid();
     analytics_builder_.TotalTimerStop();
-    return output(out);
+    return;
   }
 
   uint64_t call_address = address;
@@ -336,39 +346,13 @@ void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType 
 
   bool symbolized = false;
   for (size_t i = 0; i < stack.size(); i++) {
-    std::string out = FormatFrameIdAndAddress(frame_id, stack.size() - i - 1, address);
-
-    out += " in";
-
     // Function name.
     const zxdb::Location location = stack[i]->GetLocation();
     if (location.symbol().is_valid()) {
       symbolized = true;
-      auto symbol = location.symbol().Get();
-      auto function = symbol->As<zxdb::Function>();
-      if (function && !symbolizing_dart_) {
-        out += " " + zxdb::FormatFunctionName(function, {}).AsString();
-      } else {
-        out += " " + symbol->GetFullName();
-      }
     }
 
-    // FileLine info.
-    if (location.file_line().is_valid()) {
-      symbolized = true;
-      out += " " + location.file_line().file() + ":" + std::to_string(location.file_line().line());
-    }
-
-    // Module offset.
-    out += fxl::StringPrintf(" <%s>+0x%" PRIx64, module->name.c_str(),
-                             address - module->base + module->negative_base);
-
-    // Extra message.
-    if (!message.empty()) {
-      out += " " + std::string(message);
-    }
-
-    output(out);
+    output(stack.size() - i - 1, location, *module);
   }
 
   // One physical frame could be symbolized to multiple inlined frames. We're only counting the
@@ -377,6 +361,62 @@ void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType 
     analytics_builder_.IncreaseNumberOfFramesSymbolized();
   }
   analytics_builder_.TotalTimerStop();
+}
+
+void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType type,
+                               std::string_view message, StringOutputFn output) {
+  if (prettify_enabled_ && in_batch_mode_) {
+    if (frame_id < frames_in_batch_mode_.size()) {
+      OutputBatchedBacktrace();
+    }
+    frames_in_batch_mode_.push_back(Frame{address, type, std::move(output)});
+    return;
+  }
+
+  bool module_found = false;
+  Backtrace(address, type,
+            [this, frame_id, address, message, &output, &module_found](
+                auto inline_index, auto& location, auto& module) {
+              module_found = true;
+              std::string out = FormatFrameIdAndAddress(frame_id, inline_index, address);
+              out += " in";
+
+              if (location.symbol().is_valid()) {
+                auto symbol = location.symbol().Get();
+                auto function = symbol->template As<zxdb::Function>();
+                if (function && !symbolizing_dart_) {
+                  out += " " + zxdb::FormatFunctionName(function, {}).AsString();
+                } else {
+                  out += " " + symbol->GetFullName();
+                }
+              }
+
+              // FileLine info.
+              if (location.file_line().is_valid()) {
+                out += " " + location.file_line().file() + ":" +
+                       std::to_string(location.file_line().line());
+              }
+
+              // Module offset.
+              out += fxl::StringPrintf(" <%s>+0x%" PRIx64, module.name.c_str(),
+                                       address - module.base + module.negative_base);
+
+              // Extra message.
+              if (!message.empty()) {
+                out += " " + std::string(message);
+              }
+
+              output(out);
+            });
+
+  if (!module_found) {
+    std::string out =
+        FormatFrameIdAndAddress(frame_id, 0, address) + " is not covered by any module";
+    if (!message.empty()) {
+      out += " " + std::string(message);
+    }
+    output(out);
+  }
 }
 
 // Consume frames_in_batch_mode_ and output.
@@ -462,7 +502,7 @@ void SymbolizerImpl::OutputBatchedBacktrace() {
   FX_CHECK(frames_in_batch_mode_.empty());
 }
 
-void SymbolizerImpl::DumpFile(std::string_view type, std::string_view name, OutputFn output) {
+void SymbolizerImpl::DumpFile(std::string_view type, std::string_view name) {
   if (!dumpfile_output_.empty()) {
     dumpfile_current_object_.AddMember("type", ToJSONString(type),
                                        dumpfile_document_.GetAllocator());

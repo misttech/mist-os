@@ -40,6 +40,9 @@ struct CommandLineOptions {
   // Analytics options
   AnalyticsOption analytics = AnalyticsOption::kUnspecified;
   bool analytics_show = false;
+
+  // Configure any additional defaults from environment variables.
+  void SetupDefaultsFromEnvironment();
 };
 
 // Parses the command line into options.

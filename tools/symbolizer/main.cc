@@ -91,7 +91,7 @@ int Main(int argc, const char* argv[]) {
   }
 
   // Calling Reset at the end to make sure symbolize event is sent.
-  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown, {});
+  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown);
 
   return EXIT_SUCCESS;
 }

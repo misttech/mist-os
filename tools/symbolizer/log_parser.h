@@ -45,13 +45,13 @@ class LogParser {
 
  private:
   // Processes one markup. Returns whether the markup could be processed successfully.
-  bool ProcessMarkup(std::string_view markup, Symbolizer::OutputFn output);
+  bool ProcessMarkup(std::string_view markup, Symbolizer::StringOutputFn output);
 
   // Processes one line of Dart stack traces. Return false if it's not valid.
-  bool ProcessDart(std::string_view line, Symbolizer::OutputFn output);
+  bool ProcessDart(std::string_view line, Symbolizer::StringOutputFn output);
 
   // Create an async output function for the symbolizer.
-  Symbolizer::OutputFn CreateOutputFn(std::string_view prefix, std::string_view suffix);
+  Symbolizer::StringOutputFn CreateOutputFn(std::string_view prefix, std::string_view suffix);
 
   // Output a raw message. If there's no async output pending, output directly. Otherwise, append
   // the output to the output buffer.

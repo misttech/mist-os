@@ -30,7 +30,7 @@ class SymbolizerImplTest : public ::testing::Test {
   SymbolizerImplTest() : symbolizer_(options_) {}
 
  protected:
-  Symbolizer::OutputFn GetOutputFn() {
+  Symbolizer::StringOutputFn GetOutputFn() {
     return [this](std::string_view s) { ss_ << s << '\n'; };
   }
 
@@ -40,15 +40,15 @@ class SymbolizerImplTest : public ::testing::Test {
 };
 
 TEST_F(SymbolizerImplTest, Reset) {
-  symbolizer_.Reset(false, Symbolizer::ResetType::kUnknown, GetOutputFn());
+  symbolizer_.Reset(false, Symbolizer::ResetType::kUnknown);
   ASSERT_TRUE(ss_.str().empty());
 
-  symbolizer_.Reset(false, Symbolizer::ResetType::kUnknown, GetOutputFn());
+  symbolizer_.Reset(false, Symbolizer::ResetType::kUnknown);
   ASSERT_TRUE(ss_.str().empty());
 }
 
 TEST_F(SymbolizerImplTest, MMap) {
-  symbolizer_.Module(0, "some_module", "deadbeef", GetOutputFn());
+  symbolizer_.Module(0, "some_module", "deadbeef");
   symbolizer_.MMap(0x1000, 0x2000, 0, "r", 0x0, GetOutputFn());
   ASSERT_EQ(ss_.str(), "[[[ELF module #0x0 \"some_module\" BuildID=deadbeef 0x1000]]]\n");
 
@@ -65,7 +65,7 @@ TEST_F(SymbolizerImplTest, MMap) {
 }
 
 TEST_F(SymbolizerImplTest, Backtrace) {
-  symbolizer_.Module(0, "some_module", "deadbeef", GetOutputFn());
+  symbolizer_.Module(0, "some_module", "deadbeef");
   symbolizer_.MMap(0x1000, 0x2000, 0, "r", 0x0, GetOutputFn());
 
   ss_.str("");
@@ -84,7 +84,7 @@ TEST(SymbolizerImpl, OmitModuleLines) {
   SymbolizerImpl symbolizer(options);
   auto output = [&](std::string_view s) { ss << s << '\n'; };
 
-  symbolizer.Module(0, "some_module", "deadbeef", output);
+  symbolizer.Module(0, "some_module", "deadbeef");
   symbolizer.MMap(0x1000, 0x2000, 0, "r", 0x0, output);
   ASSERT_EQ(ss.str(), "");
 }
@@ -102,9 +102,9 @@ TEST(SymbolizerImpl, DumpFile) {
     SymbolizerImpl symbolizer(options);
     auto output = [&](std::string_view s) { ss << s << '\n'; };
 
-    symbolizer.Module(0, "some_module", "deadbeef", output);
+    symbolizer.Module(0, "some_module", "deadbeef");
     symbolizer.MMap(0x1000, 0x2000, 0, "r", 0x0, output);
-    symbolizer.DumpFile("type", "name", output);
+    symbolizer.DumpFile("type", "name");
 
     // Triggers the destructor of symbolizer.
   }
@@ -147,12 +147,12 @@ TEST(SymbolizerImpl, Analytics) {
   SymbolizerImpl symbolizer(options);
   auto output = [&](std::string_view s) { ss << s << '\n'; };
 
-  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown, output);
-  symbolizer.Module(0, "some_module", "deadbeef", output);
+  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown);
+  symbolizer.Module(0, "some_module", "deadbeef");
   symbolizer.MMap(0x1000, 0x2000, 0, "r", 0x0, output);
   symbolizer.Backtrace(0, 0x1010, Symbolizer::AddressType::kUnknown, "", output);
   symbolizer.Backtrace(1, 0x7010, Symbolizer::AddressType::kUnknown, "", output);
-  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown, output);
+  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown);
 
   rapidjson::Document measurement;
   measurement.Parse(measurement_json);

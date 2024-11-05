@@ -33,32 +33,31 @@ class Symbolizer {
 
   // The output is printed through the last parameter of each function rather than returned
   // directly, so that the implementation can output asynchronously.
-  using OutputFn = fit::function<void(std::string_view)>;
+  using StringOutputFn = fit::function<void(std::string_view)>;
 
   // {{{reset}}}, {{{reset:begin}}}, {{{reset:end}}}
   // Resets the internal state and starts processing the stack trace for a new process.
   // symbolizing_dart indicates whether the next stack stace is from Dart. The behavior could be
   // slightly different for Dart and other stack traces.
-  virtual void Reset(bool symbolizing_dart, ResetType type, OutputFn output) = 0;
+  virtual void Reset(bool symbolizing_dart, ResetType type) = 0;
 
   // {{{module:%i:%s:%s:...}}}
   // Adds a module to the current process, indexed by id.
-  virtual void Module(uint64_t id, std::string_view name, std::string_view build_id,
-                      OutputFn output) = 0;
+  virtual void Module(uint64_t id, std::string_view name, std::string_view build_id) = 0;
 
   // {{{mmap:%p:%x:...}}}
   // Associates a memory region with the module indexed by its id.
   virtual void MMap(uint64_t address, uint64_t size, uint64_t module_id, std::string_view flags,
-                    uint64_t module_offset, OutputFn output) = 0;
+                    uint64_t module_offset, StringOutputFn output) = 0;
 
   // {{{bt:%u:%p}}}, {{{bt:%u:%p:ra}}}, {{{bt:%u:%p:pc}}}
   // Represents one frame in the backtrace. We'll output the symbolized content for each frame.
   virtual void Backtrace(uint64_t frame_id, uint64_t address, AddressType type,
-                         std::string_view message, OutputFn output) = 0;
+                         std::string_view message, StringOutputFn output) = 0;
 
   // {{{dumpfile:%s:%s}}}
   // Dumps the current modules and mmaps to a json file.
-  virtual void DumpFile(std::string_view type, std::string_view name, OutputFn output) = 0;
+  virtual void DumpFile(std::string_view type, std::string_view name) = 0;
 };
 
 }  // namespace symbolizer
