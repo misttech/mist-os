@@ -63,10 +63,12 @@ source_set("lib") {
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/syslog/cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/storage/lib/vfs/cpp",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
+
+  deps = [ "//src/storage/lib/vfs/cpp:cpp" ]
 }
 
 fidl("fuchsia.driverhost.test") {
@@ -131,6 +133,7 @@ cc_test_executable("unittests") {
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/fxl/test:gtest_main",
+    "//src/storage/lib/vfs/cpp:cpp",
   ]
 
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
