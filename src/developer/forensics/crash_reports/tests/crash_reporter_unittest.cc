@@ -496,8 +496,9 @@ TEST_F(CrashReporterTest, ResetsQuota) {
     ASSERT_TRUE(FileOneCrashReport().is_response());
   }
 
-  RunLoopFor(zx::hour(24) + kResetOffset);
-  clock_.SetMonotonic(clock_.MonotonicNow() + zx::hour(24) + kResetOffset);
+  timekeeper::time_utc utc_time;
+  ASSERT_EQ(clock_.UtcNow(&utc_time), ZX_OK);
+  clock_.SetUtc(utc_time + zx::hour(24) + kResetOffset);
 
   for (size_t i = 0; i < kDailyPerProductQuota; ++i) {
     ASSERT_TRUE(FileOneCrashReport().is_response());

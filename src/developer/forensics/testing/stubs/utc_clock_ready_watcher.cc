@@ -28,4 +28,6 @@ void UtcClockReadyWatcher::StartClock() {
   callbacks_.clear();
 }
 
+void UtcClockReadyWatcher::ClearCallbacks() { callbacks_.clear(); }
+
 }  // namespace forensics::stubs

@@ -18,6 +18,7 @@
 #include "src/lib/files/path.h"
 #include "src/lib/files/scoped_temp_dir.h"
 #include "src/lib/timekeeper/async_test_clock.h"
+#include "src/lib/timekeeper/test_clock.h"
 
 namespace forensics::crash_reports {
 namespace {
@@ -28,6 +29,10 @@ constexpr char kJsonName[] = "product_quotas.json";
 constexpr uint64_t kDefaultQuota = 5;
 constexpr zx::duration kNegativeResetOffset = zx::min(-10);
 constexpr zx::duration kPositiveResetOffset = zx::min(10);
+
+// Using an arbitrary, non-hour offset to avoid uncaught bugs from, for example, the monotonic and
+// UTC clocks passing midnight at the same time.
+constexpr zx::duration kUtcOffsetFromMonotonic = zx::hour(53) + zx::min(14) + zx::sec(52);
 
 class ProductQuotasTest : public UnitTestFixture {
  public:
@@ -47,15 +52,18 @@ class ProductQuotasTest : public UnitTestFixture {
   }
 
   void MakeNewProductQuotas(std::optional<uint64_t> quota, zx::duration reset_offset = zx::min(0)) {
-    product_quotas_ = std::make_unique<ProductQuotas>(
-        dispatcher(), &clock_, quota, QuotasJsonPath(), &utc_clock_ready_watcher_, reset_offset);
+    // Clear callbacks to avoid ASAN failures due to callbacks from the old |product_quotas_| being
+    // called.
+    utc_clock_ready_watcher_.ClearCallbacks();
+    product_quotas_ = std::make_unique<ProductQuotas>(&clock_, quota, QuotasJsonPath(),
+                                                      &utc_clock_ready_watcher_, reset_offset);
   }
 
   std::unique_ptr<ProductQuotas> product_quotas_;
+  stubs::UtcClockReadyWatcher utc_clock_ready_watcher_;
 
  private:
   timekeeper::AsyncTestClock clock_;
-  stubs::UtcClockReadyWatcher utc_clock_ready_watcher_;
   files::ScopedTempDir tmp_dir_;
 };
 
@@ -430,6 +438,12 @@ TEST_F(ProductQuotasTest, Clock_StartAfterDeadlineWithPositiveOffset) {
 }
 
 TEST_F(ProductQuotasTest, ResetAtMidnightWithNegativeOffset) {
+  const Product product{
+      .name = "some name",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
+  };
+
   // AsyncTestClock starting point is 191692000000000, January 03 1970 05:14:52
   // Reset should be executed on January 03 1970 23:50:00
   MakeNewProductQuotas(1, kNegativeResetOffset);
@@ -446,13 +460,25 @@ TEST_F(ProductQuotasTest, ResetAtMidnightWithNegativeOffset) {
   // Clock Time: January 03 1970 23:50:52
   RunLoopFor(zx::min(5));
 
+  // Query remaining quota to trigger lazy reset.
+  product_quotas_->HasQuotaRemaining(product);
+
   // 345600000000000 is January 05 1970 00:00:00
   EXPECT_EQ(ReadQuotasJson(), R"({
-    "next_reset_time_utc_nanos": 345600000000000
+    "next_reset_time_utc_nanos": 345600000000000,
+    "quotas": {
+        "some name-some version": 1
+    }
 })");
 }
 
 TEST_F(ProductQuotasTest, ResetAtMidnightWithPositiveOffset) {
+  const Product product{
+      .name = "some name",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
+  };
+
   // AsyncTestClock starting point is 191692000000000, January 03 1970 05:14:52
   // Reset should be executed on January 04 1970 00:10:00
   MakeNewProductQuotas(1, kPositiveResetOffset);
@@ -469,13 +495,25 @@ TEST_F(ProductQuotasTest, ResetAtMidnightWithPositiveOffset) {
   // Clock Time: January 04 1970 00:10:52
   RunLoopFor(zx::min(5));
 
+  // Query remaining quota to trigger lazy reset.
+  product_quotas_->HasQuotaRemaining(product);
+
   // 345600000000000 is January 05 1970 00:00:00
   EXPECT_EQ(ReadQuotasJson(), R"({
-    "next_reset_time_utc_nanos": 345600000000000
+    "next_reset_time_utc_nanos": 345600000000000,
+    "quotas": {
+        "some name-some version": 1
+    }
 })");
 }
 
 TEST_F(ProductQuotasTest, TimeFromJson) {
+  const Product product{
+      .name = "some name",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
+  };
+
   StartClock();
 
   // 259200000000000 is January 04 1970 00:00:00
@@ -487,10 +525,73 @@ TEST_F(ProductQuotasTest, TimeFromJson) {
   MakeNewProductQuotas(5);
   RunLoopFor(zx::hour(25));
 
+  // Query remaining quota to trigger lazy reset.
+  product_quotas_->HasQuotaRemaining(product);
+
   // 345600000000000 is January 05 1970 00:00:00
   EXPECT_EQ(ReadQuotasJson(), R"({
-    "next_reset_time_utc_nanos": 345600000000000
+    "next_reset_time_utc_nanos": 345600000000000,
+    "quotas": {
+        "some name-some version": 5
+    }
 })");
+}
+
+TEST_F(ProductQuotasTest, LazilyResetIfPastBootDeadline) {
+  const Product product{
+      .name = "some name",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
+  };
+
+  timekeeper::TestClock clock;
+  clock.SetBoot(zx::time_boot(0));
+  clock.SetMonotonic(zx::time_monotonic(0));
+  clock.SetUtc(timekeeper::time_utc(kUtcOffsetFromMonotonic.get()));
+
+  product_quotas_ = std::make_unique<ProductQuotas>(&clock, /*quota=*/1, QuotasJsonPath(),
+                                                    &utc_clock_ready_watcher_, zx::duration(0));
+
+  EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
+  product_quotas_->DecrementRemainingQuota(product);
+  EXPECT_FALSE(product_quotas_->HasQuotaRemaining(product));
+
+  // The UTC clock hasn't become accurate, so resets will occur based on the boot timeline. Act like
+  // the system suspended long enough for the boot clock to go past the 24 hour deadline.
+  clock.SetBoot(clock.BootNow() + zx::hour(25));
+  EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
+}
+
+TEST_F(ProductQuotasTest, LazilyResetIfPastUtcDeadline) {
+  const Product product{
+      .name = "some name",
+      .version = ErrorOrString("some version"),
+      .channel = ErrorOrString("some channel"),
+  };
+
+  timekeeper::TestClock clock;
+  clock.SetBoot(zx::time_boot(0));
+  clock.SetMonotonic(zx::time_monotonic(0));
+  clock.SetUtc(timekeeper::time_utc(kUtcOffsetFromMonotonic.get()));
+
+  // Clear callbacks to avoid ASAN failures due to callbacks from the old |product_quotas_| being
+  // called.
+  utc_clock_ready_watcher_.ClearCallbacks();
+  product_quotas_ = std::make_unique<ProductQuotas>(&clock, /*quota=*/1, QuotasJsonPath(),
+                                                    &utc_clock_ready_watcher_, zx::duration(0));
+
+  StartClock();
+
+  EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
+  product_quotas_->DecrementRemainingQuota(product);
+  EXPECT_FALSE(product_quotas_->HasQuotaRemaining(product));
+
+  // Act like the system suspended long enough for the UTC clock to go past the midnight deadline.
+  timekeeper::time_utc utc_time;
+  ASSERT_EQ(clock.UtcNow(&utc_time), ZX_OK);
+  clock.SetUtc(utc_time + zx::hour(18) + zx::min(46));
+
+  EXPECT_TRUE(product_quotas_->HasQuotaRemaining(product));
 }
 
 }  // namespace

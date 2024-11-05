@@ -16,6 +16,7 @@ class UtcClockReadyWatcher : public UtcClockReadyWatcherBase {
   bool IsUtcClockReady() const override;
 
   void StartClock();
+  void ClearCallbacks();
 
  private:
   std::vector<::fit::callback<void()>> callbacks_;

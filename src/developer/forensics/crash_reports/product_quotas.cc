@@ -49,15 +49,15 @@ timekeeper::time_utc StartOfDay(const timekeeper::time_utc time) {
 
 }  // namespace
 
-ProductQuotas::ProductQuotas(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
-                             const std::optional<uint64_t> quota, std::string quota_filepath,
+ProductQuotas::ProductQuotas(timekeeper::Clock* clock, const std::optional<uint64_t> quota,
+                             std::string quota_filepath,
                              UtcClockReadyWatcherBase* utc_clock_ready_watcher,
                              const zx::duration reset_time_offset)
-    : dispatcher_(dispatcher),
-      clock_(clock),
+    : clock_(clock),
       quota_(quota),
       quota_filepath_(std::move(quota_filepath)),
       utc_clock_ready_watcher_(utc_clock_ready_watcher),
+      utc_provider_(utc_clock_ready_watcher_, clock_),
       reset_time_offset_(reset_time_offset) {
   if (!quota_.has_value()) {
     files::DeletePath(quota_filepath_, /*recursive=*/true);
@@ -67,7 +67,7 @@ ProductQuotas::ProductQuotas(async_dispatcher_t* dispatcher, timekeeper::Clock* 
   RestoreFromJson();
 
   // Assume a 24 hour reset period until UTC clock starts.
-  reset_task_.PostDelayed(dispatcher_, kResetPeriod);
+  next_reset_boot_time_ = clock_->BootNow() + kResetPeriod;
 
   // This lambda could execute immediately if the UTC clock is already ready. Registering this
   // callback with UtcClockReadyWatcherBase must be the last thing done in the constructor because
@@ -85,6 +85,10 @@ bool ProductQuotas::HasQuotaRemaining(const Product& product) {
   if (!quota_.has_value()) {
     return true;
   }
+
+  // We have no way to post delayed tasks based on the boot timeline, so for simplicity we lazily
+  // check if quotas should have been reset.
+  ResetIfPastDeadline();
 
   const auto key = Key(product);
   if (remaining_quotas_.find(key) == remaining_quotas_.end()) {
@@ -134,8 +138,6 @@ void ProductQuotas::Reset() {
   files::DeletePath(quota_filepath_, /*recursive=*/true);
 
   if (utc_clock_ready_watcher_->IsUtcClockReady()) {
-    const timekeeper::time_utc current_time = CurrentUtcTimeRaw(clock_);
-
     // Resets may not execute exactly at UTC midnight because the system's UTC clock drifts and is
     // subject to correction. The start of the next UTC day needs to be calculated from the
     // previously saved value in case Reset executes before midnight of the current day and the
@@ -143,17 +145,30 @@ void ProductQuotas::Reset() {
     // 00:00 of February 2nd and Reset ran at 23:59 of February 1st, the next midnight would be
     // 00:00 February 2nd.
     next_reset_utc_time_ = StartOfDay(*next_reset_utc_time_ + zx::hour(24));
-    const zx::duration time_until_next_reset = ActualResetTime() - current_time;
     UpdateJson(*next_reset_utc_time_);
-    reset_task_.PostDelayed(dispatcher_, time_until_next_reset);
   } else {
-    reset_task_.PostDelayed(dispatcher_, kResetPeriod);
+    next_reset_boot_time_ = clock_->BootNow() + kResetPeriod;
+  }
+}
+
+void ProductQuotas::ResetIfPastDeadline() {
+  // A device may not be up for 24 hours straight, so quotas are enforced based on the UTC clock if
+  // available.
+  if (utc_clock_ready_watcher_->IsUtcClockReady()) {
+    const timekeeper::time_utc current_time = CurrentUtcTimeRaw(clock_);
+    if (current_time >= ActualResetTime()) {
+      Reset();
+    }
+
+    return;
+  }
+
+  if (clock_->BootNow() >= next_reset_boot_time_) {
+    Reset();
   }
 }
 
 void ProductQuotas::OnClockStart() {
-  reset_task_.Cancel();
-
   const timekeeper::time_utc current_time = CurrentUtcTimeRaw(clock_);
 
   if (!next_reset_utc_time_.has_value()) {
@@ -164,10 +179,8 @@ void ProductQuotas::OnClockStart() {
 
   const timekeeper::time_utc actual_reset_utc_time = ActualResetTime();
 
-  // Delay performing the reset.
+  // Don't reset yet.
   if (current_time < actual_reset_utc_time) {
-    const zx::duration time_until_next_reset = actual_reset_utc_time - current_time;
-    reset_task_.PostDelayed(dispatcher_, time_until_next_reset);
     return;
   }
 
