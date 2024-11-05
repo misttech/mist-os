@@ -365,22 +365,6 @@ class Remote : public HasIo {
   Remote(fidl::ClientEnd<Protocol> client_end, const zxio_ops_t& ops)
       : HasIo(ops), client_(std::move(client_end)) {}
 
-  zx_status_t Close(const bool should_wait) {
-    auto cleanup = fit::defer([this] { this->~Remote(); });
-
-    if (client_.is_valid() && should_wait) {
-      const fidl::WireResult result = client_->Close();
-      if (!result.ok()) {
-        return result.status();
-      }
-      const auto& response = result.value();
-      if (response.is_error()) {
-        return response.error_value();
-      }
-    }
-    return ZX_OK;
-  }
-
   zx_status_t Release(zx_handle_t* out_handle) {
     *out_handle = client_.TakeClientEnd().TakeChannel().release();
     return ZX_OK;
@@ -479,20 +463,52 @@ class Remote : public HasIo {
 
   const fidl::WireSyncClient<Protocol>& client() const { return client_; }
 
+  template <typename T>
+    requires std::is_base_of_v<Remote, T>
+  static constexpr zxio_ops_t CommonRemoteOps() {
+    zxio_ops_t ops = zxio_default_ops;
+    ops.close = Remote::Close<T>;
+    ops.release = Adaptor<T>::template From<&T::Release>;
+    ops.borrow = Adaptor<T>::template From<&T::Borrow>;
+    ops.clone = Adaptor<T>::template From<&T::Clone>;
+    return ops;
+  }
+
  private:
+  template <typename T>
+    requires std::is_base_of_v<Remote, T>
+  static zx_status_t Close(zxio_t* zxio, bool should_wait);
+  zx_status_t CloseImpl(const bool should_wait) {
+    if (client_.is_valid() && should_wait) {
+      const fidl::WireResult result = client_->Close();
+      if (!result.ok()) {
+        return result.status();
+      }
+      const auto& response = result.value();
+      if (response.is_error()) {
+        return response.error_value();
+      }
+    }
+    return ZX_OK;
+  }
+
   fidl::WireSyncClient<Protocol> client_;
 };
+
+template <typename Protocol, zxio_object_type_t kObjectType>
+template <typename T>
+  requires std::is_base_of_v<Remote<Protocol, kObjectType>, T>
+zx_status_t Remote<Protocol, kObjectType>::Close(zxio_t* zxio, const bool should_wait) {
+  T& instance = *reinterpret_cast<T*>(zxio);
+  const zx_status_t status = instance.CloseImpl(should_wait);
+  instance.~T();
+  return status;
+}
 
 class Pty : public Remote<fuchsia_hardware_pty::Device, ZXIO_OBJECT_TYPE_TTY> {
  public:
   Pty(fidl::ClientEnd<fuchsia_hardware_pty::Device> client_end, zx::eventpair event)
       : Remote(std::move(client_end), kOps), event_(std::move(event)) {}
-
-  zx_status_t Close(const bool should_wait) {
-    const zx_status_t status = Remote::Close(should_wait);
-    this->~Pty();
-    return status;
-  }
 
   zx_status_t Clone(zx_handle_t* out_handle) {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
@@ -568,13 +584,9 @@ class Pty : public Remote<fuchsia_hardware_pty::Device, ZXIO_OBJECT_TYPE_TTY> {
 };
 
 constexpr zxio_ops_t Pty::kOps = ([]() {
-  using Adaptor = Adaptor<Pty>;
-  zxio_ops_t ops = zxio_default_ops;
-  ops.close = Adaptor::From<&Pty::Close>;
-  ops.release = Adaptor::From<&Pty::Release>;
-  ops.borrow = Adaptor::From<&Pty::Borrow>;
-  ops.clone = Adaptor::From<&Pty::Clone>;
+  zxio_ops_t ops = CommonRemoteOps<Pty>();
 
+  using Adaptor = Adaptor<Pty>;
   ops.wait_begin = Adaptor::From<&Pty::WaitBegin>;
   ops.wait_end = Adaptor::From<&Pty::WaitEnd>;
   ops.readv = Adaptor::From<&Pty::Readv>;
@@ -1586,13 +1598,9 @@ class Node : public Remote<fio::Node, ZXIO_OBJECT_TYPE_NODE> {
 };
 
 constexpr zxio_ops_t Node::kOps = ([]() {
-  using Adaptor = Adaptor<Node>;
-  zxio_ops_t ops = zxio_default_ops;
-  ops.close = Adaptor::From<&Node::Close>;
-  ops.release = Adaptor::From<&Node::Release>;
-  ops.borrow = Adaptor::From<&Node::Borrow>;
-  ops.clone = Adaptor::From<&Node::Clone>;
+  zxio_ops_t ops = CommonRemoteOps<Node>();
 
+  using Adaptor = Adaptor<Node>;
   ops.sync = Adaptor::From<&Node::Sync>;
   ops.attr_get = Adaptor::From<&Node::AttrGet>;
   ops.attr_set = Adaptor::From<&Node::AttrSet>;
@@ -1784,13 +1792,9 @@ const fidl::WireSyncClient<fio::Directory>& DirentIteratorImpl::client() const {
 }
 
 constexpr zxio_ops_t Directory::kOps = ([]() {
-  using Adaptor = Adaptor<Directory>;
-  zxio_ops_t ops = zxio_default_ops;
-  ops.close = Adaptor::From<&Directory::Close>;
-  ops.release = Adaptor::From<&Directory::Release>;
-  ops.borrow = Adaptor::From<&Directory::Borrow>;
-  ops.clone = Adaptor::From<&Directory::Clone>;
+  zxio_ops_t ops = CommonRemoteOps<Directory>();
 
+  using Adaptor = Adaptor<Directory>;
   // use specialized read functions that succeed for zero-sized reads.
   ops.readv = Adaptor::From<&Directory::Readv>;
   ops.readv_at = Adaptor::From<&Directory::ReadvAt>;
@@ -1829,12 +1833,6 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
       : Remote(std::move(client_end), kOps), event_(std::move(event)), stream_(std::move(stream)) {}
 
  private:
-  zx_status_t Close(const bool should_wait) {
-    const zx_status_t status = Remote::Close(should_wait);
-    this->~File();
-    return status;
-  }
-
   zx_status_t EnableVerity(const zxio_fsverity_descriptor_t* descriptor) {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     fidl::WireTableFrame<fio::wire::VerificationOptions> verification_options_frame;
@@ -1949,13 +1947,9 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
 };
 
 constexpr zxio_ops_t File::kOps = ([]() {
-  using Adaptor = Adaptor<File>;
-  zxio_ops_t ops = zxio_default_ops;
-  ops.close = Adaptor::From<&File::Close>;
-  ops.release = Adaptor::From<&File::Release>;
-  ops.borrow = Adaptor::From<&File::Borrow>;
-  ops.clone = Adaptor::From<&File::Clone>;
+  zxio_ops_t ops = CommonRemoteOps<File>();
 
+  using Adaptor = Adaptor<File>;
   ops.wait_begin = Adaptor::From<&File::WaitBegin>;
   ops.wait_end = Adaptor::From<&File::WaitEnd>;
   ops.readv = Adaptor::From<&File::Readv>;
@@ -1993,12 +1987,6 @@ class Symlink : public Remote<fio::Symlink, ZXIO_OBJECT_TYPE_SYMLINK> {
       : Remote(std::move(client_end), kOps), target_(std::move(target)) {}
 
  private:
-  zx_status_t Close(const bool should_wait) {
-    const zx_status_t status = Remote::Close(should_wait);
-    this->~Symlink();
-    return status;
-  }
-
   zx_status_t ReadLink(const uint8_t** out_target, size_t* out_target_len) const {
     *out_target = target_.data();
     *out_target_len = target_.size();
@@ -2010,12 +1998,9 @@ class Symlink : public Remote<fio::Symlink, ZXIO_OBJECT_TYPE_SYMLINK> {
 };
 
 constexpr zxio_ops_t Symlink::kOps = ([]() {
+  zxio_ops_t ops = CommonRemoteOps<Symlink>();
+
   using Adaptor = Adaptor<Symlink>;
-  zxio_ops_t ops = zxio_default_ops;
-  ops.close = Adaptor::From<&Symlink::Close>;
-  ops.release = Adaptor::From<&Symlink::Release>;
-  ops.borrow = Adaptor::From<&Symlink::Borrow>;
-  ops.clone = Adaptor::From<&Symlink::Clone>;
   ops.attr_get = Adaptor::From<&Symlink::AttrGet>;
   ops.flags_get = Adaptor::From<&Symlink::FlagsGet>;
   ops.read_link = Adaptor::From<&Symlink::ReadLink>;
