@@ -67,7 +67,8 @@ void RecoverA11YFocusAction::Run(a11y::gesture_util_v2::GestureContext gesture_c
     return;
   }
 
-  // Now, put in focus a node that is describable.
+  // Now, put in focus a node that is describable and speak it to the user, to inform where the
+  // Screen Reader navigated.
   if (!NodeIsDescribable(focused_node)) {
     focused_node = action_context_->semantics_source->GetNextNode(
         view_ref_koid, starting_id, [](const fuchsia::accessibility::semantics::Node* node) {
@@ -87,6 +88,9 @@ void RecoverA11YFocusAction::Run(a11y::gesture_util_v2::GestureContext gesture_c
                                         fuchsia::accessibility::semantics::Action::SHOW_ON_SCREEN)
           .and_then([this, focused_node_id, view_ref_koid]() mutable {
             return SetA11yFocusPromise(view_ref_koid, focused_node_id);
+          })
+          .and_then([this, a11y_focus, focused_node_id]() mutable {
+            return BuildSpeechTaskFromNodePromise(a11y_focus->view_ref_koid, focused_node_id);
           })
           // Cancel any promises if this class goes out of scope.
           .wrap_with(scope_);
