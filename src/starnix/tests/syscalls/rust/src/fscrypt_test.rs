@@ -105,9 +105,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
-    // TODO(https://fxbug.dev/376246108) Launching two processes should not fail with EBUSY
     fn remove_key_added_by_different_user_non_root() {
         let Some(_) = get_root_path() else { return };
         let self_path = std::fs::read_link("/proc/self/exe").unwrap();
@@ -155,9 +153,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
-    // TODO(https://fxbug.dev/376246108) Launching two processes should not fail with EBUSY
     fn remove_key_added_by_different_user_root() {
         let Some(_) = get_root_path() else { return };
         let self_path = std::fs::read_link("/proc/self/exe").unwrap();
@@ -430,9 +426,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
-    // TODO(https://fxbug.dev/376246108) Launching two processes should not fail with EBUSY
     fn set_encryption_policy_with_fake_identifier_non_root() {
         let Some(root_path) = get_root_path() else { return };
         let dir_path = std::path::Path::new(&root_path).join("my_dir");
@@ -586,9 +580,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
-    // TODO(https://fxbug.dev/376246108) Launching two processes should not fail with EBUSY
     fn set_encryption_key_on_directory_owned_by_different_user() {
         let Some(root_path) = get_root_path() else { return };
         let dir_path = std::path::Path::new(&root_path).join("my_dir");
@@ -626,9 +618,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
-    // TODO(https://fxbug.dev/376246108) Launching two processes should not fail with EBUSY
     fn set_encryption_policy_with_encryption_key_added_by_different_user() {
         let Some(root_path) = get_root_path() else { return };
         let dir_path = std::path::Path::new(&root_path).join("my_dir");
@@ -708,7 +698,7 @@ mod tests {
     #[test]
     #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
-    // TODO(https://fxbug.dev/376246108) Launching two processes should not fail with EBUSY
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn one_user_adds_the_same_encryption_key_twice() {
         let Some(root_path) = get_root_path() else { return };
         let dir_path = std::path::Path::new(&root_path).join("my_dir");

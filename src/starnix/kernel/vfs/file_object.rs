@@ -894,7 +894,16 @@ pub fn default_ioctl(
             Ok(SUCCESS)
         }
         FIONBIO => {
-            file.update_file_flags(OpenFlags::NONBLOCK, OpenFlags::NONBLOCK);
+            let arg_ref = UserAddress::from(arg).into();
+            let arg: i32 = current_task.read_object(arg_ref)?;
+            let val = if arg == 0 {
+                // Clear the NONBLOCK flag
+                OpenFlags::empty()
+            } else {
+                // Set the NONBLOCK flag
+                OpenFlags::NONBLOCK
+            };
+            file.update_file_flags(val, OpenFlags::NONBLOCK);
             Ok(SUCCESS)
         }
         FIOQSIZE => {
