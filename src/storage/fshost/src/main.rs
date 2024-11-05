@@ -141,6 +141,12 @@ async fn main() -> Result<(), Error> {
                 fxblob::blobfs_verifier_service(),
             )
             .unwrap();
+        svc_dir
+            .add_entry(
+                fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker::PROTOCOL_NAME,
+                fxblob::ota_health_check_service(),
+            )
+            .unwrap();
     }
     if config.data_filesystem_format == "fxfs" {
         if let Some(dir) = crypt_service_exposed_dir {

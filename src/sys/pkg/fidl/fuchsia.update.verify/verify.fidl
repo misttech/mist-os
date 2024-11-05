@@ -7,8 +7,7 @@ library fuchsia.update.verify;
 using zx;
 
 /// An abstract representation of an update verifier, to be used when
-/// verifying if an update should be committed. This is abstracted into a
-/// separate protocol because in the future, we may add more verifiers.
+/// verifying if an update should be committed.
 ///
 /// This is unrelated to the verification in verified execution.
 closed protocol Verifier {
@@ -45,6 +44,7 @@ type HealthStatus = strict enum {
 };
 
 /// Protocol for reading health check statuses.
+@discoverable
 closed protocol HealthVerification {
     /// Queries the suite of health checks.
     ///
@@ -54,13 +54,12 @@ closed protocol HealthVerification {
     });
 };
 
-/// Protocol for setting the health checks status of a component.
+/// Protocol for getting the health status of a component.
 /// It is up to the component authors to decide what a component should do after marking
 /// the partition as unhealthy.
+@discoverable
 closed protocol ComponentOtaHealthCheck {
-    strict SetHealthStatus(struct {
+    strict GetHealthStatus() -> (struct {
         health_status HealthStatus;
-    }) -> (struct {
-        status zx.Status;
     });
 };

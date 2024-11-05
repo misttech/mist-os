@@ -38,6 +38,7 @@
                 "fuchsia.fxfs.BlobCreator",
                 "fuchsia.fxfs.BlobReader",
                 "fuchsia.update.verify.BlobfsVerifier",
+                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
         },
         {
@@ -95,6 +96,7 @@
                 "fuchsia.fxfs.BlobCreator",
                 "fuchsia.fxfs.BlobReader",
                 "fuchsia.update.verify.BlobfsVerifier",
+                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
             from: "self",
         },

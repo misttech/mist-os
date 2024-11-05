@@ -161,6 +161,7 @@ impl FshostBuilder {
                 Route::new()
                     .capability(Capability::protocol::<ffshost::AdminMarker>())
                     .capability(Capability::protocol::<ffuv::BlobfsVerifierMarker>())
+                    .capability(Capability::protocol::<ffuv::ComponentOtaHealthCheckMarker>())
                     .capability(Capability::protocol::<ffxfs::CryptManagementMarker>())
                     .capability(Capability::protocol::<BlobCreatorMarker>())
                     .capability(Capability::protocol::<BlobReaderMarker>())
