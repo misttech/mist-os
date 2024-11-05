@@ -130,7 +130,7 @@ class Integration : public gtest::RealLoopFixture {
   void InitializeRoutes(RealmBuilder& builder) {
     builder.AddChild(kCodecFactoryName, "#meta/codec_factory.cm");
     builder.AddRoute(Route{
-        .capabilities = {Protocol{"fuchsia.logger.LogSink"}},
+        .capabilities = {Protocol{"fuchsia.logger.LogSink"}, Dictionary{"diagnostics"}},
         .source = ParentRef(),
         .targets = {ChildRef{kCodecFactoryName}},
     });
