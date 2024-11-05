@@ -171,14 +171,12 @@ class ConstantMetricsProcessor(MetricsProcessor):
     Enables publishing of metrics gathered via means other than trace processing.
     """
 
-    # TODO(b/376922110): Remove `results` arg once callers are updated.
     def __init__(
         self,
         metrics: Sequence[TestCaseResult] = (),
-        results: Sequence[TestCaseResult] = (),
         freeform_metrics: tuple[str, JSON] = ("", None),
     ):
-        self.metrics = metrics or results
+        self.metrics = metrics
         self.freeform_metrics = freeform_metrics
 
     def process_metrics(

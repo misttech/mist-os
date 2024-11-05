@@ -129,7 +129,7 @@ class MetricProcessorsTest(unittest.TestCase):
             TCR(label="test", unit=U.countBiggerIsBetter, values=[1234, 5678])
         ]
         processor = trace_metrics.ConstantMetricsProcessor(
-            results=metrics,
+            metrics=metrics,
         )
         self.assertSequenceEqual(
             processor.process_metrics(_EMPTY_MODEL), metrics
