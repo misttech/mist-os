@@ -78,11 +78,15 @@ TEST_F(RemoteDirTest, Open) {
     auto root = open_root_fd();
     // We should be able to cross the remote mount point and open the file as read-only.
     fbl::unique_fd file;
-    zx_status_t status =
-        fdio_open_fd_at(root.get(), "remote_dir/file", O_RDONLY, file.reset_and_get_address());
+    zx_status_t status = fdio_open3_fd_at(root.get(), "remote_dir/file",
+                                          static_cast<uint64_t>(fuchsia_io::Flags::kPermRead),
+                                          file.reset_and_get_address());
     ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
     // We should not be able to open the file as writable since the remote only has read access.
-    status = fdio_open_fd_at(root.get(), "remote_dir/file", O_RDWR, file.reset_and_get_address());
+    status = fdio_open3_fd_at(
+        root.get(), "remote_dir/file",
+        static_cast<uint64_t>(fuchsia_io::Flags::kPermRead | fuchsia_io::Flags::kPermWrite),
+        file.reset_and_get_address());
     ASSERT_EQ(status, ZX_ERR_ACCESS_DENIED) << zx_status_get_string(status);
   });
 }
