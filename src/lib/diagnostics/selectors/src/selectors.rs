@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::error::*;
-use crate::parser::{self, ParsingError, VerboseError};
+use crate::parser::{self, ParsingError, RequireEscapedColons, VerboseError};
 use crate::validate::*;
 use anyhow::format_err;
 use fidl_fuchsia_diagnostics::{
@@ -83,7 +83,23 @@ pub fn parse_component_selector<'a, E>(
 where
     E: ParsingError<'a>,
 {
-    let result = parser::consuming_component_selector::<E>(unparsed_component_selector)?;
+    let result = parser::consuming_component_selector::<E>(
+        unparsed_component_selector,
+        RequireEscapedColons::Yes,
+    )?;
+    Ok(result.into())
+}
+
+fn parse_component_selector_no_escaping<'a, E>(
+    unparsed_component_selector: &'a str,
+) -> Result<ComponentSelector, ParseError>
+where
+    E: ParsingError<'a>,
+{
+    let result = parser::consuming_component_selector::<E>(
+        unparsed_component_selector,
+        RequireEscapedColons::No,
+    )?;
     Ok(result.into())
 }
 
@@ -113,7 +129,7 @@ pub fn parse_log_interest_selector(selector: &str) -> Result<LogInterestSelector
     if parts.next().is_some() {
         return Err(default_invalid_selector_err);
     }
-    let parsed_selector = match parse_component_selector::<VerboseError>(component) {
+    let parsed_selector = match parse_component_selector_no_escaping::<VerboseError>(component) {
         Ok(s) => s,
         Err(e) => {
             return Err(format_err!(
@@ -1145,12 +1161,28 @@ a:b:c
                 interest: Interest { min_severity: Some(Severity::Info), ..Default::default() }
             }
         );
+        assert_eq!(
+            parse_log_interest_selector("any/coll:instance/foo#INFO").unwrap(),
+            LogInterestSelector {
+                selector: parse_component_selector::<VerboseError>("any/coll\\:instance/foo")
+                    .unwrap(),
+                interest: Interest { min_severity: Some(Severity::Info), ..Default::default() }
+            }
+        );
+        assert_eq!(
+            parse_log_interest_selector("any/coll:*/foo#INFO").unwrap(),
+            LogInterestSelector {
+                selector: parse_component_selector::<VerboseError>("any/coll\\:*/foo").unwrap(),
+                interest: Interest { min_severity: Some(Severity::Info), ..Default::default() }
+            }
+        );
     }
     #[test]
     fn test_log_interest_selector_error() {
         assert!(parse_log_interest_selector("anything////#FATAL").is_err());
         assert!(parse_log_interest_selector("core/network").is_err());
         assert!(parse_log_interest_selector("core/network#FAKE").is_err());
+        assert!(parse_log_interest_selector("core/network\\:foo#FAKE").is_err());
     }
 
     #[test]
