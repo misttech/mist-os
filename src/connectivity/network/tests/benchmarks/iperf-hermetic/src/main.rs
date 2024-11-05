@@ -191,10 +191,10 @@ async fn bench<N: Netstack, I: TestIpExt>(
                                         "--bitrate",
                                         "0",
                                         "--get-server-output",
+                                        if bench { "-t5" } else { "-n1" },
                                     ]
                                     .into_iter()
-                                    .chain((protocol == Protocol::Udp).then_some("-u"))
-                                    .chain((!bench).then_some("-n1")),
+                                    .chain((protocol == Protocol::Udp).then_some("-u")),
                                     /* eager */ false,
                                 ),
                             ]

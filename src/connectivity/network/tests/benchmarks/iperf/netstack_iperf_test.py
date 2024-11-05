@@ -462,6 +462,8 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             f"{100 // flows}M",
             dir_option,
             "--get-server-output",
+            "--time",
+            "5",
         ]
         tasks = []
         result_files = []
