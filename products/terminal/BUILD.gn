@@ -79,8 +79,9 @@ terminal_base = {
   }
 
   product = {
-    session_url =
-        "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
+    session = {
+      url = "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
+    }
     build_info = default_product_build_info
   }
   deps = [ "//build/info:build_info_files" ]

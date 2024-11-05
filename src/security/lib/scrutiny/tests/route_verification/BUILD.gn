@@ -120,7 +120,9 @@ if (is_fuchsia) {
       }
     }
     product = {
-      session_url = "fuchsia-pkg://fuchsia.com/package_for_scrutiny_testing#meta/test_session.cm"
+      session = {
+        url = "fuchsia-pkg://fuchsia.com/package_for_scrutiny_testing#meta/test_session.cm"
+      }
     }
     base_packages = [
       {
