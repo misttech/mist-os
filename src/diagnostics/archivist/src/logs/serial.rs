@@ -192,14 +192,11 @@ impl<'a, S: Write> SerialWriter<'a, S> {
 mod tests {
     use super::*;
     use crate::identity::ComponentIdentity;
-    use crate::logs::stored_message::StoredMessage;
+    use crate::logs::testing::make_message;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
-    use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use moniker::ExtendedMoniker;
-    use std::io::Cursor;
     use zx::BootInstant;
 
     struct TestSink {
@@ -343,25 +340,5 @@ mod tests {
                 "[00000.000] 00001:00002> [foo] DEBUG: c\n"
             ]
         );
-    }
-
-    fn make_message(msg: &str, tag: Option<&str>, timestamp: zx::BootInstant) -> StoredMessage {
-        let mut record = Record {
-            timestamp,
-            severity: StreamSeverity::Debug.into_primitive(),
-            arguments: vec![
-                Argument::pid(zx::Koid::from_raw(1)),
-                Argument::tid(zx::Koid::from_raw(2)),
-                Argument::message(msg),
-            ],
-        };
-        if let Some(tag) = tag {
-            record.arguments.push(Argument::tag(tag));
-        }
-        let mut buffer = Cursor::new(vec![0u8; 1024]);
-        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        encoder.write_record(record).unwrap();
-        let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }
 }

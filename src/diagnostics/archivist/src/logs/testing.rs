@@ -6,8 +6,9 @@ use crate::events::types::{Event, EventPayload, LogSinkRequestedPayload};
 use crate::identity::ComponentIdentity;
 use crate::logs::repository::LogsRepository;
 use crate::logs::servers::LogServer;
+use crate::logs::stored_message::StoredMessage;
 use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-use diagnostics_log_encoding::Record;
+use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
 use diagnostics_message::{fx_log_packet_t, MAX_DATAGRAM_LEN};
 use fidl::prelude::*;
 use fidl_fuchsia_logger::{
@@ -256,7 +257,7 @@ impl LogWriter for StructuredMessageWriter {
         let mut buffer = Cursor::new(vec![0; MAX_DATAGRAM_LEN]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(record).unwrap();
-        let slice = buffer.get_ref().as_slice();
+        let slice = &buffer.get_ref()[..buffer.position() as usize];
         sin.write(slice).unwrap();
     }
 }
@@ -591,4 +592,24 @@ pub fn start_listener(directory: &fio::DirectoryProxy) -> mpsc::UnboundedReceive
     .detach();
 
     recv_logs
+}
+
+pub fn make_message(msg: &str, tag: Option<&str>, timestamp: zx::BootInstant) -> StoredMessage {
+    let mut record = Record {
+        timestamp,
+        severity: StreamSeverity::Debug.into_primitive(),
+        arguments: vec![
+            Argument::pid(zx::Koid::from_raw(1)),
+            Argument::tid(zx::Koid::from_raw(2)),
+            Argument::message(msg),
+        ],
+    };
+    if let Some(tag) = tag {
+        record.arguments.push(Argument::tag(tag));
+    }
+    let mut buffer = Cursor::new(vec![0u8; msg.len() + 128]);
+    let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
+    encoder.write_record(record).unwrap();
+    let encoded = &buffer.get_ref()[..buffer.position() as usize];
+    StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
 }

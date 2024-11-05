@@ -25,18 +25,14 @@ pub struct StoredMessage {
     bytes: Box<[u8]>,
     severity: Severity,
     timestamp: zx::BootInstant,
-    stats: Arc<LogStreamStats>,
 }
 
 impl StoredMessage {
     pub fn new(buf: Box<[u8]>, stats: &Arc<LogStreamStats>) -> Option<Self> {
         match diagnostics_log_encoding::parse::basic_info(&buf) {
-            Ok((timestamp, severity)) => Some(StoredMessage {
-                bytes: buf,
-                severity: severity.into(),
-                timestamp,
-                stats: Arc::clone(stats),
-            }),
+            Ok((timestamp, severity)) => {
+                Some(StoredMessage { bytes: buf, severity: severity.into(), timestamp })
+            }
             _ => {
                 stats.increment_invalid(buf.len());
                 None
@@ -76,15 +72,10 @@ impl StoredMessage {
             timestamp,
             severity: Severity::from(raw_severity),
             bytes: Box::from(&buf[..position]),
-            stats: Arc::clone(stats),
         })
     }
 
-    pub fn from_debuglog(
-        record: zx::DebugLogRecord,
-        dropped: u64,
-        stats: Arc<LogStreamStats>,
-    ) -> Self {
+    pub fn from_debuglog(record: zx::DebugLogRecord, dropped: u64) -> Self {
         let mut data = record.data();
         if let Some(b'\n') = data.last() {
             data = &data[..data.len() - 1];
@@ -141,8 +132,11 @@ impl StoredMessage {
             bytes: Box::from(&buf[..position]),
             severity: severity.into(),
             timestamp: record.timestamp,
-            stats,
         }
+    }
+
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
     }
 
     pub fn size(&self) -> usize {
@@ -168,12 +162,6 @@ impl StoredMessage {
             _ => {}
         }
         Ok(data)
-    }
-}
-
-impl Drop for StoredMessage {
-    fn drop(&mut self) {
-        self.stats.increment_rolled_out(&*self);
     }
 }
 
@@ -260,9 +248,7 @@ mod tests {
     #[fuchsia::test]
     fn convert_debuglog_to_log_message_test() {
         let klog = TestDebugEntry::new("test log".as_bytes());
-        let data = StoredMessage::from_debuglog(klog.record, 10, Default::default())
-            .parse(&KERNEL_IDENTITY)
-            .unwrap();
+        let data = StoredMessage::from_debuglog(klog.record, 10).parse(&KERNEL_IDENTITY).unwrap();
         assert_eq!(
             data,
             LogsDataBuilder::new(BuilderArgs {
@@ -295,9 +281,7 @@ mod tests {
 
         // maximum allowed klog size
         let klog = TestDebugEntry::new(&vec![b'a'; zx::sys::ZX_LOG_RECORD_DATA_MAX]);
-        let data = StoredMessage::from_debuglog(klog.record, 0, Default::default())
-            .parse(&KERNEL_IDENTITY)
-            .unwrap();
+        let data = StoredMessage::from_debuglog(klog.record, 0).parse(&KERNEL_IDENTITY).unwrap();
         assert_eq!(
             data,
             LogsDataBuilder::new(BuilderArgs {
@@ -315,9 +299,7 @@ mod tests {
 
         // empty message
         let klog = TestDebugEntry::new(&[]);
-        let data = StoredMessage::from_debuglog(klog.record, 0, Default::default())
-            .parse(&KERNEL_IDENTITY)
-            .unwrap();
+        let data = StoredMessage::from_debuglog(klog.record, 0).parse(&KERNEL_IDENTITY).unwrap();
         assert_eq!(
             data,
             LogsDataBuilder::new(BuilderArgs {
@@ -335,9 +317,7 @@ mod tests {
 
         // invalid utf-8
         let klog = TestDebugEntry::new(b"\x00\x9f\x92");
-        let data = StoredMessage::from_debuglog(klog.record, 0, Default::default())
-            .parse(&KERNEL_IDENTITY)
-            .unwrap();
+        let data = StoredMessage::from_debuglog(klog.record, 0).parse(&KERNEL_IDENTITY).unwrap();
         assert_eq!(data.msg().unwrap(), "\x00��");
     }
 }

@@ -17,7 +17,7 @@ struct RandomLogRecord(zx::DebugLogRecord);
 /// Fuzzer for kernel debuglog parser.
 #[fuzz]
 fn convert_debuglog_to_log_message_fuzzer(record: RandomLogRecord) -> Option<LogsData> {
-    let msg = StoredMessage::from_debuglog(record.0, 0, Default::default());
+    let msg = StoredMessage::from_debuglog(record.0, 0);
     msg.parse(&ComponentIdentity::unknown()).ok()
 }
 
