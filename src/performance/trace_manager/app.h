@@ -30,11 +30,6 @@ class TraceManagerApp {
   // For testing.
   sys::ComponentContext* context() const { return context_.get(); }
   const TraceManager* trace_manager() const { return &trace_manager_; }
-  const OldTraceManager* old_trace_manager() const { return &old_trace_manager_; }
-
-  const fidl::BindingSet<controller::Controller>& controller_bindings() const {
-    return old_controller_bindings_;
-  }
 
   const fidl::BindingSet<controller::Session, std::shared_ptr<controller::Session>>&
   session_bindings() const {
@@ -46,14 +41,7 @@ class TraceManagerApp {
 
   TraceManager trace_manager_;
 
-  // TODO(b/42083286): Remove after the old trace Controller protocol is removed
-  // This is present to maintain backwards comparitibility during the process of
-  // migrating to use the new trace protocols. This will be removed once all tracing
-  // clients are migrated.
-  OldTraceManager old_trace_manager_;
-
   fidl::BindingSet<fuchsia::tracing::provider::Registry> provider_registry_bindings_;
-  fidl::BindingSet<fuchsia::tracing::controller::Controller> old_controller_bindings_;
   fidl::BindingSet<fuchsia::tracing::controller::Provisioner> provisioner_bindings_;
   fidl::BindingSet<fuchsia::tracing::controller::Session,
                    std::shared_ptr<fuchsia::tracing::controller::Session>>

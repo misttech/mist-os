@@ -67,7 +67,6 @@ class TraceManagerTest : public gtest::TestLoopFixture {
   static controller::TraceConfig GetDefaultTraceConfig();
   static controller::StartOptions GetDefaultStartOptions();
   static controller::StopOptions GetDefaultStopOptions();
-  static controller::TerminateOptions GetDefaultTerminateOptions();
 
   TraceManagerTest();
 
@@ -75,7 +74,9 @@ class TraceManagerTest : public gtest::TestLoopFixture {
 
   sys::testing::ComponentContextProvider& context_provider() { return context_provider_; }
 
-  const controller::ControllerPtr& controller() const { return controller_; }
+  const controller::SessionPtr& controller() const { return controller_; }
+
+  const controller::ProvisionerPtr& provisioner() const { return provisioner_; }
 
   int on_session_state_change_event_count() const { return on_session_state_change_event_count_; }
   int begin_session_state_change_event_count() const {
@@ -87,8 +88,12 @@ class TraceManagerTest : public gtest::TestLoopFixture {
     return fake_provider_bindings_;
   }
 
-  void ConnectToControllerService();
+  void ConnectToProvisionerService();
   void DisconnectFromControllerService();
+
+  const fidl::InterfaceRequest<controller::Session> NewControllerRequest() {
+    return controller_.NewRequest();
+  }
 
   // The caller must run the loop to complete the registration.
   // If |*out_provider| is non-NULL, a borrowed copy of the pointer is
@@ -115,15 +120,15 @@ class TraceManagerTest : public gtest::TestLoopFixture {
   // These assume the controller connection is already made.
   // The default session doesn't have a consumer.
   bool InitializeSession(controller::TraceConfig config = GetDefaultTraceConfig());
-  bool TerminateSession(controller::TerminateOptions options = GetDefaultTerminateOptions());
+  bool TerminateSession();
 
   // Terminating a session involves two steps: Initiating the termination
   // and waiting for it to terminate. Call these when you want to access
   // intermediate state.
-  void BeginTerminateSession(controller::TerminateOptions options = GetDefaultTerminateOptions());
+  void BeginTerminateSession();
   // Returns true on success.
   // If |result| is non-NULL the result is stored there.
-  bool FinishTerminateSession(controller::TerminateResult* result = nullptr);
+  bool FinishTerminateSession();
 
   // Wrappers to simplify |Start,Stop| operations.
   // These are only to be called at times when they're expected to succeed.
@@ -169,20 +174,14 @@ class TraceManagerTest : public gtest::TestLoopFixture {
   // This value is only valid between those calls.
   struct StartState {
     bool start_completed = false;
-    controller::Controller_StartTracing_Result start_result;
+    controller::Session_StartTracing_Result start_result;
   };
 
   // For communication between |BeginStop(),FinishStop()|.
   // This value is only valid between those calls.
   struct StopState {
     bool stop_completed = false;
-  };
-
-  // For communication between |BeginTerminate(),FinishTerminate()|.
-  // This value is only valid between those calls.
-  struct TerminateState {
-    bool terminate_completed = false;
-    controller::TerminateResult terminate_result;
+    controller::TerminateResult stop_result;
   };
 
   void SetUp() override;
@@ -199,7 +198,8 @@ class TraceManagerTest : public gtest::TestLoopFixture {
   std::unique_ptr<TraceManagerApp> app_;
 
   // Interfaces to make service requests.
-  controller::ControllerPtr controller_;
+  controller::SessionPtr controller_;
+  controller::ProvisionerPtr provisioner_;
 
   // Running count of session state changes.
   int on_session_state_change_event_count_ = 0;
@@ -220,7 +220,6 @@ class TraceManagerTest : public gtest::TestLoopFixture {
   // code to handle both cases we manage the intermediate state here.
   StartState start_state_;
   StopState stop_state_;
-  TerminateState terminate_state_;
 
   // Containers for provider bindings so that they get cleaned up at the end of the test.
   std::vector<std::unique_ptr<FakeProviderBinding>> fake_provider_bindings_;

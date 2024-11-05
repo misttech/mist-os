@@ -34,9 +34,9 @@ void TraceManagerTest::TearDown() {
   TestLoopFixture::TearDown();
 }
 
-void TraceManagerTest::ConnectToControllerService() {
-  FX_LOGS(DEBUG) << "ConnectToControllerService";
-  context_provider().ConnectToPublicService(controller_.NewRequest());
+void TraceManagerTest::ConnectToProvisionerService() {
+  FX_LOGS(DEBUG) << "ConnectToProvisionerService";
+  context_provider().ConnectToPublicService(provisioner_.NewRequest());
 }
 
 void TraceManagerTest::DisconnectFromControllerService() {
@@ -109,7 +109,8 @@ void TraceManagerTest::InitializeSessionWorker(controller::TraceConfig config, b
   zx_status_t status = zx::socket::create(0u, &our_socket, &their_socket);
   ASSERT_EQ(status, ZX_OK);
 
-  controller_->InitializeTracing(std::move(config), std::move(their_socket));
+  provisioner_->InitializeTracing(controller_.NewRequest(), std::move(config),
+                                  std::move(their_socket));
   RunLoopUntilIdle();
   FX_LOGS(DEBUG) << "Loop done, expecting session initialized";
   ASSERT_EQ(GetSessionState(), SessionState::kInitialized);
@@ -155,7 +156,7 @@ void TraceManagerTest::BeginStartSession(controller::StartOptions options) {
   MarkBeginOperation();
 
   start_state_.start_completed = false;
-  auto callback = [this](controller::Controller_StartTracing_Result result) {
+  auto callback = [this](controller::Session_StartTracing_Result result) {
     start_state_.start_completed = true;
     start_state_.start_result = std::move(result);
   };
@@ -226,9 +227,10 @@ void TraceManagerTest::BeginStopSession(controller::StopOptions options) {
   MarkBeginOperation();
 
   stop_state_.stop_completed = false;
-  auto callback = [this](controller::Controller_StopTracing_Result result) {
+  auto callback = [this](controller::Session_StopTracing_Result result) {
     ASSERT_TRUE(result.is_response());
     stop_state_.stop_completed = true;
+    stop_state_.stop_result = std::move(result.response().result);
     // We need to run the loop one last time to pick up the result.
     // Be sure to exit it now that we have the result.
     QuitLoop();
@@ -285,46 +287,27 @@ bool TraceManagerTest::StopSession(controller::StopOptions options) {
   return FinishStopSession();
 }
 
-// static
-controller::TerminateOptions TraceManagerTest::GetDefaultTerminateOptions() {
-  controller::TerminateOptions options;
-  options.set_write_results(true);
-  return options;
-}
-
-void TraceManagerTest::BeginTerminateSession(controller::TerminateOptions options) {
+void TraceManagerTest::BeginTerminateSession() {
   FX_LOGS(DEBUG) << "Terminating session";
 
   MarkBeginOperation();
 
-  terminate_state_.terminate_completed = false;
-  controller()->TerminateTracing(
-      std::move(options), [this](controller::Controller_TerminateTracing_Result result) {
-        ASSERT_TRUE(result.is_response());
-        terminate_state_.terminate_completed = true;
-        terminate_state_.terminate_result = std::move(result.response().result);
-      });
+  // Disconnecting from the controller will terminate the session
+  DisconnectFromControllerService();
+
   RunLoopUntilIdle();
   // The loop will exit for the transition to kTerminating.
   // Note: If there are no providers then the state will transition again
   // to kNonexistent(== "terminated") before the loop exits.
 }
 
-bool TraceManagerTest::FinishTerminateSession(controller::TerminateResult* result) {
+bool TraceManagerTest::FinishTerminateSession() {
   // If there are no tracees then it will also subsequently transition to
   // kTerminated before the loop exits. If there are tracees then we need to
   // wait for them to terminate.
   if (fake_provider_bindings().size() > 0) {
     FX_LOGS(DEBUG) << "Loop done, expecting session terminating";
     SessionState state = GetSessionState();
-    if (state == SessionState::kStopping) {
-      // Terminate issued without stop will implicitly call stop first
-      // Loop will exit for the transition to kStopping. Mark providers
-      // as stopped and run the loop twice to transition to kStopped,
-      // then kTerminating
-      MarkAllProvidersStopped();
-      RunLoopUntilIdle();
-    }
     state = GetSessionState();
     EXPECT_EQ(state, SessionState::kTerminating);
     if (state != SessionState::kTerminating) {
@@ -341,22 +324,11 @@ bool TraceManagerTest::FinishTerminateSession(controller::TerminateResult* resul
   FX_LOGS(DEBUG) << "Loop done, expecting session terminated";
   EXPECT_EQ(GetSessionState(), SessionState::kNonexistent);
 
-  // Run the loop one more time to ensure we pick up the result.
-  RunLoopUntilIdle();
-  EXPECT_TRUE(terminate_state_.terminate_completed);
-  if (!terminate_state_.terminate_completed) {
-    return false;
-  }
-
-  FX_LOGS(DEBUG) << "Session terminated";
-  if (result) {
-    *result = std::move(terminate_state_.terminate_result);
-  }
   return true;
 }
 
-bool TraceManagerTest::TerminateSession(controller::TerminateOptions options) {
-  BeginTerminateSession(std::move(options));
+bool TraceManagerTest::TerminateSession() {
+  BeginTerminateSession();
   return FinishTerminateSession();
 }
 

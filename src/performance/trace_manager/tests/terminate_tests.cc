@@ -10,35 +10,20 @@ namespace tracing {
 namespace test {
 
 TEST_F(TraceManagerTest, TerminateOnClose) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   ASSERT_TRUE(InitializeSession());
 
   EXPECT_EQ(GetSessionState(), SessionState::kInitialized);
 
+  ASSERT_TRUE(StartSession());
+
+  EXPECT_EQ(GetSessionState(), SessionState::kStarted);
+
   DisconnectFromControllerService();
 
   RunLoopUntilIdle();
   EXPECT_EQ(GetSessionState(), SessionState::kNonexistent);
-}
-
-TEST_F(TraceManagerTest, TerminateWhenNotInitialized) {
-  ConnectToControllerService();
-
-  controller::TerminateOptions options;
-  options.set_write_results(false);
-  bool terminated = false;
-  controller()->TerminateTracing(
-      std::move(options), [&terminated](controller::Controller_TerminateTracing_Result result) {
-        ASSERT_TRUE(result.is_response());
-        terminated = true;
-      });
-
-  RunLoopUntilIdle();
-
-  // There is no error result in this case.
-  // Mostly we just want to verify we don't crash/hang.
-  ASSERT_TRUE(terminated);
 }
 
 }  // namespace test

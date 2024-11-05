@@ -12,20 +12,12 @@ namespace tracing {
 
 TraceManagerApp::TraceManagerApp(std::unique_ptr<sys::ComponentContext> context, Config config,
                                  async::Executor& executor)
-    : context_(std::move(context)),
-      trace_manager_(this, std::move(config), executor),
-      old_trace_manager_(this, &trace_manager_, executor) {
+    : context_(std::move(context)), trace_manager_(this, std::move(config), executor) {
   [[maybe_unused]] zx_status_t status;
 
   status = context_->outgoing()->AddPublicService(
       provider_registry_bindings_.GetHandler(&trace_manager_));
   FX_DCHECK(status == ZX_OK);
-
-  status = context_->outgoing()->AddPublicService(
-      old_controller_bindings_.GetHandler(&old_trace_manager_));
-  FX_DCHECK(status == ZX_OK);
-  old_controller_bindings_.set_empty_set_handler(
-      [this]() { old_trace_manager_.OnEmptyControllerSet(); });
 
   status =
       context_->outgoing()->AddPublicService(provisioner_bindings_.GetHandler(&trace_manager_));
