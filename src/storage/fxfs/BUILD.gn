@@ -9,6 +9,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_macro.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 import("//src/storage/fs_test/suite.gni")
 import("//src/storage/testing/driver_test_realm.gni")
 import("//tools/cmc/build/expect_includes.gni")
@@ -212,6 +213,12 @@ rustc_binary("fxfs") {
     # Optimize for speed (Fxfs is split into several crates; apply optimizations across them).
     configs += [ "//build/config/lto:thinlto" ]
   }
+
+  # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
+  # enabled, shift it to the large RBE worker pool)
+  _concurrent_jobs = concurrent_jobs.link_highmem
+  configs += _concurrent_jobs.configs
+  forward_variables_from(_concurrent_jobs.vars, "*")
 }
 
 fuchsia_component("fxfs_component") {

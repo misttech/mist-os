@@ -9,6 +9,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/environments.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/pkg/bin/grand-swd-binary/gsb.gni")
 
@@ -113,6 +114,12 @@ rustc_binary("bin") {
     "//build/config/rust/lints:clippy_warn_all",
     "//build/config/rust:bootfs",
   ]
+
+  # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
+  # enabled, shift it to the large RBE worker pool)
+  _concurrent_jobs = concurrent_jobs.link_highmem
+  configs += _concurrent_jobs.configs
+  forward_variables_from(_concurrent_jobs.vars, "*")
 }
 
 fuchsia_component_manifest("manifest") {
