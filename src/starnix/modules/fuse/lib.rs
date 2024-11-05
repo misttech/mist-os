@@ -1470,6 +1470,7 @@ impl FsNodeOps for FuseNode {
 
     fn get_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1495,6 +1496,7 @@ impl FsNodeOps for FuseNode {
 
     fn set_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1523,6 +1525,7 @@ impl FsNodeOps for FuseNode {
 
     fn remove_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1537,6 +1540,7 @@ impl FsNodeOps for FuseNode {
 
     fn list_xattrs(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         max_size: usize,

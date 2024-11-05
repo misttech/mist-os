@@ -795,6 +795,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// 0, and lesser than the required size.
     fn get_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -806,6 +807,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Set an extended attribute on the node.
     fn set_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -817,6 +819,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
 
     fn remove_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -829,6 +832,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// return an ERANGE error if max_size is not 0, and lesser than the required size.
     fn list_xattrs(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _max_size: usize,
@@ -995,6 +999,7 @@ macro_rules! fs_node_impl_xattr_delegate {
     ($self:ident, $delegate:expr) => {
         fn get_xattr(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &starnix_core::vfs::FsStr,
@@ -1005,6 +1010,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn set_xattr(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &starnix_core::vfs::FsStr,
@@ -1016,6 +1022,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn remove_xattr(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &starnix_core::vfs::FsStr,
@@ -1025,6 +1032,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn list_xattrs(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             _size: usize,
@@ -2226,17 +2234,21 @@ impl FsNode {
         Ok(())
     }
 
-    pub fn get_xattr(
+    pub fn get_xattr<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         max_size: usize,
-    ) -> Result<ValueOrSize<FsString>, Errno> {
+    ) -> Result<ValueOrSize<FsString>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // Based on the man page for xattr(7), read access permissions to security attributes
         // depend on the security module. If there isn't any, read access is always allowed.
         if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
-            return security::fs_node_getsecurity(current_task, self, name, max_size);
+            return security::fs_node_getsecurity(locked, current_task, self, name, max_size);
         }
         security::check_fs_node_getxattr_access(current_task, self, name)?;
         self.check_access(
@@ -2246,22 +2258,32 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(ENODATA))?;
-        self.ops().get_xattr(self, current_task, name, max_size)
+        self.ops().get_xattr(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            name,
+            max_size,
+        )
     }
 
-    pub fn set_xattr(
+    pub fn set_xattr<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         value: &FsStr,
         op: XattrOp,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // Based on the man page for xattr(7), write access permissions to security attributes
         // depend on the security module. If there isn't any, write access is limited to
         // processed with the CAP_SYS_ADMIN capability.
         if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
-            return security::fs_node_setsecurity(current_task, self, name, value, op);
+            return security::fs_node_setsecurity(locked, current_task, self, name, value, op);
         }
         security::check_fs_node_setxattr_access(current_task, self, name, value, op)?;
         self.check_access(
@@ -2271,15 +2293,26 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().set_xattr(self, current_task, name, value, op)
+        self.ops().set_xattr(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            name,
+            value,
+            op,
+        )
     }
 
-    pub fn remove_xattr(
+    pub fn remove_xattr<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // TODO: Is removing security.* xattrs allowed at all?
         security::check_fs_node_removexattr_access(current_task, self, name)?;
         self.check_access(
@@ -2289,22 +2322,31 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().remove_xattr(self, current_task, name)
+        self.ops().remove_xattr(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, name)
     }
 
-    pub fn list_xattrs(
+    pub fn list_xattrs<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         max_size: usize,
-    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         security::check_fs_node_listxattr_access(current_task, self)?;
-        Ok(self.ops().list_xattrs(self, current_task, max_size)?.map(|mut v| {
-            v.retain(|name| {
-                self.check_trusted_attribute_access(current_task, name.as_ref(), || errno!(EPERM))
+        Ok(self
+            .ops()
+            .list_xattrs(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, max_size)?
+            .map(|mut v| {
+                v.retain(|name| {
+                    self.check_trusted_attribute_access(current_task, name.as_ref(), || {
+                        errno!(EPERM)
+                    })
                     .is_ok()
-            });
-            v
-        }))
+                });
+                v
+            }))
     }
 
     /// Returns current `FsNodeInfo`.
@@ -2675,6 +2717,7 @@ mod tests {
         // should fail.
         assert_eq!(
             node.set_xattr(
+                &mut locked,
                 &current_task,
                 &MountInfo::detached(),
                 "security.name".into(),
@@ -2714,6 +2757,7 @@ mod tests {
         // should fail.
         assert_eq!(
             node.set_xattr(
+                &mut locked,
                 &current_task,
                 &MountInfo::detached(),
                 "trusted.name".into(),
@@ -2753,6 +2797,7 @@ mod tests {
         // Setting the label should succeed even without write access to the file.
         assert_eq!(
             node.set_xattr(
+                &mut locked,
                 &current_task,
                 &MountInfo::detached(),
                 "security.name".into(),
@@ -2767,7 +2812,13 @@ mod tests {
 
         // Getting the label should succeed even without read access to the file.
         assert_eq!(
-            node.get_xattr(&current_task, &MountInfo::detached(), "security.name".into(), 4096),
+            node.get_xattr(
+                &mut locked,
+                &current_task,
+                &MountInfo::detached(),
+                "security.name".into(),
+                4096
+            ),
             Ok(ValueOrSize::Value("security_label".into()))
         );
     }

@@ -10,7 +10,7 @@ use crate::security::SecurityServer;
 use crate::task::CurrentTask;
 use crate::testing::spawn_kernel_with_selinux_and_run;
 use crate::vfs::{FsStr, NamespaceNode, XattrOp};
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
 use std::sync::Arc;
@@ -28,6 +28,7 @@ pub fn create_unlabeled_test_file(
 ) -> NamespaceNode {
     let namespace_node = create_test_file(locked, current_task);
     assert!(security::fs_node_setsecurity(
+        locked,
         current_task,
         &namespace_node.entry.node,
         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -95,7 +96,7 @@ where
         let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
         security_server.set_enforcing(true);
         security_server.load_policy(policy_bytes).expect("policy load failed");
-        super::selinuxfs_policy_loaded(security_server, current_task);
+        super::selinuxfs_policy_loaded(locked, security_server, current_task);
         callback(locked, current_task, security_server)
     })
 }
@@ -114,6 +115,7 @@ pub fn create_test_executable(
     fs_node
         .ops()
         .set_xattr(
+            &mut locked.cast_locked::<FileOpsCore>(),
             fs_node,
             current_task,
             XATTR_NAME_SELINUX.to_bytes().into(),

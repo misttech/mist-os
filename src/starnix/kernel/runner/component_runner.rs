@@ -486,7 +486,7 @@ impl MountRecord {
             rights,
         )?;
 
-        security::file_system_resolve_security(system_task, &fs)?;
+        security::file_system_resolve_security(locked, system_task, &fs)?;
 
         // Fuchsia doesn't specify mount flags in the incoming namespace, so we need to make
         // up some flags.

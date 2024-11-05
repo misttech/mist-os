@@ -1221,6 +1221,7 @@ fn read_xattr_name(current_task: &CurrentTask, name_addr: UserCString) -> Result
 }
 
 fn do_getxattr(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     node: &NamespaceNode,
     name_addr: UserCString,
@@ -1228,10 +1229,11 @@ fn do_getxattr(
     size: usize,
 ) -> Result<usize, Errno> {
     let name = read_xattr_name(current_task, name_addr)?;
-    let value = match node.entry.node.get_xattr(current_task, &node.mount, name.as_ref(), size)? {
-        ValueOrSize::Size(s) => return Ok(s),
-        ValueOrSize::Value(v) => v,
-    };
+    let value =
+        match node.entry.node.get_xattr(locked, current_task, &node.mount, name.as_ref(), size)? {
+            ValueOrSize::Size(s) => return Ok(s),
+            ValueOrSize::Value(v) => v,
+        };
     if size == 0 {
         return Ok(value.len());
     }
@@ -1251,11 +1253,11 @@ pub fn sys_getxattr(
 ) -> Result<usize, Errno> {
     let node =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
-    do_getxattr(current_task, &node, name_addr, value_addr, size)
+    do_getxattr(locked, current_task, &node, name_addr, value_addr, size)
 }
 
 pub fn sys_fgetxattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     name_addr: UserCString,
@@ -1263,7 +1265,7 @@ pub fn sys_fgetxattr(
     size: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
-    do_getxattr(current_task, &file.name, name_addr, value_addr, size)
+    do_getxattr(locked, current_task, &file.name, name_addr, value_addr, size)
 }
 
 pub fn sys_lgetxattr(
@@ -1276,10 +1278,11 @@ pub fn sys_lgetxattr(
 ) -> Result<usize, Errno> {
     let node =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
-    do_getxattr(current_task, &node, name_addr, value_addr, size)
+    do_getxattr(locked, current_task, &node, name_addr, value_addr, size)
 }
 
 fn do_setxattr(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     node: &NamespaceNode,
     name_addr: UserCString,
@@ -1303,11 +1306,11 @@ fn do_setxattr(
     };
     let name = read_xattr_name(current_task, name_addr)?;
     let value = FsString::from(current_task.read_memory_to_vec(value_addr, size)?);
-    node.entry.node.set_xattr(current_task, &node.mount, name.as_ref(), value.as_ref(), op)
+    node.entry.node.set_xattr(locked, current_task, &node.mount, name.as_ref(), value.as_ref(), op)
 }
 
 pub fn sys_fsetxattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     name_addr: UserCString,
@@ -1316,7 +1319,7 @@ pub fn sys_fsetxattr(
     flags: u32,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    do_setxattr(current_task, &file.name, name_addr, value_addr, size, flags)
+    do_setxattr(locked, current_task, &file.name, name_addr, value_addr, size, flags)
 }
 
 pub fn sys_lsetxattr(
@@ -1330,7 +1333,7 @@ pub fn sys_lsetxattr(
 ) -> Result<(), Errno> {
     let node =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
-    do_setxattr(current_task, &node, name_addr, value_addr, size, flags)
+    do_setxattr(locked, current_task, &node, name_addr, value_addr, size, flags)
 }
 
 pub fn sys_setxattr(
@@ -1344,10 +1347,11 @@ pub fn sys_setxattr(
 ) -> Result<(), Errno> {
     let node =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
-    do_setxattr(current_task, &node, name_addr, value_addr, size, flags)
+    do_setxattr(locked, current_task, &node, name_addr, value_addr, size, flags)
 }
 
 fn do_removexattr(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     node: &NamespaceNode,
     name_addr: UserCString,
@@ -1357,7 +1361,7 @@ fn do_removexattr(
         return error!(EPERM);
     }
     let name = read_xattr_name(current_task, name_addr)?;
-    node.entry.node.remove_xattr(current_task, &node.mount, name.as_ref())
+    node.entry.node.remove_xattr(locked, current_task, &node.mount, name.as_ref())
 }
 
 pub fn sys_removexattr(
@@ -1368,7 +1372,7 @@ pub fn sys_removexattr(
 ) -> Result<(), Errno> {
     let node =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
-    do_removexattr(current_task, &node, name_addr)
+    do_removexattr(locked, current_task, &node, name_addr)
 }
 
 pub fn sys_lremovexattr(
@@ -1379,27 +1383,28 @@ pub fn sys_lremovexattr(
 ) -> Result<(), Errno> {
     let node =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
-    do_removexattr(current_task, &node, name_addr)
+    do_removexattr(locked, current_task, &node, name_addr)
 }
 
 pub fn sys_fremovexattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     name_addr: UserCString,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
-    do_removexattr(current_task, &file.name, name_addr)
+    do_removexattr(locked, current_task, &file.name, name_addr)
 }
 
 fn do_listxattr(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     node: &NamespaceNode,
     list_addr: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
     let mut list = vec![];
-    let xattrs = match node.entry.node.list_xattrs(current_task, size)? {
+    let xattrs = match node.entry.node.list_xattrs(locked, current_task, size)? {
         ValueOrSize::Size(s) => return Ok(s),
         ValueOrSize::Value(v) => v,
     };
@@ -1425,7 +1430,7 @@ pub fn sys_listxattr(
 ) -> Result<usize, Errno> {
     let node =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::default())?;
-    do_listxattr(current_task, &node, list_addr, size)
+    do_listxattr(locked, current_task, &node, list_addr, size)
 }
 
 pub fn sys_llistxattr(
@@ -1437,18 +1442,18 @@ pub fn sys_llistxattr(
 ) -> Result<usize, Errno> {
     let node =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, path_addr, LookupFlags::no_follow())?;
-    do_listxattr(current_task, &node, list_addr, size)
+    do_listxattr(locked, current_task, &node, list_addr, size)
 }
 
 pub fn sys_flistxattr(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     list_addr: UserAddress,
     size: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
-    do_listxattr(current_task, &file.name, list_addr, size)
+    do_listxattr(locked, current_task, &file.name, list_addr, size)
 }
 
 pub fn sys_getcwd(

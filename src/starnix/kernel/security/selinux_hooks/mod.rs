@@ -22,7 +22,7 @@ use selinux::{
     ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::device_type::DeviceType;
@@ -79,11 +79,15 @@ fn get_fs_relative_path(dir_entry: &DirEntryHandle) -> FsString {
 
 /// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
 /// `dir_entry`.
-pub(super) fn fs_node_init_with_dentry(
+pub(super) fn fs_node_init_with_dentry<L>(
+    locked: &mut Locked<'_, L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     dir_entry: &DirEntryHandle,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     // This hook is called every time an `FsNode` is linked to a `DirEntry`, so it is expected that
     // the `FsNode` may already have been labeled.
     let fs_node = &dir_entry.node;
@@ -126,6 +130,7 @@ pub(super) fn fs_node_init_with_dentry(
                 FsUseType::Xattr => {
                     // Determine the SID from the "security.selinux" attribute.
                     let attr = fs_node.ops().get_xattr(
+                        &mut locked.cast_locked::<FileOpsCore>(),
                         fs_node,
                         current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -588,13 +593,17 @@ pub(super) fn check_fs_node_removexattr_access(
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`
 /// is labelled, otherwise delegates to the node's [`crate::vfs::FsNodeOps`].
-pub(super) fn fs_node_getsecurity(
+pub(super) fn fs_node_getsecurity<L>(
+    locked: &mut Locked<'_, L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
     name: &FsStr,
     max_size: usize,
-) -> Result<ValueOrSize<FsString>, Errno> {
+) -> Result<ValueOrSize<FsString>, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     if name == FsStr::new(XATTR_NAME_SELINUX.to_bytes()) {
         let sid = fs_node_effective_sid(&fs_node);
         if sid != SecurityId::initial(InitialSid::Unlabeled) {
@@ -608,20 +617,37 @@ pub(super) fn fs_node_getsecurity(
         // attribute value stored in the file system for this node.
     }
 
-    fs_node.ops().get_xattr(fs_node, current_task, name, max_size)
+    fs_node.ops().get_xattr(
+        &mut locked.cast_locked::<FileOpsCore>(),
+        fs_node,
+        current_task,
+        name,
+        max_size,
+    )
 }
 
 /// Sets the `name`d security attribute on `fs_node` and updates internal
 /// kernel state.
-pub(super) fn fs_node_setsecurity(
+pub(super) fn fs_node_setsecurity<L>(
+    locked: &mut Locked<'_, L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
     name: &FsStr,
     value: &FsStr,
     op: XattrOp,
-) -> Result<(), Errno> {
-    fs_node.ops().set_xattr(fs_node, current_task, name, value, op)?;
+) -> Result<(), Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
+    fs_node.ops().set_xattr(
+        &mut locked.cast_locked::<FileOpsCore>(),
+        fs_node,
+        current_task,
+        name,
+        value,
+        op,
+    )?;
     if name == FsStr::new(XATTR_NAME_SELINUX.to_bytes()) {
         // If the new value is a valid Security Context then label the node with the corresponding
         // SID, otherwise use the policy's "unlabeled" SID.
@@ -745,11 +771,15 @@ pub(super) fn file_system_init_security(
 }
 
 /// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
-pub(super) fn file_system_resolve_security(
+pub(super) fn file_system_resolve_security<L>(
+    locked: &mut Locked<'_, L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     file_system: &FileSystemHandle,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     // TODO: https://fxbug.dev/334094811 - Determine how failures, e.g. mount options containing
     // Security Context values that are not valid in the loaded policy.
     let pending_entries = {
@@ -779,14 +809,14 @@ pub(super) fn file_system_resolve_security(
     };
 
     if let Some(root_dir_entry) = file_system.maybe_root() {
-        fs_node_init_with_dentry(security_server, current_task, root_dir_entry)?;
+        fs_node_init_with_dentry(locked, security_server, current_task, root_dir_entry)?;
     }
 
     // Label the `FsNode`s for any `pending_entries`.
     let labeled_entries = pending_entries.len();
     for dir_entry in pending_entries {
         if let Some(dir_entry) = dir_entry.0.upgrade() {
-            fs_node_init_with_dentry(security_server, current_task, &dir_entry)
+            fs_node_init_with_dentry(locked, security_server, current_task, &dir_entry)
                 .unwrap_or_else(|_| panic!("Failed to resolve FsNode label"));
         }
     }
@@ -802,10 +832,13 @@ pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
 
 /// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
 /// initialization to be completed.
-pub(super) fn selinuxfs_policy_loaded(
+pub(super) fn selinuxfs_policy_loaded<L>(
+    locked: &mut Locked<'_, L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
-) {
+) where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     let kernel_state = current_task.kernel().security_state.state.as_ref().unwrap();
 
     // Invoke `file_system_resolve_security()` on all pre-existing `FileSystem`s.
@@ -813,7 +846,7 @@ pub(super) fn selinuxfs_policy_loaded(
     let pending_file_systems = std::mem::take(&mut *kernel_state.pending_file_systems.lock());
     for file_system in pending_file_systems {
         if let Some(file_system) = file_system.0.upgrade() {
-            file_system_resolve_security(security_server, current_task, &file_system)
+            file_system_resolve_security(locked, security_server, current_task, &file_system)
                 .unwrap_or_else(|_| {
                     panic!("Failed to resolve {} FileSystem label", file_system.name())
                 });
@@ -976,6 +1009,7 @@ mod tests {
     use super::*;
     use crate::testing::spawn_kernel_and_run;
     use crate::vfs::XattrOp;
+    use starnix_sync::FileOpsCore;
     use starnix_uapi::errno;
     use testing::{spawn_kernel_with_selinux_hooks_test_policy_and_run, TEST_FILE_NAME};
 
@@ -995,13 +1029,20 @@ mod tests {
 
                 // Remove the "security.selinux" label, if any.
                 let _ = node.ops().remove_xattr(
+                    &mut locked.cast_locked::<FileOpsCore>(),
                     node,
                     &current_task,
                     XATTR_NAME_SELINUX.to_bytes().into(),
                 );
                 assert_eq!(
                     node.ops()
-                        .get_xattr(node, &current_task, XATTR_NAME_SELINUX.to_bytes().into(), 4096)
+                        .get_xattr(
+                            &mut locked.cast_locked::<FileOpsCore>(),
+                            node,
+                            &current_task,
+                            XATTR_NAME_SELINUX.to_bytes().into(),
+                            4096
+                        )
                         .unwrap_err(),
                     errno!(ENODATA)
                 );
@@ -1009,7 +1050,7 @@ mod tests {
                 // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
-                fs_node_init_with_dentry(&security_server, &current_task, dir_entry)
+                fs_node_init_with_dentry(locked, &security_server, &current_task, dir_entry)
                     .expect("fs_node_init_with_dentry");
 
                 // `fs_node_getsecurity()` should now fall-back to the policy's "file" Context.
@@ -1018,6 +1059,7 @@ mod tests {
                     .unwrap()
                     .into();
                 let result = fs_node_getsecurity(
+                    locked,
                     &security_server,
                     &current_task,
                     node,
@@ -1043,6 +1085,7 @@ mod tests {
                 // Set the security label to a value which is not a valid Security Context.
                 node.ops()
                     .set_xattr(
+                        &mut locked.cast_locked::<FileOpsCore>(),
                         node,
                         &current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1054,11 +1097,12 @@ mod tests {
                 // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
-                fs_node_init_with_dentry(&security_server, &current_task, dir_entry)
+                fs_node_init_with_dentry(locked, &security_server, &current_task, dir_entry)
                     .expect("fs_node_init_with_dentry");
 
                 // `fs_node_getsecurity()` should report the same invalid string as is in the xattr.
                 let result = fs_node_getsecurity(
+                    locked,
                     &security_server,
                     &current_task,
                     node,
@@ -1088,6 +1132,7 @@ mod tests {
                 // is removed, to force the effective-SID query to resolve the label again.
                 node.ops()
                     .set_xattr(
+                        &mut locked.cast_locked::<FileOpsCore>(),
                         node,
                         &current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1099,11 +1144,12 @@ mod tests {
                 // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
-                fs_node_init_with_dentry(&security_server, &current_task, dir_entry)
+                fs_node_init_with_dentry(locked, &security_server, &current_task, dir_entry)
                     .expect("fs_node_init_with_dentry");
 
                 // `fs_node_getsecurity()` should report the same valid Security Context string as the xattr holds.
                 let result = fs_node_getsecurity(
+                    locked,
                     &security_server,
                     &current_task,
                     node,
@@ -1136,6 +1182,7 @@ mod tests {
                 let node = &testing::create_unlabeled_test_file(locked, current_task).entry.node;
 
                 node.set_xattr(
+                    &mut locked.cast_locked::<FileOpsCore>(),
                     current_task,
                     &current_task.fs().root().mount,
                     XATTR_NAME_SELINUX.to_bytes().into(),

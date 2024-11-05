@@ -139,8 +139,16 @@ impl ActiveEntry {
     /// Sets an xattr to mark the directory referenced by `entry` as opaque. Directories that are
     /// marked as opaque in the upper FS are not merged with the corresponding directories in the
     /// lower FS.
-    fn set_opaque_xattr(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+    fn set_opaque_xattr<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.entry().node.set_xattr(
+            locked,
             current_task,
             self.mount(),
             OPAQUE_DIR_XATTR.into(),
@@ -150,8 +158,12 @@ impl ActiveEntry {
     }
 
     /// Checks if the `entry` is marked as opaque.
-    fn is_opaque_node(&self, current_task: &CurrentTask) -> bool {
+    fn is_opaque_node<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> bool
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         match self.entry().node.get_xattr(
+            locked,
             current_task,
             self.mount(),
             OPAQUE_DIR_XATTR.into(),
@@ -504,7 +516,7 @@ impl OverlayNode {
                 }
 
                 // Mark the directory as opaque. Children can be removed after this.
-                dir.set_opaque_xattr(current_task)?;
+                dir.set_opaque_xattr(locked, current_task)?;
                 let _ = self.upper_is_opaque.set(());
 
                 // Finally, remove the children.
@@ -597,7 +609,7 @@ impl FsNodeOps for OverlayNodeOps {
             Some(upper) if upper.is_whiteout() => return error!(ENOENT),
             Some(upper) => {
                 let is_dir = upper.entry().node.is_dir();
-                let is_opaque = !is_dir || upper.is_opaque_node(current_task);
+                let is_opaque = !is_dir || upper.is_opaque_node(locked, current_task);
                 (is_dir, is_opaque)
             }
             None => (false, false),
@@ -678,7 +690,7 @@ impl FsNodeOps for OverlayNodeOps {
                 )?;
 
                 // Set opaque attribute to ensure the new directory is not merged with lower.
-                entry.set_opaque_xattr(current_task)?;
+                entry.set_opaque_xattr(locked, current_task)?;
 
                 Ok(entry)
             })?;

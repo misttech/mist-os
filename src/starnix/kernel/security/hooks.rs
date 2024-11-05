@@ -12,6 +12,7 @@ use crate::vfs::{
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{SecurityPermission, SecurityServer};
 use starnix_logging::log_debug;
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::auth::CAP_SYS_ADMIN;
@@ -27,18 +28,42 @@ use std::sync::Arc;
 /// Executes the `hook` closure if SELinux is enabled, and has a policy loaded.
 /// If SELinux is not enabled, or has no policy loaded, then the `default` closure is executed,
 /// and its result returned.
+fn if_selinux_else_with_arg<F, R, D, A>(arg: A, task: &Task, hook: F, default: D) -> R
+where
+    F: FnOnce(A, &Arc<SecurityServer>) -> R,
+    D: Fn(A) -> R,
+{
+    if let Some(state) = task.kernel().security_state.state.as_ref() {
+        if state.server.has_policy() {
+            hook(arg, &state.server)
+        } else {
+            default(arg)
+        }
+    } else {
+        default(arg)
+    }
+}
+
+/// Executes the `hook` closure if SELinux is enabled, and has a policy loaded.
+/// If SELinux is not enabled, or has no policy loaded, then the `default` closure is executed,
+/// and its result returned.
 fn if_selinux_else<F, R, D>(task: &Task, hook: F, default: D) -> R
 where
     F: FnOnce(&Arc<SecurityServer>) -> R,
     D: Fn() -> R,
 {
-    task.kernel().security_state.state.as_ref().map_or_else(&default, |state| {
-        if state.server.has_policy() {
-            hook(&state.server)
-        } else {
-            default()
-        }
-    })
+    if_selinux_else_with_arg((), task, |_, security_server| hook(security_server), |_| default())
+}
+
+/// Specialization of `if_selinux_else(...)` for hooks which return a `Result<..., Errno>`, that
+/// arranges to return a default `Ok(...)` result value if SELinux is not enabled, or not yet
+/// configured with a policy.
+fn if_selinux_else_default_ok_with_arg<R, F, A>(arg: A, task: &Task, hook: F) -> Result<R, Errno>
+where
+    F: FnOnce(A, &Arc<SecurityServer>) -> Result<R, Errno>,
+    R: Default,
+{
+    if_selinux_else_with_arg(arg, task, hook, |_| Ok(R::default()))
 }
 
 /// Specialization of `if_selinux_else(...)` for hooks which return a `Result<..., Errno>`, that
@@ -89,13 +114,22 @@ pub fn file_system_post_init_security(kernel: &Kernel, file_system: &FileSystemH
 /// If no policy has yet been loaded then no work is done, and the `file_system` will instead be
 /// labeled when a policy is first loaded.
 /// If the `file_system` was already labelled then no further work is done.
-pub fn file_system_resolve_security(
+pub fn file_system_resolve_security<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file_system: &FileSystemHandle,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     profile_duration!("security.hooks.file_system_resolve_security");
-    if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::file_system_resolve_security(security_server, current_task, file_system)
+    if_selinux_else_default_ok_with_arg(locked, current_task, |locked, security_server| {
+        selinux_hooks::file_system_resolve_security(
+            locked,
+            security_server,
+            current_task,
+            file_system,
+        )
     })
 }
 
@@ -109,17 +143,21 @@ pub struct FsNodeSecurityXattr {
 /// `dir_entry`.
 /// If the `FsNode` security state had already been initialized, or no policy is yet loaded, then
 /// this is a no-op.
-pub fn fs_node_init_with_dentry(
+pub fn fs_node_init_with_dentry<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     dir_entry: &DirEntryHandle,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     profile_duration!("security.hooks.fs_node_init_with_dentry");
     // TODO: https://fxbug.dev/367585803 - Don't use `if_selinux_else()` here, because the `has_policy()`
     // check is racey, so doing non-trivial work in the "else" path is unsafe. Instead, call the SELinux
     // hook implementation, and let it label, or queue, the `FsNode` based on the `FileSystem` label
     // state, thereby ensuring safe ordering.
     if let Some(state) = &current_task.kernel().security_state.state {
-        selinux_hooks::fs_node_init_with_dentry(&state.server, current_task, dir_entry)
+        selinux_hooks::fs_node_init_with_dentry(locked, &state.server, current_task, dir_entry)
     } else {
         Ok(())
     }
@@ -583,17 +621,23 @@ pub fn check_fs_node_removexattr_access(
 /// node's file system does not generally support extended attributes.
 /// If SELinux is not enabled, or the node is not labelled with a SID, then the call is delegated to
 /// the [`crate::vfs::FsNodeOps`], so the returned value may not be a valid Security Context.
-pub fn fs_node_getsecurity(
+pub fn fs_node_getsecurity<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     fs_node: &FsNode,
     name: &FsStr,
     max_size: usize,
-) -> Result<ValueOrSize<FsString>, Errno> {
+) -> Result<ValueOrSize<FsString>, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     profile_duration!("security.hooks.fs_node_getsecurity");
-    if_selinux_else(
+    if_selinux_else_with_arg(
+        locked,
         current_task,
-        |security_server| {
+        |locked, security_server| {
             selinux_hooks::fs_node_getsecurity(
+                locked,
                 security_server,
                 current_task,
                 fs_node,
@@ -601,25 +645,39 @@ pub fn fs_node_getsecurity(
                 max_size,
             )
         },
-        || fs_node.ops().get_xattr(fs_node, current_task, name, max_size),
+        |locked| {
+            fs_node.ops().get_xattr(
+                &mut locked.cast_locked::<FileOpsCore>(),
+                fs_node,
+                current_task,
+                name,
+                max_size,
+            )
+        },
     )
 }
 
 /// Sets the value of the specified security attribute for `fs_node`.
 /// If SELinux is enabled then this also updates the in-kernel SID with which
 /// the file node is labelled.
-pub fn fs_node_setsecurity(
+pub fn fs_node_setsecurity<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     fs_node: &FsNode,
     name: &FsStr,
     value: &FsStr,
     op: XattrOp,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     profile_duration!("security.hooks.fs_node_setsecurity");
-    if_selinux_else(
+    if_selinux_else_with_arg(
+        locked,
         current_task,
-        |security_server| {
+        |locked, security_server| {
             selinux_hooks::fs_node_setsecurity(
+                locked,
                 security_server,
                 current_task,
                 fs_node,
@@ -628,9 +686,16 @@ pub fn fs_node_setsecurity(
                 op,
             )
         },
-        || {
+        |locked| {
             if current_task.creds().has_capability(CAP_SYS_ADMIN) {
-                fs_node.ops().set_xattr(fs_node, current_task, name, value, op)
+                fs_node.ops().set_xattr(
+                    &mut locked.cast_locked::<FileOpsCore>(),
+                    fs_node,
+                    current_task,
+                    name,
+                    value,
+                    op,
+                )
             } else {
                 Err(errno!(EPERM))
             }
@@ -688,12 +753,18 @@ pub fn set_procattr(
 /// file-systems mounted prior to policy load (e.g. the "selinuxfs" itself), and initializing
 /// security state for any file nodes they may already contain.
 // TODO: https://fxbug.dev/362917997 - Remove this when SELinux LSM is modularized.
-pub fn selinuxfs_policy_loaded(current_task: &CurrentTask) {
+pub fn selinuxfs_policy_loaded<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     profile_duration!("security.hooks.selinuxfs_policy_loaded");
-    if_selinux_else(
+    if_selinux_else_with_arg(
+        locked,
         current_task,
-        |security_server| selinux_hooks::selinuxfs_policy_loaded(security_server, current_task),
-        || panic!("selinuxfs_policy_loaded() without policy!"),
+        |locked, security_server| {
+            selinux_hooks::selinuxfs_policy_loaded(locked, security_server, current_task)
+        },
+        |_| panic!("selinuxfs_policy_loaded() without policy!"),
     )
 }
 
@@ -1070,6 +1141,7 @@ mod tests {
             let node = &create_unlabeled_test_file(locked, current_task).entry.node;
 
             fs_node_setsecurity(
+                locked,
                 current_task,
                 &node,
                 XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1088,6 +1160,7 @@ mod tests {
             let node = &create_unlabeled_test_file(locked, current_task).entry.node;
 
             fs_node_setsecurity(
+                locked,
                 current_task,
                 &node,
                 XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1111,6 +1184,7 @@ mod tests {
                 let node = &create_unlabeled_test_file(locked, current_task).entry.node;
 
                 fs_node_setsecurity(
+                    locked,
                     current_task,
                     &node,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1141,6 +1215,7 @@ mod tests {
                 assert_ne!(Some(valid_security_context_sid), whatever_sid);
 
                 fs_node_setsecurity(
+                    locked,
                     current_task,
                     &node,
                     "security.selinu!".into(), // Note: name != "security.selinux".
@@ -1161,6 +1236,7 @@ mod tests {
             |locked, current_task, _security_server| {
                 let node = &create_test_file(locked, current_task).entry.node;
                 fs_node_setsecurity(
+                    locked,
                     current_task,
                     &node,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1174,6 +1250,7 @@ mod tests {
                 );
 
                 fs_node_setsecurity(
+                    locked,
                     current_task,
                     &node,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1197,6 +1274,7 @@ mod tests {
                 let node = &create_unlabeled_test_file(locked, current_task).entry.node;
 
                 fs_node_setsecurity(
+                    locked,
                     current_task,
                     &node,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1217,6 +1295,7 @@ mod tests {
                 let node = &create_unlabeled_test_file(locked, current_task).entry.node;
 
                 fs_node_setsecurity(
+                    locked,
                     current_task,
                     &node,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1229,6 +1308,7 @@ mod tests {
 
                 let first_sid = selinux_hooks::get_cached_sid(node).unwrap();
                 fs_node_setsecurity(
+                    locked,
                     current_task,
                     &node,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1256,6 +1336,7 @@ mod tests {
                 const TEST_VALUE: &str = "Something Random";
                 node.ops()
                     .set_xattr(
+                        &mut locked.cast_locked::<FileOpsCore>(),
                         node,
                         current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1272,6 +1353,7 @@ mod tests {
 
                 // Reading the security attribute should return the Security Context for the SID, rather than delegating.
                 let result = fs_node_getsecurity(
+                    locked,
                     current_task,
                     node,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1294,6 +1376,7 @@ mod tests {
                 // Set an invalid value in `node`'s "security.seliux" attribute.
                 const TEST_VALUE: &str = "Something Random";
                 fs_node_setsecurity(
+                    locked,
                     current_task,
                     node,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1304,6 +1387,7 @@ mod tests {
 
                 // Reading the security attribute should pass-through to read the value from the file system.
                 let result = fs_node_getsecurity(
+                    locked,
                     current_task,
                     node,
                     XATTR_NAME_SELINUX.to_bytes().into(),

@@ -239,7 +239,12 @@ impl SeLinuxApiOps for LoadApi {
     fn api_write_permission() -> SecurityPermission {
         SecurityPermission::LoadPolicy
     }
-    fn api_write_with_task(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write_with_task(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        current_task: &CurrentTask,
+        data: Vec<u8>,
+    ) -> Result<(), Errno> {
         profile_duration!("selinuxfs.load");
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
@@ -248,7 +253,7 @@ impl SeLinuxApiOps for LoadApi {
         })?;
 
         // Allow one-time initialization of state that requires a loaded policy.
-        security::selinuxfs_policy_loaded(current_task);
+        security::selinuxfs_policy_loaded(locked, current_task);
 
         Ok(())
     }
@@ -847,7 +852,12 @@ trait SeLinuxApiOps {
     }
 
     /// Variant of `api_write()` that additionally receives the `current_task`.
-    fn api_write_with_task(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+    fn api_write_with_task(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _current_task: &CurrentTask,
+        data: Vec<u8>,
+    ) -> Result<(), Errno> {
         self.api_write(data)
     }
 }
@@ -875,7 +885,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -888,7 +898,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         security::selinuxfs_check_access(current_task, T::api_write_permission())?;
         let data = data.read_all()?;
         let data_len = data.len();
-        self.ops.api_write_with_task(current_task, data)?;
+        self.ops.api_write_with_task(locked, current_task, data)?;
         Ok(data_len)
     }
 }

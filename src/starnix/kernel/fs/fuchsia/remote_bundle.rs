@@ -214,6 +214,7 @@ impl FsNodeOps for File {
 
     fn get_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -226,6 +227,7 @@ impl FsNodeOps for File {
 
     fn list_xattrs(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _size: usize,
@@ -443,6 +445,7 @@ impl FsNodeOps for DirectoryObject {
 
     fn get_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -455,6 +458,7 @@ impl FsNodeOps for DirectoryObject {
 
     fn list_xattrs(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _size: usize,
@@ -480,6 +484,7 @@ impl FsNodeOps for SymlinkObject {
 
     fn get_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -492,6 +497,7 @@ impl FsNodeOps for SymlinkObject {
 
     fn list_xattrs(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _size: usize,
@@ -570,7 +576,7 @@ mod test {
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&current_task, &test_dir.mount, "user.a".into(), usize::MAX)
+                .get_xattr(&mut locked, &current_task, &test_dir.mount, "user.a".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             "apple"
@@ -578,7 +584,7 @@ mod test {
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&current_task, &test_dir.mount, "user.b".into(), usize::MAX)
+                .get_xattr(&mut locked, &current_task, &test_dir.mount, "user.b".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             "ball"
@@ -586,7 +592,7 @@ mod test {
         assert_eq!(
             test_file
                 .node()
-                .list_xattrs(&current_task, usize::MAX)
+                .list_xattrs(&mut locked, &current_task, usize::MAX)
                 .expect("list_xattr failed")
                 .unwrap()
                 .into_iter()
