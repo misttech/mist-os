@@ -1309,48 +1309,90 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             //   SND.NXT) then send an ACK, drop the segment, and
             //   return.
             (Some(Segment::ack(*snd_max, rcv_nxt, rcv_wnd >> *wnd_scale)), DataAcked::No)
-        } else if seg_ack.after(*snd_una) {
-            // The unwrap is safe because the result must be positive.
-            let acked = u32::try_from(seg_ack - *snd_una)
-                .ok_checked::<TryFromIntError>()
-                .and_then(NonZeroU32::new)
-                .unwrap_or_else(|| {
-                    panic!("seg_ack({:?}) - snd_una({:?}) must be positive", seg_ack, snd_una);
-                });
-            let BufferLimits { len, capacity: _ } = buffer.limits();
-            let fin_acked = FIN_QUEUED && seg_ack == *snd_una + len + 1;
-            // Remove the acked bytes from the send buffer. The following
-            // operation should not panic because we are in this branch
-            // means seg_ack is before snd.max, thus seg_ack - snd.una
-            // cannot exceed the buffer length.
-            buffer.mark_read(
-                NonZeroUsize::try_from(acked)
-                    .unwrap_or_else(|TryFromIntError { .. }| {
-                        // we've checked that acked must be smaller than the outstanding
-                        // bytes we have in the buffer; plus in Rust, any allocation can
-                        // only have a size up to isize::MAX bytes.
-                        panic!(
-                            "acked({:?}) must be smaller than isize::MAX({:?})",
-                            acked,
-                            isize::MAX
-                        )
-                    })
-                    .get()
-                    - usize::from(fin_acked),
-            );
-            *snd_una = seg_ack;
-            // If the incoming segment acks something that has been sent
-            // but not yet retransmitted (`snd.nxt < seg_ack <= snd.max`),
-            // bump `snd.nxt` as well.
-            if seg_ack.after(*snd_nxt) {
-                *snd_nxt = seg_ack;
-            }
-            // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
-            //   If SND.UNA < SEG.ACK =< SND.NXT, the send window should be
+        } else {
+            let res = if seg_ack.after(*snd_una) {
+                // The unwrap is safe because the result must be positive.
+                let acked = u32::try_from(seg_ack - *snd_una)
+                    .ok_checked::<TryFromIntError>()
+                    .and_then(NonZeroU32::new)
+                    .unwrap_or_else(|| {
+                        panic!("seg_ack({:?}) - snd_una({:?}) must be positive", seg_ack, snd_una);
+                    });
+                let BufferLimits { len, capacity: _ } = buffer.limits();
+                let fin_acked = FIN_QUEUED && seg_ack == *snd_una + len + 1;
+                // Remove the acked bytes from the send buffer. The following
+                // operation should not panic because we are in this branch
+                // means seg_ack is before snd.max, thus seg_ack - snd.una
+                // cannot exceed the buffer length.
+                buffer.mark_read(
+                    NonZeroUsize::try_from(acked)
+                        .unwrap_or_else(|TryFromIntError { .. }| {
+                            // we've checked that acked must be smaller than the outstanding
+                            // bytes we have in the buffer; plus in Rust, any allocation can
+                            // only have a size up to isize::MAX bytes.
+                            panic!(
+                                "acked({:?}) must be smaller than isize::MAX({:?})",
+                                acked,
+                                isize::MAX
+                            )
+                        })
+                        .get()
+                        - usize::from(fin_acked),
+                );
+                *snd_una = seg_ack;
+                // If the incoming segment acks something that has been sent
+                // but not yet retransmitted (`snd.nxt < seg_ack <= snd.max`),
+                // bump `snd.nxt` as well.
+                if seg_ack.after(*snd_nxt) {
+                    *snd_nxt = seg_ack;
+                }
+                // If the incoming segment acks the sequence number that we used
+                // for RTT estimate, feed the sample to the estimator.
+                if let Some((seq_max, timestamp)) = *last_seq_ts {
+                    if !seg_ack.before(seq_max) {
+                        rtt_estimator.sample(now.saturating_duration_since(timestamp));
+                    }
+                }
+                congestion_control.on_ack(acked, now, rtt_estimator.rto());
+                // At least one byte of data was ACKed by the peer.
+                (None, DataAcked::Yes)
+            } else {
+                // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-2):
+                //   DUPLICATE ACKNOWLEDGMENT: An acknowledgment is considered a
+                //   "duplicate" in the following algorithms when (a) the receiver of
+                //   the ACK has outstanding data, (b) the incoming acknowledgment
+                //   carries no data, (c) the SYN and FIN bits are both off, (d) the
+                //   acknowledgment number is equal to the greatest acknowledgment
+                //   received on the given connection (TCP.UNA from [RFC793]) and (e)
+                //   the advertised window in the incoming acknowledgment equals the
+                //   advertised window in the last incoming acknowledgment.
+                let is_dup_ack = {
+                    snd_nxt.after(*snd_una) // (a)
+                && pure_ack // (b) & (c)
+                && seg_ack == *snd_una // (d)
+                && seg_wnd == *snd_wnd // (e)
+                };
+                if is_dup_ack {
+                    let fast_recovery_initiated = congestion_control.on_dup_ack(seg_ack);
+                    if fast_recovery_initiated {
+                        counters.fast_recovery.increment();
+                    }
+                }
+                // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
+                //   If the ACK is a duplicate (SEG.ACK < SND.UNA), it can be
+                //   ignored.
+                (None, DataAcked::No)
+            };
+
+            // Per RFC 9293
+            // (https://datatracker.ietf.org/doc/html/rfc9293#section-3.10.7.4-2.5.2.2.2.3.2.2):
+            //   If SND.UNA =< SEG.ACK =< SND.NXT, the send window should be
             //   updated.  If (SND.WL1 < SEG.SEQ or (SND.WL1 = SEG.SEQ and
             //   SND.WL2 =< SEG.ACK)), set SND.WND <- SEG.WND, set
             //   SND.WL1 <- SEG.SEQ, and set SND.WL2 <- SEG.ACK.
-            if snd_wl1.before(seg_seq) || (seg_seq == *snd_wl1 && !snd_wl2.after(seg_ack)) {
+            if !snd_una.after(seg_ack)
+                && (snd_wl1.before(seg_seq) || (seg_seq == *snd_wl1 && !snd_wl2.after(seg_ack)))
+            {
                 *snd_wnd = seg_wnd;
                 *snd_wl1 = seg_seq;
                 *snd_wl2 = seg_ack;
@@ -1359,44 +1401,14 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     && matches!(timer, Some(SendTimer::ZeroWindowProbe(_)))
                 {
                     *timer = None;
+                    // We need to ensure that we're reset when exiting ZWP as if
+                    // we're going to retransmit. The actual retransmit handling
+                    // will be performed by poll_send.
+                    *snd_nxt = *snd_una;
                 }
             }
-            // If the incoming segment acks the sequence number that we used
-            // for RTT estimate, feed the sample to the estimator.
-            if let Some((seq_max, timestamp)) = *last_seq_ts {
-                if !seg_ack.before(seq_max) {
-                    rtt_estimator.sample(now.saturating_duration_since(timestamp));
-                }
-            }
-            congestion_control.on_ack(acked, now, rtt_estimator.rto());
-            // At least one byte of data was ACKed by the peer.
-            (None, DataAcked::Yes)
-        } else {
-            // Per RFC 5681 (https://www.rfc-editor.org/rfc/rfc5681#section-2):
-            //   DUPLICATE ACKNOWLEDGMENT: An acknowledgment is considered a
-            //   "duplicate" in the following algorithms when (a) the receiver of
-            //   the ACK has outstanding data, (b) the incoming acknowledgment
-            //   carries no data, (c) the SYN and FIN bits are both off, (d) the
-            //   acknowledgment number is equal to the greatest acknowledgment
-            //   received on the given connection (TCP.UNA from [RFC793]) and (e)
-            //   the advertised window in the incoming acknowledgment equals the
-            //   advertised window in the last incoming acknowledgment.
-            let is_dup_ack = {
-                snd_nxt.after(*snd_una) // (a)
-                && pure_ack // (b) & (c)
-                && seg_ack == *snd_una // (d)
-                && seg_wnd == *snd_wnd // (e)
-            };
-            if is_dup_ack {
-                let fast_recovery_initiated = congestion_control.on_dup_ack(seg_ack);
-                if fast_recovery_initiated {
-                    counters.fast_recovery.increment();
-                }
-            }
-            // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-72):
-            //   If the ACK is a duplicate (SEG.ACK < SND.UNA), it can be
-            //   ignored.
-            (None, DataAcked::No)
+
+            res
         }
     }
 }
@@ -4673,8 +4685,8 @@ mod test {
                     wnd: WindowSize::DEFAULT,
                     wnd_max: WindowSize::DEFAULT,
                     buffer: send_buffer,
-                    wl1: ISS_2,
-                    wl2: ISS_1,
+                    wl1: ISS_2 + 1,
+                    wl2: ISS_1 + 1,
                     last_seq_ts: None,
                     rtt_estimator: Estimator::default(),
                     timer: None,
@@ -5857,8 +5869,8 @@ mod test {
                 wnd: WindowSize::DEFAULT,
                 wnd_max: WindowSize::DEFAULT,
                 buffer: send_buffer.clone(),
-                wl1: ISS_2,
-                wl2: ISS_1,
+                wl1: ISS_2 + 1,
+                wl2: ISS_1 + 1,
                 last_seq_ts: None,
                 rtt_estimator: Estimator::Measured { srtt: rtt, rtt_var: Duration::ZERO },
                 timer: None,
@@ -5907,7 +5919,27 @@ mod test {
                     ),
                     (None, None, DataAcked::No, _newly_closed)
                 );
+
+                // In non-test code, calling poll_send is done automatically in
+                // try_handle_incoming_for_connection.
+                //
+                // This is when the ZWP timer gets set.
+                assert_matches!(
+                    state.poll_send(
+                        &counters,
+                        u32::MAX,
+                        clock.now(),
+                        &SocketOptions {
+                            user_timeout: Some(TEST_USER_TIMEOUT),
+                            ..SocketOptions::default()
+                        },
+                    ),
+                    Err(NewlyClosed::No)
+                );
+                let inner_state = assert_matches!(state, State::Established(ref e) => e);
+                assert_matches!(inner_state.snd.timer, Some(SendTimer::ZeroWindowProbe(_)));
             }
+
             let deadline = state.poll_send_at().expect("must have a retransmission timer");
             clock.sleep(deadline.checked_duration_since(clock.now()).unwrap());
             times += 1;
@@ -6659,8 +6691,9 @@ mod test {
         }
     }
 
-    #[test]
-    fn snd_silly_window_avoidance() {
+    #[test_case(true; "prompted window update")]
+    #[test_case(false; "unprompted window update")]
+    fn snd_silly_window_avoidance(prompted_window_update: bool) {
         const CAP: usize = TEST_BYTES.len() * 2;
         let mut snd: Send<FakeInstant, RingBuffer, false> = Send {
             nxt: ISS_1 + 1,
@@ -6764,22 +6797,57 @@ mod test {
             ))
         );
 
-        // Now the receiver sends back a window update, but not enough for a
-        // full MSS.
-        assert_eq!(
-            snd.process_ack(
-                &counters,
-                ISS_2 + 1,
-                ISS_1 + 1 + TEST_BYTES.len() + 1,
-                UnscaledWindowSize::from(3),
-                true,
-                ISS_2 + 1,
-                WindowSize::DEFAULT,
-                clock.now(),
-                &KeepAlive::default(),
-            ),
-            (None, DataAcked::Yes)
-        );
+        if prompted_window_update {
+            // Now the receiver sends back a window update, but not enough for a
+            // full MSS.
+            assert_eq!(
+                snd.process_ack(
+                    &counters,
+                    ISS_2 + 1,
+                    ISS_1 + 1 + TEST_BYTES.len() + 1,
+                    UnscaledWindowSize::from(3),
+                    true,
+                    ISS_2 + 1,
+                    WindowSize::DEFAULT,
+                    clock.now(),
+                    &KeepAlive::default(),
+                ),
+                (None, DataAcked::Yes)
+            );
+        } else {
+            // First probe sees the same empty window.
+            assert_eq!(
+                snd.process_ack(
+                    &counters,
+                    ISS_2 + 1,
+                    ISS_1 + 1 + TEST_BYTES.len(),
+                    UnscaledWindowSize::from(0),
+                    true,
+                    ISS_2 + 1,
+                    WindowSize::DEFAULT,
+                    clock.now(),
+                    &KeepAlive::default(),
+                ),
+                (None, DataAcked::No)
+            );
+
+            // The receiver freed up buffer space and decided to send a sub-MSS
+            // window update (likely a bug).
+            assert_eq!(
+                snd.process_ack(
+                    &counters,
+                    ISS_2 + 1,
+                    ISS_1 + 1 + TEST_BYTES.len(),
+                    UnscaledWindowSize::from(3),
+                    true,
+                    ISS_2 + 1,
+                    WindowSize::DEFAULT,
+                    clock.now(),
+                    &KeepAlive::default(),
+                ),
+                (None, DataAcked::No)
+            );
+        }
 
         // We would then transition into SWS avoidance.
         assert_eq!(
@@ -6798,6 +6866,7 @@ mod test {
 
         // After the overriding timeout, we should push out whatever the
         // receiver is willing to receive.
+        let seq_index = usize::from(prompted_window_update);
         assert_eq!(
             snd.poll_send(
                 &counters,
@@ -6808,10 +6877,10 @@ mod test {
                 &SocketOptions::default(),
             ),
             Some(Segment::data(
-                ISS_1 + 1 + TEST_BYTES.len() + 1,
+                ISS_1 + 1 + TEST_BYTES.len() + seq_index,
                 ISS_2 + 1,
                 UnscaledWindowSize::from(u16::MAX),
-                FragmentedPayload::new_contiguous(&TEST_BYTES[1..4]),
+                FragmentedPayload::new_contiguous(&TEST_BYTES[seq_index..3 + seq_index]),
             ))
         );
     }
