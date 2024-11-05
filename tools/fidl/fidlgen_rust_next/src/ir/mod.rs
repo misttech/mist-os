@@ -15,6 +15,7 @@ mod schema;
 mod r#struct;
 mod table;
 mod r#type;
+mod type_alias;
 mod type_shape;
 mod union;
 
@@ -31,5 +32,6 @@ pub use self::r#struct::*;
 pub use self::r#type::*;
 pub use self::schema::*;
 pub use self::table::*;
+pub use self::type_alias::*;
 pub use self::type_shape::*;
 pub use self::union::*;

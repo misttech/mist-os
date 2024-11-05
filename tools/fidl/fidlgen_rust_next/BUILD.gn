@@ -12,6 +12,7 @@ if (is_host) {
     edition = "2021"
     sources = [
       "src/compiler/mod.rs",
+      "src/compiler/natural/alias.rs",
       "src/compiler/natural/constant.rs",
       "src/compiler/natural/enum.rs",
       "src/compiler/natural/mod.rs",
@@ -20,6 +21,7 @@ if (is_host) {
       "src/compiler/natural/union.rs",
       "src/compiler/resource_binding.rs",
       "src/compiler/util.rs",
+      "src/compiler/wire/alias.rs",
       "src/compiler/wire/enum.rs",
       "src/compiler/wire/mod.rs",
       "src/compiler/wire/struct.rs",
@@ -40,6 +42,7 @@ if (is_host) {
       "src/ir/struct.rs",
       "src/ir/table.rs",
       "src/ir/type.rs",
+      "src/ir/type_alias.rs",
       "src/ir/type_shape.rs",
       "src/ir/union.rs",
       "src/main.rs",

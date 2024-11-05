@@ -50,8 +50,8 @@ fidl_testdata_info = [
   {
     name = "aliases"
     target = "//tools/fidl/fidlc/testdata/aliases:test.aliases"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support type aliases yet.
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -264,8 +264,9 @@ fidl_testdata_info = [
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
-
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support type aliases yet.
+    ]
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -349,7 +350,7 @@ fidl_testdata_info = [
       "fidlgen_rust",
       "fidlgen_syzkaller",
 
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support type aliases yet.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
       "fidlgen_rust_next",
     ]
   },

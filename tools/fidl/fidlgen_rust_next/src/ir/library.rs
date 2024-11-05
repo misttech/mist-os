@@ -8,7 +8,7 @@ use serde::Deserialize;
 
 use crate::de::Index;
 
-use super::{CompIdent, DeclType};
+use super::{CompIdent, DeclType, TypeShape};
 
 #[derive(Debug, Deserialize)]
 pub struct Library {
@@ -30,4 +30,6 @@ pub struct ExternalDeclaration {
     #[serde(rename = "resource", default)]
     #[expect(dead_code)]
     pub is_resouce: bool,
+    #[serde(rename = "type_shape_v2")]
+    pub shape: Option<TypeShape>,
 }

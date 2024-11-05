@@ -147,7 +147,7 @@ template("fidl_rust_next") {
           if (label == "//zircon/vdso/zx:zx") {
             deps += [ "//sdk/rust/zx-types" ]
           } else {
-            deps += [ "${label}_rust" ]
+            deps += [ "${label}_rust_next" ]
           }
         }
       }

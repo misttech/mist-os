@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod alias;
 mod constant;
 mod r#enum;
 mod r#struct;
@@ -14,6 +15,7 @@ use crate::compiler::util::emit_natural_comp_ident;
 use crate::compiler::Compiler;
 use crate::ir::{DeclType, EndpointRole, InternalSubtype, PrimSubtype, Type, TypeKind};
 
+pub use self::alias::emit_alias;
 pub use self::constant::emit_constant;
 pub use self::r#enum::emit_enum;
 pub use self::r#struct::emit_struct;

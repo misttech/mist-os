@@ -63,12 +63,16 @@ impl<'a> Compiler<'a> {
                     natural::emit_union(self, out, ident)?;
                     wire::emit_union(self, out, ident)?;
                 }
-                DeclType::Alias => todo!(),
+                DeclType::Alias => {
+                    natural::emit_alias(self, out, ident)?;
+                    wire::emit_alias(self, out, ident)?;
+                }
                 DeclType::Bits => todo!(),
                 DeclType::Const => {
                     natural::emit_constant(self, out, ident)?;
                 }
-                DeclType::Resource => todo!(),
+                // Custom resources are currently treated as the underlying type
+                DeclType::Resource => (),
                 DeclType::NewType => todo!(),
                 DeclType::Overlay => todo!(),
                 // Skip protocols rather than panic because many basic tests have protocols in them

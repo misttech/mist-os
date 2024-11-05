@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod alias;
 mod r#enum;
 mod r#struct;
 mod table;
@@ -15,6 +16,7 @@ use crate::compiler::util::{
 use crate::compiler::Compiler;
 use crate::ir::{DeclType, EndpointRole, InternalSubtype, Type, TypeKind};
 
+pub use self::alias::emit_alias;
 pub use self::r#enum::emit_enum;
 pub use self::r#struct::emit_struct;
 pub use self::r#union::emit_union;
@@ -71,7 +73,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
             write!(out, "{}", prim_subtype_wire_name(*subtype))?;
         }
         TypeKind::Identifier { identifier, nullable, .. } => {
-            match compiler.schema.declarations[identifier] {
+            match compiler.schema.get_decl_type(identifier).unwrap() {
                 DeclType::Enum => {
                     emit_wire_comp_ident(compiler, out, identifier)?;
                 }
@@ -84,10 +86,13 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                         write!(out, "::fidl_next::WireBox<'buf, ")?;
                     }
                     emit_wire_comp_ident(compiler, out, identifier)?;
-                    let s = &compiler.schema.struct_declarations[identifier];
-                    if s.shape.max_out_of_line != 0 {
-                        write!(out, "<'buf>")?;
+
+                    if let Some(shape) = compiler.schema.get_type_shape(identifier) {
+                        if shape.max_out_of_line != 0 {
+                            write!(out, "<'buf>")?;
+                        }
                     }
+
                     if *nullable {
                         write!(out, ">")?;
                     }
@@ -98,8 +103,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                     } else {
                         emit_wire_comp_ident(compiler, out, identifier)?;
                     }
-                    let u = &compiler.schema.union_declarations[identifier];
-                    if u.shape.max_out_of_line != 0 {
+                    if ty.shape.max_out_of_line != 0 {
                         write!(out, "<'buf>")?;
                     }
                 }
@@ -107,7 +111,18 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 DeclType::Alias => todo!(),
                 DeclType::Bits => todo!(),
                 DeclType::Const => todo!(),
-                DeclType::Resource => todo!(),
+                DeclType::Resource => {
+                    // All resources are currently treated like handles
+                    if !*nullable {
+                        write!(out, "{}", compiler.config.resource_bindings.handle.wire_path)?;
+                    } else {
+                        write!(
+                            out,
+                            "{}",
+                            compiler.config.resource_bindings.handle.optional_wire_path
+                        )?;
+                    }
+                }
                 DeclType::NewType => todo!(),
                 DeclType::Overlay => todo!(),
                 DeclType::Service => todo!(),
