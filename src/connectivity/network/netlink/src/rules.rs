@@ -8,8 +8,8 @@
 
 use std::collections::BTreeMap;
 
+use assert_matches::assert_matches;
 use derivative::Derivative;
-use either::Either;
 use linux_uapi::{
     rt_class_t_RT_TABLE_DEFAULT, rt_class_t_RT_TABLE_LOCAL, rt_class_t_RT_TABLE_MAIN,
 };
@@ -91,6 +91,52 @@ fn to_nlm_new_rule(
     msg
 }
 
+/// Maps from the lower-order bits of a rule's [`fnet_routes_ext::RuleIndex`] to the rule stored
+/// at that index.
+/// (The higher-order bits will come from the [`RulePriority`].)
+#[derive(Default, Debug)]
+struct IndexedRules {
+    rules: BTreeMap<u16, RuleMessage>,
+}
+
+impl IndexedRules {
+    fn add_rule(&mut self, rule: RuleMessage) -> Result<u16, AddRuleError> {
+        if self.rules.values().any(|existing_rule| rules_are_equal(existing_rule, &rule)) {
+            return Err(AddRuleError::AlreadyExists);
+        }
+
+        let last_allocated_index = self.rules.keys().next_back();
+
+        let next_available_index = match last_allocated_index {
+            None => 0u16,
+            Some(index) => index.checked_add(1).ok_or_else(|| {
+                crate::logging::log_error!("Could not add rule due to exhausting u16 indices");
+                AddRuleError::IndicesExhausted
+            })?,
+        };
+
+        assert_matches!(self.rules.insert(next_available_index, rule), None);
+        Ok(next_available_index)
+    }
+
+    fn remove_first_matching(&mut self, pattern: &RuleMessage) -> Option<(u16, RuleMessage)> {
+        let index = self
+            .rules
+            .iter()
+            .find_map(|(index, rule)| rule_matches_del_pattern(rule, pattern).then_some(*index))?;
+        let rule = self.rules.remove(&index)?;
+        Some((index, rule))
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &RuleMessage> {
+        self.rules.values()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+}
+
 /// Holds an IP-versioned table of PBR rules.
 ///
 /// Note that Fuchsia does not support policy based routing, so this
@@ -104,11 +150,11 @@ pub(crate) struct RuleTable<I: Ip> {
     /// The rules held by this rule table.
     ///
     /// The [`BTreeMap`] ensures that the rules are sorted by their
-    /// [`RulePriority`], while the held `Vec` ensures the rules at a given
+    /// [`RulePriority`], while the held [`IndexedRules`] ensures the rules at a given
     /// [`RulePriority`] are held in insertion order (new rules are pushed onto
     /// the back). This gives the rule table a consistent ordering based first
     /// on priority, and then by age.
-    rules: BTreeMap<RulePriority, Vec<RuleMessage>>,
+    rules: BTreeMap<RulePriority, IndexedRules>,
     _ip_version_marker: IpVersionMarker<I>,
 }
 
@@ -193,10 +239,8 @@ impl<I: Ip> RuleTable<I> {
         };
 
         let rules_at_priority = self.rules.entry(priority).or_default();
-        if rules_at_priority.iter().any(|existing_rule| rules_are_equal(existing_rule, &rule)) {
-            return Err(AddRuleError::AlreadyExists);
-        }
-        rules_at_priority.push(rule);
+        let _index: u16 = rules_at_priority.add_rule(rule.clone())?;
+
         Ok(())
     }
 
@@ -206,61 +250,43 @@ impl<I: Ip> RuleTable<I> {
             return Err(DelRuleError::InvalidPattern);
         }
 
-        struct RuleKey {
-            /// The rule's priority (e.g. the key into the [`BTreeMap`]).
-            priority: RulePriority,
-            /// The index of the rule in the [`Vec`] at the given priority.
-            index: usize,
+        let bounds = if let Some(priority) = get_priority(del_pattern) {
+            (std::ops::Bound::Included(priority), std::ops::Bound::Included(priority))
+        } else {
+            (std::ops::Bound::Unbounded, std::ops::Bound::Unbounded)
+        };
+
+        fn remove_rule_in_bounds(
+            rules: &mut BTreeMap<RulePriority, IndexedRules>,
+            del_pattern: &RuleMessage,
+            bounds: (std::ops::Bound<RulePriority>, std::ops::Bound<RulePriority>),
+        ) -> Option<(RulePriority, u16, RuleMessage)> {
+            for (priority, rules) in rules.range_mut(bounds) {
+                if let Some((index, rule)) = rules.remove_first_matching(del_pattern) {
+                    return Some((*priority, index, rule));
+                }
+            }
+            None
         }
 
-        // Construct an iterator of (RuleKey, Rule).
-        let candidate_rules = {
-            let rules_by_priority = if let Some(priority) = get_priority(del_pattern) {
-                // If the deletion pattern specifies a priority, reduce the set
-                // of candidate rules to only those with the priority
-                Either::Left(self.rules.get(&priority).map(|v| (priority, v)).into_iter())
-            } else {
-                // Otherwise, search the entire table.
-                Either::Right(self.rules.iter().map(|(priority, v)| (*priority, v)))
-            };
-            rules_by_priority
-                .into_iter()
-                .map(|(priority, v)| {
-                    v.iter()
-                        .enumerate()
-                        .map(move |(index, rule)| (RuleKey { priority, index }, rule))
-                })
-                .flatten()
-        };
-
-        // Select the first suitable rule for deletion.
-        let matching_rule = candidate_rules
-            .into_iter()
-            .find(|(_key, rule)| rule_matches_del_pattern(rule, del_pattern));
-        let Some((RuleKey { priority, index }, _rule)) = matching_rule else {
-            return Err(DelRuleError::NoMatchesForPattern);
-        };
-
-        let no_more_rules_at_priority = {
-            let rules_at_priority = self
-                .rules
-                .get_mut(&priority)
-                .expect("RuleTable must have entry for existing priority");
-            let _: RuleMessage = rules_at_priority.remove(index);
-            rules_at_priority.is_empty()
-        };
-        // Clear out the empty entry from the btreemap.
-        if no_more_rules_at_priority {
-            assert_eq!(self.rules.remove(&priority), Some(Vec::new()));
+        if let Some((priority, _index, _rule)) =
+            remove_rule_in_bounds(&mut self.rules, del_pattern, bounds)
+        {
+            if self.rules.get(&priority).map(IndexedRules::is_empty).unwrap_or(false) {
+                // Garbage collect the empty `IndexedRules`.
+                let _: Option<IndexedRules> = self.rules.remove(&priority);
+            }
+            Ok(())
+        } else {
+            Err(DelRuleError::NoMatchesForPattern)
         }
-        Ok(())
     }
 
     /// Iterate over all the rules.
     ///
     /// The rules are ordered first by [`RulePriority`], and second by age.
     fn iter_rules(&self) -> impl Iterator<Item = &RuleMessage> {
-        self.rules.values().flatten()
+        self.rules.values().flat_map(|rules| rules.iter())
     }
 
     /// Returns the default_priority to use for a newly installed rule.
@@ -282,12 +308,14 @@ impl<I: Ip> RuleTable<I> {
 #[derive(Debug)]
 enum AddRuleError {
     AlreadyExists,
+    IndicesExhausted,
 }
 
 impl AddRuleError {
     fn errno(&self) -> Errno {
         match self {
             AddRuleError::AlreadyExists => Errno::EEXIST,
+            AddRuleError::IndicesExhausted => Errno::ETOOMANYREFS,
         }
     }
 }
