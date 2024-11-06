@@ -525,7 +525,15 @@ def generate_clang_cc_toolchain(
     compiler_files = name + "_compiler_files"
     native.filegroup(
         name = compiler_files,
-        srcs = common_compiler_files + sysroot_header_files,
+        # Adding :libcxx_runtime_libs here is a workaround for b/360235447, b/354016617.
+        # The clang driver became sensitive to the existence of runtime
+        # libdirs for compiling -- there is now logic that probes for
+        # the existence of libdirs when computing the set of include dirs.
+        # Including the runtime libdirs allows the driver to select
+        # the correct multilib variant of include dirs.
+        # If when the toolchain reverts this behavior, this workaround
+        # can be removed.
+        srcs = common_compiler_files + sysroot_header_files + [":libcxx_runtime_libs"],
     )
 
     linker_files = name + "_linker_files"
