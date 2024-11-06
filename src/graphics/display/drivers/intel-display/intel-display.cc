@@ -61,12 +61,12 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace intel_display {
@@ -272,7 +272,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   }
 
   // Wait for Power Well 0 distribution
-  if (!PollUntil(
+  if (!display::PollUntil(
           [&] { return registers::FuseStatus::Get().ReadFrom(mmio_space()).pg0_dist_status(); },
           zx::usec(1), 20)) {
     FDF_LOG(ERROR, "Power Well 0 distribution failed");
@@ -295,7 +295,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     pwr_well_ctrl.power_request(1).set(1);
     pwr_well_ctrl.WriteTo(mmio_space());
 
-    if (!PollUntil(
+    if (!display::PollUntil(
             [&] {
               return registers::PowerWellControl::Get().ReadFrom(mmio_space()).power_state(0).get();
             },
@@ -304,7 +304,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
       return false;
     }
 
-    if (!PollUntil(
+    if (!display::PollUntil(
             [&] { return registers::FuseStatus::Get().ReadFrom(mmio_space()).pg1_dist_status(); },
             zx::usec(1), 20)) {
       FDF_LOG(ERROR, "Power Well 1 distribution failed");
@@ -340,7 +340,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
       // The PRM instructs us to use the LCPLL1 control register to find out
       // when DPLL0 locks. This is different from most DPLL enabling sequences,
       // which use the DPLL status registers.
-      if (!PollUntil(
+      if (!display::PollUntil(
               [&] {
                 return lcpll1_control.ReadFrom(mmio_space()).pll_locked_tiger_lake_and_lcpll1();
               },
@@ -370,8 +370,9 @@ bool Controller::BringUpDisplayEngine(bool resume) {
         registers::DataBufferControl::GetForSlice(slice_index).ReadFrom(mmio_space());
     display_buffer_control.set_powered_on_target(true).WriteTo(mmio_space());
 
-    if (!PollUntil([&] { return display_buffer_control.ReadFrom(mmio_space()).powered_on(); },
-                   zx::usec(1), 10)) {
+    if (!display::PollUntil(
+            [&] { return display_buffer_control.ReadFrom(mmio_space()).powered_on(); }, zx::usec(1),
+            10)) {
       FDF_LOG(ERROR, "DBUF slice %d did not power up in time", slice_index + 1);
       return false;
     }
@@ -471,8 +472,9 @@ bool Controller::ResetDdi(DdiId ddi_id, std::optional<TranscoderId> transcoder_i
     }
   }
 
-  if (was_enabled && !PollUntil([&] { return ddi_buffer_control.ReadFrom(mmio_space()).is_idle(); },
-                                zx::msec(1), 8)) {
+  if (was_enabled &&
+      !display::PollUntil([&] { return ddi_buffer_control.ReadFrom(mmio_space()).is_idle(); },
+                          zx::msec(1), 8)) {
     FDF_LOG(ERROR, "Port failed to go idle");
     return false;
   }
@@ -485,7 +487,7 @@ bool Controller::ResetDdi(DdiId ddi_id, std::optional<TranscoderId> transcoder_i
   // This step is not documented in Intel Display PRM, but this step occurs
   // in the drm/i915 driver and experiments on NUC11 hardware indicate that
   // display hotplug may fail without this step.
-  if (!PollUntil([&] { return !power_->GetDdiIoPowerState(ddi_id); }, zx::usec(1), 1000)) {
+  if (!display::PollUntil([&] { return !power_->GetDdiIoPowerState(ddi_id); }, zx::usec(1), 1000)) {
     FDF_LOG(ERROR, "Disable IO power timeout");
     return false;
   }

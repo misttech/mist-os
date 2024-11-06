@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
+#include "src/graphics/display/lib/driver-utils/scoped-value-change.h"
 
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -10,7 +10,7 @@
 #include <mutex>
 #include <unordered_set>
 
-namespace intel_display {
+namespace display {
 
 namespace {
 
@@ -46,4 +46,4 @@ void ScopedValueChange<void>::RemovedChangeTo(void* variable) {
   ZX_DEBUG_ASSERT_MSG(erase_count == 1, "Bug in ScopedValueChange lifecycle / reference counting");
 }
 
-}  // namespace intel_display
+}  // namespace display

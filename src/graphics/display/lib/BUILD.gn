@@ -9,6 +9,7 @@ group("tests") {
     "coordinator-getter:tests",
     "designware-hdmi:tests",
     "driver-framework-migration-utils:tests",
+    "driver-utils:tests",
     "edid:tests",
     "framebuffer-display:tests",
     "rust:tests",

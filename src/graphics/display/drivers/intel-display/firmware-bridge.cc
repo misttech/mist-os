@@ -15,7 +15,7 @@
 
 #include <hwreg/bitfields.h>
 
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 // Our implementation is based on the following versions of Intel's ACPI IGD
 // (Integrated Graphics Device) OpRegion Specification:

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
+#include "src/graphics/display/lib/driver-utils/scoped-value-change.h"
 
 #include <gtest/gtest.h>
 
-namespace intel_display {
+namespace display {
 
 namespace {
 
@@ -187,4 +187,4 @@ TEST(ScopedValueChangeTest, MoveAssignmentDoesRestoreResetDestination) {
 
 }  // namespace
 
-}  // namespace intel_display
+}  // namespace display

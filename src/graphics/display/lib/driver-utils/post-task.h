@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_UTIL_POST_TASK_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_UTIL_POST_TASK_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_DRIVER_UTILS_POST_TASK_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_DRIVER_UTILS_POST_TASK_H_
 
 #include <lib/async/dispatcher.h>
 #include <lib/async/task.h>
@@ -325,4 +325,4 @@ CallFromDestructor<Callable>::~CallFromDestructor() {
 
 }  // namespace display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_UTIL_POST_TASK_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_DRIVER_UTILS_POST_TASK_H_

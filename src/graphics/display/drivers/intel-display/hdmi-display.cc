@@ -32,8 +32,8 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace intel_display {
 
@@ -160,15 +160,15 @@ bool HdmiDisplay::DdiModeset(const display::DisplayTiming& mode) {
 
   ZX_DEBUG_ASSERT(controller()->power());
   controller()->power()->SetDdiIoPowerState(ddi_id(), /*enable=*/true);
-  if (!PollUntil([&] { return controller()->power()->GetDdiIoPowerState(ddi_id()); }, zx::usec(1),
-                 20)) {
+  if (!display::PollUntil([&] { return controller()->power()->GetDdiIoPowerState(ddi_id()); },
+                          zx::usec(1), 20)) {
     FDF_LOG(ERROR, "DDI %d IO power did not come up in 20us", ddi_id());
     return false;
   }
 
   controller()->power()->SetAuxIoPowerState(ddi_id(), /*enable=*/true);
-  if (!PollUntil([&] { return controller()->power()->GetAuxIoPowerState(ddi_id()); }, zx::usec(1),
-                 10)) {
+  if (!display::PollUntil([&] { return controller()->power()->GetAuxIoPowerState(ddi_id()); },
+                          zx::usec(1), 10)) {
     FDF_LOG(ERROR, "DDI %d IO power did not come up in 10us", ddi_id());
     return false;
   }

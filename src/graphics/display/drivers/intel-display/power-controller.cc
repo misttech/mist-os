@@ -17,8 +17,8 @@
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/drivers/intel-display/registers-gt-mailbox.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
-#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/scoped-value-change.h"
 
 namespace intel_display {
 
@@ -81,8 +81,9 @@ PowerController::PowerController(fdf::MmioBuffer* mmio_buffer) : mmio_buffer_(mm
 zx::result<uint64_t> PowerController::Transact(PowerControllerCommand command) {
   auto mailbox_interface = registers::PowerMailboxInterface::Get().FromValue(0);
 
-  if (!PollUntil([&] { return !mailbox_interface.ReadFrom(mmio_buffer_).has_active_transaction(); },
-                 zx::usec(1), g_previous_command_timeout_us)) {
+  if (!display::PollUntil(
+          [&] { return !mailbox_interface.ReadFrom(mmio_buffer_).has_active_transaction(); },
+          zx::usec(1), g_previous_command_timeout_us)) {
     FDF_LOG(WARNING, "Timed out while waiting for PCU to finish pre-existing work");
     return zx::error_result(ZX_ERR_IO_MISSED_DEADLINE);
   }
@@ -101,8 +102,9 @@ zx::result<uint64_t> PowerController::Transact(PowerControllerCommand command) {
     return zx::ok(0);
   }
 
-  if (!PollUntil([&] { return !mailbox_interface.ReadFrom(mmio_buffer_).has_active_transaction(); },
-                 zx::usec(1), command.timeout_us)) {
+  if (!display::PollUntil(
+          [&] { return !mailbox_interface.ReadFrom(mmio_buffer_).has_active_transaction(); },
+          zx::usec(1), command.timeout_us)) {
     return zx::error_result(ZX_ERR_IO_MISSED_DEADLINE);
   }
 
@@ -430,56 +432,57 @@ zx::result<MemorySubsystemInfo> PowerController::GetMemorySubsystemInfoTigerLake
 }
 
 // static
-ScopedValueChange<int> PowerController::OverridePreviousCommandTimeoutUsForTesting(int timeout_us) {
-  return ScopedValueChange(g_previous_command_timeout_us, timeout_us);
+display::ScopedValueChange<int> PowerController::OverridePreviousCommandTimeoutUsForTesting(
+    int timeout_us) {
+  return display::ScopedValueChange(g_previous_command_timeout_us, timeout_us);
 }
 
 // static
-ScopedValueChange<int> PowerController::OverrideVoltageLevelRequestReplyTimeoutUsForTesting(
-    int timeout_us) {
-  return ScopedValueChange(g_voltage_level_request_reply_timeout_us, timeout_us);
+display::ScopedValueChange<int>
+PowerController::OverrideVoltageLevelRequestReplyTimeoutUsForTesting(int timeout_us) {
+  return display::ScopedValueChange(g_voltage_level_request_reply_timeout_us, timeout_us);
 }
 
 // static
-ScopedValueChange<int> PowerController::OverrideVoltageLevelRequestTotalTimeoutUsForTesting(
-    int timeout_us) {
-  return ScopedValueChange(g_voltage_level_request_total_timeout_us, timeout_us);
+display::ScopedValueChange<int>
+PowerController::OverrideVoltageLevelRequestTotalTimeoutUsForTesting(int timeout_us) {
+  return display::ScopedValueChange(g_voltage_level_request_total_timeout_us, timeout_us);
 }
 
 // static
-ScopedValueChange<int> PowerController::OverrideTypeCColdBlockingChangeReplyTimeoutUsForTesting(
-    int timeout_us) {
-  return ScopedValueChange(g_typec_cold_blocking_change_reply_timeout_us, timeout_us);
+display::ScopedValueChange<int>
+PowerController::OverrideTypeCColdBlockingChangeReplyTimeoutUsForTesting(int timeout_us) {
+  return display::ScopedValueChange(g_typec_cold_blocking_change_reply_timeout_us, timeout_us);
 }
 
 // static
-ScopedValueChange<int> PowerController::OverrideTypeCColdBlockingChangeTotalTimeoutUsForTesting(
-    int timeout_us) {
-  return ScopedValueChange(g_typec_cold_blocking_change_total_timeout_us, timeout_us);
+display::ScopedValueChange<int>
+PowerController::OverrideTypeCColdBlockingChangeTotalTimeoutUsForTesting(int timeout_us) {
+  return display::ScopedValueChange(g_typec_cold_blocking_change_total_timeout_us, timeout_us);
 }
 
 // static
-ScopedValueChange<int> PowerController::OverrideSystemAgentEnablementChangeReplyTimeoutUsForTesting(
-    int timeout_us) {
-  return ScopedValueChange(g_system_agent_enablement_change_reply_timeout_us, timeout_us);
+display::ScopedValueChange<int>
+PowerController::OverrideSystemAgentEnablementChangeReplyTimeoutUsForTesting(int timeout_us) {
+  return display::ScopedValueChange(g_system_agent_enablement_change_reply_timeout_us, timeout_us);
 }
 
 // static
-ScopedValueChange<int> PowerController::OverrideSystemAgentEnablementChangeTotalTimeoutUsForTesting(
-    int timeout_us) {
-  return ScopedValueChange(g_system_agent_enablement_change_total_timeout_us, timeout_us);
+display::ScopedValueChange<int>
+PowerController::OverrideSystemAgentEnablementChangeTotalTimeoutUsForTesting(int timeout_us) {
+  return display::ScopedValueChange(g_system_agent_enablement_change_total_timeout_us, timeout_us);
 }
 
 // static
-ScopedValueChange<int> PowerController::OverrideGetMemorySubsystemInfoReplyTimeoutUsForTesting(
-    int timeout_us) {
-  return ScopedValueChange(g_get_memory_subsystem_info_reply_timeout_us, timeout_us);
+display::ScopedValueChange<int>
+PowerController::OverrideGetMemorySubsystemInfoReplyTimeoutUsForTesting(int timeout_us) {
+  return display::ScopedValueChange(g_get_memory_subsystem_info_reply_timeout_us, timeout_us);
 }
 
 // static
-ScopedValueChange<int> PowerController::OverrideGetMemoryLatencyReplyTimeoutUsForTesting(
+display::ScopedValueChange<int> PowerController::OverrideGetMemoryLatencyReplyTimeoutUsForTesting(
     int timeout_us) {
-  return ScopedValueChange(g_get_memory_latency_reply_timeout_us, timeout_us);
+  return display::ScopedValueChange(g_get_memory_latency_reply_timeout_us, timeout_us);
 }
 
 }  // namespace intel_display

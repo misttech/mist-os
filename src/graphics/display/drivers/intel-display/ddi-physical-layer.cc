@@ -21,7 +21,7 @@
 #include "src/graphics/display/drivers/intel-display/power-controller.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi-phy-tiger-lake.h"
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace intel_display {
 
@@ -708,7 +708,8 @@ bool TypeCDdiTigerLake::SetAuxIoPower(bool target_enabled) const {
   power_->SetAuxIoPowerState(ddi_id(), /* enable */ target_enabled);
 
   if (target_enabled) {
-    if (!PollUntil([&] { return power_->GetAuxIoPowerState(ddi_id()); }, zx::usec(1), 1500)) {
+    if (!display::PollUntil([&] { return power_->GetAuxIoPowerState(ddi_id()); }, zx::usec(1),
+                            1500)) {
       FDF_LOG(ERROR, "DDI %d: failed to enable AUX power for ddi", ddi_id());
       return false;
     }
@@ -725,7 +726,7 @@ bool TypeCDdiTigerLake::SetAuxIoPower(bool target_enabled) const {
       //
       // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0, Page 417, "Type-C PHY
       //             Microcontroller health"
-      if (!PollUntil(
+      if (!display::PollUntil(
               [&] {
                 return registers::DekelCommonConfigMicroControllerDword27::GetForDdi(ddi_id())
                     .ReadFrom(mmio_space_)

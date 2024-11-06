@@ -19,7 +19,7 @@
 
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace intel_display {
 
@@ -142,7 +142,7 @@ void DdiAuxChannel::WriteRequestForTesting(const Request& request) {
 }
 
 bool DdiAuxChannel::WaitForTransactionComplete() {
-  return PollUntil(
+  return display::PollUntil(
       [&] {
         aux_control_.ReadFrom(mmio_buffer_);
         // Wait for transaction_in_progress() to be cleared, so we know we're

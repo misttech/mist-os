@@ -61,7 +61,6 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
-#include "src/graphics/display/drivers/coordinator/util/post-task.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
@@ -76,6 +75,7 @@
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
+#include "src/graphics/display/lib/driver-utils/post-task.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;

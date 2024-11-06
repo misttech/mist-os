@@ -70,7 +70,6 @@ source_set("shared") {
     "layer.h",
     "migration-util.cc",
     "migration-util.h",
-    "util/post-task.h",
     "vsync-monitor.cc",
     "vsync-monitor.h",
   ]
@@ -95,6 +94,7 @@ source_set("shared") {
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
+    "//src/graphics/display/lib/driver-utils",
     "//src/graphics/display/lib/edid",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
@@ -125,7 +125,6 @@ test("display-coordinator-unittests") {
     "inspect-test.cc",
     "integration-test.cc",
     "layer-test.cc",
-    "util/post-task-test.cc",
   ]
   deps = [
     ":testing",

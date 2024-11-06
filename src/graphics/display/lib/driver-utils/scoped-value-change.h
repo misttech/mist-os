@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_UTIL_SCOPED_VALUE_CHANGE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_UTIL_SCOPED_VALUE_CHANGE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_DRIVER_UTILS_SCOPED_VALUE_CHANGE_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_DRIVER_UTILS_SCOPED_VALUE_CHANGE_H_
 
 #include <type_traits>
 #include <utility>
 
-namespace intel_display {
+namespace display {
 
 // Sets a variable to a value. Restores the old value when going out of scope.
 //
@@ -149,6 +149,6 @@ inline void ScopedValueChange<T>::RemovedChangeTo(T* variable) {
   ScopedValueChange<void>::RemovedChangeTo(static_cast<void*>(variable));
 }
 
-}  // namespace intel_display
+}  // namespace display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_UTIL_SCOPED_VALUE_CHANGE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_DRIVER_UTILS_SCOPED_VALUE_CHANGE_H_

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 #include <gtest/gtest.h>
 
-namespace intel_display {
+namespace display {
 
 namespace {
 
@@ -65,4 +65,4 @@ TEST(PollUntilTest, Timeout) {
 
 }  // namespace
 
-}  // namespace intel_display
+}  // namespace display
