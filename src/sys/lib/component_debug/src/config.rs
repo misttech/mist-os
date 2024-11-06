@@ -79,15 +79,28 @@ pub async fn resolve_raw_config_capabilities(
     Ok(resolved_capabilities)
 }
 
-pub async fn resolve_config_capability_use_decls(
+pub(crate) enum UseConfigurationOrConfigField {
+    UseConfiguration(cm_rust::UseConfigurationDecl),
+    ConfigField(cm_rust::ConfigField),
+}
+
+pub(crate) async fn resolve_config_decls(
     realm_query: &fsys::RealmQueryProxy,
     moniker: &Moniker,
-) -> Result<Vec<cm_rust::UseConfigurationDecl>, ConfigResolveError> {
+) -> Result<Vec<UseConfigurationOrConfigField>, ConfigResolveError> {
     let manifest = get_resolved_declaration(moniker, realm_query).await?;
+    let config_decls = manifest
+        .config
+        .into_iter()
+        .map(|c| c.fields)
+        .flatten()
+        .map(UseConfigurationOrConfigField::ConfigField);
     Ok(manifest
         .uses
         .into_iter()
         .filter_map(|u| if let cm_rust::UseDecl::Config(c) = u { Some(c) } else { None })
+        .map(UseConfigurationOrConfigField::UseConfiguration)
+        .chain(config_decls)
         .collect())
 }
 

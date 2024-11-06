@@ -8,7 +8,7 @@ use std::str::FromStr;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 use crate::cli::show::config_table_print;
-use crate::config::resolve_config_capability_use_decls;
+use crate::config::{resolve_config_decls, UseConfigurationOrConfigField};
 use crate::query::get_single_instance_from_query;
 
 use super::reload_cmd;
@@ -23,7 +23,7 @@ pub async fn config_set_cmd<W: std::io::Write>(
     writer: W,
 ) -> Result<()> {
     let instance = get_single_instance_from_query(&query, &realm_query).await?;
-    let decls = resolve_config_capability_use_decls(&realm_query, &instance.moniker).await?;
+    let decls = resolve_config_decls(&realm_query, &instance.moniker).await?;
     let fields = key_values
         .into_iter()
         .map(|kv| parse_config_key_value(&kv, &decls))
@@ -73,7 +73,7 @@ pub async fn config_list_cmd<W: std::io::Write>(
 
 fn parse_config_key_value(
     kv: &str,
-    decls: &Vec<cm_rust::UseConfigurationDecl>,
+    decls: &Vec<UseConfigurationOrConfigField>,
 ) -> Result<fdecl::ConfigOverride> {
     let mut kv = kv.split("=");
     let key = kv.next().ok_or(anyhow::anyhow!("invalid key=value formatting"))?.trim().to_string();
@@ -81,11 +81,20 @@ fn parse_config_key_value(
         kv.next().ok_or(anyhow::anyhow!("invalid key=value formatting"))?.trim().to_string();
     let config_type = decls
         .iter()
-        .find_map(|d| {
-            if key == d.target_name.to_string().to_lowercase() {
-                Some(d.type_.clone())
-            } else {
-                None
+        .find_map(|d| match d {
+            UseConfigurationOrConfigField::UseConfiguration(use_config) => {
+                if key == use_config.target_name.to_string().to_lowercase() {
+                    Some(use_config.type_.clone())
+                } else {
+                    None
+                }
+            }
+            UseConfigurationOrConfigField::ConfigField(config_field) => {
+                if key == config_field.key.to_lowercase() {
+                    Some(config_field.type_.clone())
+                } else {
+                    None
+                }
             }
         })
         .ok_or(anyhow::anyhow!("configuration capability not declared for key {key}",))?;
@@ -240,10 +249,16 @@ mod test {
         let lifecycle_controller = serve_lifecycle_controller("./my_foo");
         let config_override = serve_config_override(
             "./my_foo",
-            vec![cm_rust::ConfigOverride {
-                key: "foo".to_string(),
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(true)),
-            }],
+            vec![
+                cm_rust::ConfigOverride {
+                    key: "foo".to_string(),
+                    value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(true)),
+                },
+                cm_rust::ConfigOverride {
+                    key: "bar".to_string(),
+                    value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Uint64(42)),
+                },
+            ],
         );
         let instances = vec![fsys::Instance {
             moniker: Some("./my_foo".to_string()),
@@ -264,6 +279,20 @@ mod test {
                     }),
                     ..Default::default()
                 })]),
+                config: Some(fdecl::ConfigSchema {
+                    fields: Some(vec![fdecl::ConfigField {
+                        key: Some("bar".to_string()),
+                        type_: Some(fdecl::ConfigType {
+                            layout: fdecl::ConfigTypeLayout::Uint64,
+                            constraints: Vec::new(),
+                            parameters: None,
+                        }),
+                        ..Default::default()
+                    }]),
+                    checksum: Some(fdecl::ConfigChecksum::Sha256([0; 32])),
+                    value_source: Some(fdecl::ConfigValueSource::PackagePath("".to_string())),
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
         )]);
@@ -284,6 +313,7 @@ mod test {
     #[test_case(vec!["foo=true".to_string()], false, true; "no reload succeeds")]
     #[test_case(vec!["foo=true".to_string()], true, true; "reload succeeds")]
     #[test_case(vec!["foo=42".to_string()], false, false; "wrong type fails")]
+    #[test_case(vec!["bar=42".to_string()], false, true; "structured config override succeeds")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn config_set(key_values: Vec<String>, reload: bool, succeeds: bool) {
         let (lifecycle_controller, config_override, realm_query) = setup();
