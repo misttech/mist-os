@@ -1297,10 +1297,6 @@ fn do_setxattr(
     if size > XATTR_NAME_MAX as usize {
         return error!(E2BIG);
     }
-    let mode = node.entry.node.info().mode;
-    if mode.is_chr() || mode.is_fifo() {
-        return error!(EPERM);
-    }
 
     let op = match flags {
         0 => XattrOp::Set,
