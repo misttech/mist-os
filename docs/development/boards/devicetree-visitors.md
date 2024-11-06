@@ -85,8 +85,7 @@ behavior.
 [bindings]: https://devicetree-specification.readthedocs.io/en/v0.3/device-bindings.html#device-bindings
 [example-visitor]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/devicetree/examples/example-visitor/
 [phandle]: https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#phandle
-[devicetree-binding]: /docs/development/boards/devicetree-overview#devicetree-bindings-and-visitors
+[devicetree-binding]: /docs/development/boards/devicetree-overview.md#devicetree-bindings-and-visitors
 [board-driver]: /docs/development/boards/bringup.md#board-driver
 [default-visitors]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/devicetree/visitors/default/
 [driver-visitors]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/devicetree/visitors/drivers/
-

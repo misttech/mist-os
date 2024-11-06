@@ -15,4 +15,3 @@ bringup images in Fuchsia:
 [adding-support-for-new-boards]: /docs/development/boards/bringup.md
 [devicetree-overview]: /docs/development/boards/devicetree-overview.md
 [devicetree-visitors]: /docs/development/boards/devicetree-visitors.md
-
