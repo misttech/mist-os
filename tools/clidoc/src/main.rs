@@ -122,15 +122,12 @@ const ALLOW_LIST: &'static [&'static str] = &[
     "fidlgen_hlcpp",
     "fidlgen_rust",
     "fpublish",
-    "fremote",
     "fserve",
     "fssh",
     "funnel",
     "minfs",
-    "orchestrate",
     "pm",
     "symbolizer",
-    "triage",
     "zbi",
     "zxdb",
 ];
@@ -140,11 +137,13 @@ const ALLOW_LIST: &'static [&'static str] = &[
 lazy_static! {
     static ref IGNORE_ERR_CODE: HashSet<&'static str> = {
         let h = HashSet::from([
+            "blobfs",
             "bootserver",
+            "device-finder",
+            "fvm",
             "fssh",
-            "fremote",
+            "fuchsia-sdk-run",
             "minfs",
-            "orchestrate",
             "symbolizer",
             "zxdb",
         ]);
@@ -541,7 +540,7 @@ fn help_output_for(tool: &Path, subcommands: &Vec<&String>) -> Result<Vec<String
         .args(&*subcommands)
         .arg("--help")
         .output()
-        .context(format!("Command failed for {:?}", &tool.display()))
+        .context(format!("Command failed for {:?} {subcommands:?}", &tool.display()))
         .expect("get output");
 
     let stdout = output.stdout;
