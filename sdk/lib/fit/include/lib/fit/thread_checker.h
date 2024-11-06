@@ -34,7 +34,7 @@ namespace fit {
 //    }
 //  private:
 //   fit::thread_checker thread_checker_;
-//   int resource_ FIT_GUARDED_BY(thread_checker_);
+//   int resource_ FIT_GUARDED(thread_checker_);
 // }
 //
 // Note: |lock| checks the thread in debug builds only.

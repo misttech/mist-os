@@ -10,7 +10,7 @@
   "pkg/fit/include/lib/fit/internal/utility.h": "4e59989b0aa2d15818e2b3179fbe403c",
   "pkg/fit/include/lib/fit/nullable.h": "da6714398d11156bcdae1a7a13544239",
   "pkg/fit/include/lib/fit/result.h": "d44526fdaa8634cd79f14f4cb6b10cc2",
-  "pkg/fit/include/lib/fit/thread_checker.h": "f401f70aa6e4deefa879f08020a09733",
+  "pkg/fit/include/lib/fit/thread_checker.h": "1fbc22100dc6d4914541d1c396ef2a14",
   "pkg/fit/include/lib/fit/thread_safety.h": "0df6c9f73fc6b7e13c9cedd8cdcac250",
   "pkg/fit/include/lib/fit/traits.h": "e7e9a318c7511e870c8d907055d0593c"
 }
