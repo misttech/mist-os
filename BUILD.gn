@@ -1793,9 +1793,13 @@ group("default") {
     # TODO(https://fxbug.dev/42067746) has_board check not working
     "//build/images:default-images",
     "//build/images/updates:packages",
-    "//bundles/boot_tests",
     "//sdk",
   ]
+
+  # Only add the boot-tests on bringup builds
+  if (use_bringup_assembly) {
+    deps += [ "//bundles/boot_tests" ]
+  }
 
   # SDK-only builds must not attempt to build images.
   if (has_board) {
