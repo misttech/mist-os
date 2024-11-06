@@ -212,7 +212,7 @@ group("tests") {
   }
 }
 
-group("e2e_tests") {
+group("host_tests") {
   testonly = true
   deps = []
 

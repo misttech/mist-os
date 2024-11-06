@@ -8,8 +8,8 @@ group("drivers") {
     "drivers/cr50-spi",
     "drivers/cr50-spi:cr50-spi-driver",
     "drivers/tpm:tpm-driver",
-    "drivers/tpm-lpc",
     "drivers/tpm-lpc:tpm-lpc-driver",
+    "drivers/tpm-lpc:tpm-lpc-pkg",
   ]
 }
 

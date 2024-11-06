@@ -6,8 +6,8 @@ group("drivers") {
   deps = [
     "codecs/alc5514",
     "codecs/alc5663",
-    "codecs/da7219",
     "codecs/da7219:da7219-dfv2",
+    "codecs/da7219:pkg",
     "codecs/max98373",
     "codecs/max98927",
     "codecs/tas27xx",

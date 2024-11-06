@@ -65,6 +65,7 @@ group("host_tests") {
   testonly = true
   deps = [
     "e2e_emu:host_tests($host_toolchain)",
+    "fuchsia-controller:host_tests($host_toolchain)",
     "symbolize:host_tests($host_toolchain)",
   ]
 }
