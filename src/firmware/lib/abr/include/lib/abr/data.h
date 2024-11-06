@@ -20,9 +20,9 @@ extern "C" {
 #define kAbrMagic "\0AB0"
 #define kAbrMagicLen 4
 
-/* Versioning for the on-disk A/B metadata. */
+/* Versioning for the on-disk A/B metadata. Keep up-to-date with the changelog in README.md. */
 static const uint8_t kAbrMajorVersion = 2;
-static const uint8_t kAbrMinorVersion = 2;
+static const uint8_t kAbrMinorVersion = 3;
 
 /* Maximum values for slot data. */
 static const uint8_t kAbrMaxPriority = 15;
@@ -42,8 +42,12 @@ typedef struct AbrSlotData {
   /* Non-zero if this slot has booted successfully. */
   uint8_t successful_boot;
 
-  /* Reserved for future use. */
-  uint8_t reserved[1];
+  /* Unbootable reason.
+   *
+   * For forward-compatibility, any unknown reboot reasons should be propagated so that newer
+   * versions of the library can continue to use them.
+   */
+  uint8_t unbootable_reason;
 } ABR_ATTR_PACKED AbrSlotData;
 
 /* Struct used for recording A/B/R metadata.
