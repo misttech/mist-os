@@ -348,10 +348,8 @@ impl Display for KernelStatistics {
         writeln!(w, "    ipc:   {}", format_bytes(self.ipc as f64))?;
         if let Some(zram) = self.zram_compressed_total {
             writeln!(w, "    zram:  {}", format_bytes(zram as f64))?;
-            writeln!(w, "    other: {}", format_bytes((self.other - zram) as f64))?;
-        } else {
-            writeln!(w, "    other: {}", format_bytes(self.other as f64))?;
         }
+        writeln!(w, "    other: {}", format_bytes(self.other as f64))?;
         writeln!(w)
     }
 }
