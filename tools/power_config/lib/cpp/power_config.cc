@@ -9,9 +9,8 @@
 namespace power_config {
 zx::result<fuchsia_hardware_power::ComponentPowerConfiguration> Load(const char* path) {
   auto [file_channel, server] = fidl::Endpoints<fuchsia_io::File>::Create();
-  if (zx_status_t status =
-          fdio_open(path, static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
-                    server.TakeChannel().release());
+  if (zx_status_t status = fdio_open3(path, static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
+                                      server.TakeChannel().release());
       status != ZX_OK) {
     return zx::error_result(status);
   }
