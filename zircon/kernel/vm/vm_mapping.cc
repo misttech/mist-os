@@ -984,9 +984,9 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       ("va", ktrace::Pointer{va}));
   canary_.Assert();
 
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
   DEBUG_ASSERT(is_in_range_locked(va, 1));
 
-  va = ROUNDDOWN(va, PAGE_SIZE);
   uint64_t vmo_offset = va - base_ + object_offset_locked();
 
   [[maybe_unused]] char pf_string[5];
