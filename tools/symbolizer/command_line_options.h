@@ -28,6 +28,9 @@ struct CommandLineOptions {
   std::optional<std::string> symbol_cache;
   std::optional<std::string> dumpfile_output;
 
+  // Whether to enable DEBUG level logs printed to stderr.
+  bool verbose = false;
+
   bool auth_mode = false;
   bool requested_version = false;
 

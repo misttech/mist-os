@@ -54,30 +54,49 @@ void SetupCommandLineOptions(const CommandLineOptions& options, zxdb::MapSetting
   }
 
   if (options.symbol_cache) {
+    FX_LOGS(DEBUG) << "Setting symbol cache to " << *options.symbol_cache;
     settings.SetString(Settings::System::kSymbolCache, *options.symbol_cache);
   }
 
   if (!options.symbol_index_files.empty()) {
+    for (const auto& file : options.symbol_index_files) {
+      FX_LOGS(DEBUG) << "Adding symbol index file " << file;
+    }
     settings.SetList(Settings::System::kSymbolIndexFiles, options.symbol_index_files);
   }
 
   if (!options.private_symbol_servers.empty()) {
+    for (const auto& server : options.private_symbol_servers) {
+      FX_LOGS(DEBUG) << "Adding private symbol server " << server;
+    }
     settings.SetList(Settings::System::kPrivateSymbolServers, options.private_symbol_servers);
   }
 
   if (!options.public_symbol_servers.empty()) {
+    for (const auto& server : options.public_symbol_servers) {
+      FX_LOGS(DEBUG) << "Adding public symbol server " << server;
+    }
     settings.SetList(Settings::System::kPublicSymbolServers, options.public_symbol_servers);
   }
 
   if (!options.symbol_paths.empty()) {
+    for (const auto& path : options.symbol_paths) {
+      FX_LOGS(DEBUG) << "Adding symbol path " << path;
+    }
     settings.SetList(Settings::System::kSymbolPaths, options.symbol_paths);
   }
 
   if (!options.build_id_dirs.empty()) {
+    for (const auto& dir : options.build_id_dirs) {
+      FX_LOGS(DEBUG) << "Adding build-id dir " << dir;
+    }
     settings.SetList(Settings::System::kBuildIdDirs, options.build_id_dirs);
   }
 
   if (!options.ids_txts.empty()) {
+    for (const auto& file : options.ids_txts) {
+      FX_LOGS(DEBUG) << "Adding idx.txt " << file;
+    }
     settings.SetList(Settings::System::kIdsTxts, options.ids_txts);
   }
 }
@@ -115,12 +134,16 @@ SymbolizerImpl::SymbolizerImpl(const CommandLineOptions& options)
   session_.system().GetSymbols()->set_create_index(false);
   target_ = session_.system().GetTargets()[0];
 
+  FX_LOGS(DEBUG) << "Initializing async loop...";
   loop_.Init(nullptr);
   // Setting symbol servers will trigger an asynchronous network request.
   SetupCommandLineOptions(options, session_.system().settings());
+  FX_LOGS(DEBUG) << "CLI options set up.";
   if (waiting_auth_) {
+    FX_LOGS(DEBUG) << "Checking for auth...";
     remote_symbol_lookup_enabled_ = true;
     loop_.Run();
+    FX_LOGS(DEBUG) << "Auth state updated.";
   }
 
   // Check and prompt authentication message.
@@ -138,9 +161,11 @@ SymbolizerImpl::SymbolizerImpl(const CommandLineOptions& options)
     ResetDumpfileCurrentObject();
   }
 
+  FX_LOGS(DEBUG) << "Making stack manager and loading matchers.";
   pretty_stack_manager_ = fxl::MakeRefCounted<zxdb::PrettyStackManager>();
   pretty_stack_manager_->LoadDefaultMatchers();
 
+  FX_LOGS(DEBUG) << "Creating source file provider.";
   source_file_provider_ = std::make_unique<zxdb::SourceFileProviderImpl>(target_->settings());
 }
 
@@ -615,7 +640,9 @@ void SymbolizerImpl::InitProcess() {
 
   // Wait until downloading completes.
   if (is_downloading_) {
+    FX_LOGS(DEBUG) << "Waiting for download to complete...";
     loop_.Run();
+    FX_LOGS(DEBUG) << "Done downloading symbols for process.";
   }
 }
 

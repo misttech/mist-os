@@ -79,6 +79,9 @@ const char kVersionHelp[] = R"(  --version
   -v
       Prints the version.)";
 
+const char kVerboseHelp[] = R"(  --verbose
+      Enables DEBUG-level logging to stderr.)";
+
 const char kAuthHelp[] = R"(  --auth [deprecated]
       Starts the authentication process for symbol servers.)";
 
@@ -112,6 +115,7 @@ Error ParseCommandLine(int argc, const char* argv[], CommandLineOptions* options
                    &CommandLineOptions::private_symbol_servers);
   parser.AddSwitch("public-symbol-server", 0, kPublicSymbolServerHelp,
                    &CommandLineOptions::public_symbol_servers);
+  parser.AddSwitch("verbose", 0, kVerboseHelp, &CommandLineOptions::verbose);
   parser.AddSwitch("auth", 0, kAuthHelp, &CommandLineOptions::auth_mode);
   parser.AddSwitch("version", 'v', kVersionHelp, &CommandLineOptions::requested_version);
   parser.AddSwitch("omit-module-lines", 0, kOmitModuleLinesHelp,
