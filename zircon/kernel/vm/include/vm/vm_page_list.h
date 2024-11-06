@@ -471,7 +471,16 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
   uint64_t offset() const { return obj_offset_; }
   uint64_t GetKey() const { return obj_offset_; }
 
-  uint64_t end_offset() const { return offset() + kPageFanOut * PAGE_SIZE; }
+  uint64_t end_offset() const {
+    const uint64_t end = obj_offset_ + kPageFanOut * PAGE_SIZE;
+    // By construction the node cannot overflow, but the compiler does not know this. By explicitly
+    // telling it some checks can be avoided as the compiler does not have to consider the case
+    // where end wrapped.
+    if (end <= obj_offset_) {
+      __builtin_unreachable();
+    }
+    return end;
+  }
 
   void set_offset(uint64_t offset) {
     DEBUG_ASSERT(!InContainer());
