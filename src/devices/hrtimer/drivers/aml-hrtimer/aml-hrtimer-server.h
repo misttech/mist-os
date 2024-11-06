@@ -31,24 +31,16 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   static const fuchsia_power_broker::PowerLevel kWakeHandlingLeaseOn =
       static_cast<fuchsia_power_broker::PowerLevel>(fuchsia_power_broker::BinaryPowerLevel::kOn);
 
-  AmlHrtimerServer(
-      async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio,
-      std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control,
-      fidl::SyncClient<fuchsia_power_broker::Lessor> lessor,
-      fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level,
-      fidl::Client<fuchsia_power_broker::RequiredLevel> required_level,
-      fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag, zx::interrupt irq_a,
-      zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d, zx::interrupt irq_f,
-      zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i,
-      inspect::ComponentInspector& inspect);
+  AmlHrtimerServer(async_dispatcher_t* dispatcher, fdf::MmioBuffer mmio,
+                   std::optional<fidl::SyncClient<fuchsia_power_system::ActivityGovernor>> sag,
+                   zx::interrupt irq_a, zx::interrupt irq_b, zx::interrupt irq_c,
+                   zx::interrupt irq_d, zx::interrupt irq_f, zx::interrupt irq_g,
+                   zx::interrupt irq_h, zx::interrupt irq_i, inspect::ComponentInspector& inspect);
 
   void ShutDown();
 
   // For unit testing.
   static size_t GetNumberOfTimers() { return kNumberOfTimers; }
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>>& element_control() {
-    return element_control_;
-  }
   bool HasWaitCompleter(size_t timer_index) {
     ZX_ASSERT(timer_index < kNumberOfTimers);
     return !std::holds_alternative<std::monostate>(
@@ -132,8 +124,6 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
 
   bool IsTimerStarted(size_t id);
   fit::result<const fuchsia_hardware_hrtimer::DriverError> StartHardware(size_t timer_index);
-  zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> LeaseWakeHandling();
-  void WatchRequiredLevel();
   void RecordEvent(int64_t now, uint64_t id, EventType type, uint64_t data);
 
   TimersProperties timers_properties_[kNumberOfTimers] = {
@@ -170,17 +160,8 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
       Timer(*this, timers_properties_[6]), Timer(*this, timers_properties_[7]),
       Timer(*this, timers_properties_[8])};
   std::optional<fdf::MmioBuffer> mmio_;
-  // Need to keep the ElementControl channel end (returned from adding the power element
-  // aml-timer-wake) so the power element stays in the topology.
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_;
-  // This Lessor client allows us to request a lease on the WakeHandling power element.
-  fidl::SyncClient<fuchsia_power_broker::Lessor> wake_handling_lessor_;
-  // FIDL client used to update the Power Broker about the power element level.
-  fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level_;
-  // FIDL client used to monitor the power level to be set as required by the Power Broker.
-  fidl::Client<fuchsia_power_broker::RequiredLevel> required_level_;
   // FIDL client used to request wake leases directly from SAG.
-  fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag_;
+  std::optional<fidl::SyncClient<fuchsia_power_system::ActivityGovernor>> sag_;
   async_dispatcher_t* dispatcher_;
 
   inspect::Node inspect_node_;

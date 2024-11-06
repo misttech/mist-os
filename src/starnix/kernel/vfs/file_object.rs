@@ -2203,7 +2203,7 @@ impl fmt::Debug for FileObject {
 
 impl OnWakeOps for FileReleaser {
     /// Called when the underneath `FileOps` is waken up by the power framework.
-    fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel) {
+    fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Handle) {
         // Activate associated wake leases in registered epfd.
         for epfd in self.epoll_files.lock().iter() {
             if let Ok(file) = current_task.files.get(*epfd) {

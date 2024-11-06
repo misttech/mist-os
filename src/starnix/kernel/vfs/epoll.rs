@@ -503,7 +503,7 @@ impl EpollFileObject {
         &self,
         current_task: &CurrentTask,
         file: &FileHandle,
-        _baton_lease: &zx::Channel,
+        _baton_lease: &zx::Handle,
     ) -> Result<(), Errno> {
         let key = as_epoll_key(file);
         let mut guard = self.state.lock();

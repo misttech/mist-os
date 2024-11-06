@@ -19,8 +19,8 @@
 
 #include <gtest/gtest.h>
 
-#include "fidl/fuchsia.power.broker/cpp/markers.h"
 #include "src/devices/hrtimer/drivers/aml-hrtimer/aml-hrtimer.h"
+#include "src/devices/hrtimer/drivers/aml-hrtimer/aml_hrtimer_config.h"
 
 namespace hrtimer {
 
@@ -225,6 +225,7 @@ class FakeSystemActivityGovernor
     zx::eventpair wake_lease_remote, wake_lease_local;
     zx::eventpair::create(0, &wake_lease_local, &wake_lease_remote);
     wake_leases_.push_back(std::move(wake_lease_local));
+    lease_requested_ = true;
     completer.Reply(std::move(wake_lease_remote));
   }
 
@@ -235,130 +236,13 @@ class FakeSystemActivityGovernor
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
- private:
-  zx::event wake_handling_;
-  std::vector<zx::eventpair> wake_leases_;
-  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
-};
-
-class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
- public:
-  void WatchStatus(fuchsia_power_broker::LeaseControlWatchStatusRequest& request,
-                   WatchStatusCompleter::Sync& completer) override {
-    completer.Reply(lease_status_);
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::LeaseControl> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  fuchsia_power_broker::LeaseStatus lease_status_ = fuchsia_power_broker::LeaseStatus::kSatisfied;
-};
-
-class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
- public:
-  void Lease(fuchsia_power_broker::LessorLeaseRequest& request,
-             LeaseCompleter::Sync& completer) override {
-    if (lease_error_) {
-      completer.Reply(fit::error(fuchsia_power_broker::LeaseError::kInternal));
-      return;
-    }
-    auto lease_control = fidl::CreateEndpoints<fuchsia_power_broker::LeaseControl>();
-    lease_control_binding_.emplace(
-        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(lease_control->server),
-        &lease_control_, [this](fidl::UnbindInfo info) mutable { lease_requested_ = false; });
-
-    lease_requested_ = true;
-    completer.Reply(fit::success(std::move(lease_control->client)));
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
   bool GetLeaseRequested() { return lease_requested_; }
-  void SetLeaseError() { lease_error_ = true; }
 
  private:
   bool lease_requested_ = false;
-  bool lease_error_ = false;
-  FakeLeaseControl lease_control_;
-  std::optional<fidl::ServerBinding<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
-};
-
-class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
- public:
-  void Watch(WatchCompleter::Sync& completer) override {
-    ZX_ASSERT(!completer_);
-    completer_.emplace(completer.ToAsync());
-  }
-
-  void SetRequiredLevel(fuchsia_power_broker::PowerLevel level) {
-    ZX_ASSERT(completer_);
-    completer_->Reply(fit::success(level));
-    completer_.reset();
-  }
-
-  bool WatchReceived() { return completer_.has_value(); }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  std::optional<WatchCompleter::Async> completer_;
-};
-
-class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
- public:
-  fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
-    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   fidl::kIgnoreBindingClosure);
-  }
-
-  void AddElement(fuchsia_power_broker::ElementSchema& request,
-                  AddElementCompleter::Sync& completer) override {
-    EXPECT_TRUE(request.element_control().has_value());
-    zx_status_t status = request.element_control()->channel().get_info(
-        ZX_INFO_HANDLE_BASIC, &element_control_info_, sizeof(zx_info_handle_basic_t), nullptr,
-        nullptr);
-    EXPECT_EQ(status, ZX_OK);
-    fidl::BindServer<fuchsia_power_broker::ElementControl>(
-        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*request.element_control()),
-        &element_control_);
-
-    if (request.lessor_channel()) {
-      fidl::BindServer<fuchsia_power_broker::Lessor>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*request.lessor_channel()),
-          &wake_lessor_);
-    }
-
-    if (request.level_control_channels()) {
-      fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-          std::move(request.level_control_channels()->required()), &required_level_);
-      fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-          std::move(request.level_control_channels()->current()), &current_level_);
-    }
-
-    completer.Reply(fit::success());
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  const zx_info_handle_basic_t& element_control_info() const { return element_control_info_; }
-  FakeRequiredLevel& required_level() { return required_level_; }
-  FakeCurrentLevel& current_level() { return current_level_; }
-  bool GetLeaseRequested() { return wake_lessor_.GetLeaseRequested(); }
-  void SetLeaseError() { wake_lessor_.SetLeaseError(); }
-
- private:
-  FakeLessor wake_lessor_;
-  FakeRequiredLevel required_level_;
-  FakeCurrentLevel current_level_;
-  FakeElementControl element_control_;
-  zx_info_handle_basic_t element_control_info_;
-  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
+  zx::event wake_handling_;
+  std::vector<zx::eventpair> wake_leases_;
+  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
 };
 
 class TestEnvironment : public fdf_testing::Environment {
@@ -378,19 +262,14 @@ class TestEnvironment : public fdf_testing::Environment {
         to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
             system_activity_governor_->CreateHandler());
     EXPECT_EQ(ZX_OK, result_sag.status_value());
-    auto result_broker =
-        to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
-            power_broker_.CreateHandler());
-    EXPECT_EQ(ZX_OK, result_broker.status_value());
     return zx::ok();
   }
   FakePlatformDevice& platform_device() { return platform_device_; }
-  FakePowerBroker& power_broker() { return power_broker_; }
+  FakeSystemActivityGovernor& system_activity_governor() { return *system_activity_governor_; }
 
  private:
   FakePlatformDevice platform_device_;
   std::optional<FakeSystemActivityGovernor> system_activity_governor_;
-  FakePowerBroker power_broker_;
   zx::event wake_handling_;
 };
 
@@ -408,7 +287,12 @@ class DriverTest : public ::testing::Test {
   }
 
   void SetUp() override {
-    zx::result<> result = driver_test().StartDriver();
+    zx::result<> result =
+        driver_test().StartDriverWithCustomStartArgs([](fdf::DriverStartArgs& start_args) mutable {
+          aml_hrtimer_config::Config fake_config;
+          fake_config.enable_suspend() = true;
+          start_args.config(fake_config.ToVmo());
+        });
     ASSERT_EQ(ZX_OK, result.status_value());
     zx::result device_result =
         driver_test().ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
@@ -417,9 +301,10 @@ class DriverTest : public ::testing::Test {
   }
 
   void CheckLeaseRequested(size_t timer_id) {
-    driver_test().RunInEnvironmentTypeContext(
-        [](TestEnvironment& env) { ASSERT_FALSE(env.power_broker().GetLeaseRequested()); });
-    fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease;
+    driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
+      ASSERT_FALSE(env.system_activity_governor().GetLeaseRequested());
+    });
+    zx::eventpair lease;
     std::thread thread([this, timer_id, &lease]() {
       auto result_start = client_->StartAndWait(
           {timer_id, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
@@ -439,8 +324,9 @@ class DriverTest : public ::testing::Test {
     driver_test().RunInEnvironmentTypeContext(
         [timer_id](TestEnvironment& env) { env.platform_device().TriggerIrq(timer_id); });
     thread.join();
-    driver_test().RunInEnvironmentTypeContext(
-        [](TestEnvironment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
+    driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
+      ASSERT_TRUE(env.system_activity_governor().GetLeaseRequested());
+    });
   }
 
   void CheckInspect(const char* path, const char* type, uint64_t id, uint64_t data) {
@@ -876,21 +762,6 @@ TEST_F(DriverTest, GetTicksTimers5678ArbitraryCountWithIrq) {
   }
 }
 
-TEST_F(DriverTest, PowerLeaseControl) {
-  // Element control server in the driver is the same as provided by the fake SAG.
-  zx_info_handle_basic_t broker_element_control, driver_element_control;
-  driver_test().RunInDriverContext([&](AmlHrtimer& driver) {
-    zx_status_t status = driver.element_control()->channel().get_info(
-        ZX_INFO_HANDLE_BASIC, &driver_element_control, sizeof(zx_info_handle_basic_t), nullptr,
-        nullptr);
-    ASSERT_EQ(status, ZX_OK);
-  });
-  driver_test().RunInEnvironmentTypeContext([&](TestEnvironment& env) {
-    broker_element_control = env.power_broker().element_control_info();
-  });
-  ASSERT_EQ(broker_element_control.koid, driver_element_control.related_koid);
-}
-
 TEST_F(DriverTest, StartAndWaitTriggering) {
   std::vector<std::thread> threads;
   for (auto& i : kTimersSupportWait) {
@@ -984,80 +855,6 @@ TEST_F(DriverTest, StartAndWait2Triggering) {
   CheckInspect("14", "StartAndWait2", 8, 0);
   CheckInspect("15", "StartHardware", 8, 0);
   // Not checking TriggerIrqWait2 since we are not ordering IRQ triggers.
-}
-
-TEST_F(DriverTest, RunningPowerElement) {
-  // Wait until we have received the Watch.
-  driver_test().runtime().RunUntil([this]() {
-    return driver_test().RunInEnvironmentTypeContext<bool>(
-        [](TestEnvironment& env) { return env.power_broker().required_level().WatchReceived(); });
-  });
-
-  // The driver sets the CurrentLevel to the RequiredLevel kWakeHandlingLeaseOn.
-  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
-    env.power_broker().required_level().SetRequiredLevel(AmlHrtimerServer::kWakeHandlingLeaseOn);
-  });
-  driver_test().runtime().RunUntil([this]() {
-    return driver_test().RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>(
-               [](TestEnvironment& env) {
-                 return env.power_broker().current_level().current_level();
-               }) == AmlHrtimerServer::kWakeHandlingLeaseOn;
-  });
-
-  // Wait until we have received the Watch.
-  driver_test().runtime().RunUntil([this]() {
-    return driver_test().RunInEnvironmentTypeContext<bool>(
-        [](TestEnvironment& env) { return env.power_broker().required_level().WatchReceived(); });
-  });
-
-  // The driver sets the CurrentLevel to the RequiredLevel 0.
-  driver_test().RunInEnvironmentTypeContext(
-      [](TestEnvironment& env) { env.power_broker().required_level().SetRequiredLevel(0); });
-  driver_test().runtime().RunUntil([this]() {
-    return driver_test().RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>(
-               [](TestEnvironment& env) {
-                 return env.power_broker().current_level().current_level();
-               }) == 0;
-  });
-
-  // Wait until we have received the Watch.
-  driver_test().runtime().RunUntil([this]() {
-    return driver_test().RunInEnvironmentTypeContext<bool>(
-        [](TestEnvironment& env) { return env.power_broker().required_level().WatchReceived(); });
-  });
-}
-
-TEST_F(DriverTest, LeaseError) {
-  driver_test().RunInEnvironmentTypeContext(
-      [](TestEnvironment& env) { env.power_broker().SetLeaseError(); });
-
-  std::vector<std::thread> threads;
-  for (auto& i : kTimersSupportWait) {
-    threads.emplace_back([this, i]() {
-      auto result_start = client_->StartAndWait(
-          {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
-      ASSERT_TRUE(result_start.is_error());
-      ASSERT_TRUE(result_start.error_value().is_domain_error());
-      ASSERT_EQ(result_start.error_value().domain_error(),
-                fuchsia_hardware_hrtimer::DriverError::kBadState);
-    });
-
-    // Wait until the driver has acquired the timer wait completer before triggering the IRQ.
-    bool has_wait_completer = false;
-    while (!has_wait_completer) {
-      driver_test().RunInDriverContext([i, &has_wait_completer](AmlHrtimer& driver) {
-        has_wait_completer = driver.HasWaitCompleter(i);
-      });
-      zx::nanosleep(zx::deadline_after(zx::msec(1)));
-    }
-  }
-  driver_test().RunInEnvironmentTypeContext(
-      [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
-
-  // Join the threads such that we check for timers triggered.
-  for (auto& thread : threads) {
-    thread.join();
-  }
 }
 
 TEST_F(DriverTest, StartAndWaitStop) {
@@ -1167,14 +964,18 @@ TEST_F(DriverTest, StartAndWait2Stop) {
 class DriverTestNoAutoStop : public ::testing::Test {
  public:
   void SetUp() override {
-    zx::result<> result = driver_test().StartDriver();
+    zx::result<> result =
+        driver_test().StartDriverWithCustomStartArgs([](fdf::DriverStartArgs& start_args) mutable {
+          aml_hrtimer_config::Config fake_config;
+          fake_config.enable_suspend() = true;
+          start_args.config(fake_config.ToVmo());
+        });
     ASSERT_EQ(ZX_OK, result.status_value());
     zx::result device_result =
         driver_test().ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
     ASSERT_EQ(ZX_OK, device_result.status_value());
     client_.Bind(std::move(device_result.value()));
   }
-
   fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
 
   fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
@@ -1232,13 +1033,15 @@ TEST_F(DriverTest, LeaseRequested2) { CheckLeaseRequested(2); }
 TEST_F(DriverTest, LeaseRequested3) { CheckLeaseRequested(3); }
 
 TEST_F(DriverTest, LeaseNotRequested4) {
-  driver_test().RunInEnvironmentTypeContext(
-      [](TestEnvironment& env) { ASSERT_FALSE(env.power_broker().GetLeaseRequested()); });
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    ASSERT_FALSE(env.system_activity_governor().GetLeaseRequested());
+  });
   auto result_start =
       client_->StartAndWait({4, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
   ASSERT_TRUE(result_start.is_error());
-  driver_test().RunInEnvironmentTypeContext(
-      [](TestEnvironment& env) { ASSERT_FALSE(env.power_broker().GetLeaseRequested()); });
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    ASSERT_FALSE(env.system_activity_governor().GetLeaseRequested());
+  });
 }
 
 TEST_F(DriverTest, LeaseRequested5) { CheckLeaseRequested(5); }
@@ -1275,7 +1078,12 @@ class DriverTestNoPower : public ::testing::Test {
   }
 
   void SetUp() override {
-    zx::result<> result = driver_test().StartDriver();
+    zx::result<> result =
+        driver_test().StartDriverWithCustomStartArgs([](fdf::DriverStartArgs& start_args) mutable {
+          aml_hrtimer_config::Config fake_config;
+          fake_config.enable_suspend() = false;
+          start_args.config(fake_config.ToVmo());
+        });
     ASSERT_EQ(ZX_OK, result.status_value());
     zx::result device_result =
         driver_test().ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");

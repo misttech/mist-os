@@ -92,22 +92,6 @@
 	};
 };
 
-&hrtimer {
-	power-elements {
-		aml-hrtimer-wake-element {
-			power-levels {
-				off-level {
-					level = <0>;
-				};
-				on-level {
-					level = <1>;
-					level-dependencies = <&sag_wake_active 1>;
-				};
-			};
-		};
-	};
-};
-
 &audio {
 	power-elements {
 		audio-hw-element {

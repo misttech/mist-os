@@ -297,11 +297,11 @@ impl HrTimerManager {
                         .as_handle_ref()
                         .signal(zx::Signals::NONE, zx::Signals::TIMER_SIGNALED);
                     if let Some(wake_source) = wake_source.as_ref().and_then(|f| f.upgrade()) {
-                        let lease_channel = lease.into_channel();
-                        wake_source.on_wake(system_task, &lease_channel);
+                        let lease_token = lease.into_handle();
+                        wake_source.on_wake(system_task, &lease_token);
                         // Drop the baton lease after wake leases in associated epfd
                         // are activated.
-                        drop(lease_channel);
+                        drop(lease_token);
                     }
 
                     let mut guard = self.lock();

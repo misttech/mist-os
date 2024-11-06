@@ -692,7 +692,7 @@ pub trait WakeLeaseInterlockOps {
 }
 
 pub trait OnWakeOps: Send + Sync {
-    fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel);
+    fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Handle);
 }
 
 /// The signal that the runner raises when handing over an event to the kernel.

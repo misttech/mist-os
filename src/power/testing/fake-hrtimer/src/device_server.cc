@@ -123,11 +123,15 @@ void DeviceServer::StartAndWait(StartAndWaitRequest& request,
           return zx::error(ZX_ERR_BAD_STATE);
         }
 
-        fidl::SyncClient<fuchsia_power_broker::LeaseControl> lease_control(
-            std::move(result_lease->lease_control()));
-
+        fuchsia_power_system::LeaseToken local_wake_token, remote_wake_token;
+        zx_status_t status =
+            fuchsia_power_system::LeaseToken::create(0, &local_wake_token, &remote_wake_token);
+        if (status != ZX_OK) {
+          FX_LOGS(ERROR) << "LeaseToken create failed: " << zx_status_get_string(status)
+                         << std::endl;
+        }
         fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse response;
-        response.keep_alive(lease_control.TakeClientEnd());
+        response.keep_alive(std::move(remote_wake_token));
 
         if (event_) {
           event_->signal(0, ZX_EVENT_SIGNALED);

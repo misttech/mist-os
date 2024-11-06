@@ -12,6 +12,11 @@
         bind: "meta/bind/aml-hrtimer.bindbc",
     },
     use: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+        },
         { service: "fuchsia.hardware.platform.device.Service" },
         { protocol: "fuchsia.power.broker.Topology" },
 
