@@ -196,45 +196,6 @@ set_defaults("fuchsia_cc_driver") {
   configs = default_shared_library_configs
 }
 
-# Define a fuchsia driver built as a loadable module (deprecated: b/370513425)
-#
-# This target is a deprecated alias for `fuchsia_cc_driver`.
-#
-# Parameters
-#
-# Flags: cflags, cflags_c, cflags_cc,  asmflags, defines, include_dirs,
-#        ldflags, lib_dirs, libs
-# Deps: data_deps, deps, public_deps
-# Dependent configs: all_dependent_configs, public_configs
-# General: check_includes, configs, data, inputs, output_name,
-#          output_extension, public, sources, testonly, visibility
-template("fuchsia_driver") {
-  _fuchsia_driver(target_name) {
-    target_type = "loadable_module"
-
-    # Explicitly forward applicable_licenses and visibility, implicitly forward everything else.
-    # See comment in //build/config/BUILDCONFIG.gn for details on this pattern.
-    forward_variables_from(invoker,
-                           [
-                             "applicable_licenses",
-                             "visibility",
-                           ])
-    forward_variables_from(invoker,
-                           "*",
-                           [
-                             "applicable_licenses",
-                             "test",
-                             "visibility",
-                           ])
-  }
-}
-
-set_defaults("fuchsia_driver") {
-  # Sets the default configs for fuchsia_driver, which can be modified later
-  # by the invoker. This overrides the loadable_module default.
-  configs = default_shared_library_configs
-}
-
 # Define a fuchsia driver built as a rust cdylib.
 #
 # This target allows you to create an ELF shared library that can be used as a driver
