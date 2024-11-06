@@ -9,7 +9,7 @@ import collections
 from trace_processing import trace_metrics, trace_model, trace_utils
 
 MEMORY_SYSTEM_CATEGORY = "memory:kernel"
-KERNEL_EVENT_NAMES = ("kmem_stats", "kmem_stats_compression")
+KERNEL_EVENT_NAMES = ("kmem_stats_a", "kmem_stats_b", "kmem_stats_compression")
 
 
 def standard_metrics_json(values: list[int | float]) -> trace_metrics.JSON:

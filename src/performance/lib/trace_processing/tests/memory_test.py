@@ -17,7 +17,7 @@ class MemoryTest(unittest.TestCase):
             trace_model.CounterEvent.from_dict(
                 {
                     "cat": "memory:kernel",
-                    "name": "kmem_stats",
+                    "name": "kmem_stats_a",
                     "pid": 0x8C01_1EC7_EDDA_7A10,
                     "tid": 0x8C01_1EC7_EDDA_7A20,
                     "ts": 500000,  # microseconds
