@@ -1042,6 +1042,9 @@ zx_status_t Sdhci::Init() {
     return ZX_ERR_INTERNAL;
   }
 
+  const bool non_standard_tuning = quirks_ & SDHCI_QUIRK_NON_STANDARD_TUNING;
+  const bool tuning_for_sdr50 = caps1.use_tuning_for_sdr50();
+
   // Get controller capabilities
   if (caps0.bus_width_8_support()) {
     info_.caps |= SDMMC_HOST_CAP_BUS_WIDTH_8;
@@ -1052,16 +1055,16 @@ zx_status_t Sdhci::Init() {
   if (caps0.voltage_3v3_support()) {
     info_.caps |= SDMMC_HOST_CAP_VOLTAGE_330;
   }
-  if (caps1.sdr50_support()) {
+  if (caps1.sdr50_support() && (!non_standard_tuning || !tuning_for_sdr50)) {
     info_.caps |= SDMMC_HOST_CAP_SDR50;
   }
   if (caps1.ddr50_support() && !(quirks_ & SDHCI_QUIRK_NO_DDR)) {
     info_.caps |= SDMMC_HOST_CAP_DDR50;
   }
-  if (caps1.sdr104_support()) {
+  if (caps1.sdr104_support() && !non_standard_tuning) {
     info_.caps |= SDMMC_HOST_CAP_SDR104;
   }
-  if (!caps1.use_tuning_for_sdr50()) {
+  if (!tuning_for_sdr50) {
     info_.caps |= SDMMC_HOST_CAP_NO_TUNING_SDR50;
   }
   info_.caps |= SDMMC_HOST_CAP_AUTO_CMD12;
