@@ -471,6 +471,61 @@ class Remote : public HasIo {
   Remote(fidl::ClientEnd<Protocol> client_end, const zxio_ops_t& ops)
       : HasIo(ops), client_(std::move(client_end)) {}
 
+  zx_status_t Sync();
+
+  zx_status_t AttrGet(zxio_node_attributes_t* inout_attr);
+
+  zx_status_t AttrSet(const zxio_node_attributes_t* attr);
+
+  zx_status_t AdvisoryLock(advisory_lock_req* req);
+
+  zx_status_t FlagsGet(uint32_t* out_flags);
+
+  zx_status_t FlagsSet(uint32_t flags);
+
+  zx_status_t LinkInto(zx_handle_t dst_token, const char* dst_path, size_t dst_path_len);
+
+  zx_status_t XattrList(void (*callback)(void* context, const uint8_t* name, size_t name_len),
+                        void* context);
+
+  zx_status_t XattrGet(const uint8_t* name, size_t name_len,
+                       zx_status_t (*callback)(void* context, zxio_xattr_data_t data),
+                       void* context);
+
+  zx_status_t XattrSet(const uint8_t* name, size_t name_len, const uint8_t* value, size_t value_len,
+                       zxio_xattr_set_mode_t mode);
+
+  zx_status_t XattrRemove(const uint8_t* name, size_t name_len);
+
+  const fidl::WireSyncClient<Protocol>& client() const { return client_; }
+
+  template <typename T>
+    requires std::is_base_of_v<Remote, T>
+  static constexpr zxio_ops_t CommonRemoteOps() {
+    zxio_ops_t ops = zxio_default_ops;
+
+    // Operations we disallow "overloading" as this class manages the associated object's resources.
+    ops.close = Remote::Close<T>;
+    ops.release = Adaptor<T>::template From<&T::Release>;
+    ops.borrow = Adaptor<T>::template From<&T::Borrow>;
+    ops.clone = Adaptor<T>::template From<&T::Clone>;
+
+    // Common `fuchsia.io/Node` operations. Note that derived classes may "overload" these
+    // operations by providing a method in their public interface with the same name/type.
+    ops.attr_get = Adaptor<T>::template From<&T::AttrGet>;
+    ops.attr_set = Adaptor<T>::template From<&T::AttrSet>;
+    ops.flags_get = Adaptor<T>::template From<&T::FlagsGet>;
+    ops.flags_set = Adaptor<T>::template From<&T::FlagsSet>;
+    ops.sync = Adaptor<T>::template From<&T::Sync>;
+    ops.xattr_list = Adaptor<T>::template From<&T::XattrList>;
+    ops.xattr_get = Adaptor<T>::template From<&T::XattrGet>;
+    ops.xattr_set = Adaptor<T>::template From<&T::XattrSet>;
+    ops.xattr_remove = Adaptor<T>::template From<&T::XattrRemove>;
+
+    return ops;
+  }
+
+ private:
   zx_status_t Release(zx_handle_t* out_handle) {
     *out_handle = client_.TakeClientEnd().TakeChannel().release();
     return ZX_OK;
@@ -492,82 +547,18 @@ class Remote : public HasIo {
     return ZX_OK;
   }
 
-  zx_status_t Sync();
-
-  zx_status_t AttrGet(zxio_node_attributes_t* inout_attr);
-
-  zx_status_t AttrSet(const zxio_node_attributes_t* attr);
-
-  zx_status_t AdvisoryLock(advisory_lock_req* req);
-
-  zx_status_t Seek(zxio_seek_origin_t start, int64_t offset, size_t* out_offset);
-
-  zx_status_t Truncate(uint64_t length);
-
-  zx_status_t FlagsGet(uint32_t* out_flags);
-
-  zx_status_t FlagsSet(uint32_t flags);
-
-  zx_status_t VmoGet(zxio_vmo_flags_t zxio_flags, zx_handle_t* out_vmo);
-
-  zx_status_t Open(uint32_t flags, const char* path, size_t path_len, zxio_storage_t* storage);
-
-  zx_status_t Open3(const char* path, size_t path_len, zxio_open_flags_t flags,
-                    const zxio_open_options_t* options, zxio_storage_t* storage);
-
-  zx_status_t OpenAsync(uint32_t flags, const char* path, size_t path_len, zx_handle_t request);
-
-  zx_status_t Unlink(const char* name, size_t name_len, int flags);
-
-  zx_status_t TokenGet(zx_handle_t* out_token);
-
-  zx_status_t Rename(const char* old_path, size_t old_path_len, zx_handle_t dst_token,
-                     const char* new_path, size_t new_path_len);
-
-  zx_status_t Link(const char* src_path, size_t src_path_len, zx_handle_t dst_token,
-                   const char* dst_path, size_t dst_path_len);
-
-  zx_status_t LinkInto(zx_handle_t dst_token, const char* dst_path, size_t dst_path_len);
-
-  zx_status_t DirentIteratorInit(zxio_dirent_iterator_t* iterator);
-
-  zx_status_t DirentIteratorNext(zxio_dirent_iterator_t* iterator, zxio_dirent_t* inout_entry);
-
-  zx_status_t DirentIteratorRewind(zxio_dirent_iterator_t* iterator);
-
-  void DirentIteratorDestroy(zxio_dirent_iterator_t* iterator);
-
-  zx_status_t XattrList(void (*callback)(void* context, const uint8_t* name, size_t name_len),
-                        void* context);
-
-  zx_status_t XattrGet(const uint8_t* name, size_t name_len,
-                       zx_status_t (*callback)(void* context, zxio_xattr_data_t data),
-                       void* context);
-
-  zx_status_t XattrSet(const uint8_t* name, size_t name_len, const uint8_t* value, size_t value_len,
-                       zxio_xattr_set_mode_t mode);
-
-  zx_status_t XattrRemove(const uint8_t* name, size_t name_len);
-
-  zx_status_t Allocate(uint64_t offset, uint64_t len, zxio_allocate_mode_t mode);
-
-  const fidl::WireSyncClient<Protocol>& client() const { return client_; }
-
+  /// Helper that implements `zxio_ops_t::close` correctly for objects which derive `Remote`.
+  /// This method is static since we destroy the object `T` represented by `zxio`, making it more
+  /// clear when the object should no longer be used.
   template <typename T>
     requires std::is_base_of_v<Remote, T>
-  static constexpr zxio_ops_t CommonRemoteOps() {
-    zxio_ops_t ops = zxio_default_ops;
-    ops.close = Remote::Close<T>;
-    ops.release = Adaptor<T>::template From<&T::Release>;
-    ops.borrow = Adaptor<T>::template From<&T::Borrow>;
-    ops.clone = Adaptor<T>::template From<&T::Clone>;
-    return ops;
+  static zx_status_t Close(zxio_t* zxio, bool should_wait) {
+    T& instance = *reinterpret_cast<T*>(zxio);
+    const zx_status_t status = instance.CloseImpl(should_wait);
+    instance.~T();
+    return status;
   }
 
- private:
-  template <typename T>
-    requires std::is_base_of_v<Remote, T>
-  static zx_status_t Close(zxio_t* zxio, bool should_wait);
   zx_status_t CloseImpl(const bool should_wait) {
     if (client_.is_valid() && should_wait) {
       const fidl::WireResult result = client_->Close();
@@ -584,16 +575,6 @@ class Remote : public HasIo {
 
   fidl::WireSyncClient<Protocol> client_;
 };
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-template <typename T>
-  requires std::is_base_of_v<Remote<Protocol, kObjectType>, T>
-zx_status_t Remote<Protocol, kObjectType>::Close(zxio_t* zxio, const bool should_wait) {
-  T& instance = *reinterpret_cast<T*>(zxio);
-  const zx_status_t status = instance.CloseImpl(should_wait);
-  instance.~T();
-  return status;
-}
 
 template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::Sync() {
@@ -908,34 +889,6 @@ zx_status_t Remote<Protocol, kObjectType>::AdvisoryLock(advisory_lock_req* req) 
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Seek(zxio_seek_origin_t start, int64_t offset,
-                                                size_t* out_offset) {
-  const fidl::WireResult result = client()->Seek(static_cast<fio::wire::SeekOrigin>(start), offset);
-  if (!result.ok()) {
-    return result.status();
-  }
-  const auto& response = result.value();
-  if (response.is_error()) {
-    return response.error_value();
-  }
-  *out_offset = response.value()->offset_from_start;
-  return ZX_OK;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Truncate(uint64_t length) {
-  const fidl::WireResult result = client()->Resize(length);
-  if (!result.ok()) {
-    return result.status();
-  }
-  const auto& response = result.value();
-  if (response.is_error()) {
-    return response.error_value();
-  }
-  return ZX_OK;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::FlagsGet(uint32_t* out_flags) {
   const fidl::WireResult result = client()->GetFlags();
   if (!result.ok()) {
@@ -952,182 +905,6 @@ zx_status_t Remote<Protocol, kObjectType>::FlagsGet(uint32_t* out_flags) {
 template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::FlagsSet(uint32_t flags) {
   const fidl::WireResult result = client()->SetFlags(static_cast<fio::wire::OpenFlags>(flags));
-  if (!result.ok()) {
-    return result.status();
-  }
-  const auto& response = result.value();
-  return response.s;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::VmoGet(zxio_vmo_flags_t zxio_flags,
-                                                  zx_handle_t* out_vmo) {
-  fio::wire::VmoFlags flags;
-  if (zxio_flags & ZXIO_VMO_READ) {
-    flags |= fio::wire::VmoFlags::kRead;
-  }
-  if (zxio_flags & ZXIO_VMO_WRITE) {
-    flags |= fio::wire::VmoFlags::kWrite;
-  }
-  if (zxio_flags & ZXIO_VMO_EXECUTE) {
-    flags |= fio::wire::VmoFlags::kExecute;
-  }
-  if (zxio_flags & ZXIO_VMO_PRIVATE_CLONE) {
-    flags |= fio::wire::VmoFlags::kPrivateClone;
-  }
-  if (zxio_flags & ZXIO_VMO_SHARED_BUFFER) {
-    flags |= fio::wire::VmoFlags::kSharedBuffer;
-  }
-  fidl::WireResult result = client()->GetBackingMemory(flags);
-  if (!result.ok()) {
-    return result.status();
-  }
-  const auto& response = result.value();
-  if (response.is_error()) {
-    return response.error_value();
-  }
-  zx::vmo& vmo = response.value()->vmo;
-  *out_vmo = vmo.release();
-  return ZX_OK;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Open(uint32_t flags, const char* path, size_t path_len,
-                                                zxio_storage_t* storage) {
-  auto [client_end, server_end] = fidl::Endpoints<fio::Node>::Create();
-  const fidl::Status result =
-      client()->Open(static_cast<fio::wire::OpenFlags>(flags) | fio::wire::OpenFlags::kDescribe, {},
-                     fidl::StringView::FromExternal(path, path_len), std::move(server_end));
-  if (!result.ok()) {
-    return result.status();
-  }
-  return zxio_create_with_on_open(client_end.TakeChannel().release(), storage);
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Open3(const char* path, size_t path_len,
-                                                 zxio_open_flags_t flags,
-                                                 const zxio_open_options_t* options,
-                                                 zxio_storage_t* storage) {
-  zx::channel client_end, server_end;
-  if (zx_status_t status = zx::channel::create(0, &client_end, &server_end); status != ZX_OK) {
-    return status;
-  }
-
-  fio::NodeAttributesQuery attributes;
-  MutableAttributesDataHolder mutable_attributes_holder;
-  fidl::WireTableFrame<fio::wire::MutableNodeAttributes> create_attributes_frame;
-  zx::result<fio::wire::MutableNodeAttributes> create_attributes;
-  fidl::WireTableFrame<fio::wire::Options> options_frame;
-  fio::wire::Options open_options;
-
-  if (options && (options->inout_attr || options->create_attr)) {
-    auto options_builder = fio::wire::Options::ExternalBuilder(
-        fidl::ObjectView<fidl::WireTableFrame<fio::wire::Options>>::FromExternal(&options_frame));
-
-    // -- attributes --
-    if (options->inout_attr) {
-      attributes = BuildAttributeQuery(options->inout_attr->has);
-      if (attributes) {
-        options_builder.attributes(
-            fidl::ObjectView<fio::wire::NodeAttributesQuery>::FromExternal(&attributes));
-      }
-    }
-
-    // -- create_attributes --
-    if (options->create_attr) {
-      create_attributes = BuildMutableAttributes(options->create_attr, create_attributes_frame,
-                                                 &mutable_attributes_holder);
-      if (create_attributes.is_error()) {
-        return create_attributes.error_value();
-      }
-      options_builder.create_attributes(
-          fidl::ObjectView<fio::wire::MutableNodeAttributes>::FromExternal(
-              &create_attributes.value()));
-    }
-
-    open_options = options_builder.Build();
-  }
-
-  const fidl::Status result = client()->Open3(
-      fidl::StringView::FromExternal(path, path_len),
-      fio::Flags::kFlagSendRepresentation | fio::Flags{flags}, open_options, std::move(server_end));
-
-  if (!result.ok()) {
-    return result.status();
-  }
-  return zxio_create_with_on_representation(client_end.release(),
-                                            options ? options->inout_attr : nullptr, storage);
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::OpenAsync(uint32_t flags, const char* path,
-                                                     size_t path_len, zx_handle_t request) {
-  fidl::ServerEnd<fio::Node> node_request{zx::channel(request)};
-  const fidl::Status result =
-      client()->Open(static_cast<fio::wire::OpenFlags>(flags), {},
-                     fidl::StringView::FromExternal(path, path_len), std::move(node_request));
-  return result.status();
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Unlink(const char* name, size_t name_len, int flags) {
-  fidl::Arena allocator;
-  auto options = fio::wire::UnlinkOptions::Builder(allocator);
-  auto io_flags = fio::wire::UnlinkFlags::kMustBeDirectory;
-  if (flags & AT_REMOVEDIR) {
-    options.flags(fidl::ObjectView<decltype(io_flags)>::FromExternal(&io_flags));
-  }
-  const fidl::WireResult result =
-      client()->Unlink(fidl::StringView::FromExternal(name, name_len), options.Build());
-  if (!result.ok()) {
-    return result.status();
-  }
-  const auto& response = result.value();
-  if (response.is_error()) {
-    return response.error_value();
-  }
-  return ZX_OK;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::TokenGet(zx_handle_t* out_token) {
-  fidl::WireResult result = client()->GetToken();
-  if (!result.ok()) {
-    return result.status();
-  }
-  auto& response = result.value();
-  if (const zx_status_t status = response.s; status != ZX_OK) {
-    return status;
-  }
-  *out_token = response.token.release();
-  return ZX_OK;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Rename(const char* old_path, size_t old_path_len,
-                                                  zx_handle_t dst_token, const char* new_path,
-                                                  size_t new_path_len) {
-  const fidl::WireResult result =
-      client()->Rename(fidl::StringView::FromExternal(old_path, old_path_len), zx::event(dst_token),
-                       fidl::StringView::FromExternal(new_path, new_path_len));
-  if (!result.ok()) {
-    return result.status();
-  }
-  const auto& response = result.value();
-  if (response.is_error()) {
-    return response.error_value();
-  }
-  return ZX_OK;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Link(const char* src_path, size_t src_path_len,
-                                                zx_handle_t dst_token, const char* dst_path,
-                                                size_t dst_path_len) {
-  const fidl::WireResult result =
-      client()->Link(fidl::StringView::FromExternal(src_path, src_path_len), zx::handle(dst_token),
-                     fidl::StringView::FromExternal(dst_path, dst_path_len));
   if (!result.ok()) {
     return result.status();
   }
@@ -1153,28 +930,6 @@ zx_status_t Remote<Protocol, kObjectType>::LinkInto(zx_handle_t dst_token_handle
 #else
   return ZX_ERR_NOT_SUPPORTED;
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::DirentIteratorInit(zxio_dirent_iterator_t* iterator) {
-  new (iterator) DirentIteratorImpl(io());
-  return ZX_OK;
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::DirentIteratorNext(zxio_dirent_iterator_t* iterator,
-                                                              zxio_dirent_t* inout_entry) {
-  return reinterpret_cast<DirentIteratorImpl*>(iterator)->Next(inout_entry);
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::DirentIteratorRewind(zxio_dirent_iterator_t* iterator) {
-  return reinterpret_cast<DirentIteratorImpl*>(iterator)->Rewind();
-}
-
-template <typename Protocol, zxio_object_type_t kObjectType>
-void Remote<Protocol, kObjectType>::DirentIteratorDestroy(zxio_dirent_iterator_t* iterator) {
-  reinterpret_cast<DirentIteratorImpl*>(iterator)->~DirentIteratorImpl();
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
@@ -1344,42 +1099,6 @@ zx_status_t Remote<Protocol, kObjectType>::XattrRemove(const uint8_t* name, size
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 }
 
-template <typename Protocol, zxio_object_type_t kObjectType>
-zx_status_t Remote<Protocol, kObjectType>::Allocate(uint64_t offset, uint64_t len,
-                                                    zxio_allocate_mode_t mode) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  if (!client().is_valid()) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  fio::AllocateMode fidl_mode;
-  if (mode & ZXIO_ALLOCATE_KEEP_SIZE) {
-    fidl_mode |= fio::AllocateMode::kKeepSize;
-  } else if (mode & ZXIO_ALLOCATE_UNSHARE_RANGE) {
-    fidl_mode |= fio::AllocateMode::kUnshareRange;
-  } else if (mode & ZXIO_ALLOCATE_PUNCH_HOLE) {
-    fidl_mode |= fio::AllocateMode::kPunchHole;
-  } else if (mode & ZXIO_ALLOCATE_COLLAPSE_RANGE) {
-    fidl_mode |= fio::AllocateMode::kCollapseRange;
-  } else if (mode & ZXIO_ALLOCATE_ZERO_RANGE) {
-    fidl_mode |= fio::AllocateMode::kZeroRange;
-  } else if (mode & ZXIO_ALLOCATE_INSERT_RANGE) {
-    fidl_mode |= fio::AllocateMode::kInsertRange;
-  }
-  const fidl::WireResult result = client()->Allocate(offset, len, fidl_mode);
-  if (!result.ok()) {
-    return result.status();
-  }
-  if (result.value().is_error()) {
-    return result.value().error_value();
-  }
-
-  return ZX_OK;
-#else
-  return ZX_ERR_NOT_SUPPORTED;
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-}
-
 class Node : public Remote<fio::Node, ZXIO_OBJECT_TYPE_NODE> {
  public:
   explicit Node(fidl::ClientEnd<fio::Node> client_end) : Remote(std::move(client_end), kOps) {}
@@ -1388,24 +1107,13 @@ class Node : public Remote<fio::Node, ZXIO_OBJECT_TYPE_NODE> {
   static const zxio_ops_t kOps;
 };
 
-constexpr zxio_ops_t Node::kOps = ([]() {
-  zxio_ops_t ops = CommonRemoteOps<Node>();
-
-  using Adaptor = Adaptor<Node>;
-  ops.sync = Adaptor::From<&Node::Sync>;
-  ops.attr_get = Adaptor::From<&Node::AttrGet>;
-  ops.attr_set = Adaptor::From<&Node::AttrSet>;
-  ops.flags_get = Adaptor::From<&Node::FlagsGet>;
-  ops.flags_set = Adaptor::From<&Node::FlagsSet>;
-  return ops;
-})();
+constexpr zxio_ops_t Node::kOps = CommonRemoteOps<Node>();
 
 class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
  public:
   explicit Directory(fidl::ClientEnd<fio::Directory> client_end)
       : Remote(std::move(client_end), kOps) {}
 
- private:
   friend class DirentIteratorImpl;
 
   zx_status_t Readv(const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
@@ -1413,7 +1121,6 @@ class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
     if (flags) {
       return ZX_ERR_NOT_SUPPORTED;
     }
-
     return zxio_do_vector(
         vector, vector_count, out_actual,
         [](void* buffer, size_t capacity, size_t total_so_far, size_t* out_actual) {
@@ -1575,6 +1282,155 @@ class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
   }
 
+  zx_status_t Open(uint32_t flags, const char* path, size_t path_len, zxio_storage_t* storage) {
+    auto [client_end, server_end] = fidl::Endpoints<fio::Node>::Create();
+    const fidl::Status result =
+        client()->Open(static_cast<fio::wire::OpenFlags>(flags) | fio::wire::OpenFlags::kDescribe,
+                       {}, fidl::StringView::FromExternal(path, path_len), std::move(server_end));
+    if (!result.ok()) {
+      return result.status();
+    }
+    return zxio_create_with_on_open(client_end.TakeChannel().release(), storage);
+  }
+
+  zx_status_t Open3(const char* path, size_t path_len, zxio_open_flags_t flags,
+                    const zxio_open_options_t* options, zxio_storage_t* storage) {
+    zx::channel client_end, server_end;
+    if (zx_status_t status = zx::channel::create(0, &client_end, &server_end); status != ZX_OK) {
+      return status;
+    }
+
+    fio::NodeAttributesQuery attributes;
+    MutableAttributesDataHolder mutable_attributes_holder;
+    fidl::WireTableFrame<fio::wire::MutableNodeAttributes> create_attributes_frame;
+    zx::result<fio::wire::MutableNodeAttributes> create_attributes;
+    fidl::WireTableFrame<fio::wire::Options> options_frame;
+    fio::wire::Options open_options;
+
+    if (options && (options->inout_attr || options->create_attr)) {
+      auto options_builder = fio::wire::Options::ExternalBuilder(
+          fidl::ObjectView<fidl::WireTableFrame<fio::wire::Options>>::FromExternal(&options_frame));
+
+      // -- attributes --
+      if (options->inout_attr) {
+        attributes = BuildAttributeQuery(options->inout_attr->has);
+        if (attributes) {
+          options_builder.attributes(
+              fidl::ObjectView<fio::wire::NodeAttributesQuery>::FromExternal(&attributes));
+        }
+      }
+
+      // -- create_attributes --
+      if (options->create_attr) {
+        create_attributes = BuildMutableAttributes(options->create_attr, create_attributes_frame,
+                                                   &mutable_attributes_holder);
+        if (create_attributes.is_error()) {
+          return create_attributes.error_value();
+        }
+        options_builder.create_attributes(
+            fidl::ObjectView<fio::wire::MutableNodeAttributes>::FromExternal(
+                &create_attributes.value()));
+      }
+
+      open_options = options_builder.Build();
+    }
+
+    const fidl::Status result =
+        client()->Open3(fidl::StringView::FromExternal(path, path_len),
+                        fio::Flags::kFlagSendRepresentation | fio::Flags{flags}, open_options,
+                        std::move(server_end));
+
+    if (!result.ok()) {
+      return result.status();
+    }
+    return zxio_create_with_on_representation(client_end.release(),
+                                              options ? options->inout_attr : nullptr, storage);
+  }
+
+  zx_status_t OpenAsync(uint32_t flags, const char* path, size_t path_len, zx_handle_t request) {
+    fidl::ServerEnd<fio::Node> node_request{zx::channel(request)};
+    const fidl::Status result =
+        client()->Open(static_cast<fio::wire::OpenFlags>(flags), {},
+                       fidl::StringView::FromExternal(path, path_len), std::move(node_request));
+    return result.status();
+  }
+
+  zx_status_t Unlink(const char* name, size_t name_len, int flags) {
+    fidl::Arena allocator;
+    auto options = fio::wire::UnlinkOptions::Builder(allocator);
+    auto io_flags = fio::wire::UnlinkFlags::kMustBeDirectory;
+    if (flags & AT_REMOVEDIR) {
+      options.flags(fidl::ObjectView<decltype(io_flags)>::FromExternal(&io_flags));
+    }
+    const fidl::WireResult result =
+        client()->Unlink(fidl::StringView::FromExternal(name, name_len), options.Build());
+    if (!result.ok()) {
+      return result.status();
+    }
+    const auto& response = result.value();
+    if (response.is_error()) {
+      return response.error_value();
+    }
+    return ZX_OK;
+  }
+
+  zx_status_t TokenGet(zx_handle_t* out_token) {
+    fidl::WireResult result = client()->GetToken();
+    if (!result.ok()) {
+      return result.status();
+    }
+    auto& response = result.value();
+    if (const zx_status_t status = response.s; status != ZX_OK) {
+      return status;
+    }
+    *out_token = response.token.release();
+    return ZX_OK;
+  }
+
+  zx_status_t Rename(const char* old_path, size_t old_path_len, zx_handle_t dst_token,
+                     const char* new_path, size_t new_path_len) {
+    const fidl::WireResult result = client()->Rename(
+        fidl::StringView::FromExternal(old_path, old_path_len), zx::event(dst_token),
+        fidl::StringView::FromExternal(new_path, new_path_len));
+    if (!result.ok()) {
+      return result.status();
+    }
+    const auto& response = result.value();
+    if (response.is_error()) {
+      return response.error_value();
+    }
+    return ZX_OK;
+  }
+
+  zx_status_t Link(const char* src_path, size_t src_path_len, zx_handle_t dst_token,
+                   const char* dst_path, size_t dst_path_len) {
+    const fidl::WireResult result = client()->Link(
+        fidl::StringView::FromExternal(src_path, src_path_len), zx::handle(dst_token),
+        fidl::StringView::FromExternal(dst_path, dst_path_len));
+    if (!result.ok()) {
+      return result.status();
+    }
+    const auto& response = result.value();
+    return response.s;
+  }
+
+  zx_status_t DirentIteratorInit(zxio_dirent_iterator_t* iterator) {
+    new (iterator) DirentIteratorImpl(io());
+    return ZX_OK;
+  }
+
+  zx_status_t DirentIteratorNext(zxio_dirent_iterator_t* iterator, zxio_dirent_t* inout_entry) {
+    return reinterpret_cast<DirentIteratorImpl*>(iterator)->Next(inout_entry);
+  }
+
+  zx_status_t DirentIteratorRewind(zxio_dirent_iterator_t* iterator) {
+    return reinterpret_cast<DirentIteratorImpl*>(iterator)->Rewind();
+  }
+
+  void DirentIteratorDestroy(zxio_dirent_iterator_t* iterator) {
+    reinterpret_cast<DirentIteratorImpl*>(iterator)->~DirentIteratorImpl();
+  }
+
   static const zxio_ops_t kOps;
 };
 
@@ -1586,10 +1442,8 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
   zxio_ops_t ops = CommonRemoteOps<Directory>();
 
   using Adaptor = Adaptor<Directory>;
-  // use specialized read functions that succeed for zero-sized reads.
   ops.readv = Adaptor::From<&Directory::Readv>;
   ops.readv_at = Adaptor::From<&Directory::ReadvAt>;
-
   ops.open = Adaptor::From<&Directory::Open>;
   ops.open3 = Adaptor::From<&Directory::Open3>;
   ops.open_async = Adaptor::From<&Directory::OpenAsync>;
@@ -1602,19 +1456,8 @@ constexpr zxio_ops_t Directory::kOps = ([]() {
   ops.dirent_iterator_rewind = Adaptor::From<&Directory::DirentIteratorRewind>;
   ops.dirent_iterator_destroy = Adaptor::From<&Directory::DirentIteratorDestroy>;
   ops.watch_directory = Adaptor::From<&Directory::WatchDirectory>;
-
-  ops.sync = Adaptor::From<&Directory::Sync>;
-  ops.attr_get = Adaptor::From<&Directory::AttrGet>;
-  ops.attr_set = Adaptor::From<&Directory::AttrSet>;
-  ops.flags_get = Adaptor::From<&Directory::FlagsGet>;
-  ops.flags_set = Adaptor::From<&Directory::FlagsSet>;
   ops.advisory_lock = Adaptor::From<&Directory::AdvisoryLock>;
-
   ops.create_symlink = Adaptor::From<&Directory::CreateSymlink>;
-  ops.xattr_list = Adaptor::From<&Directory::XattrList>;
-  ops.xattr_get = Adaptor::From<&Directory::XattrGet>;
-  ops.xattr_set = Adaptor::From<&Directory::XattrSet>;
-  ops.xattr_remove = Adaptor::From<&Directory::XattrRemove>;
   return ops;
 })();
 
@@ -1681,11 +1524,9 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     if (flags) {
       return ZX_ERR_NOT_SUPPORTED;
     }
-
     if (stream_.is_valid()) {
       return map_status(stream_.readv(0, vector, vector_count, out_actual));
     }
-
     // Fallback to fuchsia.io/Readable.Read (File composes Readable).
     fidl::UnownedClientEnd<fio::Readable> readable_client(client().client_end().handle());
     return RemoteReadv(readable_client, vector, vector_count, flags, out_actual);
@@ -1696,11 +1537,9 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     if (flags) {
       return ZX_ERR_NOT_SUPPORTED;
     }
-
     if (stream_.is_valid()) {
       return map_status(stream_.readv_at(0, offset, vector, vector_count, out_actual));
     }
-
     // Fallback to fuchsia.io/File.ReadAt.
     return FileReadvAt(client(), offset, vector, vector_count, flags, out_actual);
   }
@@ -1710,11 +1549,9 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     if (flags) {
       return ZX_ERR_NOT_SUPPORTED;
     }
-
     if (stream_.is_valid()) {
       return map_status(stream_.writev(0, vector, vector_count, out_actual));
     }
-
     // Fallback to fuchsia.io/Writable.Write (File composes Writable).
     fidl::UnownedClientEnd<fio::Writable> writable_client(client().client_end().handle());
     return RemoteWritev(writable_client, vector, vector_count, flags, out_actual);
@@ -1725,11 +1562,9 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     if (flags) {
       return ZX_ERR_NOT_SUPPORTED;
     }
-
     if (stream_.is_valid()) {
       return map_status(stream_.writev_at(0, offset, vector, vector_count, out_actual));
     }
-
     // Fallback to fuchsia.io/File.WriteAt.
     return FileWritevAt(client(), offset, vector, vector_count, flags, out_actual);
   }
@@ -1738,7 +1573,93 @@ class File : public Remote<fio::File, ZXIO_OBJECT_TYPE_FILE> {
     if (stream_.is_valid()) {
       return map_status(stream_.seek(start, offset, out_offset));
     }
-    return Remote::Seek(start, offset, out_offset);
+    const fidl::WireResult result =
+        client()->Seek(static_cast<fio::wire::SeekOrigin>(start), offset);
+    if (!result.ok()) {
+      return result.status();
+    }
+    const auto& response = result.value();
+    if (response.is_error()) {
+      return response.error_value();
+    }
+    *out_offset = response.value()->offset_from_start;
+    return ZX_OK;
+  }
+
+  zx_status_t Truncate(uint64_t length) {
+    const fidl::WireResult result = client()->Resize(length);
+    if (!result.ok()) {
+      return result.status();
+    }
+    const auto& response = result.value();
+    if (response.is_error()) {
+      return response.error_value();
+    }
+    return ZX_OK;
+  }
+
+  zx_status_t VmoGet(zxio_vmo_flags_t zxio_flags, zx_handle_t* out_vmo) {
+    fio::wire::VmoFlags flags;
+    if (zxio_flags & ZXIO_VMO_READ) {
+      flags |= fio::wire::VmoFlags::kRead;
+    }
+    if (zxio_flags & ZXIO_VMO_WRITE) {
+      flags |= fio::wire::VmoFlags::kWrite;
+    }
+    if (zxio_flags & ZXIO_VMO_EXECUTE) {
+      flags |= fio::wire::VmoFlags::kExecute;
+    }
+    if (zxio_flags & ZXIO_VMO_PRIVATE_CLONE) {
+      flags |= fio::wire::VmoFlags::kPrivateClone;
+    }
+    if (zxio_flags & ZXIO_VMO_SHARED_BUFFER) {
+      flags |= fio::wire::VmoFlags::kSharedBuffer;
+    }
+    fidl::WireResult result = client()->GetBackingMemory(flags);
+    if (!result.ok()) {
+      return result.status();
+    }
+    const auto& response = result.value();
+    if (response.is_error()) {
+      return response.error_value();
+    }
+    zx::vmo& vmo = response.value()->vmo;
+    *out_vmo = vmo.release();
+    return ZX_OK;
+  }
+
+  zx_status_t Allocate(uint64_t offset, uint64_t len, zxio_allocate_mode_t mode) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    if (!client().is_valid()) {
+      return ZX_ERR_BAD_STATE;
+    }
+
+    fio::AllocateMode fidl_mode;
+    if (mode & ZXIO_ALLOCATE_KEEP_SIZE) {
+      fidl_mode |= fio::AllocateMode::kKeepSize;
+    } else if (mode & ZXIO_ALLOCATE_UNSHARE_RANGE) {
+      fidl_mode |= fio::AllocateMode::kUnshareRange;
+    } else if (mode & ZXIO_ALLOCATE_PUNCH_HOLE) {
+      fidl_mode |= fio::AllocateMode::kPunchHole;
+    } else if (mode & ZXIO_ALLOCATE_COLLAPSE_RANGE) {
+      fidl_mode |= fio::AllocateMode::kCollapseRange;
+    } else if (mode & ZXIO_ALLOCATE_ZERO_RANGE) {
+      fidl_mode |= fio::AllocateMode::kZeroRange;
+    } else if (mode & ZXIO_ALLOCATE_INSERT_RANGE) {
+      fidl_mode |= fio::AllocateMode::kInsertRange;
+    }
+    const fidl::WireResult result = client()->Allocate(offset, len, fidl_mode);
+    if (!result.ok()) {
+      return result.status();
+    }
+    if (result.value().is_error()) {
+      return result.value().error_value();
+    }
+
+    return ZX_OK;
+#else
+    return ZX_ERR_NOT_SUPPORTED;
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   }
 
   static const zxio_ops_t kOps;
@@ -1761,19 +1682,7 @@ constexpr zxio_ops_t File::kOps = ([]() {
   ops.truncate = Adaptor::From<&File::Truncate>;
   ops.vmo_get = Adaptor::From<&File::VmoGet>;
   ops.enable_verity = Adaptor::From<&File::EnableVerity>;
-
-  ops.sync = Adaptor::From<&File::Sync>;
-  ops.attr_get = Adaptor::From<&File::AttrGet>;
-  ops.attr_set = Adaptor::From<&File::AttrSet>;
-  ops.flags_get = Adaptor::From<&File::FlagsGet>;
-  ops.flags_set = Adaptor::From<&File::FlagsSet>;
   ops.advisory_lock = Adaptor::From<&File::AdvisoryLock>;
-
-  ops.xattr_list = Adaptor::From<&File::XattrList>;
-  ops.xattr_get = Adaptor::From<&File::XattrGet>;
-  ops.xattr_set = Adaptor::From<&File::XattrSet>;
-  ops.xattr_remove = Adaptor::From<&File::XattrRemove>;
-
   ops.link_into = Adaptor::From<&File::LinkInto>;
   ops.allocate = Adaptor::From<&File::Allocate>;
 
@@ -1802,14 +1711,8 @@ constexpr zxio_ops_t Symlink::kOps = ([]() {
   zxio_ops_t ops = CommonRemoteOps<Symlink>();
 
   using Adaptor = Adaptor<Symlink>;
-  ops.attr_get = Adaptor::From<&Symlink::AttrGet>;
-  ops.flags_get = Adaptor::From<&Symlink::FlagsGet>;
   ops.read_link = Adaptor::From<&Symlink::ReadLink>;
   ops.link_into = Adaptor::From<&Symlink::LinkInto>;
-  ops.xattr_list = Adaptor::From<&Symlink::XattrList>;
-  ops.xattr_get = Adaptor::From<&Symlink::XattrGet>;
-  ops.xattr_set = Adaptor::From<&Symlink::XattrSet>;
-  ops.xattr_remove = Adaptor::From<&Symlink::XattrRemove>;
   return ops;
 })();
 
