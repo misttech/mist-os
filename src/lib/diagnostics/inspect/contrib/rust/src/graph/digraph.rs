@@ -47,17 +47,18 @@ where
         if options.max_events > 0 {
             let list_node = node.create_child("events");
             events_tracker = Some(GraphEventsTracker::new(list_node, options.max_events));
-            let accessor_0 = events_tracker.as_ref().unwrap().history_duration_accessor();
+            let accessor_0 = events_tracker.as_ref().unwrap().history_stats_accessor();
             _stats_node = Some(node.create_lazy_child("stats", move || {
                 let accessor_1 = accessor_0.clone();
                 async move {
                     let inspector = inspect::Inspector::default();
                     let root = inspector.root();
                     root.record_uint("event_capacity", options.max_events as u64);
-                    root.record_uint(
-                        "history_duration_ns",
-                        accessor_1.history_duration().into_nanos().try_into().unwrap(),
-                    );
+                    let duration = accessor_1.history_duration().into_nanos();
+                    root.record_int("history_duration_ns", duration);
+                    if accessor_1.at_capacity() {
+                        root.record_int("at_capacity_history_duration_ns", duration);
+                    }
                     Ok(inspector)
                 }
                 .boxed()
@@ -95,7 +96,7 @@ mod tests {
         inspector: &inspect::Inspector,
         first_index: &str,
         last_index: &str,
-    ) -> u64 {
+    ) -> i64 {
         let first_path = &["fuchsia.inspect.Graph", "events", first_index, "@time"];
         let first_time = inspector
             .get_diagnostics_hierarchy()
@@ -108,7 +109,7 @@ mod tests {
             .get_property_by_path(last_path)
             .and_then(|p| p.int())
             .unwrap();
-        (last_time - first_time).try_into().unwrap()
+        last_time - first_time
     }
 
     #[fuchsia::test]
@@ -295,7 +296,7 @@ mod tests {
                 },
                 stats: {
                     event_capacity: 8u64,
-                    history_duration_ns: 0u64,
+                    history_duration_ns: 0i64,
                 }
             }
         });
@@ -386,8 +387,10 @@ mod tests {
                         vertex_id: "test-node"
                     }
                 },
-                stats: contains {
+                stats: {
+                    event_capacity: 8u64,
                     history_duration_ns: history_duration,
+                    at_capacity_history_duration_ns: history_duration,
                 },
             }
         });
@@ -461,8 +464,10 @@ mod tests {
                         vertex_id: "test-node"
                     }
                 },
-                "stats": contains {
+                "stats": {
+                    event_capacity: 8u64,
                     history_duration_ns: history_duration,
+                    at_capacity_history_duration_ns: history_duration,
                 }
             }
         });
@@ -801,7 +806,8 @@ mod tests {
                         }
                     },
                 },
-                "stats": contains {
+                "stats": {
+                    event_capacity: 5u64,
                     history_duration_ns: history_duration,
                 },
                 "topology": {
@@ -884,8 +890,10 @@ mod tests {
                         "vertex_id": "test-node-1",
                     },
                 },
-                "stats": contains {
+                "stats": {
+                    event_capacity: 5u64,
                     history_duration_ns: history_duration,
+                    at_capacity_history_duration_ns: history_duration,
                 },
                 "topology": {
                     "test-node-1": {
@@ -940,8 +948,10 @@ mod tests {
                         "vertex_id": "test-node-2",
                     }
                 },
-                "stats": contains {
+                "stats": {
+                    event_capacity: 5u64,
                     history_duration_ns: history_duration,
+                    at_capacity_history_duration_ns: history_duration,
                 },
                 "topology": {}
             }
@@ -984,8 +994,9 @@ mod tests {
                         }
                     }
                 },
-                "stats": contains {
-                    history_duration_ns: 0u64,
+                "stats": {
+                    event_capacity: 3u64,
+                    history_duration_ns: 0i64,
                 },
                 "topology": {
                     "test-node": {
@@ -1022,7 +1033,8 @@ mod tests {
                         "vertex_id": "test-node",
                     },
                 },
-                "stats": contains {
+                "stats": {
+                    event_capacity: 3u64,
                     history_duration_ns: history_duration,
                 },
                 "topology": {

@@ -62,6 +62,10 @@ impl ShadowBuffer {
         }
         self.buffer.back().unwrap().time - self.buffer.front().unwrap().time
     }
+    // Report whether capacity reached.
+    pub fn at_capacity(&self) -> bool {
+        self.buffer.len() == self.capacity
+    }
 }
 
 // Simple container to share a mutex.
@@ -95,19 +99,22 @@ impl GraphEventsTracker {
     }
 
     // Allows closure-capture of weak reference for lazy node pattern.
-    pub fn history_duration_accessor(&self) -> HistoryDurationAccessor {
-        HistoryDurationAccessor(Arc::downgrade(&self.inner))
+    pub fn history_stats_accessor(&self) -> HistoryStatsAccessor {
+        HistoryStatsAccessor(Arc::downgrade(&self.inner))
     }
 }
 
 #[derive(Clone)]
-pub struct HistoryDurationAccessor(Weak<Mutex<Inner>>);
+pub struct HistoryStatsAccessor(Weak<Mutex<Inner>>);
 
-impl HistoryDurationAccessor {
+impl HistoryStatsAccessor {
     pub fn history_duration(&self) -> zx::BootDuration {
         self.0
             .upgrade()
             .map_or(zx::BootDuration::ZERO, |inner| inner.lock().shadow.history_duration())
+    }
+    pub fn at_capacity(&self) -> bool {
+        self.0.upgrade().map_or(false, |inner| inner.lock().shadow.at_capacity())
     }
 }
 
