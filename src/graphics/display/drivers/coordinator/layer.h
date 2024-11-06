@@ -107,8 +107,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
       fuchsia_hardware_display_types::wire::CoordinateTransformation image_source_transformation,
       fuchsia_math::wire::RectU image_source, fuchsia_math::wire::RectU display_destination);
   void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
-  void SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,
-                      ::fidl::VectorView<uint8_t> color_bytes);
+  void SetColorConfig(fuchsia_hardware_display_types::wire::Color color);
   void SetImage(fbl::RefPtr<Image> image_id, EventId wait_event_id, EventId signal_event_id);
 
  private:
@@ -147,8 +146,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   uint64_t current_image_config_gen_ = 0;
 
   // Storage for a color layer's color data bytes.
-  uint8_t pending_color_bytes_[4];
-  uint8_t current_color_bytes_[4];
+  uint8_t pending_color_bytes_[8];
+  uint8_t current_color_bytes_[8];
 
   LayerNode pending_node_;
   LayerNode current_node_;

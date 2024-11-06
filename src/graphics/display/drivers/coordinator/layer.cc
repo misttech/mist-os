@@ -275,17 +275,16 @@ void Layer::SetPrimaryAlpha(fhdt::wire::AlphaMode mode, float val) {
   config_change_ = true;
 }
 
-void Layer::SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,
-                           ::fidl::VectorView<uint8_t> color_bytes) {
+void Layer::SetColorConfig(fuchsia_hardware_display_types::wire::Color color) {
   // Increase the size of the static array when large color formats are introduced
-  ZX_ASSERT(color_bytes.count() <= sizeof(pending_color_bytes_));
+  static_assert(color.bytes.size() == sizeof(pending_color_bytes_));
 
   pending_layer_.type = LAYER_TYPE_COLOR;
   color_layer_t* color_layer = &pending_layer_.cfg.color;
 
-  ZX_DEBUG_ASSERT(!pixel_format.IsUnknown());
-  color_layer->format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(pixel_format);
-  memcpy(pending_color_bytes_, color_bytes.data(), sizeof(pending_color_bytes_));
+  ZX_DEBUG_ASSERT(!color.format.IsUnknown());
+  color_layer->format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(color.format);
+  std::memcpy(pending_color_bytes_, color.bytes.data(), sizeof(pending_color_bytes_));
 
   pending_image_ = nullptr;
   config_change_ = true;

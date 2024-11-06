@@ -584,15 +584,15 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
   }
 
   uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(
-      request->pixel_format,
+      request->color.format,
       /*pixel_format_modifier_param=*/fuchsia_images2::wire::PixelFormatModifier::kLinear));
-  if (request->color_bytes.count() != bytes_per_pixel) {
-    FDF_LOG(ERROR, "SetLayerColorConfig with invalid color bytes");
+  if (request->color.bytes.size() < bytes_per_pixel) {
+    FDF_LOG(ERROR, "SetLayerColorConfig with invalid pixel format");
     TearDown();
     return;
   }
 
-  layer->SetColorConfig(request->pixel_format, request->color_bytes);
+  layer->SetColorConfig(request->color);
   pending_config_valid_ = false;
   // no Reply defined
 }

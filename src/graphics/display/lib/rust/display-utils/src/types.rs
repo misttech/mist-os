@@ -8,7 +8,9 @@ use fidl_fuchsia_hardware_display::{
     BufferCollectionId as FidlBufferCollectionId, BufferId as FidlBufferId, EventId as FidlEventId,
     ImageId as FidlImageId, Info, LayerId as FidlLayerId,
 };
-use fidl_fuchsia_hardware_display_types::{DisplayId as FidlDisplayId, INVALID_DISP_ID};
+use fidl_fuchsia_hardware_display_types::{
+    Color as FidlColor, DisplayId as FidlDisplayId, INVALID_DISP_ID,
+};
 use fuchsia_async::OnSignals;
 use std::fmt;
 use zx::{self as zx, AsHandleRef};
@@ -240,9 +242,44 @@ impl Event {
     }
 }
 
+/// Enhances the `fuchsia.hardware.display.typers.Color` FIDL struct.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Color {
+    /// The format of `bytes`.
+    pub format: PixelFormat,
+
+    /// The constant color, represented as one pixel using `format`.
+    pub bytes: [u8; 8],
+}
+
+impl From<FidlColor> for Color {
+    fn from(fidl_color: FidlColor) -> Self {
+        Color { format: fidl_color.format.into(), bytes: fidl_color.bytes }
+    }
+}
+
+impl From<&FidlColor> for Color {
+    fn from(fidl_color: &FidlColor) -> Self {
+        Self::from(*fidl_color)
+    }
+}
+
+impl From<Color> for FidlColor {
+    fn from(color: Color) -> Self {
+        FidlColor { format: color.format.into(), bytes: color.bytes }
+    }
+}
+
+impl From<&Color> for FidlColor {
+    fn from(color: &Color) -> Self {
+        Self::from(*color)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl_fuchsia_images2::PixelFormat as FidlPixelFormat;
 
     #[fuchsia::test]
     fn layer_id_from_fidl_layer_id() {
@@ -577,30 +614,60 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn buffer_id_to_fidl_buffer_id() {
+    fn color_from_fidl_color() {
         assert_eq!(
-            FidlBufferId {
-                buffer_collection_id: FidlBufferCollectionId { value: 1 },
-                buffer_index: 2
+            Color {
+                format: PixelFormat::R8G8B8A8,
+                bytes: [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48]
             },
-            BufferId { buffer_collection_id: BufferCollectionId(1), buffer_index: 2 }.into()
+            Color::from(FidlColor {
+                format: FidlPixelFormat::R8G8B8A8,
+                bytes: [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48],
+            })
         );
+    }
+
+    #[fuchsia::test]
+    fn fidl_color_from_color() {
         assert_eq!(
-            FidlBufferId {
-                buffer_collection_id: FidlBufferCollectionId { value: 2 },
-                buffer_index: 3
+            FidlColor {
+                format: FidlPixelFormat::R8G8B8A8,
+                bytes: [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48]
             },
-            BufferId { buffer_collection_id: BufferCollectionId(2), buffer_index: 3 }.into()
+            FidlColor::from(Color {
+                format: PixelFormat::R8G8B8A8,
+                bytes: [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48],
+            })
         );
-        const LARGE_64: u64 = 1 << 63;
-        const LARGE_32: u32 = 1 << 31;
+    }
+
+    #[fuchsia::test]
+    fn fidl_color_to_color() {
         assert_eq!(
-            FidlBufferId {
-                buffer_collection_id: FidlBufferCollectionId { value: LARGE_64 },
-                buffer_index: LARGE_32
+            Color {
+                format: PixelFormat::R8G8B8A8,
+                bytes: [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48]
             },
-            BufferId { buffer_collection_id: BufferCollectionId(LARGE_64), buffer_index: LARGE_32 }
-                .into()
+            FidlColor {
+                format: FidlPixelFormat::R8G8B8A8,
+                bytes: [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48]
+            }
+            .into()
+        );
+    }
+
+    #[fuchsia::test]
+    fn color_to_fidl_color() {
+        assert_eq!(
+            FidlColor {
+                format: FidlPixelFormat::R8G8B8A8,
+                bytes: [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48]
+            },
+            Color {
+                format: PixelFormat::R8G8B8A8,
+                bytes: [0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48]
+            }
+            .into()
         );
     }
 }

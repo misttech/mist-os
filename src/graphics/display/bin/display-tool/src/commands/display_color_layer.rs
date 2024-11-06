@@ -7,7 +7,7 @@
 use {
     anyhow::{format_err, Result},
     display_utils::{
-        Coordinator, DisplayConfig, DisplayInfo, Layer, LayerConfig, PixelFormat, VsyncEvent,
+        Color, Coordinator, DisplayConfig, DisplayInfo, Layer, LayerConfig, PixelFormat, VsyncEvent,
     },
     futures::StreamExt,
     std::io::Write,
@@ -24,13 +24,13 @@ pub struct Args<'a> {
     pub pixel_format: PixelFormat,
 }
 
-pub fn get_bytes_for_rgb_color(rgb: Rgb888, pixel_format: PixelFormat) -> Result<Vec<u8>> {
+pub fn get_bytes_for_rgb_color(rgb: Rgb888, pixel_format: PixelFormat) -> Result<[u8; 8]> {
     match pixel_format {
         PixelFormat::Bgra32 => {
-            Ok(vec![rgb.b, rgb.g, rgb.r, /*alpha=*/ 255])
+            Ok([rgb.b, rgb.g, rgb.r, /*alpha=*/ 255, 0, 0, 0, 0])
         }
         PixelFormat::R8G8B8A8 => {
-            Ok(vec![rgb.r, rgb.g, rgb.b, /*alpha=*/ 255])
+            Ok([rgb.r, rgb.g, rgb.b, /*alpha=*/ 255, 0, 0, 0, 0])
         }
         _ => Err(anyhow::format_err!("unsupported pixel format {}", pixel_format)),
     }
@@ -46,7 +46,12 @@ pub async fn run<'a>(coordinator: &Coordinator, args: Args<'a>) -> Result<()> {
     let layer = coordinator.create_layer().await?;
     let configs = vec![DisplayConfig {
         id: display.id(),
-        layers: vec![Layer { id: layer, config: LayerConfig::Color { pixel_format, color_bytes } }],
+        layers: vec![Layer {
+            id: layer,
+            config: LayerConfig::Color {
+                color: Color { format: pixel_format, bytes: color_bytes },
+            },
+        }],
     }];
     coordinator.apply_config(&configs).await?;
     let recent_applied_config_stamp = coordinator.get_recent_applied_config_stamp().await?;
