@@ -218,15 +218,15 @@ std::unique_ptr<Result> RunTest(const char* argv[], const char* output_dir, cons
 
     vfs.emplace(loop.dispatcher());
 
-    std::tuple<const char*, fuchsia_io::OpenFlags> map[] = {
-        {"/boot", fuchsia_io::OpenFlags::kRightReadable},
+    std::tuple<const char*, fuchsia_io::Flags> map[] = {
+        {"/boot", fuchsia_io::kPermReadable},
         {"/svc", {}},
-        {"/tmp", fuchsia_io::OpenFlags::kRightReadable | fuchsia_io::OpenFlags::kRightWritable},
+        {"/tmp", fuchsia_io::kPermReadable | fuchsia_io::kPermWritable},
     };
     for (auto [path, flags] : map) {
       auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
       if (zx_status_t status =
-              fdio_open(path, static_cast<uint32_t>(flags), server_end.TakeChannel().release());
+              fdio_open3(path, static_cast<uint64_t>(flags), server_end.TakeChannel().release());
           status != ZX_OK) {
         fprintf(stderr, "FAILURE: Could not open directory %s: %s\n", path,
                 zx_status_get_string(status));

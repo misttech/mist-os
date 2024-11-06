@@ -79,10 +79,9 @@ zx_handle_t tu_launch_process(zx_handle_t job, const char* name, int argc, const
 // Loads the executable at the given path into the given VMO.
 static zx_status_t load_executable_vmo(const char* path, zx::vmo* result) {
   fbl::unique_fd fd;
-  zx_status_t status = fdio_open_fd(path,
-                                    static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable |
-                                                          fio::wire::OpenFlags::kRightExecutable),
-                                    fd.reset_and_get_address());
+  zx_status_t status = fdio_open3_fd(
+      path, static_cast<uint64_t>(fio::wire::kPermReadable | fio::wire::kPermExecutable),
+      fd.reset_and_get_address());
   tu_check("open executable fd", status);
 
   status = fdio_get_vmo_exec(fd.get(), result->reset_and_get_address());
