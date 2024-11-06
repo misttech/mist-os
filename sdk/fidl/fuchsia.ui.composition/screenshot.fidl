@@ -14,7 +14,7 @@ type ScreenshotFormat = flexible enum : uint8 {
     BGRA_RAW = 0;
 
     /// Requests tightly packed pixel data with 32 bit RGBA pixels.
-    @available(added=NEXT)
+    @available(added=25)
     RGBA_RAW = 2;
 
     /// Requests tightly packed pixel data which is compressed into PNG format.

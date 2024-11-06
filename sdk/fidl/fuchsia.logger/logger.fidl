@@ -74,11 +74,11 @@ type LogMessage = struct {
     tid uint64;
 
     /// [zx_clock_get_monotonic](https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_monotonic.md)
-    @available(replaced=NEXT)
+    @available(replaced=25)
     time zx.Time;
 
     /// [zx_clock_get_boot](https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_boot.md)
-    @available(added=NEXT)
+    @available(added=25)
     time zx.InstantBoot;
 
     severity int32;

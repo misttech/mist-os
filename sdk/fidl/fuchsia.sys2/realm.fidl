@@ -119,16 +119,16 @@ type OpenError = flexible enum {
     BAD_DIR_TYPE = 7;
 
     /// The given path could not be parsed by component manager.
-    @available(removed=NEXT)
+    @available(removed=25)
     BAD_PATH = 8;
 
     /// Serving the requested directory requires starting the instance, but the
     /// instance failed to start.
-    @available(added=19, removed=NEXT)
+    @available(added=19, removed=25)
     INSTANCE_FAILED_TO_START = 9;
 
     /// Instance matching moniker was destroyed.
-    @available(added=NEXT)
+    @available(added=25)
     INSTANCE_DESTROYED = 10;
 };
 
@@ -304,7 +304,7 @@ closed protocol RealmQuery {
     }) error ConstructNamespaceError;
 
     /// Makes an fuchsia.io.Directory/Open call on a directory in an instance.
-    @available(added=11, removed=NEXT)
+    @available(added=11, removed=25)
     strict Open(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         dir_type OpenDirType;
@@ -315,7 +315,7 @@ closed protocol RealmQuery {
     }) -> () error OpenError;
 
     /// Opens the specified directory in an instance.
-    @available(added=NEXT)
+    @available(added=25)
     strict OpenDirectory(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         dir_type OpenDirType;

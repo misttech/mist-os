@@ -120,7 +120,7 @@ impl RemoteControlService {
                 Ok(())
             }
             #[cfg(any(
-                fuchsia_api_level_less_than = "NEXT",
+                fuchsia_api_level_less_than = "25",
                 fuchsia_api_level_at_least = "PLATFORM"
             ))]
             rcs::RemoteControlRequest::OpenCapability {
@@ -138,7 +138,7 @@ impl RemoteControlService {
                 )?;
                 Ok(())
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "25")]
             rcs::RemoteControlRequest::ConnectCapability {
                 moniker,
                 capability_set,

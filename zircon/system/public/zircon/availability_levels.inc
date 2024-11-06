@@ -26,6 +26,7 @@
 // `NEXT` API level.
 //
 // TODO(https://fxbug.dev/349622444): Generate the numbered levels from version_history.json.
+#define FUCHSIA_INTERNAL_LEVEL_25_() 25
 #define FUCHSIA_INTERNAL_LEVEL_24_() 24
 #define FUCHSIA_INTERNAL_LEVEL_23_() 23
 #define FUCHSIA_INTERNAL_LEVEL_22_() 22

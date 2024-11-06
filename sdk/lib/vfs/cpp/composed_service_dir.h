@@ -60,7 +60,7 @@ class ComposedServiceDir final : public Node {
   // will not be enumerated. This method may only be called once.
   // TODO(https://fxbug.dev/336617685): Mark this as removed at NEXT once we ship API level 24.
   void set_fallback(fidl::InterfaceHandle<fuchsia::io::Directory> fallback_dir)
-      ZX_REMOVED_SINCE(1, NEXT, HEAD, "Replaced by SetFallback().") {
+      ZX_REMOVED_SINCE(1, 25, HEAD, "Replaced by SetFallback().") {
     ZX_ASSERT(vfs_internal_composed_svc_dir_set_fallback(
                   handle(), fallback_dir.TakeChannel().release()) == ZX_OK);
   }

@@ -134,11 +134,11 @@ closed protocol Stream {
     /// to complete. This also means that any SetConstraints call on the returned token can't
     /// conflict with the constraints in the `StreamConfig`, otherwise attempts to wait for buffers
     /// on the token will fail.
-    @available(added=NEXT)
+    @available(added=25)
     strict GetBuffers2() -> (resource struct {
         token client_end:fuchsia.sysmem2.BufferCollectionToken;
     });
-    @available(deprecated=NEXT, note="use GetBuffers2 or preferably fuchsia.camera3")
+    @available(deprecated=25, note="use GetBuffers2 or preferably fuchsia.camera3")
     strict GetBuffers() -> (resource struct {
         token client_end:fuchsia.sysmem.BufferCollectionToken;
     });

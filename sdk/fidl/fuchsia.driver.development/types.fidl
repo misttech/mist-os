@@ -41,7 +41,7 @@ type NodeInfo = table {
 
     /// Whether the node is in a quarantined state. That is, the |bound_driver_url| has failed to
     /// start, and the node is no longer running its driver instance.
-    @available(added=NEXT)
+    @available(added=25)
     10: quarantined bool;
 };
 

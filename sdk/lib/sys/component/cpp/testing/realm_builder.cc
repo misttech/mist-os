@@ -194,7 +194,7 @@ Realm& Realm::AddCapability(fuchsia::component::decl::Capability capability) {
 }
 #endif
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
 Realm& Realm::AddCollection(fuchsia::component::decl::Collection collection) {
   fuchsia::component::test::Realm_AddCollection_Result result;
   ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(

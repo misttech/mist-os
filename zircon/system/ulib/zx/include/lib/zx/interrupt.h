@@ -40,10 +40,10 @@ class interrupt final : public object<interrupt> {
   zx_status_t wait(zx::time* timestamp) const ZX_AVAILABLE_SINCE(7) {
     return zx_interrupt_wait(get(), timestamp ? timestamp->get_address() : nullptr);
   }
-  zx_status_t wait(std::nullptr_t) const ZX_AVAILABLE_SINCE(NEXT) {
+  zx_status_t wait(std::nullptr_t) const ZX_AVAILABLE_SINCE(25) {
     return wait(static_cast<zx::time*>(nullptr));
   }
-  zx_status_t wait(zx::time_boot* timestamp) const ZX_AVAILABLE_SINCE(NEXT) {
+  zx_status_t wait(zx::time_boot* timestamp) const ZX_AVAILABLE_SINCE(25) {
     return zx_interrupt_wait(get(), timestamp ? timestamp->get_address() : nullptr);
   }
 
@@ -54,7 +54,7 @@ class interrupt final : public object<interrupt> {
   zx_status_t trigger(uint32_t options, zx::time timestamp) const ZX_AVAILABLE_SINCE(7) {
     return zx_interrupt_trigger(get(), options, timestamp.get());
   }
-  zx_status_t trigger(uint32_t options, zx::time_boot timestamp) const ZX_AVAILABLE_SINCE(NEXT) {
+  zx_status_t trigger(uint32_t options, zx::time_boot timestamp) const ZX_AVAILABLE_SINCE(25) {
     return zx_interrupt_trigger(get(), options, timestamp.get());
   }
 

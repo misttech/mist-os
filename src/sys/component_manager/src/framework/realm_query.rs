@@ -104,7 +104,7 @@ impl RealmQuery {
                     responder.send(result)
                 }
                 #[cfg(any(
-                    fuchsia_api_level_less_than = "NEXT",
+                    fuchsia_api_level_less_than = "25",
                     fuchsia_api_level_at_least = "PLATFORM"
                 ))]
                 fsys::RealmQueryRequest::Open {
@@ -129,7 +129,7 @@ impl RealmQuery {
                     .await;
                     responder.send(result)
                 }
-                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 fsys::RealmQueryRequest::OpenDirectory { moniker, dir_type, object, responder } => {
                     let result =
                         open_directory(&model, &scope_moniker, &moniker, dir_type, object).await;
@@ -419,7 +419,7 @@ async fn construct_namespace(
     Ok(ns.into())
 }
 
-#[cfg(any(fuchsia_api_level_less_than = "NEXT", fuchsia_api_level_at_least = "PLATFORM"))]
+#[cfg(any(fuchsia_api_level_less_than = "25", fuchsia_api_level_at_least = "PLATFORM"))]
 async fn open_deprecated(
     model: &Arc<Model>,
     scope_moniker: &Moniker,
@@ -519,7 +519,7 @@ async fn open_deprecated(
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "25")]
 async fn open_directory(
     model: &Arc<Model>,
     scope_moniker: &Moniker,

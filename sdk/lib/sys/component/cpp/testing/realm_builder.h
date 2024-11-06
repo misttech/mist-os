@@ -178,7 +178,7 @@ class Realm final {
   Realm& AddCapability(fuchsia::component::decl::Capability capability);
 #endif
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
   Realm& AddCollection(fuchsia::component::decl::Collection collection);
   Realm& AddEnvironment(fuchsia::component::decl::Environment environment);
 #endif

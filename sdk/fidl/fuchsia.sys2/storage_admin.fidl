@@ -46,7 +46,7 @@ type DeletionError = strict enum {
 closed protocol StorageAdmin {
     /// Opens the isolated directory for the given component. The open request will provision
     /// the storage if it hasn't been already.
-    @available(removed=NEXT)
+    @available(removed=25)
     strict OpenComponentStorage(resource struct {
         relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         flags fuchsia.io.OpenFlags;
@@ -56,7 +56,7 @@ closed protocol StorageAdmin {
 
     /// Opens the isolated directory for the given component. The open request will provision
     /// the storage if it hasn't been already.
-    @available(added=NEXT)
+    @available(added=25)
     strict OpenStorage(resource struct {
         relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         object server_end:fuchsia.io.Node;

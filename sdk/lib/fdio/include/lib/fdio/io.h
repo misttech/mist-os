@@ -156,7 +156,7 @@ zx_status_t fdio_get_vmo_exec(int fd, zx_handle_t* out_vmo) ZX_AVAILABLE_SINCE(1
 //   * `ZX_ERR_NO_MEMORY`: Failed due to a lack of memory.
 //
 //   * `ZX_ERR_NO_RESOURCES`: Failed to bind to the file descriptor.
-zx_status_t fdio_transferable_fd(int* out_fd, zx_handle_t* out_handle) ZX_AVAILABLE_SINCE(NEXT);
+zx_status_t fdio_transferable_fd(int* out_fd, zx_handle_t* out_handle) ZX_AVAILABLE_SINCE(25);
 
 __END_CDECLS
 

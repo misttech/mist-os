@@ -11,7 +11,7 @@ use cm_rust::{
     SourceName, UseDecl, UseProtocolDecl, UseSource,
 };
 use cm_types::Path;
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "25")]
 use cm_types::RelativePath;
 use component_events::events::Started;
 use component_events::matcher::EventMatcher;
@@ -706,7 +706,7 @@ impl DictionaryCapability {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "25")]
 impl Into<ftest::Capability> for DictionaryCapability {
     fn into(self) -> ftest::Capability {
         ftest::Capability::Dictionary(ftest::Dictionary {
@@ -1243,7 +1243,7 @@ impl RealmBuilder {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
                 }
-                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 d @ ExposeDecl::Dictionary(_) => {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
@@ -1256,7 +1256,7 @@ impl RealmBuilder {
                     let expose = ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: decl.target_name.clone(),
-                        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                        #[cfg(fuchsia_api_level_at_least = "25")]
                         source_dictionary: Default::default(),
                         target: ExposeTarget::Parent,
                         target_name: decl.target_name.clone(),
@@ -1268,7 +1268,7 @@ impl RealmBuilder {
                     let expose = ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: decl.target_name.clone(),
-                        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                        #[cfg(fuchsia_api_level_at_least = "25")]
                         source_dictionary: Default::default(),
                         target: ExposeTarget::Parent,
                         target_name: decl.target_name.clone(),
@@ -1285,7 +1285,7 @@ impl RealmBuilder {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
                 }
-                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 d @ ExposeDecl::Dictionary(_) => {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
@@ -1303,7 +1303,7 @@ impl RealmBuilder {
                 .expect("unable to create path from capability name"),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::default(),
-                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary: RelativePath::dot(),
             })
             .map(|d| UseDecl::Protocol(d))
@@ -1619,7 +1619,7 @@ impl RealmBuilder {
         self.root_realm.add_capability(capability).await
     }
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "25")]
     /// Adds a Collection to the root realm.
     pub async fn add_collection(
         &self,
@@ -1628,7 +1628,7 @@ impl RealmBuilder {
         self.root_realm.add_collection(collection).await
     }
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "25")]
     /// Adds a Environment to the root realm.
     pub async fn add_environment(
         &self,
@@ -1803,7 +1803,7 @@ impl SubRealmBuilder {
         for target in &route.to {
             target.check_scope(&self.realm_path)?;
         }
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "25")]
         if let Some(from_dictionary) = route.from_dictionary {
             for c in &mut capabilities {
                 match c {
@@ -1880,7 +1880,7 @@ impl SubRealmBuilder {
         Ok(())
     }
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "25")]
     /// Adds a Collection to the root realm.
     pub async fn add_collection(
         &self,
@@ -1891,7 +1891,7 @@ impl SubRealmBuilder {
         Ok(CollectionRef::new(name, self.realm_path.clone()))
     }
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "25")]
     /// Adds a Environment to the root realm.
     pub async fn add_environment(
         &self,

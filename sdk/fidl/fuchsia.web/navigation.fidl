@@ -126,7 +126,7 @@ type NavigationState = resource table {
     7: favicon Favicon;
 
     /// Indicates type of the error when `page_type` is set to `ERROR`.
-    @available(added=NEXT)
+    @available(added=25)
     8: error_detail ErrorDetail;
 };
 
@@ -158,7 +158,7 @@ type PageType = strict enum {
 };
 
 /// Indicates the reason for the error when `page_type` is set to [`PageType.ERROR`].
-@available(added=NEXT)
+@available(added=25)
 type ErrorDetail = flexible enum {
     /// Page has failed to load. No content is rendered.
     LOAD_FAILED = 0;

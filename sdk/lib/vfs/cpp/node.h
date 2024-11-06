@@ -70,7 +70,7 @@ class Node {
   // TODO(https://fxbug.dev/336617685): Mark this as removed at NEXT once we ship API level 25.
   zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
                     async_dispatcher_t* dispatcher = nullptr)
-      ZX_DEPRECATED_SINCE(1, NEXT, "Use new signature of Serve which takes fuchsia.io/Flags.") {
+      ZX_DEPRECATED_SINCE(1, 25, "Use new signature of Serve which takes fuchsia.io/Flags.") {
     if (!dispatcher) {
       dispatcher = async_get_default_dispatcher();
     }
