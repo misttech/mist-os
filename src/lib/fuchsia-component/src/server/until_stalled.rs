@@ -221,7 +221,7 @@ mod tests {
     use fasync::TestExecutor;
     use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_component_client_test::{
-        ServiceAMarker, ServiceARequest, ServiceARequestStream,
+        ProtocolAMarker, ProtocolARequest, ProtocolARequestStream,
     };
     use futures::future::BoxFuture;
     use futures::{pin_mut, select, TryStreamExt};
@@ -231,7 +231,7 @@ mod tests {
     use super::*;
 
     enum Requests {
-        ServiceA(ServiceARequestStream),
+        ServiceA(ProtocolARequestStream),
     }
 
     #[derive(Clone)]
@@ -260,7 +260,7 @@ mod tests {
                         let Requests::ServiceA(mut request_stream) = requests;
                         while let Ok(Some(request)) = request_stream.try_next().await {
                             match request {
-                                ServiceARequest::Foo { responder } => {
+                                ProtocolARequest::Foo { responder } => {
                                     call_count.inc();
                                     let _ = responder.send();
                                 }
@@ -317,7 +317,7 @@ mod tests {
         let mut proxies = Vec::new();
         for _ in 0..NUM_FOO_REQUESTS {
             proxies.push(
-                crate::client::connect_to_protocol_at_dir_svc::<ServiceAMarker>(&client_end)
+                crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end)
                     .unwrap(),
             );
         }
@@ -384,7 +384,7 @@ mod tests {
 
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         let proxy =
-            crate::client::connect_to_protocol_at_dir_svc::<ServiceAMarker>(&client_end).unwrap();
+            crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap();
 
         let foo = proxy.foo().fuse();
         pin_mut!(foo);
@@ -421,7 +421,7 @@ mod tests {
         assert!(TestExecutor::poll_until_stalled(&mut fs).await.is_pending());
 
         let proxy =
-            crate::client::connect_to_protocol_at_dir_svc::<ServiceAMarker>(&client_end).unwrap();
+            crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end).unwrap();
         select! {
             result = proxy.foo().fuse() => assert_matches!(result, Ok(_)),
             _ = fs => unreachable!(),
@@ -456,7 +456,7 @@ mod tests {
             current_time += request_interval;
             TestExecutor::advance_to(current_time).await;
             let proxy =
-                crate::client::connect_to_protocol_at_dir_svc::<ServiceAMarker>(&client_end)
+                crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end)
                     .unwrap();
             assert_matches!(proxy.foo().await, Ok(_));
         }
@@ -468,7 +468,7 @@ mod tests {
             current_time += request_interval;
             TestExecutor::advance_to(current_time).await;
             let proxy =
-                crate::client::connect_to_protocol_at_dir_svc::<ServiceAMarker>(&client_end)
+                crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end)
                     .unwrap();
             let foo = proxy.foo();
             pin_mut!(foo);
@@ -503,7 +503,7 @@ mod tests {
             assert_matches!(
                 fuchsia_fs::directory::readdir(&svc).await,
                 Ok(ref entries)
-                if entries.len() == 1 && entries[0].name == "fuchsia.component.client.test.ServiceA"
+                if entries.len() == 1 && entries[0].name == "fuchsia.component.client.test.ProtocolA"
             );
             assert!(TestExecutor::poll_until_stalled(&mut fs).await.is_pending());
 
@@ -572,7 +572,7 @@ mod tests {
         const NUM_REQUESTS: usize = 30;
         for delay_factor in 0..NUM_REQUESTS {
             let proxy =
-                crate::client::connect_to_protocol_at_dir_svc::<ServiceAMarker>(&client_end)
+                crate::client::connect_to_protocol_at_dir_svc::<ProtocolAMarker>(&client_end)
                     .unwrap();
             proxy.foo().await.unwrap();
             drop(proxy);

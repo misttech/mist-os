@@ -381,11 +381,12 @@ mod tests {
     async fn end_to_end() {
         let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
-        use fidl_fuchsia_component_client_test::{ServiceAMarker, ServiceARequest};
+        use fidl_fuchsia_component_client_test::{ProtocolAMarker, ProtocolARequest};
 
         const DURATION_NANOS: i64 = 40_000_000;
         let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ServiceAMarker>().unwrap();
+        let (proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<ProtocolAMarker>().unwrap();
         let (stream, stalled) = until_stalled(stream, idle_duration);
 
         // Launch a task that serves the stream.
@@ -393,7 +394,7 @@ mod tests {
             let mut stream = pin!(stream);
             while let Some(request) = stream.try_next().await.unwrap() {
                 match request {
-                    ServiceARequest::Foo { responder } => responder.send().unwrap(),
+                    ProtocolARequest::Foo { responder } => responder.send().unwrap(),
                 }
             }
         });
