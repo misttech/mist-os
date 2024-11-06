@@ -280,7 +280,7 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
   }
 }
 
-fuchsia_images2::PixelFormat CpuRenderer::ChoosePreferredPixelFormat(
+fuchsia_images2::PixelFormat CpuRenderer::ChoosePreferredRenderTargetFormat(
     const std::vector<fuchsia_images2::PixelFormat>& available_formats) const {
   for (const auto& format : available_formats) {
     if (format == fuchsia_images2::PixelFormat::kB8G8R8A8) {

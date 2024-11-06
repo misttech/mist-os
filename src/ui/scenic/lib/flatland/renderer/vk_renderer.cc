@@ -967,7 +967,7 @@ void VkRenderer::SetColorConversionValues(const std::array<float, 9>& coefficien
   compositor_.SetColorConversionParams({glm_matrix, glm_preoffsets, glm_postoffsets});
 }
 
-fuchsia_images2::PixelFormat VkRenderer::ChoosePreferredPixelFormat(
+fuchsia_images2::PixelFormat VkRenderer::ChoosePreferredRenderTargetFormat(
     const std::vector<fuchsia_images2::PixelFormat>& available_formats) const {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
 

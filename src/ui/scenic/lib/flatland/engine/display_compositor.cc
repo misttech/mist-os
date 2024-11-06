@@ -1062,7 +1062,7 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
   // Grab the best pixel format that the renderer prefers given the list of available formats on
   // the display.
   FX_DCHECK(!info.formats.empty());
-  const auto pixel_format = renderer_->ChoosePreferredPixelFormat(info.formats);
+  const auto pixel_format = renderer_->ChoosePreferredRenderTargetFormat(info.formats);
 
   const fuchsia::math::SizeU size = {/*width*/ info.dimensions.x, /*height*/ info.dimensions.y};
 

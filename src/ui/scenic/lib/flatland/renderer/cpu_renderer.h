@@ -56,7 +56,7 @@ class CpuRenderer final : public Renderer {
                                 const std::array<float, 3>& postoffsets) override;
 
   // |Renderer|.
-  fuchsia_images2::PixelFormat ChoosePreferredPixelFormat(
+  fuchsia_images2::PixelFormat ChoosePreferredRenderTargetFormat(
       const std::vector<fuchsia_images2::PixelFormat>& available_formats) const override;
 
   // |Renderer|.

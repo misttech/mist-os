@@ -1241,7 +1241,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
         completer.Reply({{.res = fuchsia_hardware_display_types::ConfigResult::kOk, .ops = {}}});
       }));
 
-  EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
+  EXPECT_CALL(*renderer_, ChoosePreferredRenderTargetFormat(_));
 
   DisplayInfo display_info = {resolution, {kPixelFormat}};
   scenic_impl::display::Display display(kDisplayId, resolution.x, resolution.y);
@@ -1461,7 +1461,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
         completer.Reply({{.res = fuchsia_hardware_display_types::ConfigResult::kOk, .ops = {}}});
       }));
 
-  EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
+  EXPECT_CALL(*renderer_, ChoosePreferredRenderTargetFormat(_));
 
   DisplayInfo display_info = {resolution, {kPixelFormat}};
   scenic_impl::display::Display display(kDisplayId, resolution.x, resolution.y);
@@ -1764,7 +1764,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
                 fuchsia_hardware_display::LayerId{{.value = layer_id_value++}});
             completer.Reply(fit::ok(std::move(response)));
           }));
-  EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
+  EXPECT_CALL(*renderer_, ChoosePreferredRenderTargetFormat(_));
 
   // Add display.
   const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
