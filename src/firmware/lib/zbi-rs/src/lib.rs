@@ -665,6 +665,41 @@ impl<B: SplitByteSliceMut + PartialEq> ZbiContainer<B> {
         Ok(())
     }
 
+    /// Extends a ZBI container with another ZBI item.
+    ///
+    /// # Arguments
+    ///   * `iter` - ZBI container iterator. Elements starting from `iter` till the end are to be
+    ///   appended to the container.
+    ///
+    /// # Returns
+    ///   * `Ok(())` - On success.
+    ///   * Err([`ZbiError::TooBig`]) - If container is too small.
+    pub fn extend_items<'a>(
+        &mut self,
+        iter: ZbiContainerIterator<impl SplitByteSlice + Default + Debug + PartialEq + 'a>,
+    ) -> ZbiResult<()> {
+        for i in iter {
+            // Make sure `extend_blob` for header and payload would not fail due to lack of space
+            if self.get_next_payload()?.len() < i.payload.as_bytes().len() {
+                return Err(ZbiError::TooBig);
+            }
+            self.extend_blob(i.header.as_bytes())?;
+            self.extend_blob(i.payload.as_bytes())?;
+            self.align_tail()?;
+        }
+        Ok(())
+    }
+
+    // Append blob data to the container.
+    // The intend use is to help with item copy from iterator
+    fn extend_blob<'a>(&mut self, blob: &[u8]) -> ZbiResult<()> {
+        let length = self.get_payload_length_usize();
+        let new_used = length.checked_add(blob.len()).ok_or(ZbiError::LengthOverflow)?;
+        self.buffer[length..new_used].copy_from_slice(blob);
+        self.set_payload_length_usize(new_used)?;
+        Ok(())
+    }
+
     /// Extends with another ZBI container stored on a potentially unaligned buffer.
     ///
     /// The method copies `other` into the unused space first before checking validity and
@@ -2894,5 +2929,99 @@ mod tests {
         zbi_container.payload_length = usize::MAX;
         let res = zbi_container.container_size();
         assert_eq!(res, Err(ZbiError::TooBig));
+    }
+
+    #[test]
+    fn extend_items_good() {
+        // Container 0: 152 bytes
+        //   ZbiHeader:  32
+        //   3 ZbiItems: (32 + 8)*3
+        // Container 1: 72 bytes
+        //   ZbiHeader:  32
+        //   1 ZbiItem:  32 + 8
+        //
+        // Container 1 append 2 ZbiItems: 72 + 2(32+8) = 152 bytes
+        //
+        // Min buffer size = Cont0 + Cont1extended = 304
+        //
+        let mut buffer = vec![0u8; 304];
+        let buffer = align_buffer(&mut buffer[..]).unwrap();
+
+        let mut container_0 = ZbiContainer::new(&mut buffer[..]).unwrap();
+        container_0
+            .create_entry_with_payload(ZbiType::CmdLine, 0, ZbiFlags::default(), b"0")
+            .unwrap();
+        container_0
+            .create_entry_with_payload(ZbiType::CmdLine, 0, ZbiFlags::default(), b"1")
+            .unwrap();
+        container_0
+            .create_entry_with_payload(ZbiType::CmdLine, 0, ZbiFlags::default(), b"2")
+            .unwrap();
+        let container_size_0 = container_0.container_size().unwrap();
+        let mut container_1 = ZbiContainer::new(&mut buffer[container_size_0..]).unwrap();
+        container_1
+            .create_entry_with_payload(ZbiType::CmdLine, 0, ZbiFlags::default(), b"3")
+            .unwrap();
+
+        let (buffer_0, buffer_1) = buffer.split_at_mut(container_size_0);
+        let container_0 = ZbiContainer::parse(buffer_0).unwrap();
+        let mut container_1 = ZbiContainer::parse(buffer_1).unwrap();
+
+        // Copy last items from container 0 to 1
+        let mut last_2_item_iter = container_0.iter();
+        let _ = last_2_item_iter.next();
+        container_1.extend_items(last_2_item_iter).unwrap();
+
+        assert_eq!(container_1.iter().count(), 3);
+        let mut it0 = container_0.iter();
+        let mut it1 = container_1.iter();
+        let _ = it0.next();
+        let _ = it1.next();
+        assert_eq!(it0.next().unwrap(), it1.next().unwrap());
+        assert_eq!(it0.next().unwrap(), it1.next().unwrap());
+        assert!(it0.next().is_none());
+        assert!(it1.next().is_none());
+    }
+
+    #[test]
+    fn extend_items_too_big() {
+        // Container 0: 152 bytes
+        //   ZbiHeader:  32
+        //   3 ZbiItems: (32 + 8)*3
+        // Container 1: 72 bytes
+        //   ZbiHeader:  32
+        //   1 ZbiItem:  32 + 8
+        //
+        // Container 1 append 2 ZbiItems: 72 + 2(32+8) = 152 bytes
+        //
+        // Min buffer size = Cont0 + Cont1extended = 304
+        //
+        let mut buffer = vec![0u8; 304 - 1];
+        let buffer = align_buffer(&mut buffer[..]).unwrap();
+
+        let mut container_0 = ZbiContainer::new(&mut buffer[..]).unwrap();
+        container_0
+            .create_entry_with_payload(ZbiType::CmdLine, 0, ZbiFlags::default(), b"0")
+            .unwrap();
+        container_0
+            .create_entry_with_payload(ZbiType::CmdLine, 0, ZbiFlags::default(), b"1")
+            .unwrap();
+        container_0
+            .create_entry_with_payload(ZbiType::CmdLine, 0, ZbiFlags::default(), b"2")
+            .unwrap();
+        let container_size_0 = container_0.container_size().unwrap();
+        let mut container_1 = ZbiContainer::new(&mut buffer[container_size_0..]).unwrap();
+        container_1
+            .create_entry_with_payload(ZbiType::CmdLine, 0, ZbiFlags::default(), b"3")
+            .unwrap();
+
+        let (buffer_0, buffer_1) = buffer.split_at_mut(container_size_0);
+        let container_0 = ZbiContainer::parse(buffer_0).unwrap();
+        let mut container_1 = ZbiContainer::parse(buffer_1).unwrap();
+
+        // Copy last items from container 0 to 1
+        let mut last_2_item_iter = container_0.iter();
+        let _ = last_2_item_iter.next();
+        assert_eq!(container_1.extend_items(last_2_item_iter), Err(ZbiError::TooBig));
     }
 }
