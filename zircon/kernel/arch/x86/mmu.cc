@@ -638,7 +638,8 @@ zx_status_t X86PageTableMmu::InitKernel(void* ctx,
   test_page_alloc_func_ = test_paf;
 
   phys_ = kernel_pt_phys;
-  virt_ = (pt_entry_t*)X86_PHYS_TO_VIRT(phys_);
+  virt_ = (pt_entry_t*)X86_PHYS_TO_VIRT(kernel_pt_phys);
+  page_ = Pmm::Node().PaddrToPage(kernel_pt_phys);
   ctx_ = ctx;
   // These are all the page tables mapped in by start.S into the kernel aspace.
   pages_ = kNumKernelPageTables;
@@ -1089,6 +1090,9 @@ static void unwire_boot_mmu_page(uintptr_t addr) {
   // Unwire and mark it as an MMU page.
   pmm_unwire_page(page);
   page->set_state(vm_page_state::MMU);
+
+  page->mmu.num_mappings =
+      X86PageTableMmu::CountPresentEntries(reinterpret_cast<pt_entry_t*>(paddr_to_physmap(paddr)));
 }
 
 void x86_mmu_prevm_init() {
