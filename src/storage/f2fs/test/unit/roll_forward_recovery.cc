@@ -101,7 +101,7 @@ zx::result<fbl::RefPtr<VnodeF2fs>> CreateFileAndWritePages(Dir *dir_vnode,
 
 void CheckFsyncedFile(F2fs *fs, ino_t ino, pgoff_t data_page_count, pgoff_t node_page_count) {
   block_t data_blkaddr = fs->GetSegmentManager().NextFreeBlkAddr(CursegType::kCursegWarmNode);
-  uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
+  uint64_t curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpointVer(true);
   pgoff_t checked_data_page_count = 0;
   pgoff_t checked_node_page_count = 0;
 
@@ -1175,7 +1175,7 @@ TEST(FsyncRecoveryTest, AtomicFsync) {
       fs->GetSegmentManager().NextFreeBlkAddr(CursegType::kCursegWarmNode) - 1;
   BlockBuffer<Node> node_block;
   fs->GetBc().Readblk(last_dnode_blkaddr, &node_block);
-  ASSERT_EQ(curr_checkpoint_ver, LeToCpu(node_block->footer.cp_ver));
+  ASSERT_EQ(fs->GetSuperblockInfo().GetCheckpointVer(true), LeToCpu(node_block->footer.cp_ver));
   ASSERT_EQ(node_block->footer.ino, invalid_fsync_vnode->Ino());
   uint32_t mask = 1 << static_cast<uint32_t>(BitShift::kFsyncBitShift);
   ASSERT_NE(mask & node_block->footer.flag, 0U);

@@ -63,7 +63,7 @@ zx::result<F2fs::FsyncInodeList> F2fs::FindFsyncDnodes() {
       return zx::error(ret);
     }
 
-    if (superblock_info_->GetCheckpointVer() != page.GetPage<NodePage>().CpverOfNode()) {
+    if (superblock_info_->GetCheckpointVer(true) != page.GetPage<NodePage>().CpverOfNode()) {
       break;
     }
 
@@ -270,7 +270,7 @@ void F2fs::RecoverData(FsyncInodeList &inode_list) {
       break;
     }
 
-    if (superblock_info_->GetCheckpointVer() != page.GetPage<NodePage>().CpverOfNode()) {
+    if (superblock_info_->GetCheckpointVer(true) != page.GetPage<NodePage>().CpverOfNode()) {
       break;
     }
 

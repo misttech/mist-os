@@ -484,6 +484,7 @@ zx_status_t MkfsWorker::WriteCheckPointPack() {
 
   checkpoint->cp_pack_total_block_count = CpuToLe(8U + LeToCpu(super_block_.cp_payload));
   checkpoint->ckpt_flags |= CpuToLe(static_cast<uint32_t>(CpFlag::kCpUmountFlag));
+  checkpoint->ckpt_flags |= CpuToLe(static_cast<uint32_t>(CpFlag::kCpCrcRecoveryFlag));
   checkpoint->cp_pack_start_sum = CpuToLe(1U + LeToCpu(super_block_.cp_payload));
   checkpoint->valid_node_count = CpuToLe(1U);
   checkpoint->valid_inode_count = CpuToLe(1U);

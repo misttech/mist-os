@@ -903,7 +903,7 @@ block_t SegmentManager::GetBlockAddrOnSegment(LockedPage &page, block_t old_blka
 
     if (p_type == PageType::kNode) {
       page.GetPage<NodePage>().FillNodeFooterBlkaddr(NextFreeBlkAddr(type),
-                                                     superblock_info_.GetCheckpointVer());
+                                                     superblock_info_.GetCheckpointVer(true));
     }
   }
   return new_blkaddr;

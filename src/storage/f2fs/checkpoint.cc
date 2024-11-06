@@ -163,57 +163,39 @@ void F2fs::WriteOrphanInodes(block_t start_blk) {
 }
 
 zx_status_t F2fs::ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedPage *out) {
-  LockedPage cp_page_1, cp_page_2;
-  uint64_t blk_size = superblock_info_->GetBlocksize();
-  Checkpoint *cp_block;
-  uint64_t cur_version = 0, pre_version = 0;
-  uint32_t crc = 0;
-  uint32_t crc_offset;
+  uint64_t checkpoint_version = 0;
+  constexpr size_t kFirstCheckpointHeaderBlock = 0;
+  LockedPage header;
+  for (size_t i = 0; i < kNumCheckpointHeaderBlocks; ++i) {
+    LockedPage cp_page;
+    // Read the header page in this checkpoint pack
+    if (zx_status_t ret = GetMetaPage(cp_addr, &cp_page); ret != ZX_OK) {
+      return ret;
+    }
+    // get the version number
+    Checkpoint *cp_block = cp_page->GetAddress<Checkpoint>();
+    zx::result crc_or = superblock_info_->GetCrcFromCheckpointBlock(cp_block);
+    if (crc_or.is_error()) {
+      return crc_or.error_value();
+    }
 
-  // Read the 1st cp block in this CP pack
-  if (zx_status_t ret = GetMetaPage(cp_addr, &cp_page_1); ret != ZX_OK) {
-    return ret;
+    if (!F2fsCrcValid(*crc_or, cp_block, LeToCpu(cp_block->checksum_offset))) {
+      return ZX_ERR_BAD_STATE;
+    }
+    // The checkpoint header and its copy are located in the first and last blocks on a checkpoint
+    // pack respectively.
+    if (i == kFirstCheckpointHeaderBlock) {
+      checkpoint_version = LeToCpu(cp_block->checkpoint_ver);
+      header = std::move(cp_page);
+      // Set |cp_addr| to read a copy of the header page in this checkpoint pack
+      cp_addr += LeToCpu(cp_block->cp_pack_total_block_count) - 1;
+    } else if (checkpoint_version != LeToCpu(cp_block->checkpoint_ver)) {
+      return ZX_ERR_BAD_STATE;
+    }
   }
-
-  // get the version number
-  cp_block = cp_page_1->GetAddress<Checkpoint>();
-  crc_offset = LeToCpu(cp_block->checksum_offset);
-  if (crc_offset >= blk_size) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  crc = *reinterpret_cast<uint32_t *>(reinterpret_cast<uint8_t *>(cp_block) + crc_offset);
-  if (!F2fsCrcValid(crc, cp_block, crc_offset)) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  pre_version = LeToCpu(cp_block->checkpoint_ver);
-
-  // Read the 2nd cp block in this CP pack
-  cp_addr += LeToCpu(cp_block->cp_pack_total_block_count) - 1;
-  if (zx_status_t ret = GetMetaPage(cp_addr, &cp_page_2); ret != ZX_OK) {
-    return ret;
-  }
-
-  cp_block = cp_page_2->GetAddress<Checkpoint>();
-  crc_offset = LeToCpu(cp_block->checksum_offset);
-  if (crc_offset >= blk_size) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  crc = *reinterpret_cast<uint32_t *>(reinterpret_cast<uint8_t *>(cp_block) + crc_offset);
-  if (!F2fsCrcValid(crc, cp_block, crc_offset)) {
-    return ZX_ERR_BAD_STATE;
-  }
-
-  cur_version = LeToCpu(cp_block->checkpoint_ver);
-
-  if (cur_version == pre_version) {
-    *version = cur_version;
-    *out = std::move(cp_page_1);
-    return ZX_OK;
-  }
-  return ZX_ERR_BAD_STATE;
+  *version = checkpoint_version;
+  *out = std::move(header);
+  return ZX_OK;
 }
 
 zx_status_t F2fs::GetValidCheckpoint() {
@@ -420,6 +402,9 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
   } else {
     superblock_info.ClearCpFlags(CpFlag::kCpOrphanPresentFlag);
   }
+
+  // Make use crc and version for recovery
+  superblock_info.SetCpFlags(CpFlag::kCpCrcRecoveryFlag);
 
   // update SIT/NAT bitmap
   GetSegmentManager().GetSitBitmap(superblock_info.GetSitBitmap());
