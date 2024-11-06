@@ -24,8 +24,8 @@ int main(int argc, char** argv) {
     return -1;
   }
   zx_status_t status;
-  status = fdio_open("/pkg", static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable),
-                     endpoints->server.TakeChannel().release());
+  status = fdio_open3("/pkg", static_cast<uint64_t>(fuchsia_io::wire::kPermReadable),
+                      endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to open /pkg";
     return -1;
