@@ -171,7 +171,7 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
                 return;
             }
         } {
-            error!("Error occurred when handling IGMPv2 message: {}", e);
+            debug!("Error occurred when handling IGMPv2 message: {}", e);
         }
     }
 }

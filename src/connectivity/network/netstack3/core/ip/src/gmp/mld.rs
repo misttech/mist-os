@@ -141,7 +141,7 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::Device
                 return;
             }
         } {
-            error!("Error occurred when handling MLD message: {}", e);
+            debug!("Error occurred when handling MLD message: {}", e);
         }
     }
 }
