@@ -67,9 +67,6 @@ impl PolicyEngine {
                 return Ok(Self(State::NoOp));
             }
             paver::ConfigurationStatus::Pending => {}
-            // TODO(https://fxbug.dev/368597963) On the final boot attempt the current config will
-            // be marked unbootable, but fuchsia.paver.Firmware/SetConfigurationHealthy says it is
-            // an error to call it when the current config is unbootable.
             paver::ConfigurationStatus::Unbootable => {
                 return Err(PolicyError::CurrentConfigurationUnbootable((&current_config).into()));
             }
