@@ -40,12 +40,6 @@ if (is_host) {
     ]
   }
 
-  sdk_host_tool("test_pilot_sdk") {
-    category = "internal"
-    output_name = "test_pilot"
-    deps = [ ":test_pilot" ]
-  }
-
   install_host_tools("install") {
     deps = [ ":test_pilot" ]
     outputs = [ "test_pilot" ]

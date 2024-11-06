@@ -51,7 +51,6 @@ fuchsia_driver_component("ramdisk-v1") {
 }
 
 bind_library("fuchsia.hardware.ramdisk") {
-  sdk_category = "internal"
   source = "ramdisk-lib.bind"
 }
 
