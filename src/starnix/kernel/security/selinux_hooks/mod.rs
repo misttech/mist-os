@@ -530,8 +530,7 @@ pub(super) fn check_fs_node_setxattr_access(
     let current_sid = current_task.read().security_state.attrs.current_sid;
     let file_sid = fs_node_effective_sid(fs_node);
     let file_class = file_class_from_file_mode(fs_node.info().mode)?;
-    todo_check_permission!(
-        TODO("https://fxbug.dev/376429620", "Fix app vs system domain labeling"),
+    check_permission(
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
