@@ -328,7 +328,7 @@ pub fn sys_connect(
                 WaitCallback::none(),
             );
             if !client_socket.query_events(locked, current_task)?.contains(FdEvents::POLLOUT) {
-                waiter.wait(current_task)?;
+                waiter.wait(locked, current_task)?;
             }
             client_socket.connect(current_task, peer)
         }

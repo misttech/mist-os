@@ -80,6 +80,7 @@ impl Pipe {
     }
 
     pub fn open(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         pipe: &Arc<Mutex<Self>>,
         flags: OpenFlags,
@@ -136,7 +137,7 @@ impl Pipe {
                 WaitCallback::none(),
             );
             std::mem::drop(pipe_locked);
-            match waiter.wait(current_task) {
+            match waiter.wait(locked, current_task) {
                 Err(e) => {
                     return Err(e);
                 }

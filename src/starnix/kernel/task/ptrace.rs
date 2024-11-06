@@ -18,7 +18,7 @@ use crate::task::{
 use crate::vfs::parse_unsigned_file;
 use bitflags::bitflags;
 use starnix_logging::track_stub;
-use starnix_sync::{LockBefore, Locked, MmDumpable};
+use starnix_sync::{LockBefore, Locked, MmDumpable, Unlocked};
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_syscalls::SyscallResult;
 use starnix_types::ownership::{OwnedRef, Releasable, WeakRef};
@@ -1225,7 +1225,7 @@ pub fn ptrace_get_scope(kernel: &Arc<Kernel>) -> Vec<u8> {
 }
 
 #[inline(never)]
-pub fn ptrace_syscall_enter(current_task: &mut CurrentTask) {
+pub fn ptrace_syscall_enter(locked: &mut Locked<'_, Unlocked>, current_task: &mut CurrentTask) {
     let block = {
         let mut state = current_task.write();
         if state.ptrace.is_some() {
@@ -1246,12 +1246,16 @@ pub fn ptrace_syscall_enter(current_task: &mut CurrentTask) {
         }
     };
     if block {
-        current_task.block_while_stopped();
+        current_task.block_while_stopped(locked);
     }
 }
 
 #[inline(never)]
-pub fn ptrace_syscall_exit(current_task: &mut CurrentTask, is_error: bool) {
+pub fn ptrace_syscall_exit(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &mut CurrentTask,
+    is_error: bool,
+) {
     let block = {
         let mut state = current_task.write();
         current_task.trace_syscalls.store(false, Ordering::Relaxed);
@@ -1276,7 +1280,7 @@ pub fn ptrace_syscall_exit(current_task: &mut CurrentTask, is_error: bool) {
         }
     };
     if block {
-        current_task.block_while_stopped();
+        current_task.block_while_stopped(locked);
     }
 }
 

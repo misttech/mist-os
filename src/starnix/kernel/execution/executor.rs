@@ -192,6 +192,7 @@ struct RestrictedEnterContext<'a> {
 ///   5. Handle pending signals.
 ///   6. Goto 1.
 fn run_task(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     mut restricted_state: RestrictedState,
 ) -> Result<ExitStatus, Error> {
@@ -211,7 +212,9 @@ fn run_task(
 
     // We need to check for exit once, before the task starts executing, in case
     // the task has already been sent a signal that will cause it to exit.
-    if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)? {
+    if let Some(exit_status) =
+        process_completed_restricted_exit(locked, current_task, &error_context)?
+    {
         return Ok(exit_status);
     }
 
@@ -343,7 +346,7 @@ fn process_restricted_exit(
             current_task.thread_state.registers =
                 zx::sys::zx_thread_state_general_regs_t::from(&restricted_exception.state).into();
             let exception_result = current_task.process_exception(&restricted_exception.exception);
-            process_completed_exception(current_task, exception_result);
+            process_completed_exception(&mut locked, current_task, exception_result);
         }
         zx::sys::ZX_RESTRICTED_REASON_KICK => {
             firehose_trace_instant!(
@@ -364,7 +367,9 @@ fn process_restricted_exit(
             return Err(format_err!("Received unexpected restricted reason code: {}", reason_code));
         }
     }
-    if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)? {
+    if let Some(exit_status) =
+        process_completed_restricted_exit(&mut locked, current_task, &error_context)?
+    {
         return Ok(Some(exit_status));
     }
 
@@ -526,13 +531,16 @@ where
 
             // Map the restricted state VMO and arrange for it to be unmapped later.
             let exit_status = match RestrictedState::from_vmo(state_vmo) {
-                Ok(restricted_state) => match run_task(&mut current_task, restricted_state) {
-                    Ok(ok) => ok,
-                    Err(error) => {
-                        log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
-                        ExitStatus::Kill(SignalInfo::default(SIGKILL))
+                Ok(restricted_state) => {
+                    let mut locked = Unlocked::new();
+                    match run_task(&mut locked, &mut current_task, restricted_state) {
+                        Ok(ok) => ok,
+                        Err(error) => {
+                            log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
+                            ExitStatus::Kill(SignalInfo::default(SIGKILL))
+                        }
                     }
-                },
+                }
                 Err(error) => {
                     log_error!("failed to map mode state vmo, {error:?}! treating as SIGKILL");
                     ExitStatus::Kill(SignalInfo::default(SIGKILL))
@@ -588,7 +596,11 @@ where
     Ok(())
 }
 
-fn process_completed_exception(current_task: &mut CurrentTask, exception_result: ExceptionResult) {
+fn process_completed_exception(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &mut CurrentTask,
+    exception_result: ExceptionResult,
+) {
     match exception_result {
         ExceptionResult::Handled => {}
         ExceptionResult::Signal(signal) => {
@@ -614,7 +626,7 @@ fn process_completed_exception(current_task: &mut CurrentTask, exception_result:
                     &mut registers,
                     &current_task.thread_state.extended_pstate,
                 ) {
-                    current_task.thread_group_exit(status);
+                    current_task.thread_group_exit(locked, status);
                 }
             }
             current_task.thread_state.registers = registers;
@@ -760,7 +772,7 @@ pub fn execute_syscall(
     current_task.thread_state.registers.save_registers_for_restart(syscall.decl.number);
 
     if current_task.trace_syscalls.load(std::sync::atomic::Ordering::Relaxed) {
-        ptrace_syscall_enter(current_task);
+        ptrace_syscall_enter(locked, current_task);
     }
 
     log_trace!("{:?}", syscall);
@@ -769,7 +781,7 @@ pub fn execute_syscall(
         if current_task.seccomp_filter_state.get() != SeccompStateValue::None {
             // Inlined fast path for seccomp, so that we don't incur the cost
             // of a method call when running the filters.
-            if let Some(res) = current_task.run_seccomp_filters(&syscall) {
+            if let Some(res) = current_task.run_seccomp_filters(locked, &syscall) {
                 res
             } else {
                 dispatch_syscall(locked, current_task, &syscall)
@@ -794,7 +806,7 @@ pub fn execute_syscall(
     };
 
     if current_task.trace_syscalls.load(std::sync::atomic::Ordering::Relaxed) {
-        ptrace_syscall_exit(current_task, return_value.is_some());
+        ptrace_syscall_exit(locked, current_task, return_value.is_some());
     }
 
     return_value
@@ -804,6 +816,7 @@ pub fn execute_syscall(
 ///
 /// Returns an `ExitStatus` if the task is meant to exit.
 pub fn process_completed_restricted_exit(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     error_context: &Option<ErrorContext>,
 ) -> Result<Option<ExitStatus>, Errno> {
@@ -813,7 +826,7 @@ pub fn process_completed_restricted_exit(
         {
             {
                 if !current_task.is_exitted() {
-                    dequeue_signal(current_task);
+                    dequeue_signal(locked, current_task);
                 }
                 // The syscall may need to restart for a non-signal-related
                 // reason. This call does nothing if we aren't restarting.
@@ -842,7 +855,7 @@ pub fn process_completed_restricted_exit(
         } else {
             // Block a stopped process after it's had a chance to handle signals, since a signal might
             // cause it to stop.
-            current_task.block_while_stopped();
+            current_task.block_while_stopped(locked);
             // If ptrace_cont has sent a signal, process it immediately.  This
             // seems to match Linux behavior.
 
@@ -883,10 +896,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_block_while_stopped_stop_and_continue() {
-        let (_kernel, mut task) = create_kernel_and_task();
+        let (_kernel, mut task, mut locked) = create_kernel_task_and_unlocked();
 
         // block_while_stopped must immediately returned if the task is not stopped.
-        task.block_while_stopped();
+        task.block_while_stopped(&mut locked);
 
         // Stop the task.
         task.thread_group.set_stopped(
@@ -914,21 +927,21 @@ mod tests {
         });
 
         // Block until continued.
-        task.block_while_stopped();
+        task.block_while_stopped(&mut locked);
 
         // Join the thread, which will ensure set_stopped terminated.
         thread.join().expect("joined");
 
         // The task should not be blocked anymore.
-        task.block_while_stopped();
+        task.block_while_stopped(&mut locked);
     }
 
     #[::fuchsia::test]
     async fn test_block_while_stopped_stop_and_exit() {
-        let (_kernel, mut task) = create_kernel_and_task();
+        let (_kernel, mut task, mut locked) = create_kernel_task_and_unlocked();
 
         // block_while_stopped must immediately returned if the task is neither stopped nor exited.
-        task.block_while_stopped();
+        task.block_while_stopped(&mut locked);
 
         // Stop the task.
         task.thread_group.set_stopped(
@@ -940,6 +953,7 @@ mod tests {
         let thread = std::thread::spawn({
             let task = task.weak_task();
             move || {
+                let mut locked = Unlocked::new();
                 let task = task.upgrade().expect("task must be alive");
                 // Wait for the task to have a waiter.
                 while !task.read().is_blocked() {
@@ -947,17 +961,17 @@ mod tests {
                 }
 
                 // exit the task.
-                task.thread_group.exit(ExitStatus::Exit(1), None);
+                task.thread_group.exit(&mut locked, ExitStatus::Exit(1), None);
             }
         });
 
         // Block until continued.
-        task.block_while_stopped();
+        task.block_while_stopped(&mut locked);
 
         // Join the task, which will ensure thread_group.exit terminated.
         thread.join().expect("joined");
 
         // The task should not be blocked because it is stopped.
-        task.block_while_stopped();
+        task.block_while_stopped(&mut locked);
     }
 }

@@ -23,13 +23,10 @@ use crate::vfs::{
 };
 use extended_pstate::ExtendedPstateState;
 use fuchsia_inspect_contrib::profile_duration;
-use starnix_sync::{LockEqualOrBefore, Unlocked};
-use zx::sys::zx_thread_state_general_regs_t;
-
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
-    EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable, ProcessGroupState,
-    RwLockWriteGuard, TaskRelease, WakeReason,
+    EventWaitGuard, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, MmDumpable,
+    ProcessGroupState, RwLockWriteGuard, TaskRelease, Unlocked, WakeReason,
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
@@ -59,6 +56,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
+use zx::sys::zx_thread_state_general_regs_t;
 
 pub struct TaskBuilder {
     /// The underlying task object.
@@ -218,9 +216,9 @@ impl CurrentTask {
 
     pub fn trigger_delayed_releaser<L>(&self, locked: &mut Locked<'_, L>)
     where
-        L: LockEqualOrBefore<TaskRelease>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<TaskRelease>();
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         self.kernel().delayed_releaser.apply(&mut locked, self);
     }
 
@@ -263,20 +261,22 @@ impl CurrentTask {
     /// signal machinery in the syscall dispatch loop.
     ///
     /// The returned result is the result returned from the wait function.
-    pub fn wait_with_temporary_mask<F, T>(
+    pub fn wait_with_temporary_mask<F, T, L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         signal_mask: SigSet,
         wait_function: F,
     ) -> Result<T, Errno>
     where
-        F: FnOnce(&CurrentTask) -> Result<T, Errno>,
+        L: LockEqualOrBefore<FileOpsCore>,
+        F: FnOnce(&mut Locked<'_, L>, &CurrentTask) -> Result<T, Errno>,
     {
         {
             let mut state = self.write();
             state.set_flags(TaskFlags::TEMPORARY_SIGNAL_MASK, true);
             state.set_temporary_signal_mask(signal_mask);
         }
-        wait_function(self)
+        wait_function(locked, self)
     }
 
     /// If waking, promotes from waking to awake.  If not waking, make waiter async
@@ -897,7 +897,7 @@ impl CurrentTask {
             return Err(err);
         }
 
-        self.ptrace_event(PtraceOptions::TRACEEXEC, self.task.id as u64);
+        self.ptrace_event(locked, PtraceOptions::TRACEEXEC, self.task.id as u64);
         self.signal_vfork();
 
         Ok(())
@@ -1099,6 +1099,7 @@ impl CurrentTask {
 
     pub fn run_seccomp_filters(
         &mut self,
+        locked: &mut Locked<'_, Unlocked>,
         syscall: &Syscall,
     ) -> Option<Result<SyscallResult, Errno>> {
         profile_duration!("RunSeccompFilters");
@@ -1111,7 +1112,7 @@ impl CurrentTask {
         // Run user-defined seccomp filters
         let result = self.task.read().seccomp_filters.run_all(self, syscall);
 
-        SeccompState::do_user_defined(result, self, syscall)
+        SeccompState::do_user_defined(locked, result, self, syscall)
     }
 
     fn seccomp_tsync_error(id: i32, flags: u32) -> Result<SyscallResult, Errno> {
@@ -1925,7 +1926,7 @@ impl CurrentTask {
 
     /// Block the execution of `current_task` as long as the task is stopped and
     /// not terminated.
-    pub fn block_while_stopped(&mut self) {
+    pub fn block_while_stopped(&mut self, locked: &mut Locked<'_, Unlocked>) {
         // Upgrade the state from stopping to stopped if needed. Return if the task
         // should not be stopped.
         if !self.finalize_stop_state() {
@@ -1947,7 +1948,7 @@ impl CurrentTask {
             }
 
             // Do the wait. Result is not needed, as this is not in a syscall.
-            let _: Result<(), Errno> = waiter.wait(self);
+            let _: Result<(), Errno> = waiter.wait(locked, self);
 
             // Maybe go from stopping to stopped, if we are currently stopping
             // again.
@@ -1976,7 +1977,12 @@ impl CurrentTask {
     /// Note that the Linux kernel has a documented bug where, if TRACEEXIT is
     /// enabled, SIGKILL will trigger an event.  We do not exhibit this
     /// behavior.
-    pub fn ptrace_event(&mut self, trace_kind: PtraceOptions, msg: u64) {
+    pub fn ptrace_event(
+        &mut self,
+        locked: &mut Locked<'_, Unlocked>,
+        trace_kind: PtraceOptions,
+        msg: u64,
+    ) {
         if !trace_kind.is_empty() {
             {
                 let mut state = self.write();
@@ -2004,15 +2010,23 @@ impl CurrentTask {
                     return;
                 }
             }
-            self.block_while_stopped();
+            self.block_while_stopped(locked);
         }
     }
 
     /// Causes the current thread's thread group to exit, notifying any ptracer
     /// of this task first.
-    pub fn thread_group_exit(&mut self, exit_status: ExitStatus) {
-        self.ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
-        self.thread_group.exit(exit_status, None);
+    pub fn thread_group_exit(
+        &mut self,
+        locked: &mut Locked<'_, Unlocked>,
+        exit_status: ExitStatus,
+    ) {
+        self.ptrace_event(
+            locked,
+            PtraceOptions::TRACEEXIT,
+            exit_status.signal_info_status() as u64,
+        );
+        self.thread_group.exit(locked, exit_status, None);
     }
 
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the

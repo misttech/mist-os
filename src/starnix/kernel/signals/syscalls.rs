@@ -188,7 +188,7 @@ pub fn sys_sigaltstack(
 }
 
 pub fn sys_rt_sigsuspend(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     user_mask: UserRef<SigSet>,
     sigset_size: usize,
@@ -203,12 +203,14 @@ pub fn sys_rt_sigsuspend(
     // interrupted by a signal delivered to a user handler, and the syscall
     // should be restarted otherwise.
     current_task
-        .wait_with_temporary_mask(mask, |current_task| waiter.wait(current_task))
+        .wait_with_temporary_mask(locked, mask, |locked, current_task| {
+            waiter.wait(locked, current_task)
+        })
         .map_eintr(errno!(ERESTARTNOHAND))
 }
 
 pub fn sys_rt_sigtimedwait(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     set_addr: UserRef<SigSet>,
     siginfo_addr: UserAddress,
@@ -250,9 +252,10 @@ pub fn sys_rt_sigtimedwait(
         let tmp_mask = current_task.read().signal_mask() & !unblock;
 
         // Wait for a timeout or a new signal.
-        let waiter_result = current_task.wait_with_temporary_mask(tmp_mask, |current_task| {
-            waiter.wait_until(current_task, deadline)
-        });
+        let waiter_result =
+            current_task.wait_with_temporary_mask(locked, tmp_mask, |locked, current_task| {
+                waiter.wait_until(locked, current_task, deadline)
+            });
 
         // Restore mask after timeout or get a new signal.
         current_task.write().restore_signal_mask();
@@ -670,6 +673,7 @@ impl WaitingOptions {
 /// - `pid`: The id of the task to wait on.
 /// - `options`: The options passed to the wait syscall.
 fn wait_on_pid(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     selector: ProcessSelector,
     options: &WaitingOptions,
@@ -734,12 +738,12 @@ fn wait_on_pid(
         if !options.block {
             return Ok(None);
         }
-        waiter.wait(current_task).map_eintr(errno!(ERESTARTSYS))?;
+        waiter.wait(locked, current_task).map_eintr(errno!(ERESTARTSYS))?;
     }
 }
 
 pub fn sys_waitid(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     id_type: u32,
     id: i32,
@@ -770,7 +774,9 @@ pub fn sys_waitid(
 
     // wait_on_pid returns None if the task was not waited on. In that case, we don't write out a
     // siginfo. This seems weird but is the correct behavior according to the waitid(2) man page.
-    if let Some(waitable_process) = wait_on_pid(current_task, task_selector, &waiting_options)? {
+    if let Some(waitable_process) =
+        wait_on_pid(locked, current_task, task_selector, &waiting_options)?
+    {
         if !user_rusage.is_null() {
             let usage = rusage {
                 ru_utime: timeval_from_duration(waitable_process.time_stats.user_time),
@@ -802,7 +808,7 @@ pub fn sys_waitid(
 }
 
 pub fn sys_wait4(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     raw_selector: pid_t,
     user_wstatus: UserRef<i32>,
@@ -828,7 +834,7 @@ pub fn sys_wait4(
         return error!(ENOSYS);
     };
 
-    if let Some(waitable_process) = wait_on_pid(current_task, selector, &waiting_options)? {
+    if let Some(waitable_process) = wait_on_pid(locked, current_task, selector, &waiting_options)? {
         let status = waitable_process.exit_info.status.wait_status();
 
         if !user_rusage.is_null() {
@@ -1743,6 +1749,7 @@ mod tests {
         // block waiting for.
         assert_eq!(
             wait_on_pid(
+                &mut locked,
                 &current_task,
                 ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
@@ -1761,11 +1768,12 @@ mod tests {
             exit_info: ProcessExitInfo { status: ExitStatus::Exit(1), exit_signal: Some(SIGCHLD) },
             time_stats: Default::default(),
         };
-        child.thread_group.exit(ExitStatus::Exit(1), None);
+        child.thread_group.exit(&mut locked, ExitStatus::Exit(1), None);
         std::mem::drop(child);
 
         assert_eq!(
             wait_on_pid(
+                &mut locked,
                 &current_task,
                 ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions")
@@ -1785,6 +1793,7 @@ mod tests {
         // No child is currently terminated.
         assert_eq!(
             wait_on_pid(
+                &mut locked,
                 &task,
                 ProcessSelector::Any,
                 &WaitingOptions::new_for_wait4(WNOHANG, 0).expect("WaitingOptions")
@@ -1796,19 +1805,21 @@ mod tests {
             let task = task.weak_task();
             move || {
                 // Create child
+                let mut locked = Unlocked::new();
                 let task = task.upgrade().expect("task must be alive");
                 let child: AutoReleasableTask = child.into();
                 // Wait for the main thread to be blocked on waiting for a child.
                 while !task.read().is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
-                child.thread_group.exit(ExitStatus::Exit(0), None);
+                child.thread_group.exit(&mut locked, ExitStatus::Exit(0), None);
                 child.id
             }
         });
 
         // Block until child is terminated.
         let waited_child = wait_on_pid(
+            &mut locked,
             &task,
             ProcessSelector::Any,
             &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
@@ -1839,6 +1850,7 @@ mod tests {
         send_standard_signal(&task, SignalInfo::default(SIGUSR1));
 
         let errno = wait_on_pid(
+            &mut locked,
             &task,
             ProcessSelector::Any,
             &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
@@ -1854,7 +1866,7 @@ mod tests {
 
         // Send SIGKILL to the child. As kill is handled immediately, no need to dequeue signals.
         send_standard_signal(&child, SignalInfo::default(SIGKILL));
-        dequeue_signal_for_test(&mut child);
+        dequeue_signal_for_test(&mut locked, &mut child);
         std::mem::drop(child);
 
         // Retrieve the exit status.
@@ -1877,7 +1889,7 @@ mod tests {
 
         // Send the signal to the child.
         send_standard_signal(&child, SignalInfo::default(sig));
-        dequeue_signal_for_test(&mut child);
+        dequeue_signal_for_test(&mut locked, &mut child);
         std::mem::drop(child);
 
         // Retrieve the exit status.
@@ -1907,12 +1919,12 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child1 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         let child1_pid = child1.id;
-        child1.thread_group.exit(ExitStatus::Exit(42), None);
+        child1.thread_group.exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child1);
         let child2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         child2.thread_group.setsid(&mut locked).expect("setsid");
         let child2_pid = child2.id;
-        child2.thread_group.exit(ExitStatus::Exit(42), None);
+        child2.thread_group.exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child2);
 
         assert_eq!(
@@ -1937,12 +1949,12 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child1 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         let child1_pid = child1.id;
-        child1.thread_group.exit(ExitStatus::Exit(42), None);
+        child1.thread_group.exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child1);
         let child2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         child2.thread_group.setsid(&mut locked).expect("setsid");
         let child2_pid = child2.id;
-        child2.thread_group.exit(ExitStatus::Exit(42), None);
+        child2.thread_group.exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child2);
 
         let address = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);

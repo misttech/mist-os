@@ -379,7 +379,7 @@ impl EpollFileObject {
             // The first time through this loop we'll use the timeout passed into this function so
             // can get EINTR. But since we haven't done anything or accumulated any results yet it's
             // OK to immediately return and no information will be lost.
-            match self.waiter.wait_until(current_task, wait_deadline) {
+            match self.waiter.wait_until(locked, current_task, wait_deadline) {
                 Err(err) if err == ETIMEDOUT => break,
                 Err(err) if err == EINTR => {
                     // Terminating early will lose any events in the pending_list so that should

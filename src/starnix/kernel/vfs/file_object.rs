@@ -1636,8 +1636,13 @@ impl FileObject {
                 Err(e) if e == EAGAIN => {}
                 result => return result,
             }
+            let mut locked = locked.cast_locked::<FileOpsCore>();
             waiter
-                .wait_until(current_task, deadline.unwrap_or(zx::MonotonicInstant::INFINITE))
+                .wait_until(
+                    &mut locked,
+                    current_task,
+                    deadline.unwrap_or(zx::MonotonicInstant::INFINITE),
+                )
                 .map_err(|e| if e == ETIMEDOUT { errno!(EAGAIN) } else { e })?;
         }
     }
@@ -2119,11 +2124,12 @@ impl FileObject {
 
     pub fn record_lock(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         cmd: RecordLockCommand,
         flock: uapi::flock,
     ) -> Result<Option<uapi::flock>, Errno> {
-        self.node().record_lock(current_task, self, cmd, flock)
+        self.node().record_lock(locked, current_task, self, cmd, flock)
     }
 
     pub fn flush<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask, id: FdTableId)

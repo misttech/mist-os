@@ -361,6 +361,7 @@ impl FileObject {
     /// See flock(2).
     pub fn flock(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         operation: FlockOperation,
     ) -> Result<(), Errno> {
@@ -426,7 +427,7 @@ impl FileObject {
             let waiter = Waiter::new();
             flock_info.wait_queue.wait_async(&waiter);
             std::mem::drop(flock_info);
-            waiter.wait(current_task)?;
+            waiter.wait(locked, current_task)?;
         }
     }
 }
@@ -1310,12 +1311,13 @@ impl FsNode {
 
     pub fn record_lock(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         file: &FileObject,
         cmd: RecordLockCommand,
         flock: uapi::flock,
     ) -> Result<Option<uapi::flock>, Errno> {
-        self.record_locks.lock(current_task, file, cmd, flock)
+        self.record_locks.lock(locked, current_task, file, cmd, flock)
     }
 
     /// Release all record locks acquired by the given owner.
@@ -1403,7 +1405,7 @@ impl FsNode {
                     DeviceMode::Block,
                 )
             }
-            FileMode::IFIFO => Pipe::open(current_task, self.fifo.as_ref().unwrap(), flags),
+            FileMode::IFIFO => Pipe::open(locked, current_task, self.fifo.as_ref().unwrap(), flags),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
             _ => self.create_file_ops(locked, current_task, flags),

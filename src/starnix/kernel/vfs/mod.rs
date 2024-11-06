@@ -74,7 +74,7 @@ pub use xattr::*;
 use crate::device::binder::BinderDriver;
 use crate::task::CurrentTask;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
-use starnix_sync::{Locked, TaskRelease};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::ownership::{Releasable, ReleaseGuard};
 use std::cell::RefCell;
 use std::ops::DerefMut;
@@ -165,7 +165,7 @@ impl ReleaserAction<BinderDriver> for BinderDriverReleaserAction {
 pub type BinderDriverReleaser = ObjectReleaser<BinderDriver, BinderDriverReleaserAction>;
 impl_ctr_for_option!(ReleaseGuard<BinderDriver>);
 
-pub type CurrentTaskAndLocked<'a, 'b> = (&'b mut Locked<'a, TaskRelease>, &'b CurrentTask);
+pub type CurrentTaskAndLocked<'a, 'b> = (&'b mut Locked<'a, FileOpsCore>, &'b CurrentTask);
 
 /// An object-safe/dyn-compatible trait to wrap `Releasable` types.
 trait CurrentTaskAndLockedReleasable {
@@ -215,7 +215,7 @@ impl DelayedReleaser {
     /// Run all current delayed releases for the current thread.
     pub fn apply<'a>(
         &self,
-        locked: &'a mut Locked<'a, TaskRelease>,
+        locked: &'a mut Locked<'a, FileOpsCore>,
         current_task: &'a CurrentTask,
     ) {
         loop {

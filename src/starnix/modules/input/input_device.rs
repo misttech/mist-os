@@ -552,8 +552,14 @@ mod test {
                 EventHandler::None,
             );
         });
-        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
-        assert_matches!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
+        assert_matches!(
+            waiter1.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Err(_)
+        );
+        assert_matches!(
+            waiter2.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Err(_)
+        );
 
         // Reply to first `Watch` request.
         answer_next_watch_request(
@@ -566,8 +572,14 @@ mod test {
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
         // the interested waiters.
-        assert_eq!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Ok(()));
-        assert_eq!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Ok(()));
+        assert_eq!(
+            waiter1.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Ok(())
+        );
+        assert_eq!(
+            waiter2.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Ok(())
+        );
     }
 
     #[::fuchsia::test]
@@ -587,8 +599,10 @@ mod test {
             EventHandler::None,
         );
 
-        let mut waiter_thread =
-            kernel.kthreads.spawner().spawn_and_get_result(move |_, task| waiter.wait(&task));
+        let mut waiter_thread = kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result(move |locked, task| waiter.wait(locked, &task));
         assert!(futures::poll!(&mut waiter_thread).is_pending());
 
         // Reply to first `Watch` request.
@@ -625,8 +639,14 @@ mod test {
                 EventHandler::None,
             );
         });
-        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
-        assert_matches!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
+        assert_matches!(
+            waiter1.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Err(_)
+        );
+        assert_matches!(
+            waiter2.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Err(_)
+        );
 
         // Reply to first `Watch` request with an empty set of events.
         answer_next_watch_request(&mut touch_source_stream, vec![]).await;
@@ -634,8 +654,14 @@ mod test {
         // `InputFile` should be done processing the first reply. Since there
         // were no touch_events given, `InputFile` should not have notified the
         // interested waiters.
-        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
-        assert_matches!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
+        assert_matches!(
+            waiter1.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Err(_)
+        );
+        assert_matches!(
+            waiter2.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Err(_)
+        );
     }
 
     // Note: a user program may also want to be woken if events were already ready at the
@@ -690,8 +716,14 @@ mod test {
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
         // the interested waiters.
-        assert_matches!(waiter1.wait_until(&current_task, zx::MonotonicInstant::ZERO), Err(_));
-        assert_eq!(waiter2.wait_until(&current_task, zx::MonotonicInstant::ZERO), Ok(()));
+        assert_matches!(
+            waiter1.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Err(_)
+        );
+        assert_eq!(
+            waiter2.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO),
+            Ok(())
+        );
     }
 
     #[::fuchsia::test]

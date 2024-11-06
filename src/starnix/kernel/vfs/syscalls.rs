@@ -25,7 +25,6 @@ use crate::vfs::{
     SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount,
     XattrOp,
 };
-
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -161,7 +160,7 @@ pub fn sys_lseek(
 }
 
 pub fn sys_fcntl(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     cmd: u32,
@@ -283,7 +282,7 @@ pub fn sys_fcntl(
             let flock_ref = UserRef::<uapi::flock>::new(arg.into());
             let flock = current_task.read_object(flock_ref)?;
             let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
-            if let Some(flock) = file.record_lock(current_task, cmd, flock)? {
+            if let Some(flock) = file.record_lock(locked, current_task, cmd, flock)? {
                 current_task.write_object(flock_ref, &flock)?;
             }
             Ok(SUCCESS)
@@ -2112,7 +2111,7 @@ fn select(
         None
     };
 
-    waiter.wait(current_task, mask, deadline)?;
+    waiter.wait(locked, current_task, mask, deadline)?;
 
     let mut num_fds = 0;
     let mut readfds: __kernel_fd_set = Default::default();
@@ -2336,7 +2335,7 @@ fn do_epoll_pwait(
 
     let active_events = if !user_sigmask.is_null() {
         let signal_mask = current_task.read_object(user_sigmask)?;
-        current_task.wait_with_temporary_mask(signal_mask, |current_task| {
+        current_task.wait_with_temporary_mask(locked, signal_mask, |locked, current_task| {
             epoll_file.wait(locked, current_task, max_events, deadline)
         })?
     } else {
@@ -2419,20 +2418,26 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
         Ok(())
     }
 
-    fn wait(
+    fn wait<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &mut CurrentTask,
         signal_mask: Option<SigSet>,
         deadline: zx::MonotonicInstant,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if self.ready_items.lock().is_empty() {
             // When wait_until() returns Ok() it means there was a wake up; however there may not
             // be a ready item, for example if waiting on a sync file with multiple sync points.
             // Keep waiting until there's at least one ready item.
             let signal_mask = signal_mask.unwrap_or_else(|| current_task.read().signal_mask());
-            let mut result = current_task.wait_with_temporary_mask(signal_mask, |current_task| {
-                self.waiter.wait_until(current_task, deadline)
-            });
+            let mut result = current_task.wait_with_temporary_mask(
+                locked,
+                signal_mask,
+                |locked, current_task| self.waiter.wait_until(locked, current_task, deadline),
+            );
             loop {
                 match result {
                     Err(err) if err == ETIMEDOUT => return Ok(()),
@@ -2443,7 +2448,7 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
                     }
                     result => result?,
                 };
-                result = self.waiter.wait_until(current_task, deadline);
+                result = self.waiter.wait_until(locked, current_task, deadline);
             }
         }
         Ok(())
@@ -2481,7 +2486,7 @@ pub fn poll(
         )?;
     }
 
-    waiter.wait(current_task, mask, deadline)?;
+    waiter.wait(locked, current_task, mask, deadline)?;
 
     let mut ready_items = waiter.ready_items.lock();
     let mut unique_ready_items =
@@ -2565,14 +2570,14 @@ pub fn sys_ppoll(
 }
 
 pub fn sys_flock(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     operation: u32,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let operation = FlockOperation::from_flags(operation)?;
-    file.flock(current_task, operation)
+    file.flock(locked, current_task, operation)
 }
 
 pub fn sys_sync(
