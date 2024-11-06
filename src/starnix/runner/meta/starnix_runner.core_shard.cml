@@ -26,6 +26,8 @@
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
                 "fuchsia.net.routes.admin.RouteTableV4",
                 "fuchsia.net.routes.admin.RouteTableV6",
+                "fuchsia.net.routes.admin.RuleTableV4",
+                "fuchsia.net.routes.admin.RuleTableV6",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.net.stack.Stack",
