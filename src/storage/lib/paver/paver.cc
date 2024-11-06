@@ -731,27 +731,64 @@ void BootManager::QueryConfigurationLastSetActive(
   completer.ReplySuccess(SlotIndexToConfiguration(status.value()));
 }
 
-namespace {
+// libabr is primarily a firmware library, so generally reports the *next* boot attempt state rather
+// than the current boot attempt. Usually this doesn't matter, but on the final boot attempt libabr
+// has already set the attempts remaining to 0, which makes the slot look like it's unbootable when
+// in fact it's still pending.
+//
+// This function detects that case, returning true if |configuration| is currently running its final
+// boot attempt.
+bool BootManager::IsFinalBootAttempt(const AbrSlotInfo& slot_info, Configuration configuration) {
+  // This is the final boot attempt if:
+  //   1. |slot_index| is our currently booted slot
+  //   2. The slot reports unbootable
+  //   3. The unbootable reason is "no more tries" (or "none" for backwards-compatibility with
+  //      older bootloaders)
+  //
+  // This works because we trust the bootloader to respect the A/B/R metadata, so we never would
+  // have gotten into this slot unless it was bootable at the time. So it either:
+  //   * was set unbootable by the bootloader just before boot because it's the final attempt
+  //   * has been set unbootable during this attempt via SetConfigurationUnbootable()
+  // and we can check for the first by filtering the reboot reason.
+  //
+  // This cannot be done entirely in libabr because the current boot slot is not always possible to
+  // determine based on the A/B/R metadata, so we have to do it in the paver where we do know the
+  // current slot.
 
-// Reads the status for the given `configuration`.
+  // Check the slot info first because it's the quickest, since all the data is local.
+  if (slot_info.is_bootable || (slot_info.unbootable_reason != kAbrUnbootableReasonNoMoreTries &&
+                                slot_info.unbootable_reason != kAbrUnbootableReasonNone)) {
+    return false;
+  }
+
+  // If the slot in question is our current boot slot, we're on our last attempt.
+  zx::result<Configuration> current_configuration = abr::QueryBootConfig(devices_, svc_root_);
+  return current_configuration.is_ok() && *current_configuration == configuration;
+}
+
+// Returns the status for the given `configuration`.
 //
 // Returns a pair containing:
 //   1. The `ConfigurationStatus`
 //   2. If status is pending, the number of boots attempted; otherwise, nullopt.
-zx::result<std::pair<ConfigurationStatus, std::optional<uint8_t>>> GetConfigurationStatus(
-    abr::Client& abr_client, Configuration configuration) {
+zx::result<std::pair<ConfigurationStatus, std::optional<uint8_t>>>
+BootManager::GetConfigurationStatus(Configuration configuration) {
   auto slot_index = ConfigurationToSlotIndex(configuration);
   if (!slot_index) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  auto slot_info = abr_client.GetSlotInfo(*slot_index);
+  auto slot_info = abr_client_->GetSlotInfo(*slot_index);
   if (slot_info.is_error()) {
     ERROR("Failed to get slot info %d\n", static_cast<uint32_t>(configuration));
     return slot_info.take_error();
   }
 
   if (!slot_info->is_bootable) {
+    // If this is the final boot attempt, we aren't actually unbootable yet.
+    if (IsFinalBootAttempt(*slot_info, configuration)) {
+      return zx::ok(std::make_pair(ConfigurationStatus::kPending, kMaxPendingBootAttempts));
+    }
     return zx::ok(std::make_pair(ConfigurationStatus::kUnbootable, std::nullopt));
   }
 
@@ -772,11 +809,9 @@ zx::result<std::pair<ConfigurationStatus, std::optional<uint8_t>>> GetConfigurat
                                kMaxPendingBootAttempts - slot_info->num_tries_remaining));
 }
 
-}  // namespace
-
 void BootManager::QueryConfigurationStatus(QueryConfigurationStatusRequestView request,
                                            QueryConfigurationStatusCompleter::Sync& completer) {
-  auto result = GetConfigurationStatus(*abr_client_, request->configuration);
+  auto result = GetConfigurationStatus(request->configuration);
 
   if (result.is_error()) {
     completer.ReplyError(result.error_value());
@@ -788,7 +823,7 @@ void BootManager::QueryConfigurationStatus(QueryConfigurationStatusRequestView r
 void BootManager::QueryConfigurationStatusAndBootAttempts(
     QueryConfigurationStatusAndBootAttemptsRequestView request,
     QueryConfigurationStatusAndBootAttemptsCompleter::Sync& completer) {
-  auto result = GetConfigurationStatus(*abr_client_, request->configuration);
+  auto result = GetConfigurationStatus(request->configuration);
 
   if (result.is_error()) {
     completer.ReplyError(result.error_value());
@@ -840,6 +875,7 @@ void BootManager::SetConfigurationUnbootable(SetConfigurationUnbootableRequestVi
     return;
   }
 
+  // This string is load-bearing in the firmware test suite, make sure they change together.
   LOG("Set %d configuration as unbootable\n", static_cast<uint32_t>(request->configuration));
 
   completer.Reply(ZX_OK);
@@ -850,18 +886,42 @@ void BootManager::SetConfigurationHealthy(SetConfigurationHealthyRequestView req
   LOG("Setting configuration %d as healthy\n", static_cast<uint32_t>(request->configuration));
 
   auto slot_index = ConfigurationToSlotIndex(request->configuration);
-  auto status =
-      slot_index ? abr_client_->MarkSlotSuccessful(*slot_index) : zx::error(ZX_ERR_INVALID_ARGS);
-  if (status.is_error()) {
-    ERROR("Failed to set configuration: %d healthy\n",
-          static_cast<uint32_t>(request->configuration));
-    completer.Reply(status.error_value());
+  if (!slot_index) {
+    ERROR("Invalid configuration %d\n", static_cast<uint32_t>(request->configuration));
+    completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
   }
 
-  LOG("Set %d configuration as healthy\n", static_cast<uint32_t>(request->configuration));
+  // Attempt to set it healthy normally first - this may fail if we're on the last boot attempt
+  // and libabr thinks the slot is already unbootable, but in the common case this will work and
+  // it's quick and harmless to attempt.
+  auto status = abr_client_->MarkSlotSuccessful(*slot_index);
+  if (status.is_error()) {
+    // Failure is expected if we're on the final boot attempt; check if this was the case.
+    auto slot_info = abr_client_->GetSlotInfo(*slot_index);
+    if (slot_info.is_error()) {
+      ERROR("Failed to query slot info (%d); assuming this is not the final boot attempt\n",
+            slot_info.error_value());
+    } else if (IsFinalBootAttempt(*slot_info, request->configuration)) {
+      // Try again with |from_unbootable_ok| set. This must only be used when we are booting the
+      // final attempt on a slot; it's unsafe otherwise and could lead to a bootloop.
+      LOG("Last boot attempt; allowing unbootable -> success\n");
+      status = abr_client_->MarkSlotSuccessful(*slot_index, true);
+      if (status.is_error()) {
+        ERROR("Failed to mark slot successful from last boot attempt (%d)\n", status.error_value());
+      }
+    }
+  }
 
-  completer.Reply(ZX_OK);
+  if (status.is_ok()) {
+    // This string is load-bearing in the firmware test suite, make sure they change together.
+    LOG("Set configuration %d healthy\n", static_cast<uint32_t>(request->configuration));
+    completer.Reply(ZX_OK);
+  } else {
+    ERROR("Failed to set configuration %d healthy (%d)\n",
+          static_cast<uint32_t>(request->configuration), status.error_value());
+    completer.Reply(status.error_value());
+  }
 }
 
 void BootManager::SetOneShotRecovery(SetOneShotRecoveryCompleter::Sync& completer) {

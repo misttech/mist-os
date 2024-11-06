@@ -579,6 +579,34 @@ constexpr AbrData kAbrDataAUnbootableBSuccessful = {
     .crc32 = {},
 };
 
+// Returns AbrData that has both slots unbootable with |reason|, and A higher priority.
+AbrData AbrDataBothUnbootable(uint8_t reason) {
+  return {
+      .magic = {'\0', 'A', 'B', '0'},
+      .version_major = 2,
+      .version_minor = 3,
+      .reserved1 = {},
+      .slot_data =
+          {
+              {
+                  .priority = 15,
+                  .tries_remaining = 0,
+                  .successful_boot = 0,
+                  .unbootable_reason = reason,
+              },
+              {
+                  .priority = 14,
+                  .tries_remaining = 0,
+                  .successful_boot = 0,
+                  .unbootable_reason = reason,
+              },
+          },
+      .one_shot_flags = kAbrDataOneShotFlagNone,
+      .reserved2 = {},
+      .crc32 = {},
+  };
+}
+
 void ComputeCrc(AbrData* data) {
   data->crc32 = htobe32(crc32(0, reinterpret_cast<const uint8_t*>(data), offsetof(AbrData, crc32)));
 }
@@ -844,9 +872,13 @@ void PaverServiceSkipBlockTest::TestQueryConfigurationStatus(
   ASSERT_EQ((*result)->status, expected_status);
 }
 
-// Registers the given `abr_data`, calls `BootManager::QueryConfigurationStatusAndBootAttempts`, and
-// checks that the resulting status matches `expected_status` and boot attempts matches
-// `expected_boot_attempts`.
+// Common test logic for `QueryConfigurationStatusAndBootAttempts`.
+//
+// Args:
+// * abr_data: A/B/R metadata to set; CRC will be updated by this function.
+// * configuration: which `Configuration` slot to query.
+// * expected_status: the expected returned configuration status.
+// * expected_boot_attempts: the expected reported boot attempts.
 void PaverServiceSkipBlockTest::TestQueryConfigurationStatusAndBootAttempts(
     AbrData abr_data, fuchsia_paver::wire::Configuration configuration,
     fuchsia_paver::wire::ConfigurationStatus expected_status,
@@ -912,29 +944,62 @@ TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsPending
                                               kAbrMaxTriesRemaining - 1);
 }
 
-TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsPendingFinalBoot) {
-  AbrData abr_data = kAbrDataAUnbootableBSuccessful;
-  abr_data.slot_data[1].successful_boot = 0;
-  abr_data.slot_data[1].tries_remaining = 0;
-  abr_data.slot_data[1].unbootable_reason = kAbrUnbootableReasonNone;
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootA) {
+  // The current boot slot should interpret "no more tries" as "last attempt".
+  SetArgResponse("_a");
+  TestQueryConfigurationStatusAndBootAttempts(
+      AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries),
+      fuchsia_paver::wire::Configuration::kA, fuchsia_paver::wire::ConfigurationStatus::kPending,
+      kAbrMaxTriesRemaining);
+}
 
-  // TODO(b/368597963): when querying the currently booting slot, the paver must interpret this case
-  // as the final boot rather than unbootable. Once it does, update FIDL documentation as well.
-  TestQueryConfigurationStatusAndBootAttempts(abr_data, fuchsia_paver::wire::Configuration::kB,
-                                              fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
-                                              std::nullopt);
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootB) {
+  // The current boot slot should interpret "no more tries" as "last attempt".
+  SetArgResponse("_b");
+  TestQueryConfigurationStatusAndBootAttempts(
+      AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries),
+      fuchsia_paver::wire::Configuration::kB, fuchsia_paver::wire::ConfigurationStatus::kPending,
+      kAbrMaxTriesRemaining);
+}
+
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootLegacyReason) {
+  // The current boot slot should also interpret "unknown reason" as "last attempt" to support
+  // bootloaders that haven't been updated yet to include the reboot reason.
+  SetArgResponse("_a");
+  TestQueryConfigurationStatusAndBootAttempts(
+      AbrDataBothUnbootable(kAbrUnbootableReasonNone), fuchsia_paver::wire::Configuration::kA,
+      fuchsia_paver::wire::ConfigurationStatus::kPending, kAbrMaxTriesRemaining);
+}
+
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootAQueryB) {
+  // When it's not the current boot slot, "no more tries" really does mean unbootable.
+  SetArgResponse("_a");
+  TestQueryConfigurationStatusAndBootAttempts(
+      AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries),
+      fuchsia_paver::wire::Configuration::kB, fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
+      std::nullopt);
+}
+
+TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsFinalBootBQueryA) {
+  // When it's not the current boot slot, "no more tries" really does mean unbootable.
+  SetArgResponse("_b");
+  TestQueryConfigurationStatusAndBootAttempts(
+      AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries),
+      fuchsia_paver::wire::Configuration::kA, fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
+      std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusUnbootable) {
-  TestQueryConfigurationStatus(kAbrDataAUnbootableBSuccessful,
+  TestQueryConfigurationStatus(AbrDataBothUnbootable(kAbrUnbootableReasonUserRequested),
                                fuchsia_paver::wire::Configuration::kA,
                                fuchsia_paver::wire::ConfigurationStatus::kUnbootable);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsUnbootable) {
   TestQueryConfigurationStatusAndBootAttempts(
-      kAbrDataAUnbootableBSuccessful, fuchsia_paver::wire::Configuration::kA,
-      fuchsia_paver::wire::ConfigurationStatus::kUnbootable, std::nullopt);
+      AbrDataBothUnbootable(kAbrUnbootableReasonUserRequested),
+      fuchsia_paver::wire::Configuration::kA, fuchsia_paver::wire::ConfigurationStatus::kUnbootable,
+      std::nullopt);
 }
 
 TEST_F(PaverServiceSkipBlockTest, QueryConfigurationStatusAndBootAttemptsInvalidBootAttempts) {
@@ -1212,17 +1277,72 @@ TEST_F(PaverServiceSkipBlockTest, SetConfigurationHealthyOtherHealthy) {
   ASSERT_BYTES_EQ(&abr_data, &actual, sizeof(abr_data));
 }
 
-TEST_F(PaverServiceSkipBlockTest, SetUnbootableConfigurationHealthy) {
+TEST_F(PaverServiceSkipBlockTest, SetUnbootableConfigurationHealthyFails) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
-  AbrData abr_data = kAbrDataAUnbootableBSuccessful;
+  AbrData abr_data = AbrDataBothUnbootable(kAbrUnbootableReasonUserRequested);
   ComputeCrc(&abr_data);
   SetAbr(abr_data);
 
   ASSERT_NO_FATAL_FAILURE(FindBootManager());
 
-  auto result = boot_manager_->SetConfigurationHealthy(fuchsia_paver::wire::Configuration::kA);
-  ASSERT_OK(result.status());
-  ASSERT_EQ(result.value().status, ZX_ERR_INVALID_ARGS);
+  {
+    auto result = boot_manager_->SetConfigurationHealthy(fuchsia_paver::wire::Configuration::kA);
+    ASSERT_OK(result.status());
+    ASSERT_EQ(result.value().status, ZX_ERR_INVALID_ARGS);
+  }
+
+  {
+    auto result = boot_manager_->SetConfigurationHealthy(fuchsia_paver::wire::Configuration::kB);
+    ASSERT_OK(result.status());
+    ASSERT_EQ(result.value().status, ZX_ERR_INVALID_ARGS);
+  }
+
+  // A/B/R metadata should not have changed.
+  {
+    auto result = boot_manager_->Flush();
+    ASSERT_OK(result.status());
+    ASSERT_OK(result.value().status);
+  }
+  auto actual = GetAbr();
+  ASSERT_BYTES_EQ(&abr_data, &actual, sizeof(abr_data));
+}
+
+TEST_F(PaverServiceSkipBlockTest, SetUnbootableConfigurationHealthyLastBootAttemptSucceeds) {
+  ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
+  AbrData abr_data = AbrDataBothUnbootable(kAbrUnbootableReasonNoMoreTries);
+  ComputeCrc(&abr_data);
+  SetAbr(abr_data);
+
+  ASSERT_NO_FATAL_FAILURE(FindBootManager());
+
+  // If we're on the last boot attempt, we should still be able to set the configuration healthy.
+  // Here we set B to be the current slot on its last boot attempt, so A should still refuse but
+  // B should now be allowed to be marked healthy.
+  SetArgResponse("_b");
+  {
+    auto result = boot_manager_->SetConfigurationHealthy(fuchsia_paver::wire::Configuration::kA);
+    ASSERT_OK(result.status());
+    ASSERT_EQ(result.value().status, ZX_ERR_INVALID_ARGS);
+  }
+  {
+    auto result = boot_manager_->SetConfigurationHealthy(fuchsia_paver::wire::Configuration::kB);
+    ASSERT_OK(result.status());
+    ASSERT_OK(result.value().status);
+  }
+
+  {
+    auto result = boot_manager_->Flush();
+    ASSERT_OK(result.status());
+    ASSERT_OK(result.value().status);
+  }
+
+  // Make sure the A/B/R metadata was updated as we expect.
+  abr_data.slot_data[1].successful_boot = 1;
+  abr_data.slot_data[1].tries_remaining = 0;
+  abr_data.slot_data[1].unbootable_reason = kAbrUnbootableReasonNone;
+  ComputeCrc(&abr_data);
+  auto actual = GetAbr();
+  ASSERT_BYTES_EQ(&abr_data, &actual, sizeof(abr_data));
 }
 
 TEST_F(PaverServiceSkipBlockTest, BootManagerBuffered) {

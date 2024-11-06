@@ -63,8 +63,9 @@ class Client {
     return AbrResultToZxStatus(AbrMarkSlotUnbootable(&abr_ops_, index));
   }
 
-  zx::result<> MarkSlotSuccessful(AbrSlotIndex index) {
-    return AbrResultToZxStatus(AbrMarkSlotSuccessful(&abr_ops_, index));
+  // Only set |from_unbootable_ok| if this is the final boot into the current slot.
+  zx::result<> MarkSlotSuccessful(AbrSlotIndex index, bool from_unbootable_ok = false) {
+    return AbrResultToZxStatus(AbrMarkSlotSuccessful(&abr_ops_, index, from_unbootable_ok));
   }
 
   zx::result<AbrSlotInfo> GetSlotInfo(AbrSlotIndex index) const {

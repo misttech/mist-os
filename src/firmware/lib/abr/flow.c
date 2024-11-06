@@ -367,7 +367,8 @@ AbrResult AbrMarkSlotUnbootable(const AbrOps* abr_ops, AbrSlotIndex slot_index) 
   return save_metadata_if_changed(abr_ops, &abr_data, &abr_data_orig);
 }
 
-AbrResult AbrMarkSlotSuccessful(const AbrOps* abr_ops, AbrSlotIndex slot_index) {
+AbrResult AbrMarkSlotSuccessful(const AbrOps* abr_ops, AbrSlotIndex slot_index,
+                                bool from_unbootable_ok) {
   AbrData abr_data, abr_data_orig;
   AbrSlotIndex other_slot_index;
   AbrResult result;
@@ -386,13 +387,14 @@ AbrResult AbrMarkSlotSuccessful(const AbrOps* abr_ops, AbrSlotIndex slot_index) 
     return result;
   }
 
-  if (!is_slot_bootable(&abr_data.slot_data[slot_index])) {
+  if (!(is_slot_bootable(&abr_data.slot_data[slot_index]) || from_unbootable_ok)) {
     ABR_ERROR("Invalid argument: Cannot mark unbootable slot as successful.\n");
     return kAbrResultErrorInvalidData;
   }
 
   abr_data.slot_data[slot_index].tries_remaining = 0;
   abr_data.slot_data[slot_index].successful_boot = 1;
+  abr_data.slot_data[slot_index].unbootable_reason = kAbrUnbootableReasonNone;
 
   /* Remove any success mark on the other slot.
    *

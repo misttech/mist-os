@@ -326,12 +326,11 @@ closed protocol BootManager {
     ///
     /// The returned table will always contain the current `ConfigurationStatus`. Additionally, if
     /// the status is `ConfigurationStatus::PENDING`, the table will also contain the number of
-    /// times this configuration has attempted to boot.
+    /// times this configuration has attempted to boot, including the current attempt.
     ///
-    /// If `boot_attempts` is provided, it will be in the range `[0, MAX_PENDING_BOOT_ATTEMPTS)`.
-    /// 0 indicates the configuration was just set active and has not attempted any boots yet, but
-    /// `MAX_PENDING_BOOT_ATTEMPTS` will never be returned because on the final boot attempt the
-    /// state instead becomes `ConfigurationStatus::UNBOOTABLE`.
+    /// If `boot_attempts` is provided, it will be in the range `[0, MAX_PENDING_BOOT_ATTEMPTS]`.
+    /// 0 indicates the configuration was just set active and has not attempted any boots yet, and
+    /// `MAX_PENDING_BOOT_ATTEMPTS` indicates that all attempts have been used.
     ///
     /// Returns `ZX_ERR_INVALID_ARGS` if `Configuration.RECOVERY` is passed in via `configuration`.
     strict QueryConfigurationStatusAndBootAttempts(struct {
