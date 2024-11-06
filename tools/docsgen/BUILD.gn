@@ -111,33 +111,19 @@ sdk_host_tools_visibility_bridge_label =
     "//src/developer/ffx/build:internal_sdk_tools_for_ffx($host_toolchain)"
 
 _sdk_host_tools_label = "//sdk:host_tools.internal($host_toolchain)"
+
 sdk_host_tools_manifest =
     get_label_info(_sdk_host_tools_label, "root_out_dir") +
     "/sdk/manifest/host_tools.internal"
-
-# The list of tools to be documented comes from the sdk_host_tools_for_single_toolchain
-# This label expected to be a "sdk_molecule" so there is a manifest generated and the tool
-# executables are dependencies. This means they are built before clidoc runs.
-_sdk_host_tools_for_single_toolchain_molecule =
-    "host_tools_for_single_toolchain"
-_sdk_host_tools_for_single_toolchain_label =
-    "//sdk:${_sdk_host_tools_for_single_toolchain_molecule}($host_toolchain)"
-_sdk_host_tools_for_single_toolchain_gen_dir =
-    get_label_info(_sdk_host_tools_for_single_toolchain_label, "target_gen_dir")
-_sdk_host_tools_for_single_toolchain_manifest = "${_sdk_host_tools_for_single_toolchain_gen_dir}/${_sdk_host_tools_for_single_toolchain_molecule}.sdk"
-
-_clidoc_path =
-    get_label_info(_sdk_host_tools_for_single_toolchain_label, "root_out_dir")
-_clidoc_path = "${_clidoc_path}/clidoc"
-
-action("invoke_clidoc") {
-  script = "clidoc_run.py"
+compiled_action("invoke_clidoc") {
+  tool = "//tools/clidoc:clidoc_bin"
+  tool_output_name = "clidoc"
   depfile = "$target_out_dir/$target_name.d"
   deps = [
+    "//sdk:host_tools_for_single_toolchain($host_toolchain)",
     "//src/developer/ffx:tool_manifest($host_toolchain)",
     "//src/developer/ffx/frontends/ffx:ffx_bin_unversioned($host_toolchain)",
-    "//tools/clidoc:clidoc_bin($host_toolchain)",
-    _sdk_host_tools_for_single_toolchain_label,
+    "//src/diagnostics/triage:triage_bin($host_toolchain)",
     sdk_host_tools_visibility_bridge_label,
   ]
 
@@ -156,18 +142,15 @@ action("invoke_clidoc") {
   }
 
   inputs = [
-    _clidoc_path,
     "${root_out_dir}/ffx_tools.json",
     sdk_host_tools_manifest,
-    _sdk_host_tools_for_single_toolchain_manifest,
   ]
   outputs = [ clidoc_tarfile ]
   args = [
-    "--clidoc",
-    rebase_path(_clidoc_path, root_build_dir),
-    "--input",
-    rebase_path(_sdk_host_tools_for_single_toolchain_manifest, root_build_dir),
-    "--output",
+    "-o",
+    rebase_path("$target_gen_dir/sdk-docs", root_build_dir),
+    "--quiet",
+    "--archive-path",
     rebase_path(clidoc_tarfile, root_build_dir),
     "--depfile",
     rebase_path(depfile, root_build_dir),
@@ -179,12 +162,6 @@ action("invoke_clidoc") {
     rebase_path(target_gen_dir, root_build_dir),
     "--subtool-manifest",
     rebase_path("${root_out_dir}/ffx_tools.json", root_build_dir),
-    "--excludes",
-    "device-finder",
-    "far",
-    "fuchsia-sdk-run",
-    "fvm",
-    "merkleroot",
   ]
 }
 
