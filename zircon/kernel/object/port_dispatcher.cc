@@ -126,6 +126,8 @@ void PortObserver::OnMatch(zx_signals_t signals) {
   if (options_ & ZX_WAIT_ASYNC_TIMESTAMP) {
     // Getting the current time can be somewhat expensive.
     packet_.packet.signal.timestamp = current_time();
+  } else if (options_ & ZX_WAIT_ASYNC_BOOT_TIMESTAMP) {
+    packet_.packet.signal.timestamp = current_boot_time();
   }
 
   // The packet is not allocated in the packet arena and does not count against the per-port limit

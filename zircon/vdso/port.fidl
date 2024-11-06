@@ -16,7 +16,7 @@ type PacketSignal = struct {
     trigger Signals;
     observed Signals;
     count uint64;
-    reserved0 uint64;
+    timestamp Time;
     reserved1 uint64;
 };
 
