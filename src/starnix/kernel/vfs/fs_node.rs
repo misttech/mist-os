@@ -844,7 +844,12 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     }
 
     /// Called when the FsNode is freed by the Kernel.
-    fn forget(&self, _node: &FsNode, _current_task: &CurrentTask) -> Result<(), Errno> {
+    fn forget(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+    ) -> Result<(), Errno> {
         Ok(())
     }
 
@@ -2567,11 +2572,13 @@ impl Releasable for FsNode {
     type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
 
     fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
-        let (_locked, current_task) = context;
+        let (locked, current_task) = context;
         if let Some(fs) = self.fs.upgrade() {
             fs.remove_node(&self);
         }
-        if let Err(err) = self.ops.forget(&self, current_task) {
+        if let Err(err) =
+            self.ops.forget(&mut locked.cast_locked::<FileOpsCore>(), &self, current_task)
+        {
             log_error!("Error on FsNodeOps::forget: {err:?}");
         }
     }
