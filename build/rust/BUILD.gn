@@ -187,25 +187,6 @@ if (is_host) {
   }
 }
 
-if (current_toolchain == host_toolchain) {
-  # Make a shim called rust-analyzer that runs the actual rust-analyzer binary.
-  # fx will link to that from out/, giving a predictable location to run
-  # rust-analyzer from regardless of the user's host, and taking into account
-  # custom toolchains.
-  #
-  # We want this to be available as soon as gen is done, so we don't wait for
-  # the build itself.  The only reason this needs to be done as a script instead
-  # of write_file is because the shim needs the executable bit set.
-  rust_analyzer_path = "${rustc_prefix}/bin/rust-analyzer"
-  if (rebase_path(rustc_prefix, "") == rustc_prefix) {
-    # rustc_prefix is already a system-absolute path; leave it alone.
-  } else {
-    # Otherwise, make it relative to the build dir.
-    rust_analyzer_path = rebase_path(rust_analyzer_path, root_build_dir)
-  }
-  exec_script("make_tool_shim.sh", [ rust_analyzer_path ])
-}
-
 group("tests") {
   testonly = true
   deps = [

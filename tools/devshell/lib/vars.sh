@@ -202,11 +202,6 @@ function _link_gen_artifacts {
       _symlink_relative "${FUCHSIA_BUILD_DIR}/$artifact" "${FUCHSIA_DIR}/$artifact"
     fi
   done
-
-  # Put rust-analyzer in out/ to avoid polluting the root directory.
-  if [[ -f "${FUCHSIA_BUILD_DIR}/rust-analyzer" ]]; then
-    _symlink_relative "${FUCHSIA_BUILD_DIR}/rust-analyzer" "${FUCHSIA_DIR}/out"
-  fi
 }
 
 function fx-gen-internal {
