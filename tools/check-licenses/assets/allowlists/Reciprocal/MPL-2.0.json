@@ -46,6 +46,13 @@
             ],
             "bug": "",
             "notes": []
+          },
+          {
+            "projects": [
+              "src/third_party/grpc"
+            ],
+            "bug": "",
+            "notes": []
           }
         ]
       }
