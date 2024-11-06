@@ -138,11 +138,9 @@ template("sdk_source_set") {
   if (make_internal_atom) {
     assert(!defined(invoker.stable) || !invoker.stable)
     is_stable = false
-    is_exempt_from_unstable_allowlist = true
   } else {
     assert(defined(invoker.stable), "Must specify stability.")
     is_stable = invoker.stable
-    is_exempt_from_unstable_allowlist = false
   }
   assert(!is_stable || invoker.category == "partner")
 
@@ -194,13 +192,14 @@ template("sdk_source_set") {
     # Ensure that 'sdk_source_set()' targets are included in the appropriate
     # allowlist. The allowlist target's `visibility` list ensures that the
     # target using this template is in the allowlist.
-    if (is_stable) {
+    if (make_internal_atom) {
+      deps += [ "//build/sdk:internal_source_sets_allowlist" ]
+    } else if (is_stable) {
       assert(
           invoker.category == "partner",
           "Create a separate allowlist when adding support for other categories.")
       deps += [ "//build/sdk:partner_idk_source_sets_allowlist" ]
-      not_needed([ "is_exempt_from_unstable_allowlist" ])
-    } else if (!is_exempt_from_unstable_allowlist) {
+    } else {
       assert(
           invoker.category == "partner",
           "Create a separate allowlist when adding support for other categories.")

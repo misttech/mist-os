@@ -98,8 +98,8 @@ template("sdk_static_library") {
       !is_internal ||
           # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
           target_name == "devicetree" ||
-          # TODO(https://fxbug.dev/366517646): Remove once all uses are
-          # migrated to the //sdk versions and these targets are deleted.
+          # TODO(https://fxbug.dev/366517646): Remove these once all uses of
+          # `fake-bti` are migrated to the //sdk target.
           target_name == "fake-bti" || target_name == "fake-object",
       "Do not add more internal static libraries.")
 

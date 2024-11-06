@@ -920,7 +920,14 @@ if (current_toolchain == default_toolchain) {
   sdk_molecule("bazel_internal_only_libs") {
     category = "internal"
     deps = [
+      # When removing targets from this list, remove them from the exceptions or
+      # allowlist for the `sdk_*()` template they used.
+
+      # TODO(https://fxbug.dev/333907192): Depend on the target already in the
+      # core IDK.
       ":version_history_sdk($default_toolchain)",
+
+      # TODO(https://fxbug.dev/343059325): Promote devicetree to "partner".
       "//sdk/lib/driver/devicetree/manager:manager_sdk",
       "//sdk/lib/driver/devicetree/testing:board-test-helper_sdk",
       "//sdk/lib/driver/devicetree/visitors:driver-visitor_sdk",
@@ -928,12 +935,21 @@ if (current_toolchain == default_toolchain) {
       "//sdk/lib/driver/devicetree/visitors:registration_sdk",
       "//sdk/lib/driver/devicetree/visitors/default:default_sdk",
       "//sdk/lib/driver/devicetree/visitors/drivers:all-driver-visitors_sdk",
-      "//sdk/lib/driver/platform-device/cpp:cpp_sdk",
-      "//src/devices/lib/mmio:test_helper_sdk",
+
+      # TODO(https://fxbug.dev/333907192): Promote mock-registers to "partner".
       "//src/devices/registers/testing/mock-registers:mock-registers_sdk",
-      "//src/devices/testing/fake-bti:fake-bti_sdk",
+
+      # TODO(https://fxbug.dev/333907192): Promote mmio source sets to "partner".
+      "//src/devices/lib/mmio:test_helper_sdk",
       "//src/devices/testing/fake-mmio-reg:fake-mmio-reg_sdk",
       "//src/devices/testing/mock-mmio-reg:mock-mmio-reg_sdk",
+
+      # TODO(https://fxbug.dev/366517646): Remove once all uses of `fake-bti`
+      # are migrated to the //sdk target.
+      "//src/devices/testing/fake-bti:fake-bti_sdk",
+
+      # TODO(https://fxbug.dev/333907192): Eliminate vendor dependencies on fzl
+      # or promote it to "partner".
       "//zircon/system/ulib/fzl:fzl_sdk",
     ]
   }
