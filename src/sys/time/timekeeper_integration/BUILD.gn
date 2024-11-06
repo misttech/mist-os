@@ -19,12 +19,8 @@ group("tests") {
 }
 
 # CTF archive deps only.
+# Removed as a quick way to detach these tests from CTF.
 group("ctf-tests") {
-  testonly = true
-  deps = [
-    ":faketime-integration_archive",
-    ":timekeeper-integration_archive",
-  ]
 }
 
 # Other test-only targets.
