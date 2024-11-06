@@ -393,5 +393,24 @@ TEST(BlockServer, Group) {
   EXPECT_EQ(response.reqid, 999u);
 }
 
+TEST(BlockServer, SplitRequest) {
+  Request request = {.operation = {.tag = Operation::Tag::Read,
+                                   .read = {
+                                       .device_block_offset = 10,
+                                       .block_count = 20,
+                                       .vmo_offset = 4096,
+                                   }}};
+
+  Request head = SplitRequest(request, 5, 512);
+
+  EXPECT_EQ(head.operation.read.device_block_offset, 10u);
+  EXPECT_EQ(head.operation.read.block_count, 5u);
+  EXPECT_EQ(head.operation.read.vmo_offset, 4096u);
+
+  EXPECT_EQ(request.operation.read.device_block_offset, 15u);
+  EXPECT_EQ(request.operation.read.block_count, 15u);
+  EXPECT_EQ(request.operation.read.vmo_offset, 6656u);
+}
+
 }  // namespace
 }  // namespace block_server

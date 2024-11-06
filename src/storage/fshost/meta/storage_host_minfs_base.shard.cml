@@ -99,5 +99,10 @@
             from: "self",
             availability: "same_as_target",
         },
+        {
+            protocol: "fuchsia.storagehost.PartitionsAdmin",
+            from: "self",
+            availability: "same_as_target",
+        },
     ],
 }

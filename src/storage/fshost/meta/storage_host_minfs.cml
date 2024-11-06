@@ -18,10 +18,5 @@
             from: "parent",
             to: "#fvm",
         },
-        {
-            protocol: "fuchsia.storagehost.PartitionsAdmin",
-            from: "self",
-            availability: "same_as_target",
-        },
     ],
 }

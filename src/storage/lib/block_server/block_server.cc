@@ -97,7 +97,7 @@ Request SplitRequest(Request& request, uint32_t block_offset, uint32_t block_siz
   }
   head.operation.read.block_count = block_offset;
   request.operation.read.device_block_offset += block_offset;
-  request.operation.read.block_count += block_offset;
+  request.operation.read.block_count -= block_offset;
   return head;
 }
 
