@@ -984,6 +984,7 @@ impl Zxio {
     }
 
     pub fn attr_set(&self, attributes: &zxio_node_attributes_t) -> Result<(), zx::Status> {
+        validate_pointer_fields(attributes);
         let status = unsafe { zxio::zxio_attr_set(self.as_ptr(), attributes) };
         zx::ok(status)?;
         Ok(())
