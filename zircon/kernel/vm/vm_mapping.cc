@@ -50,8 +50,9 @@ KCOUNTER(vm_mappings_protect_no_write, "vm.aspace.mapping.protect_without_write"
 // location and call Success, or this object will automatically unmap the location if necessary.
 class VmMapping::CurrentlyFaulting {
  public:
-  CurrentlyFaulting(VmMapping* mapping, uint64_t object_offset) TA_REQ(mapping->object_->lock())
-      : mapping_(mapping), object_offset_(object_offset) {
+  CurrentlyFaulting(VmMapping* mapping, uint64_t object_offset, uint64_t len)
+      TA_REQ(mapping->object_->lock())
+      : mapping_(mapping), object_offset_(object_offset), len_(len) {
     DEBUG_ASSERT(mapping->currently_faulting_ == nullptr);
     mapping->currently_faulting_ = this;
   }
@@ -62,10 +63,9 @@ class VmMapping::CurrentlyFaulting {
     if (state_ == State::UnmapSkipped) {
       vaddr_t base;
       size_t new_len;
-      bool valid_range =
-          mapping_->ObjectRangeToVaddrRange(object_offset_, PAGE_SIZE, &base, &new_len);
+      bool valid_range = mapping_->ObjectRangeToVaddrRange(object_offset_, len_, &base, &new_len);
       ASSERT(valid_range);
-      ASSERT(new_len == PAGE_SIZE);
+      ASSERT(new_len == len_);
       zx_status_t status = mapping_->aspace_->arch_aspace().Unmap(
           base, new_len / PAGE_SIZE, mapping_->aspace_->EnlargeArchUnmap(), nullptr);
       ASSERT(status == ZX_OK);
@@ -78,7 +78,7 @@ class VmMapping::CurrentlyFaulting {
   // Returns false if the caller should unmap themselves.
   bool UnmapRange(uint64_t object_offset, uint64_t len) {
     DEBUG_ASSERT(state_ != State::Completed);
-    if (Intersects(object_offset, len)) {
+    if (Intersects(object_offset, len, object_offset_, len_)) {
       state_ = State::UnmapSkipped;
       return true;
     }
@@ -92,13 +92,11 @@ class VmMapping::CurrentlyFaulting {
   DISALLOW_COPY_ASSIGN_AND_MOVE(CurrentlyFaulting);
 
  private:
-  bool Intersects(uint64_t object_offset, uint64_t len) const {
-    return object_offset == object_offset_;
-  }
   // Reference back to the original mapping.
   VmMapping* mapping_;
   // The offset, in object space, of the page fault.
   uint64_t object_offset_;
+  uint64_t len_;
   enum class State {
     NoUnmapNeeded,
     UnmapSkipped,
@@ -1054,7 +1052,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   // Trim out pages to the limit of the VMO.
   max_out_pages = ktl::min(max_out_pages, (vmo_size - vmo_offset) / PAGE_SIZE);
 
-  CurrentlyFaulting currently_faulting(this, vmo_offset);
+  CurrentlyFaulting currently_faulting(this, vmo_offset, PAGE_SIZE);
 
   __UNINITIALIZED VmMappingCoalescer<kMaxPages> coalescer(
       this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
