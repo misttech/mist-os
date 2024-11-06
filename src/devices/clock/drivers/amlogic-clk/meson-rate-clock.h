@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_CLOCK_DRIVERS_AMLOGIC_CLK_MESON_RATE_CLOCK_H_
 #define SRC_DEVICES_CLOCK_DRIVERS_AMLOGIC_CLK_MESON_RATE_CLOCK_H_
 
+#include <lib/zx/result.h>
 #include <zircon/types.h>
 
 namespace amlogic_clock {
@@ -12,8 +13,8 @@ namespace amlogic_clock {
 class MesonRateClock {
  public:
   virtual zx_status_t SetRate(uint32_t hz) = 0;
-  virtual zx_status_t QuerySupportedRate(uint64_t max_rate, uint64_t* result) = 0;
-  virtual zx_status_t GetRate(uint64_t* result) = 0;
+  virtual zx::result<uint64_t> QuerySupportedRate(uint64_t max_rate) = 0;
+  virtual zx::result<uint64_t> GetRate() = 0;
   virtual ~MesonRateClock() = default;
 };
 

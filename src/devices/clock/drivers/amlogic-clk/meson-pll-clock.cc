@@ -34,7 +34,7 @@ zx_status_t MesonPllClock::SetRate(const uint32_t hz) {
   return s905d2_pll_set_rate(&pll_, hz);
 }
 
-zx_status_t MesonPllClock::QuerySupportedRate(const uint64_t max_rate, uint64_t* result) {
+zx::result<uint64_t> MesonPllClock::QuerySupportedRate(const uint64_t max_rate) {
   // Find the largest rate that does not exceed `max_rate`
 
   // Start by getting the rate tables.
@@ -61,14 +61,13 @@ zx_status_t MesonPllClock::QuerySupportedRate(const uint64_t max_rate, uint64_t*
   }
 
   if (best_rate == nullptr) {
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  *result = best_rate->rate;
-  return ZX_OK;
+  return zx::ok(best_rate->rate);
 }
 
-zx_status_t MesonPllClock::GetRate(uint64_t* result) { return ZX_ERR_NOT_SUPPORTED; }
+zx::result<uint64_t> MesonPllClock::GetRate() { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
 zx_status_t MesonPllClock::Toggle(const bool enable) {
   if (enable) {

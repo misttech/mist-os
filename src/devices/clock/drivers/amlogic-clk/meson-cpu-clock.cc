@@ -251,76 +251,60 @@ zx_status_t MesonCpuClock::ConfigureSysPLL(uint32_t new_rate) {
   return status;
 }
 
-zx_status_t MesonCpuClock::QuerySupportedRate(const uint64_t max_rate, uint64_t* result) {
+zx::result<uint64_t> MesonCpuClock::QuerySupportedRate(const uint64_t max_rate) {
   // Cpu Clock supported rates fall into two categories based on whether they're below
   // or above the 1GHz threshold. This method scans both the syspll and the fclk to
   // determine the maximum rate that does not exceed `max_rate`.
-  uint64_t syspll_rate = 0;
-  uint64_t fclk_rate = 0;
-  zx_status_t syspll_status = ZX_ERR_NOT_FOUND;
-  zx_status_t fclk_status = ZX_ERR_NOT_FOUND;
+  zx::result<uint64_t> syspll_rate = zx::error(ZX_ERR_NOT_FOUND);
+  zx::result<uint64_t> fclk_rate = zx::error(ZX_ERR_NOT_FOUND);
 
   if (chip_id_ == PDEV_PID_AMLOGIC_A5) {
     for (const auto& entry : a5_cpu_dyn_table) {
       if (entry.rate > fclk_rate && entry.rate <= max_rate) {
-        fclk_rate = entry.rate;
-        fclk_status = ZX_OK;
+        fclk_rate = zx::ok(entry.rate);
       }
     }
     for (const auto& entry : a5_sys_pll_params_table) {
       if (entry.rate > fclk_rate && entry.rate <= max_rate) {
-        syspll_rate = entry.rate;
-        syspll_status = ZX_OK;
+        syspll_rate = zx::ok(entry.rate);
       }
     }
   } else {
-    syspll_status = sys_pll_->QuerySupportedRate(max_rate, &syspll_rate);
+    syspll_rate = sys_pll_->QuerySupportedRate(max_rate);
 
     const aml_fclk_rate_table_t* fclk_rate_table = s905d2_fclk_get_rate_table();
     size_t rate_count = s905d2_fclk_get_rate_table_count();
 
     for (size_t i = 0; i < rate_count; i++) {
       if (fclk_rate_table[i].rate > fclk_rate && fclk_rate_table[i].rate <= max_rate) {
-        fclk_rate = fclk_rate_table[i].rate;
-        fclk_status = ZX_OK;
+        fclk_rate = zx::ok(fclk_rate_table[i].rate);
       }
     }
   }
 
   // 4 cases: rate supported by syspll only, rate supported by fclk only
   //          rate supported by neither or rate supported by both.
-  if (syspll_status == ZX_OK && fclk_status != ZX_OK) {
+  if (syspll_rate.is_ok() && fclk_rate.is_error()) {
     // Case 1
-    *result = syspll_rate;
-    return ZX_OK;
+    return syspll_rate;
   }
-  if (syspll_status != ZX_OK && fclk_status == ZX_OK) {
+  if (syspll_rate.is_error() && fclk_rate.is_ok()) {
     // Case 2
-    *result = fclk_rate;
-    return ZX_OK;
+    return fclk_rate;
   }
-  if (syspll_status != ZX_OK && fclk_status != ZX_OK) {
+  if (syspll_rate.is_error() && fclk_rate.is_error()) {
     // Case 3
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   // Case 4
-  if (syspll_rate > kFrequencyThresholdHz) {
-    *result = syspll_rate;
-  } else {
-    *result = fclk_rate;
+  if (syspll_rate.value() > kFrequencyThresholdHz) {
+    return syspll_rate;
   }
-  return ZX_OK;
+  return fclk_rate;
 }
 
-zx_status_t MesonCpuClock::GetRate(uint64_t* result) {
-  if (result == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  *result = current_rate_hz_;
-  return ZX_OK;
-}
+zx::result<uint64_t> MesonCpuClock::GetRate() { return zx::ok(current_rate_hz_); }
 
 // NOTE: This block doesn't modify the MPLL, it just programs the muxes &
 // dividers to get the new_rate in the sys_pll_div block. Refer fig. 6.6 Multi

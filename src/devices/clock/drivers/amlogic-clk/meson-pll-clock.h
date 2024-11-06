@@ -31,8 +31,8 @@ class MesonPllClock : public MesonRateClock {
 
   // Implement MesonRateClock
   zx_status_t SetRate(uint32_t hz) final;
-  zx_status_t QuerySupportedRate(uint64_t max_rate, uint64_t* result) final;
-  zx_status_t GetRate(uint64_t* result) final;
+  zx::result<uint64_t> QuerySupportedRate(uint64_t max_rate) final;
+  zx::result<uint64_t> GetRate() final;
 
   zx_status_t Toggle(bool enable);
 

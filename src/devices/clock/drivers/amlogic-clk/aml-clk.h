@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.hardware.clock.measure/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
-#include <fuchsia/hardware/clockimpl/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.clockimpl/cpp/driver/wire.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -32,7 +32,7 @@
 namespace amlogic_clock {
 
 class AmlClock : public fdf::DriverBase,
-                 public ddk::ClockImplProtocol<AmlClock>,
+                 public fdf::WireServer<fuchsia_hardware_clockimpl::ClockImpl>,
                  public fidl::WireServer<fuchsia_hardware_clock_measure::Measurer> {
  public:
   static constexpr char kDriverName[] = "aml-clk";
@@ -52,17 +52,29 @@ class AmlClock : public fdf::DriverBase,
   void Stop() override;
 
   // CLK protocol implementation.
-  zx_status_t ClockImplEnable(uint32_t id);
-  zx_status_t ClockImplDisable(uint32_t id);
-  zx_status_t ClockImplIsEnabled(uint32_t id, bool* out_enabled);
-
-  zx_status_t ClockImplSetRate(uint32_t id, uint64_t hz);
-  zx_status_t ClockImplQuerySupportedRate(uint32_t id, uint64_t max_rate, uint64_t* out_best_rate);
-  zx_status_t ClockImplGetRate(uint32_t id, uint64_t* out_current_rate);
-
-  zx_status_t ClockImplSetInput(uint32_t id, uint32_t idx);
-  zx_status_t ClockImplGetNumInputs(uint32_t id, uint32_t* out_num_inputs);
-  zx_status_t ClockImplGetInput(uint32_t id, uint32_t* out_input);
+  void Enable(EnableRequestView request, fdf::Arena& arena,
+              EnableCompleter::Sync& completer) override;
+  void Disable(DisableRequestView request, fdf::Arena& arena,
+               DisableCompleter::Sync& completer) override;
+  void IsEnabled(IsEnabledRequestView request, fdf::Arena& arena,
+                 IsEnabledCompleter::Sync& completer) override;
+  void SetRate(SetRateRequestView request, fdf::Arena& arena,
+               SetRateCompleter::Sync& completer) override;
+  void QuerySupportedRate(QuerySupportedRateRequestView request, fdf::Arena& arena,
+                          QuerySupportedRateCompleter::Sync& completer) override;
+  void GetRate(GetRateRequestView request, fdf::Arena& arena,
+               GetRateCompleter::Sync& completer) override;
+  void SetInput(SetInputRequestView request, fdf::Arena& arena,
+                SetInputCompleter::Sync& completer) override;
+  void GetNumInputs(GetNumInputsRequestView request, fdf::Arena& arena,
+                    GetNumInputsCompleter::Sync& completer) override;
+  void GetInput(GetInputRequestView request, fdf::Arena& arena,
+                GetInputCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_clockimpl::ClockImpl> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FDF_LOG(ERROR, "Unexpected clockimpl FIDL call: 0x%lx", metadata.method_ordinal);
+  }
 
   // CLK FIDL implementation.
   void Measure(MeasureRequestView request, MeasureCompleter::Sync& completer) override;
@@ -136,11 +148,11 @@ class AmlClock : public fdf::DriverBase,
   meson_clk_msr_t clk_msr_offsets_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> child_node_controller_;
-  compat::BanjoServer banjo_server_{ZX_PROTOCOL_CLOCK_IMPL, this, &clock_impl_protocol_ops_};
   compat::SyncInitializedDeviceServer compat_server_;
   driver_devfs::Connector<fuchsia_hardware_clock_measure::Measurer> devfs_connector_{
       fit::bind_member<&AmlClock::DevfsConnect>(this)};
   fidl::ServerBindingGroup<fuchsia_hardware_clock_measure::Measurer> measurer_binding_group_;
+  fdf::ServerBindingGroup<fuchsia_hardware_clockimpl::ClockImpl> clock_impl_binding_group_;
 };
 
 }  // namespace amlogic_clock

@@ -14,7 +14,16 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         colocate: "true",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.clockimpl.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.clockimpl.Service",
+            from: "self",
+        },
     ],
 }

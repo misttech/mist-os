@@ -53,9 +53,9 @@ source_set("amlogic-clk-driver-source") {
     "meson-rate-clock.h",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.clock.measure:fuchsia.hardware.clock.measure_cpp",
+    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/platform-device/cpp",

@@ -174,12 +174,9 @@ zx_status_t AmlClock::PopulateRegisterBlocks(uint32_t device_id, fdf::PDev& pdev
 zx::result<> AmlClock::Start() {
   // Initialize compat server.
   {
-    compat::DeviceServer::BanjoConfig banjo_config{.default_proto_id = ZX_PROTOCOL_CLOCK_IMPL};
-    banjo_config.callbacks[ZX_PROTOCOL_CLOCK_IMPL] = banjo_server_.callback();
     zx::result<> result = compat_server_.Initialize(
         incoming(), outgoing(), node_name(), kChildNodeName,
-        compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS, DEVICE_METADATA_CLOCK_INIT}),
-        std::move(banjo_config));
+        compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS, DEVICE_METADATA_CLOCK_INIT}));
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
       return result.take_error();
@@ -275,6 +272,16 @@ zx::result<> AmlClock::Start() {
     return zx::error(status);
   }
 
+  auto add_service_result = outgoing()->AddService<fuchsia_hardware_clockimpl::Service>(
+      fuchsia_hardware_clockimpl::Service::InstanceHandler({
+          .device = clock_impl_binding_group_.CreateHandler(
+              this, fdf::Dispatcher::GetCurrent()->get(), fidl::kIgnoreBindingClosure),
+      }));
+  if (add_service_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add clock-impl service %s", add_service_result.status_string());
+    return add_service_result.take_error();
+  }
+
   status = InitChildNode();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to initialize child node: %s", zx_status_get_string(status));
@@ -296,8 +303,10 @@ zx_status_t AmlClock::InitChildNode() {
   auto properties = {
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_clock::BIND_PROTOCOL_IMPL)};
 
-  zx::result result =
-      AddChild(kChildNodeName, devfs_add_args, properties, compat_server_.CreateOffers2());
+  auto offers = compat_server_.CreateOffers2();
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_clockimpl::Service>());
+
+  zx::result result = AddChild(kChildNodeName, devfs_add_args, properties, offers);
   if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to add device: %s", result.status_string());
     return result.status_value();
@@ -379,91 +388,136 @@ void AmlClock::ClkToggleHw(const meson_clk_gate_t* gate, bool enable) {
   }
 }
 
-zx_status_t AmlClock::ClockImplEnable(uint32_t id) {
+void AmlClock::Enable(EnableRequestView request, fdf::Arena& arena,
+                      EnableCompleter::Sync& completer) {
   // Determine which clock type we're trying to control.
-  aml_clk_common::aml_clk_type type = aml_clk_common::AmlClkType(id);
-  const uint16_t clkid = aml_clk_common::AmlClkIndex(id);
+  aml_clk_common::aml_clk_type type = aml_clk_common::AmlClkType(request->id);
+  const uint16_t clkid = aml_clk_common::AmlClkIndex(request->id);
 
+  zx_status_t status;
   switch (type) {
     case aml_clk_common::aml_clk_type::kMesonGate:
-      return ClkToggle(clkid, true);
+      status = ClkToggle(clkid, true);
+      if (status != ZX_OK) {
+        completer.buffer(arena).ReplyError(status);
+        return;
+      }
+      break;
     case aml_clk_common::aml_clk_type::kMesonPll:
-      return ClkTogglePll(clkid, true);
+      status = ClkTogglePll(clkid, true);
+      if (status != ZX_OK) {
+        completer.buffer(arena).ReplyError(status);
+        return;
+      }
+      break;
     default:
       // Not a supported clock type?
-      return ZX_ERR_NOT_SUPPORTED;
+      completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+      return;
   }
+
+  completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlClock::ClockImplDisable(uint32_t id) {
+void AmlClock::Disable(DisableRequestView request, fdf::Arena& arena,
+                       DisableCompleter::Sync& completer) {
   // Determine which clock type we're trying to control.
-  aml_clk_common::aml_clk_type type = aml_clk_common::AmlClkType(id);
-  const uint16_t clkid = aml_clk_common::AmlClkIndex(id);
+  aml_clk_common::aml_clk_type type = aml_clk_common::AmlClkType(request->id);
+  const uint16_t clkid = aml_clk_common::AmlClkIndex(request->id);
 
+  zx_status_t status;
   switch (type) {
     case aml_clk_common::aml_clk_type::kMesonGate:
-      return ClkToggle(clkid, false);
+      status = ClkToggle(clkid, false);
+      if (status != ZX_OK) {
+        completer.buffer(arena).ReplyError(status);
+        return;
+      }
+      break;
     case aml_clk_common::aml_clk_type::kMesonPll:
-      return ClkTogglePll(clkid, false);
+      status = ClkTogglePll(clkid, false);
+      if (status != ZX_OK) {
+        completer.buffer(arena).ReplyError(status);
+        return;
+      }
+      break;
     default:
       // Not a supported clock type?
-      return ZX_ERR_NOT_SUPPORTED;
+      completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+      return;
   };
+
+  completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlClock::ClockImplIsEnabled(uint32_t id, bool* out_enabled) {
-  return ZX_ERR_NOT_SUPPORTED;
+void AmlClock::IsEnabled(IsEnabledRequestView request, fdf::Arena& arena,
+                         IsEnabledCompleter::Sync& completer) {
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx_status_t AmlClock::ClockImplSetRate(uint32_t id, uint64_t hz) {
-  FDF_LOG(TRACE, "%s: clk = %u, hz = %lu", __func__, id, hz);
+void AmlClock::SetRate(SetRateRequestView request, fdf::Arena& arena,
+                       SetRateCompleter::Sync& completer) {
+  FDF_LOG(TRACE, "%s: clk = %u, hz = %lu", __func__, request->id, request->hz);
 
-  if (hz >= UINT32_MAX) {
-    FDF_LOG(ERROR, "%s: requested rate exceeds uint32_max, clkid = %u, rate = %lu", __func__, id,
-            hz);
-    return ZX_ERR_INVALID_ARGS;
+  if (request->hz >= UINT32_MAX) {
+    FDF_LOG(ERROR, "%s: requested rate exceeds uint32_max, clkid = %u, rate = %lu", __func__,
+            request->id, request->hz);
+    completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
   }
 
   MesonRateClock* target_clock;
-  zx_status_t st = GetMesonRateClock(id, &target_clock);
+  zx_status_t st = GetMesonRateClock(request->id, &target_clock);
   if (st != ZX_OK) {
-    return st;
+    completer.buffer(arena).ReplyError(st);
+    return;
   }
 
-  return target_clock->SetRate(static_cast<uint32_t>(hz));
+  st = target_clock->SetRate(static_cast<uint32_t>(request->hz));
+  if (st != ZX_OK) {
+    completer.buffer(arena).ReplyError(st);
+    return;
+  }
+
+  completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlClock::ClockImplQuerySupportedRate(uint32_t id, uint64_t max_rate,
-                                                  uint64_t* out_best_rate) {
-  FDF_LOG(TRACE, "%s: clkid = %u, max_rate = %lu", __func__, id, max_rate);
-
-  if (out_best_rate == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
-  }
+void AmlClock::QuerySupportedRate(QuerySupportedRateRequestView request, fdf::Arena& arena,
+                                  QuerySupportedRateCompleter::Sync& completer) {
+  FDF_LOG(TRACE, "%s: clkid = %u, max_rate = %lu", __func__, request->id, request->hz);
 
   MesonRateClock* target_clock;
-  zx_status_t st = GetMesonRateClock(id, &target_clock);
+  zx_status_t st = GetMesonRateClock(request->id, &target_clock);
   if (st != ZX_OK) {
-    return st;
+    completer.buffer(arena).ReplyError(st);
+    return;
   }
 
-  return target_clock->QuerySupportedRate(max_rate, out_best_rate);
+  zx::result supported_rate = target_clock->QuerySupportedRate(request->hz);
+  if (supported_rate.is_error()) {
+    completer.buffer(arena).ReplyError(supported_rate.status_value());
+    return;
+  }
+  completer.buffer(arena).ReplySuccess(supported_rate.value());
 }
 
-zx_status_t AmlClock::ClockImplGetRate(uint32_t id, uint64_t* out_current_rate) {
-  FDF_LOG(TRACE, "%s: clkid = %u", __func__, id);
-
-  if (out_current_rate == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
-  }
+void AmlClock::GetRate(GetRateRequestView request, fdf::Arena& arena,
+                       GetRateCompleter::Sync& completer) {
+  FDF_LOG(TRACE, "%s: clkid = %u", __func__, request->id);
 
   MesonRateClock* target_clock;
-  zx_status_t st = GetMesonRateClock(id, &target_clock);
+  zx_status_t st = GetMesonRateClock(request->id, &target_clock);
   if (st != ZX_OK) {
-    return st;
+    completer.buffer(arena).ReplyError(st);
+    return;
   }
 
-  return target_clock->GetRate(out_current_rate);
+  zx::result rate = target_clock->GetRate();
+  if (rate.is_error()) {
+    completer.buffer(arena).ReplyError(rate.status_value());
+    return;
+  }
+  completer.buffer(arena).ReplySuccess(rate.value());
 }
 
 zx_status_t AmlClock::IsSupportedMux(uint32_t id, uint16_t supported_mask) {
@@ -489,30 +543,33 @@ zx_status_t AmlClock::IsSupportedMux(uint32_t id, uint16_t supported_mask) {
   return ZX_OK;
 }
 
-zx_status_t AmlClock::ClockImplSetInput(uint32_t id, uint32_t idx) {
+void AmlClock::SetInput(SetInputRequestView request, fdf::Arena& arena,
+                        SetInputCompleter::Sync& completer) {
   constexpr uint16_t kSupported = static_cast<uint16_t>(aml_clk_common::aml_clk_type::kMesonMux);
-  zx_status_t st = IsSupportedMux(id, kSupported);
+  zx_status_t st = IsSupportedMux(request->id, kSupported);
   if (st != ZX_OK) {
-    return st;
+    completer.buffer(arena).ReplyError(st);
+    return;
   }
 
-  const uint16_t index = aml_clk_common::AmlClkIndex(id);
+  const uint16_t index = aml_clk_common::AmlClkIndex(request->id);
 
   fbl::AutoLock al(&lock_);
 
   const meson_clk_mux_t& mux = muxes_[index];
 
-  if (idx >= mux.n_inputs) {
+  if (request->idx >= mux.n_inputs) {
     FDF_LOG(ERROR, "%s: mux input index out of bounds, max = %u, idx = %u.", __func__, mux.n_inputs,
-            idx);
-    return ZX_ERR_OUT_OF_RANGE;
+            request->idx);
+    completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
+    return;
   }
 
   uint32_t clkidx;
   if (mux.inputs) {
-    clkidx = mux.inputs[idx];
+    clkidx = mux.inputs[request->idx];
   } else {
-    clkidx = idx;
+    clkidx = request->idx;
   }
 
   uint32_t val = hiu_mmio_->Read32(mux.reg);
@@ -520,40 +577,42 @@ zx_status_t AmlClock::ClockImplSetInput(uint32_t id, uint32_t idx) {
   val |= (clkidx & mux.mask) << mux.shift;
   hiu_mmio_->Write32(val, mux.reg);
 
-  return ZX_OK;
+  completer.buffer(arena).ReplySuccess();
 }
 
-zx_status_t AmlClock::ClockImplGetNumInputs(uint32_t id, uint32_t* out_num_inputs) {
+void AmlClock::GetNumInputs(GetNumInputsRequestView request, fdf::Arena& arena,
+                            GetNumInputsCompleter::Sync& completer) {
   constexpr uint16_t kSupported =
       (static_cast<uint16_t>(aml_clk_common::aml_clk_type::kMesonMux) |
        static_cast<uint16_t>(aml_clk_common::aml_clk_type::kMesonMuxRo));
 
-  zx_status_t st = IsSupportedMux(id, kSupported);
+  zx_status_t st = IsSupportedMux(request->id, kSupported);
   if (st != ZX_OK) {
-    return st;
+    completer.buffer(arena).ReplyError(st);
+    return;
   }
 
-  const uint16_t index = aml_clk_common::AmlClkIndex(id);
+  const uint16_t index = aml_clk_common::AmlClkIndex(request->id);
 
   const meson_clk_mux_t& mux = muxes_[index];
 
-  *out_num_inputs = mux.n_inputs;
-
-  return ZX_OK;
+  completer.buffer(arena).ReplySuccess(mux.n_inputs);
 }
 
-zx_status_t AmlClock::ClockImplGetInput(uint32_t id, uint32_t* out_input) {
+void AmlClock::GetInput(GetInputRequestView request, fdf::Arena& arena,
+                        GetInputCompleter::Sync& completer) {
   // Bitmask representing clock types that support this operation.
   constexpr uint16_t kSupported =
       (static_cast<uint16_t>(aml_clk_common::aml_clk_type::kMesonMux) |
        static_cast<uint16_t>(aml_clk_common::aml_clk_type::kMesonMuxRo));
 
-  zx_status_t st = IsSupportedMux(id, kSupported);
+  zx_status_t st = IsSupportedMux(request->id, kSupported);
   if (st != ZX_OK) {
-    return st;
+    completer.buffer(arena).ReplyError(st);
+    return;
   }
 
-  const uint16_t index = aml_clk_common::AmlClkIndex(id);
+  const uint16_t index = aml_clk_common::AmlClkIndex(request->id);
 
   const meson_clk_mux_t& mux = muxes_[index];
 
@@ -562,14 +621,13 @@ zx_status_t AmlClock::ClockImplGetInput(uint32_t id, uint32_t* out_input) {
   if (mux.inputs) {
     for (uint32_t i = 0; i < mux.n_inputs; i++) {
       if (result == mux.inputs[i]) {
-        *out_input = i;
-        return ZX_OK;
+        completer.buffer(arena).ReplySuccess(i);
+        return;
       }
     }
   }
 
-  *out_input = result;
-  return ZX_OK;
+  completer.buffer(arena).ReplySuccess(result);
 }
 
 // Note: The clock index taken here are the index of clock
