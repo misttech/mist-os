@@ -1696,7 +1696,6 @@ build_api_module("product_bundles") {
     deps = [
              ":tests",
              "//build/images:default-images",
-             "//bundles/boot_tests",
            ] + product_bundle_labels
   }
 }
@@ -1795,11 +1794,6 @@ group("default") {
     "//build/images/updates:packages",
     "//sdk",
   ]
-
-  # Only add the boot-tests on bringup builds
-  if (use_bringup_assembly) {
-    deps += [ "//bundles/boot_tests" ]
-  }
 
   # SDK-only builds must not attempt to build images.
   if (has_board) {
