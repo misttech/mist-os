@@ -851,7 +851,7 @@ pub fn sys_fchdir(
 }
 
 pub fn sys_fstat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     buffer: UserRef<uapi::stat>,
@@ -862,7 +862,7 @@ pub fn sys_fstat(
     //
     // See https://man7.org/linux/man-pages/man2/open.2.html
     let file = current_task.files.get_allowing_opath(fd)?;
-    let result = file.node().stat(current_task)?;
+    let result = file.node().stat(locked, current_task)?;
     current_task.write_object(buffer, &result)?;
     Ok(())
 }
@@ -878,7 +878,7 @@ pub fn sys_newfstatat(
     let flags =
         LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW | AT_NO_AUTOMOUNT)?;
     let name = lookup_at(locked, current_task, dir_fd, user_path, flags)?;
-    let result = name.entry.node.stat(current_task)?;
+    let result = name.entry.node.stat(locked, current_task)?;
     current_task.write_object(buffer, &result)?;
     Ok(())
 }
@@ -900,7 +900,7 @@ pub fn sys_statx(
     }
 
     let name = lookup_at(locked, current_task, dir_fd, user_path, LookupFlags::from(flags))?;
-    let result = name.entry.node.statx(current_task, flags, mask)?;
+    let result = name.entry.node.statx(locked, current_task, flags, mask)?;
     current_task.write_object(statxbuf, &result)?;
     Ok(())
 }
@@ -3112,7 +3112,7 @@ mod tests {
         let fd = FdNumber::from_raw(10);
         let file_handle =
             current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
-        let file_size = file_handle.node().stat(&current_task).unwrap().st_size;
+        let file_size = file_handle.node().stat(&mut locked, &current_task).unwrap().st_size;
         current_task.files.insert(&current_task, fd, file_handle).unwrap();
 
         assert_eq!(sys_lseek(&mut locked, &current_task, fd, 0, SEEK_CUR)?, 0);

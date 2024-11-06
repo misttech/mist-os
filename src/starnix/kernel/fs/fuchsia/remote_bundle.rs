@@ -189,6 +189,7 @@ impl FsNodeOps for File {
 
     fn fetch_and_refresh_info<'a>(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,

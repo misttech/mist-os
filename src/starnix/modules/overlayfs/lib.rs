@@ -786,12 +786,20 @@ impl FsNodeOps for OverlayNodeOps {
 
     fn fetch_and_refresh_info<'a>(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+        let real_info = self
+            .node
+            .main_entry()
+            .entry()
+            .node
+            .fetch_and_refresh_info(locked, current_task)?
+            .clone();
         let mut lock = info.write();
-        *lock = self.node.main_entry().entry().node.fetch_and_refresh_info(current_task)?.clone();
+        *lock = real_info;
         Ok(RwLockWriteGuard::downgrade(lock))
     }
 

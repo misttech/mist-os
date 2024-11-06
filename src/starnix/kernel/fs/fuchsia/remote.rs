@@ -180,7 +180,7 @@ impl FileSystemOps for RemoteFs {
 
     fn rename(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -191,8 +191,8 @@ impl FileSystemOps for RemoteFs {
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
         // Renames should fail if the src or target directory is encrypted and locked.
-        old_parent.fail_if_locked(current_task)?;
-        new_parent.fail_if_locked(current_task)?;
+        old_parent.fail_if_locked(locked, current_task)?;
+        new_parent.fail_if_locked(locked, current_task)?;
 
         let Some(old_parent) = old_parent.downcast_ops::<RemoteNode>() else {
             return error!(EXDEV);
@@ -512,13 +512,13 @@ impl FsNodeOps for RemoteNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         {
-            let node_info = node.fetch_and_refresh_info(current_task)?;
+            let node_info = node.fetch_and_refresh_info(locked, current_task)?;
             if node_info.mode.is_dir() {
                 if let Some(wrapping_key_id) = node_info.wrapping_key_id {
                     let encryption_keys = current_task.kernel().encryption_keys.read();
@@ -537,7 +537,7 @@ impl FsNodeOps for RemoteNode {
         }
 
         // Locked encrypted files cannot be opened.
-        node.fail_if_locked(current_task)?;
+        node.fail_if_locked(locked, current_task)?;
 
         // fsverity files cannot be opened in write mode, including while building.
         if flags.can_write() {
@@ -551,7 +551,7 @@ impl FsNodeOps for RemoteNode {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -559,7 +559,7 @@ impl FsNodeOps for RemoteNode {
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        node.fail_if_locked(current_task)?;
+        node.fail_if_locked(locked, current_task)?;
         let name = get_name_str(name)?;
 
         let fs = node.fs();
@@ -627,14 +627,14 @@ impl FsNodeOps for RemoteNode {
 
     fn mkdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        node.fail_if_locked(current_task)?;
+        node.fail_if_locked(locked, current_task)?;
         let name = get_name_str(name)?;
 
         let fs = node.fs();
@@ -775,13 +775,13 @@ impl FsNodeOps for RemoteNode {
 
     fn truncate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
-        node.fail_if_locked(current_task)?;
+        node.fail_if_locked(locked, current_task)?;
         self.zxio.truncate(length).map_err(|status| from_status_like_fdio!(status))
     }
 
@@ -797,10 +797,10 @@ impl FsNodeOps for RemoteNode {
     ) -> Result<(), Errno> {
         match mode {
             FallocMode::Allocate { keep_size: false } => {
-                node.fail_if_locked(current_task)?;
+                node.fail_if_locked(locked, current_task)?;
                 let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
                 let info_size = {
-                    let info = node.fetch_and_refresh_info(current_task)?;
+                    let info = node.fetch_and_refresh_info(locked, current_task)?;
                     info.size as u64
                 };
                 if info_size < allocate_size {
@@ -814,6 +814,7 @@ impl FsNodeOps for RemoteNode {
 
     fn fetch_and_refresh_info<'a>(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -871,7 +872,7 @@ impl FsNodeOps for RemoteNode {
 
     fn create_symlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -881,7 +882,7 @@ impl FsNodeOps for RemoteNode {
         // TODO(https://fxbug.dev/360171961): Add symlink support for fscrypt.
         // Fail if user tries to create a symlink inside an encrypted directory.
         {
-            let node_info = node.fetch_and_refresh_info(current_task)?;
+            let node_info = node.fetch_and_refresh_info(locked, current_task)?;
             if node_info.wrapping_key_id.is_some() {
                 return error!(ENOTSUP);
             }
@@ -1478,6 +1479,7 @@ impl FsNodeOps for RemoteSymlink {
 
     fn fetch_and_refresh_info<'a>(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -1722,7 +1724,8 @@ mod test {
                 SymlinkTarget::Node(_) => panic!("readlink returned SymlinkTarget::Node"),
             }
             // Ensure the size stat reports matches what is expected.
-            let stat_result = child.entry.node.stat(&current_task).expect("stat failed");
+            let stat_result =
+                child.entry.node.stat(&mut locked, &current_task).expect("stat failed");
             assert_eq!(stat_result.st_size as usize, LINK_SIZE);
         }
 
@@ -1766,8 +1769,11 @@ mod test {
                 }
             }
             // Ensure the size stat reports matches what is expected.
-            let stat_result =
-                child.entry.node.stat(&current_task).expect("stat failed after remount");
+            let stat_result = child
+                .entry
+                .node
+                .stat(&mut locked, &current_task)
+                .expect("stat failed after remount");
             assert_eq!(stat_result.st_size as usize, LINK_SIZE);
         }
 
@@ -2587,7 +2593,7 @@ mod test {
                     let time_before_write = child
                         .entry
                         .node
-                        .fetch_and_refresh_info(&current_task)
+                        .fetch_and_refresh_info(locked, &current_task)
                         .expect("fetch_and_refresh_info failed")
                         .time_modify;
                     let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
@@ -2598,7 +2604,7 @@ mod test {
                     let last_modified = child
                         .entry
                         .node
-                        .fetch_and_refresh_info(&current_task)
+                        .fetch_and_refresh_info(locked, &current_task)
                         .expect("fetch_and_refresh_info failed")
                         .time_modify;
                     assert!(last_modified > time_before_write);
@@ -2649,7 +2655,7 @@ mod test {
                     let last_modified = child
                         .entry
                         .node
-                        .fetch_and_refresh_info(&current_task)
+                        .fetch_and_refresh_info(locked, &current_task)
                         .expect("fetch_and_refresh_info failed")
                         .time_modify;
                     last_modified
@@ -2698,7 +2704,7 @@ mod test {
                     let info_original = child
                         .entry
                         .node
-                        .fetch_and_refresh_info(&current_task)
+                        .fetch_and_refresh_info(locked, &current_task)
                         .expect("fetch_and_refresh_info failed")
                         .clone();
 
@@ -2716,7 +2722,7 @@ mod test {
                     let info_after_update = child
                         .entry
                         .node
-                        .fetch_and_refresh_info(&current_task)
+                        .fetch_and_refresh_info(locked, &current_task)
                         .expect("fetch_and_refresh_info failed")
                         .clone();
                     assert_eq!(info_after_update.time_modify, info_original.time_modify);
@@ -2736,7 +2742,7 @@ mod test {
                     let info_after_update2 = child
                         .entry
                         .node
-                        .fetch_and_refresh_info(&current_task)
+                        .fetch_and_refresh_info(locked, &current_task)
                         .expect("fetch_and_refresh_info failed")
                         .clone();
                     assert_eq!(info_after_update2.time_modify, UtcInstant::from_nanos(50));
@@ -2789,7 +2795,7 @@ mod test {
                         let info = child
                             .entry
                             .node
-                            .fetch_and_refresh_info(&current_task)
+                            .fetch_and_refresh_info(locked, &current_task)
                             .expect("fetch_and_refresh_info failed");
                         (info.time_status_change, info.time_modify)
                     };
@@ -2818,7 +2824,7 @@ mod test {
                         let info = child
                             .entry
                             .node
-                            .fetch_and_refresh_info(&current_task)
+                            .fetch_and_refresh_info(locked, &current_task)
                             .expect("fetch_and_refresh_info failed");
                         (info.time_status_change, info.time_modify)
                     };
@@ -2920,7 +2926,7 @@ mod test {
                     let casefold = child
                         .entry
                         .node
-                        .fetch_and_refresh_info(&current_task)
+                        .fetch_and_refresh_info(locked, &current_task)
                         .expect("fetch_and_refresh_info failed")
                         .casefold;
                     casefold

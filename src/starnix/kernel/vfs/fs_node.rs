@@ -757,6 +757,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Return a read guard for the updated information.
     fn fetch_and_refresh_info<'a>(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -1264,8 +1265,15 @@ impl FsNode {
     }
 
     /// Returns an error if this node is encrypted and locked.
-    pub fn fail_if_locked(&self, current_task: &CurrentTask) -> Result<(), Errno> {
-        let node_info = self.fetch_and_refresh_info(current_task)?;
+    pub fn fail_if_locked<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let node_info = self.fetch_and_refresh_info(locked, current_task)?;
         if let Some(wrapping_key_id) = node_info.wrapping_key_id {
             let encryption_keys = current_task.kernel().encryption_keys.read();
             // Fail if the user tries to create a child in a locked encrypted directory.
@@ -2140,8 +2148,15 @@ impl FsNode {
         self.fs().dev_id
     }
 
-    pub fn stat(&self, current_task: &CurrentTask) -> Result<uapi::stat, Errno> {
-        let info = self.fetch_and_refresh_info(current_task)?;
+    pub fn stat<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<uapi::stat, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let info = self.fetch_and_refresh_info(locked, current_task)?;
 
         let time_to_kernel_timespec_pair = |t| {
             let timespec { tv_sec, tv_nsec } = timespec_from_time(t);
@@ -2184,17 +2199,21 @@ impl FsNode {
         }
     }
 
-    pub fn statx(
+    pub fn statx<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         flags: StatxFlags,
         mask: u32,
-    ) -> Result<statx, Errno> {
+    ) -> Result<statx, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // Ignore mask for now and fill in all of the fields.
         let info = if flags.contains(StatxFlags::AT_STATX_DONT_SYNC) {
             self.info()
         } else {
-            self.fetch_and_refresh_info(current_task)?
+            self.fetch_and_refresh_info(locked, current_task)?
         };
         if mask & STATX__RESERVED == STATX__RESERVED {
             return error!(EINVAL);
@@ -2392,11 +2411,20 @@ impl FsNode {
     }
 
     /// Refreshes the `FsNodeInfo` if necessary and returns a read guard.
-    pub fn fetch_and_refresh_info(
+    pub fn fetch_and_refresh_info<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
-    ) -> Result<RwLockReadGuard<'_, FsNodeInfo>, Errno> {
-        self.ops().fetch_and_refresh_info(self, current_task, &self.info)
+    ) -> Result<RwLockReadGuard<'_, FsNodeInfo>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.ops().fetch_and_refresh_info(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            &self.info,
+        )
     }
 
     pub fn update_info<F, T>(&self, mutator: F) -> T
@@ -2611,7 +2639,7 @@ mod tests {
             info.time_modify = UtcInstant::from_nanos(3);
             info.rdev = DeviceType::new(13, 13);
         });
-        let stat = node.stat(&current_task).expect("stat");
+        let stat = node.stat(&mut locked, &current_task).expect("stat");
 
         assert_eq!(stat.st_mode, FileMode::IFSOCK.bits());
         assert_eq!(stat.st_size, 1);

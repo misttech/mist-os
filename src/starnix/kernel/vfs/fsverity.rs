@@ -163,7 +163,7 @@ pub mod ioctl {
         // Nb: Lock order is important here.
         let args: fsverity_enable_arg = task.read_object(arg.into())?;
         let mut descriptor = fsverity_descriptor_from_enable_arg(task, block_size, &args)?;
-        descriptor.data_size = file.node().fetch_and_refresh_info(task)?.size as u64;
+        descriptor.data_size = file.node().fetch_and_refresh_info(locked, task)?.size as u64;
         // The "Exec" writeguard mode means 'no writers'.
         let _guard = file.node().create_write_guard(FileWriteGuardMode::Exec)?;
         let mut fsverity = file.node().fsverity.lock();

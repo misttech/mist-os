@@ -822,7 +822,7 @@ impl FileOps for FuseFileObject {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
@@ -858,7 +858,7 @@ impl FileOps for FuseFileObject {
         }
 
         default_seek(current_offset, target, |offset| {
-            let eof_offset = default_eof_offset(file, current_task)?;
+            let eof_offset = default_eof_offset(locked, file, current_task)?;
             offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
         })
     }
@@ -1462,6 +1462,7 @@ impl FsNodeOps for FuseNode {
 
     fn fetch_and_refresh_info<'a>(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,

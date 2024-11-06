@@ -626,8 +626,15 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
     }
 }
 
-pub fn default_eof_offset(file: &FileObject, current_task: &CurrentTask) -> Result<off_t, Errno> {
-    Ok(file.node().stat(current_task)?.st_size as off_t)
+pub fn default_eof_offset<L>(
+    locked: &mut Locked<'_, L>,
+    file: &FileObject,
+    current_task: &CurrentTask,
+) -> Result<off_t, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
+    Ok(file.node().stat(locked, current_task)?.st_size as off_t)
 }
 
 /// Implement the seek method for a file. The computation from the end of the file must be provided
@@ -728,14 +735,14 @@ macro_rules! fileops_impl_seekable {
 
         fn seek(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
+            locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             file: &starnix_core::vfs::FileObject,
             current_task: &starnix_core::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
             target: starnix_core::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             starnix_core::vfs::default_seek(current_offset, target, |offset| {
-                let eof_offset = starnix_core::vfs::default_eof_offset(file, current_task)?;
+                let eof_offset = starnix_core::vfs::default_eof_offset(locked, file, current_task)?;
                 offset.checked_add(eof_offset).ok_or_else(|| starnix_uapi::errno!(EINVAL))
             })
         }
@@ -889,7 +896,7 @@ pub fn default_ioctl(
                 return error!(ENOTTY);
             }
 
-            let blocksize = file.node().stat(current_task)?.st_blksize;
+            let blocksize = file.node().stat(locked, current_task)?.st_blksize;
             current_task.write_object(arg.into(), &blocksize)?;
             Ok(SUCCESS)
         }
@@ -913,7 +920,7 @@ pub fn default_ioctl(
                 return error!(ENOTTY);
             }
 
-            let size = file.node().stat(current_task)?.st_size;
+            let size = file.node().stat(locked, current_task)?.st_size;
             current_task.write_object(arg.into(), &size)?;
             Ok(SUCCESS)
         }
@@ -927,7 +934,7 @@ pub fn default_ioctl(
                 .name
                 .entry
                 .node
-                .fetch_and_refresh_info(current_task)
+                .fetch_and_refresh_info(locked, current_task)
                 .map_err(|_| errno!(EINVAL))?
                 .size;
             let offset = usize::try_from(*file.offset.lock()).map_err(|_| errno!(EINVAL))?;
@@ -1822,7 +1829,7 @@ impl FileObject {
             //   O_APPEND, pwrite() appends data to the end of the file, regardless of the value of offset.
             if self.flags().contains(OpenFlags::APPEND) && self.ops().is_seekable() {
                 checked_add_offset_and_length(offset, data.available())?;
-                offset = default_eof_offset(self, current_task)? as usize;
+                offset = default_eof_offset(&mut locked, self, current_task)? as usize;
             }
 
             self.write_common(&mut locked, current_task, offset, data)

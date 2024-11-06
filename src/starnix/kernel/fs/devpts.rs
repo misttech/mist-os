@@ -1209,10 +1209,10 @@ mod tests {
         task.set_creds(Credentials::with_ids(22, 22));
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
-        let ptmx_stat = ptmx.node().stat(&task).expect("stat");
+        let ptmx_stat = ptmx.node().stat(&mut locked, &task).expect("stat");
         assert_eq!(ptmx_stat.st_blksize as usize, BLOCK_SIZE);
         let pts = open_file(&mut locked, &task, &fs, "0".into()).expect("open file");
-        let pts_stats = pts.node().stat(&task).expect("stat");
+        let pts_stats = pts.node().stat(&mut locked, &task).expect("stat");
         assert_eq!(pts_stats.st_mode & FileMode::PERMISSIONS.bits(), 0o620);
         assert_eq!(pts_stats.st_uid, 22);
         // TODO(qsr): Check that gid is tty.
