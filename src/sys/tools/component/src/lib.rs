@@ -26,6 +26,9 @@ pub async fn exec() -> Result<()> {
     let lifecycle_controller = connect_to_protocol_at_path::<fsys::LifecycleControllerMarker>(
         "/svc/fuchsia.sys2.LifecycleController.root",
     )?;
+    let config_override = connect_to_protocol_at_path::<fsys::ConfigOverrideMarker>(
+        "/svc/fuchsia.sys2.ConfigOverride.root",
+    )?;
 
     match args.subcommand {
         ComponentSubcommand::Show(args) => {
@@ -155,6 +158,34 @@ pub async fn exec() -> Result<()> {
             CollectionSubcommand::List(_) => collection_list_cmd(realm_query, writer).await,
             CollectionSubcommand::Show(show_args) => {
                 collection_show_cmd(show_args.query, realm_query, writer).await
+            }
+        },
+        ComponentSubcommand::Config(args) => match args.subcommand {
+            ConfigSubcommand::Set(SetArgs { query, key_values, reload }) => {
+                config_set_cmd(
+                    query,
+                    key_values,
+                    reload,
+                    lifecycle_controller,
+                    realm_query,
+                    config_override,
+                    writer,
+                )
+                .await
+            }
+            ConfigSubcommand::Unset(UnsetArgs { query, reload }) => {
+                config_unset_cmd(
+                    query,
+                    reload,
+                    lifecycle_controller,
+                    realm_query,
+                    config_override,
+                    writer,
+                )
+                .await
+            }
+            ConfigSubcommand::List(ConfigListArgs { query }) => {
+                config_list_cmd(query, realm_query, writer).await
             }
         },
     }

@@ -205,6 +205,12 @@
             availability: "same_as_target",
         },
         {
+            protocol: "fuchsia.sys2.ConfigOverride",
+            from: "framework",
+            as: "fuchsia.sys2.ConfigOverride.root",
+            to: "#core",
+        },
+        {
             protocol: "fuchsia.sys2.RealmExplorer",
             from: "framework",
             as: "fuchsia.sys2.RealmExplorer.root",

@@ -340,6 +340,12 @@
             protocol: "fuchsia.sys2.ConfigOverride",
             from: "framework",
             as: "fuchsia.sys2.ConfigOverride.root",
+            to: "#bootstrap",
+        },
+        {
+            protocol: "fuchsia.sys2.ConfigOverride",
+            from: "framework",
+            as: "fuchsia.sys2.ConfigOverride.root",
             to: "#toolbox",
         },
         {
