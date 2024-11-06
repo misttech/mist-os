@@ -72,8 +72,8 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         _LOGGER.info("Waiting for Starnix kernel to shut down")
         while True:
-            list = self.device.ffx.run(["component", "list"])
-            if list.find("starnix_runner/kernels") == -1:
+            components: str = self.device.ffx.run(["component", "list"])
+            if components.find("starnix_runner/kernels") == -1:
                 _LOGGER.info("Starnix kernel has shut down")
                 break
 

@@ -72,6 +72,7 @@ def send_http_request(
 
     context: ssl.SSLContext | None = None
     if not verify_ssl:
+        # pylint: disable-next=protected-access
         context = ssl._create_unverified_context()
 
     for attempt in range(1, attempts + 1):
