@@ -4,11 +4,9 @@
 
 #include "aml-clk.h"
 
-#include <lib/async-loop/default.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio-buffer.h>
 
@@ -26,32 +24,40 @@
 #include "aml-g12b-blocks.h"
 #include "aml-sm1-blocks.h"
 #include "src/devices/lib/mmio/test-helper.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace amlogic_clock::test {
 
-class IncomingNamespace {
+class Environment : public fdf_testing::Environment {
  public:
-  void Init(fidl::ServerEnd<fuchsia_io::Directory> outgoing_server, fdf::MmioBuffer hiu_buffer,
-            fdf::MmioBuffer dos_buffer, uint32_t pdev_did) {
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+        pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()));
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return zx::ok();
+  }
+
+  void SetupPDev(fdf::MmioBuffer hiu_buffer, fdf::MmioBuffer dos_buffer, uint32_t pdev_did) {
     fdf_fake::FakePDev::Config pdev_config{
         .device_info = std::make_optional<fdf::PDev::DeviceInfo>({.did = pdev_did})};
     pdev_config.mmios[AmlClock::kHiuMmio] = std::move(hiu_buffer);
     pdev_config.mmios[AmlClock::kDosbusMmio] = std::move(dos_buffer);
     ASSERT_OK(pdev_.SetConfig(std::move(pdev_config)));
-    ASSERT_OK(outgoing_.AddService<fuchsia_hardware_platform_device::Service>(
-        pdev_.GetInstanceHandler()));
-    ASSERT_OK(outgoing_.Serve(std::move(outgoing_server)));
   }
 
  private:
   fdf_fake::FakePDev pdev_;
-  component::OutgoingDirectory outgoing_{async_get_default_dispatcher()};
 };
 
-class AmlClockTest : public gtest::TestLoopFixture {
+class AmlClockTestConfig {
+ public:
+  using DriverType = AmlClock;
+  using EnvironmentType = Environment;
+};
+
+class AmlClockTest : public ::testing::Test {
  protected:
   static constexpr uint64_t kilohertz(uint64_t hz) { return hz * 1000; }
   static constexpr uint64_t megahertz(uint64_t hz) { return kilohertz(hz) * 1000; }
@@ -76,24 +82,20 @@ class AmlClockTest : public gtest::TestLoopFixture {
     return std::make_tuple(dos_buffer.View(0), std::move(dos_buffer));
   }
 
+  void TearDown() override { ASSERT_OK(driver_test_.StopDriver()); }
+
   void InitDriver(fdf::MmioBuffer hiu_buffer, uint32_t pdev_did) {
     auto [_, dos_buffer] = MakeDosbusMmio();
     InitDriver(std::move(hiu_buffer), std::move(dos_buffer), pdev_did);
   }
 
   void InitDriver(fdf::MmioBuffer hiu_buffer, fdf::MmioBuffer dos_buffer, uint32_t pdev_did) {
-    ASSERT_OK(incoming_loop_.StartThread("incoming-namespace"));
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    incoming_namespace_.SyncCall(&IncomingNamespace::Init, std::move(endpoints->server),
-                                 std::move(hiu_buffer), std::move(dos_buffer), pdev_did);
-    parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                            std::move(endpoints->client));
-    ASSERT_OK(AmlClock::Bind(nullptr, parent_.get()));
-    auto aml_clock_device = parent_->GetLatestChild();
-    ASSERT_NE(aml_clock_device, nullptr);
-    ASSERT_OK(ddk::ClockImplProtocolClient::CreateFromDevice(aml_clock_device, &clock_impl_));
-    ASSERT_TRUE(clock_impl_.is_valid());
+    driver_test_.RunInEnvironmentTypeContext([hiu_buffer = std::move(hiu_buffer),
+                                              dos_buffer = std::move(dos_buffer),
+                                              pdev_did](Environment& environment) mutable {
+      environment.SetupPDev(std::move(hiu_buffer), std::move(dos_buffer), pdev_did);
+    });
+    ASSERT_OK(driver_test_.StartDriver());
   }
 
   void TestPlls(const uint32_t pdev_did) {
@@ -111,24 +113,20 @@ class AmlClockTest : public gtest::TestLoopFixture {
       zx_status_t st;
       uint64_t best_supported_rate;
       constexpr uint64_t kMaxRateHz = gigahertz(1);
-      st = clock_impl().QuerySupportedRate(clkid, kMaxRateHz, &best_supported_rate);
+      st = driver()->ClockImplQuerySupportedRate(clkid, kMaxRateHz, &best_supported_rate);
       EXPECT_OK(st);
 
       EXPECT_LE(best_supported_rate, kMaxRateHz);
 
-      st = clock_impl().SetRate(clkid, best_supported_rate);
+      st = driver()->ClockImplSetRate(clkid, best_supported_rate);
       EXPECT_OK(st);
     }
   }
 
-  ddk::ClockImplProtocolClient& clock_impl() { return clock_impl_; }
+  AmlClock* driver() { return driver_test_.driver(); }
 
  private:
-  std::shared_ptr<MockDevice> parent_ = MockDevice::FakeRootParent();
-  async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_namespace_{
-      incoming_loop_.dispatcher(), std::in_place};
-  ddk::ClockImplProtocolClient clock_impl_;
+  fdf_testing::ForegroundDriverTest<AmlClockTestConfig> driver_test_;
 };
 
 namespace {
@@ -157,7 +155,7 @@ TEST_F(AmlClockTest, AxgEnableDisableAll) {
     (*ptr) |= bit;
 
     const uint32_t clk_i = aml_clk_common::AmlClkId(i, aml_clk_common::aml_clk_type::kMesonGate);
-    zx_status_t st = clock_impl().Enable(clk_i);
+    zx_status_t st = driver()->ClockImplEnable(clk_i);
     EXPECT_OK(st);
   }
 
@@ -172,7 +170,7 @@ TEST_F(AmlClockTest, AxgEnableDisableAll) {
     (*ptr) &= ~(bit);
 
     const uint32_t clk_i = aml_clk_common::AmlClkId(i, aml_clk_common::aml_clk_type::kMesonGate);
-    zx_status_t st = clock_impl().Disable(clk_i);
+    zx_status_t st = driver()->ClockImplDisable(clk_i);
     EXPECT_OK(st);
   }
 
@@ -204,7 +202,7 @@ TEST_F(AmlClockTest, G12aEnableDisableAll) {
     (*ptr) |= bit;
 
     const uint32_t clk_i = aml_clk_common::AmlClkId(i, aml_clk_common::aml_clk_type::kMesonGate);
-    zx_status_t st = clock_impl().Enable(clk_i);
+    zx_status_t st = driver()->ClockImplEnable(clk_i);
     EXPECT_OK(st);
   }
 
@@ -219,7 +217,7 @@ TEST_F(AmlClockTest, G12aEnableDisableAll) {
     (*ptr) &= ~(bit);
 
     const uint32_t clk_i = aml_clk_common::AmlClkId(i, aml_clk_common::aml_clk_type::kMesonGate);
-    zx_status_t st = clock_impl().Disable(clk_i);
+    zx_status_t st = driver()->ClockImplDisable(clk_i);
     EXPECT_OK(st);
   }
 
@@ -251,7 +249,7 @@ TEST_F(AmlClockTest, Sm1EnableDisableAll) {
     (*ptr) |= bit;
 
     const uint32_t clk_i = aml_clk_common::AmlClkId(i, aml_clk_common::aml_clk_type::kMesonGate);
-    zx_status_t st = clock_impl().Enable(clk_i);
+    zx_status_t st = driver()->ClockImplEnable(clk_i);
     EXPECT_OK(st);
   }
 
@@ -266,7 +264,7 @@ TEST_F(AmlClockTest, Sm1EnableDisableAll) {
     (*ptr) &= ~(bit);
 
     const uint32_t clk_i = aml_clk_common::AmlClkId(i, aml_clk_common::aml_clk_type::kMesonGate);
-    zx_status_t st = clock_impl().Disable(clk_i);
+    zx_status_t st = driver()->ClockImplDisable(clk_i);
     EXPECT_OK(st);
   }
 
@@ -280,7 +278,7 @@ TEST_F(AmlClockTest, G12aEnableDos) {
   auto [dos_data, dos_buffer] = MakeDosbusMmio();
   InitDriver(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12A_CLK);
 
-  zx_status_t st = clock_impl().Enable(g12a_clk::CLK_DOS_GCLK_VDEC);
+  zx_status_t st = driver()->ClockImplEnable(g12a_clk::CLK_DOS_GCLK_VDEC);
   EXPECT_OK(st);
 
   EXPECT_EQ(0x3ffu, dos_data.Read32(0x3f01 * sizeof(uint32_t)));
@@ -292,7 +290,7 @@ TEST_F(AmlClockTest, G12bEnableAudio) {
 
   InitDriver(std::move(buffer), PDEV_DID_AMLOGIC_G12B_CLK);
 
-  zx_status_t st = clock_impl().Enable(g12b_clk::G12B_CLK_AUDIO);
+  zx_status_t st = driver()->ClockImplEnable(g12b_clk::G12B_CLK_AUDIO);
   EXPECT_OK(st);
 
   constexpr uint32_t kHhiGclkMpeg1Offset = 0x51;
@@ -305,7 +303,7 @@ TEST_F(AmlClockTest, G12bEnableEmmcC) {
 
   InitDriver(std::move(buffer), PDEV_DID_AMLOGIC_G12B_CLK);
 
-  zx_status_t st = clock_impl().Enable(g12b_clk::G12B_CLK_EMMC_C);
+  zx_status_t st = driver()->ClockImplEnable(g12b_clk::G12B_CLK_EMMC_C);
   EXPECT_OK(st);
 
   constexpr uint32_t kHhiGclkMpeg0Offset = 0x50;
@@ -323,18 +321,18 @@ TEST_F(AmlClockTest, Sm1MuxRo) {
   InitDriver(std::move(buffer), PDEV_DID_AMLOGIC_SM1_CLK);
 
   // Ensure that SetInput fails for RO muxes.
-  zx_status_t st = clock_impl().SetInput(sm1_clk::CLK_MPEG_CLK_SEL, 0);
+  zx_status_t st = driver()->ClockImplSetInput(sm1_clk::CLK_MPEG_CLK_SEL, 0);
   EXPECT_NE(st, ZX_OK);
 
   // Make sure we can read the number of parents.
   uint32_t out_num_inputs = 0;
-  st = clock_impl().GetNumInputs(sm1_clk::CLK_MPEG_CLK_SEL, &out_num_inputs);
+  st = driver()->ClockImplGetNumInputs(sm1_clk::CLK_MPEG_CLK_SEL, &out_num_inputs);
   EXPECT_OK(st);
   EXPECT_GT(out_num_inputs, 0u);
 
   // Make sure that we can read the current parent of the mux.
   uint32_t out_input = UINT32_MAX;
-  st = clock_impl().GetInput(sm1_clk::CLK_MPEG_CLK_SEL, &out_input);
+  st = driver()->ClockImplGetInput(sm1_clk::CLK_MPEG_CLK_SEL, &out_input);
   EXPECT_OK(st);
   EXPECT_NE(out_input, UINT32_MAX);
 
@@ -357,7 +355,7 @@ TEST_F(AmlClockTest, Sm1Mux) {
   InitDriver(std::move(buffer), PDEV_DID_AMLOGIC_SM1_CLK);
 
   const uint32_t newParentIdx = test_mux.n_inputs - 1;
-  zx_status_t st = clock_impl().SetInput(kTestMux, newParentIdx);
+  zx_status_t st = driver()->ClockImplSetInput(kTestMux, newParentIdx);
   EXPECT_OK(st);
 
   const uint32_t actual_regval = regs.Read32((test_mux.reg >> 2) * sizeof(uint32_t));
@@ -366,13 +364,13 @@ TEST_F(AmlClockTest, Sm1Mux) {
 
   // Make sure we can read the number of parents.
   uint32_t out_num_inputs = 0;
-  st = clock_impl().GetNumInputs(kTestMux, &out_num_inputs);
+  st = driver()->ClockImplGetNumInputs(kTestMux, &out_num_inputs);
   EXPECT_OK(st);
   EXPECT_EQ(out_num_inputs, test_mux.n_inputs);
 
   // Make sure that we can read the current parent of the mux.
   uint32_t out_input = UINT32_MAX;
-  st = clock_impl().GetInput(kTestMux, &out_input);
+  st = driver()->ClockImplGetInput(kTestMux, &out_input);
   EXPECT_OK(st);
   EXPECT_EQ(out_input, newParentIdx);
 }
@@ -387,10 +385,10 @@ TEST_F(AmlClockTest, TestCpuClkSetRate) {
 
   zx_status_t st;
   for (unsigned int kCpuClkSupportedFrequency : kCpuClkSupportedFrequencies) {
-    st = clock_impl().SetRate(kTestCpuClk, kCpuClkSupportedFrequency);
+    st = driver()->ClockImplSetRate(kTestCpuClk, kCpuClkSupportedFrequency);
     EXPECT_OK(st);
 
-    st = clock_impl().SetRate(kTestCpuClk, kCpuClkSupportedFrequency + 1);
+    st = driver()->ClockImplSetRate(kTestCpuClk, kCpuClkSupportedFrequency + 1);
     EXPECT_NE(st, ZX_OK);
   }
 }
@@ -405,7 +403,7 @@ TEST_F(AmlClockTest, TestCpuClkQuerySupportedRates) {
   InitDriver(std::move(buffer), PDEV_DID_AMLOGIC_G12A_CLK);
 
   uint64_t rate;
-  zx_status_t st = clock_impl().QuerySupportedRate(kTestCpuClk, kJustOver1GHz, &rate);
+  zx_status_t st = driver()->ClockImplQuerySupportedRate(kTestCpuClk, kJustOver1GHz, &rate);
   EXPECT_OK(st);
   EXPECT_EQ(rate, gigahertz(1));
 }
@@ -420,11 +418,11 @@ TEST_F(AmlClockTest, TestCpuClkGetRate) {
   InitDriver(std::move(buffer), PDEV_DID_AMLOGIC_G12A_CLK);
   zx_status_t st;
 
-  st = clock_impl().SetRate(kTestCpuClk, kOneGHz);
+  st = driver()->ClockImplSetRate(kTestCpuClk, kOneGHz);
   EXPECT_OK(st);
 
   uint64_t rate;
-  st = clock_impl().GetRate(kTestCpuClk, &rate);
+  st = driver()->ClockImplGetRate(kTestCpuClk, &rate);
   EXPECT_OK(st);
   EXPECT_EQ(rate, kOneGHz);
 }
@@ -442,18 +440,18 @@ TEST_F(AmlClockTest, TestCpuClkG12b) {
 
   zx_status_t st;
 
-  st = clock_impl().SetRate(kTestCpuBigClk, kBigClockTestFreq);
+  st = driver()->ClockImplSetRate(kTestCpuBigClk, kBigClockTestFreq);
   EXPECT_OK(st);
 
   uint64_t rate;
-  st = clock_impl().GetRate(kTestCpuBigClk, &rate);
+  st = driver()->ClockImplGetRate(kTestCpuBigClk, &rate);
   EXPECT_OK(st);
   EXPECT_EQ(rate, kBigClockTestFreq);
 
-  st = clock_impl().SetRate(kTestCpuLittleClk, kLittleClockTestFreq);
+  st = driver()->ClockImplSetRate(kTestCpuLittleClk, kLittleClockTestFreq);
   EXPECT_OK(st);
 
-  st = clock_impl().GetRate(kTestCpuLittleClk, &rate);
+  st = driver()->ClockImplGetRate(kTestCpuLittleClk, &rate);
   EXPECT_OK(st);
   EXPECT_EQ(rate, kLittleClockTestFreq);
 }
@@ -480,7 +478,7 @@ TEST_F(AmlClockTest, DisableRefZero) {
   auto assert_death_regex =
       "ASSERT FAILED at \\(.*\\): \\(.*\\)Cannot disable already disabled clock. clkid = " +
       std::to_string(kTestClock);
-  ASSERT_DEATH(clock_impl().Disable(clk_id), assert_death_regex);
+  ASSERT_DEATH(driver()->ClockImplDisable(clk_id), assert_death_regex);
 }
 
 TEST_F(AmlClockTest, EnableDisableRefCount) {
@@ -500,14 +498,14 @@ TEST_F(AmlClockTest, EnableDisableRefCount) {
   constexpr uint32_t bit = (1u << g12a_clk_gates[kTestClock].bit);
 
   // Enable the test clock and verify that the register was written.
-  st = clock_impl().Enable(kTestClockId);
+  st = driver()->ClockImplEnable(kTestClockId);
   EXPECT_OK(st);
   EXPECT_EQ(actual.Read32(reg), bit);
 
   // Zero out the register and enable the clock again. Since the driver
   // should already think the clock is enabled, this should be a no-op.
   actual.Write32(0, reg);
-  st = clock_impl().Enable(kTestClockId);
+  st = driver()->ClockImplEnable(kTestClockId);
   EXPECT_OK(st);
   EXPECT_EQ(actual.Read32(reg), 0u);  // Make sure the driver didn't touch the register.
 
@@ -515,13 +513,13 @@ TEST_F(AmlClockTest, EnableDisableRefCount) {
   // it's been enabled twice, the first disable should only drop a ref rather than
   // actually disabling clock hardware.
   actual.Write32(0xffffffff, reg);
-  st = clock_impl().Disable(kTestClockId);
+  st = driver()->ClockImplDisable(kTestClockId);
   EXPECT_OK(st);
   EXPECT_EQ(actual.Read32(reg), 0xffffffff);  // Make sure the driver didn't touch the register.
 
   // The second call to disable should actually disable the clock hardware.
   actual.Write32(0xffffffff, reg);
-  st = clock_impl().Disable(kTestClockId);
+  st = driver()->ClockImplDisable(kTestClockId);
   EXPECT_OK(st);
   EXPECT_EQ(actual.Read32(reg),
             (0xffffffff & (~bit)));  // Make sure the driver actually disabled the hardware.

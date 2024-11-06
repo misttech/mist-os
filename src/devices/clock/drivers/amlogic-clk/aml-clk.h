@@ -8,15 +8,15 @@
 #include <fidl/fuchsia.hardware.clock.measure/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/syscalls/smc.h>
 
-#include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/mutex.h>
 #include <hwreg/mmio.h>
@@ -31,12 +31,12 @@
 
 namespace amlogic_clock {
 
-class AmlClock;
-using DeviceType = ddk::Device<AmlClock, ddk::Unbindable,
-                               ddk::Messageable<fuchsia_hardware_clock_measure::Measurer>::Mixin>;
-
-class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk::base_protocol> {
+class AmlClock : public fdf::DriverBase,
+                 public ddk::ClockImplProtocol<AmlClock>,
+                 public fidl::WireServer<fuchsia_hardware_clock_measure::Measurer> {
  public:
+  static constexpr char kDriverName[] = "aml-clk";
+  static constexpr char kChildNodeName[] = "clocks";
   // MMIO Indexes
   static constexpr uint32_t kHiuMmio = 0;
   static constexpr uint32_t kDosbusMmio = 1;
@@ -44,12 +44,12 @@ class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk:
   static constexpr uint32_t kCpuCtrlMmio = 3;
 
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlClock);
-  AmlClock(zx_device_t* device, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffer dosbus_mmio,
-           std::optional<fdf::MmioBuffer> msr_mmio, std::optional<fdf::MmioBuffer> cpuctrl_mmio);
+  AmlClock(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
   ~AmlClock() override = default;
 
-  // Performs the object initialization.
-  static zx_status_t Bind(void* ctx, zx_device_t* device);
+  zx::result<> Start() override;
+  void Stop() override;
 
   // CLK protocol implementation.
   zx_status_t ClockImplEnable(uint32_t id);
@@ -64,24 +64,23 @@ class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk:
   zx_status_t ClockImplGetNumInputs(uint32_t id, uint32_t* out_num_inputs);
   zx_status_t ClockImplGetInput(uint32_t id, uint32_t* out_input);
 
-  zx_status_t Init(uint32_t device_id, fdf::PDev& pdev);
-
   // CLK FIDL implementation.
   void Measure(MeasureRequestView request, MeasureCompleter::Sync& completer) override;
   void GetCount(GetCountCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_clock_measure::Measurer> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {
-    zxlogf(ERROR, "Unexpected Clock FIDL call: 0x%lx", metadata.method_ordinal);
+    FDF_LOG(ERROR, "Unexpected Clock FIDL call: 0x%lx", metadata.method_ordinal);
   }
 
-  // Device protocol implementation.
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-
-  void ShutDown();
-
  private:
+  // Called by devfs_connector_ when a client connects.
+  void DevfsConnect(fidl::ServerEnd<fuchsia_hardware_clock_measure::Measurer> request);
+
+  zx_status_t PopulateRegisterBlocks(uint32_t device_id, fdf::PDev& pdev);
+
+  zx_status_t InitChildNode();
+
   // Toggle clocks enable bit.
   zx_status_t ClkToggle(uint32_t id, bool enable);
   void ClkToggleHw(const meson_clk_gate_t* gate, bool enable) __TA_REQUIRES(lock_);
@@ -107,10 +106,11 @@ class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk:
   void InitHiuA1();
 
   // IO MMIO
-  fdf::MmioBuffer hiu_mmio_;
-  fdf::MmioBuffer dosbus_mmio_;
+  std::optional<fdf::MmioBuffer> hiu_mmio_;
+  std::optional<fdf::MmioBuffer> dosbus_mmio_;
   std::optional<fdf::MmioBuffer> msr_mmio_;
   std::optional<fdf::MmioBuffer> cpuctrl_mmio_;
+
   // Protects clock gate registers.
   // Clock gates.
   fbl::Mutex lock_;
@@ -134,6 +134,13 @@ class AmlClock : public DeviceType, public ddk::ClockImplProtocol<AmlClock, ddk:
   size_t clk_table_count_ = 0;
   // MSR_CLK offsets/
   meson_clk_msr_t clk_msr_offsets_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> child_node_controller_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_CLOCK_IMPL, this, &clock_impl_protocol_ops_};
+  compat::SyncInitializedDeviceServer compat_server_;
+  driver_devfs::Connector<fuchsia_hardware_clock_measure::Measurer> devfs_connector_{
+      fit::bind_member<&AmlClock::DevfsConnect>(this)};
+  fidl::ServerBindingGroup<fuchsia_hardware_clock_measure::Measurer> measurer_binding_group_;
 };
 
 }  // namespace amlogic_clock

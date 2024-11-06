@@ -4,9 +4,8 @@
 
 #include "meson-cpu-clock.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/ddk/platform-defs.h>
-#include <zircon/status.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/syscalls/smc.h>
 
 #include <hwreg/bitfields.h>
@@ -54,7 +53,7 @@ zx_status_t MesonCpuClock::SecSetClk(uint32_t func_id, uint64_t arg1, uint64_t a
   zx_smc_result_t smc_result;
   status = zx_smc_call(smc_.get(), &smc_params, &smc_result);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "zx_smc_call failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "zx_smc_call failed: %s", zx_status_get_string(status));
   }
 
   return status;
@@ -66,7 +65,7 @@ zx_status_t MesonCpuClock::SecSetCpuClkMux(uint64_t clock_source) {
   status = SecSetClk(kSecureCpuClk, static_cast<uint64_t>(SecPll::kSecidCpuClkSel),
                      kFinalMuxSelMask, clock_source, 0, 0, 0);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "kSecidCpuClkSel failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "kSecidCpuClkSel failed: %s", zx_status_get_string(status));
   }
   return status;
 }
@@ -77,7 +76,7 @@ zx_status_t MesonCpuClock::SecSetSys0DcoPll(const pll_params_table& pll_params) 
   status = SecSetClk(kSecurePllClk, static_cast<uint64_t>(SecPll::kSecidSys0DcoPll), pll_params.m,
                      pll_params.n, pll_params.od, 0, 0);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "kSecidSys0DcoPll failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "kSecidSys0DcoPll failed: %s", zx_status_get_string(status));
   }
   return status;
 }
@@ -88,7 +87,7 @@ zx_status_t MesonCpuClock::SecSetCpuClkDyn(const cpu_dyn_table& dyn_params) {
   status = SecSetClk(kSecureCpuClk, static_cast<uint64_t>(SecPll::kSecidCpuClkDyn),
                      dyn_params.dyn_pre_mux, dyn_params.dyn_post_mux, dyn_params.dyn_div, 0, 0);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "kSecidCpuClkDyn failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "kSecidCpuClkDyn failed: %s", zx_status_get_string(status));
   }
   return status;
 }
@@ -109,48 +108,48 @@ zx_status_t MesonCpuClock::SetRateA5(const uint32_t hz) {
     auto rate = std::ranges::find_if(a5_sys_pll_params_table,
                                      [hz](const pll_params_table& a) { return a.rate == hz; });
     if (rate == std::end(a5_sys_pll_params_table)) {
-      zxlogf(ERROR, "Invalid cpu freq");
+      FDF_LOG(ERROR, "Invalid cpu freq");
       return ZX_ERR_NOT_SUPPORTED;
     }
 
     // Switch to low freq source(cpu_dyn)
     status = SecSetCpuClkMux(kFinalMuxSelCpuDyn);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "SecSetCpuClkMux failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "SecSetCpuClkMux failed: %s", zx_status_get_string(status));
       return status;
     }
 
     // Set clock by sys_pll
     status = SecSetSys0DcoPll(*rate);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "SecSetSys0DcoPll failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "SecSetSys0DcoPll failed: %s", zx_status_get_string(status));
       return status;
     }
 
     // Switch to high freq source(sys_pll)
     status = SecSetCpuClkMux(kFinalMuxSelSysPll);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "SecSetCpuClkMux failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "SecSetCpuClkMux failed: %s", zx_status_get_string(status));
     }
   } else {
     auto rate = std::ranges::find_if(a5_cpu_dyn_table,
                                      [hz](const cpu_dyn_table& a) { return a.rate == hz; });
     if (rate == std::end(a5_cpu_dyn_table)) {
-      zxlogf(ERROR, "Invalid cpu freq");
+      FDF_LOG(ERROR, "Invalid cpu freq");
       return ZX_ERR_NOT_SUPPORTED;
     }
 
     // Set clock by cpu_dyn
     status = SecSetCpuClkDyn(*rate);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "SecSetCpuClkDyn failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "SecSetCpuClkDyn failed: %s", zx_status_get_string(status));
       return status;
     }
 
     // Switch to low freq source(cpu_dyn)
     status = SecSetCpuClkMux(kFinalMuxSelCpuDyn);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "SecSetCpuClkMux failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "SecSetCpuClkMux failed: %s", zx_status_get_string(status));
     }
   }
 
@@ -191,14 +190,14 @@ zx_status_t MesonCpuClock::SetRate(uint32_t hz) {
 
       // Let's first switch to 1GHz
       if (zx_status_t status = SetRate(kFrequencyThresholdHz); status != ZX_OK) {
-        zxlogf(ERROR, "%s: failed to set CPU freq to intermediate freq, status = %d", __func__,
-               status);
+        FDF_LOG(ERROR, "%s: failed to set CPU freq to intermediate freq, status = %d", __func__,
+                status);
         return status;
       }
 
       // Now let's set SYS_PLL rate to hz.
       if (zx_status_t status = ConfigureSysPLL(hz); status != ZX_OK) {
-        zxlogf(ERROR, "Failed to configure sys PLL: %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "Failed to configure sys PLL: %s", zx_status_get_string(status));
         return status;
       }
 
@@ -209,7 +208,7 @@ zx_status_t MesonCpuClock::SetRate(uint32_t hz) {
 
       // Now let's set SYS_PLL rate to hz.
       if (zx_status_t status = ConfigureSysPLL(hz); status != ZX_OK) {
-        zxlogf(ERROR, "Failed to configure sys PLL: %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "Failed to configure sys PLL: %s", zx_status_get_string(status));
         return status;
       }
 
@@ -219,7 +218,7 @@ zx_status_t MesonCpuClock::SetRate(uint32_t hz) {
       // to get the required rate from MPLL and do not touch the
       // final mux.
       if (zx_status_t status = ConfigCpuFixedPll(hz); status != ZX_OK) {
-        zxlogf(ERROR, "Failed to configure CPU fixed PLL: %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "Failed to configure CPU fixed PLL: %s", zx_status_get_string(status));
         return status;
       }
     }
@@ -234,14 +233,14 @@ zx_status_t MesonCpuClock::ConfigureSysPLL(uint32_t new_rate) {
   // So no need to validate it here.
   zx_status_t status = sys_pll_->SetRate(new_rate);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to set SYS_PLL rate: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to set SYS_PLL rate: %s", zx_status_get_string(status));
     return status;
   }
 
   // Now we need to change the final mux to select input as SYS_PLL.
   status = WaitForBusyCpu();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to wait for busy, status = %d", __func__, status);
+    FDF_LOG(ERROR, "%s: failed to wait for busy, status = %d", __func__, status);
     return status;
   }
 
@@ -350,7 +349,7 @@ zx_status_t MesonCpuClock::ConfigCpuFixedPll(const uint32_t new_rate) {
 
   zx_status_t status = WaitForBusyCpu();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to wait for busy, status = %d", __func__, status);
+    FDF_LOG(ERROR, "%s: failed to wait for busy, status = %d", __func__, status);
     return status;
   }
 
