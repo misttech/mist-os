@@ -113,6 +113,8 @@ zx::result<> AmlSdmmc::Start() {
 
   // Initialize our compat server.
   {
+    // TODO(b/355244376): Don't forward `DEVICE_METADATA_SDMMC` once all drivers no longer retrieve
+    // SDMMC metadata using the legacy ddk metadata functions.
     zx::result<> result = compat_server_.Initialize(
         incoming(), outgoing(), node_name(), name(),
         compat::ForwardMetadata::Some({DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO}),
@@ -195,6 +197,12 @@ zx::result<> AmlSdmmc::Start() {
 zx::result<> AmlSdmmc::InitResources(
     fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client) {
   fdf::PDev pdev{std::move(pdev_client)};
+
+  if (zx_status_t status = InitMetadataServer(pdev); status != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to initialize metadata server: %s",
+             zx_status_get_string(status));
+    return zx::error(status);
+  }
 
   {
     zx::result mmio_params = pdev.GetMmio(0);
@@ -1801,6 +1809,26 @@ void AmlSdmmc::PrepareStop(fdf::PrepareStopCompleter completer) {
   }
 
   completer(zx::ok());
+}
+
+zx_status_t AmlSdmmc::InitMetadataServer(fdf::PDev& pdev) {
+  // TODO(b/355244376): Replace `std::to_string(DEVICE_METADATA_SDMMC)` with
+  // `fuchsia_hardware_sdmmc::kMetadataTypeName` once drivers no longer retrieve sdmmc metadata
+  // using legacy ddk metadata functions.
+  zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_sdmmc::SdmmcMetadata>(
+      std::to_string(DEVICE_METADATA_SDMMC));
+  if (metadata.is_error()) {
+    FDF_LOGL(ERROR, logger(), "Failed to get metadata: %s", metadata.status_string());
+    return metadata.status_value();
+  }
+  metadata_server_.SetMetadata(metadata.value());
+  zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
+  if (status != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to serve metadata: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
 }
 
 }  // namespace aml_sdmmc

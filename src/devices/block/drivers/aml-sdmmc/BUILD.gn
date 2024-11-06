@@ -58,6 +58,7 @@ source_set("aml-sdmmc-driver-source") {
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/platform-device/cpp",
     "//sdk/lib/inspect/component/cpp",
     "//src/devices/lib/amlogic",

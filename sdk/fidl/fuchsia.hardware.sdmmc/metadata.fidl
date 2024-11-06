@@ -35,3 +35,6 @@ type SdmmcMetadata = table {
     /// is specified.
     7: instance_identifier string:MAX_NAME_LENGTH;
 };
+
+// Name of the FIDL type [`fuchsia.hardware.sdmmc/SdmmcMetadata`].
+const METADATA_TYPE_NAME string = "fuchsia.hardware.sdmmc.SdmmcMetadata";

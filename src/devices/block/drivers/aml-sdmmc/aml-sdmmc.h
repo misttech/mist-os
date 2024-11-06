@@ -15,6 +15,7 @@
 #include <lib/dma-buffer/buffer.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -318,6 +319,8 @@ class AmlSdmmc : public fdf::DriverBase,
   // Serves requests that were delayed because they were received during suspended state.
   void ServeDelayedRequests() __TA_REQUIRES(tuning_lock_, lock_);
 
+  zx_status_t InitMetadataServer(fdf::PDev& pdev);
+
   std::optional<fdf::MmioBuffer> mmio_ __TA_GUARDED(lock_);
 
   aml_sdmmc_config::Config config_;
@@ -359,6 +362,10 @@ class AmlSdmmc : public fdf::DriverBase,
 
   // Dedicated dispatcher for inlining fuchsia_hardware_sdmmc::Sdmmc FIDL requests.
   fdf::Dispatcher worker_dispatcher_;
+
+  fdf_metadata::MetadataServer<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata_server_{
+      fuchsia_hardware_sdmmc::kMetadataTypeName,
+      component::OutgoingDirectory::kDefaultServiceInstance};
 };
 
 }  // namespace aml_sdmmc

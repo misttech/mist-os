@@ -61,6 +61,7 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
         "@fuchsia_sdk//fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
         "@fuchsia_sdk//pkg/driver_component_cpp",
+        "@fuchsia_sdk//pkg/driver_metadata_cpp",
         "@fuchsia_sdk//pkg/driver_platform_device_cpp",
         "@fuchsia_sdk//pkg/driver_power_cpp",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
