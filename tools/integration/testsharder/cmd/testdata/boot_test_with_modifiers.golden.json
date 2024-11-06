@@ -10,7 +10,6 @@
                 "os": "fuchsia",
                 "cpu": "x64",
                 "log_settings": {},
-                "isolated": true,
                 "runs": 1,
                 "run_algorithm": "STOP_ON_SUCCESS",
                 "tags": [
@@ -41,7 +40,8 @@
         "summary": {
             "tests": null
         },
-        "product_bundle": "boot-test_product_bundle"
+        "product_bundle": "boot-test_product_bundle",
+        "is_boot_test": true
     },
     {
         "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm",
@@ -54,7 +54,6 @@
                 "os": "fuchsia",
                 "cpu": "x64",
                 "log_settings": {},
-                "isolated": true,
                 "runs": 1,
                 "run_algorithm": "STOP_ON_SUCCESS",
                 "tags": [
@@ -85,6 +84,7 @@
         "summary": {
             "tests": null
         },
-        "product_bundle": "boot-test_product_bundle"
+        "product_bundle": "boot-test_product_bundle",
+        "is_boot_test": true
     }
 ]

@@ -30,6 +30,10 @@ type TestSpec struct {
 	// ExpectsSSH specifies whether the test is expected to run against
 	// a product bundle that supports SSH.
 	ExpectsSSH bool `json:"expects_ssh,omitempty"`
+
+	// IsBootTest specifies whether the test is a boot test. This indicates that the
+	// test should be isolated in its own shard.
+	IsBootTest bool `json:"is_boot_test,omitempty"`
 }
 
 // Test encapsulates details about a particular test.

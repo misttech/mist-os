@@ -51,6 +51,7 @@
         "summary": {
             "tests": null
         },
+        "product_bundle": "core.x64",
         "expects_ssh": true
     },
     {
@@ -105,6 +106,7 @@
         "summary": {
             "tests": null
         },
+        "product_bundle": "core.x64",
         "expects_ssh": true
     }
 ]

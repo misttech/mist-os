@@ -313,6 +313,15 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	shards = append(multipliedAffectedShards, shards...)
 	shards = append(shards, multipliedShards...)
 
+	platform, err := getHostPlatform()
+	if err != nil {
+		return err
+	}
+	ffxTool, err := m.Tools().LookupTool(platform, "ffx")
+	if err != nil {
+		return err
+	}
+	ffxPath := filepath.Join(flags.buildDir, ffxTool.Path)
 	for _, s := range shards {
 		// Pave = false means netboot = true. We set this after creating the shards
 		// so that `netboot` doesn't get added to the shard names since this would
@@ -326,26 +335,16 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools(), params.Pave); err != nil {
 			return err
 		}
-		productBundle := params.ProductBundleName
-		if s.ProductBundle != "" {
-			productBundle = s.ProductBundle
+		if s.ProductBundle == "" {
+			s.ProductBundle = params.ProductBundleName
 		}
-		if productBundle == "" {
+		if s.ProductBundle == "" {
 			return fmt.Errorf("-product-bundle-name must be provided")
 		}
-		pbPath := build.GetPbPathByName(m.ProductBundles(), productBundle)
+		pbPath := build.GetPbPathByName(m.ProductBundles(), s.ProductBundle)
 		if pbPath == "" {
-			return fmt.Errorf("product bundle %s is not included in the product_bundles.json manifest", productBundle)
+			return fmt.Errorf("product bundle %s is not included in the product_bundles.json manifest", s.ProductBundle)
 		}
-		platform, err := getHostPlatform()
-		if err != nil {
-			return err
-		}
-		ffxTool, err := m.Tools().LookupTool(platform, "ffx")
-		if err != nil {
-			return err
-		}
-		ffxPath := filepath.Join(flags.buildDir, ffxTool.Path)
 		if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, m.Images(), params.Pave, pbPath, ffxPath); err != nil {
 			return err
 		}

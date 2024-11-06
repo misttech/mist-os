@@ -105,6 +105,7 @@ template("_boot_test") {
     os = host_os
     cpu = invoker.cpu_for_host
     isolated = true
+    is_boot_test = true
     product_bundle = name
     expects_ssh = false
 
