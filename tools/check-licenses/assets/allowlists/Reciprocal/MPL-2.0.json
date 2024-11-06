@@ -49,7 +49,7 @@
           },
           {
             "projects": [
-              "src/third_party/grpc"
+              "third_party/grpc"
             ],
             "bug": "",
             "notes": []
