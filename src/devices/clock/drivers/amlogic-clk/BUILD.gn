@@ -46,6 +46,11 @@ source_set("amlogic-clk-driver-source") {
     "aml-g12b-blocks.h",
     "aml-gxl-blocks.h",
     "aml-sm1-blocks.h",
+    "meson-cpu-clock.cc",
+    "meson-cpu-clock.h",
+    "meson-pll-clock.cc",
+    "meson-pll-clock.h",
+    "meson-rate-clock.h",
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",

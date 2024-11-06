@@ -25,12 +25,11 @@
 #include <soc/aml-s905d2/s905d2-hiu.h>
 
 #include "aml-clk-blocks.h"
+#include "meson-cpu-clock.h"
+#include "meson-pll-clock.h"
+#include "meson-rate-clock.h"
 
 namespace amlogic_clock {
-
-class MesonPllClock;
-class MesonCpuClock;
-class MesonRateClock;
 
 class AmlClock;
 using DeviceType = ddk::Device<AmlClock, ddk::Unbindable,
