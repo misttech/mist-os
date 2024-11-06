@@ -671,6 +671,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Reads the symlink from this node.
     fn readlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
@@ -1584,9 +1585,16 @@ impl FsNode {
 
     // This method does not attempt to update the atime of the node.
     // Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
-    pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    pub fn readlink<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // TODO(qsr): Is there a permission check here?
-        self.ops().readlink(self, current_task)
+        self.ops().readlink(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
     pub fn link<L>(

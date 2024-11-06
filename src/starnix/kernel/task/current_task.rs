@@ -545,7 +545,7 @@ impl CurrentTask {
                     }
 
                     context.remaining_follows -= 1;
-                    match name.readlink(self)? {
+                    match name.readlink(locked, self)? {
                         SymlinkTarget::Path(path) => {
                             let dir = if path[0] == b'/' { self.fs().root() } else { parent };
                             self.resolve_open_path(

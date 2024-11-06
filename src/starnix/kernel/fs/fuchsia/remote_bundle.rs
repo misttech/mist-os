@@ -475,7 +475,12 @@ struct SymlinkObject;
 impl FsNodeOps for SymlinkObject {
     fs_node_impl_symlink!();
 
-    fn readlink(&self, node: &FsNode, _current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    fn readlink(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let target =
@@ -613,7 +618,7 @@ mod test {
             .expect("lookup failed");
 
         if let SymlinkTarget::Path(target) =
-            test_symlink.readlink(&current_task).expect("readlink failed")
+            test_symlink.readlink(&mut locked, &current_task).expect("readlink failed")
         {
             assert_eq!(&target, "file");
         } else {

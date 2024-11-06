@@ -1302,7 +1302,7 @@ impl NamespaceNode {
                             return error!(ELOOP);
                         }
                         context.remaining_follows -= 1;
-                        child = match child.readlink(current_task)? {
+                        child = match child.readlink(locked, current_task)? {
                             SymlinkTarget::Path(link_target) => {
                                 let link_directory = if link_target[0] == b'/' {
                                     match &context.resolve_base {
@@ -1540,9 +1540,16 @@ impl NamespaceNode {
         }
     }
 
-    pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    pub fn readlink<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.update_atime();
-        self.entry.node.readlink(current_task)
+        self.entry.node.readlink(locked, current_task)
     }
 
     pub fn notify(&self, event_mask: InotifyMask) {

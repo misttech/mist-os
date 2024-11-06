@@ -298,7 +298,12 @@ impl FsNodeOps for ExtSymlink {
     fs_node_impl_symlink!();
     fs_node_impl_xattr_delegate!(self, self.inner);
 
-    fn readlink(&self, node: &FsNode, _current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    fn readlink(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
         let fs = node.fs();
         let fs_ops = fs.downcast_ops::<ExtFilesystem>().unwrap();
         let data = fs_ops.parser.read_data(self.inner.inode_num).map_err(|e| errno!(EIO, e))?;

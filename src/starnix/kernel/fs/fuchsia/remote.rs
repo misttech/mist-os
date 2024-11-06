@@ -1469,6 +1469,7 @@ impl FsNodeOps for RemoteSymlink {
 
     fn readlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
@@ -1719,7 +1720,7 @@ mod test {
                 .lookup_child(&mut locked, &current_task, &mut context, "symlink".into())
                 .expect("lookup_child failed");
 
-            match child.readlink(&current_task).expect("readlink failed") {
+            match child.readlink(&mut locked, &current_task).expect("readlink failed") {
                 SymlinkTarget::Path(path) => assert_eq!(path, LINK_TARGET),
                 SymlinkTarget::Node(_) => panic!("readlink returned SymlinkTarget::Node"),
             }
@@ -1762,7 +1763,8 @@ mod test {
                 .lookup_child(&mut locked, &current_task, &mut context, "symlink".into())
                 .expect("lookup_child failed after remount");
 
-            match child.readlink(&current_task).expect("readlink failed after remount") {
+            match child.readlink(&mut locked, &current_task).expect("readlink failed after remount")
+            {
                 SymlinkTarget::Path(path) => assert_eq!(path, LINK_TARGET),
                 SymlinkTarget::Node(_) => {
                     panic!("readlink returned SymlinkTarget::Node after remount")

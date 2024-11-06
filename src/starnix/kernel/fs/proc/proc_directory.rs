@@ -461,7 +461,12 @@ impl SelfSymlink {
 impl FsNodeOps for SelfSymlink {
     fs_node_impl_symlink!();
 
-    fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    fn readlink(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path(current_task.get_pid().to_string().into()))
     }
 }
@@ -483,7 +488,12 @@ impl ThreadSelfSymlink {
 impl FsNodeOps for ThreadSelfSymlink {
     fs_node_impl_symlink!();
 
-    fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    fn readlink(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path(
             format!("{}/task/{}", current_task.get_pid(), current_task.get_tid()).into(),
         ))
@@ -508,6 +518,7 @@ impl FsNodeOps for MountsSymlink {
 
     fn readlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {

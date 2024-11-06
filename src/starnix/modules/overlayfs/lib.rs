@@ -341,7 +341,7 @@ impl OverlayNode {
             let cred = info.cred();
 
             let res = if info.mode.is_lnk() {
-                let link_target = lower.entry().node.readlink(current_task)?;
+                let link_target = lower.entry().node.readlink(locked, current_task)?;
                 let link_path = match &link_target {
                     SymlinkTarget::Node(_) => return error!(EIO),
                     SymlinkTarget::Path(path) => path,
@@ -728,8 +728,13 @@ impl FsNodeOps for OverlayNodeOps {
         Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
-    fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
-        self.node.main_entry().entry().node.readlink(current_task)
+    fn readlink(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
+        self.node.main_entry().entry().node.readlink(locked, current_task)
     }
 
     fn link(

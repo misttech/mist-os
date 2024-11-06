@@ -1350,7 +1350,12 @@ impl FsNodeOps for FuseNode {
         )
     }
 
-    fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    fn readlink(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
         let response = self.connection.lock().execute_operation(
             current_task,
             self,

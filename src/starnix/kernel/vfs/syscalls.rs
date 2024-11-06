@@ -928,7 +928,7 @@ pub fn sys_readlinkat(
     };
     let name = lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?;
 
-    let target = match name.readlink(current_task)? {
+    let target = match name.readlink(locked, current_task)? {
         SymlinkTarget::Path(path) => path,
         SymlinkTarget::Node(node) => node.path(current_task),
     };
