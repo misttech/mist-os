@@ -6,18 +6,36 @@ declare_args() {
   # The GN files for the ICU library are located in this directory.
   # Some Fuchsia builds use a different value here.
   icu_root = "//third_party/icu/default"
+
+  # Set this to false once a Jiri hook has been added to
+  # integration.git/fuchsia/stem to invoke build/icu/update-config-json.sh
+  #
+  # It is possible to test the feature locally by setting this variable
+  # to true in args.gn _after_ calling the script manually. Benchmarking
+  # shows that this saves about 700ms of `fx gen` time on a powerful
+  # workstation for a moderate build configuration.
+  #
+  # See https://fxbug.dev/377674727 for details.
+  icu_config_use_jiri_hook = false
 }
 
-# ~7ms per call.
-# Executed only once to set the default value.
-icu_git_info =
-    exec_script("gen-git-head-commit-id.sh",
-                [
-                  "json",
-                  rebase_path("//third_party/icu/default", root_build_dir),
-                  rebase_path("//third_party/icu/latest", root_build_dir),
-                ],
-                "json")
+if (icu_config_use_jiri_hook) {
+  icu_git_info = read_file("jiri_generated/config.json", "json")
+} else {
+  icu_git_info =
+      exec_script("update-config-json.sh",
+                  [
+                    "--fuchsia-dir=" + rebase_path("//", root_build_dir),
+                    "--mode=print",
+                  ],
+                  "json")
+}
+
+# A target that verifies that the content of config.json is valid at build time.
+# All targets that depend on the content of icu_git_info should data-depend on
+# this.
+icu_config_validation_target =
+    "//build/icu:validate_config_json($default_toolchain)"
 
 # The unflavored dependencies that must be replaced with flavored ones when
 # compiling flavored targets.  Defined because the correct contents are

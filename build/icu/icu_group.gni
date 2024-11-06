@@ -68,6 +68,11 @@ template("icu_group") {
         public_deps += public_deps_to_remove
         public_deps -= public_deps_to_remove
       }
+
+      if (!defined(data_deps)) {
+        data_deps = []
+      }
+      data_deps += [ icu_config_validation_target ]
     }
   }
 

@@ -1,0 +1,34 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+if (current_toolchain == default_toolchain) {
+  # This import must appear inside this block
+  import("//build/icu/config.gni")
+  if (icu_config_use_jiri_hook) {
+    # All icu_xxx() targets will depend on this one which verifies
+    # that the content of jiri_generated/config.json matches the
+    # current source checkout. See https://fxbug.dev/377674727
+    #
+    # In case of failure, this prints a human-friendly error message
+    # explaining the situation and how to fix it.
+    #
+    action("validate_config_json") {
+      script = "//build/icu/update-config-json.sh"
+      inputs = []
+      outputs = [ "$target_out_dir/$target_name.timestamp" ]
+      args = [
+        "--fuchsia-dir=" + rebase_path("//", root_build_dir),
+        "--timestamp=" + rebase_path(outputs[0], root_build_dir),
+        "--mode=check",
+      ]
+    }
+  } else {
+    # For now, just define an empty group as there is no verification
+    # action to perform, since there is no guarantee that the config.json
+    # file exists yet.
+    group("validate_config_json") {
+      # Nothing to do here.
+    }
+  }
+}

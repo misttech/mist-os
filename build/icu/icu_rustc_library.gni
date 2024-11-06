@@ -159,6 +159,11 @@ template("icu_rustc_library") {
         non_rust_deps += non_rust_deps_to_remove
         non_rust_deps -= non_rust_deps_to_remove
       }
+
+      if (!defined(data_deps)) {
+        data_deps = []
+      }
+      data_deps += [ icu_config_validation_target ]
     }
   }
 
