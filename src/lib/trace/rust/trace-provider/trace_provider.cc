@@ -6,10 +6,13 @@
 #include <lib/async-loop/default.h>
 #include <lib/trace-provider/provider.h>
 #include <zircon/compiler.h>
+#include <zircon/threads.h>
 
 #include <latch>
 #include <mutex>
 #include <thread>
+
+constexpr char PROVIDER_THREAD_NAME[] = "tracing:provider";
 
 __BEGIN_CDECLS
 
@@ -21,6 +24,7 @@ __END_CDECLS
 static std::once_flag init_once;
 static std::latch provider_initialized(1);
 
+namespace {
 // The C++ trace provider API depends on libasync. Create a new thread here
 // to run a libasync loop here to host that trace provider.
 //
@@ -28,7 +32,7 @@ static std::latch provider_initialized(1);
 // trace-provider implementation.
 //
 // Shouldn't be calling this more than once during the lifetime of your program.
-static void trace_provider_with_fdio_thread_entry() {
+void trace_provider_with_fdio_thread_entry() {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   std::unique_ptr<trace::TraceProviderWithFdio> trace_provider;
   bool result = trace::TraceProviderWithFdio::CreateSynchronously(loop.dispatcher(), nullptr,
@@ -48,12 +52,16 @@ static void trace_provider_with_fdio_thread_entry() {
   // If the initialization failed, unblock waiters regardless.
   provider_initialized.count_down();
 }
+}  // namespace
 
 // Calling this function multiple times is idempotent, to ensure that resources
 // for the trace provider are created only once.
 void trace_provider_create_with_fdio_rust() {
   std::call_once(init_once, [] {
     std::thread thread(trace_provider_with_fdio_thread_entry);
+    zx_handle_t thread_handle = native_thread_get_zx_handle(thread.native_handle());
+    zx_object_set_property(thread_handle, ZX_PROP_NAME, PROVIDER_THREAD_NAME,
+                           sizeof(PROVIDER_THREAD_NAME));
     thread.detach();
   });
 }
