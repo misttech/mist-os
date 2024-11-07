@@ -1178,7 +1178,7 @@ mod tests {
                 let expected_sid = security_server
                     .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
                     .expect("no SID for VALID_SECURITY_CONTEXT");
-                let node = &testing::create_unlabeled_test_file(locked, current_task).entry.node;
+                let node = &testing::create_test_file(locked, current_task).entry.node;
 
                 node.set_xattr(
                     &mut locked.cast_locked::<FileOpsCore>(),
