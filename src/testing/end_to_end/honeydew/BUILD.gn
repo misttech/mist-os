@@ -32,6 +32,7 @@ python_library("honeydew_no_testonly") {
   sources = [
     "__init__.py",
     "affordances/__init__.py",
+    "affordances/affordance.py",
     "affordances/connectivity/wlan/__init__.py",
     "affordances/connectivity/wlan/utils/errors.py",
     "affordances/connectivity/wlan/utils/types.py",

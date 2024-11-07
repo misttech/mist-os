@@ -5,6 +5,7 @@
 
 import abc
 
+from honeydew.affordances import affordance
 from honeydew.affordances.connectivity.wlan.utils.types import (
     AccessPointState,
     ConnectivityMode,
@@ -13,7 +14,7 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
 )
 
 
-class WlanPolicyAp(abc.ABC):
+class WlanPolicyAp(affordance.Affordance):
     """Abstract base class for the WLAN Policy Access Point affordance."""
 
     # List all the public methods

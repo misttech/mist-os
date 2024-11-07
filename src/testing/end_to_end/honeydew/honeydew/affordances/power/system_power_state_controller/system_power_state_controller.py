@@ -7,6 +7,7 @@ import abc
 from dataclasses import dataclass
 
 from honeydew import errors
+from honeydew.affordances import affordance
 
 
 @dataclass(frozen=True)
@@ -56,7 +57,7 @@ class SystemPowerStateControllerError(errors.HoneydewError):
     """Exception to be raised by SystemPowerStateController affordance."""
 
 
-class SystemPowerStateController(abc.ABC):
+class SystemPowerStateController(affordance.Affordance):
     """Abstract base class for SystemPowerStateController affordance."""
 
     # List all the public methods
