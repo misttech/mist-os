@@ -15,8 +15,8 @@ go_library(
     ],
     importpath = "go.fuchsia.dev/fuchsia/tools/net/netboot",
     deps = [
-        "//third_party/golibs/vendor/golang.org/x/net/ipv6",
-        "//third_party/golibs/vendor/golang.org/x/sys/unix",
+        "//third_party/golibs:golang.org/x/net/ipv6",
+        "//third_party/golibs:golang.org/x/sys/unix",
         "//tools/lib/logger",
     ],
 )

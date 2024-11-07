@@ -37,6 +37,8 @@ go_library(
         "//third_party/golibs/vendor/github.com/theupdateframework/go-tuf",
         "//third_party/golibs/vendor/github.com/theupdateframework/go-tuf/data",
         "//third_party/golibs/vendor/github.com/theupdateframework/go-tuf/pkg/keys",
+        "//third_party/golibs/vendor/go.starlark.net/starlark",
+        "//third_party/golibs/vendor/go.starlark.net/syntax",
         "//third_party/golibs/vendor/go.uber.org/goleak",
         "//third_party/golibs/vendor/golang.org/x/crypto/openpgp",
         "//third_party/golibs/vendor/golang.org/x/crypto/ssh",
