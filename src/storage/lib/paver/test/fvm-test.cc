@@ -41,10 +41,9 @@ constexpr fvm::SparseImage SparseHeaderForSliceSizeAndMaxDiskSize(size_t slice_s
   return header;
 }
 
-class FvmTest : public PaverTest {
+class FvmTest : public zxtest::Test {
  public:
-  void SetUp() override {
-    PaverTest::SetUp();
+  FvmTest() {
     IsolatedDevmgr::Args args;
     args.disable_block_watcher = true;
 

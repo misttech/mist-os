@@ -280,12 +280,10 @@ struct IncomingNamespace {
   FakeSysinfo fake_sysinfo;
 };
 
-class PaverServiceTest : public PaverTest {
+class PaverServiceTest : public zxtest::Test {
  public:
   PaverServiceTest();
   ~PaverServiceTest() override;
-
-  void SetUp() override { PaverTest::SetUp(); }
 
   void StartPaver(fbl::unique_fd devfs_root, fidl::ClientEnd<fuchsia_io::Directory> svc_root = {});
 
@@ -334,6 +332,22 @@ class PaverServiceTest : public PaverTest {
 PaverServiceTest::PaverServiceTest()
     : loop_(&kAsyncLoopConfigAttachToCurrentThread),
       loop2_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::AstroAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::NelsonAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::KolaAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
+
   loop_.StartThread("paver-svc-test-loop");
   loop2_.StartThread("paver-svc-test-loop-2");
 

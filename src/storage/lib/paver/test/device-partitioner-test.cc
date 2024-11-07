@@ -12,9 +12,7 @@
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
-#include <fidl/fuchsia.system.state/cpp/common_types.h>
 #include <fidl/fuchsia.system.state/cpp/fidl.h>
-#include <fidl/fuchsia.system.state/cpp/markers.h>
 #include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <fidl/fuchsia.tracing.provider/cpp/wire.h>
 #include <lib/abr/util.h>
@@ -22,7 +20,6 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -32,8 +29,6 @@
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/sys/cpp/testing/service_directory_provider.h>
 #include <lib/zbi-format/zbi.h>
-#include <lib/zx/result.h>
-#include <lib/zx/time.h>
 #include <unistd.h>
 #include <zircon/errors.h>
 #include <zircon/hw/gpt.h>
@@ -50,9 +45,14 @@
 
 #include <fbl/unique_fd.h>
 #include <gpt/gpt.h>
+#include <sdk/lib/component/outgoing/cpp/outgoing_directory.h>
 #include <soc/aml-common/aml-guid.h>
 #include <zxtest/zxtest.h>
 
+#include "fidl/fuchsia.system.state/cpp/common_types.h"
+#include "fidl/fuchsia.system.state/cpp/markers.h"
+#include "lib/zx/result.h"
+#include "lib/zx/time.h"
 #include "src/lib/files/directory.h"
 #include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
@@ -169,14 +169,13 @@ TEST(PartitionSpec, ToStringWithContentType) {
   EXPECT_EQ(PartitionSpec(paver::Partition::kVbMetaB, "a b c").ToString(), "VBMeta B (a b c)");
 }
 
-class GptDevicePartitionerTests : public PaverTest {
+class GptDevicePartitionerTests : public zxtest::Test {
  protected:
   explicit GptDevicePartitionerTests(fbl::String board_name = fbl::String(),
                                      uint32_t block_size = 512)
       : board_name_(std::move(board_name)), block_size_(block_size) {}
 
   void SetUp() override {
-    PaverTest::SetUp();
     paver::g_wipe_timeout = 0;
     IsolatedDevmgr::Args args = BaseDevmgrArgs();
     args.board_name = board_name_;
@@ -780,10 +779,9 @@ TEST_F(EfiDevicePartitionerWithStorageHostTests, InitializePartitionsWithoutExpl
   ASSERT_OK(EfiDevicePartitionerTests::CreatePartitioner({}));
 }
 
-class FixedDevicePartitionerTests : public PaverTest {
+class FixedDevicePartitionerTests : public zxtest::Test {
  protected:
-  void SetUp() override {
-    PaverTest::SetUp();
+  FixedDevicePartitionerTests() {
     IsolatedDevmgr::Args args;
     args.disable_block_watcher = false;
 

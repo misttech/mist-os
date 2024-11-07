@@ -108,7 +108,7 @@ TEST(X64AbrTests, CreateFails) {
   ASSERT_NOT_OK(paver::X64AbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
 }
 
-class CurrentSlotUuidTest : public PaverTest {
+class CurrentSlotUuidTest : public zxtest::Test {
  protected:
   static constexpr int kBlockSize = 512;
   static constexpr int kDiskBlocks = 1024;
@@ -118,7 +118,6 @@ class CurrentSlotUuidTest : public PaverTest {
                                                       0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
                                                       0xcc, 0xdd, 0xee, 0xff};
   void SetUp() override {
-    PaverTest::SetUp();
     args_.disable_block_watcher = true;
 
     ASSERT_OK(IsolatedDevmgr::Create(&args_, &devmgr_));
@@ -460,10 +459,9 @@ class FakePartitionClient final : public paver::PartitionClient {
   zx_status_t result_ = ZX_OK;
 };
 
-class OneShotFlagsTest : public PaverTest {
+class OneShotFlagsTest : public zxtest::Test {
  public:
   void SetUp() override {
-    PaverTest::SetUp();
     auto partition_client = std::make_unique<FakePartitionClient>(10, 100);
     auto abr_partition_client = abr::AbrPartitionClient::Create(std::move(partition_client));
     ASSERT_OK(abr_partition_client);
