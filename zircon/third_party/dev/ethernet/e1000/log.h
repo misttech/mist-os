@@ -5,6 +5,7 @@
 #define ZIRCON_THIRD_PARTY_DEV_ETHERNET_E1000_LOG_H_
 
 #include <sdk/lib/syslog/structured_backend/fuchsia_syslog.h>
+#include <zircon/compiler.h>
 
 __BEGIN_CDECLS
 
