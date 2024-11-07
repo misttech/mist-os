@@ -14,3 +14,4 @@
 import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
+import("//build/sdk/sdk_host_tool.gni")
