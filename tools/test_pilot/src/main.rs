@@ -6,6 +6,7 @@ use anyhow::Error;
 
 mod errors;
 mod opts;
+mod params;
 mod run_tests;
 mod test_config;
 
