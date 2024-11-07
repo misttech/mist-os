@@ -766,9 +766,6 @@ void DebugAgent::OnAttach(const debug_ipc::AttachRequest& request, debug_ipc::At
   if (request.config.target == debug_ipc::AttachConfig::Target::kJob) {
     if (!IsAttachedToParentOrAncestorOf(request.koid)) {
       reply->status = AttachToExistingJob(request.koid, request.config, reply);
-      if (reply->status.ok()) {
-        DEBUG_LOG(Agent) << "Could not attach to job: " << reply->status.message();
-      }
     } else {
       reply->status =
           debug::Status(debug::Status::kAlreadyExists, "Already attached to ancestor job.");
