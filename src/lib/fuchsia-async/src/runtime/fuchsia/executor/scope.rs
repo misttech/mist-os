@@ -102,7 +102,8 @@ impl Scope {
         // Use ManuallyDrop to destructure self, because Rust doesn't allow this
         // for types which implement Drop.
         let this = ManuallyDrop::new(self);
-        // SAFETY: this.inner is obviously valid, and we don't access it after moving.
+        // SAFETY: this.inner is obviously valid, and we don't access `this`
+        // after moving.
         mem::drop(unsafe { std::ptr::read(&this.inner) });
     }
 }
@@ -140,30 +141,37 @@ impl Deref for Scope {
     }
 }
 
+impl Borrow<ScopeRef> for Scope {
+    fn borrow(&self) -> &ScopeRef {
+        &*self
+    }
+}
+
 pin_project! {
     /// Join handle for a [`Scope`].
     ///
     /// This is a future that resolves when all tasks on the scope are complete
-    /// or have been cancelled. It also provides access to the [`ScopeRef`]
-    /// methods, which allows spawning additional tasks on the scope. Note that
-    /// you cannot spawn tasks on a scope once [`Scope::cancel`] has been
-    /// called.
+    /// or have been cancelled.
     ///
     /// When this object is dropped, the scope and all tasks in it are
     /// cancelled.
-    pub struct Join {
-        scope: Scope,
+    //
+    // Note: The drop property is only true when S = Scope; it does not apply to
+    // other (internal) uses of this struct.
+    pub struct Join<S = Scope> {
+        scope: S,
         #[pin]
         waker_entry: WakerEntry<ScopeState>,
     }
 }
 
-// Yes, this is functionally equivalent to a `Scope` except it is about 40 bytes larger.
-impl Join {
-    fn new(scope: Scope) -> Self {
+impl<S> Join<S> {
+    fn new(scope: S) -> Self {
         Self { scope, waker_entry: WakerEntry::new() }
     }
+}
 
+impl Join {
     /// Cancel the scope. The future will resolve when all tasks have finished
     /// polling.
     ///
@@ -174,12 +182,14 @@ impl Join {
     }
 }
 
-impl Future for Join {
+impl<S> Future for Join<S>
+where
+    S: Borrow<ScopeRef>,
+{
     type Output = ();
-
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let mut state = this.scope.lock();
+        let mut state = Borrow::borrow(&*this.scope).lock();
         if state.has_tasks() {
             state.add_waker(this.waker_entry, cx.waker().clone());
             Poll::Pending
@@ -268,6 +278,20 @@ impl ScopeRef {
         state.insert_child(weak.clone());
         Scope { inner: child }
     }
+
+    /// Cancel all the scope's tasks.
+    pub fn cancel(self) -> impl Future<Output = ()> {
+        self.cancel_all_tasks();
+        Join::new(self)
+    }
+
+    // Joining the scope could be allowed from a ScopeRef, but the use case
+    // seems less common and more bug prone than cancelling. Someone might want
+    // to cancel a scope from within the scope. But it's impossible to join a
+    // scope from within a task on that scope; the task and scope would spend
+    // forever waiting on each other. As a minor additional point, seeing calls
+    // to `.join()` on a ScopeRef might cause a reader to think they have a
+    // Scope.
 
     /// Wait for there to be no tasks. This is racy: as soon as this returns it is possible for
     /// another task to have been spawned on this scope.
@@ -625,7 +649,7 @@ impl ScopeRef {
     /// # Safety
     ///
     /// The caller must guarantee that `R` is the correct type.
-    pub(crate) unsafe fn cancel<R>(&self, task_id: usize) -> Option<R> {
+    pub(crate) unsafe fn cancel_task<R>(&self, task_id: usize) -> Option<R> {
         let mut state = self.lock();
         if let Some(JoinResult::Result(task)) = state.join_results.remove(&task_id) {
             return task.future.take_result();
@@ -1192,6 +1216,28 @@ mod tests {
         let mut cancel = pin!(join.cancel());
         assert_eq!(executor.run_until_stalled(&mut cancel), Poll::Ready(()));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
+    }
+
+    #[test]
+    fn cancel_from_scope_ref_inside_task() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().new_child();
+        {
+            // Spawn a task that never finishes until the scope is cancelled.
+            scope.spawn(pending::<()>());
+
+            let mut no_tasks = pin!(scope.on_no_tasks());
+            assert_eq!(executor.run_until_stalled(&mut no_tasks), Poll::Pending);
+
+            let scope_ref = scope.make_ref();
+            scope.spawn(async move {
+                scope_ref.cancel().await;
+                panic!("cancel() should never complete");
+            });
+
+            assert_eq!(executor.run_until_stalled(&mut no_tasks), Poll::Ready(()));
+        }
+        assert_eq!(scope.join().now_or_never(), Some(()));
     }
 
     #[test]

@@ -39,7 +39,7 @@ impl<T> JoinHandle<T> {
     /// future can be ignored in which case the task will still be cancelled.
     pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
         // SAFETY: We spawned the task so the return type should be correct.
-        let result = unsafe { self.scope.cancel(self.task_id) };
+        let result = unsafe { self.scope.cancel_task(self.task_id) };
         async move {
             match result {
                 Some(output) => Some(output),
