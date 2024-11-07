@@ -64,6 +64,7 @@ zx_library("vm") {
     "//zircon/kernel/phys:handoff",
     "//zircon/kernel/phys/lib/memalloc:range",
     "//zircon/system/ulib/affine",
+    "//zircon/system/ulib/ffl",
     "//zircon/system/ulib/lazy_init",
     "//zircon/system/ulib/pretty",
     "//zircon/third_party/ulib/lz4",
@@ -95,6 +96,9 @@ zx_library("vm") {
 
     # <vm/vm_cow_pages.h> has #include <lib/page_cache.h>
     "//zircon/kernel/lib/page_cache:headers",
+
+    # <vm/vm_object.h> has #include <ffl/fixed.h>
+    "//zircon/system/ulib/ffl:headers",
 
     # "pmm_arena.h" has #include <lib/zx/result.h>.
     "//zircon/system/ulib/zx:headers",

@@ -26,6 +26,7 @@
 #include <object/thread_dispatcher.h>
 #include <object/vm_address_region_dispatcher.h>
 #include <object/vm_object_dispatcher.h>
+#include <vm/attribution.h>
 #include <vm/vm.h>
 #include <vm/vm_aspace.h>
 #include <vm/vm_object.h>
@@ -659,11 +660,12 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
   }
 
   // If there's only one process using this aspace, then the accounting is simple.
+  vm::FractionalBytes scaled_shared_bytes;
   if (count == 1) {
     stats->mem_mapped_bytes = usage.mapped_bytes;
     stats->mem_private_bytes = usage.private_bytes;
     stats->mem_shared_bytes = usage.shared_bytes;
-    stats->mem_scaled_shared_bytes = usage.scaled_shared_bytes;
+    scaled_shared_bytes = usage.scaled_shared_bytes;
   } else {
     // There are multiple processes using the shareable aspace so things are a little more complex
     // because the values in VmAspace::vm_usage_t are aspace-centric, while zx_info_task_stats_t is
@@ -685,10 +687,12 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
     //
     // Start by scaling down the aspace's scaled_shared_bytes by the number of processes sharing the
     // aspace.
-    stats->mem_scaled_shared_bytes = usage.scaled_shared_bytes / count;
+    scaled_shared_bytes = usage.scaled_shared_bytes / count;
     // Now, add to that the private-to-aspace pages, scaled down by the number of processes that
     // share the aspace.
-    stats->mem_scaled_shared_bytes += usage.private_bytes / count;
+    //
+    // Ensure the fractional part of private / count is tracked, rather than using integer division.
+    scaled_shared_bytes += vm::FractionalBytes{usage.private_bytes} / count;
   }
 
   // Now that we've handled the shareable aspace, handle the restricted aspace (if present).
@@ -701,8 +705,11 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
     stats->mem_mapped_bytes += r_usage.mapped_bytes;
     stats->mem_private_bytes += r_usage.private_bytes;
     stats->mem_shared_bytes += r_usage.shared_bytes;
-    stats->mem_scaled_shared_bytes += r_usage.scaled_shared_bytes;
+    scaled_shared_bytes += r_usage.scaled_shared_bytes;
   }
+
+  // Update the scaled bytes with the final total, after doing computations above in fixed-point.
+  stats->mem_scaled_shared_bytes = scaled_shared_bytes.integral;
 
   return ZX_OK;
 }

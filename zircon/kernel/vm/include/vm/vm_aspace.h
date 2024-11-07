@@ -21,6 +21,7 @@
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 #include <vm/arch_vm_aspace.h>
+#include <vm/attribution.h>
 #include <vm/vm.h>
 
 class VmAddressRegion;
@@ -146,30 +147,31 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   // A collection of memory usage counts.
   struct vm_usage_t {
     // A count of bytes covered by VmMapping ranges.
-    size_t mapped_bytes;
+    size_t mapped_bytes = 0;
 
-    // For the fields below, a bytes is considered committed if a VmMapping
-    // covers a range of a VmObject that contains that byte's page, and the page
-    // has physical memory allocated to it.
+    // For the fields below, a byte is considered committed if a VmMapping covers a range of a
+    // VmObject that contains that byte's page, and the page has physical memory allocated to it.
 
-    // A count of committed bytes that are only mapped into this address
-    // space.
-    size_t private_bytes;
+    // A count of committed bytes that are only mapped into this address space and are not shared
+    // between VMOs via copy-on-write.
+    size_t private_bytes = 0;
 
-    // A count of committed bytes that are mapped into this and at least
-    // one other address spaces.
-    size_t shared_bytes;
+    // A count of committed bytes that are mapped into this and at least one other address space, or
+    // are shared between VMOs via copy-on-write (even if the VMOs are both mapped into this address
+    // space).
+    size_t shared_bytes = 0;
 
-    // A number that estimates the fraction of shared_pages that this
-    // address space is responsible for keeping alive.
+    // A number that estimates the fraction of shared_bytes that this address space is responsible
+    // for keeping alive.
     //
     // An estimate of:
     //   For each shared, committed page:
-    //   scaled_shared_bytes +=
-    //       PAGE_SIZE / (number of address spaces mapping this page)
+    //   share_factor = (number of VMOs sharing this page) *
+    //                  (number of address spaces mapping this page)
+    //   scaled_shared_bytes += PAGE_SIZE / share_factor
     //
-    // This number is strictly smaller than shared_pages * PAGE_SIZE.
-    size_t scaled_shared_bytes;
+    // This number is strictly smaller than shared_bytes.
+    vm::FractionalBytes scaled_shared_bytes{0};
   };
 
   // Counts memory usage under the VmAspace.

@@ -33,10 +33,13 @@
 #include <ktl/enforce.h>
 
 // This flag enables usage of split bits instead of share counts when tracking COW pages.
+// We couple this flag to the usge of legacy vs new attribution code as the legacy code only works
+// with split bits and the new code only works with share counts.
 //
 // TODO(https://fxbug.dev/issues/338300808): Remove this flag when the new attribution code (and
 // thus share counts) are the default.
 #define ENABLE_COW_SPLIT_BITS true
+static_assert(ENABLE_LEGACY_ATTRIBUTION == ENABLE_COW_SPLIT_BITS);
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 

@@ -748,11 +748,32 @@ class VmCounter final : public VmEnumerator {
     const VmObject::AttributionCounts counts =
         vmo->GetAttributedMemoryInRange(map->object_offset_locked(), map->size_locked());
     const uint32_t share_count = vmo->share_count();
-    if (share_count == 1) {
-      usage.private_bytes += counts.uncompressed_bytes;
+    if constexpr (ENABLE_LEGACY_ATTRIBUTION) {
+      if (share_count == 1) {
+        usage.private_bytes += counts.uncompressed_bytes;
+      } else {
+        usage.shared_bytes += counts.uncompressed_bytes;
+        usage.scaled_shared_bytes += counts.uncompressed_bytes / share_count;
+      }
     } else {
-      usage.shared_bytes += counts.uncompressed_bytes;
-      usage.scaled_shared_bytes += counts.uncompressed_bytes / share_count;
+      // Portions of the VMO itself may have sharing via copy-on-write and so, regardless of how
+      // many aspaces it is mapped into (represented by share_count), it may have a mix of reported
+      // private and non private bytes. At this point we can only perform approximations as we only
+      // have an aggregate VMO aspace sharing factor, and aggregate counts, with no ability to
+      // precisely know what portions of the private and shared vmo bytes are actually part of what
+      // level of aspace sharing.
+      // The approximation chosen here is to consider any shared bytes as shared, even if this
+      // specific VMO does not have other mappings, and to assume that if the VMO has multiple
+      // mappings that any private VMO bytes are actually shared.
+      if (share_count == 1) {
+        usage.private_bytes += counts.private_uncompressed_bytes;
+        usage.shared_bytes += counts.uncompressed_bytes - counts.private_uncompressed_bytes;
+        usage.scaled_shared_bytes +=
+            (counts.scaled_uncompressed_bytes - counts.private_uncompressed_bytes) / share_count;
+      } else {
+        usage.shared_bytes += counts.uncompressed_bytes;
+        usage.scaled_shared_bytes += counts.scaled_uncompressed_bytes / share_count;
+      }
     }
     return true;
   }

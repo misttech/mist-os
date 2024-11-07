@@ -31,6 +31,7 @@
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 #include <ktl/move.h>
+#include <vm/attribution.h>
 #include <vm/content_size_manager.h>
 #include <vm/page.h>
 #include <vm/vm.h>
@@ -331,23 +332,7 @@ class VmObject : public VmHierarchyBase,
   // VMOs).
   virtual void mark_modified_locked() TA_REQ(lock()) {}
 
-  struct AttributionCounts {
-    size_t uncompressed_bytes = 0;
-    size_t compressed_bytes = 0;
-
-    const AttributionCounts& operator+=(const AttributionCounts& other) {
-      uncompressed_bytes += other.uncompressed_bytes;
-      compressed_bytes += other.compressed_bytes;
-      return *this;
-    }
-
-    bool operator==(const AttributionCounts& other) const {
-      return uncompressed_bytes == other.uncompressed_bytes &&
-             compressed_bytes == other.compressed_bytes;
-    }
-
-    bool operator!=(const AttributionCounts& other) const { return !(*this == other); }
-  };
+  using AttributionCounts = struct vm::AttributionCounts;
 
   // Returns the number of physical bytes currently attributed to a range of this VMO.
   // The range is `[offset_bytes, offset_bytes+len_bytes)`.
