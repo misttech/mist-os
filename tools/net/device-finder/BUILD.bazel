@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("//build/tools/gnerator/bazel_rules:defs.bzl", "install_host_tools", "sdk_host_tool")
 
 go_library(
     name = "lib",
@@ -18,8 +20,9 @@ go_library(
         "cmd/resolve.go",
     ],
     cgo = True,
+    target_compatible_with = HOST_CONSTRAINTS,
     deps = [
-        "//third_party/golibs/vendor/github.com/google/subcommands",
+        "//third_party/golibs:github.com/google/subcommands",
         "//tools/lib/color",
         "//tools/lib/logger",
         "//tools/net/mdns",
@@ -28,8 +31,9 @@ go_library(
 )
 
 go_binary(
-    name = "main",
+    name = "device-finder",
     embed = [":lib"],
+    target_compatible_with = HOST_CONSTRAINTS,
 )
 
 go_test(
@@ -40,7 +44,23 @@ go_test(
     embed = [
         ":lib",
     ],
+    target_compatible_with = HOST_CONSTRAINTS,
     deps = [
-        "//third_party/golibs/vendor/github.com/google/go-cmp/cmp",
+        "//third_party/golibs:github.com/google/go-cmp/cmp",
     ],
+)
+
+sdk_host_tool(
+    name = "device-finder_sdk",
+    category = "partner",
+    output_name = "device-finder",
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [":device-finder"],
+)
+
+install_host_tools(
+    name = "host",
+    outputs = ["device-finder"],
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [":device-finder"],
 )
