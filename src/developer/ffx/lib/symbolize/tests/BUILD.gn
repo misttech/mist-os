@@ -32,6 +32,10 @@ if (is_host) {
       "//third_party/rust_crates:tracing",
     ]
     product_bundle = ":product_bundle($default_toolchain)"
+
+    # Get the symbolizer to log as much as it can about symbol resolution to help debug
+    # infra-only failures.
+    env = [ "FUCHSIA_HOST_LOG_MIN_SEVERITY=TRACE" ]
   }
 
   group("host_tests") {
