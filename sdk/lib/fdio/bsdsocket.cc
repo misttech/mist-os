@@ -37,6 +37,7 @@ namespace fpacketsocket = fuchsia_posix_socket_packet;
 
 constexpr int kSockFlagsMask = SOCK_CLOEXEC | SOCK_NONBLOCK;
 
+namespace {
 template <typename T>
 zx_status_t get_socket_provider(zx_handle_t* provider_handle) {
   const auto& provider = get_client<T>();
@@ -46,6 +47,7 @@ zx_status_t get_socket_provider(zx_handle_t* provider_handle) {
   *provider_handle = provider.value().client_end().channel().get();
   return ZX_OK;
 }
+}  // namespace
 
 __EXPORT
 int socket(int domain, int type, int protocol) {
@@ -133,8 +135,9 @@ int connect(int fd, const struct sockaddr* addr, socklen_t len) {
   return 0;
 }
 
+namespace {
 template <typename F>
-static int delegate(int fd, F fn) {
+int delegate(int fd, F fn) {
   const fdio_ptr io = fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
@@ -149,6 +152,7 @@ static int delegate(int fd, F fn) {
   }
   return out_code;
 }
+}  // namespace
 
 __EXPORT
 int bind(int fd, const struct sockaddr* addr, socklen_t len) {

@@ -35,14 +35,15 @@ struct fdio_timer_t {
 static_assert(sizeof(fdio_timer_t) <= sizeof(zxio_storage_t),
               "fdio_timer_t must fit inside zxio_storage_t.");
 
-static struct timespec duration_to_timespec(zx::duration duration) {
+namespace {
+struct timespec duration_to_timespec(zx::duration duration) {
   struct timespec result = {};
   result.tv_sec = duration.to_secs();
   result.tv_nsec = duration % zx::sec(1);
   return result;
 }
 
-static bool timespec_to_duration(const struct timespec* spec, zx::duration* out_duration) {
+bool timespec_to_duration(const struct timespec* spec, zx::duration* out_duration) {
   if (!spec || spec->tv_sec < 0 || spec->tv_nsec < 0 || spec->tv_sec > INT64_MAX / ZX_SEC(1)) {
     return false;
   }
@@ -50,14 +51,14 @@ static bool timespec_to_duration(const struct timespec* spec, zx::duration* out_
   return true;
 }
 
-static zx_status_t fdio_timer_close(zxio_t* io, const bool should_wait) {
+zx_status_t fdio_timer_close(zxio_t* io, const bool should_wait) {
   auto* timer = reinterpret_cast<fdio_timer_t*>(io);
   timer->~fdio_timer_t();
   return ZX_OK;
 }
 
-static zx_status_t fdio_timer_readv(zxio_t* io, const zx_iovec_t* vector, size_t vector_count,
-                                    zxio_flags_t flags, size_t* out_actual) {
+zx_status_t fdio_timer_readv(zxio_t* io, const zx_iovec_t* vector, size_t vector_count,
+                             zxio_flags_t flags, size_t* out_actual) {
   if (fdio_iovec_get_capacity(vector, vector_count) < sizeof(uint64_t)) {
     return ZX_ERR_BUFFER_TOO_SMALL;
   }
@@ -97,8 +98,8 @@ static zx_status_t fdio_timer_readv(zxio_t* io, const zx_iovec_t* vector, size_t
   return ZX_OK;
 }
 
-static void fdio_timer_wait_begin(zxio_t* io, zxio_signals_t zxio_signals, zx_handle_t* out_handle,
-                                  zx_signals_t* out_zx_signals) {
+void fdio_timer_wait_begin(zxio_t* io, zxio_signals_t zxio_signals, zx_handle_t* out_handle,
+                           zx_signals_t* out_zx_signals) {
   fdio_timer_t* timer = reinterpret_cast<fdio_timer_t*>(io);
   zx_signals_t zx_signals = ZX_SIGNAL_NONE;
   if (zxio_signals & ZXIO_SIGNAL_READABLE) {
@@ -108,8 +109,7 @@ static void fdio_timer_wait_begin(zxio_t* io, zxio_signals_t zxio_signals, zx_ha
   *out_zx_signals = zx_signals;
 }
 
-static void fdio_timer_wait_end(zxio_t* io, zx_signals_t zx_signals,
-                                zxio_signals_t* out_zxio_signals) {
+void fdio_timer_wait_end(zxio_t* io, zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals) {
   zxio_signals_t zxio_signals = ZXIO_SIGNAL_NONE;
   if (zx_signals & ZX_TIMER_SIGNALED) {
     zxio_signals |= ZXIO_SIGNAL_READABLE;
@@ -117,7 +117,7 @@ static void fdio_timer_wait_end(zxio_t* io, zx_signals_t zx_signals,
   *out_zxio_signals = zxio_signals;
 }
 
-static constexpr zxio_ops_t fdio_timer_ops = []() {
+constexpr zxio_ops_t fdio_timer_ops = []() {
   zxio_ops_t ops = zxio_default_ops;
   ops.close = fdio_timer_close;
   ops.readv = fdio_timer_readv;
@@ -126,7 +126,7 @@ static constexpr zxio_ops_t fdio_timer_ops = []() {
   return ops;
 }();
 
-static fdio_timer_t* to_timer(const fdio_ptr& io) {
+fdio_timer_t* to_timer(const fdio_ptr& io) {
   if (!io) {
     return nullptr;
   }
@@ -136,6 +136,7 @@ static fdio_timer_t* to_timer(const fdio_ptr& io) {
   }
   return reinterpret_cast<fdio_timer_t*>(&zxio);
 }
+}  // namespace
 
 __EXPORT
 int timerfd_create(int clockid, int flags) {
@@ -190,7 +191,8 @@ int timerfd_create(int clockid, int flags) {
   return ERRNO(EMFILE);
 }
 
-static void fdio_timer_get_current_timespec(fdio_timer_t* timer, struct itimerspec* out_timespec)
+namespace {
+void fdio_timer_get_current_timespec(fdio_timer_t* timer, struct itimerspec* out_timespec)
     __TA_REQUIRES(timer->lock) {
   zx::time now = zx::clock::get_monotonic();
   if (timer->interval == zx::duration() && timer->current_deadline <= now) {
@@ -201,6 +203,7 @@ static void fdio_timer_get_current_timespec(fdio_timer_t* timer, struct itimersp
   }
   out_timespec->it_interval = duration_to_timespec(timer->interval);
 }
+}  // namespace
 
 __EXPORT int timerfd_settime(int fd, int flags, const struct itimerspec* new_value,
                              struct itimerspec* old_value) {

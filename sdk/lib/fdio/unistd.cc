@@ -1004,7 +1004,8 @@ off_t lseek(int fd, off_t offset, int whence) {
   return status != ZX_OK ? ERROR(status) : static_cast<off_t>(result);
 }
 
-static int truncateat(int dirfd, const char* path, off_t len) {
+namespace {
+int truncateat(int dirfd, const char* path, off_t len) {
   zx::result io = fdio_internal::open_at(dirfd, path, O_WRONLY, 0);
   if (io.is_error()) {
     return ERROR(io.status_value());
@@ -1014,6 +1015,7 @@ static int truncateat(int dirfd, const char* path, off_t len) {
   }
   return STATUS(io->truncate(static_cast<uint64_t>(len)));
 }
+}  // namespace
 
 __EXPORT
 int truncate(const char* path, off_t len) { return truncateat(AT_FDCWD, path, len); }
@@ -1046,8 +1048,9 @@ int ftruncate(int fd, off_t len) {
 // Using zircon kernel primitives (cookies) to authenticate the vnode token, this
 // allows these multi-path operations to mix absolute / relative paths and cross
 // mount points with ease.
-static int two_path_op_at(int olddirfd, const char* oldpath, int newdirfd, const char* newpath,
-                          two_path_op fdio_t::* op_getter) {
+namespace {
+int two_path_op_at(int olddirfd, const char* oldpath, int newdirfd, const char* newpath,
+                   two_path_op fdio_t::* op_getter) {
   fdio_internal::NameBuffer oldname;
   zx::result io_oldparent =
       fdio_internal::opendir_containing_at(olddirfd, oldpath, &oldname, nullptr);
@@ -1069,6 +1072,7 @@ static int two_path_op_at(int olddirfd, const char* oldpath, int newdirfd, const
   }
   return STATUS((io_oldparent.value().get()->*op_getter)(oldname, token, newname));
 }
+}  // namespace
 
 __EXPORT
 int renameat(int olddirfd, const char* oldpath, int newdirfd, const char* newpath) {
@@ -1098,7 +1102,8 @@ int link(const char* oldpath, const char* newpath) {
 __EXPORT
 int unlink(const char* path) { return unlinkat(AT_FDCWD, path, 0); }
 
-static int vopenat(int dirfd, const char* path, int flags, va_list args) {
+namespace {
+int vopenat(int dirfd, const char* path, int flags, va_list args) {
   uint32_t mode = 0;
   if (flags & O_CREAT) {
     if (flags & O_DIRECTORY) {
@@ -1122,6 +1127,7 @@ static int vopenat(int dirfd, const char* path, int flags, va_list args) {
   }
   return ERRNO(EMFILE);
 }
+}  // namespace
 
 __EXPORT
 int open(const char* path, int flags, ...) {
@@ -1186,12 +1192,14 @@ int fstat(int fd, struct stat* s) {
   return STATUS(fdio_internal::stat_impl(io, s));
 }
 
+namespace {
 int fstatat(int dirfd, std::string_view filename, struct stat* s, int flags) {
   zx::result io = fdio_internal::open_at(dirfd, filename.data(), O_PATH, 0);
   if (io.is_error()) {
     return ERROR(io.status_value());
   }
   return STATUS(fdio_internal::stat_impl(io.value(), s));
+}
 }
 
 __EXPORT
@@ -1249,7 +1257,8 @@ char* realpath(const char* __restrict filename, char* __restrict resolved) {
   return resolved ? strcpy(resolved, clean_buffer.c_str()) : strdup(clean_buffer.c_str());
 }
 
-static zx_status_t zx_utimens(const fdio_ptr& io, const std::timespec times[2], int flags) {
+namespace {
+zx_status_t zx_utimens(const fdio_ptr& io, const std::timespec times[2], int flags) {
   zxio_node_attributes_t attr = {};
 
   zx_time_t modification_time;
@@ -1272,6 +1281,7 @@ static zx_status_t zx_utimens(const fdio_ptr& io, const std::timespec times[2], 
   // set time(s) on underlying object
   return io->set_attr(&attr);
 }
+}  // namespace
 
 __EXPORT
 int utimensat(int dirfd, const char* path, const struct timespec times[2], int flags) {
@@ -1296,7 +1306,8 @@ int futimens(int fd, const struct timespec times[2]) {
   return STATUS(zx_utimens(io, times, 0));
 }
 
-static int socketpair_create(int fd[2], uint32_t options, int flags) {
+namespace {
+int socketpair_create(int fd[2], uint32_t options, int flags) {
   constexpr int allowed_flags = O_NONBLOCK | O_CLOEXEC;
   if (flags & ~allowed_flags) {
     return ERRNO(EINVAL);
@@ -1333,6 +1344,7 @@ static int socketpair_create(int fd[2], uint32_t options, int flags) {
   }
   return ERRNO(EMFILE);
 }
+}  // namespace
 
 __EXPORT
 int pipe2(int pipefd[2], int flags) { return socketpair_create(pipefd, 0, flags); }
@@ -1462,7 +1474,8 @@ int chdir(const char* path) {
   return 0;
 }
 
-static bool resolve_path(const char* relative, fdio_internal::PathBuffer* out_resolved) {
+namespace {
+bool resolve_path(const char* relative, fdio_internal::PathBuffer* out_resolved) {
   bool is_dir = false;
   if (relative[0] == '/') {
     return fdio_internal::CleanPath(relative, out_resolved, &is_dir);
@@ -1484,6 +1497,7 @@ static bool resolve_path(const char* relative, fdio_internal::PathBuffer* out_re
   buffer.Append(relative, relative_length);
   return fdio_internal::CleanPath(buffer.c_str(), out_resolved, &is_dir);
 }
+}  // namespace
 
 __EXPORT
 int chroot(const char* path) {
@@ -1598,7 +1612,8 @@ int closedir(DIR* dir) {
   return 0;
 }
 
-static zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr io) {
+namespace {
+zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr io) {
   if (dir->iterator != nullptr) {
     return ZX_OK;
   }
@@ -1611,6 +1626,7 @@ static zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr io) {
 
   return status;
 }
+}  // namespace
 
 __EXPORT
 struct dirent* readdir(DIR* dir) {
