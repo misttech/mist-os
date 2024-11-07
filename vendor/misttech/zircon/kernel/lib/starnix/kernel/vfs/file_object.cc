@@ -84,7 +84,7 @@ fit::result<Errno, FileHandle> FileObject::New(ktl::unique_ptr<FileOps> ops, Nam
   if (!kernel) {
     return fit::error(errno(ENOENT));
   }
-  auto id = FileObjectId{kernel->next_file_object_id.next()};
+  auto id = FileObjectId{kernel->next_file_object_id_.next()};
   fbl::AllocChecker ac;
   auto file =
       fbl::AdoptRef(new (&ac) FileObject(WeakFileHandle(), id, name, fs, ktl::move(ops), flags));

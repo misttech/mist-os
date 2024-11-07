@@ -44,7 +44,7 @@ fbl::RefPtr<Namespace> Namespace::new_with_flags(FileSystemHandle fs, MountFlags
   fbl::AllocChecker ac;
   auto handle = fbl::AdoptRef(new (&ac) Namespace(
       Mount::New({.type = WhatToMountEnum::Fs, .what = fs}, MountFlags::empty()),
-      kernel->get_next_namespace_id()));
+      kernel->next_namespace_id_.next()));
   ZX_ASSERT(ac.check());
   return handle;
 }

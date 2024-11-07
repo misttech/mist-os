@@ -128,7 +128,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(
     const fbl::RefPtr<Kernel>& kernel, pid_t pid, const ktl::string_view& initial_name,
     fbl::RefPtr<FsContext> fs, fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits) {
   LTRACE;
-  auto pids = kernel->pids.Write();
+  auto pids = kernel->pids_.Write();
 
   auto task_info_factory = [kernel, initial_name](pid_t pid,
                                                   fbl::RefPtr<ProcessGroup> process_group) {
@@ -160,7 +160,7 @@ fit::result<Errno, CurrentTask> CurrentTask::create_system_task(const fbl::RefPt
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
     const fbl::RefPtr<Kernel>& kernel, const ktl::string_view& initial_name) {
   LTRACE;
-  util::WeakPtr<Task> weak_init = kernel->pids.Read()->get_task(1);
+  util::WeakPtr<Task> weak_init = kernel->pids_.Read()->get_task(1);
   fbl::RefPtr<Task> init_task = weak_init.Lock();
   if (!init_task) {
     return fit::error(errno(EINVAL));
@@ -196,7 +196,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task(const fbl::RefPtr<Kerne
                                                          fbl::RefPtr<FsContext> root_fs,
                                                          TaskInfoFactory&& task_info_factory) {
   LTRACE;
-  auto pids = kernel->pids.Write();
+  auto pids = kernel->pids_.Write();
   auto pid = pids->allocate_pid();
   return create_task_with_pid(kernel, pids, pid, initial_name, root_fs, task_info_factory,
                               Credentials::root(),
@@ -324,7 +324,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   auto files = clone_files ? task_->files_ : task_->files_.fork();
 
   auto kernel = task_->kernel();
-  auto pids = kernel->pids.Write();
+  auto pids = kernel->pids_.Write();
 
   pid_t pid;
   ktl::string_view command;

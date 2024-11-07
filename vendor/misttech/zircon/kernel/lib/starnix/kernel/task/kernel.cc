@@ -22,8 +22,9 @@
 
 namespace starnix {
 
-Kernel::Kernel(const ktl::string_view& _cmdline)
-    : kthreads_(KernelThreads::New(util::WeakPtr(this))), cmdline{ktl::move(_cmdline)} {
+Kernel::Kernel(const ktl::string_view& cmdline)
+    : kthreads_(KernelThreads::New(util::WeakPtr(this))),
+      cmdline_{ktl::move(cmdline)} {
   LTRACE_ENTRY_OBJ;
 }
 
@@ -35,12 +36,7 @@ fit::result<zx_status_t, fbl::RefPtr<Kernel>> Kernel::New(const ktl::string_view
   if (!ac.check()) {
     return fit::error(ZX_ERR_NO_MEMORY);
   }
-
   return fit::ok(ktl::move(kernel));
 }
-
-uint64_t Kernel::get_next_mount_id() { return next_mount_id.next(); }
-
-uint64_t Kernel::get_next_namespace_id() { return next_namespace_id.next(); }
 
 }  // namespace starnix

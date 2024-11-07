@@ -81,7 +81,7 @@ MountHandle Mount::new_with_root(DirEntryHandle root, MountFlags flags) {
   ASSERT_MSG(kernel, "can't create mount without a kernel");
 
   fbl::AllocChecker ac;
-  auto handle = fbl::AdoptRef(new (&ac) Mount(kernel->get_next_mount_id(), flags, root, fs));
+  auto handle = fbl::AdoptRef(new (&ac) Mount(kernel->next_mount_id_.next(), flags, root, fs));
   ZX_ASSERT(ac.check());
   return handle;
 }

@@ -32,16 +32,15 @@ using FileSystemHandle = fbl::RefPtr<FileSystem>;
 /// The structure of this object will likely need to evolve as we implement more namespacing and
 /// isolation mechanisms, such as `namespaces(7)` and `pid_namespaces(7)`.
 class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
- private:
+ public:
   /// The kernel threads running on behalf of this kernel.
   KernelThreads kthreads_;
 
- public:
   /// The feaures enabled for this kernel.
   // pub features: KernelFeatures,
 
   // The processes and threads running in this kernel, organized by pid_t.
-  starnix_sync::RwLock<PidTable> pids;
+  starnix_sync::RwLock<PidTable> pids_;
 
   /// The default namespace for abstract AF_UNIX sockets in this kernel.
   ///
@@ -54,11 +53,11 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   // pub default_abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
   // The kernel command line. Shows up in /proc/cmdline.
-  std::string_view cmdline;
+  ktl::string_view cmdline_;
 
   // Owned by anon_node.rs
   // pub anon_fs: OnceCell<FileSystemHandle>,
-  OnceCell<FileSystemHandle> anon_fs;
+  OnceCell<FileSystemHandle> anon_fs_;
 
   // Owned by pipe.rs
   // pub pipe_fs: OnceCell<FileSystemHandle>,
@@ -163,14 +162,12 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   // pub power_manager: PowerManager,
 
   /// Unique IDs for new mounts and mount namespaces.
-  AtomicCounter<uint64_t> next_mount_id;
-
-  // pub next_peer_group_id: AtomicU64Counter,
-
-  AtomicCounter<uint64_t> next_namespace_id;
+  AtomicCounter<uint64_t> next_mount_id_;
+  AtomicCounter<uint64_t> next_peer_group_id_;
+  AtomicCounter<uint64_t> next_namespace_id_;
 
   /// Unique IDs for file objects.
-  AtomicCounter<uint64_t> next_file_object_id;
+  AtomicCounter<uint64_t> next_file_object_id_;
 
   /// Unique cookie used to link two inotify events, usually an IN_MOVE_FROM/IN_MOVE_TO pair.
   // pub next_inotify_cookie: AtomicU32Counter,
@@ -201,24 +198,11 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   /// impl Kernel
   static fit::result<zx_status_t, fbl::RefPtr<Kernel>> New(const ktl::string_view& cmdline);
 
-  uint64_t get_next_mount_id();
-
-  uint64_t get_next_namespace_id();
-
- public:
-  using fbl::RefCountedUpgradeable<Kernel>::AddRef;
-  using fbl::RefCountedUpgradeable<Kernel>::Release;
-  using fbl::RefCountedUpgradeable<Kernel>::Adopt;
-  using fbl::RefCountedUpgradeable<Kernel>::AddRefMaybeInDestructor;
-
   // C++
-  const KernelThreads& kthreads() const { return kthreads_; }
-  KernelThreads& kthreads() { return kthreads_; }
-
   ~Kernel();
 
  private:
-  Kernel(const ktl::string_view& _cmdline);
+  Kernel(const ktl::string_view& cmdline);
 };
 
 }  // namespace starnix

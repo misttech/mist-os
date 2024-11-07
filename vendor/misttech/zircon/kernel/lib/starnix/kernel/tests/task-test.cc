@@ -28,7 +28,7 @@ bool test_tid_allocation() {
   pid_t another_tid = (*another_current)->get_tid();
   ASSERT_TRUE(another_tid >= 2);
 
-  auto pids = kernel->pids.Read();
+  auto pids = kernel->pids_.Read();
   ASSERT_EQ(1, pids->get_task(1).Lock()->get_tid());
   ASSERT_EQ(another_tid, pids->get_task(another_tid).Lock()->get_tid());
 

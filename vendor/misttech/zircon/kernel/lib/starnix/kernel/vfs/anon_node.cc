@@ -35,13 +35,13 @@ FileHandle Anon::new_file(const CurrentTask& current_task, ktl::unique_ptr<FileO
 }
 
 FileSystemHandle anon_fs(const fbl::RefPtr<Kernel>& kernel) {
-  if (!kernel->anon_fs.is_initialized()) {
+  if (!kernel->anon_fs_.is_initialized()) {
     fbl::AllocChecker ac;
     auto anonfs = new (&ac) AnonFs();
     ZX_ASSERT(ac.check());
-    kernel->anon_fs.set(FileSystem::New(kernel, {.type = CacheModeType::Uncached}, anonfs, {}));
+    kernel->anon_fs_.set(FileSystem::New(kernel, {.type = CacheModeType::Uncached}, anonfs, {}));
   }
-  return kernel->anon_fs.get();
+  return kernel->anon_fs_.get();
 }
 
 }  // namespace starnix

@@ -56,7 +56,7 @@ fit::result<Errno, Container> create_container(const Config& config) {
   }
   fs_context = result.value();
 
-  auto init_pid = kernel->pids.Write()->allocate_pid();
+  auto init_pid = kernel->pids_.Write()->allocate_pid();
   // Lots of software assumes that the pid for the init process is 1.
   DEBUG_ASSERT(init_pid == 1);
 
@@ -68,10 +68,10 @@ fit::result<Errno, Container> create_container(const Config& config) {
     // pid 1 to init, but this value matches what is supposed to happen.
     DEBUG_ASSERT(system_task->id_ == 2);
 
-    _EP(kernel->kthreads().Init(ktl::move(system_task)));
+    _EP(kernel->kthreads_.Init(ktl::move(system_task)));
   }
 
-  auto& system_task = kernel->kthreads().system_task();
+  auto& system_task = kernel->kthreads_.system_task();
 
   // Register common devices and add them in sysfs and devtmpfs.
   starnix_modules::init_common_devices(system_task);

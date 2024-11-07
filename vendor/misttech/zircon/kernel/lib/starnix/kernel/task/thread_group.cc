@@ -522,7 +522,7 @@ void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> curren
     //             .ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
   }
 
-  auto pids = kernel_->pids.Write();
+  auto pids = kernel_->pids_.Write();
   auto state = mutable_state_.Write();
   if (state->terminating_) {
     // The thread group is already terminating and all threads in the thread group have
@@ -570,7 +570,7 @@ fit::result<Errno> ThreadGroup::add(fbl::RefPtr<Task> task) const {
 }
 
 void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
-  auto pids = kernel_->pids.Write();
+  auto pids = kernel_->pids_.Write();
 
   // task->set_ptrace_zombie(pids.get());
   pids->remove_task(task->id_);
@@ -694,7 +694,7 @@ void ThreadGroup::do_zombie_notifications(fbl::RefPtr<ZombieProcess> zombie) con
 
 fit::result<Errno> ThreadGroup::setsid() const {
   {
-    auto pids = kernel_->pids.Write();
+    auto pids = kernel_->pids_.Write();
     if (pids->get_process_group(leader_).has_value()) {
       return fit::error(errno(EPERM));
     }
@@ -734,7 +734,7 @@ void ThreadGroup::check_orphans() const {
 
 void ThreadGroup::release() {
   LTRACE_ENTRY_OBJ;
-  auto pids = kernel_->pids.Write();
+  auto pids = kernel_->pids_.Write();
   auto state = Write();
 
   for (auto& zombie : state->zombie_children_) {

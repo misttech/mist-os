@@ -39,7 +39,7 @@ fit::result<Errno, pid_t> negate_pid(pid_t pid) {
 
 fit::result<Errno> sys_kill(const CurrentTask& current_task, pid_t pid,
                             starnix_uapi::UncheckedSignal unchecked_signal) {
-  auto pids = current_task->kernel()->pids.Write();
+  auto pids = current_task->kernel()->pids_.Write();
 
   if (pid > 0) {
     // "If pid is positive, then signal sig is sent to the process with
@@ -128,7 +128,7 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
   auto waiter = Waiter::New();
   do {
     {
-      auto pids = current_task->kernel()->pids.Write();
+      auto pids = current_task->kernel()->pids_.Write();
       // Waits and notifies on a given task need to be done atomically
       // with respect to changes to the task's waitable state; otherwise,
       // we see missing notifications. We do that by holding the task lock.

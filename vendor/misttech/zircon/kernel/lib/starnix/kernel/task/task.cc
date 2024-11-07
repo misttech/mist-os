@@ -276,7 +276,9 @@ const fbl::RefPtr<MemoryManager>& Task::mm() const {
 
 fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group_->kernel_; }
 
-util::WeakPtr<Task> Task::get_task(pid_t pid) const { return kernel()->pids.Read()->get_task(pid); }
+util::WeakPtr<Task> Task::get_task(pid_t pid) const {
+  return kernel()->pids_.Read()->get_task(pid);
+}
 
 pid_t Task::get_pid() const { return thread_group_->leader_; }
 

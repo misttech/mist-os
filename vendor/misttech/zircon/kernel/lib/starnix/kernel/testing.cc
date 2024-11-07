@@ -44,7 +44,7 @@ fbl::RefPtr<FsContext> create_test_fs_context(const fbl::RefPtr<Kernel>& kernel,
 }  // namespace
 
 TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs) {
-  auto init_pid = kernel->pids.Write()->allocate_pid();
+  auto init_pid = kernel->pids_.Write()->allocate_pid();
   ASSERT(init_pid == 1);
   fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits;
   auto init_task =
@@ -56,7 +56,7 @@ TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsCont
 
   auto system_task = CurrentTask::create_system_task(kernel, fs);
   ZX_ASSERT_MSG(system_task.is_ok(), "create system task");
-  ZX_ASSERT_MSG(kernel->kthreads().Init(ktl::move(system_task.value())).is_ok(),
+  ZX_ASSERT_MSG(kernel->kthreads_.Init(ktl::move(system_task.value())).is_ok(),
                 "failed to initialize kthreads");
 
   // let system_task = kernel.kthreads.system_task();
