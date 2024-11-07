@@ -24,6 +24,11 @@ impl Interrupt {
             unsafe { sys::zx_interrupt_bind(self.raw_handle(), port.raw_handle(), key, options) };
         ok(status)
     }
+
+    pub fn ack(&self) -> Result<(), Status> {
+        let status = unsafe { sys::zx_interrupt_ack(self.raw_handle()) };
+        ok(status)
+    }
 }
 
 #[cfg(test)]
@@ -36,6 +41,13 @@ mod tests {
         let port = Port::create_with_opts(PortOptions::BIND_TO_INTERRUPT);
         let key = 1;
         let result = interrupt.bind_port(&port, key);
+        assert_eq!(result.err(), Some(Status::BAD_HANDLE));
+    }
+
+    #[test]
+    fn ack() {
+        let interrupt: Interrupt = Handle::invalid().into();
+        let result = interrupt.ack();
         assert_eq!(result.err(), Some(Status::BAD_HANDLE));
     }
 }
