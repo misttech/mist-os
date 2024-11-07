@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,7 +26,6 @@ type TestOrchestrator struct {
 	deviceConfig  *DeviceConfig
 	ffxLogProc    *os.Process
 	targetLogFile *os.File
-	repoName      string
 }
 
 var (
@@ -41,7 +41,6 @@ var (
 func NewTestOrchestrator(deviceConfig *DeviceConfig) *TestOrchestrator {
 	return &TestOrchestrator{
 		deviceConfig: deviceConfig,
-		repoName:     fmt.Sprintf("repo-%d", os.Getpid()),
 	}
 }
 
@@ -172,27 +171,12 @@ func (r *TestOrchestrator) setupFfx() error {
 		{"config", "set", "daemon.autostart", "false"},
 		{"config", "set", "overnet.cso", "only"},
 		{"config", "set", "ffx-repo-add", "true"},
-		// Set a unique repository server name for this run.
-		{"config", "set", "repository.default", r.repoName},
-		// Disable the daemon based repo server.
-		{"config", "set", "repository.server.enabled", "false"},
 	}
-
 	for _, cmd := range cmds {
 		if out, err := r.ffx.RunCmdSync(cmd...); err != nil {
 			return fmt.Errorf("ffx setup %v: %w out: %s", cmd, err, out)
 		}
 	}
-
-	// If there is a log dir, set it instead of the default
-	log_dir := os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR")
-	if log_dir != "" {
-		cmd := []string{"config", "set", "log.dir", log_dir}
-		if out, err := r.ffx.RunCmdSync(cmd...); err != nil {
-			return fmt.Errorf("ffx setup %v: %w out: %s", cmd, err, out)
-		}
-	}
-
 	if err := r.dumpFfxConfig(); err != nil {
 		return fmt.Errorf("dumpFfxConfig: %w", err)
 	}
@@ -289,20 +273,10 @@ func (r *TestOrchestrator) startEmulator(productDir string) error {
 }
 
 /* Step 4 - Serving packages. */
-/*
-Serving packages requires:
-* Creating the package repository or having a downloaded product bundle.
-* Publishing a package to make sure the metadata is up to date. (Can we use --refresh metadata instead?)
-* Starting the package server process
-* Registering the package server on the target device.
-* Package servers are managed by name. or if using product bundles, the product bundle directory.
-
-*/
 func (r *TestOrchestrator) servePackages(in *RunInput, productDir string) error {
-	if err := r.serveAndWait(productDir); err != nil {
-		return fmt.Errorf("serveAndWait: %w", err)
+	if out, err := r.ffx.RunCmdSync("repository", "add-from-pm", productDir); err != nil {
+		return fmt.Errorf("ffx repository add-from-pm: %w out: %s", err, out)
 	}
-
 	// It is important to always publish, even if there is nothing in
 	// in.Target().PackageArchives, because it will force the package metadata
 	// to be refreshed (see b/309847820).
@@ -318,41 +292,39 @@ func (r *TestOrchestrator) servePackages(in *RunInput, productDir string) error 
 			return fmt.Errorf("ffx debug symbol-index add %s: %w out: %s", buildID, err, out)
 		}
 	}
-
-	if _, err := r.ffx.RunCmdSync("repository", "server", "list"); err != nil {
-		return fmt.Errorf("ffx repository server list: %w", err)
+	if err := r.serveAndWait(); err != nil {
+		return fmt.Errorf("serveAndWait: %w", err)
+	}
+	if _, err := r.ffx.RunCmdSync("repository", "list"); err != nil {
+		return fmt.Errorf("ffx repository list: %w", err)
 	}
 	return nil
 }
 
-func (r *TestOrchestrator) serveAndWait(productDir string) error {
+func (r *TestOrchestrator) serveAndWait() error {
 	port := os.Getenv("FUCHSIA_PACKAGE_SERVER_PORT")
 	if port == "" {
-		// Use a dynamic port unless the environment is specific.
-		port = "0"
+		port = "8083"
 	}
 	addr := fmt.Sprintf("[::]:%s", port)
-	args := []string{
-		"repository", "server", "start",
-		"--background", "--no-device",
-		"--address", addr,
-		"--product-bundle", productDir,
-		"--repository", r.repoName,
-	}
-	if _, err := r.ffx.RunCmdSync(args...); err != nil {
+	if _, err := r.ffx.RunCmdAsync("repository", "server", "start", "--address", addr); err != nil {
 		return fmt.Errorf("ffx repository server start: %w", err)
 	}
-
-	// The server start command when using `--background` waits for the server
-	// to actually start before exiting, so this check is a double check.
-	running, err := r.ffx.IsPackageServerRunning(r.repoName)
-	if err != nil {
-		return fmt.Errorf("ffx isPackageServerRunning: %w", err)
-	}
-	if !running {
-		return fmt.Errorf("repository %s is not running", r.repoName)
-	}
-	return nil
+	return utils.RunWithRetries(context.Background(), 500*time.Millisecond, 5, func() error {
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%s", port), nil)
+		if err != nil {
+			return fmt.Errorf("http.NewRequest: %w", err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("http.DefaultClient.Do: %w", err)
+		}
+		// Check the response status code
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("resp.StatusCode: got %d, want 200", resp.StatusCode)
+		}
+		return nil
+	})
 }
 
 /* Step 5 - Reach Device */
@@ -363,7 +335,6 @@ func (r *TestOrchestrator) reachDevice() error {
 			return fmt.Errorf("ffx target add: %w", err)
 		}
 	}
-
 	if _, err := r.ffx.RunCmdSync("target", "wait"); err != nil {
 		return fmt.Errorf("ffx target wait: %w", err)
 	}
@@ -373,19 +344,16 @@ func (r *TestOrchestrator) reachDevice() error {
 	if err := r.dumpFfxLog(); err != nil {
 		return fmt.Errorf("dumpFfxLog: %w", err)
 	}
-
-	// Register the repo server using the aliases configured with the running server.
 	if out, err := r.ffx.RunCmdSync(
 		"target",
 		"repository",
 		"register",
 		"--repository",
-		r.repoName,
+		"devhost",
 		"--alias",
 		"fuchsia.com",
 		"--alias",
-		"chromium.org",
-	); err != nil {
+		"chromium.org"); err != nil {
 		return fmt.Errorf("ffx target repository register: %w out: %s", err, out)
 	}
 	return nil
@@ -513,7 +481,7 @@ func writeJSON(filename string, data any) error {
 
 /* Cleanup */
 func (r *TestOrchestrator) stopPackageServer() {
-	if _, err := r.ffx.RunCmdSync("repository", "server", "stop", r.repoName); err != nil {
+	if _, err := r.ffx.RunCmdSync("repository", "server", "stop"); err != nil {
 		fmt.Printf("ffx repository server stop: %v", err)
 	}
 }
