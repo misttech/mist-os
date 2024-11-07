@@ -8,16 +8,16 @@
 #include <lib/fdio/limits.h>
 #include <lib/fdio/namespace.h>
 #include <sys/types.h>  // mode_t
-#include <threads.h>    // mtx_t
 
 #include <array>
+#include <mutex>
 
 #include "sdk/lib/fdio/cleanpath.h"
 #include "sdk/lib/fdio/fdio_slot.h"
 
 struct fdio_state_t {
-  mtx_t lock;
-  mtx_t cwd_lock __TA_ACQUIRED_BEFORE(lock);
+  std::mutex lock;
+  std::mutex cwd_lock __TA_ACQUIRED_BEFORE(lock);
   mode_t umask __TA_GUARDED(lock);
   fdio_slot root __TA_GUARDED(lock);
   fdio_slot cwd __TA_GUARDED(lock);

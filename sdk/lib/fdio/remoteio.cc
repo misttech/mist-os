@@ -9,7 +9,6 @@
 #include <lib/zxio/cpp/inception.h>
 #include <poll.h>
 
-#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 
 #include "sdk/lib/fdio/internal.h"

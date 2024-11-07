@@ -4,12 +4,10 @@
 
 #include "sdk/lib/fdio/fdio_unistd.h"
 
-#include <fbl/auto_lock.h>
-
 #include "sdk/lib/fdio/internal.h"
 
 std::optional<int> bind_to_fd(const fbl::RefPtr<fdio>& io) {
-  fbl::AutoLock lock(&fdio_lock);
+  std::lock_guard lock(fdio_lock);
   return bind_to_fd_locked(io);
 }
 
@@ -34,7 +32,7 @@ fdio_slot* slot_locked(int fd) __TA_REQUIRES(fdio_lock) {
 }  // namespace
 
 fbl::RefPtr<fdio> fd_to_io(int fd) {
-  fbl::AutoLock lock(&fdio_lock);
+  std::lock_guard lock(fdio_lock);
   return fd_to_io_locked(fd);
 }
 
@@ -47,7 +45,7 @@ fbl::RefPtr<fdio> fd_to_io_locked(int fd) {
 }
 
 fbl::RefPtr<fdio> unbind_from_fd(int fd) {
-  fbl::AutoLock lock(&fdio_lock);
+  std::lock_guard lock(fdio_lock);
   return unbind_from_fd_locked(fd);
 }
 

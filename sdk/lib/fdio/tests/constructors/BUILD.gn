@@ -47,10 +47,11 @@ link_output_rspfile("fdio-rspfile") {
 }
 
 toolchain_utils_action("no-static-ctor") {
-  max_ctors = 0
+  # Known constructor of `__fdio_global_state`
+  max_ctors = 1
   if (current_cpu == "arm64") {
     # Known constructor on arm `init_have_lse_atomics` from libclang_rt.builtins
-    max_ctors = 1
+    max_ctors += 1
   }
 
   testonly = true

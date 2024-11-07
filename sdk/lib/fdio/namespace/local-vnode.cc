@@ -11,7 +11,6 @@
 
 #include <utility>
 
-#include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
@@ -129,7 +128,7 @@ LocalVnode::Local::Local(fdio_open_local_func_t on_open, void* context)
     : on_open_(on_open), context_(context) {}
 
 zx::result<fdio_ptr> LocalVnode::Local::Open() {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard lock(lock_);
   if (on_open_ == nullptr) {
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
@@ -148,7 +147,7 @@ zx::result<fdio_ptr> LocalVnode::Local::Open() {
 }
 
 void LocalVnode::Local::Unlink() {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard lock(lock_);
   on_open_ = nullptr;
   context_ = nullptr;
 }

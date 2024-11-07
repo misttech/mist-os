@@ -15,11 +15,11 @@
 #include <limits.h>
 #include <zircon/types.h>
 
+#include <mutex>
 #include <utility>
 
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/macros.h>
-#include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
@@ -151,7 +151,7 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
     void Unlink();
 
    private:
-    fbl::Mutex lock_;
+    std::mutex lock_;
     fdio_open_local_func_t on_open_ __TA_GUARDED(lock_);
     void* context_ __TA_GUARDED(lock_);
   };

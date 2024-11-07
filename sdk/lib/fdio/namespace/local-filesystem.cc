@@ -16,8 +16,6 @@
 #include <new>
 #include <utility>
 
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
@@ -64,7 +62,7 @@ void fdio_namespace::ResetRoot() {
 }
 
 fdio_namespace::~fdio_namespace() {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard lock(lock_);
   root_->Unlink();
 }
 
@@ -150,7 +148,7 @@ zx::result<fdio_ptr> fdio_namespace::OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn
                                                       std::string_view path,
                                                       fio::wire::OpenFlags flags) const {
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard lock(lock_);
     zx_status_t status = WalkLocked(&vn, &path);
     if (status != ZX_OK) {
       return zx::error(status);
@@ -179,7 +177,7 @@ zx::result<fdio_ptr> fdio_namespace::OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn
 zx::result<fdio_ptr> fdio_namespace::OpenAt(fbl::RefPtr<LocalVnode> vn, std::string_view path,
                                             fio::Flags flags) const {
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard lock(lock_);
     zx_status_t status = WalkLocked(&vn, &path);
     if (status != ZX_OK) {
       return zx::error(status);
@@ -202,7 +200,7 @@ zx::result<fdio_ptr> fdio_namespace::OpenAt(fbl::RefPtr<LocalVnode> vn, std::str
 
 zx_status_t fdio_namespace::Readdir(const LocalVnode& vn, DirentIteratorState* state,
                                     zxio_dirent_t* inout_entry) const {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard lock(lock_);
 
   auto populate_entry = [](zxio_dirent_t* inout_entry, std::string_view name) {
     if (name.size() > NAME_MAX) {
@@ -246,7 +244,7 @@ zx_status_t fdio_namespace::OpenRemoteDeprecated(std::string_view path, fio::wir
 
   fbl::RefPtr<LocalVnode> vn;
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard lock(lock_);
     vn = root_;
     zx_status_t status = WalkLocked(&vn, &path);
     if (status != ZX_OK) {
@@ -288,7 +286,7 @@ zx_status_t fdio_namespace::OpenRemote(std::string_view path, fio::Flags flags,
 
   fbl::RefPtr<LocalVnode> vn;
   {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard lock(lock_);
     vn = root_;
     zx_status_t status = WalkLocked(&vn, &path);
     if (status != ZX_OK) {
@@ -326,7 +324,7 @@ zx_status_t fdio_namespace::Unbind(std::string_view path) {
   // Skip leading slash.
   path.remove_prefix(1);
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard lock(lock_);
   fbl::RefPtr<LocalVnode> vn = root_;
 
   // This node denotes the "highest" node in a lineage of nodes with
@@ -465,7 +463,7 @@ bool fdio_namespace::IsBound(std::string_view path) {
   }
   path.remove_prefix(1);
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard lock(lock_);
   fbl::RefPtr<LocalVnode> vn = root_;
   zx_status_t status = WalkLocked(&vn, &path);
   if (status != ZX_OK) {
@@ -509,7 +507,7 @@ zx_status_t fdio_namespace::Bind(
   // Skip leading slash.
   path.remove_prefix(1);
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard lock(lock_);
   if (path.empty()) {
     // We've been asked to bind the namespace root. In this function, we will not
     // bind root if:
@@ -651,7 +649,7 @@ zx_status_t fdio_namespace::Bind(
 
 zx::result<fdio_ptr> fdio_namespace::OpenRoot() const {
   fbl::RefPtr<LocalVnode> vn = [this]() {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard lock(lock_);
     return root_;
   }();
 
@@ -702,7 +700,7 @@ zx_status_t fdio_namespace::SetRoot(fdio_t* io) {
     vn = std::move(vn_res.value());
   }
 
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard lock(lock_);
   if (vn == root_) {
     // Nothing to do.
     return ZX_OK;
@@ -716,7 +714,7 @@ zx_status_t fdio_namespace::SetRoot(fdio_t* io) {
 
 zx_status_t fdio_namespace::Export(fdio_flat_namespace_t** out) const {
   fbl::RefPtr<LocalVnode> vn = [this]() {
-    fbl::AutoLock lock(&lock_);
+    std::lock_guard lock(lock_);
     return root_;
   }();
 

@@ -20,7 +20,6 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
-#include <fbl/auto_lock.h>
 
 #include "fdio_unistd.h"
 
