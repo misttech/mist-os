@@ -22,23 +22,21 @@ jobs:
             jiri init -analytics-opt=true
             jiri import -name=integration flower https://github.com/misttech/integration
       - run:
-          name: Retrieve integration/jiri.lock
+          name: Retrieve jiri.lock to temp folder
           command: |
-            mkdir -p integration
-            curl -o integration/jiri.lock "https://raw.githubusercontent.com/misttech/integration/refs/heads/main/jiri.lock"
+            mkdir -p tmp
+            curl -o tmp/jiri.lock "https://raw.githubusercontent.com/misttech/integration/refs/heads/main/jiri.lock"
       - restore_cache:
           name: Restore Jiri Cache
           keys:
-            - &jiri-cache-v1 jiri-{{ checksum "integration/jiri.lock" }}
+            - &jiri-cache-v1 jiri-{{ checksum "tmp/jiri.lock" }}
             - jiri
       - run:
           name: Update Jiri
           command: |
             export PATH=$PWD/.jiri_root/bin:$PATH
+            jiri project-config --no-update=true --no-rebase=true
             jiri update
-            git checkout $CIRCLE_BRANCH
-          # why???
-          #jiri project-config --no-update=true --no-rebase=true
       - save_cache:
           name: Save Jiri Cache
           key: *jiri-cache-v1
@@ -55,7 +53,7 @@ jobs:
             NOECHO= make kernel_unit_test
       - run:
           name: Test
-          command: NOECHO= make kernel_unit_test
+          command: NOECHO= make run_kernel_unit_test
 
 workflows:
   version: 2
