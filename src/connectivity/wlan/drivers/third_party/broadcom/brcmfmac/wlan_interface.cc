@@ -313,14 +313,6 @@ void WlanInterface::Start(StartRequestView request, StartCompleter::Sync& comple
   completer.ReplySuccess(std::move(out_mlme_channel));
 }
 
-void WlanInterface::Stop(StopCompleter::Sync& completer) {
-  std::shared_lock<std::shared_mutex> guard(lock_);
-  if (wdev_ != nullptr) {
-    brcmf_if_stop(wdev_->netdev);
-  }
-  completer.Reply();
-}
-
 void WlanInterface::Query(QueryCompleter::Sync& completer) {
   std::shared_lock<std::shared_mutex> guard(lock_);
   fdf::Arena arena('WLAN');

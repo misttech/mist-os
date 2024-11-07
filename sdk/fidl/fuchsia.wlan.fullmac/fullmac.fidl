@@ -535,7 +535,6 @@ closed protocol WlanFullmacImpl {
     }) -> (resource struct {
         sme_channel zx.Handle:CHANNEL;
     }) error zx.Status;
-    strict Stop() -> ();
 
     // State operation
     strict Query() -> (struct {

@@ -3223,6 +3223,8 @@ void SimFirmware::RxDataFrame(std::shared_ptr<const simulation::SimDataFrame> da
   for (uint8_t idx = 0; idx < kMaxIfSupported; idx++) {
     if (!iface_tbl_[idx].allocated)
       continue;
+    if (!iface_tbl_[idx].is_up)
+      continue;
     if (!(is_broadcast || (data_frame->addr1_ == iface_tbl_[idx].mac_addr)))
       continue;
     if (OffloadArpFrame(idx, data_frame))

@@ -29,12 +29,6 @@ const std::vector<uint8_t> SimInterface::kDefaultScanChannels = {
 SimInterface::SimInterface() : test_arena_(fdf::Arena('IFAC')) {}
 
 SimInterface::~SimInterface() {
-  // If the client is valid, it means that this SimInterface has been connected to a real
-  // WlanInterface object, otherwise skip the stop.
-  if (client_.is_valid()) {
-    auto result = client_.buffer(test_arena_)->Stop();
-    ZX_ASSERT(result.ok());
-  }
   if (ch_sme_ != ZX_HANDLE_INVALID) {
     zx_handle_close(ch_sme_);
   }
@@ -297,13 +291,6 @@ void SimInterface::SaeFrameRx(SaeFrameRxRequestView request, SaeFrameRxCompleter
 void SimInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request,
                                    OnWmmStatusRespCompleter::Sync& completer) {
   completer.Reply();
-}
-
-void SimInterface::StopInterface() {
-  auto result = client_.buffer(test_arena_)->Stop();
-  if (!result.ok()) {
-    BRCMF_ERR("Stop failed, FIDL error: %s", result.status_string());
-  }
 }
 
 void SimInterface::Query(wlan_fullmac_wire::WlanFullmacQueryInfo* out_info) {
