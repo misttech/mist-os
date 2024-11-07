@@ -4,7 +4,6 @@
 
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
 load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
-load("//build/tools/gnerator/bazel_rules:defs.bzl", "install_host_tools")
 
 go_library(
     name = "gnerator_lib",
@@ -45,11 +44,4 @@ go_test(
         "//third_party/golibs:go.starlark.net/starlark",
         "//third_party/golibs:go.starlark.net/syntax",
     ],
-)
-
-install_host_tools(
-    name = "host",
-    outputs = ["gnerator"],
-    target_compatible_with = HOST_CONSTRAINTS,
-    deps = [":gnerator"],
 )

@@ -13,8 +13,8 @@ go_library(
     ],
     importpath = "go.fuchsia.dev/fuchsia/tools/net/mdns",
     deps = [
-        "//third_party/golibs:golang.org/x/net/ipv4",
-        "//third_party/golibs:golang.org/x/net/ipv6",
+        "//third_party/golibs/vendor/golang.org/x/net/ipv4",
+        "//third_party/golibs/vendor/golang.org/x/net/ipv6",
         "//tools/lib/logger",
     ],
 )
@@ -28,6 +28,6 @@ go_test(
         ":mdns",
     ],
     deps = [
-        "//third_party/golibs:github.com/google/go-cmp/cmp",
+        "//third_party/golibs/vendor/github.com/google/go-cmp/cmp",
     ],
 )
