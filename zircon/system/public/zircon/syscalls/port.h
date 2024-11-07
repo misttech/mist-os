@@ -17,6 +17,7 @@ __BEGIN_CDECLS
 #define ZX_WAIT_ASYNC_ONCE            ((uint32_t)0u)
 #define ZX_WAIT_ASYNC_TIMESTAMP       ((uint32_t)1u)
 #define ZX_WAIT_ASYNC_EDGE            ((uint32_t)2u)
+#define ZX_WAIT_ASYNC_BOOT_TIMESTAMP  ((uint32_t)4u)
 
 typedef uint32_t zx_packet_type_t;
 
@@ -69,7 +70,7 @@ typedef struct zx_packet_signal {
   zx_signals_t trigger;
   zx_signals_t observed;
   uint64_t count;
-  uint64_t timestamp;
+  zx_time_t timestamp;
   uint64_t reserved1;
 } zx_packet_signal_t;
 
@@ -148,7 +149,7 @@ typedef struct zx_packet_guest_vcpu {
 } zx_packet_guest_vcpu_t;
 
 typedef struct zx_packet_interrupt {
-  zx_time_t timestamp;
+  zx_instant_boot_t timestamp;
   uint64_t reserved0;
   uint64_t reserved1;
   uint64_t reserved2;

@@ -26,7 +26,10 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
  public:
   // The heap can be nullopt initially, but in that case set_heap() must be used to set the heap
   // before set_ready().
-  ContiguousPooledMemoryAllocator(Owner* parent_device, const char* allocation_name,
+  //
+  // The heap_name must be a string literal (or equivalent null termination and lifetime) because
+  // heap_name is used to call TRACE_* macros.
+  ContiguousPooledMemoryAllocator(Owner* parent_device, const char* heap_name,
                                   inspect::Node* parent_node,
                                   std::optional<fuchsia_sysmem2::Heap> heap, uint64_t size,
                                   bool is_always_cpu_accessible, bool is_ever_cpu_accessible,
@@ -247,7 +250,9 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
 
   Owner* const parent_device_{};
   async_dispatcher_t* dispatcher_{};
-  const char* const allocation_name_{};
+  // This must point at a string literal (or equivalent null termination and lifetime), because this
+  // is passed to TRACE_* macros.
+  const char* const heap_name_{};
   std::optional<fuchsia_sysmem2::Heap> heap_;
   const uint64_t counter_id_{};
   char child_name_[ZX_MAX_NAME_LEN] = {};

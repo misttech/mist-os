@@ -100,6 +100,14 @@ _storage_minfs = {
   }
 }
 
+_network_netstack3 = {
+  connectivity = {
+    network = {
+      netstack_version = "netstack3"
+    }
+  }
+}
+
 _base_packages = [
   {
     # Provides font assets for `platform.fonts.font_collection` above.
@@ -111,6 +119,10 @@ product_assembly_configuration("core") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
+
+    if (target_cpu == "arm" || target_cpu == "arm64") {
+      forward_variables_from(_network_netstack3, "*")
+    }
   }
   product = {
     build_info = default_product_build_info
@@ -125,6 +137,9 @@ product_assembly_configuration("core_with_f2fs") {
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
     forward_variables_from(_storage_f2fs, "*")
+    if (target_cpu == "arm" || target_cpu == "arm64") {
+      forward_variables_from(_network_netstack3, "*")
+    }
   }
   product = {
     build_info = default_product_build_info
@@ -139,6 +154,9 @@ product_assembly_configuration("core_with_minfs") {
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
     forward_variables_from(_storage_minfs, "*")
+    if (target_cpu == "arm" || target_cpu == "arm64") {
+      forward_variables_from(_network_netstack3, "*")
+    }
   }
   product = {
     build_info = default_product_build_info
@@ -152,12 +170,7 @@ product_assembly_configuration("core_with_netstack3") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
-
-    connectivity = {
-      network = {
-        netstack_version = "netstack3"
-      }
-    }
+    forward_variables_from(_network_netstack3, "*")
   }
   product = {
     build_info = default_product_build_info
@@ -171,6 +184,9 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
   testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
+    if (target_cpu == "arm" || target_cpu == "arm64") {
+      forward_variables_from(_network_netstack3, "*")
+    }
 
     driver_framework = {
       test_fuzzing_config = {

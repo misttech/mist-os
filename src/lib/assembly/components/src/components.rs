@@ -59,7 +59,6 @@ impl ComponentBuilder {
         let mut args = vec![
             "compile".into(),
             "--features=allow_long_names".into(),
-            "--features=dictionaries".into(),
             "--config-package-path".into(),
             format!("meta/{}.cvf", &self.name),
             "-o".into(),
@@ -129,7 +128,6 @@ mod tests {
                     "args": [
                         "compile",
                         "--features=allow_long_names",
-                        "--features=dictionaries",
                         "--config-package-path",
                         "meta/test.cvf",
                         "-o",

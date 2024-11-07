@@ -6,7 +6,7 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 #include <bind/fuchsia/test/cpp/bind.h>
 
@@ -37,17 +37,17 @@ zx::result<> TemplateDriver::Start() {
 }
 
 void TemplateDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
-  FDF_LOG(INFO,
-          "TemplateDriver::PrepareStop() invoked. This is called before "
-          "the driver dispatchers are shutdown. Only implement this function "
-          "if you need to manually clearn up objects (ex/ unique_ptrs) in the driver dispatchers");
+  fdf::info(
+      "TemplateDriver::PrepareStop() invoked. This is called before "
+      "the driver dispatchers are shutdown. Only implement this function "
+      "if you need to manually clearn up objects (ex/ unique_ptrs) in the driver dispatchers");
   completer(zx::ok());
 }
 
 void TemplateDriver::Stop() {
-  FDF_LOG(INFO,
-          "TemplateDriver::Stop() invoked. This is called after all driver dispatchers are "
-          "shutdown. Use this function to perform any remaining teardowns");
+  fdf::info(
+      "TemplateDriver::Stop() invoked. This is called after all driver dispatchers are "
+      "shutdown. Use this function to perform any remaining teardowns");
 }
 
 }  // namespace template_driver

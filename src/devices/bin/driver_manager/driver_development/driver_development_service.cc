@@ -24,8 +24,7 @@ namespace {
 
 void SetNodeInfoBuilderNodeProperties(
     fidl::AnyArena& allocator, const driver_manager::Node& node,
-    fidl::WireTableBuilder<fuchsia_driver_development::wire::NodeInfo> node_info_builder,
-    fidl::WireTableBuilder<fuchsia_driver_development::wire::V2NodeInfo>& v2_node_info_builder) {
+    fidl::WireTableBuilder<fuchsia_driver_development::wire::NodeInfo> node_info_builder) {
   // Composite node's "default" node properties are its primary parent's node properties which
   // should not be used.
   if (node.type() == driver_manager::NodeType::kComposite) {
@@ -46,7 +45,6 @@ void SetNodeInfoBuilderNodeProperties(
     };
   }
   node_info_builder.node_property_list(node_properties);
-  v2_node_info_builder.node_property_list(node_properties);
 }
 
 zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
@@ -80,15 +78,12 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
     device_info.parent_ids(parent_ids);
   }
 
-  auto v2_info_builder = fuchsia_driver_development::wire::V2NodeInfo::Builder(allocator);
-
-  v2_info_builder.moniker(fidl::StringView(allocator, node->MakeComponentMoniker()));
   device_info.moniker(fidl::StringView(allocator, node->MakeComponentMoniker()));
 
   device_info.quarantined(node->quarantined());
   device_info.bound_driver_url(fidl::StringView(allocator, node->driver_url()));
 
-  SetNodeInfoBuilderNodeProperties(allocator, *node, device_info, v2_info_builder);
+  SetNodeInfoBuilderNodeProperties(allocator, *node, device_info);
 
   // TODO(https://fxbug.dev/42172220): Get topological path
 
@@ -125,13 +120,8 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
       node_offers[i] = fidl::ToWire(allocator, fidl::ToNatural(inner_offer));
     }
 
-    v2_info_builder.offer_list(node_offers);
     device_info.offer_list(node_offers);
   }
-
-  auto versioned_info = fuchsia_driver_development::wire::VersionedNodeInfo::WithV2(
-      allocator, v2_info_builder.Build());
-  device_info.versioned_info(versioned_info);
 
   return zx::ok(device_info.Build());
 }

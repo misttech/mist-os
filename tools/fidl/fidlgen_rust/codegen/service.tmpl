@@ -88,7 +88,16 @@ impl {{ .Name }}Proxy {
         Ok(proxy)
     }
 
+    /// Like `connect_to_{{ .SnakeName }}`, but returns a sync proxy.
+    /// See [`Self::connect_to_{{ .SnakeName }}`] for more details.
+    pub fn connect_to_{{ .SnakeName }}_sync(&self) -> Result<{{ .ProtocolType }}SynchronousProxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<{{ .ProtocolType }}Marker>();
+        self.connect_channel_to_{{ .SnakeName }}(server_end)?;
+        Ok(proxy)
+    }
+
     /// Like `connect_to_{{ .SnakeName }}`, but accepts a server end.
+    /// See [`Self::connect_to_{{ .SnakeName }}`] for more details.
     pub fn connect_channel_to_{{ .SnakeName }}(&self, server_end: fidl::endpoints::ServerEnd<{{ .ProtocolType }}Marker>) -> Result<(), fidl::Error> {
         self.0.open_member("{{ .Name }}", server_end.into_channel())
     }

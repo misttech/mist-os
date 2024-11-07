@@ -12,12 +12,6 @@
         "type": "fuchsia.driver.framework/CompositeInfo"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.driver.development/CompositeInfo.legacy_composite",
-        "ordinal": "1",
-        "type": "fuchsia.driver.legacy/CompositeInfo"
-    },
-    {
         "kind": "union",
         "name": "fuchsia.driver.development/CompositeInfo",
         "strictness": "strict"
@@ -402,12 +396,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.driver.development/NodeBindingInfo.legacy_composite_parents",
-        "ordinal": "4",
-        "type": "vector<fuchsia.driver.legacy/CompositeParent>"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.driver.development/NodeBindingInfo.node_name",
         "ordinal": "1",
         "type": "string:1024"
@@ -465,12 +453,6 @@
         "type": "vector<uint64>"
     },
     {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/NodeInfo.versioned_info",
-        "ordinal": "6",
-        "type": "fuchsia.driver.development/VersionedNodeInfo"
-    },
-    {
         "kind": "table",
         "name": "fuchsia.driver.development/NodeInfo"
     },
@@ -505,11 +487,6 @@
     },
     {
         "kind": "bits/member",
-        "name": "fuchsia.driver.development/RestartRematchFlags.LEGACY_COMPOSITE",
-        "value": "4"
-    },
-    {
-        "kind": "bits/member",
         "name": "fuchsia.driver.development/RestartRematchFlags.NON_REQUESTED",
         "value": "2"
     },
@@ -539,85 +516,6 @@
     {
         "kind": "table",
         "name": "fuchsia.driver.development/TestNodeAddArgs"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/V1DeviceInfo.bound_driver_libname",
-        "ordinal": "2",
-        "type": "string:1024"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/V1DeviceInfo.flags",
-        "ordinal": "4",
-        "type": "fuchsia.driver.legacy/DeviceFlags"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/V1DeviceInfo.property_list",
-        "ordinal": "3",
-        "type": "fuchsia.driver.legacy/DevicePropertyList"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/V1DeviceInfo.protocol_id",
-        "ordinal": "5",
-        "type": "uint32"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/V1DeviceInfo.protocol_name",
-        "ordinal": "6",
-        "type": "string"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/V1DeviceInfo.topological_path",
-        "ordinal": "1",
-        "type": "string:1024"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.driver.development/V1DeviceInfo"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/V2NodeInfo.moniker",
-        "ordinal": "1",
-        "type": "string:1024"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/V2NodeInfo.node_property_list",
-        "ordinal": "2",
-        "type": "vector<fuchsia.driver.framework/NodeProperty>:64"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.driver.development/V2NodeInfo.offer_list",
-        "ordinal": "3",
-        "type": "vector<fuchsia.component.decl/Offer>"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.driver.development/V2NodeInfo"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.development/VersionedNodeInfo.v1",
-        "ordinal": "1",
-        "type": "fuchsia.driver.development/V1DeviceInfo"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.driver.development/VersionedNodeInfo.v2",
-        "ordinal": "2",
-        "type": "fuchsia.driver.development/V2NodeInfo"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.driver.development/VersionedNodeInfo",
-        "strictness": "flexible"
     },
     {
         "kind": "library",

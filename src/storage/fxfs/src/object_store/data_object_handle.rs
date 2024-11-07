@@ -1124,6 +1124,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     ) -> Result<NeedsTrim, Error> {
         let needs_trim = self.handle.shrink(transaction, self.attribute_id(), size).await?;
         self.txn_update_size(transaction, size).await?;
+        self.overwrite_ranges.truncate(size);
         Ok(needs_trim)
     }
 

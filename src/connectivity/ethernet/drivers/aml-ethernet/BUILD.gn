@@ -17,7 +17,7 @@ driver_bind_rules("aml_eth_bind") {
   ]
 }
 
-fuchsia_driver("aml-ethernet-driver") {
+fuchsia_cc_driver("aml-ethernet-driver") {
   output_name = "aml-ethernet"
   configs += [
     "//build/config:all_source",

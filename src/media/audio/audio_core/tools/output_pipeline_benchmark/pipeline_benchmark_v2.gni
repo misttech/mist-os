@@ -7,8 +7,8 @@ import("//build/config.gni")
 
 # Example:
 # ```
-#   # Creates the shell command 'audio-output-pipeline-benchmark-astro'.
-#   audio_pipeline_benchmark("audio-output-pipeline-benchmark-astro") {
+#   # Creates the shell command 'audio_output_pipeline_benchmark_astro'.
+#   audio_pipeline_benchmark("audio_output_pipeline_benchmark_astro") {
 #     config = "//path/to/audio_core_config.json"
 #   }
 # ```

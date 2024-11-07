@@ -3,15 +3,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use once_cell::sync::Lazy;
-use starnix_sync::{LockBefore, Locked, RwLock, Unlocked};
-use starnix_uapi::auth::CAP_SYS_RESOURCE;
-use static_assertions::const_assert;
-use std::cmp;
-use std::ffi::CString;
-use std::sync::Arc;
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-
 use crate::execution::execute_task;
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
@@ -31,14 +22,15 @@ use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
     VecOutputBuffer,
 };
+use once_cell::sync::Lazy;
 use starnix_logging::{log_error, log_info, log_trace, set_zx_name, track_stub};
-use starnix_sync::{MmDumpable, ProcessGroupState, TaskRelease};
+use starnix_sync::{Locked, RwLock, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_types::ownership::WeakRef;
 use starnix_types::time::timeval_from_duration;
 use starnix_uapi::auth::{
     Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
-    CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_TTY_CONFIG,
+    CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_SYS_TTY_CONFIG,
 };
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
@@ -82,17 +74,17 @@ use starnix_uapi::{
     PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN,
     _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
+use static_assertions::const_assert;
+use std::cmp;
+use std::ffi::CString;
+use std::sync::Arc;
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-pub fn do_clone<L>(
-    locked: &mut Locked<'_, L>,
+pub fn do_clone(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     args: &clone_args,
-) -> Result<pid_t, Errno>
-where
-    L: LockBefore<MmDumpable>,
-    L: LockBefore<TaskRelease>,
-    L: LockBefore<ProcessGroupState>,
-{
+) -> Result<pid_t, Errno> {
     security::check_task_create_access(current_task)?;
 
     let child_exit_signal = if args.exit_signal == 0 {
@@ -130,11 +122,11 @@ where
     let task_ref = WeakRef::from(&new_task.task);
     execute_task(locked, new_task, |_, _| Ok(()), |_| {}, ptrace_state)?;
 
-    current_task.ptrace_event(trace_kind, tid as u64);
+    current_task.ptrace_event(locked, trace_kind, tid as u64);
 
     if args.flags & (CLONE_VFORK as u64) != 0 {
         current_task.wait_for_execve(task_ref)?;
-        current_task.ptrace_event(PtraceOptions::TRACEVFORKDONE, tid as u64);
+        current_task.ptrace_event(locked, PtraceOptions::TRACEVFORKDONE, tid as u64);
     }
     Ok(tid)
 }
@@ -724,11 +716,11 @@ pub fn sys_exit(
 }
 
 pub fn sys_exit_group(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     code: i32,
 ) -> Result<(), Errno> {
-    current_task.thread_group_exit(ExitStatus::Exit(code as u8));
+    current_task.thread_group_exit(locked, ExitStatus::Exit(code as u8));
     Ok(())
 }
 
@@ -1838,7 +1830,7 @@ pub fn sys_kcmp(
 }
 
 pub fn sys_syslog(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     action_type: i32,
     address: UserAddress,
@@ -1853,7 +1845,7 @@ pub fn sys_syslog(
             }
             let mut output_buffer =
                 UserBuffersOutputBuffer::unified_new_at(current_task, address, length as usize)?;
-            syslog.blocking_read(current_task, &mut output_buffer)
+            syslog.blocking_read(locked, current_task, &mut output_buffer)
         }
         SyslogAction::ReadAll => {
             if address.is_null() || length < 0 {

@@ -60,13 +60,9 @@ pub fn serialize_packages_json(
 pub(crate) async fn packages(
     proxy: &fio::DirectoryProxy,
 ) -> Result<Vec<PinnedAbsolutePackageUrl>, ParsePackageError> {
-    let file = fuchsia_fs::directory::open_file_deprecated(
-        proxy,
-        "packages.json",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .map_err(ParsePackageError::FailedToOpen)?;
+    let file = fuchsia_fs::directory::open_file(proxy, "packages.json", fio::PERM_READABLE)
+        .await
+        .map_err(ParsePackageError::FailedToOpen)?;
 
     let contents = fuchsia_fs::file::read(&file).await.map_err(ParsePackageError::ReadError)?;
     parse_packages_json(&contents)

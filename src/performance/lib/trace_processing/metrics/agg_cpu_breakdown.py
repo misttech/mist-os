@@ -6,6 +6,7 @@
 from typing import Any, TypedDict
 
 from trace_processing import trace_metrics
+from trace_processing.metrics import cpu
 
 # Default cut-off for the percentage CPU. Any process that has CPU below this
 # won't be listed in the results. User can pass in a cutoff.
@@ -28,7 +29,7 @@ class AggregateRecord(TypedDict):
     percent: float
 
 
-def record_from_dict(t: dict[str, trace_metrics.JsonType]) -> Record:
+def record_from_dict(t: dict[str, trace_metrics.JSON]) -> Record:
     record: dict[str, Any] = {}
     for key, key_type in Record.__annotations__.items():
         assert key in t and isinstance(
@@ -61,7 +62,7 @@ class AggCpuBreakdownMetricsProcessor:
         self._total_time = total_time
 
     def aggregate_metrics(
-        self, breakdown: list[dict[str, trace_metrics.JsonType]]
+        self, breakdown: cpu.Breakdown
     ) -> dict[float, list[AggregateRecord]]:
         """
         Given the breakdown of duration per thread, iterates through all the threads' durations for each

@@ -60,6 +60,11 @@
     "package_name": "vulkan-loader-tests"
   },
   {
+    "archive_gn_label": "//src/diagnostics/archivist/tests/integration/test_cases:pkg_archive_copy",
+    "archive_name": "archivist_integration_test_cases",
+    "package_name": "archivist_integration_test_cases"
+  },
+  {
     "archive_gn_label": "//src/sys/component_manager/tests/realm:realm_integration_tests-ctf_archive_copy",
     "archive_name": "realm_integration_tests-ctf",
     "package_name": "realm_integration_tests-ctf",
@@ -72,16 +77,6 @@
     "archive_gn_label": "//src/sys/pkg/tests/pkgdir:pkgdir-tests_archive_copy",
     "archive_name": "pkgdir-tests",
     "package_name": "pkgdir-tests"
-  },
-  {
-    "archive_gn_label": "//src/sys/time/timekeeper_integration:faketime-integration_archive_copy",
-    "archive_name": "faketime-integration",
-    "package_name": "faketime-integration"
-  },
-  {
-    "archive_gn_label": "//src/sys/time/timekeeper_integration:timekeeper-integration_archive_copy",
-    "archive_name": "timekeeper-integration",
-    "package_name": "timekeeper-integration"
   },
   {
     "archive_gn_label": "//src/ui/scenic/tests:flatland-allocation-test-suite_archive_copy",

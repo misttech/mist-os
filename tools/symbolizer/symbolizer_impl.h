@@ -36,15 +36,47 @@ class SymbolizerImpl : public Symbolizer,
   explicit SymbolizerImpl(const CommandLineOptions& options);
   ~SymbolizerImpl() override;
 
+  struct ModuleInfo {
+    std::string name;
+    std::string build_id;
+    uint64_t base = 0;  // Load address of the module.
+    uint64_t size = 0;  // Range of the module.
+
+    // Zircon on x64 has a negative base address, i.e. the module offset is larger than the load
+    // address. Since zxdb doesn't support that, we load the module at 0 and modify the pc for all
+    // frames.
+    //
+    // At least one of the base and the negative_base must be zero.
+    uint64_t negative_base = 0;
+    bool printed = false;  // Whether we've printed the module info.
+  };
+
+  enum class MMapStatus : uint8_t {
+    // No problems were encountered.
+    kOk,
+    // The module ID was invalid and no updates were made.
+    kInvalidModuleId,
+    // The mapping was recorded but the base address was inconsistent with the provided module.
+    kInconsistentBaseAddress,
+  };
+
+  // Provides location information as a callback, along with its offset within a frame.
+  using LocationOutputFn = fit::function<void(size_t, const zxdb::Location&, const ModuleInfo&)>;
+
+  // Methods which allow C++ callers to directly symbolize addresses without relying on string
+  // outputs.
+  MMapStatus MMap(uint64_t address, uint64_t size, uint64_t module_id, std::string_view flags,
+                  uint64_t module_offset);
+  void Backtrace(uint64_t address, AddressType type, LocationOutputFn output);
+
   // |Symbolizer| implementation.
-  void Reset(bool symbolizing_dart, ResetType type, OutputFn output) override;
-  void Module(uint64_t id, std::string_view name, std::string_view build_id,
-              OutputFn output) override;
+  void Reset(bool symbolizing_dart, ResetType type) override;
+  void Module(uint64_t id, std::string_view name, std::string_view build_id) override;
   void MMap(uint64_t address, uint64_t size, uint64_t module_id, std::string_view flags,
-            uint64_t module_offset, OutputFn output) override;
+            uint64_t module_offset, StringOutputFn output) override;
   void Backtrace(uint64_t frame_id, uint64_t address, AddressType type, std::string_view message,
-                 OutputFn output) override;
-  void DumpFile(std::string_view type, std::string_view name, OutputFn output) override;
+                 StringOutputFn output) override;
+  void DumpFile(std::string_view type, std::string_view name) override;
 
   // |DownloadObserver| implementation.
   void OnDownloadsStarted() override;
@@ -90,21 +122,6 @@ class SymbolizerImpl : public Symbolizer,
 
   // Whether there are symbol downloads in progress.
   bool is_downloading_ = false;
-
-  struct ModuleInfo {
-    std::string name;
-    std::string build_id;
-    uint64_t base = 0;  // Load address of the module.
-    uint64_t size = 0;  // Range of the module.
-
-    // Zircon on x64 has a negative base address, i.e. the module offset is larger than the load
-    // address. Since zxdb doesn't support that, we load the module at 0 and modify the pc for all
-    // frames.
-    //
-    // At least one of the base and the negative_base must be zero.
-    uint64_t negative_base = 0;
-    bool printed = false;  // Whether we've printed the module info.
-  };
 
   // Mapping from module_id (available in the log) to module info.
   //
@@ -175,7 +192,7 @@ class SymbolizerImpl : public Symbolizer,
   struct Frame {
     uint64_t address;
     AddressType type;
-    OutputFn output;
+    StringOutputFn output;
   };
   std::deque<Frame> frames_in_batch_mode_;
 };

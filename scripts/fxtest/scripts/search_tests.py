@@ -21,6 +21,18 @@ colorama.init(strip=bool(os.getenv("NO_COLOR", None)))
 
 DEFAULT_THRESHOLD = 0.75
 
+# These tests must be built with host toolchain.
+HOST_TEST_TEMPLATE_NAMES = [
+    "python_host_test",
+    "python_mobly_test",
+    "host_test",
+]
+
+# These tests may be build with target toolchain.
+DEVELOPER_TEST_TEMPLATE_NAMES = [
+    "python_perf_test",
+]
+
 
 def command(args: argparse.Namespace) -> None:
     """Fuzzy match build targets and tests.
@@ -273,6 +285,19 @@ class SearchLocations:
         return str(self.__dict__)
 
 
+@dataclasses.dataclass(frozen=True, eq=True, order=True)
+class FoundTest:
+    """Wrapper for a test found in a BUILD.gn file.
+
+    Attributes:
+        target_path: The path to the test target.
+        is_host: True if the test only works on host. Default is False.
+    """
+
+    target_path: str
+    is_host: bool = False
+
+
 class BuildFileMatcher:
     """Given a source directory, support searching for matching targets."""
 
@@ -316,7 +341,17 @@ class BuildFileMatcher:
             r"component_name\s*=\s*\"([^\"]+)\""
         )
 
-        parse_results: list[dict[str, list[str]]] = []
+        self._host_test_regex = re.compile(
+            # Note: `?:` designates a "non-capture" group.
+            f'(?:{"|".join(HOST_TEST_TEMPLATE_NAMES)})\\("([^"]+)"\\)'
+        )
+
+        self._developer_test_regex = re.compile(
+            # Note: `?:` designates a "non-capture" group.
+            f'(?:{"|".join(DEVELOPER_TEST_TEMPLATE_NAMES)})\\("([^"]+)"\\)'
+        )
+
+        parse_results: list[dict[str, list[FoundTest]]] = []
         with TimingTracker("..Parse BUILD.gn files"):
             parse_results = list(
                 map(
@@ -326,15 +361,17 @@ class BuildFileMatcher:
             )
 
         with TimingTracker("..Collect results"):
-            name_to_target: defaultdict[str, list[str]] = defaultdict(list)
+            name_to_tests: defaultdict[str, list[FoundTest]] = defaultdict(list)
             for result in parse_results:
                 for key, value in result.items():
-                    name_to_target[key] += value
-            self._name_to_target: dict[str, list[str]] = dict(name_to_target)
+                    name_to_tests[key] += value
+            self._name_to_tests: dict[str, list[FoundTest]] = dict(
+                name_to_tests
+            )
 
     def _parse_build_file(
         self, build_file: str, source_directory: str
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[FoundTest]]:
         """Parse a build file into a mapping from name to referencing build targets.
 
         The output of this method is used to provide a set of names
@@ -353,6 +390,7 @@ class BuildFileMatcher:
         name.
         - If a test package has a "component_name" that will also
         be used to override "package_name".
+        - Host tests are any of host_test, python_host_test, or python_mobly_test.
 
         As an example, consider:
         fuchsia_component("my_component") {
@@ -378,7 +416,7 @@ class BuildFileMatcher:
             source_directory: Relative path to the source directory.
 
         Returns:
-            A mapping from test names to the BUILD.gn target for that test.
+            A mapping from test names to FoundTest targets with that name.
         """
         name_to_target = defaultdict(list)
         with open(build_file, "r") as f:
@@ -387,6 +425,24 @@ class BuildFileMatcher:
             )
 
             contents = f.read()
+
+            # Collect host tests
+            for find in re.finditer(self._host_test_regex, contents):
+                target_name = find.group(1)
+                test_target_path = f"{build_rule_prefix}:{target_name}"
+                name_to_target[target_name].append(
+                    FoundTest(test_target_path, is_host=True)
+                )
+
+            # Collect "developer" tests, which go in a more general
+            # label list and do not need to be built with the host
+            # toolchain.
+            for find in re.finditer(self._developer_test_regex, contents):
+                target_name = find.group(1)
+                test_target_path = f"{build_rule_prefix}:{target_name}"
+                name_to_target[target_name].append(
+                    FoundTest(test_target_path, is_host=False)
+                )
 
             # Iterate over test components in the file, and keep track
             # of what we find in a list of (target, name) pairs.
@@ -455,7 +511,9 @@ class BuildFileMatcher:
 
                 package_target_path = f"{build_rule_prefix}:{target_name}"
 
-                name_to_target[package_name].append(package_target_path)
+                name_to_target[package_name].append(
+                    FoundTest(package_target_path)
+                )
 
                 # See if any of the components in this file are included
                 # as a test component of this file.
@@ -482,7 +540,7 @@ class BuildFileMatcher:
                         >= 0
                     ):
                         name_to_target[component_name].append(
-                            package_target_path
+                            FoundTest(package_target_path)
                         )
         return dict(name_to_target)
 
@@ -500,8 +558,8 @@ class BuildFileMatcher:
         """
         matches: list[Suggestion] = []
 
-        for name, targets in self._name_to_target.items():
-            options = [name] + targets
+        for name, targets in self._name_to_tests.items():
+            options = [name] + list(map(lambda t: t.target_path, targets))
             similarity = max(
                 [
                     score
@@ -512,8 +570,15 @@ class BuildFileMatcher:
             )
             if similarity is not None:
                 for target in sorted(set(targets)):  # deduplicate targets
+                    command = (
+                        "add-test" if not target.is_host else "add-host-test"
+                    )
                     matches.append(
-                        Suggestion(name, similarity, f"fx add-test {target}")
+                        Suggestion(
+                            name,
+                            similarity,
+                            f"fx {command} {target.target_path}",
+                        )
                     )
 
         return matches
@@ -572,10 +637,12 @@ class TestsFileMatcher:
                 options.append(maybe_match.group(1))
 
             # If the name is a file path, match on the last segment.
-            # If the last segment ends in '.cm', strip that off.
+            # If the last segment ends in '.cm' or '.sh', strip that off.
             segments = name.split("/")
             if len(segments) > 1:
                 if segments[-1][-3:] == ".cm":
+                    segment = segments[-1][:-3]
+                elif segments[-1][-3:] == ".sh":
                     segment = segments[-1][:-3]
                 else:
                     segment = segments[-1]

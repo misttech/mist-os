@@ -5,7 +5,7 @@
 """Rule for creating an update package."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
     "FuchsiaPartitionsConfigInfo",
@@ -26,9 +26,7 @@ def _fuchsia_update_package_impl(ctx):
     outputs = [out_dir, ffx_isolate_dir]
 
     # Gather all the arguments to pass to ffx.
-    ffx_invocation = [
-        fuchsia_toolchain.ffx.path,
-        "--config \"assembly_enabled=true\"",
+    ffx_invocation = get_ffx_assembly_args(fuchsia_toolchain) + [
         "--isolate-dir",
         ffx_isolate_dir.path,
         "assembly",

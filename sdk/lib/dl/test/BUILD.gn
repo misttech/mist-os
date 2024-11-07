@@ -17,8 +17,12 @@ group("tests") {
 test("dl-unittests") {
   visibility = [ ":*" ]
 
-  sources = [ "dl-tests.cc" ]
+  sources = [
+    "concat-view-tests.cc",
+    "dl-tests.cc",
+  ]
   deps = [
+    "..:concat-view",
     "..:diagnostics",
     "..:error",
     "..:stateful-error",
@@ -36,11 +40,12 @@ test("dl-unittests") {
       "dl-tests-base.h",
     ]
     deps += [
+      ":dl-unittest.deps",
       "..:runtime",
       "//sdk/lib/ld/testing",
       "//src/lib/elfldltl/testing",
     ]
-
+    include_dirs = [ "//sdk/lib/ld/test/modules" ]
     if (is_fuchsia) {
       sources += [
         "dl-load-zircon-tests-base.cc",
@@ -54,6 +59,14 @@ test("dl-unittests") {
     }
     data_deps = [ ":test-data" ]
   }
+}
+
+# These are the shared_library() targets to be included as startup modules for
+# tests.
+user_basic_redirect("dl-unittest.deps") {
+  visibility = [ ":*" ]
+  testonly = true
+  public_deps = [ "//sdk/lib/ld/test/modules:dl-unittest.deps" ]
 }
 
 # This collects all the test modules and their runtime deps.  On Fuchsia, they

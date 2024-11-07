@@ -39,7 +39,7 @@ impl<T> JoinHandle<T> {
     /// future can be ignored in which case the task will still be cancelled.
     pub fn cancel(mut self) -> impl Future<Output = Option<T>> {
         // SAFETY: We spawned the task so the return type should be correct.
-        let result = unsafe { self.scope.cancel(self.task_id) };
+        let result = unsafe { self.scope.cancel_task(self.task_id) };
         async move {
             match result {
                 Some(output) => Some(output),
@@ -128,7 +128,7 @@ impl Task<()> {
 }
 
 impl<T: Send + 'static> Task<T> {
-    /// Spawn a new task on the current executor.
+    /// Spawn a new task on the root scope of the current executor.
     ///
     /// The task may be executed on any thread(s) owned by the current executor.
     /// See [`Task::local`] for an equivalent that ensures locality.
@@ -150,7 +150,7 @@ impl<T: Send + 'static> Task<T> {
 }
 
 impl<T: 'static> Task<T> {
-    /// Spawn a new task on the thread local executor.
+    /// Spawn a new task on the root scope of the thread local executor.
     ///
     /// The passed future will live until either (a) the future completes,
     /// (b) the returned [`Task`] is dropped while the executor is running, or

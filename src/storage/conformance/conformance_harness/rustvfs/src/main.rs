@@ -30,10 +30,7 @@ const HARNESS_EXEC_PATH: &'static str = "/pkg/bin/io_conformance_harness_rustvfs
 /// Creates and returns a Rust VFS VmoFile-backed executable file using the contents of the
 /// conformance test harness binary itself.
 fn new_executable_file() -> Result<Arc<vmo::VmoFile>, Error> {
-    let file = fdio::open_fd(
-        HARNESS_EXEC_PATH,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )?;
+    let file = fdio::open_fd(HARNESS_EXEC_PATH, fio::PERM_READABLE | fio::PERM_EXECUTABLE)?;
     let exec_vmo = fdio::get_vmo_exec_from_file(&file)?;
     let exec_file = vmo::VmoFile::new(
         exec_vmo, /*readable*/ true, /*writable*/ false, /*executable*/ true,

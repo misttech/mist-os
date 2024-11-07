@@ -23,7 +23,7 @@ group("tests") {
   ]
 }
 
-fuchsia_driver("usb-composite-driver") {
+fuchsia_cc_driver("usb-composite-driver") {
   output_name = "usb-composite"
   configs += [
     "//build/config:all_source",

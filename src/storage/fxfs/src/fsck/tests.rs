@@ -3321,3 +3321,103 @@ async fn test_casefold() {
         [FsckIssue::Error(FsckError::CasefoldInconsistency(..)), ..]
     );
 }
+
+#[fuchsia::test]
+async fn test_missing_overwrite_extents() {
+    let mut test = FsckTest::new().await;
+
+    {
+        let fs = test.filesystem();
+        let store = fs.root_store();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let file = root_directory
+            .create_child_file(&mut transaction, "child_file")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), file.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(file.object_id(), 0, AttributeKey::Attribute),
+                ObjectValue::attribute(0, true),
+            ),
+        );
+        transaction.commit().await.expect("commit failed");
+    }
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions::default()).await.expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::MissingOverwriteExtents(..)), ..]
+    );
+}
+
+#[fuchsia::test]
+async fn test_overwrite_extent_flag_not_set() {
+    let mut test = FsckTest::new().await;
+
+    {
+        let fs = test.filesystem();
+        let store = fs.root_store();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let file = root_directory
+            .create_child_file(&mut transaction, "child_file")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+
+        file.allocate(0..fs.block_size()).await.expect("allocate failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), file.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(file.object_id(), 0, AttributeKey::Attribute),
+                ObjectValue::attribute(fs.block_size(), false),
+            ),
+        );
+        transaction.commit().await.expect("commit failed");
+    }
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions::default()).await.expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::OverwriteExtentFlagUnset(..)), ..]
+    );
+}

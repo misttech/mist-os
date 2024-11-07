@@ -372,6 +372,12 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
       out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
       out_data[MMC_EXT_CSD_BOOT_SIZE_MULT] = 0x10;
       out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
+
+// TODO(https://fxbug.dev/376147833): The fake driver doesn't support packed transfers
+#if 0
+      out_data[MMC_EXT_CSD_MAX_PACKED_READS] = 16;
+      out_data[MMC_EXT_CSD_MAX_PACKED_WRITES] = 16;
+#endif
     });
   }
 
@@ -514,6 +520,54 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
   void QueueRpmbRequests();
   fidl::WireSharedClient<fuchsia_hardware_rpmb::Rpmb>& rpmb_client() { return rpmb_client_; }
   std::atomic<bool>& run_threads() { return run_threads_; }
+
+  // Returns a RemoteBlockDevice for the BlockServer interface.
+  zx::result<std::unique_ptr<block_client::RemoteBlockDevice>>
+  GetRemoteBlockDeviceForBlockServer() {
+    auto [service_client, service_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    std::string path = std::string(component::kServiceDirectory) + "/" +
+                       fuchsia_hardware_block_volume::Service::Name;
+    if (zx_status_t status = fdio_open_at(outgoing_directory_client_.channel().get(), path.c_str(),
+                                          static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                                          service_server.TakeChannel().release());
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    fbl::unique_fd service_dir;
+    if (zx_status_t status = fdio_fd_create(service_client.TakeChannel().release(),
+                                            service_dir.reset_and_get_address());
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    std::string instance_name;
+
+    if (zx_status_t status = fdio_watch_directory(
+            service_dir.get(),
+            [](int fd, int event, const char* name, void* cookie) {
+              if (strcmp(name, ".") == 0)
+                return ZX_OK;
+              *reinterpret_cast<std::string*>(cookie) = name;
+              return ZX_ERR_STOP;
+            },
+            ZX_TIME_INFINITE, &instance_name);
+        status != ZX_ERR_STOP) {
+      return zx::error(status);
+    }
+
+    fdio_cpp::FdioCaller service_dir_caller(std::move(service_dir));
+    auto [volume_client, volume_server] =
+        fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
+    std::string volume_path = instance_name + "/volume";
+    if (zx_status_t status = fdio_open_at(service_dir_caller.borrow_channel(), volume_path.c_str(),
+                                          0, volume_server.TakeChannel().release());
+        status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    return block_client::RemoteBlockDevice::Create(std::move(volume_client));
+  }
 
  protected:
   static constexpr size_t kBlockOpSize = BlockOperation::OperationSize(sizeof(block_op_t));
@@ -2273,38 +2327,7 @@ TEST_P(SdmmcBlockDeviceTest, BlockServer) {
   ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/0, /*supply_power_framework=*/false));
 
   runtime_.PerformBlockingWork([&] {
-    auto [service_client, service_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    std::string path = std::string(component::kServiceDirectory) + "/" +
-                       fuchsia_hardware_block_volume::Service::Name;
-    ASSERT_OK(fdio_open_at(outgoing_directory_client_.channel().get(), path.c_str(),
-                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                           service_server.TakeChannel().release()));
-
-    fbl::unique_fd service_dir;
-    ASSERT_OK(fdio_fd_create(service_client.TakeChannel().release(),
-                             service_dir.reset_and_get_address()));
-
-    std::string instance_name;
-
-    ASSERT_EQ(fdio_watch_directory(
-                  service_dir.get(),
-                  [](int fd, int event, const char* name, void* cookie) {
-                    if (strcmp(name, ".") == 0)
-                      return ZX_OK;
-                    *reinterpret_cast<std::string*>(cookie) = name;
-                    return ZX_ERR_STOP;
-                  },
-                  ZX_TIME_INFINITE, &instance_name),
-              ZX_ERR_STOP);
-
-    fdio_cpp::FdioCaller service_dir_caller(std::move(service_dir));
-    auto [volume_client, volume_server] =
-        fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
-    std::string volume_path = instance_name + "/volume";
-    ASSERT_OK(fdio_open_at(service_dir_caller.borrow_channel(), volume_path.c_str(), 0,
-                           volume_server.TakeChannel().release()));
-
-    auto client = block_client::RemoteBlockDevice::Create(std::move(volume_client));
+    auto client = GetRemoteBlockDeviceForBlockServer();
     ASSERT_OK(client);
 
     fuchsia_hardware_block::wire::BlockInfo info;
@@ -2313,7 +2336,7 @@ TEST_P(SdmmcBlockDeviceTest, BlockServer) {
     const int len = 2 * info.block_size;
 
     zx::vmo vmo;
-    ASSERT_OK(zx::vmo::create(len, 0, &vmo));
+    ASSERT_OK(zx::vmo::create(len * 2, 0, &vmo));
 
     storage::Vmoid owned_vmoid;
     EXPECT_OK(client->BlockAttachVmo(vmo, &owned_vmoid));
@@ -2330,13 +2353,111 @@ TEST_P(SdmmcBlockDeviceTest, BlockServer) {
 
     EXPECT_OK(vmo.write(buffer.get(), 0, len));
 
+    block_fifo_request_t requests[] = {
+        {
+            .command =
+                {
+                    .opcode = BLOCK_OPCODE_WRITE,
+                },
+            .vmoid = vmoid,
+            .length = 1,
+            .vmo_offset = 0,
+            .dev_offset = 0,
+        },
+        {
+            .command =
+                {
+                    .opcode = BLOCK_OPCODE_WRITE,
+                },
+            .vmoid = vmoid,
+            .length = 1,
+            .vmo_offset = 1,
+            .dev_offset = 1,
+        },
+        {
+            .command =
+                {
+                    .opcode = BLOCK_OPCODE_TRIM,
+                },
+            .length = 1,
+            .dev_offset = 2,
+        },
+        {
+            .command =
+                {
+                    .opcode = BLOCK_OPCODE_FLUSH,
+                },
+        },
+    };
+
+    EXPECT_OK(client->FifoTransaction(requests, 2));
+
+    requests[0].command.opcode = BLOCK_OPCODE_READ;
+    requests[0].vmo_offset += 2;
+    requests[1].command.opcode = BLOCK_OPCODE_READ;
+    requests[1].vmo_offset += 2;
+
+    EXPECT_OK(client->FifoTransaction(requests, 2));
+
+    auto read_buffer = std::make_unique<uint8_t[]>(len);
+    EXPECT_OK(vmo.read(read_buffer.get(), len, len));
+
+    EXPECT_BYTES_EQ(read_buffer.get(), buffer.get(), len);
+  });
+}
+
+// TODO(https://fxbug.dev/376147833): The fake driver doesn't support packed transfers
+TEST_P(SdmmcBlockDeviceTest, DISABLED_BlockServerMaxTransferSize) {
+  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/0, /*supply_power_framework=*/false));
+
+  runtime_.PerformBlockingWork([&] {
+    constexpr int kMaxTransferSize = 16384;
+
+    sdmmc_.set_host_info({
+        .caps = 0,
+        .max_transfer_size = kMaxTransferSize,
+    });
+
+    auto client = GetRemoteBlockDeviceForBlockServer();
+    ASSERT_OK(client);
+
+    fuchsia_hardware_block::wire::BlockInfo info;
+    EXPECT_OK(client->BlockGetInfo(&info));
+
+    ASSERT_EQ(kMaxTransferSize % info.block_size, 0);
+    const uint32_t max_transfer_size_in_blocks = kMaxTransferSize / info.block_size;
+    ASSERT_GT(max_transfer_size_in_blocks, 1);
+
+    const int len = 2 * kMaxTransferSize;
+
+    zx::vmo vmo;
+    ASSERT_OK(zx::vmo::create(len * 2, 0, &vmo));
+
+    storage::Vmoid owned_vmoid;
+    EXPECT_OK(client->BlockAttachVmo(vmo, &owned_vmoid));
+
+    // It doesn't matter if we leak the ID.
+    vmoid_t vmoid = owned_vmoid.TakeId();
+
+    auto buffer = std::make_unique<uint8_t[]>(len);
+    uint8_t c = 0;
+    for (int i = 0; i < len / 2; ++i) {
+      buffer[i] = c;
+      c += 7;
+    }
+
+    EXPECT_OK(vmo.write(buffer.get(), 0, len));
+
+    const uint32_t blocks1 = max_transfer_size_in_blocks - 1;
+    const uint32_t blocks2 = 2 * max_transfer_size_in_blocks - blocks1;
+
     block_fifo_request_t requests[] = {{
                                            .command =
                                                {
                                                    .opcode = BLOCK_OPCODE_WRITE,
                                                },
                                            .vmoid = vmoid,
-                                           .length = 1,
+                                           .length = blocks1,
                                            .vmo_offset = 0,
                                            .dev_offset = 0,
                                        },
@@ -2346,17 +2467,17 @@ TEST_P(SdmmcBlockDeviceTest, BlockServer) {
                                                    .opcode = BLOCK_OPCODE_WRITE,
                                                },
                                            .vmoid = vmoid,
-                                           .length = 1,
-                                           .vmo_offset = 1,
-                                           .dev_offset = 1,
+                                           .length = blocks2,
+                                           .vmo_offset = blocks1,
+                                           .dev_offset = blocks1,
                                        }};
 
     EXPECT_OK(client->FifoTransaction(requests, 2));
 
     requests[0].command.opcode = BLOCK_OPCODE_READ;
-    requests[0].vmo_offset += 2;
+    requests[0].vmo_offset += max_transfer_size_in_blocks * 2;
     requests[1].command.opcode = BLOCK_OPCODE_READ;
-    requests[1].vmo_offset += 2;
+    requests[1].vmo_offset += max_transfer_size_in_blocks * 2;
 
     EXPECT_OK(client->FifoTransaction(requests, 2));
 

@@ -241,8 +241,6 @@ pub fn update_register_state_for_restart(registers: &mut RegisterState, err: Err
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use super::*;
     use crate::mm::memory::MemoryObject;
     use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags};
@@ -251,9 +249,12 @@ mod tests {
     use crate::task::Kernel;
     use crate::testing::*;
     use crate::vfs::FileWriteGuardRef;
+    use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::{EINTR, ERESTARTSYS};
+    use starnix_uapi::file_mode::Access;
     use starnix_uapi::signals::{SIGUSR1, SIGUSR2};
     use starnix_uapi::{__NR_rt_sigreturn, SA_RESTART, SA_RESTORER, SA_SIGINFO, SI_USER};
+    use std::sync::Arc;
 
     const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::const_from(100);
     const SYSCALL_NUMBER: u64 = 42;
@@ -268,7 +269,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn syscall_restart_adjusts_instruction_pointer_and_rax() {
-        let (_kernel, mut current_task) = create_kernel_and_task_with_stack();
+        let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
 
         // Register the signal action.
         current_task.thread_group.signal_actions.set(
@@ -304,7 +305,7 @@ mod tests {
         ));
 
         // Process the signal.
-        dequeue_signal_for_test(&mut current_task);
+        dequeue_signal_for_test(&mut locked, &mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.thread_state.registers.rip, SA_HANDLER_ADDRESS.ptr() as u64);
@@ -339,7 +340,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn syscall_nested_restart() {
-        let (_kernel, mut current_task) = create_kernel_and_task_with_stack();
+        let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
 
         // Register the signal actions.
         current_task.thread_group.signal_actions.set(
@@ -384,7 +385,7 @@ mod tests {
         ));
 
         // Process the signal.
-        dequeue_signal_for_test(&mut current_task);
+        dequeue_signal_for_test(&mut locked, &mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.thread_state.registers.rip, SA_HANDLER_ADDRESS.ptr() as u64);
@@ -414,7 +415,7 @@ mod tests {
         ));
 
         // Process the signal.
-        dequeue_signal_for_test(&mut current_task);
+        dequeue_signal_for_test(&mut locked, &mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.thread_state.registers.rip, SA_HANDLER2_ADDRESS.ptr() as u64);
@@ -471,7 +472,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn syscall_does_not_restart_if_signal_action_has_no_sa_restart_flag() {
-        let (_kernel, mut current_task) = create_kernel_and_task_with_stack();
+        let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
 
         // Register the signal action.
         current_task.thread_group.signal_actions.set(
@@ -507,7 +508,7 @@ mod tests {
         ));
 
         // Process the signal.
-        dequeue_signal_for_test(&mut current_task);
+        dequeue_signal_for_test(&mut locked, &mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.thread_state.registers.rip, SA_HANDLER_ADDRESS.ptr() as u64);
@@ -535,8 +536,9 @@ mod tests {
     }
 
     /// Creates a kernel and initial task, giving the task a stack.
-    fn create_kernel_and_task_with_stack() -> (Arc<Kernel>, AutoReleasableTask) {
-        let (kernel, mut current_task) = create_kernel_and_task();
+    fn create_kernel_and_task_with_stack<'l>(
+    ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+        let (kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
         const STACK_SIZE: usize = 0x1000;
 
@@ -553,6 +555,7 @@ mod tests {
                 0,
                 STACK_SIZE,
                 prot_flags,
+                Access::rwx(),
                 MappingOptions::empty(),
                 MappingName::Stack,
                 FileWriteGuardRef(None),
@@ -560,6 +563,6 @@ mod tests {
             .expect("failed to map stack VMO");
         current_task.thread_state.registers.rsp = (stack_base + (STACK_SIZE - 8)).ptr() as u64;
 
-        (kernel, current_task)
+        (kernel, current_task, locked)
     }
 }

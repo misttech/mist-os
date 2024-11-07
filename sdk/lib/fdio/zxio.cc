@@ -26,53 +26,55 @@
 
 namespace fio = fuchsia_io;
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 namespace {
-constexpr fio::Flags Open1FlagsToOpen3(fio::wire::OpenFlags io1_flags) {
+
+// Translates legacy `fuchsia.io/OpenFlags` to an equivalent set of `fuchsia.io/Flags` for callers
+// that still are using deprecated FDIO functions.
+constexpr fio::Flags TranslateFlags(fio::wire::OpenFlags legacy_flags) {
   fio::Flags flags = fio::Flags::kPermGetAttributes;
 
-  if (io1_flags & fio::OpenFlags::kNodeReference) {
+  if (legacy_flags & fio::OpenFlags::kNodeReference) {
     flags |= fio::Flags::kProtocolNode;
-    if (io1_flags & fio::OpenFlags::kDirectory) {
+    if (legacy_flags & fio::OpenFlags::kDirectory) {
       flags |= fio::Flags::kProtocolDirectory;
-    } else if (io1_flags & fio::OpenFlags::kNotDirectory) {
+    } else if (legacy_flags & fio::OpenFlags::kNotDirectory) {
       flags |= fio::Flags::kProtocolFile;
     }
   } else {
     // Permissions
-    if (io1_flags & fio::OpenFlags::kRightReadable) {
+    if (legacy_flags & fio::OpenFlags::kRightReadable) {
       flags |= static_cast<fio::Flags>(static_cast<uint64_t>(fio::wire::kRStarDir));
     }
-    if (io1_flags & fio::OpenFlags::kRightWritable) {
+    if (legacy_flags & fio::OpenFlags::kRightWritable) {
       flags |= static_cast<fio::Flags>(static_cast<uint64_t>(fio::wire::kWStarDir));
     }
-    if (io1_flags & fio::OpenFlags::kRightExecutable) {
+    if (legacy_flags & fio::OpenFlags::kRightExecutable) {
       flags |= static_cast<fio::Flags>(static_cast<uint64_t>(fio::wire::kXStarDir));
     }
 
     // POSIX flags
-    if (io1_flags & fio::OpenFlags::kPosixWritable) {
+    if (legacy_flags & fio::OpenFlags::kPosixWritable) {
       flags |= fio::Flags::kPermInheritWrite;
     }
-    if (io1_flags & fio::OpenFlags::kPosixExecutable) {
+    if (legacy_flags & fio::OpenFlags::kPosixExecutable) {
       flags |= fio::Flags::kPermInheritExecute;
     }
 
     // Type flags
-    if (io1_flags & fio::OpenFlags::kDirectory) {
+    if (legacy_flags & fio::OpenFlags::kDirectory) {
       flags |= fio::Flags::kProtocolDirectory;
-    } else if (io1_flags & fio::OpenFlags::kNotDirectory) {
+    } else if (legacy_flags & fio::OpenFlags::kNotDirectory) {
       flags |= fio::Flags::kProtocolFile;
     }
 
     // Create flags
-    if (io1_flags & fio::OpenFlags::kCreateIfAbsent) {
+    if (legacy_flags & fio::OpenFlags::kCreateIfAbsent) {
       flags |= fio::Flags::kFlagMustCreate;
-    } else if (io1_flags & fio::OpenFlags::kCreate) {
+    } else if (legacy_flags & fio::OpenFlags::kCreate) {
       flags |= fio::Flags::kFlagMaybeCreate;
     }
 
-    if (io1_flags & (fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kCreate) &&
+    if (legacy_flags & (fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kCreate) &&
         !(flags & fio::wire::kMaskKnownProtocols)) {
       // A protocol must be specified when creating a node. If the DIRECTORY flag wasn't specified,
       // we ensure that we will create a file.
@@ -80,10 +82,10 @@ constexpr fio::Flags Open1FlagsToOpen3(fio::wire::OpenFlags io1_flags) {
     }
 
     // File flags
-    if (io1_flags & fio::OpenFlags::kTruncate) {
+    if (legacy_flags & fio::OpenFlags::kTruncate) {
       flags |= fio::Flags::kFileTruncate;
     }
-    if (io1_flags & fio::OpenFlags::kAppend) {
+    if (legacy_flags & fio::OpenFlags::kAppend) {
       flags |= fio::Flags::kFileAppend;
     }
   }
@@ -91,7 +93,6 @@ constexpr fio::Flags Open1FlagsToOpen3(fio::wire::OpenFlags io1_flags) {
   return flags;
 }
 }  // namespace
-#endif
 
 namespace fdio_internal {
 
@@ -303,35 +304,8 @@ zx_status_t pipe::recvmsg(struct msghdr* msg, int flags, size_t* out_actual, int
 }
 
 zx::result<fdio_ptr> open_async_deprecated(zxio_t* directory, std::string_view path,
-                                           fio::wire::OpenFlags flags) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  // This is the primary way that our POSIX functions open files/directories, so to ensure
-  // compatibility with Open3 when we remove this in lieu of |open_async|, we translate the legacy
-  // OpenFlags to an equivalent set of Flags and try calling Open3 at HEAD.
-  zx::result io = open_async(directory, path, Open1FlagsToOpen3(flags));
-  // Only fallback to open1 if open3 is not supported.
-  // TODO(https://fxbug.dev/324111518): Remove this branch and make sure we can rely on Open3
-  // unconditionally (e.g. this function should just call |open_async| with translated flags).
-  if (io.is_ok() || io.error_value() != ZX_ERR_NOT_SUPPORTED) {
-    return io;
-  }
-#endif
-  zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-
-  zx_status_t status = zxio_open_async(directory, static_cast<uint32_t>(flags), path.data(),
-                                       path.length(), endpoints->server.channel().release());
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-
-  if (flags & fio::wire::OpenFlags::kDescribe) {
-    return fdio::create_with_on_open_deprecated(std::move(endpoints->client));
-  }
-
-  return remote::create(std::move(endpoints->client));
+                                           fio::wire::OpenFlags legacy_flags) {
+  return open_async(directory, path, TranslateFlags(legacy_flags));
 }
 
 zx::result<fdio_ptr> open_async(zxio_t* directory, std::string_view path, fio::Flags flags) {

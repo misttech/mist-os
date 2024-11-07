@@ -15,18 +15,82 @@ readonly script_dir="${script%/*}"
 
 source "$script_dir"/common-setup.sh
 
-project_root="$default_project_root"
-project_root_rel="$(relpath . "$project_root")"
+readonly project_root="$default_project_root"
+readonly project_root_rel="$(relpath . "$project_root")"
 
-diff_limit=25
-clang_dir_local="$project_root_rel"/prebuilt/third_party/clang/"$HOST_PLATFORM"
+readonly clang_dir_local="$project_root_rel"/prebuilt/third_party/clang/"$HOST_PLATFORM"
 
 # Tools
-objdump="$clang_dir_local"/bin/llvm-objdump
-readelf="$clang_dir_local"/bin/llvm-readelf
-dwarfdump="$clang_dir_local"/bin/llvm-dwarfdump
-nm="$clang_dir_local"/bin/llvm-nm
-jq="$project_root_rel/prebuilt/third_party/jq/$HOST_PLATFORM/bin/jq"
+readonly objdump="$clang_dir_local"/bin/llvm-objdump
+readonly readelf="$clang_dir_local"/bin/llvm-readelf
+readonly dwarfdump="$clang_dir_local"/bin/llvm-dwarfdump
+readonly nm="$clang_dir_local"/bin/llvm-nm
+readonly jq="$project_root_rel/prebuilt/third_party/jq/$HOST_PLATFORM/bin/jq"
+
+# Configurable options
+diff_limit=25
+# Set the following with --left-suffix and --right-suffix
+# to make the diff reports more meaningful in their context.
+left_suffix=left
+right_suffix=right
+
+function usage() {
+  cat <<EOF
+Compares two files in human-readable detail.
+usage: $script [options] left-file right-file
+options:
+  -n LINES : display first N lines of detailed differences
+    [default: $diff_limit]
+  -l SUFFIX : left file suffix when diff-ing output from another tool
+    [default: $left_suffix]
+  -r SUFFIX : right file suffix when diff-ing output from another tool
+    [default: $right_suffix]
+EOF
+}
+
+prev_opt=
+positional_args=()
+for opt
+do
+  # handle --option arg
+  if [[ -n "$prev_opt" ]]
+  then
+    eval "$prev_opt"=\$opt
+    prev_opt=
+    shift
+    continue
+  fi
+
+  # Extract optarg from --opt=optarg
+  optarg=
+  case "$opt" in
+    -*=*) optarg="${opt#*=}" ;;  # remove-prefix, shortest-match
+  esac
+
+  case "$opt" in
+    -h) usage; exit ;;
+    -l) prev_opt=left_suffix ;;
+    -l=*) left_suffix="$optarg" ;;
+    -r) prev_opt=right_suffix ;;
+    -r=*) right_suffix="$optarg" ;;
+    -n) prev_opt=diff_limit ;;
+    -n=*) diff_limit="$optarg" ;;
+    --) shift ; break ;;
+    -*) echo "Unknown $0 option: $opt" ; usage ; exit 1 ;;
+    *) positional_args+=( "$opt" ) ;;
+  esac
+  shift
+done
+
+positional_args+=( "$@" )
+set -- "${positional_args[@]}"
+if [[ "$#" < 2 ]]
+then
+  echo "Requires 2 positional arguments, but missing at least 1."
+  usage
+  exit 1
+fi
+# positional arguments are $1 and $2
 
 # Diff two files, run through a command: diff -u <(command $1) <(command $2)
 # Usage: diff_with command [options] -- input1 input2
@@ -43,7 +107,7 @@ function diff_with() {
     shift
   done
 
-  # The rest of "$@" are input files.  $1 is from local, $2 is from remote.
+  # The rest of "$@" are input files.
   test "$#" = 2 || {
     echo "diff_with: Expected two inputs, but got $#."
     exit 1
@@ -52,19 +116,19 @@ function diff_with() {
   # Some tools' output include the full name of the file
   # being examined, and behavior may depend on the file extension.
   # So use $1 as the canonical name for tool operation on both files.
-  suffix="$(basename "${tool[0]}")"
+  tool_suffix="$(basename "${tool[0]}")"
 
-  "${tool[@]}" "$1" > "$1.$suffix.local"
-  # Use the same name for the remote file with a temporary move.
+  "${tool[@]}" "$1" > "$1.$tool_suffix.$left_suffix"
+  # Use the same name for the other file with a temporary move.
   mv "$1"{,.bkp}
   mv "$2" "$1"
-  "${tool[@]}" "$1" > "$1.$suffix.remote"
+  "${tool[@]}" "$1" > "$1.$tool_suffix.$right_suffix"
   # Restore the original names.
   mv "$1" "$2"
   mv "$1"{.bkp,}
 
   echo "diff -u <(${tool[@]} $1) <(${tool[@]} $2)"
-  diff -u "$1.$suffix.local" "$1.$suffix.remote"
+  diff -u "$1.$tool_suffix.$left_suffix" "$1.$tool_suffix.$right_suffix"
 }
 
 function json_diff() {
@@ -105,6 +169,7 @@ function binary_diff() {
   return "$diff_status"
 }
 
+# main
 case "$1" in
   *.d | *.map | *.ll)
     echo "text diff (first $diff_limit lines):"

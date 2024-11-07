@@ -188,7 +188,12 @@ impl FileOps for TimerFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         if let Err(e) = self.timer.stop(current_task) {
             log_warn!("Failed to stop the timer when closing the timerfd: {e:?}");
         }

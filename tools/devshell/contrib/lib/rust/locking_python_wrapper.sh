@@ -12,6 +12,6 @@ fx-config-read
 # Ninja actions that use RBE need a running reproxy process.
 # The following wrapper starts/shuts down reproxy around any command.
 rbe_wrapper=()
-if fx-rbe-enabled ; then rbe_wrapper=("${RBE_WRAPPER[@]}") ; fi
+if fx-rbe-enabled ; then rbe_wrapper=("${RBE_WRAPPER[@]}" --) ; fi
 
 fx-try-locked "${rbe_wrapper[@]}" "${PREBUILT_PYTHON3}" "${FUCHSIA_DIR}/tools/devshell/contrib/lib/rust/$(basename $0).py" "${@:1}" --out-dir=$FUCHSIA_BUILD_DIR

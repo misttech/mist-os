@@ -27,7 +27,7 @@ driver_bind_rules("aml-g12-tdm-bind") {
   ]
 }
 
-fuchsia_driver("aml-g12-tdm-driver") {
+fuchsia_cc_driver("aml-g12-tdm-driver") {
   output_name = "aml-g12-tdm"
   configs += [
     "//build/config:all_source",
@@ -91,7 +91,7 @@ driver_bind_rules("aml-g12-tdm-dai-bind") {
   ]
 }
 
-fuchsia_driver("aml-g12-tdm-dai-driver") {
+fuchsia_cc_driver("aml-g12-tdm-dai-driver") {
   output_name = "aml-g12-tdm-dai"
   configs += [
     "//build/config:all_source",

@@ -16,7 +16,7 @@ driver_bind_rules("nand-broker-bind") {
   deps = [ "//src/devices/bind/fuchsia.nand" ]
 }
 
-fuchsia_driver("nand-broker-driver") {
+fuchsia_cc_driver("nand-broker-driver") {
   output_name = "nand-broker"
   configs += [
     "//build/config:all_source",

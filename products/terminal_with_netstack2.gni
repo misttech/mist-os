@@ -27,3 +27,6 @@ import("//products/terminal.gni")
 
 fuchsia_product_assembly_config_label =
     "//products/terminal:terminal_with_netstack2"
+
+bazel_product_bundle_prefix =
+    "//products/terminal:product_bundle_with_netstack2"

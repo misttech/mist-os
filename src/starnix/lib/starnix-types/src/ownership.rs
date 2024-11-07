@@ -45,18 +45,20 @@ macro_rules! make_ownership_types {
 /// The base trait for explicit ownership. Any `Releasable` object must call `release` before
 /// being dropped.
 pub trait [< Releasable $($suffix)? >] {
-    type Context<'a>;
+    // TODO(https://github.com/rust-lang/rust/issues/100013): See whether one can use either
+    // only one, or no lifetime annotation once GAT is introduced.
+    type Context<'a: 'b, 'b>;
 
     // TODO(https://fxbug.dev/42081308): Only the `self` version should exist, but this is
     // problematic with Task and CurrentTask at this point.
-    fn release<'a>(self: $self, c: Self::Context<'a>);
+    fn release<'a: 'b, 'b>(self: $self, c: Self::Context<'a, 'b>);
 }
 
 /// Releasing an option calls release if the option is not empty.
 impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for Option<T> {
-    type Context<'a> = T::Context<'a>;
+    type Context<'a: 'b, 'b> = T::Context<'a, 'b>;
 
-    fn release<'a>(self: $self, c: Self::Context<'a>) {
+    fn release<'a: 'b, 'b>(self: $self, c: Self::Context<'a, 'b>) {
         if let Some(v) = self {
             v.release(c);
         }
@@ -65,9 +67,9 @@ impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for Option<T>
 
 /// Releasing a result calls release on the value if the result is ok.
 impl<T: [< Releasable $($suffix)? >], E> [< Releasable $($suffix)? >] for Result<T, E> {
-    type Context<'a> = T::Context<'a>;
+    type Context<'a: 'b, 'b> = T::Context<'a, 'b>;
 
-    fn release<'a>(self: $self, c: Self::Context<'a>) {
+    fn release<'a: 'b, 'b>(self: $self, c: Self::Context<'a, 'b>) {
         if let Ok(v) = self {
             v.release(c);
         }
@@ -75,9 +77,9 @@ impl<T: [< Releasable $($suffix)? >], E> [< Releasable $($suffix)? >] for Result
 }
 
 impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for ReleaseGuard<T> {
-    type Context<'a> = T::Context<'a>;
+    type Context<'a: 'b, 'b> = T::Context<'a, 'b>;
 
-    fn release(self: $self, c: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self: $self, c: Self::Context<'a, 'b>) {
         self.drop_guard.disarm();
         self.value.release(c);
     }
@@ -204,12 +206,12 @@ impl<T: Releasable> Share for OwnedRef<T> {
 }
 
 impl<T: Releasable> Releasable for OwnedRef<T> {
-    type Context<'a> = T::Context<'a>;
+    type Context<'a: 'b, 'b> = T::Context<'a, 'b>;
 
     /// Release the `OwnedRef`. If this is the last instance, this method will block until all
     /// `TempRef` instances are dropped, and will release the underlying object.
     #[allow(unused_mut)]
-    fn release(mut self, c: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(mut self, c: Self::Context<'a, 'b>) {
         OwnedRef::take(&mut self).release(c);
     }
 }
@@ -756,24 +758,24 @@ mod test {
     struct Data;
 
     impl ReleasableByRef for Data {
-        type Context<'a> = ();
-        fn release(&self, _: ()) {}
+        type Context<'a: 'b, 'b> = ();
+        fn release<'a: 'b, 'b>(&self, _: ()) {}
     }
     impl ReleasableByMut for Data {
-        type Context<'a> = ();
-        fn release(&mut self, _: ()) {}
+        type Context<'a: 'b, 'b> = ();
+        fn release<'a: 'b, 'b>(&mut self, _: ()) {}
     }
     impl Releasable for Data {
-        type Context<'a> = ();
-        fn release(self, _: ()) {}
+        type Context<'a: 'b, 'b> = ();
+        fn release<'a: 'b, 'b>(self, _: ()) {}
     }
 
     #[derive(Default)]
     struct DataWithMutableReleaseContext;
 
     impl Releasable for DataWithMutableReleaseContext {
-        type Context<'a> = &'a mut ();
-        fn release(self, _: &mut ()) {}
+        type Context<'a: 'b, 'b> = &'a mut ();
+        fn release<'a: 'b, 'b>(self, _: &mut ()) {}
     }
 
     #[::fuchsia::test]

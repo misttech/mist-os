@@ -4,8 +4,6 @@
 
 #include <lib/driver/logging/cpp/logger.h>
 
-#include <fbl/auto_lock.h>
-
 #include "src/devices/usb/drivers/dwc3/dwc3-regs.h"
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
@@ -42,7 +40,7 @@ zx_status_t Dwc3::Fifo::Init(zx::bti& bti) {
 void Dwc3::Fifo::Release() { first = next = current = last = nullptr; }
 
 void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
 
   if (enable) {
@@ -178,7 +176,7 @@ zx_status_t Dwc3::UserEpCancelAll(UserEndpoint& uep) {
   FidlRequestQueue to_complete;
 
   {
-    fbl::AutoLock lock(&uep.ep.lock);
+    std::lock_guard<std::mutex> lock(uep.ep.lock);
     to_complete = UserEpCancelAllLocked(uep);
   }
 
@@ -221,7 +219,7 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
     UserEndpoint* const uep = get_user_endpoint(ep_num);
     ZX_DEBUG_ASSERT(uep != nullptr);
 
-    fbl::AutoLock lock{&uep->ep.lock};
+    std::lock_guard<std::mutex> lock{uep->ep.lock};
 
     if (uep->ep.current_req.has_value()) {
       opt_info.emplace(std::move(*uep->ep.current_req));
@@ -257,20 +255,20 @@ void Dwc3::HandleEpTransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
   UserEndpoint* const uep = get_user_endpoint(ep_num);
   ZX_DEBUG_ASSERT(uep != nullptr);
 
-  fbl::AutoLock lock(&uep->ep.lock);
+  std::lock_guard<std::mutex> lock(uep->ep.lock);
   uep->ep.got_not_ready = true;
   UserEpQueueNext(*uep);
 }
 
 void Dwc3::HandleEpTransferStartedEvent(uint8_t ep_num, uint32_t rsrc_id) {
   if (is_ep0_num(ep_num)) {
-    fbl::AutoLock ep0_lock(&ep0_.lock);
+    std::lock_guard<std::mutex> ep0_lock(ep0_.lock);
     ((ep_num == kEp0Out) ? ep0_.out : ep0_.in).rsrc_id = rsrc_id;
   } else {
     UserEndpoint* const uep = get_user_endpoint(ep_num);
     ZX_DEBUG_ASSERT(uep != nullptr);
 
-    fbl::AutoLock lock(&uep->ep.lock);
+    std::lock_guard<std::mutex> lock(uep->ep.lock);
     uep->ep.rsrc_id = rsrc_id;
   }
 }

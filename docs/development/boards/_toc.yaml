@@ -6,5 +6,11 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
+- title: "Overview"
+  path: /docs/development/boards/
 - title: "Adding support for new boards"
   path: /docs/development/boards/bringup.md
+- title: "Devicetree overview"
+  path: /docs/development/boards/devicetree-overview.md
+- title: "Devicetree visitors"
+  path: /docs/development/boards/devicetree-visitors.md

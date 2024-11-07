@@ -220,6 +220,7 @@ def main():
         else []
     )
 
+    linked = set()
     # Create a GOPATH for the packages dependency tree.
     for dst, src in sorted(files_to_link):
         # This path is later used in go commands that run in cwd=gopath_src.
@@ -252,6 +253,21 @@ def main():
             raise ValueError(f"Invalid go_dep entry: {dst=}, {src=}")
 
         dstdir = os.path.join(gopath_src, dst)
+
+        # Skip previously linked files. This could happen when a binary has
+        # dependencies with overlapping sources.
+        #
+        # This is currently only possible when depending on golibs that use
+        # `...`, which are globbing-like targets that provision multiple Go
+        # packages. For example: `golang.org/x/net` includes
+        # `golang.org/x/net/bpf`, and it's possible to have both in the
+        # dependency graph.
+        #
+        # TODO(https://fxbug.dev/377788797): Re-evaluate support for `...`.
+        to_link = (src, dstdir)
+        if to_link in linked:
+            continue
+        linked.add(to_link)
 
         # Make a symlink to the src directory or file.
         parent = os.path.dirname(dstdir)

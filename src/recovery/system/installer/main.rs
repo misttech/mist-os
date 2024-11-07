@@ -590,9 +590,9 @@ async fn fuchsia_install(
 
 /// Wait for a display to become available.
 async fn wait_for_display() -> Result<(), Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+    let dir = fuchsia_fs::directory::open_in_namespace(
         "/dev/class/display-coordinator",
-        fuchsia_fs::OpenFlags::empty(),
+        fuchsia_fs::Flags::empty(),
     )
     .context("opening display coordinator dir")?;
     let mut watcher = Watcher::new(&dir).await.context("starting watch")?;
@@ -628,11 +628,9 @@ async fn check_is_interactive() -> Result<bool, Error> {
 
 /// Wait for an installation source to become present on the system.
 async fn wait_for_install_disk() -> Result<(), Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        "/dev/class/block",
-        fuchsia_fs::OpenFlags::empty(),
-    )
-    .context("opening block dir")?;
+    let dir =
+        fuchsia_fs::directory::open_in_namespace("/dev/class/block", fuchsia_fs::Flags::empty())
+            .context("opening block dir")?;
     let mut watcher = Watcher::new(&dir).await.context("starting watch")?;
     let bootloader_type = get_bootloader_type().await?;
     let mut devices = vec![];

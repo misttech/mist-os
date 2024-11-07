@@ -105,8 +105,16 @@ pub fn make_inspects_for_lifecycle() -> Vec<InspectData> {
     ]
 }
 
-pub fn setup_fake_rcs() -> RemoteControlProxy {
-    let mock_realm_query = iquery_test_support::MockRealmQuery::default();
+// `components` are component monikers that should report as existing in the resultant RealmQuery.
+// This will make them appear in fuzzy searches using RemoteControlProxy/RealmQuery
+pub fn setup_fake_rcs(components: Vec<&str>) -> RemoteControlProxy {
+    let mut mock_realm_query_builder = iquery_test_support::MockRealmQueryBuilder::prefilled();
+    for c in components {
+        mock_realm_query_builder =
+            mock_realm_query_builder.when(c).moniker(format!("{c}").as_ref()).add();
+    }
+
+    let mock_realm_query = mock_realm_query_builder.build();
     let (proxy, mut stream) =
         fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
     fuchsia_async::Task::local(async move {

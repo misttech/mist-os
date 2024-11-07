@@ -156,7 +156,7 @@ fn sync_open_in_namespace(
     let dir_proxy = fidl_fuchsia_io::DirectorySynchronousProxy::new(client);
 
     let namespace = fdio::Namespace::installed().map_err(|_| errno!(EINVAL))?;
-    namespace.open(path, flags, server).map_err(|_| errno!(ENOENT))?;
+    namespace.open_deprecated(path, flags, server).map_err(|_| errno!(ENOENT))?;
     Ok(dir_proxy)
 }
 
@@ -186,7 +186,7 @@ fn load_time_values_memory() -> Result<Arc<MemoryObject>, Errno> {
 
     let namespace = fdio::Namespace::installed().map_err(|_| errno!(EINVAL))?;
     namespace
-        .open(DIR, fuchsia_fs::OpenFlags::RIGHT_READABLE, server)
+        .open_deprecated(DIR, fuchsia_fs::OpenFlags::RIGHT_READABLE, server)
         .map_err(|_| errno!(ENOENT))?;
 
     let vmo = syncio::directory_open_vmo(

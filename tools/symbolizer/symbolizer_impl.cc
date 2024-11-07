@@ -48,31 +48,55 @@ namespace {
 void SetupCommandLineOptions(const CommandLineOptions& options, zxdb::MapSettingStore& settings) {
   using Settings = zxdb::ClientSettings;
 
+  const char* symbol_index_from_env = getenv("SYMBOL_INDEX_INCLUDE");
+  if (symbol_index_from_env) {
+    settings.SetList(Settings::System::kSymbolIndexInclude, {symbol_index_from_env});
+  }
+
   if (options.symbol_cache) {
+    FX_LOGS(DEBUG) << "Setting symbol cache to " << *options.symbol_cache;
     settings.SetString(Settings::System::kSymbolCache, *options.symbol_cache);
   }
 
   if (!options.symbol_index_files.empty()) {
+    for (const auto& file : options.symbol_index_files) {
+      FX_LOGS(DEBUG) << "Adding symbol index file " << file;
+    }
     settings.SetList(Settings::System::kSymbolIndexFiles, options.symbol_index_files);
   }
 
   if (!options.private_symbol_servers.empty()) {
+    for (const auto& server : options.private_symbol_servers) {
+      FX_LOGS(DEBUG) << "Adding private symbol server " << server;
+    }
     settings.SetList(Settings::System::kPrivateSymbolServers, options.private_symbol_servers);
   }
 
   if (!options.public_symbol_servers.empty()) {
+    for (const auto& server : options.public_symbol_servers) {
+      FX_LOGS(DEBUG) << "Adding public symbol server " << server;
+    }
     settings.SetList(Settings::System::kPublicSymbolServers, options.public_symbol_servers);
   }
 
   if (!options.symbol_paths.empty()) {
+    for (const auto& path : options.symbol_paths) {
+      FX_LOGS(DEBUG) << "Adding symbol path " << path;
+    }
     settings.SetList(Settings::System::kSymbolPaths, options.symbol_paths);
   }
 
   if (!options.build_id_dirs.empty()) {
+    for (const auto& dir : options.build_id_dirs) {
+      FX_LOGS(DEBUG) << "Adding build-id dir " << dir;
+    }
     settings.SetList(Settings::System::kBuildIdDirs, options.build_id_dirs);
   }
 
   if (!options.ids_txts.empty()) {
+    for (const auto& file : options.ids_txts) {
+      FX_LOGS(DEBUG) << "Adding idx.txt " << file;
+    }
     settings.SetList(Settings::System::kIdsTxts, options.ids_txts);
   }
 }
@@ -110,12 +134,16 @@ SymbolizerImpl::SymbolizerImpl(const CommandLineOptions& options)
   session_.system().GetSymbols()->set_create_index(false);
   target_ = session_.system().GetTargets()[0];
 
+  FX_LOGS(DEBUG) << "Initializing async loop...";
   loop_.Init(nullptr);
   // Setting symbol servers will trigger an asynchronous network request.
   SetupCommandLineOptions(options, session_.system().settings());
+  FX_LOGS(DEBUG) << "CLI options set up.";
   if (waiting_auth_) {
+    FX_LOGS(DEBUG) << "Checking for auth...";
     remote_symbol_lookup_enabled_ = true;
     loop_.Run();
+    FX_LOGS(DEBUG) << "Auth state updated.";
   }
 
   // Check and prompt authentication message.
@@ -133,9 +161,11 @@ SymbolizerImpl::SymbolizerImpl(const CommandLineOptions& options)
     ResetDumpfileCurrentObject();
   }
 
+  FX_LOGS(DEBUG) << "Making stack manager and loading matchers.";
   pretty_stack_manager_ = fxl::MakeRefCounted<zxdb::PrettyStackManager>();
   pretty_stack_manager_->LoadDefaultMatchers();
 
+  FX_LOGS(DEBUG) << "Creating source file provider.";
   source_file_provider_ = std::make_unique<zxdb::SourceFileProviderImpl>(target_->settings());
 }
 
@@ -152,7 +182,7 @@ SymbolizerImpl::~SymbolizerImpl() {
   }
 }
 
-void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type, OutputFn output) {
+void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type) {
   // We got a reset:begin before a previous begin tag had a corresponding end tag. For instance,
   // this can happen when many rust components crash at the same time, with each panic handler
   // outputting the respective process' backtrace. If they become interleaved in the log, then
@@ -193,8 +223,7 @@ void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type, OutputFn outpu
   in_batch_mode_ = type == Symbolizer::ResetType::kBegin;
 }
 
-void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view build_id,
-                            OutputFn output) {
+void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view build_id) {
   if (!frames_in_batch_mode_.empty()) {
     FlushBufferedFramesWithContext("got a module tag, expected bt");
   }
@@ -212,54 +241,42 @@ void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view
   }
 }
 
-void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
-                          std::string_view flags, uint64_t module_offset, OutputFn output) {
+SymbolizerImpl::MMapStatus SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
+                                                std::string_view flags, uint64_t module_offset) {
   if (!frames_in_batch_mode_.empty()) {
     FlushBufferedFramesWithContext("got a mmap tag, expected bt");
   }
 
-  if (modules_.find(module_id) == modules_.end()) {
+  if (!modules_.contains(module_id)) {
     analytics_builder_.SetAtLeastOneInvalidInput();
-    output("symbolizer: Invalid module id.");
-    return;
+    return MMapStatus::kInvalidModuleId;
   }
 
   ModuleInfo& module = modules_[module_id];
   uint64_t base = address - module_offset;
 
+  bool inconsistent_base_address = false;
   if (address < module_offset) {
     // Negative load address. This happens for zircon on x64.
     if (module.printed) {
       if (module.base != 0 || module.negative_base != module_offset - address) {
-        analytics_builder_.SetAtLeastOneInvalidInput();
-        output("symbolizer: Inconsistent base address.");
+        inconsistent_base_address = true;
       }
     } else {
       base = address;  // for printing only
       module.base = 0;
       module.negative_base = module_offset - address;
     }
-    if (module.size < address + size) {
-      module.size = address + size;
-    }
+    module.size = std::max(module.size, address + size);
   } else {
     if (module.printed) {
       if (module.base != base) {
-        analytics_builder_.SetAtLeastOneInvalidInput();
-        output("symbolizer: Inconsistent base address.");
+        inconsistent_base_address = true;
       }
     } else {
       module.base = base;
     }
-    if (module.size < size + module_offset) {
-      module.size = size + module_offset;
-    }
-  }
-
-  if (!omit_module_lines_ && !symbolizing_dart_ && !module.printed) {
-    output(fxl::StringPrintf("[[[ELF module #0x%" PRIx64 " \"%s\" BuildID=%s 0x%" PRIx64 "]]]",
-                             module_id, module.name.c_str(), module.build_id.c_str(), base));
-    module.printed = true;
+    module.size = std::max(module.size, size + module_offset);
   }
 
   // Support for dumpfile
@@ -272,18 +289,46 @@ void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
     segment.AddMember("mod_rel_addr", module_offset, dumpfile_document_.GetAllocator());
     dumpfile_current_object_["segments"].PushBack(segment, dumpfile_document_.GetAllocator());
   }
+
+  if (inconsistent_base_address) {
+    analytics_builder_.SetAtLeastOneInvalidInput();
+    return MMapStatus::kInconsistentBaseAddress;
+  }
+  return MMapStatus::kOk;
 }
 
-void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType type,
-                               std::string_view message, OutputFn output) {
-  if (prettify_enabled_ && in_batch_mode_) {
-    if (frame_id < frames_in_batch_mode_.size()) {
-      OutputBatchedBacktrace();
-    }
-    frames_in_batch_mode_.push_back(Frame{address, type, std::move(output)});
-    return;
+void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
+                          std::string_view flags, uint64_t module_offset, StringOutputFn output) {
+  if (!frames_in_batch_mode_.empty()) {
+    FlushBufferedFramesWithContext("got a mmap tag, expected bt");
   }
 
+  auto status = MMap(address, size, module_id, flags, module_offset);
+  switch (status) {
+    case MMapStatus::kOk:
+      break;
+    case MMapStatus::kInconsistentBaseAddress:
+      output("symbolizer: Inconsistent base address.");
+      break;
+    case MMapStatus::kInvalidModuleId:
+      output("symbolizer: Invalid module id.");
+      return;
+    default:
+      output("symbolizer: Unknown error state.");
+      return;
+  }
+
+  // We only continue from the above switch/case block if module_id is valid.
+  ModuleInfo& module = modules_[module_id];
+
+  if (!omit_module_lines_ && !symbolizing_dart_ && !module.printed) {
+    output(fxl::StringPrintf("[[[ELF module #0x%" PRIx64 " \"%s\" BuildID=%s 0x%" PRIx64 "]]]",
+                             module_id, module.name.c_str(), module.build_id.c_str(), module.base));
+    module.printed = true;
+  }
+}
+
+void SymbolizerImpl::Backtrace(uint64_t address, AddressType type, LocationOutputFn output) {
   InitProcess();
   analytics_builder_.IncreaseNumberOfFrames();
 
@@ -298,16 +343,20 @@ void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType 
       module = &prev;
     }
   }
+  // Also check for negative loads which can happen on zircon on x64.
+  // When this happens, the module will have a base address of 0.
+  if (!module && address_to_module_id_.contains(0)) {
+    uint64_t module_id = address_to_module_id_[0];
+    const auto& mod = modules_[module_id];
+    if (address - mod.base <= mod.size) {
+      module = &mod;
+    }
+  }
 
   if (!module) {
-    std::string out =
-        FormatFrameIdAndAddress(frame_id, 0, address) + " is not covered by any module";
-    if (!message.empty()) {
-      out += " " + std::string(message);
-    }
     analytics_builder_.IncreaseNumberOfFramesInvalid();
     analytics_builder_.TotalTimerStop();
-    return output(out);
+    return;
   }
 
   uint64_t call_address = address;
@@ -331,39 +380,13 @@ void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType 
 
   bool symbolized = false;
   for (size_t i = 0; i < stack.size(); i++) {
-    std::string out = FormatFrameIdAndAddress(frame_id, stack.size() - i - 1, address);
-
-    out += " in";
-
     // Function name.
     const zxdb::Location location = stack[i]->GetLocation();
     if (location.symbol().is_valid()) {
       symbolized = true;
-      auto symbol = location.symbol().Get();
-      auto function = symbol->As<zxdb::Function>();
-      if (function && !symbolizing_dart_) {
-        out += " " + zxdb::FormatFunctionName(function, {}).AsString();
-      } else {
-        out += " " + symbol->GetFullName();
-      }
     }
 
-    // FileLine info.
-    if (location.file_line().is_valid()) {
-      symbolized = true;
-      out += " " + location.file_line().file() + ":" + std::to_string(location.file_line().line());
-    }
-
-    // Module offset.
-    out += fxl::StringPrintf(" <%s>+0x%" PRIx64, module->name.c_str(),
-                             address - module->base + module->negative_base);
-
-    // Extra message.
-    if (!message.empty()) {
-      out += " " + std::string(message);
-    }
-
-    output(out);
+    output(stack.size() - i - 1, location, *module);
   }
 
   // One physical frame could be symbolized to multiple inlined frames. We're only counting the
@@ -372,6 +395,62 @@ void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType 
     analytics_builder_.IncreaseNumberOfFramesSymbolized();
   }
   analytics_builder_.TotalTimerStop();
+}
+
+void SymbolizerImpl::Backtrace(uint64_t frame_id, uint64_t address, AddressType type,
+                               std::string_view message, StringOutputFn output) {
+  if (prettify_enabled_ && in_batch_mode_) {
+    if (frame_id < frames_in_batch_mode_.size()) {
+      OutputBatchedBacktrace();
+    }
+    frames_in_batch_mode_.push_back(Frame{address, type, std::move(output)});
+    return;
+  }
+
+  bool module_found = false;
+  Backtrace(address, type,
+            [this, frame_id, address, message, &output, &module_found](
+                auto inline_index, auto& location, auto& module) {
+              module_found = true;
+              std::string out = FormatFrameIdAndAddress(frame_id, inline_index, address);
+              out += " in";
+
+              if (location.symbol().is_valid()) {
+                auto symbol = location.symbol().Get();
+                auto function = symbol->template As<zxdb::Function>();
+                if (function && !symbolizing_dart_) {
+                  out += " " + zxdb::FormatFunctionName(function, {}).AsString();
+                } else {
+                  out += " " + symbol->GetFullName();
+                }
+              }
+
+              // FileLine info.
+              if (location.file_line().is_valid()) {
+                out += " " + location.file_line().file() + ":" +
+                       std::to_string(location.file_line().line());
+              }
+
+              // Module offset.
+              out += fxl::StringPrintf(" <%s>+0x%" PRIx64, module.name.c_str(),
+                                       address - module.base + module.negative_base);
+
+              // Extra message.
+              if (!message.empty()) {
+                out += " " + std::string(message);
+              }
+
+              output(out);
+            });
+
+  if (!module_found) {
+    std::string out =
+        FormatFrameIdAndAddress(frame_id, 0, address) + " is not covered by any module";
+    if (!message.empty()) {
+      out += " " + std::string(message);
+    }
+    output(out);
+  }
 }
 
 // Consume frames_in_batch_mode_ and output.
@@ -457,7 +536,7 @@ void SymbolizerImpl::OutputBatchedBacktrace() {
   FX_CHECK(frames_in_batch_mode_.empty());
 }
 
-void SymbolizerImpl::DumpFile(std::string_view type, std::string_view name, OutputFn output) {
+void SymbolizerImpl::DumpFile(std::string_view type, std::string_view name) {
   if (!dumpfile_output_.empty()) {
     dumpfile_current_object_.AddMember("type", ToJSONString(type),
                                        dumpfile_document_.GetAllocator());
@@ -561,7 +640,9 @@ void SymbolizerImpl::InitProcess() {
 
   // Wait until downloading completes.
   if (is_downloading_) {
+    FX_LOGS(DEBUG) << "Waiting for download to complete...";
     loop_.Run();
+    FX_LOGS(DEBUG) << "Done downloading symbols for process.";
   }
 }
 

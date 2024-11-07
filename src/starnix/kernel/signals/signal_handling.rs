@@ -165,7 +165,7 @@ pub fn action_for_signal(siginfo: &SignalInfo, sigaction: sigaction_t) -> Delive
 }
 
 /// Dequeues and handles a pending signal for `current_task`.
-pub fn dequeue_signal(current_task: &mut CurrentTask) {
+pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut CurrentTask) {
     let CurrentTask { task, thread_state, .. } = current_task;
     let mut task_state = task.write();
     // This code is occasionally executed as the task is stopping. Stopping /
@@ -217,7 +217,7 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
             &mut current_task.thread_state.registers,
             &current_task.thread_state.extended_pstate,
         ) {
-            current_task.thread_group_exit(status);
+            current_task.thread_group_exit(locked, status);
         }
     }
 }
@@ -462,11 +462,14 @@ pub fn sys_restart_syscall(
 /// Test utilities for signal handling.
 #[cfg(test)]
 pub(crate) mod testing {
-    use crate::signals::dequeue_signal;
+    use super::*;
     use crate::testing::AutoReleasableTask;
     use std::ops::DerefMut as _;
 
-    pub(crate) fn dequeue_signal_for_test(current_task: &mut AutoReleasableTask) {
-        dequeue_signal(current_task.deref_mut());
+    pub(crate) fn dequeue_signal_for_test(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &mut AutoReleasableTask,
+    ) {
+        dequeue_signal(locked, current_task.deref_mut());
     }
 }

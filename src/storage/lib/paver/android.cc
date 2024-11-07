@@ -16,7 +16,6 @@
 #include <string>
 
 #include <fbl/algorithm.h>
-#include <src/lib/uuid/uuid.h>
 
 #include "src/storage/lib/paver/boot_control_definition.h"
 #include "src/storage/lib/paver/device-partitioner.h"
@@ -31,7 +30,6 @@ namespace paver {
 namespace {
 
 using fuchsia_system_state::SystemPowerState;
-using uuid::Uuid;
 
 }  // namespace
 
@@ -50,7 +48,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> AndroidDevicePartitioner::Initial
   auto partitioner =
       WrapUnique(new AndroidDevicePartitioner(std::move(status->gpt), std::move(context)));
   if (status->initialize_partition_tables) {
-    if (auto status = partitioner->InitPartitionTables(); status.is_error()) {
+    if (auto status = partitioner->ResetPartitionTables(); status.is_error()) {
       return status.take_error();
     }
   }
@@ -71,12 +69,6 @@ bool AndroidDevicePartitioner::SupportsPartition(const PartitionSpec& spec) cons
       PartitionSpec(paver::Partition::kFuchsiaVolumeManager)};
   return std::any_of(std::cbegin(supported_specs), std::cend(supported_specs),
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
-}
-
-zx::result<std::unique_ptr<PartitionClient>> AndroidDevicePartitioner::AddPartition(
-    const PartitionSpec& spec) const {
-  ERROR("Adding partitions is not supported for Android devices\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx::result<std::unique_ptr<PartitionClient>> AndroidDevicePartitioner::FindPartition(
@@ -124,12 +116,14 @@ zx::result<std::unique_ptr<PartitionClient>> AndroidDevicePartitioner::FindParti
   }
   LOG("Looking for part %s\n", std::string(part_name).c_str());
 
-  const auto filter = [&](const gpt_partition_t& part) { return FilterByName(part, part_name); };
+  const auto filter = [&](const GptPartitionMetadata& part) {
+    return FilterByName(part, part_name);
+  };
   auto status = gpt_->FindPartition(filter);
   if (status.is_error()) {
     return status.take_error();
   }
-  return zx::ok(std::move(status->partition));
+  return zx::ok(std::move(*status));
 }
 
 zx::result<> AndroidDevicePartitioner::FinalizePartition(const PartitionSpec& spec) const {
@@ -143,13 +137,8 @@ zx::result<> AndroidDevicePartitioner::FinalizePartition(const PartitionSpec& sp
 
 zx::result<> AndroidDevicePartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
-zx::result<> AndroidDevicePartitioner::InitPartitionTables() const {
+zx::result<> AndroidDevicePartitioner::ResetPartitionTables() const {
   ERROR("Initialising partition tables is not supported for Android devices\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
-zx::result<> AndroidDevicePartitioner::WipePartitionTables() const {
-  ERROR("Wiping partition tables is not supported for Android devices\n");
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -308,7 +297,7 @@ class AndroidAbrClient : public abr::Client, android::IoOps {
     return zx::ok();
   }
 
-  zx::result<> Flush() const override {
+  zx::result<> Flush() override {
     if (auto status = partition_->Write(vmo_, data_size_); status.is_error()) {
       ERROR("Failed to read from partition\n");
       return status.take_error();
@@ -325,8 +314,8 @@ class AndroidAbrClient : public abr::Client, android::IoOps {
 zx::result<std::unique_ptr<abr::Client>> AndroidAbrClientFactory::New(
     const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  auto partitioner = AndroidDevicePartitioner::Initialize(devices, std::move(svc_root),
-                                                          GetCurrentArch(), {}, std::move(context));
+  auto partitioner = AndroidDevicePartitioner::Initialize(devices, svc_root, GetCurrentArch(), {},
+                                                          std::move(context));
 
   if (partitioner.is_error()) {
     ERROR("Failed to initialize android partitioner: %s\n", partitioner.status_string());

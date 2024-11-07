@@ -5,6 +5,7 @@
 #include "src/developer/forensics/feedback/annotations/time_provider.h"
 
 #include <fuchsia/time/cpp/fidl.h>
+#include <lib/zx/time.h>
 
 #include <memory>
 
@@ -17,8 +18,12 @@
 namespace forensics::feedback {
 namespace {
 
-constexpr timekeeper::time_utc kTime((zx::hour(7) + zx::min(14) + zx::sec(52)).get());
-constexpr char kTimeStr[] = "1970-01-01 07:14:52 GMT";
+constexpr timekeeper::time_utc kUtcTime((zx::hour(7) + zx::min(14) + zx::sec(52)).get());
+constexpr zx::time_boot kUptime((zx::hour(2) + zx::min(14) + zx::sec(52)).get());
+constexpr zx::time_monotonic kRuntime((zx::hour(1) + zx::min(14) + zx::sec(52)).get());
+constexpr char kUtcTimeStr[] = "1970-01-01 07:14:52 GMT";
+constexpr char kUptimeStr[] = "000d02h14m52s";
+constexpr char kRuntimeStr[] = "000d01h14m52s";
 
 class TimeProviderTest : public UnitTestFixture {
  public:
@@ -39,7 +44,9 @@ class TimeProviderTest : public UnitTestFixture {
 
   void SetUpTimeProvider() {
     auto clock = std::make_unique<timekeeper::TestClock>();
-    clock->SetUtc(kTime);
+    clock->SetUtc(kUtcTime);
+    clock->SetBoot(kUptime);
+    clock->SetMonotonic(kRuntime);
 
     time_provider_ = std::make_unique<TimeProvider>(
         dispatcher(), zx::unowned_clock(clock_handle_.get_handle()), std::move(clock));
@@ -57,7 +64,7 @@ TEST_F(TimeProviderTest, Check_LoggingQualityClock) {
   RunLoopUntilIdle();
 
   ASSERT_TRUE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
-  EXPECT_EQ(time_provider_->Get().at(kDeviceUtcTimeKey).Value(), kTimeStr);
+  EXPECT_EQ(time_provider_->Get().at(kDeviceUtcTimeKey).Value(), kUtcTimeStr);
 }
 
 TEST_F(TimeProviderTest, Check_LoggingQualityClockBeforeFeedback) {
@@ -66,14 +73,15 @@ TEST_F(TimeProviderTest, Check_LoggingQualityClockBeforeFeedback) {
   RunLoopUntilIdle();
 
   ASSERT_TRUE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
-  EXPECT_EQ(time_provider_->Get().at(kDeviceUtcTimeKey).Value(), kTimeStr);
+  EXPECT_EQ(time_provider_->Get().at(kDeviceUtcTimeKey).Value(), kUtcTimeStr);
 }
 
 TEST_F(TimeProviderTest, Check_NotReadyOnClockStarted) {
   SetUpTimeProvider();
   EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
 
-  ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get()))), ZX_OK);
+  ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kUtcTime.get()))),
+            ZX_OK);
   RunLoopUntilIdle();
 
   EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
@@ -89,6 +97,21 @@ TEST_F(TimeProviderTest, Check_NotReadyOnClockSynchronized) {
   RunLoopUntilIdle();
 
   EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
+}
+
+TEST_F(TimeProviderTest, GetValuesCorrect) {
+  SetUpTimeProvider();
+  SignalLoggingQualityClock();
+  RunLoopUntilIdle();
+
+  ASSERT_TRUE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
+  EXPECT_EQ(time_provider_->Get().at(kDeviceUtcTimeKey).Value(), kUtcTimeStr);
+
+  ASSERT_TRUE(time_provider_->Get().at(kDeviceUptimeKey).HasValue());
+  EXPECT_EQ(time_provider_->Get().at(kDeviceUptimeKey).Value(), kUptimeStr);
+
+  ASSERT_TRUE(time_provider_->Get().at(kDeviceRuntimeKey).HasValue());
+  EXPECT_EQ(time_provider_->Get().at(kDeviceRuntimeKey).Value(), kRuntimeStr);
 }
 
 }  // namespace

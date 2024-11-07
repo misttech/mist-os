@@ -135,7 +135,7 @@ class UfsMockDevice {
 
   zx_status_t AddLun(uint8_t lun);
 
-  void TriggerInterrupt() { irq_->trigger(0, zx::clock::get_monotonic()); }
+  void TriggerInterrupt() { irq_->trigger(0, zx::clock::get_boot()); }
 
   zx_status_t BufferWrite(uint8_t lun, const void *buf, size_t block_count, off_t block_offset);
   zx_status_t BufferRead(uint8_t lun, void *buf, size_t block_count, off_t block_offset);

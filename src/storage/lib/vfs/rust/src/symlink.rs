@@ -95,12 +95,7 @@ impl<T: Symlink> Connection<T> {
                 self.handle_clone(flags, object);
             }
             fio::SymlinkRequest::Clone2 { request, control_handle: _ } => {
-                // TODO(https://fxbug.dev/324112547): Handle unimplemented io2 method.
-                // Suppress any errors in the event a bad `request` channel was provided.\
-
-                // FIXME
-
-                let _: Result<_, _> = request.close_with_epitaph(Status::NOT_SUPPORTED);
+                self.handle_clone2(ServerEnd::new(request.into_channel()));
             }
             fio::SymlinkRequest::Close { responder } => {
                 responder.send(Ok(()))?;
@@ -206,6 +201,19 @@ impl<T: Symlink> Connection<T> {
                 return;
             }
         };
+        flags.to_object_request(server_end).handle(|object_request| {
+            self.scope.spawn(Self::create(
+                self.scope.clone(),
+                self.symlink.clone(),
+                &flags,
+                object_request,
+            )?);
+            Ok(())
+        });
+    }
+
+    fn handle_clone2(&mut self, server_end: ServerEnd<fio::SymlinkMarker>) {
+        let flags = fio::Flags::PROTOCOL_SYMLINK | fio::Flags::PERM_GET_ATTRIBUTES;
         flags.to_object_request(server_end).handle(|object_request| {
             self.scope.spawn(Self::create(
                 self.scope.clone(),
@@ -327,7 +335,7 @@ mod tests {
     use crate::node::Node;
     use crate::{immutable_attributes, ToObjectRequest};
     use assert_matches::assert_matches;
-    use fidl::endpoints::create_proxy;
+    use fidl::endpoints::{create_proxy, ServerEnd};
     use fidl_fuchsia_io as fio;
     use futures::StreamExt;
     use std::collections::HashMap;
@@ -498,6 +506,30 @@ mod tests {
             ) if mode == fio::MODE_TYPE_SYMLINK
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false)
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_clone2() {
+        let scope = ExecutionScope::new();
+        let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>().unwrap();
+        scope.spawn(
+            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
+                .run(fio::Flags::PERM_GET_ATTRIBUTES.to_object_request(server_end)),
+        );
+        let orig_attrs = client_end
+            .get_attributes(fio::NodeAttributesQuery::all())
+            .await
+            .expect("fidl failed")
+            .unwrap();
+        // Clone the original connection and query it's attributes, which should match the original.
+        let (cloned_client, cloned_server) = create_proxy::<fio::SymlinkMarker>().unwrap();
+        client_end.clone2(ServerEnd::new(cloned_server.into_channel())).unwrap();
+        let cloned_attrs = cloned_client
+            .get_attributes(fio::NodeAttributesQuery::all())
+            .await
+            .expect("fidl failed")
+            .unwrap();
+        assert_eq!(orig_attrs, cloned_attrs);
     }
 
     #[fuchsia::test]

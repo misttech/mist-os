@@ -18,7 +18,10 @@ using Runner = ComponentRunner;
 
 class SegmentManagerTest : public F2fsFakeDevTestFixture {
  public:
-  SegmentManagerTest() {}
+  SegmentManagerTest()
+      : F2fsFakeDevTestFixture(TestOptions{
+            .mount_options = {{MountOption::kInlineDentry, false}},
+        }) {}
 
  protected:
   void MakeDirtySegments(size_t invalidate_ratio, int num_files) {
@@ -290,6 +293,7 @@ TEST_F(SegmentManagerTest, GetVictimByDefault) TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 TEST_F(SegmentManagerTest, SelectBGVictims) TA_NO_THREAD_SAFETY_ANALYSIS {
+  fs_->GetSuperblockInfo().SetOpt(MountOption::kForceLfs);
   DirtySeglistInfo *dirty_info = &fs_->GetSegmentManager().GetDirtySegmentInfo();
   auto &bitmap = dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)];
 
@@ -403,6 +407,132 @@ TEST_F(SegmentManagerTest, DirtySegments) TA_NO_THREAD_SAFETY_ANALYSIS {
                                dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyColdNode)];
 
   ASSERT_EQ(fs_->GetSegmentManager().DirtySegments(), dirtyDataSegments + dirtyNodeSegments);
+}
+
+TEST_F(SegmentManagerTest, SsrData) TA_NO_THREAD_SAFETY_ANALYSIS {
+  zx::result vnode_or = root_dir_->Create("hot_data_A", fs::CreationType::kDirectory);
+  ASSERT_TRUE(vnode_or.is_ok());
+  auto dir = fbl::RefPtr<Dir>::Downcast(*std::move(vnode_or));
+  std::vector<fbl::RefPtr<Dir>> dirs;
+  dirs.push_back(std::move(dir));
+
+  vnode_or = root_dir_->Create("hot_data_B", fs::CreationType::kDirectory);
+  ASSERT_TRUE(vnode_or.is_ok());
+  dir = fbl::RefPtr<Dir>::Downcast(*std::move(vnode_or));
+  dirs.push_back(std::move(dir));
+
+  constexpr size_t kChunkSize = kDefaultBlocksPerSegment / 2;
+  size_t index = 1;
+  // Write hot data
+  while (fs_->GetSuperblockInfo().Utilization() < 30) {
+    for (size_t i = 0; i < 2; ++i) {
+      LockedPage page;
+      ASSERT_EQ(dirs[i]->GetNewDataPage(index, true, &page), ZX_OK);
+      page.SetDirty();
+    }
+    // Writeback dirty pages when each file has kChunkSize dirty pages, which makes a hot data
+    // segment have data blocks of the two dirs.
+    if (!(index++ % kChunkSize)) {
+      fs_->SyncFs();
+    }
+  }
+  fs_->SyncFs();
+
+  DirtySeglistInfo &dirty_info = fs_->GetSegmentManager().GetDirtySegmentInfo();
+
+  // There should be no dirty data segments.
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyHotData)], 0);
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyWarmData)], 0);
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyColdData)], 0);
+
+  // Make dirty hot data segments
+  size_t expected = dirs[1]->GetSize() / Page::Size() / kChunkSize;
+  dirs[1]->DoTruncate(4096);
+  fs_->SyncFs();
+
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyHotData)],
+            static_cast<int>(expected));
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyWarmData)], 0);
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyColdData)], 0);
+
+  // It should be able to allocate new blocks from dirty hot data segments for hot data (e.g.,
+  // |dirs[1]|) without gc and checkpoint.
+  auto prev_ver = fs_->GetSuperblockInfo().GetCheckpointVer(true);
+  for (size_t i = 1; i <= kDefaultBlocksPerSegment; ++i) {
+    LockedPage page;
+    ASSERT_EQ(dirs[1]->GetNewDataPage(i, true, &page), ZX_OK);
+    page.SetDirty();
+  }
+  ASSERT_EQ(prev_ver, fs_->GetSuperblockInfo().GetCheckpointVer(true));
+  fs_->SyncFs();
+
+  prev_ver = fs_->GetSuperblockInfo().GetCheckpointVer(true);
+
+  // It should be able to allocate new blocks from dirty hot data segments for warm data (e.g.,
+  // |file|) without gc and checkpoint.
+  vnode_or = root_dir_->Create("warm_data", fs::CreationType::kFile);
+  ASSERT_TRUE(vnode_or.is_ok());
+  auto file = fbl::RefPtr<File>::Downcast(*std::move(vnode_or));
+  uint8_t buf[Page::Size()];
+  for (size_t i = 0; i < kDefaultBlocksPerSegment * 2; ++i) {
+    size_t out = 0;
+    ASSERT_EQ(FileTester::Write(file.get(), buf, sizeof(buf), i * Page::Size(), &out), ZX_OK);
+    ASSERT_EQ(out, Page::Size());
+  }
+  file->SyncFile(false);
+
+  ASSERT_EQ(prev_ver, fs_->GetSuperblockInfo().GetCheckpointVer(true));
+
+  file->Close();
+  dirs[0]->Close();
+  dirs[1]->Close();
+}
+
+TEST_F(SegmentManagerTest, SsrNode) TA_NO_THREAD_SAFETY_ANALYSIS {
+  size_t i = 0;
+  std::vector<fbl::RefPtr<VnodeF2fs>> deleted;
+  // Write warm nodes
+  while (fs_->GetSuperblockInfo().Utilization() < 30) {
+    zx::result warm_node_or = root_dir_->Create(std::to_string(i), fs::CreationType::kFile);
+    ASSERT_TRUE(warm_node_or.is_ok());
+    warm_node_or->Close();
+    if (i++ % 2) {
+      deleted.push_back(fbl::RefPtr<VnodeF2fs>::Downcast(*warm_node_or));
+    }
+  }
+  fs_->SyncFs();
+
+  DirtySeglistInfo &dirty_info = fs_->GetSegmentManager().GetDirtySegmentInfo();
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyHotNode)], 0);
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyWarmNode)], 0);
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyColdNode)], 0);
+
+  // Make dirty warm node segments
+  FileTester::DeleteChildren(deleted, root_dir_, deleted.size());
+  deleted.clear();
+
+  fs_->SyncFs();
+  size_t expected = i / kDefaultBlocksPerSegment;
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyHotNode)], 0);
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyWarmNode)],
+            static_cast<int>(expected));
+  ASSERT_EQ(dirty_info.nr_dirty[static_cast<int>(DirtyType::kDirtyColdNode)], 0);
+  ASSERT_TRUE(expected >= 8);
+
+  // It should be able to allocate new blocks from dirty warm data segments without gc or
+  // checkpoint.
+  size_t prev_ver = fs_->GetSuperblockInfo().GetCheckpointVer(true);
+  for (size_t i = 0; i < kDefaultBlocksPerSegment * 2; ++i) {
+    zx::result warm_node_or = root_dir_->Create(std::to_string(i) + "W", fs::CreationType::kFile);
+    ASSERT_TRUE(warm_node_or.is_ok());
+    warm_node_or->Close();
+    zx::result hot_node_or =
+        root_dir_->Create(std::to_string(i) + "H", fs::CreationType::kDirectory);
+    ASSERT_TRUE(hot_node_or.is_ok());
+    hot_node_or->Close();
+  }
+  ASSERT_EQ(prev_ver, fs_->GetSuperblockInfo().GetCheckpointVer(true));
+  fs_->SyncFs();
 }
 
 TEST(SegmentManagerOptionTest, Section) TA_NO_THREAD_SAFETY_ANALYSIS {

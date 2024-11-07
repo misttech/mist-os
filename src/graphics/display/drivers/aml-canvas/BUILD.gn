@@ -49,7 +49,7 @@ source_set("common_srcs") {
   ]
 }
 
-fuchsia_driver("aml-canvas-driver") {
+fuchsia_cc_driver("aml-canvas-driver") {
   output_name = "aml-canvas"
   deps = [ ":common_srcs" ]
 }

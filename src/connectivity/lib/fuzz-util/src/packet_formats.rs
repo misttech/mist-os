@@ -9,6 +9,7 @@ use net_types::ethernet::Mac;
 use net_types::ip::{IpAddress, Ipv4Addr};
 use packet_formats::ethernet::{EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck};
 use packet_formats::icmp::IcmpParseArgs;
+use packet_formats::ip::FragmentOffset;
 use packet_formats::ipv4::Ipv4PacketBuilder;
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::tcp::TcpParseArgs;
@@ -61,7 +62,7 @@ impl<'a> Arbitrary<'a> for Fuzzed<Ipv4PacketBuilder> {
         builder.dscp_and_ecn(u.arbitrary::<u8>()?.into());
         builder.df_flag(u.arbitrary()?);
         builder.mf_flag(u.arbitrary()?);
-        builder.fragment_offset(u.int_in_range(0..=(1 << 13) - 1)?);
+        builder.fragment_offset(FragmentOffset::new(u.int_in_range(0..=(1 << 13) - 1)?).unwrap());
 
         Ok(Self(builder))
     }

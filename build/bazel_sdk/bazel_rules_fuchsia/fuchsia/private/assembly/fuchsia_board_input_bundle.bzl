@@ -5,7 +5,7 @@
 """Rules for defining assembly board input bundle."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":providers.bzl", "FuchsiaBoardInputBundleInfo")
@@ -95,12 +95,9 @@ def _fuchsia_board_input_bundle_impl(ctx):
         creation_inputs += dep[FuchsiaPackageInfo].files
 
     # Create Board Input Bundle
-    ffx_tool = fuchsia_toolchain.ffx_assembly
     board_input_bundle_dir = ctx.actions.declare_directory(ctx.label.name)
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
-    ffx_invocation = [
-        ffx_tool.path,
-        "--config \"assembly_enabled=true,sdk.root=" + ctx.attr._sdk_manifest.label.workspace_root + "\"",
+    ffx_invocation = get_ffx_assembly_args(fuchsia_toolchain) + [
         "--isolate-dir " + ffx_isolate_dir.path,
         "assembly",
         "board-input-bundle",

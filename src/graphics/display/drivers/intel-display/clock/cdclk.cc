@@ -14,7 +14,7 @@
 #include "src/graphics/display/drivers/intel-display/power-controller.h"
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace intel_display {
 
@@ -381,8 +381,8 @@ bool CoreDisplayClockTigerLake::Enable(uint32_t freq_khz, State state) {
 
   // Poll CDCLK_PLL_ENABLE for PLL lock. Timeout and fail if not locked after
   // 200 us.
-  if (!PollUntil([&] { return cdclk_pll_enable.ReadFrom(mmio_space_).pll_lock(); }, zx::usec(1),
-                 200)) {
+  if (!display::PollUntil([&] { return cdclk_pll_enable.ReadFrom(mmio_space_).pll_lock(); },
+                          zx::usec(1), 200)) {
     FDF_LOG(ERROR, "Tiger Lake CDCLK Enable: Timeout");
     return false;
   }
@@ -423,8 +423,8 @@ bool CoreDisplayClockTigerLake::Disable() {
 
   // Poll CDCLK_PLL_ENABLE for PLL unlocked. Timeout and fail if not unlocked
   // after 200 us.
-  if (!PollUntil([&] { return !cdclk_pll_enable.ReadFrom(mmio_space_).pll_lock(); }, zx::usec(1),
-                 200)) {
+  if (!display::PollUntil([&] { return !cdclk_pll_enable.ReadFrom(mmio_space_).pll_lock(); },
+                          zx::usec(1), 200)) {
     FDF_LOG(ERROR, "Tiger Lake CDCLK Disable: Timeout");
     return false;
   }

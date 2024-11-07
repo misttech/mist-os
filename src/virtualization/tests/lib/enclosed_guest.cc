@@ -721,9 +721,8 @@ zx_status_t TerminaEnclosedGuest::BuildLaunchInfo(GuestLaunchInfo* launch_info) 
            {"/pkg/data/extras.img", "extras"},
        }) {
     fidl::InterfaceHandle<fuchsia::io::File> file;
-    if (zx_status_t status =
-            fdio_open(path, static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),
-                      file.NewRequest().TakeChannel().release());
+    if (zx_status_t status = fdio_open3(path, static_cast<uint64_t>(fuchsia::io::PERM_READABLE),
+                                        file.NewRequest().TakeChannel().release());
         status != ZX_OK) {
       return status;
     }

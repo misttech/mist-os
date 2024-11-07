@@ -17,7 +17,6 @@
 
 #include "src/cobalt/bin/testing/fake_http_loader.h"
 #include "src/lib/fsl/socket/strings.h"
-#include "src/lib/fxl/command_line.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace cobalt {

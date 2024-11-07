@@ -9,6 +9,8 @@ use crate::compiler::wire::{emit_type, emit_type_check};
 use crate::compiler::Compiler;
 use crate::ir::CompIdent;
 
+// TODO: wire tables need a drop impl
+
 pub fn emit_table<W: Write>(
     compiler: &mut Compiler<'_>,
     out: &mut W,

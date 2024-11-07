@@ -183,16 +183,16 @@ struct TransactionState {
 }
 
 /// Manages a connection to a GPT-formatted block device.
-pub struct GptManager {
-    client: RemoteBlockClient,
+pub struct Gpt {
+    client: Arc<RemoteBlockClient>,
     header: format::Header,
     partitions: BTreeMap<u32, PartitionInfo>,
     transaction_state: Arc<Mutex<TransactionState>>,
 }
 
-impl std::fmt::Debug for GptManager {
+impl std::fmt::Debug for Gpt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("GptManager")
+        f.debug_struct("Gpt")
             .field("header", &self.header)
             .field("partitions", &self.partitions)
             .finish()
@@ -228,9 +228,9 @@ impl From<TransactionCommitError> for zx::Status {
     }
 }
 
-impl GptManager {
+impl Gpt {
     /// Loads and validates a GPT-formatted block device.
-    pub async fn open(client: RemoteBlockClient) -> Result<Self, Error> {
+    pub async fn open(client: Arc<RemoteBlockClient>) -> Result<Self, Error> {
         let mut restore_primary = false;
         let (header, partitions) = match load_metadata(&client, WhichHeader::Primary).await {
             Ok(v) => v,
@@ -273,8 +273,12 @@ impl GptManager {
         Ok(this)
     }
 
+    pub fn client(&self) -> &Arc<RemoteBlockClient> {
+        &self.client
+    }
+
     #[cfg(test)]
-    fn take_client(self) -> RemoteBlockClient {
+    fn take_client(self) -> Arc<RemoteBlockClient> {
         self.client
     }
 
@@ -400,7 +404,7 @@ impl Drop for Transaction {
 
 #[cfg(test)]
 mod tests {
-    use crate::GptManager;
+    use crate::Gpt;
     use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use fake_block_server::{FakeServer, FakeServerOptions};
     use fidl_fuchsia_hardware_block_volume as fvolume;
@@ -421,7 +425,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect_err("load should fail");
             }.fuse() => {},
@@ -441,7 +445,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
             }.fuse() => {},
@@ -476,7 +480,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 assert_eq!(manager.header.first_usable, 3);
@@ -518,7 +522,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let partition = manager.partitions().get(&0).expect("No entry found");
@@ -572,7 +576,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let partition = manager.partitions().get(&0).expect("No entry found");
@@ -620,7 +624,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let partition = manager.partitions().get(&0).expect("No entry found");
@@ -658,7 +662,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let partition = manager.partitions().get(&0).expect("No entry found");
@@ -710,7 +714,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let partition = manager.partitions().get(&0).expect("No entry found");
@@ -773,7 +777,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let partition = manager.partitions().get(&0).expect("No entry found");
@@ -806,7 +810,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 {
@@ -832,7 +836,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let transaction = manager.create_transaction().unwrap();
@@ -842,7 +846,7 @@ mod tests {
                 // representation match.
                 assert_eq!(manager.header().num_parts, 0);
                 assert!(manager.partitions().is_empty());
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 0);
@@ -881,7 +885,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let mut transaction = manager.create_transaction().unwrap();
@@ -900,7 +904,7 @@ mod tests {
                 // representation match.
                 assert_eq!(manager.header().num_parts, 2);
                 assert!(manager.partitions().get(&2).is_none());
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 2);
@@ -949,7 +953,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let mut transaction = manager.create_transaction().unwrap();
@@ -961,7 +965,7 @@ mod tests {
                 // representation match.
                 assert_eq!(manager.header().num_parts, 0);
                 assert!(manager.partitions().get(&0).is_none());
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 0);
@@ -1000,7 +1004,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let mut transaction = manager.create_transaction().unwrap();
@@ -1024,7 +1028,7 @@ mod tests {
                 assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_2_GUID);
                 assert_eq!(partition.start_block, 7);
                 assert_eq!(partition.num_blocks, 1);
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 1);
@@ -1063,7 +1067,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 assert_eq!(manager.header().num_parts, 1);
@@ -1083,7 +1087,7 @@ mod tests {
                 assert_eq!(partition.start_block, 34);
                 assert_eq!(partition.num_blocks, 1);
                 assert!(manager.partitions().get(&1).is_none());
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 128);
@@ -1123,7 +1127,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 assert_eq!(manager.header().num_parts, 128);
@@ -1137,7 +1141,7 @@ mod tests {
                 assert_eq!(manager.header().num_parts, 0);
                 assert_eq!(manager.header().first_usable, 2);
                 assert!(manager.partitions().get(&0).is_none());
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 0);
@@ -1175,7 +1179,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let mut transaction = manager.create_transaction().unwrap();
@@ -1194,7 +1198,7 @@ mod tests {
                 assert_eq!(partition.instance_guid.to_bytes(), PART_INSTANCE_GUID);
                 assert_eq!(partition.start_block, 4);
                 assert_eq!(partition.num_blocks, 1);
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 1);
@@ -1273,7 +1277,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let mut transaction = manager.create_transaction().unwrap();
@@ -1287,7 +1291,7 @@ mod tests {
                 });
                 manager.commit_transaction(transaction).await.expect("Commit failed");
 
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 2);
@@ -1345,7 +1349,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let mut transaction = manager.create_transaction().unwrap();
@@ -1359,7 +1363,7 @@ mod tests {
                 });
                 manager.commit_transaction(transaction).await.expect("Commit failed");
 
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 1);
@@ -1412,7 +1416,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let mut manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let mut transaction = manager.create_transaction().unwrap();
@@ -1426,7 +1430,7 @@ mod tests {
                 });
                 manager.commit_transaction(transaction).await.expect("Commit failed");
 
-                let manager = GptManager::open(manager.take_client())
+                let manager = Gpt::open(manager.take_client())
                     .await
                     .expect("reload should succeed");
                 assert_eq!(manager.header().num_parts, 1);
@@ -1469,13 +1473,13 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let client = RemoteBlockClient::new(client).await.unwrap();
+                let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
                 let mut old_metadata = vec![0u8; 2048];
                 client.read_at(MutableBufferSlice::Memory(&mut old_metadata[..]), 0).await.unwrap();
                 let mut buffer = vec![0u8; 2048];
                 client.write_at(BufferSlice::Memory(&buffer[..]), 0).await.unwrap();
 
-                let manager = GptManager::open(client)
+                let manager = Gpt::open(client)
                     .await
                     .expect("load should succeed");
                 let client = manager.take_client();
@@ -1498,7 +1502,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 let partition = manager.partitions().get(&0).expect("No entry found");
@@ -1572,7 +1576,7 @@ mod tests {
                 unreachable!();
             },
             _ = async {
-                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                let manager = Gpt::open(Arc::new(RemoteBlockClient::new(client).await.unwrap()))
                     .await
                     .expect("load should succeed");
                 for i in 0..EXPECTED_PARTITIONS.len() as u32 {

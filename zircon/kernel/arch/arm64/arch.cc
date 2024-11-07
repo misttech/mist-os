@@ -344,7 +344,7 @@ void arch_early_init() {
   arm64_cpu_early_init();
 }
 
-void arch_prevm_init() {}
+void arch_prevm_init() { arm64_boot_mmu_unwire(); }
 
 void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   arch_mp_init_percpu();

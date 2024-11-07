@@ -153,10 +153,10 @@ impl RecordsImplLayout for Mldv2ReportRecords {
     type Error = ParseError;
 }
 
-impl<'a> RecordsImpl<'a> for Mldv2ReportRecords {
-    type Record = MulticastRecord<&'a [u8]>;
+impl RecordsImpl for Mldv2ReportRecords {
+    type Record<'a> = MulticastRecord<&'a [u8]>;
 
-    fn parse_with_context<BV: BufferView<&'a [u8]>>(
+    fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
         data: &mut BV,
         _ctx: &mut usize,
     ) -> RecordParseResult<MulticastRecord<&'a [u8]>, ParseError> {

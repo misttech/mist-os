@@ -44,7 +44,9 @@
 #  - runtime.workspace_path: Callable[Path, [str]]
 #
 #    A function that can convert a local path relative to the main workspace directory
-#    and return its absolute Path value.
+#    and return its absolute Path value. As a special case, if the path starts with @,
+#    it must point to a file in the repository, and the function will return
+#    its parent directory Path value.
 #
 #  - runtime.label_to_path: Callable[Path, [str]]
 #
@@ -115,9 +117,11 @@ _SDK_TEMPLATES = {
     "component_manifest_collection": "//fuchsia/workspace/sdk_templates:component_manifest_collection.BUILD.template",
     "export_all_files": "//fuchsia/workspace/sdk_templates:export_all_files.BUILD.template",
     "ffx_subtool": "//fuchsia/workspace/sdk_templates:ffx_subtool.BUILD.template",
+    "ffx_subtool_external": "//fuchsia/workspace/sdk_templates:ffx_subtool_external.BUILD.template",
     "fidl_library": "//fuchsia/workspace/sdk_templates:fidl_library.BUILD.template",
     "filegroup": "//fuchsia/workspace/sdk_templates:filegroup.BUILD.template",
     "host_tool": "//fuchsia/workspace/sdk_templates:host_tool.BUILD.template",
+    "host_tool_external": "//fuchsia/workspace/sdk_templates:host_tool_external.BUILD.template",
     "loadable_module": "//fuchsia/workspace/sdk_templates:loadable_module.BUILD.template",
     "loadable_module_sub": "//fuchsia/workspace/sdk_templates:loadable_module_sub.BUILD.template",
     "package": "//fuchsia/workspace/sdk_templates:package.BUILD.template",
@@ -147,6 +151,19 @@ def resolve_repository_labels(runtime):
     runtime.label_to_path(_REPOSITORY_BUILD_TEMPLATE)
     for template in _SDK_TEMPLATES.values():
         runtime.label_to_path(template)
+
+def _is_external_file(filepath):
+    """Returns true if |filepath| is a label to an external repository."""
+
+    # fuchsia_idk_repository() ensures that all labels start with @<repo_name>//
+    # so just checking the first character is enough.
+    return filepath.startswith("@")
+
+def _final_bazel_path(path):
+    """Convert a path that appears in a metadata file into a corresponding Bazel label."""
+    if _is_external_file(path):
+        return path  # Already a label
+    return "//:" + path
 
 def _sdk_template_path(runtime, name):
     """Return the path value of a given SDK template file.
@@ -276,6 +293,45 @@ def _find_dep_paths(deps, root_for_relative, parent_sdk, parent_sdk_contents):
         for dep in deps
     ]
 
+def _meta_root_relative_path(meta, filepath):
+    """Convert a filepath as it appears in a metadata file into a relative one.
+
+    Args:
+      meta: The metadata JSON object.
+      filepath: The input file path as it appears in 'meta'.
+    Return:
+      the file path, relative to the meta["root"] value.
+    """
+
+    # NOTE: Keep this in sync with _meta_root_relative_paths() below.
+    meta_root = meta["root"].rstrip("/")
+    return filepath[len(meta_root) + 1:]
+
+def _meta_root_relative_paths(meta, filepaths):
+    """Apply _meta_root_relative_path() to a list of input file paths."""
+
+    # Equivalent to return [_meta_root_relative_path(meta, f) for f in filepaths]
+    # without the repeated rstrip("/") calls.
+    meta_root = meta["root"].rstrip("/")
+    return [f[len(meta_root) + 1:] for f in filepaths]
+
+def _split_internal_external_files(files):
+    """Split a list of file paths into internal and external ones.
+
+    An external file path is really a Bazel target label that
+    begins with '@' as it points to a different repository.
+
+    An internal file path is a regular file path.
+    """
+    internal_files = []
+    external_files = []
+    for f in files:
+        if _is_external_file(f):
+            external_files.append(f)
+        else:
+            internal_files.append(f)
+    return internal_files, external_files
+
 # buildifier: disable=unused-variable
 def _generate_bind_library_build_rules(
         runtime,
@@ -333,6 +389,7 @@ def _generate_sysroot_build_rules(
             files.extend(meta_for_arch["headers"])
         if "link_libs" in meta_for_arch:
             files.extend(meta_for_arch["link_libs"])
+
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files)
 
     _merge_template(
@@ -346,12 +403,39 @@ def _generate_sysroot_build_rules(
 
     for arch in arch_list:
         srcs = {}
-        libs_base = meta["versions"][arch]["dist_dir"] + "/dist/lib/"
+
+        # Expected dist_dir = "arch/x64/sysroot"
+        dist_dir = meta["versions"][arch]["dist_dir"]
+
+        libs_base = dist_dir + "/dist/lib/"
         for dist_lib in meta["versions"][arch]["dist_libs"]:
-            variant, _, _ = dist_lib.removeprefix(libs_base).rpartition("/")
+            if _is_external_file(dist_lib):
+                # Expect dist_lib as @fuchsia_idk//arch/x64/sysroot:dist/lib/FOO
+                # Compute:
+                #    repo_name        = fuchsia_idk
+                #    dist_path        = arch/x64/sysroot/dist/lib/FOO
+                #    dist_lib_subpath = FOO
+                #    strip_prefix    = ../fuchsia_idk/arch/x64/sysroot/dist/lib/
+                repo_name, _, label = dist_lib.partition("//")
+                repo_name = repo_name[1:]  # Remove initial @
+                dist_path = label.replace(":", "/")
+            else:
+                # Expect dist_lib as arch/x64/sysroot/dist/lib/FOO
+                # Compute:
+                #    repo_name        = fuchsia_sdk   (current repository name)
+                #    dist_path        = arch/x64/sysroot/dist/lib/FOO
+                #    dist_lib_subpath = FOO
+                #    strip_prefix    = ../fuchsia_sdk/arch/x64/sysroot/dist/lib/
+                repo_name = ctx.attr.name
+                dist_path = dist_lib
+
+            dist_lib_subpath = dist_path.removeprefix(libs_base)
+            strip_prefix = "../%s/%s/dist/lib/" % (repo_name, dist_dir)
+
+            # dist_lib_subpath can be 'libfoo.so' or '<variant>/libfoo.so'
+            variant, _, _ = dist_lib_subpath.rpartition("/")
             variant_config = _FUCHSIA_CLANG_VARIANT_MAP[variant]
-            srcs.setdefault(variant_config, []).append("//:" + dist_lib)
-        strip_prefix = "../%s/%s" % (ctx.attr.name, libs_base)
+            srcs.setdefault(variant_config, []).append(_final_bazel_path(dist_lib))
 
         per_arch_build_file = build_file.dirname.get_child(arch).get_child(
             "BUILD.bazel",
@@ -396,20 +480,34 @@ def _generate_ffx_subtool_build_rules(
         for arch in meta["target_files"]:
             _ffx_tool_files(meta["target_files"][arch], files_str)
 
-    relative_files = []
-    for file in files_str:
-        relative_file = file[len(meta["root"]) + 1:]
-        relative_files.append(relative_file)
+    internal_files, external_files = _split_internal_external_files(files_str)
 
-    _merge_template(
-        runtime.ctx,
-        build_file,
-        _sdk_template_path(runtime, "ffx_subtool"),
-        {
-            "{{files}}": _get_starlark_list(runtime, relative_files),
-        },
-    )
-    process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files_str)
+    if internal_files:
+        relative_files = _meta_root_relative_paths(meta, internal_files)
+
+        _merge_template(
+            runtime.ctx,
+            build_file,
+            _sdk_template_path(runtime, "ffx_subtool"),
+            {
+                "{{files}}": _get_starlark_list(runtime, relative_files),
+            },
+        )
+        process_context.files_to_copy[meta["_meta_sdk_root"]].extend(internal_files)
+
+    for file in external_files:
+        repository, _, label = file.partition("//")
+        relative_file = _meta_root_relative_path(meta, label.replace(":", "/"))
+
+        _merge_template(
+            runtime.ctx,
+            build_file,
+            _sdk_template_path(runtime, "ffx_subtool_external"),
+            {
+                "{{name}}": relative_file,
+                "{{actual}}": file,
+            },
+        )
 
 # buildifier: disable=unused-variable
 def _generate_host_tool_build_rules(
@@ -429,20 +527,33 @@ def _generate_host_tool_build_rules(
         for arch in meta["target_files"]:
             files_str.extend(meta["target_files"][arch])
 
-    relative_files = []
-    for file in files_str:
-        relative_file = file[len(meta["root"]) + 1:]
-        relative_files.append(relative_file)
+    internal_files, external_files = _split_internal_external_files(files_str)
+    if internal_files:
+        relative_files = _meta_root_relative_paths(meta, internal_files)
 
-    _merge_template(
-        ctx,
-        build_file,
-        _sdk_template_path(runtime, "host_tool"),
-        {
-            "{{files}}": _get_starlark_list(runtime, relative_files),
-        },
-    )
-    process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files_str)
+        _merge_template(
+            ctx,
+            build_file,
+            _sdk_template_path(runtime, "host_tool"),
+            {
+                "{{files}}": _get_starlark_list(runtime, relative_files),
+            },
+        )
+        process_context.files_to_copy[meta["_meta_sdk_root"]].extend(internal_files)
+
+    for file in external_files:
+        repository, _, label = file.partition("//")
+        relative_file = _meta_root_relative_path(meta, label.replace(":", "/"))
+
+        _merge_template(
+            ctx,
+            build_file,
+            _sdk_template_path(runtime, "host_tool_external"),
+            {
+                "{{name}}": relative_file,
+                "{{actual}}": file,
+            },
+        )
 
 # buildifier: disable=unused-variable
 def _generate_companion_host_tool_build_rules(
@@ -463,10 +574,9 @@ def _generate_companion_host_tool_build_rules(
         for arch in meta["target_files"]:
             files_str.extend(meta["target_files"][arch])
 
-    relative_files = []
-    for file in files_str:
-        relative_file = file[len(meta["root"]) + 1:]
-        relative_files.append(relative_file)
+    internal_files, external_files = _split_internal_external_files(files_str)
+
+    tool_files = _meta_root_relative_paths(meta, internal_files) + external_files
 
     # SDK metadata has one companion_host_tool metadata for each architecture, but they are rooted in the same location (//tools)
     # and have the same name (eg aemu_internal). If we just reuse the metadata name, there will be a conflict in Bazel, as there
@@ -485,7 +595,7 @@ def _generate_companion_host_tool_build_rules(
         _sdk_template_path(runtime, "companion_host_tool"),
         {
             "{{name}}": name,
-            "{{files}}": _get_starlark_list(runtime, relative_files),
+            "{{files}}": _get_starlark_list(runtime, tool_files),
         },
     )
 
@@ -792,6 +902,9 @@ def _api_level_deprecation_message(api_level):
 # We can't just do f"//:{file}" for file srcs, since the relative dir may have a
 # BUILD.bazel file, making that subdir its own Bazel package.
 def _bazel_file_path(relative_dir, file):
+    if _is_external_file(file):
+        return file
+
     prefix = relative_dir if file.startswith(relative_dir) else ""
     suffix = file[len(prefix):].lstrip("/")
     return "//%s:%s" % (prefix, suffix)
@@ -877,7 +990,7 @@ def _generate_cc_prebuilt_library_build_rules(
             per_arch_x_api_build_file,
             _sdk_template_path(runtime, "cc_prebuilt_library_linklib"),
             {
-                "{{link_lib}}": "//:" + variant.link_lib,
+                "{{link_lib}}": _final_bazel_path(variant.link_lib),
                 "{{library_type}}": meta["format"],
             },
         )
@@ -898,7 +1011,7 @@ def _generate_cc_prebuilt_library_build_rules(
                     per_arch_x_api_build_file,
                     _sdk_template_path(runtime, "cc_prebuilt_library_distlib"),
                     {
-                        "{{dist_lib}}": "//:" + dist_lib,
+                        "{{dist_lib}}": _final_bazel_path(dist_lib),
                         "{{dist_path}}": variant.dist_lib_dest,
                     },
                 )
@@ -911,8 +1024,8 @@ def _generate_cc_prebuilt_library_build_rules(
                         "cc_prebuilt_library_distlib_unstripped",
                     ),
                     {
-                        "{{stripped_file}}": "//:" + dist_lib,
-                        "{{unstripped_file}}": "//:" + debug_lib,
+                        "{{stripped_file}}": _final_bazel_path(dist_lib),
+                        "{{unstripped_file}}": _final_bazel_path(debug_lib),
                         "{{dist_path}}": variant.dist_lib_dest,
                     },
                 )
@@ -944,7 +1057,7 @@ def _generate_cc_prebuilt_library_build_rules(
             per_arch_build_file,
             _sdk_template_path(runtime, "cc_prebuilt_library_linklib"),
             {
-                "{{link_lib}}": "//:" + linklib,
+                "{{link_lib}}": _final_bazel_path(linklib),
                 "{{library_type}}": meta["format"],
             },
         )
@@ -964,7 +1077,7 @@ def _generate_cc_prebuilt_library_build_rules(
                     per_arch_build_file,
                     _sdk_template_path(runtime, "cc_prebuilt_library_distlib"),
                     {
-                        "{{dist_lib}}": "//:" + dist_lib,
+                        "{{dist_lib}}": _final_bazel_path(dist_lib),
                         "{{dist_path}}": meta["binaries"][arch]["dist_path"],
                     },
                 )
@@ -977,8 +1090,8 @@ def _generate_cc_prebuilt_library_build_rules(
                         "cc_prebuilt_library_distlib_unstripped",
                     ),
                     {
-                        "{{stripped_file}}": "//:" + dist_lib,
-                        "{{unstripped_file}}": "//:" + debug_lib,
+                        "{{stripped_file}}": _final_bazel_path(dist_lib),
+                        "{{unstripped_file}}": _final_bazel_path(debug_lib),
                         "{{dist_path}}": meta["binaries"][arch]["dist_path"],
                     },
                 )
@@ -986,14 +1099,14 @@ def _generate_cc_prebuilt_library_build_rules(
                     process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
 
     prebuilt_select_str = (
-        "fuchsia_select(" + _get_starlark_dict(runtime, prebuilt_select) + ")"
+        "variant_select(" + _get_starlark_dict(runtime, prebuilt_select) + ")"
     )
 
     # Assumption: if one architecture doesn't have distlib binaries for this library,
     # the other architectures will also not have them.
     if has_distlibs:
         dist_select_str = (
-            "fuchsia_select(" + _get_starlark_dict(runtime, dist_select) + ")"
+            "variant_select(" + _get_starlark_dict(runtime, dist_select) + ")"
         )
     else:
         dist_select_str = "[]"
@@ -1128,7 +1241,8 @@ def _generate_python_e2e_test_rules(
 
     # Seggregate data files based on api level from metadata.
     files_for_api_level = {}
-    for file in meta["files"]:
+    internal_files, external_files = _split_internal_external_files(meta["files"])
+    for file in internal_files:
         if not file.startswith(meta["root"]):
             # buildifier: disable=print
             print(
@@ -1136,7 +1250,7 @@ def _generate_python_e2e_test_rules(
                 (file, meta["root"]),
             )
             continue
-        file = file[len(meta["root"]):].lstrip("/")
+        file = _meta_root_relative_path(meta, file)
         api_level, _, file = file.partition("/")
         if api_level not in files_for_api_level:
             files_for_api_level[api_level] = []
@@ -1535,6 +1649,12 @@ def _generate_sdk_build_rules(
 
     _write_cmc_includes(runtime, process_context)
 
+    # Do not copy files from external repositories.
+    # E.g. `@fuchsia_idk//arch/x64:dist/lib/libfoo.so`.
+    files_to_copy = {
+        root: [f for f in files if not _is_external_file(f)]
+        for root, files in files_to_copy.items()
+    }
     runtime.file_copier(files_to_copy)
 
 def _merge_rules_fuchsia(runtime):
@@ -1567,6 +1687,12 @@ def _merge_rules_fuchsia(runtime):
         },
         executable = False,
     )
+
+    # BUILD.bazel references //:.build-id in a fuchsia_debug_symbol()
+    # target declaration. This directory may not exist when the input
+    # IDK is an external repository, so create an empty one if needed.
+    if not ctx.path(".build-id").exists:
+        ctx.file(".build-id/.empty-on-purpose")
 
 def _export_all_files(runtime):
     ctx = runtime.ctx

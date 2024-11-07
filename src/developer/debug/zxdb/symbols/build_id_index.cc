@@ -110,7 +110,27 @@ void BuildIDIndex::SetCacheDir(const std::string& cache_dir) {
   cache_dir_ = std::make_unique<CacheDir>(cache_dir);
 }
 
-void BuildIDIndex::AddSymbolIndexFile(const std::string& path) { LoadSymbolIndexFile(path); }
+void BuildIDIndex::AddSymbolIndex(const std::string& contents,
+                                  const std::filesystem::path& relative_to) {
+  rapidjson::Document document;
+  document.Parse(contents);
+  if (document.HasParseError() || !document.IsObject()) {
+    LOGS(Warn) << "Provided string is not a valid symbol-index.json";
+    return;
+  }
+
+  std::vector<std::filesystem::path> files_to_load;
+  LoadSymbolIndexDocument(document, relative_to, files_to_load);
+
+  std::set<std::filesystem::path> visited;
+  LoadIndexFilesFromQueue(files_to_load, visited);
+}
+
+void BuildIDIndex::AddSymbolIndexFile(const std::string& path) {
+  std::vector<std::filesystem::path> files_to_load = {path};
+  std::set<std::filesystem::path> visited;
+  LoadIndexFilesFromQueue(files_to_load, visited);
+}
 
 void BuildIDIndex::AddPlainFileOrDir(const std::string& path) {
   if (std::find(sources_.begin(), sources_.end(), path) != sources_.end())
@@ -217,12 +237,10 @@ void BuildIDIndex::LoadIdsTxt(const IdsTxt& ids_txt) {
     LOGS(Warn) << "No mappings found in build ID file: " << ids_txt.path;
 }
 
-void BuildIDIndex::LoadSymbolIndexFile(const std::string& file_name) {
-  std::vector<std::string> files_to_load{file_name};
-  std::set<std::string> visited;
-
+void BuildIDIndex::LoadIndexFilesFromQueue(std::vector<std::filesystem::path>& files_to_load,
+                                           std::set<std::filesystem::path>& visited) {
   while (!files_to_load.empty()) {
-    auto file_name = std::move(files_to_load.back());
+    std::filesystem::path file_name = files_to_load.back();
     files_to_load.pop_back();
 
     // Avoid recursive includes.
@@ -234,7 +252,7 @@ void BuildIDIndex::LoadSymbolIndexFile(const std::string& file_name) {
     std::ifstream file(file_name);
     if (!file) {
       LOGS(Warn) << "Can't open " << file_name;
-      return;
+      continue;
     }
 
     rapidjson::IStreamWrapper input_stream(file);
@@ -242,83 +260,87 @@ void BuildIDIndex::LoadSymbolIndexFile(const std::string& file_name) {
     document.ParseStream(input_stream);
     if (document.HasParseError() || !document.IsObject()) {
       LOGS(Warn) << file_name << " is not a valid symbol-index.json";
-      return;
+      continue;
     }
 
-    auto resolve_path = [base = std::filesystem::path(file_name).parent_path()](const char* path) {
-      // "/abc/def/..".lexically_normal() => "/abc/", while we want "/abc"
-      auto res = (base / path).lexically_normal();
-      if (!res.has_filename()) {
-        res = res.parent_path();
-      }
-      return res;
-    };
+    LoadSymbolIndexDocument(document, file_name.parent_path(), files_to_load);
+  }
+}
 
-    if (document.HasMember("includes") && document["includes"].IsArray()) {
-      for (auto& value : document["includes"].GetArray()) {
-        if (value.IsString() && strlen(value.GetString())) {
-          for (auto path : files::Glob(resolve_path(value.GetString()))) {
-            files_to_load.push_back(path);
-          }
+void BuildIDIndex::LoadSymbolIndexDocument(const rapidjson::Document& document,
+                                           const std::filesystem::path& relative_to,
+                                           std::vector<std::filesystem::path>& queue) {
+  auto resolve_path = [relative_to](const char* path) {
+    // "/abc/def/..".lexically_normal() => "/abc/", while we want "/abc"
+    auto res = (relative_to / path).lexically_normal();
+    if (!res.has_filename()) {
+      res = res.parent_path();
+    }
+    return res;
+  };
+
+  if (document.HasMember("includes") && document["includes"].IsArray()) {
+    for (auto& value : document["includes"].GetArray()) {
+      if (value.IsString() && strlen(value.GetString())) {
+        for (auto path : files::Glob(resolve_path(value.GetString()))) {
+          queue.push_back(path);
         }
       }
     }
+  }
 
-    if (document.HasMember("build_id_dirs") && document["build_id_dirs"].IsArray()) {
-      for (auto& value : document["build_id_dirs"].GetArray()) {
-        if (value.IsObject() && value.HasMember("path") && value["path"].IsString() &&
-            strlen(value["path"].GetString())) {
-          std::string build_dir;
-          if (value.HasMember("build_dir") && value["build_dir"].IsString()) {
-            build_dir = resolve_path(value["build_dir"].GetString());
-          }
-          for (auto path : files::Glob(resolve_path(value["path"].GetString()))) {
-            AddBuildIdDir(path, build_dir);
-          }
+  if (document.HasMember("build_id_dirs") && document["build_id_dirs"].IsArray()) {
+    for (auto& value : document["build_id_dirs"].GetArray()) {
+      if (value.IsObject() && value.HasMember("path") && value["path"].IsString() &&
+          strlen(value["path"].GetString())) {
+        std::string build_dir;
+        if (value.HasMember("build_dir") && value["build_dir"].IsString()) {
+          build_dir = resolve_path(value["build_dir"].GetString());
+        }
+        for (auto path : files::Glob(resolve_path(value["path"].GetString()))) {
+          AddBuildIdDir(path, build_dir);
         }
       }
     }
+  }
 
-    if (document.HasMember("ids_txts") && document["ids_txts"].IsArray()) {
-      for (auto& value : document["ids_txts"].GetArray()) {
-        if (value.IsObject() && value.HasMember("path") && value["path"].IsString() &&
-            strlen(value["path"].GetString())) {
-          std::string build_dir;
-          if (value.HasMember("build_dir") && value["build_dir"].IsString()) {
-            build_dir = resolve_path(value["build_dir"].GetString());
-          }
-          for (auto path : files::Glob(resolve_path(value["path"].GetString()))) {
-            AddIdsTxt(path, build_dir);
-          }
+  if (document.HasMember("ids_txts") && document["ids_txts"].IsArray()) {
+    for (auto& value : document["ids_txts"].GetArray()) {
+      if (value.IsObject() && value.HasMember("path") && value["path"].IsString() &&
+          strlen(value["path"].GetString())) {
+        std::string build_dir;
+        if (value.HasMember("build_dir") && value["build_dir"].IsString()) {
+          build_dir = resolve_path(value["build_dir"].GetString());
+        }
+        for (auto path : files::Glob(resolve_path(value["path"].GetString()))) {
+          AddIdsTxt(path, build_dir);
         }
       }
     }
+  }
 
-    if (document.HasMember("gcs_flat") && document["gcs_flat"].IsArray()) {
-      for (auto& value : document["gcs_flat"].GetArray()) {
-        if (value.IsObject() && value.HasMember("url") && value["url"].IsString() &&
-            strlen(value["url"].GetString())) {
-          bool require_authentication = false;
-          if (value.HasMember("require_authentication") &&
-              value["require_authentication"].IsBool()) {
-            require_authentication = value["require_authentication"].GetBool();
-          }
-          AddSymbolServer(value["url"].GetString(), require_authentication);
+  if (document.HasMember("gcs_flat") && document["gcs_flat"].IsArray()) {
+    for (auto& value : document["gcs_flat"].GetArray()) {
+      if (value.IsObject() && value.HasMember("url") && value["url"].IsString() &&
+          strlen(value["url"].GetString())) {
+        bool require_authentication = false;
+        if (value.HasMember("require_authentication") && value["require_authentication"].IsBool()) {
+          require_authentication = value["require_authentication"].GetBool();
         }
+        AddSymbolServer(value["url"].GetString(), require_authentication);
       }
     }
+  }
 
-    if (document.HasMember("debuginfod") && document["debuginfod"].IsArray()) {
-      for (auto& value : document["debuginfod"].GetArray()) {
-        if (value.IsObject() && value.HasMember("url") && value["url"].IsString() &&
-            strlen(value["url"].GetString())) {
-          bool require_authentication = false;
-          if (value.HasMember("require_authentication") &&
-              value["require_authentication"].IsBool()) {
-            require_authentication = value["require_authentication"].GetBool();
-          }
-          AddSymbolServer(value["url"].GetString(), require_authentication);
+  if (document.HasMember("debuginfod") && document["debuginfod"].IsArray()) {
+    for (auto& value : document["debuginfod"].GetArray()) {
+      if (value.IsObject() && value.HasMember("url") && value["url"].IsString() &&
+          strlen(value["url"].GetString())) {
+        bool require_authentication = false;
+        if (value.HasMember("require_authentication") && value["require_authentication"].IsBool()) {
+          require_authentication = value["require_authentication"].GetBool();
         }
+        AddSymbolServer(value["url"].GetString(), require_authentication);
       }
     }
   }

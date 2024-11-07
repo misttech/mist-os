@@ -173,19 +173,17 @@ TEST_F(OpenclLoader, DebugFilesystems) {
       fdio_service_connect("/svc/fuchsia.sys2.RealmQuery", realm.server.TakeChannel().release()),
       ZX_OK);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-  ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+  auto [outgoing_client, outgoing_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   auto response = fidl::WireCall(realm.client)
-                      ->Open("./opencl_loader", fuchsia_sys2::OpenDirType::kOutgoingDir,
-                             fuchsia_io::OpenFlags::kRightReadable, /*mode=*/{}, /*path=*/".",
-                             std::move(endpoints->server));
+                      ->OpenDirectory("./opencl_loader", fuchsia_sys2::OpenDirType::kOutgoingDir,
+                                      std::move(outgoing_server));
   ASSERT_TRUE(response.ok()) << response;
   ASSERT_TRUE(response->is_ok()) << static_cast<uint32_t>(response->error_value());
 
   fdio_ns_t* ns;
   EXPECT_EQ(ZX_OK, fdio_ns_get_installed(&ns));
-  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, "/loader_out", endpoints->client.TakeChannel().release()));
+  EXPECT_EQ(ZX_OK, fdio_ns_bind(ns, "/loader_out", outgoing_client.TakeChannel().release()));
   auto cleanup_binding = fit::defer([&]() { fdio_ns_unbind(ns, "/loader_out"); });
 
   const std::string debug_path("/loader_out/debug/");

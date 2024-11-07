@@ -470,6 +470,11 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
         config.power_elements = GetAllPowerConfigs();
       }
       incoming->pdev_server.SetConfig(std::move(config));
+      // TODO(b/355244376): Replace `std::to_string(DEVICE_METADATA_SDMMC)` with
+      // `fuchsia_hardware_sdmmc::kMetadataTypeName` once drivers no longer retrieve sdmmc
+      // metadata using legacy ddk metadata functions.
+      ASSERT_OK(incoming->pdev_server.AddFidlMetadata(std::to_string(DEVICE_METADATA_SDMMC),
+                                                      fuchsia_hardware_sdmmc::SdmmcMetadata{}));
       {
         auto result = incoming->env.incoming_directory()
                           .AddService<fuchsia_hardware_platform_device::Service>(

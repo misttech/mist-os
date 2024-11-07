@@ -11,6 +11,11 @@
             url: "fuchsia-boot:///pkg-cache#meta/pkg-cache.cm",
             on_terminate: "reboot",
         },
+        {
+            name: "pkg-shell-commands",
+            url: "fuchsia-pkg://fuchsia.com/pkg-shell-commands#meta/shell-commands.cm",
+            environment: "#base-resolver-env",
+        },
     ],
     offer: [
         {
@@ -101,9 +106,9 @@
             from: "#pkg-cache",
         },
         {
-            directory: "shell-commands-bin",
-            from: "#pkg-cache",
-            as: "bin",
+            directory: "bin",
+            from: "#pkg-shell-commands",
+            as: "base-bin",
         },
         {
             protocol: "fuchsia.pkg.PackageResolver",

@@ -88,7 +88,7 @@ class PowerState {
   constexpr bool is_active() const { return !is_idle() && !!active_power_level_; }
   constexpr std::optional<uint8_t> active_power_level() const { return active_power_level_; }
 
-  // Returns the power-level currently affecting the devices power state.
+  // Returns the power level currently affecting the device's power state.
   constexpr std::optional<uint8_t> power_level() const {
     return is_idle() ? idle_power_level_ : active_power_level_;
   }

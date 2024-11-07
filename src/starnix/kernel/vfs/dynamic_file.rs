@@ -171,6 +171,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -448,13 +449,13 @@ mod tests {
         assert_eq!(read(&mut locked, 20)?, (3..10).collect::<Vec<u8>>());
 
         // Seek to the start of the file. Content should be updated on the following read.
-        file.seek(&current_task, SeekTarget::Set(0))?;
+        file.seek(&mut locked, &current_task, SeekTarget::Set(0))?;
         assert_eq!(*counter.value.lock(), 1);
         assert_eq!(read(&mut locked, 2)?, [1, 2]);
         assert_eq!(*counter.value.lock(), 2);
 
         // Seeking to `pos > 0` should update the content.
-        file.seek(&current_task, SeekTarget::Set(1))?;
+        file.seek(&mut locked, &current_task, SeekTarget::Set(1))?;
         assert_eq!(*counter.value.lock(), 3);
 
         Ok(())

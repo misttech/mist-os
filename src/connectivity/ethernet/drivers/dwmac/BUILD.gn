@@ -17,7 +17,7 @@ driver_bind_rules("dwmac_bind") {
   ]
 }
 
-fuchsia_driver("dwmac-driver") {
+fuchsia_cc_driver("dwmac-driver") {
   output_name = "dwmac"
   configs += [
     "//build/config:all_source",

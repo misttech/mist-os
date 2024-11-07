@@ -92,6 +92,17 @@ void BlockDevice::Create(const fbl::unique_fd& devfs_root, const uint8_t* guid,
   device->reset(new BlockDevice(client, block_count, block_size));
 }
 
+void BlockDevice::CreateFromVmo(const fbl::unique_fd& devfs_root, const uint8_t* guid, zx::vmo vmo,
+                                uint32_t block_size, std::unique_ptr<BlockDevice>* device) {
+  ramdisk_client_t* client;
+  uint64_t block_count;
+  ASSERT_OK(vmo.get_size(&block_count));
+  block_count /= block_size;
+  ASSERT_OK(ramdisk_create_at_from_vmo_with_params(devfs_root.get(), vmo.release(), block_size,
+                                                   guid, ZBI_PARTITION_GUID_LEN, &client));
+  device->reset(new BlockDevice(client, block_count, block_size));
+}
+
 void BlockDevice::Read(const zx::vmo& vmo, size_t blk_cnt, size_t blk_offset) {
   ASSERT_LE(blk_offset + blk_cnt, block_count());
   auto block_client = paver::BlockPartitionClient::Create(

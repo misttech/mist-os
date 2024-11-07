@@ -79,6 +79,11 @@ template("_common") {
       foreach(icu_public_dep, icu_public_deps) {
         public_deps += [ "${icu_public_dep}.icu_${icu_flavor.name}_${icu_flavor.commit_id}(${current_toolchain})" ]
       }
+
+      if (!defined(data_deps)) {
+        data_deps = []
+      }
+      data_deps += [ icu_config_validation_target ]
     }
   }
 

@@ -105,7 +105,12 @@ impl FileOps for SocketFile {
         self.socket.ioctl(locked, file, current_task, request, arg)
     }
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         self.socket.close();
     }
 

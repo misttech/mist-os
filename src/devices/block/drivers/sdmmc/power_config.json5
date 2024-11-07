@@ -14,6 +14,16 @@
                     ],
                 },
                 {
+                    level: 2,
+                    name: "boot",
+                    transitions: [
+                        {
+                            target_level: 0,
+                            latency_us: 200,
+                        },
+                    ],
+                },
+                {
                     level: 1,
                     name: "on",
                     transitions: [
@@ -33,7 +43,7 @@
                 },
                 level_deps: [
                     {
-                        child_level: 1,
+                        child_level: 2,
                         parent_level: 1,
                     },
                 ],

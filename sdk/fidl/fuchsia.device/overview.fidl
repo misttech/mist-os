@@ -1,6 +1,9 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-// TODO(https://fxbug.dev/364422340): Uncomment when fdio deps resolved.
-// @available(added=HEAD)
+
+// This library is deprecated, and no new elements should be added to it.
+// Only the `NameProvider` part of the library is stable and in
+// "partner_internal" because fdio uses it.
+@available(added=7)
 library fuchsia.device;

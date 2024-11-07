@@ -33,7 +33,7 @@ fuchsia_driver_package("msd-vsi-vip-test") {
   ]
 }
 
-fuchsia_driver("msd_vsi-driver") {
+fuchsia_cc_driver("msd_vsi-driver") {
   output_name = "libmsd_vsi"
   deps = [
     ":msd_vsi_entry",
@@ -50,7 +50,7 @@ fuchsia_driver_component("msd_vsi") {
   manifest = "meta/msd_vsi.cml"
 }
 
-fuchsia_driver("msd_vsi_test-driver") {
+fuchsia_cc_driver("msd_vsi_test-driver") {
   testonly = true
   output_name = "libmsd_vsi_test"
   deps = [

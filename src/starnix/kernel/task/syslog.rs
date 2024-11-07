@@ -9,7 +9,7 @@ use fidl_fuchsia_diagnostics as fdiagnostics;
 use fuchsia_component::client::connect_to_protocol_sync;
 use once_cell::sync::OnceCell;
 use serde::Deserialize;
-use starnix_sync::Mutex;
+use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::auth::{CAP_SYSLOG, CAP_SYS_ADMIN};
 use starnix_uapi::errors::{errno, error, Errno, EAGAIN};
 use starnix_uapi::vfs::FdEvents;
@@ -83,6 +83,7 @@ impl GrantedSyslog<'_> {
 
     pub fn blocking_read(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         out: &mut dyn OutputBuffer,
     ) -> Result<i32, Errno> {
@@ -111,7 +112,7 @@ impl GrantedSyslog<'_> {
                 Ok(Some(log)) => return write_log(log),
                 Ok(None) => return Ok(0),
             }
-            waiter.wait(current_task)?;
+            waiter.wait(locked, current_task)?;
         }
     }
 

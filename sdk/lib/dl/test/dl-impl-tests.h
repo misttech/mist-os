@@ -28,10 +28,10 @@ class DlImplTests : public Base {
   static constexpr bool kCanMatchExactError = true;
   // TODO(https://fxbug.dev/348727901): Implement RTLD_NOLOAD
   static constexpr bool kSupportsNoLoadMode = false;
-  // TODO(https://fxbug.dev/338233824): Implement RTLD_GLOBAL
-  static constexpr bool kSupportsGlobalMode = false;
   // TODO(https://fxbug.dev/342480690): Support TLS
   static constexpr bool kSupportsTls = false;
+  // TODO(https://fxbug.dev/324136831): Support startup modules
+  static constexpr bool kSupportsStartupModules = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were

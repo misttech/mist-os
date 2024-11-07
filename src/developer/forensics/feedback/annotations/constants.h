@@ -33,6 +33,7 @@ constexpr const char kDebugSnapshotPresentKey[] = "debug.snapshot.present";
 constexpr const char kDeviceBoardNameKey[] = "device.board-name";
 constexpr const char kDeviceFeedbackIdKey[] = "device.feedback-id";
 constexpr const char kDeviceNumCPUsKey[] = "device.num-cpus";
+constexpr const char kDeviceRuntimeKey[] = "device.runtime";
 constexpr const char kDeviceUptimeKey[] = "device.uptime";
 constexpr const char kDeviceUtcTimeKey[] = "device.utc-time";
 constexpr const char kHardwareBoardNameKey[] = "hardware.board.name";

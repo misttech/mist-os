@@ -60,6 +60,7 @@ use zx::{
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
+    fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync,
     fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
 };
@@ -69,6 +70,81 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_starnix_container as fstarcontainer,
     fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
 };
+
+use std::sync::Weak;
+
+use crate::serve_memory_attribution_provider_container;
+use attribution_server::{AttributionServer, AttributionServerHandle};
+use fidl::HandleBased;
+
+/// Manages the memory attribution protocol for a Starnix container.
+struct ContainerMemoryAttributionManager {
+    /// Holds state for the hanging-get attribution protocol.
+    memory_attribution_server: AttributionServerHandle,
+}
+
+impl ContainerMemoryAttributionManager {
+    /// Creates a new [ContainerMemoryAttributionManager] from a Starnix kernel and the moniker
+    /// token of the container component.
+    pub fn new(kernel: Weak<Kernel>, component_instance: zx::Event) -> Self {
+        let memory_attribution_server = AttributionServer::new(Box::new(move || {
+            let kernel_ref = match kernel.upgrade() {
+                None => return vec![],
+                Some(k) => k,
+            };
+            attribution_info_for_kernel(kernel_ref.as_ref(), &component_instance)
+        }));
+
+        ContainerMemoryAttributionManager { memory_attribution_server }
+    }
+
+    /// Creates a new observer for the attribution information from this container.
+    pub fn new_observer(
+        &self,
+        control_handle: fattribution::ProviderControlHandle,
+    ) -> attribution_server::Observer {
+        self.memory_attribution_server.new_observer(control_handle)
+    }
+}
+
+/// Generates the attribution information for the Starnix kernel ELF component. The attribution
+/// information for the container is handled by the container component, not the kernel
+/// component itself, even if both are hosted within the same kernel process.
+fn attribution_info_for_kernel(
+    kernel: &Kernel,
+    component_instance: &zx::Event,
+) -> Vec<fattribution::AttributionUpdate> {
+    // Start the server to handle the memory attribution requests for the container, and provide
+    // a handle to get detailed attribution. We start a new task as each incoming connection is
+    // independent.
+    let (client_end, server_end) =
+        fidl::endpoints::create_request_stream::<fattribution::ProviderMarker>().unwrap();
+    fuchsia_async::Task::spawn(serve_memory_attribution_provider_container(server_end, kernel))
+        .detach();
+
+    let new_principal = fattribution::NewPrincipal {
+        identifier: Some(component_instance.get_koid().unwrap().raw_koid()),
+        description: Some(fattribution::Description::Component(
+            component_instance.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+        )),
+        principal_type: Some(fattribution::PrincipalType::Runnable),
+        detailed_attribution: Some(client_end),
+        ..Default::default()
+    };
+    let attribution = fattribution::UpdatedPrincipal {
+        identifier: Some(component_instance.get_koid().unwrap().raw_koid()),
+        resources: Some(fattribution::Resources::Data(fattribution::Data {
+            resources: vec![fattribution::Resource::KernelObject(
+                fuchsia_runtime::job_default().get_koid().unwrap().raw_koid(),
+            )],
+        })),
+        ..Default::default()
+    };
+    vec![
+        fattribution::AttributionUpdate::Add(new_principal),
+        fattribution::AttributionUpdate::Update(attribution),
+    ]
+}
 
 struct Config {
     /// The features enabled for this container.
@@ -109,6 +185,10 @@ struct Config {
 
     /// The data directory of the container, used to persist data.
     data_dir: Option<zx::Channel>,
+
+    /// Component moniker token for the container component. This token is used in various protocols
+    /// to uniquely identify a component.
+    component_instance: Option<zx::Event>,
 }
 
 fn get_ns_entry(
@@ -148,6 +228,7 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
     let svc_dir = get_ns_entry(&mut ns, "/svc");
     let data_dir = get_ns_entry(&mut ns, "/data");
     let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
+    let component_instance = start_info.component_instance;
 
     Config {
         features,
@@ -163,6 +244,7 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
         outgoing_dir,
         svc_dir,
         data_dir,
+        component_instance,
     }
 }
 
@@ -181,6 +263,8 @@ pub struct ContainerServiceConfig {
 pub struct Container {
     /// The `Kernel` object that is associated with the container.
     pub kernel: Arc<Kernel>,
+
+    memory_attribution_manager: ContainerMemoryAttributionManager,
 
     /// Inspect node holding information about the state of the container.
     _node: inspect::Node,
@@ -255,6 +339,13 @@ impl Container {
             server_component_controller(service_config.request_stream, service_config.receiver)
         );
         r
+    }
+
+    pub fn new_memory_attribution_observer(
+        &self,
+        control_handle: fattribution::ProviderControlHandle,
+    ) -> attribution_server::Observer {
+        self.memory_attribution_manager.new_observer(control_handle)
     }
 }
 
@@ -538,7 +629,17 @@ async fn create_container(
         wait_for_init_file(&config.startup_file_path, &system_task).await?;
     };
 
-    Ok(Container { kernel, _node: node, _thread_bound: Default::default() })
+    let memory_attribution_manager = ContainerMemoryAttributionManager::new(
+        Arc::downgrade(&kernel),
+        config.component_instance.take().ok_or(Error::msg("No component instance"))?,
+    );
+
+    Ok(Container {
+        kernel,
+        memory_attribution_manager,
+        _node: node,
+        _thread_bound: Default::default(),
+    })
 }
 
 fn create_fs_context(
@@ -656,15 +757,11 @@ fn mount_filesystems(
 }
 
 #[cfg(not(feature = "starnix_lite"))]
-fn init_remote_block_devices<L>(
-    locked: &mut Locked<'_, L>,
+fn init_remote_block_devices(
+    locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
     config: &Config,
-) -> Result<(), Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-{
+) -> Result<(), Error> {
     let devices_iter = config.remote_block_devices.iter();
     for device_spec in devices_iter {
         create_remote_block_device_from_spec(locked, system_task, device_spec)
@@ -694,15 +791,11 @@ fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
 }
 
 #[cfg(not(feature = "starnix_lite"))]
-fn create_remote_block_device_from_spec<'a, L>(
-    locked: &mut Locked<'_, L>,
+fn create_remote_block_device_from_spec<'a>(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     spec: &'a str,
-) -> Result<(), Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-{
+) -> Result<(), Error> {
     let mut iter = spec.splitn(2, ':');
     let device_name =
         iter.next().ok_or_else(|| anyhow!("remoteblk name is missing from {:?}", spec))?;

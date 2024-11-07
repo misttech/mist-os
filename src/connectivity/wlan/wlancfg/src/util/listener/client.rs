@@ -6,7 +6,7 @@ use super::generic::{CurrentStateCache, Listener, Message};
 use crate::client::types as client_types;
 use fidl_fuchsia_wlan_policy as fidl_policy;
 use futures::channel::mpsc;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::prelude::*;
 
 #[derive(Clone, PartialEq)]
@@ -89,7 +89,7 @@ impl Listener<fidl_policy::ClientStateSummary> for fidl_policy::ClientStateUpdat
     fn notify_listener(
         self,
         update: fidl_policy::ClientStateSummary,
-    ) -> BoxFuture<'static, Option<Box<Self>>> {
+    ) -> LocalBoxFuture<'static, Option<Box<Self>>> {
         let fut =
             async move { self.on_client_state_update(&update).await.ok().map(|()| Box::new(self)) };
         fut.boxed()

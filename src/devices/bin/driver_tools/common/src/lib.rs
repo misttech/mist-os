@@ -6,48 +6,18 @@ use anyhow::{anyhow, format_err, Context, Result};
 use {fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf};
 
 #[derive(Debug)]
-pub struct DFv1Device(pub fdd::NodeInfo);
+pub struct Device(pub fdd::NodeInfo);
 
-impl DFv1Device {
-    /// Gets the full topological path name of the device.
-    pub fn get_topo_path(&self) -> Result<&str> {
-        let topological_path = self.0.versioned_info.as_ref().and_then(|info| match info {
-            fdd::VersionedNodeInfo::V1(v1) => v1.topological_path.as_ref(),
-            _ => None,
-        });
-        Ok(topological_path.ok_or(format_err!("Missing topological path"))?)
-    }
-
-    /// Gets the last ordinal of the device's topological path.
-    ///
-    /// For a `topological_path` value of "/some/topo/path/foo/bar", "bar" will be returned.
-    pub fn extract_name(&self) -> Result<&str> {
-        let topological_path = self.get_topo_path()?;
-        let (_, name) = topological_path.rsplit_once('/').unwrap_or(("", &topological_path));
-        Ok(name)
-    }
-
-    pub fn get_v1_info(&self) -> Result<&fdd::V1DeviceInfo> {
-        let info = self.0.versioned_info.as_ref().and_then(|info| match info {
-            fdd::VersionedNodeInfo::V1(v1) => Some(v1),
-            _ => None,
-        });
-
-        Ok(info.ok_or(format_err!("Missing v1 info"))?)
-    }
-}
-
-#[derive(Debug)]
-pub struct DFv2Node(pub fdd::NodeInfo);
-
-impl DFv2Node {
+impl Device {
     /// Gets the full moniker name of the device.
     pub fn get_moniker(&self) -> Result<&str> {
-        let moniker = self.0.versioned_info.as_ref().and_then(|info| match info {
-            fdd::VersionedNodeInfo::V2(v2) => v2.moniker.as_ref(),
-            _ => None,
-        });
+        let moniker = self.0.moniker.as_ref();
         Ok(moniker.ok_or(format_err!("Missing moniker"))?)
+    }
+
+    /// Gets the full identifying path name of the device.
+    pub fn get_full_name(&self) -> Result<&str> {
+        self.get_moniker()
     }
 
     /// Gets the last ordinal of the device's moniker.
@@ -58,64 +28,11 @@ impl DFv2Node {
         let (_, name) = moniker.rsplit_once('.').unwrap_or(("", &moniker));
         Ok(name)
     }
-
-    pub fn get_v2_info(&self) -> Result<&fdd::V2NodeInfo> {
-        let info = self.0.versioned_info.as_ref().and_then(|info| match info {
-            fdd::VersionedNodeInfo::V2(v2) => Some(v2),
-            _ => None,
-        });
-
-        Ok(info.ok_or(format_err!("Missing v2 info"))?)
-    }
-}
-
-#[derive(Debug)]
-pub enum Device {
-    V1(DFv1Device),
-    V2(DFv2Node),
-}
-
-impl Device {
-    pub fn get_device_info(&self) -> &fdd::NodeInfo {
-        match self {
-            Device::V1(device) => &device.0,
-            Device::V2(node) => &node.0,
-        }
-    }
-
-    /// Gets the full identifying path name of the device.
-    ///
-    /// For V1 devices, that is the `topological_path`.
-    /// For V2 devices, that is the `moniker`.
-    pub fn get_full_name(&self) -> Result<&str> {
-        match self {
-            Device::V1(device) => device.get_topo_path(),
-            Device::V2(node) => node.get_moniker(),
-        }
-    }
-
-    /// Gets the last ordinal of the identifying path name of the device.
-    ///
-    /// For V1 devices, it would be the part of the string after the last `/`.
-    /// For V2 devices, it would be the part of the string after the last `.`.
-    pub fn extract_name(&self) -> Result<&str> {
-        match self {
-            Device::V1(device) => device.extract_name(),
-            Device::V2(node) => node.extract_name(),
-        }
-    }
 }
 
 impl std::convert::From<fdd::NodeInfo> for Device {
     fn from(device_info: fdd::NodeInfo) -> Device {
-        match &device_info.versioned_info {
-            Some(info) => match &info {
-                fdd::VersionedNodeInfo::V1(_) => Device::V1(DFv1Device(device_info)),
-                fdd::VersionedNodeInfo::V2(_) => Device::V2(DFv2Node(device_info)),
-                _ => Device::V1(DFv1Device(device_info)),
-            },
-            None => Device::V1(DFv1Device(device_info)),
-        }
+        Device(device_info)
     }
 }
 
@@ -293,8 +210,7 @@ pub async fn get_devices_by_driver(
     let mut matches: Vec<Device> = Vec::new();
     for device_item in device_list.into_iter() {
         let device: Device = device_item.into();
-        if let (Some(bound_driver_url), Some(url)) =
-            (&device.get_device_info().bound_driver_url, &driver_info.url)
+        if let (Some(bound_driver_url), Some(url)) = (&device.0.bound_driver_url, &driver_info.url)
         {
             if &url == &bound_driver_url {
                 matches.push(device);

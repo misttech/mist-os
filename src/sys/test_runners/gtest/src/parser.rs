@@ -118,9 +118,7 @@ pub struct TestOutput {
 /// Opens and reads file defined by `path` in `dir`.
 pub async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<String, Error> {
     // Open the file in read-only mode.
-    let result_file_proxy =
-        fuchsia_fs::directory::open_file_deprecated(dir, path, fio::OpenFlags::RIGHT_READABLE)
-            .await?;
+    let result_file_proxy = fuchsia_fs::directory::open_file(dir, path, fio::PERM_READABLE).await?;
     return fuchsia_fs::file::read_to_string(&result_file_proxy).await.map_err(Into::into);
 }
 

@@ -344,14 +344,14 @@ zx_status_t Dwc2::HandleSetupRequest(size_t* out_actual) {
   auto* setup = &cur_setup_;
   auto* buffer = ep0_buffer_.virt();
   zx::duration elapsed;
-  zx::time now;
+  zx::time_boot now;
   if (setup->bm_request_type == (USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE)) {
     // Handle some special setup requests in this driver
     switch (setup->b_request) {
       case USB_REQ_SET_ADDRESS:
         zxlogf(SERIAL, "SET_ADDRESS %d", setup->w_value);
         SetAddress(static_cast<uint8_t>(setup->w_value));
-        now = zx::clock::get_monotonic();
+        now = zx::clock::get_boot();
         elapsed = now - irq_timestamp_;
         zxlogf(
             INFO,
@@ -1093,9 +1093,9 @@ int Dwc2::IrqThread() {
            zx_status_get_string(status));
   }
   while (1) {
-    wait_start_time_ = zx::clock::get_monotonic();
+    wait_start_time_ = zx::clock::get_boot();
     auto wait_res = irq_.wait(&irq_timestamp_);
-    irq_dispatch_timestamp_ = zx::clock::get_monotonic();
+    irq_dispatch_timestamp_ = zx::clock::get_boot();
     if (wait_res == ZX_ERR_CANCELED) {
       break;
     } else if (wait_res != ZX_OK) {

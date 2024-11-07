@@ -5,10 +5,11 @@
 use crate::events::router::EventConsumer;
 use crate::events::types::{Event, EventPayload, LogSinkRequestedPayload};
 use crate::identity::ComponentIdentity;
-use crate::logs::budget::BudgetManager;
 use crate::logs::container::LogsArtifactsContainer;
 use crate::logs::debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY};
 use crate::logs::multiplex::{Multiplexer, MultiplexerHandle};
+use crate::logs::shared_buffer::SharedBuffer;
+use crate::logs::stats::LogStreamStats;
 use crate::severity_filter::KlogSeverityFilter;
 use anyhow::format_err;
 use diagnostics_data::{LogsData, Severity};
@@ -16,6 +17,7 @@ use fidl_fuchsia_diagnostics::{
     LogInterestSelector, Selector, Severity as FidlSeverity, StreamMode,
 };
 use flyweights::FlyStr;
+use fuchsia_inspect_derive::WithInspect;
 use fuchsia_sync::{Mutex, RwLock};
 use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::AbsoluteComponentUrl;
@@ -26,7 +28,7 @@ use selectors::SelectorExt;
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, LazyLock};
+use std::sync::{Arc, LazyLock, Weak};
 use tracing::{debug, error};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace};
 
@@ -89,9 +91,7 @@ static ARCHIVIST_MONIKER: LazyLock<Moniker> =
 pub struct LogsRepository {
     log_sender: RwLock<mpsc::UnboundedSender<fasync::Task<()>>>,
     mutable_state: Mutex<LogsRepositoryState>,
-    /// Processes removal of components emitted by the budget handler. This is done to prevent a
-    /// deadlock. It's behind a mutex, but it's only set once. Holds an Arc<Self>.
-    component_removal_task: Mutex<Option<fasync::Task<()>>>,
+    shared_buffer: Arc<SharedBuffer>,
 }
 
 impl LogsRepository {
@@ -100,28 +100,31 @@ impl LogsRepository {
         initial_interests: impl Iterator<Item = ComponentInitialInterest>,
         parent: &fuchsia_inspect::Node,
     ) -> Arc<Self> {
-        let (remover_snd, remover_rcv) = mpsc::unbounded();
-        let logs_budget = BudgetManager::new(logs_max_cached_original_bytes as usize, remover_snd);
         let (log_sender, log_receiver) = mpsc::unbounded();
-        let this = Arc::new(LogsRepository {
-            mutable_state: Mutex::new(LogsRepositoryState::new(
-                logs_budget,
-                log_receiver,
-                parent,
-                initial_interests,
-            )),
-            log_sender: RwLock::new(log_sender),
-            component_removal_task: Mutex::new(None),
-        });
-        *this.component_removal_task.lock() = Some(fasync::Task::spawn(
-            Self::process_removal_of_components(remover_rcv, Arc::clone(&this)),
-        ));
-        this
+        Arc::new_cyclic(|me: &Weak<LogsRepository>| {
+            let me = Weak::clone(me);
+            LogsRepository {
+                mutable_state: Mutex::new(LogsRepositoryState::new(
+                    log_receiver,
+                    parent,
+                    initial_interests,
+                )),
+                log_sender: RwLock::new(log_sender),
+                shared_buffer: Arc::new(SharedBuffer::new(
+                    logs_max_cached_original_bytes as usize,
+                    Box::new(move |identity| {
+                        if let Some(this) = me.upgrade() {
+                            this.on_container_inactive(&identity);
+                        }
+                    }),
+                )),
+            }
+        })
     }
 
     /// Drain the kernel's debug log. The returned future completes once
     /// existing messages have been ingested.
-    pub fn drain_debuglog<K>(&self, klog_reader: K)
+    pub fn drain_debuglog<K>(self: &Arc<Self>, klog_reader: K)
     where
         K: DebugLog + Send + Sync + 'static,
     {
@@ -132,11 +135,11 @@ impl LogsRepository {
             return;
         }
 
-        let container = mutable_state.get_log_container(KERNEL_IDENTITY.clone());
+        let container =
+            mutable_state.get_log_container(KERNEL_IDENTITY.clone(), &self.shared_buffer, self);
         mutable_state.drain_klog_task = Some(fasync::Task::spawn(async move {
             debug!("Draining debuglog.");
-            let mut kernel_logger =
-                DebugLogBridge::create(klog_reader, Arc::clone(&container.stats));
+            let mut kernel_logger = DebugLogBridge::create(klog_reader);
             let mut messages = match kernel_logger.existing_logs() {
                 Ok(messages) => messages,
                 Err(e) => {
@@ -180,14 +183,14 @@ impl LogsRepository {
     }
 
     pub fn get_log_container(
-        &self,
+        self: &Arc<Self>,
         identity: Arc<ComponentIdentity>,
     ) -> Arc<LogsArtifactsContainer> {
-        self.mutable_state.lock().get_log_container(identity)
+        self.mutable_state.lock().get_log_container(identity, &self.shared_buffer, self)
     }
 
-    /// Stop accepting new messages, ensuring that pending Cursors return Poll::Ready(None) after
-    /// consuming any messages received before this call.
+    /// Waits until `stop_accepting_new_log_sinks` is called and all log sink tasks have completed.
+    /// After that, any pending Cursors will return Poll::Ready(None).
     pub async fn wait_for_termination(&self) {
         let receiver = self.mutable_state.lock().log_receiver.take().unwrap();
         receiver.for_each_concurrent(None, |rx| rx).await;
@@ -198,9 +201,6 @@ impl LogsRepository {
             container.terminate();
         }
         repo.logs_multiplexers.terminate();
-
-        debug!("Terminated logs");
-        repo.logs_budget.terminate();
     }
 
     /// Closes the connection in which new logger draining tasks are sent. No more logger tasks
@@ -225,19 +225,6 @@ impl LogsRepository {
         self.mutable_state.lock().finish_interest_connection(connection_id);
     }
 
-    async fn process_removal_of_components(
-        mut removal_requests: mpsc::UnboundedReceiver<Arc<ComponentIdentity>>,
-        logs_repo: Arc<LogsRepository>,
-    ) {
-        while let Some(identity) = removal_requests.next().await {
-            let mut repo = logs_repo.mutable_state.lock();
-            if !repo.is_live(&identity) {
-                debug!(%identity, "Removing component from repository.");
-                repo.remove(&identity);
-            }
-        }
-    }
-
     #[cfg(test)]
     pub(crate) fn default() -> Arc<Self> {
         LogsRepository::new(
@@ -245,6 +232,13 @@ impl LogsRepository {
             std::iter::empty(),
             &Default::default(),
         )
+    }
+
+    fn on_container_inactive(&self, identity: &ComponentIdentity) {
+        let mut repo = self.mutable_state.lock();
+        if !repo.is_live(identity) {
+            repo.remove(identity);
+        }
     }
 }
 
@@ -272,8 +266,6 @@ pub struct LogsRepositoryState {
     /// an option.
     log_receiver: Option<mpsc::UnboundedReceiver<fasync::Task<()>>>,
 
-    /// A reference to the budget manager, kept to be passed to containers.
-    logs_budget: BudgetManager,
     /// BatchIterators for logs need to be made aware of new components starting and their logs.
     logs_multiplexers: MultiplexerBroker,
 
@@ -290,7 +282,6 @@ pub struct LogsRepositoryState {
 
 impl LogsRepositoryState {
     fn new(
-        logs_budget: BudgetManager,
         log_receiver: mpsc::UnboundedReceiver<fasync::Task<()>>,
         parent: &fuchsia_inspect::Node,
         initial_interests: impl Iterator<Item = ComponentInitialInterest>,
@@ -298,7 +289,6 @@ impl LogsRepositoryState {
         Self {
             inspect_node: parent.create_child("log_sources"),
             logs_data_store: HashMap::new(),
-            logs_budget,
             log_receiver: Some(log_receiver),
             logs_multiplexers: MultiplexerBroker::new(),
             interest_registrations: BTreeMap::new(),
@@ -316,18 +306,30 @@ impl LogsRepositoryState {
     pub fn get_log_container(
         &mut self,
         identity: Arc<ComponentIdentity>,
+        shared_buffer: &Arc<SharedBuffer>,
+        repo: &Arc<LogsRepository>,
     ) -> Arc<LogsArtifactsContainer> {
         match self.logs_data_store.get(&identity) {
             None => {
                 let initial_interest = self.get_initial_interest(identity.as_ref());
+                let weak_repo = Arc::downgrade(repo);
+                let stats = LogStreamStats::default()
+                    .with_inspect(&self.inspect_node, identity.moniker.to_string())
+                    .expect("failed to attach component log stats");
+                stats.set_url(&identity.url);
+                let stats = Arc::new(stats);
                 let container = Arc::new(LogsArtifactsContainer::new(
                     Arc::clone(&identity),
                     self.interest_registrations.values().flat_map(|s| s.iter()),
                     initial_interest,
-                    &self.inspect_node,
-                    self.logs_budget.handle(),
+                    Arc::clone(&stats),
+                    shared_buffer.new_container_buffer(Arc::clone(&identity), stats),
+                    Some(Box::new(move |c| {
+                        if let Some(repo) = weak_repo.upgrade() {
+                            repo.on_container_inactive(&c.identity)
+                        }
+                    })),
                 ));
-                self.logs_budget.add_container(Arc::clone(&container));
                 self.logs_data_store.insert(identity, Arc::clone(&container));
                 self.logs_multiplexers.send(&container);
                 container
@@ -347,9 +349,9 @@ impl LogsRepositoryState {
         }
     }
 
-    fn is_live(&self, identity: &Arc<ComponentIdentity>) -> bool {
+    fn is_live(&self, identity: &ComponentIdentity) -> bool {
         match self.logs_data_store.get(identity) {
-            Some(container) => container.should_retain(),
+            Some(container) => container.is_active(),
             None => false,
         }
     }
@@ -407,7 +409,7 @@ impl LogsRepositoryState {
         }
     }
 
-    pub fn remove(&mut self, identity: &Arc<ComponentIdentity>) {
+    pub fn remove(&mut self, identity: &ComponentIdentity) {
         self.logs_data_store.remove(identity);
     }
 }
@@ -475,14 +477,11 @@ impl MultiplexerBroker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::logs::stored_message::StoredMessage;
-    use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
+    use crate::logs::testing::make_message;
     use fidl_fuchsia_logger::LogSinkMarker;
 
     use moniker::ExtendedMoniker;
     use selectors::FastError;
-    use std::io::Cursor;
     use std::time::Duration;
 
     #[fuchsia::test]
@@ -497,9 +496,9 @@ mod tests {
             "fuchsia-pkg://bar",
         )));
 
-        foo_container.ingest_message(make_message("a", zx::BootInstant::from_nanos(1)));
-        bar_container.ingest_message(make_message("b", zx::BootInstant::from_nanos(2)));
-        foo_container.ingest_message(make_message("c", zx::BootInstant::from_nanos(3)));
+        foo_container.ingest_message(make_message("a", None, zx::BootInstant::from_nanos(1)));
+        bar_container.ingest_message(make_message("b", None, zx::BootInstant::from_nanos(2)));
+        foo_container.ingest_message(make_message("c", None, zx::BootInstant::from_nanos(3)));
 
         let stream = repo.logs_cursor(StreamMode::Snapshot, None, ftrace::Id::random());
 
@@ -539,7 +538,7 @@ mod tests {
     #[fuchsia::test]
     async fn data_repo_correctly_sets_initial_interests() {
         let repo = LogsRepository::new(
-            1000,
+            100000,
             [
                 ComponentInitialInterest {
                     component: UrlOrMoniker::Url("fuchsia-pkg://bar".into()),
@@ -603,22 +602,5 @@ mod tests {
         container.handle_log_sink(stream, sender);
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
         assert_eq!(initial_interest.min_severity, expected_severity);
-    }
-
-    fn make_message(msg: &str, timestamp: zx::BootInstant) -> StoredMessage {
-        let record = Record {
-            timestamp,
-            severity: StreamSeverity::Debug.into_primitive(),
-            arguments: vec![
-                Argument::pid(zx::Koid::from_raw(1)),
-                Argument::tid(zx::Koid::from_raw(2)),
-                Argument::message(msg),
-            ],
-        };
-        let mut buffer = Cursor::new(vec![0u8; 1024]);
-        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        encoder.write_record(record).unwrap();
-        let encoded = &buffer.get_ref()[..buffer.position() as usize];
-        StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }
 }

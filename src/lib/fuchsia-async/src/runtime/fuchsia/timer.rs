@@ -72,7 +72,7 @@ impl TimeInterface for BootInstant {
     }
 
     fn now() -> i64 {
-        BootInstant::from_zx(zx::BootInstant::get()).into_nanos()
+        EHandle::local().inner().boot_now().into_nanos()
     }
 }
 
@@ -459,7 +459,7 @@ impl<T: TimeInterface> Timers<T> {
     ///
     /// This will panic if we are not using fake time.
     pub fn maybe_notify(&self, now: T) {
-        assert!(self.fake);
+        assert!(self.fake, "calling this function requires using fake time.");
         // SAFETY: `inner` is locked.
         if self
             .inner

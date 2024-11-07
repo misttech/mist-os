@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.hardware.light/cpp/fidl.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <string.h>
 #include <zircon/errors.h>
 
@@ -198,25 +198,41 @@ zx_status_t AmlLight::Create(void* ctx, zx_device_t* parent) {
 zx_status_t AmlLight::Init() {
   zx_status_t status = ZX_OK;
 
-  ddk::PDevFidl pdev(parent(), "pdev");
-  pdev_board_info_t board_info = {};
-  status = ZX_OK;
-  if (!pdev.is_valid() || (status = pdev.GetBoardInfo(&board_info)) != ZX_OK) {
-    board_info.pid = PDEV_PID_GENERIC;
+  fdf::PDev pdev;
+  {
+    zx::result result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>("pdev");
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to connect to platform device: %s", result.status_string());
+      return result.status_value();
+    }
+    pdev = fdf::PDev{std::move(result.value())};
   }
 
-  zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_light::Metadata>(
-      fuchsia_hardware_light::kMetadataTypeName);
-  if (metadata.is_error()) {
-    zxlogf(ERROR, "Failed to get metadata: %s", metadata.status_string());
-    return metadata.status_value();
+  fdf::PDev::BoardInfo board_info{.pid = PDEV_PID_GENERIC};
+  {
+    zx::result result = pdev.GetBoardInfo();
+    if (result.is_ok()) {
+      board_info = std::move(result.value());
+    }
+  }
+
+  fuchsia_hardware_light::Metadata metadata;
+  {
+    zx::result result = pdev.GetFidlMetadata<fuchsia_hardware_light::Metadata>(
+        fuchsia_hardware_light::kMetadataTypeName);
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to get metadata: %s", result.status_string());
+      return result.status_value();
+    }
+    metadata = std::move(result.value());
   }
 
   const zx::duration pwm_period = board_info.pid == PDEV_PID_NELSON ? kNelsonPwmPeriod : kPwmPeriod;
 
   zxlogf(INFO, "PWM period: %ld ns", pwm_period.to_nsecs());
 
-  const std::optional<std::vector<fuchsia_hardware_light::Config>>& configs = metadata->configs();
+  const std::optional<std::vector<fuchsia_hardware_light::Config>>& configs = metadata.configs();
   if (!configs.has_value()) {
     zxlogf(ERROR, "Metadata missing configs");
     return ZX_ERR_INTERNAL;

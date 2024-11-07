@@ -6,7 +6,7 @@ use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
     CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsStr,
 };
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{statfs, CGROUP2_SUPER_MAGIC, CGROUP_SUPER_MAGIC};
@@ -30,7 +30,12 @@ impl FileSystemOps for CgroupV1Fs {
     fn name(&self) -> &'static FsStr {
         b"cgroup".into()
     }
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(CGROUP_SUPER_MAGIC))
     }
 }
@@ -53,7 +58,12 @@ impl FileSystemOps for CgroupV2Fs {
     fn name(&self) -> &'static FsStr {
         b"cgroup2".into()
     }
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(CGROUP2_SUPER_MAGIC))
     }
 }

@@ -19,6 +19,7 @@ if (is_host) {
     ]
     public_deps = [
       "//sdk/lib/fit",
+      "//sdk/lib/syslog/cpp",
       "//src/developer/debug/ipc",
       "//src/developer/debug/zxdb/client",
       "//src/developer/debug/zxdb/console",
@@ -34,6 +35,7 @@ if (is_host) {
     sources = [ "main.cc" ]
     deps = [
       ":src",
+      "//sdk/lib/syslog/cpp",
       "//src/lib/fxl",
     ]
   }

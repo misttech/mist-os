@@ -17,10 +17,18 @@ namespace mock_spmi {
 
 class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
  public:
+  void ExpectGetProperties(uint16_t sid, std::string name) {
+    expectations_.push({
+        .type = CallType::kGetProperties,
+        .sid = sid,
+        .name = name,
+    });
+  }
+
   void ExpectExtendedRegisterReadLong(uint16_t address, uint32_t size_bytes,
                                       std::vector<uint8_t> expected_data) {
     expectations_.push({
-        .is_read = true,
+        .type = CallType::kRead,
         .address = address,
         .size_bytes = size_bytes,
         .data = std::move(expected_data),
@@ -30,7 +38,7 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
   void ExpectExtendedRegisterReadLong(uint16_t address, uint32_t size_bytes,
                                       fuchsia_hardware_spmi::DriverError expected_error) {
     expectations_.push({
-        .is_read = true,
+        .type = CallType::kRead,
         .error = expected_error,
         .address = address,
         .size_bytes = size_bytes,
@@ -41,10 +49,18 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
       uint16_t address, std::vector<uint8_t> data,
       std::optional<fuchsia_hardware_spmi::DriverError> expected_error = std::nullopt) {
     expectations_.push({
-        .is_read = false,
+        .type = CallType::kWrite,
         .error = expected_error,
         .address = address,
         .data = std::move(data),
+    });
+  }
+
+  void ExpectWatchControllerWriteCommands(uint8_t address, uint16_t data) {
+    expectations_.push({
+        .type = CallType::kWatch,
+        .address = address,
+        .data = {data},
     });
   }
 
@@ -56,17 +72,37 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
   fidl::ServerBindingGroup<fuchsia_hardware_spmi::Device> bindings_;
 
  private:
+  enum CallType : uint8_t {
+    kRead = 0,
+    kWrite = 1,
+    kGetProperties = 2,
+    kWatch = 3,
+  };
+
   struct SpmiExpectation {
-    bool is_read;
+    CallType type;
 
     std::optional<fuchsia_hardware_spmi::DriverError> error = std::nullopt;
 
     uint16_t address;
     uint32_t size_bytes;
     std::vector<uint8_t> data;
+
+    uint16_t sid;
+    std::string name;
   };
 
-  void GetProperties(GetPropertiesCompleter::Sync& completer) override { ASSERT_TRUE(false); }
+  void GetProperties(GetPropertiesCompleter::Sync& completer) override {
+    ASSERT_FALSE(expectations_.empty());
+    auto expectation = std::move(expectations_.front());
+    expectations_.pop();
+
+    ASSERT_EQ(expectation.type, CallType::kGetProperties);
+    completer.Reply({{
+        .sid = expectation.sid,
+        .name = expectation.name,
+    }});
+  }
 
   void ExtendedRegisterReadLong(ExtendedRegisterReadLongRequest& request,
                                 ExtendedRegisterReadLongCompleter::Sync& completer) override {
@@ -74,7 +110,7 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
     auto expectation = std::move(expectations_.front());
     expectations_.pop();
 
-    ASSERT_TRUE(expectation.is_read);
+    ASSERT_EQ(expectation.type, CallType::kRead);
     EXPECT_EQ(expectation.address, request.address());
     EXPECT_EQ(expectation.size_bytes, request.size_bytes());
     EXPECT_EQ(expectation.size_bytes, expectation.data.size());
@@ -91,7 +127,7 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
     auto expectation = std::move(expectations_.front());
     expectations_.pop();
 
-    ASSERT_FALSE(expectation.is_read);
+    ASSERT_EQ(expectation.type, CallType::kWrite);
     EXPECT_EQ(expectation.address, request.address());
     ASSERT_EQ(expectation.data.size(), request.data().size());
     EXPECT_EQ(expectation.data, std::vector<uint8_t>(request.data().begin(), request.data().end()));
@@ -100,6 +136,19 @@ class MockSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device> {
     } else {
       completer.Reply(zx::ok());
     }
+  }
+
+  void WatchControllerWriteCommands(
+      WatchControllerWriteCommandsRequest& request,
+      WatchControllerWriteCommandsCompleter::Sync& completer) override {
+    ASSERT_FALSE(expectations_.empty());
+    auto expectation = std::move(expectations_.front());
+    expectations_.pop();
+
+    ASSERT_EQ(expectation.type, CallType::kWatch);
+    ASSERT_EQ(expectation.data.size(), 1);
+    completer.Reply(zx::ok(
+        std::vector<fuchsia_hardware_spmi::Register8>{{expectation.address, expectation.data[0]}}));
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_spmi::Device> metadata,

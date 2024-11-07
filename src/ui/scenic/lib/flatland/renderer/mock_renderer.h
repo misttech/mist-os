@@ -36,7 +36,7 @@ class MockRenderer : public Renderer {
               ((const std::array<float, 9>&), (const std::array<float, 3>&),
                (const std::array<float, 3>&)));
 
-  MOCK_METHOD(fuchsia_images2::PixelFormat, ChoosePreferredPixelFormat,
+  MOCK_METHOD(fuchsia_images2::PixelFormat, ChoosePreferredRenderTargetFormat,
               (const std::vector<fuchsia_images2::PixelFormat>&), (const));
 
   MOCK_METHOD(bool, SupportsRenderInProtected, (), (const));

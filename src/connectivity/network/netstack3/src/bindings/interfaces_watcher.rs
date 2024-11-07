@@ -106,13 +106,13 @@ impl EventQueue {
                 addresses,
                 has_default_ipv4_route,
                 has_default_ipv6_route,
-                online,
+                enabled,
             } = state;
             let mut event = finterfaces::Event::Existing(
                 finterfaces_ext::Properties {
                     id: *id,
                     name: name.clone(),
-                    online: *online,
+                    online: enabled.online(),
                     addresses: Worker::collect_addresses(addresses),
                     has_default_ipv4_route: *has_default_ipv4_route,
                     has_default_ipv6_route: *has_default_ipv6_route,
@@ -267,7 +267,10 @@ pub(crate) enum InterfaceUpdate {
         version: IpVersion,
         has_default_route: bool,
     },
-    OnlineChanged(bool),
+    IpEnabledChanged {
+        version: IpVersion,
+        enabled: bool,
+    },
 }
 
 /// Changes to address properties (e.g. via interfaces-admin).
@@ -291,10 +294,42 @@ pub(crate) struct InterfaceProperties {
 #[cfg_attr(test, derive(Clone, Eq, PartialEq))]
 pub(crate) struct InterfaceState {
     properties: InterfaceProperties,
-    online: bool,
+    enabled: IpEnabledState,
     addresses: HashMap<IpAddr, AddressProperties>,
     has_default_ipv4_route: bool,
     has_default_ipv6_route: bool,
+}
+
+/// Caches IPv4 and IPv6 enabled state to produce a unified `online` signal.
+///
+/// The split signals come directly from core. We consider an interface online
+/// if _either_ v4 or v6 are up.
+#[derive(Debug, Default, Copy, Clone)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
+struct IpEnabledState {
+    v4: bool,
+    v6: bool,
+}
+
+impl IpEnabledState {
+    /// Updates the enabled state for `version` returning the new value for
+    /// `online` if it changed.
+    fn update(&mut self, version: IpVersion, enabled: bool) -> Option<bool> {
+        let before = self.online();
+        let Self { v4, v6 } = self;
+        let target = match version {
+            IpVersion::V4 => v4,
+            IpVersion::V6 => v6,
+        };
+        *target = enabled;
+        let after = self.online();
+        (after != before).then_some(after)
+    }
+
+    fn online(&self) -> bool {
+        let Self { v4, v6 } = self;
+        *v4 || *v6
+    }
 }
 
 #[derive(Debug)]
@@ -601,14 +636,14 @@ impl Worker {
     ) -> Result<Option<(finterfaces::Event, ChangedAddressProperties)>, WorkerError> {
         match event {
             InterfaceEvent::Added { id, properties: InterfaceProperties { name, port_class } } => {
-                let online = false;
+                let enabled = IpEnabledState::default();
                 let has_default_ipv4_route = false;
                 let has_default_ipv6_route = false;
                 match state.insert(
                     id,
                     InterfaceState {
                         properties: InterfaceProperties { name: name.clone(), port_class },
-                        online,
+                        enabled,
                         addresses: HashMap::new(),
                         has_default_ipv4_route,
                         has_default_ipv6_route,
@@ -621,7 +656,7 @@ impl Worker {
                                 id,
                                 name,
                                 port_class,
-                                online,
+                                online: enabled.online(),
                                 addresses: Vec::new(),
                                 has_default_ipv4_route,
                                 has_default_ipv6_route,
@@ -642,7 +677,7 @@ impl Worker {
             InterfaceEvent::Changed { id, event } => {
                 let InterfaceState {
                     properties: _,
-                    online,
+                    enabled,
                     addresses,
                     has_default_ipv4_route,
                     has_default_ipv6_route,
@@ -747,9 +782,8 @@ impl Worker {
                                 )
                             }))
                     }
-                    InterfaceUpdate::OnlineChanged(new_online) => {
-                        Ok((*online != new_online).then(|| {
-                            *online = new_online;
+                    InterfaceUpdate::IpEnabledChanged { version, enabled: new_enabled } => {
+                        Ok(enabled.update(version, new_enabled).map(|new_online| {
                             (
                                 finterfaces::Event::Changed(finterfaces::Properties {
                                     id: Some(id.get()),
@@ -1115,7 +1149,7 @@ mod tests {
                 }),
             ),
             (
-                InterfaceUpdate::OnlineChanged(true),
+                InterfaceUpdate::IpEnabledChanged { enabled: true, version: IpVersion::V4 },
                 finterfaces::Event::Changed(finterfaces::Properties {
                     online: Some(true),
                     ..base_properties.clone()
@@ -1208,7 +1242,7 @@ mod tests {
                     name: IFACE1_NAME.to_string(),
                     port_class: IFACE1_TYPE,
                 },
-                online: false,
+                enabled: IpEnabledState { v4: false, v6: false },
                 addresses: Default::default(),
                 has_default_ipv4_route: false,
                 has_default_ipv6_route: false,
@@ -1283,7 +1317,10 @@ mod tests {
                 &mut state,
                 InterfaceEvent::Changed {
                     id: IFACE1_ID,
-                    event: InterfaceUpdate::OnlineChanged(true)
+                    event: InterfaceUpdate::IpEnabledChanged {
+                        enabled: true,
+                        version: IpVersion::V4
+                    }
                 }
             ),
             Err(WorkerError::UpdateNonexistentInterface(IFACE1_ID))
@@ -1679,11 +1716,17 @@ mod tests {
         let (id, initial_state) = iface1_initial_state();
         let mut state = HashMap::from([(id, initial_state)]);
 
-        // Change to online.
+        // Change V4 to online.
         assert_eq!(
             Worker::consume_event(
                 &mut state,
-                InterfaceEvent::Changed { id, event: InterfaceUpdate::OnlineChanged(true) }
+                InterfaceEvent::Changed {
+                    id,
+                    event: InterfaceUpdate::IpEnabledChanged {
+                        enabled: true,
+                        version: IpVersion::V4
+                    }
+                }
             ),
             Ok(Some((
                 finterfaces::Event::Changed(finterfaces::Properties {
@@ -1694,15 +1737,76 @@ mod tests {
                 ChangedAddressProperties::InterestNotApplicable
             )))
         );
+
+        let entry = state.get(&id).expect("missing interface entry");
+        assert_eq!(entry.enabled, IpEnabledState { v4: true, v6: false });
+
+        // Change V6 to online.
+        assert_eq!(
+            Worker::consume_event(
+                &mut state,
+                InterfaceEvent::Changed {
+                    id,
+                    event: InterfaceUpdate::IpEnabledChanged {
+                        enabled: true,
+                        version: IpVersion::V6
+                    }
+                }
+            ),
+            Ok(None)
+        );
         // Check state is updated.
-        assert_eq!(state.get(&id).expect("missing interface entry").online, true);
+        let entry = state.get(&id).expect("missing interface entry");
+        assert_eq!(entry.enabled, IpEnabledState { v4: true, v6: true });
         // Change again produces no update.
         assert_eq!(
             Worker::consume_event(
                 &mut state,
-                InterfaceEvent::Changed { id, event: InterfaceUpdate::OnlineChanged(true) }
+                InterfaceEvent::Changed {
+                    id,
+                    event: InterfaceUpdate::IpEnabledChanged {
+                        enabled: true,
+                        version: IpVersion::V4
+                    }
+                }
             ),
             Ok(None)
+        );
+
+        // Change just one side produces no update.
+        assert_eq!(
+            Worker::consume_event(
+                &mut state,
+                InterfaceEvent::Changed {
+                    id,
+                    event: InterfaceUpdate::IpEnabledChanged {
+                        enabled: false,
+                        version: IpVersion::V4
+                    }
+                }
+            ),
+            Ok(None)
+        );
+
+        assert_eq!(
+            Worker::consume_event(
+                &mut state,
+                InterfaceEvent::Changed {
+                    id,
+                    event: InterfaceUpdate::IpEnabledChanged {
+                        enabled: false,
+                        version: IpVersion::V6
+                    }
+                }
+            ),
+            Ok(Some((
+                finterfaces::Event::Changed(finterfaces::Properties {
+                    id: Some(id.get()),
+                    online: Some(false),
+                    ..Default::default()
+                }),
+                ChangedAddressProperties::InterestNotApplicable
+            )))
         );
     }
 

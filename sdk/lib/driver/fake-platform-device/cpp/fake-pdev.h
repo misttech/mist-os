@@ -19,7 +19,7 @@ namespace fdf_fake {
 
 using Mmio = std::variant<fdf::PDev::MmioInfo, fdf::MmioBuffer>;
 
-class FakePDev : public fidl::WireServer<fuchsia_hardware_platform_device::Device> {
+class FakePDev final : public fidl::WireServer<fuchsia_hardware_platform_device::Device> {
  public:
   // Allows for `std::string_view`'s to be used when searching an unordered map that uses
   // `std::string` as its key.
@@ -35,7 +35,7 @@ class FakePDev : public fidl::WireServer<fuchsia_hardware_platform_device::Devic
   using MetadataMap =
       std::unordered_map<std::string, std::vector<uint8_t>, MetadataIdHash, std::equal_to<>>;
 
-  struct Config {
+  struct Config final {
     // If true, a bti will be generated lazily if it does not exist.
     bool use_fake_bti = false;
 
@@ -59,6 +59,11 @@ class FakePDev : public fidl::WireServer<fuchsia_hardware_platform_device::Devic
 
   FakePDev() = default;
 
+  FakePDev(const FakePDev&) = delete;
+  FakePDev& operator=(const FakePDev&) = delete;
+  FakePDev(FakePDev&&) = delete;
+  FakePDev& operator=(FakePDev&&) = delete;
+
   fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler(
       async_dispatcher_t* dispatcher = nullptr) {
     return fuchsia_hardware_platform_device::Service::InstanceHandler({
@@ -74,7 +79,7 @@ class FakePDev : public fidl::WireServer<fuchsia_hardware_platform_device::Devic
     return ZX_OK;
   }
 
-  zx_status_t SetConfig(Config config) {
+  zx_status_t SetConfig(Config&& config) {
     config_ = std::move(config);
     return ZX_OK;
   }

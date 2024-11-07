@@ -83,7 +83,7 @@ struct remote : public zxio {
 };
 
 zx::result<fdio_ptr> open_async_deprecated(zxio_t* directory, std::string_view path,
-                                           fuchsia_io::wire::OpenFlags flags);
+                                           fuchsia_io::wire::OpenFlags legacy_flags);
 
 zx::result<fdio_ptr> open_async(zxio_t* directory, std::string_view path, fuchsia_io::Flags flags);
 

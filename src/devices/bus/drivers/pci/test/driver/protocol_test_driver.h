@@ -53,7 +53,9 @@ class ProtocolTestDriver : public ProtocolTestDriverType, public TestObserver {
   void DdkRelease() { delete this; }
 
  private:
-  explicit ProtocolTestDriver(zx_device_t* parent) : ProtocolTestDriverType(parent), pci_(parent) {}
+  explicit ProtocolTestDriver(zx_device_t* parent) : ProtocolTestDriverType(parent) {
+    pci_ = ddk::Pci::FromFragment(parent);
+  }
 
   static ProtocolTestDriver* instance_;
   ddk::Pci pci_;

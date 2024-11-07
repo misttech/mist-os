@@ -29,6 +29,16 @@ FakeBlockDevice::FakeBlockDevice(const FakeBlockDevice::Config& config)
   }
 }
 
+zx::result<zx::vmo> FakeBlockDevice::VmoChildReference() const {
+  fbl::AutoLock lock(&lock_);
+  zx::vmo vmo;
+  if (zx_status_t status = block_device_.create_child(ZX_VMO_CHILD_REFERENCE, 0, 0, &vmo);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(vmo));
+}
+
 void FakeBlockDevice::Pause() {
   fbl::AutoLock lock(&lock_);
   paused_ = true;

@@ -104,6 +104,7 @@ struct Superblock {
 
 // For checkpoint
 enum class CpFlag {
+  kCpCrcRecoveryFlag = 0x40,
   kCpErrorFlag = 0x8,
   kCpCompactSumFlag = 0x4,
   kCpOrphanPresentFlag = 0x2,

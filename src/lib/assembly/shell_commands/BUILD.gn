@@ -16,9 +16,11 @@ rustc_library("shell_commands") {
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/package_utils",
     "//src/lib/assembly/util",
+    "//src/lib/fidl/rust/fidl",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
+    "//tools/lib/cml",
   ]
   test_deps = [ "//third_party/rust_crates:tempfile" ]
   sources = [

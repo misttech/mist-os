@@ -24,7 +24,7 @@ driver_bind_rules("bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "init-test"
   sources = [ "init-test.cc" ]
   deps = [

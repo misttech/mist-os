@@ -68,12 +68,21 @@ fi
 # another process is running.
 readonly profile_wrap="${FUCHSIA_DIR}/build/profile/profile_wrap.sh"
 
+readonly date="$(date +%Y%m%d-%H%M%S)"
+
+readonly jq="$PREBUILT_JQ"
+
 # For commands whose subprocesses may use reclient for RBE, prefix those
 # commands conditioned on 'if fx-rbe-enabled' (function).
 # This could not be made into a shell-function because it is used
 # as both a function and non-built-in command, and functions do not compose
 # by prefixing in shell.
-RBE_WRAPPER=( "$FUCHSIA_DIR"/build/rbe/fuchsia-reproxy-wrap.sh -- )
+RBE_WRAPPER=( "$FUCHSIA_DIR"/build/rbe/fuchsia-reproxy-wrap.sh )
+# Propagate tracing option from `fx -x build` to the wrapper script.
+# This is less invasive than re-exporting SHELLOPTS.
+if [[ -o xtrace ]]; then
+  RBE_WRAPPER=( "$SHELL" -x "${RBE_WRAPPER[@]}" )
+fi
 
 # Use this to conditionally prefix a command with "${RBE_WRAPPER[@]}".
 # NOTE: this function depends on FUCHSIA_BUILD_DIR which is set only after
@@ -88,7 +97,7 @@ function fx-rbe-enabled {
 
   # Check to see if the rbe settings indicate that the reproxy wrapper is
   # needed.
-  needs_reproxy=($("${PREBUILT_JQ}" '-r' '.final.needs_reproxy' < "${rbe_settings_file}"))
+  needs_reproxy=($("$jq" '-r' '.final.needs_reproxy' < "${rbe_settings_file}"))
   if [[ "$needs_reproxy" != "true" ]]; then
     return 1
   fi
@@ -193,11 +202,6 @@ function _link_gen_artifacts {
       _symlink_relative "${FUCHSIA_BUILD_DIR}/$artifact" "${FUCHSIA_DIR}/$artifact"
     fi
   done
-
-  # Put rust-analyzer in out/ to avoid polluting the root directory.
-  if [[ -f "${FUCHSIA_BUILD_DIR}/rust-analyzer" ]]; then
-    _symlink_relative "${FUCHSIA_BUILD_DIR}/rust-analyzer" "${FUCHSIA_DIR}/out"
-  fi
 }
 
 function fx-gen-internal {
@@ -998,12 +1002,51 @@ function fx-run-ninja {
   # duration of the build, so that RBE-enabled build actions can operate
   # through the proxy.
   #
-  local build_uuid="$(fx-uuid)"
+  local -r build_uuid="$(fx-uuid)"
   local rbe_wrapper=()
   local user_rbe_env=()
   if fx-rbe-enabled
   then
-    rbe_wrapper=(env "FUCHSIA_BUILD_DIR=${FUCHSIA_BUILD_DIR}" "${RBE_WRAPPER[@]}")
+    # Move the reproxy logs outside of $FUCHSIA_BUILD_DIR so they do not get cleaned,
+    # but under 'out' so it does not pollute the source root.
+    # `fx rbe cleanlogs` will remove all of the accumulated reproxy logs.
+    # Choose a unique reproxy log dir based on basename of $FUCHSIA_BUILD_DIR.
+    local -r _build_dir_base="${FUCHSIA_BUILD_DIR##*/}"  # basename
+
+    # LINT.IfChange(reproxy_log_dirs)
+    local -r _logs_root="$FUCHSIA_DIR/out/.reproxy_logs/$_build_dir_base"
+    # LINT.ThenChange(/tools/devshell/rbe:reproxy_log_dirs)
+    mkdir -p "$_logs_root"
+    # 'mktemp -p' still yields to TMPDIR in the environment (bug?),
+    # so override TMPDIR instead.
+    local -r reproxy_logdir="$(env TMPDIR="$_logs_root" mktemp -d -t "reproxy.$date.XXXX")"
+    local -r _log_base="${reproxy_logdir##*/}"  # basename
+
+    # reproxy wants temporary space on the same physical device where the build happens.
+    # Re-use the randomly generated dir name in a custom tempdir.
+    local -r reproxy_tmpdir="$FUCHSIA_BUILD_DIR/.reproxy_tmpdirs/$_log_base"
+    mkdir -p "$reproxy_tmpdir"
+
+    # Honor additional cfg files from the current build dir.
+    local -r rbe_config_json="$FUCHSIA_BUILD_DIR/rbe_config.json"
+    local proxy_cfg_args=()
+    if [[ -r "$rbe_config_json" ]]
+    then
+      all_proxy_cfgs=($("$jq" '.[] | .path' < "$rbe_config_json" | sed -e 's|"\(.*\)"|\1|'))
+      # Adjust paths to be absolute.
+      for f in "${all_proxy_cfgs[@]}"
+      do proxy_cfg_args+=(--cfg "$FUCHSIA_BUILD_DIR/$f")  # cumulative, repeatable
+      done
+    fi
+
+    rbe_wrapper=(
+      env
+      "${RBE_WRAPPER[@]}"
+      --logdir "$reproxy_logdir"
+      --tmpdir "$reproxy_tmpdir"
+      "${proxy_cfg_args[@]}"
+      --
+    )
     [[ "${USER-NOT_SET}" != "NOT_SET" ]] || {
       echo "Error: USER is not set"
       exit 1
@@ -1031,9 +1074,10 @@ function fx-run-ninja {
     "NINJA_STATUS_MAX_COMMANDS=${NINJA_STATUS_MAX_COMMANDS:-4}"
     "NINJA_STATUS_REFRESH_MILLIS=${NINJA_STATUS_REFRESH_MILLIS:-100}"
     "NINJA_PERSISTENT_MODE=${NINJA_PERSISTENT_MODE:-0}"
-    ${MAKEFLAGS+"MAKEFLAGS=${MAKEFLAGS}"}
     # Forward the following only if the environment already sets them:
+    ${MAKEFLAGS+"MAKEFLAGS=${MAKEFLAGS}"}
     ${FUCHSIA_BAZEL_DISK_CACHE+"FUCHSIA_BAZEL_DISK_CACHE=${FUCHSIA_BAZEL_DISK_CACHE}"}
+    ${FUCHSIA_DEBUG_BAZEL_SANDBOX+"FUCHSIA_DEBUG_BAZEL_SANDBOX=${FUCHSIA_DEBUG_BAZEL_SANDBOX}"}
     ${NINJA_PERSISTENT_TIMEOUT_SECONDS+"NINJA_PERSISTENT_TIMEOUT_SECONDS=$NINJA_PERSISTENT_TIMEOUT_SECONDS"}
     ${NINJA_PERSISTENT_LOG_FILE+"NINJA_PERSISTENT_LOG_FILE=$NINJA_PERSISTENT_LOG_FILE"}
     ${TMPDIR+"TMPDIR=$TMPDIR"}
@@ -1052,7 +1096,6 @@ function fx-run-ninja {
   if [[ "$BUILD_PROFILE_ENABLED" == 1 ]]
   then
     # Collect system profile data while build is running.
-    local date="$(date +%Y%m%d-%H%M%S)"
     # Note: this profile dir will get cleaned by 'fx clean'
     local profile_dir="${FUCHSIA_BUILD_DIR}/.build_profile"
     mkdir -p "$profile_dir"

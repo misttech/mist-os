@@ -79,7 +79,7 @@ bool LogParser::ProcessNextLine() {
   return true;
 }
 
-bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn output) {
+bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::StringOutputFn output) {
   auto splitted = fxl::SplitString(markup, ":", fxl::kKeepWhitespace, fxl::kSplitWantAll);
   if (splitted.empty()) {
     return false;
@@ -96,7 +96,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
         type = Symbolizer::ResetType::kEnd;
       }
     }
-    symbolizer_->Reset(false, type, std::move(output));
+    symbolizer_->Reset(false, type);
     return true;
   }
 
@@ -109,7 +109,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
     if (!ParseInt(splitted[1], id) || splitted[3] != "elf")
       return false;
 
-    symbolizer_->Module(id, splitted[2], splitted[4], std::move(output));
+    symbolizer_->Module(id, splitted[2], splitted[4]);
     return true;
   }
 
@@ -167,7 +167,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
     if (splitted.size() < 3)
       return false;
 
-    symbolizer_->DumpFile(splitted[1], splitted[2], std::move(output));
+    symbolizer_->DumpFile(splitted[1], splitted[2]);
     return true;
   }
 
@@ -175,7 +175,7 @@ bool LogParser::ProcessMarkup(std::string_view markup, Symbolizer::OutputFn outp
 }
 
 // If returning true, we're responsible to output the line.
-bool LogParser::ProcessDart(std::string_view line, Symbolizer::OutputFn output) {
+bool LogParser::ProcessDart(std::string_view line, Symbolizer::StringOutputFn output) {
   constexpr uint64_t kModuleId = 0;
   constexpr uint64_t kModuleSize = 0x800000000;  // 32 GB should be big enough.
 
@@ -184,11 +184,10 @@ bool LogParser::ProcessDart(std::string_view line, Symbolizer::OutputFn output) 
   if (splitted.size() == 6 && splitted[0] == "pid:") {
     // pid: 12, tid: 30221, name some.ui
     dart_process_name_ = splitted[5];
-    symbolizer_->Reset(true, Symbolizer::ResetType::kUnknown, std::move(output));
+    symbolizer_->Reset(true, Symbolizer::ResetType::kUnknown);
   } else if (splitted.size() == 2 && splitted[0] == "build_id:") {
     // build_id: '0123456789abcdef'
-    symbolizer_->Module(kModuleId, dart_process_name_, fxl::TrimString(splitted[1], "'"),
-                        std::move(output));
+    symbolizer_->Module(kModuleId, dart_process_name_, fxl::TrimString(splitted[1], "'"));
   } else if (splitted.size() == 4 && splitted[0] == "isolate_dso_base:") {
     // isolate_dso_base: f2e4c8000, vm_dso_base: f2e4c8000
     uint64_t address;
@@ -222,7 +221,8 @@ bool LogParser::ProcessDart(std::string_view line, Symbolizer::OutputFn output) 
   return true;
 }
 
-Symbolizer::OutputFn LogParser::CreateOutputFn(std::string_view prefix, std::string_view suffix) {
+Symbolizer::StringOutputFn LogParser::CreateOutputFn(std::string_view prefix,
+                                                     std::string_view suffix) {
   // Our design requires that the output must be in the same order of the input, which means the
   // the destruction of OutputFn must be in the same order of the construction.
   output_buffers_.emplace_back();

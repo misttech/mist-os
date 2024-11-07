@@ -61,14 +61,12 @@ closed protocol ProfileProvider {
     /// `name` is the name of a system memory role to apply to the memory given by
     /// `vmar_handle` -- different products may customize the underlying memory strategy based
     /// on the requested role.
-    @available(added=15)
     strict RegisterMemoryRange(resource struct {
         vmar_handle zx.Handle:VMAR;
         name string:64;
     }) -> ();
 
     /// Reset a memory range's memory profile.
-    @available(added=15)
     strict UnregisterMemoryRange(resource struct {
         vmar_handle zx.Handle:VMAR;
     }) -> ();

@@ -26,7 +26,7 @@ driver_bind_rules("root-driver-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("root-driver") {
+fuchsia_cc_driver("root-driver") {
   output_name = "multibind-root-driver"
   sources = [ "root-driver.cc" ]
   deps = [
@@ -52,7 +52,7 @@ driver_bind_rules("spec-composite-1-bind") {
   deps = [ ":multibind.test" ]
 }
 
-fuchsia_driver("spec-composite-1-driver") {
+fuchsia_cc_driver("spec-composite-1-driver") {
   output_name = "spec-composite-1"
   sources = [ "composite.cc" ]
   deps = [
@@ -76,7 +76,7 @@ driver_bind_rules("spec-composite-2-bind") {
   deps = [ ":multibind.test" ]
 }
 
-fuchsia_driver("spec-composite-2-driver") {
+fuchsia_cc_driver("spec-composite-2-driver") {
   output_name = "spec-composite-2"
   sources = [ "composite.cc" ]
   deps = [

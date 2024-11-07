@@ -4,6 +4,8 @@
 @available(added=HEAD)
 library fuchsia.hardware.sdmmc;
 
+const MAX_NAME_LENGTH uint8 = 64;
+
 type SdmmcMetadata = table {
     /// Maximum bus operating frequency. The SDMMC core driver will cap the bus frequency to this
     /// level. The default value is UINT32_MAX if no metadata is specified.
@@ -27,4 +29,12 @@ type SdmmcMetadata = table {
     /// complete. If true, use the FIDL SDMMC protocol. If false, use the Banjo SDMMC protocol. The
     /// default value is true if no metadata is specified.
     6: use_fidl bool;
+    // TODO(https://fxbug.dev/376702843): Use the identifier supplied by the Driver Framework
+    /// instead.
+    /// String identifier for the port instance. The default value is an empty string if no metadata
+    /// is specified.
+    7: instance_identifier string:MAX_NAME_LENGTH;
 };
+
+// Name of the FIDL type [`fuchsia.hardware.sdmmc/SdmmcMetadata`].
+const METADATA_TYPE_NAME string = "fuchsia.hardware.sdmmc.SdmmcMetadata";

@@ -113,11 +113,6 @@ class DevicePartitioner {
   // an unsupported spec if something else goes wong.
   virtual bool SupportsPartition(const PartitionSpec& spec) const = 0;
 
-  // Returns a PartitionClient matching |spec|, creating the partition.
-  // Assumes that the partition does not already exist.
-  virtual zx::result<std::unique_ptr<PartitionClient>> AddPartition(
-      const PartitionSpec& spec) const = 0;
-
   // Returns a PartitionClient matching |spec| if one exists.
   virtual zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const = 0;
@@ -128,11 +123,10 @@ class DevicePartitioner {
   // Wipes Fuchsia Volume Manager partition.
   virtual zx::result<> WipeFvm() const = 0;
 
-  // Initializes partition tables.
-  virtual zx::result<> InitPartitionTables() const = 0;
-
-  // Wipes partition tables.
-  virtual zx::result<> WipePartitionTables() const = 0;
+  // Reset partition tables to a board-specific initial state.
+  // This is only supported on some boards; in general it is preferred to use fastboot to
+  // reinitialize partition tables.
+  virtual zx::result<> ResetPartitionTables() const = 0;
 
   // Determine if the given data file is a valid image for this device.
   //
@@ -190,9 +184,6 @@ class FixedDevicePartitioner : public DevicePartitioner {
 
   bool SupportsPartition(const PartitionSpec& spec) const override;
 
-  zx::result<std::unique_ptr<PartitionClient>> AddPartition(
-      const PartitionSpec& spec) const override;
-
   zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const override;
 
@@ -200,9 +191,7 @@ class FixedDevicePartitioner : public DevicePartitioner {
 
   zx::result<> WipeFvm() const override;
 
-  zx::result<> InitPartitionTables() const override;
-
-  zx::result<> WipePartitionTables() const override;
+  zx::result<> ResetPartitionTables() const override;
 
   zx::result<> ValidatePayload(const PartitionSpec& spec,
                                std::span<const uint8_t> data) const override;

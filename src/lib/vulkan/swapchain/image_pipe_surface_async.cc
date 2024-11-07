@@ -14,7 +14,7 @@
 // May need to fall back to `buffer_collection_token` instead of `buffer_collection_token2`
 // in `Flatland.RegisterBufferCollectionArgs()`.
 #include <zircon/availability.h>
-#if !FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if !FUCHSIA_API_LEVEL_AT_LEAST(25)
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #endif
 
@@ -218,7 +218,7 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
     if (flatland_allocator_.is_valid()) {
       fuchsia_ui_composition::RegisterBufferCollectionArgs args{};
       args.export_token(std::move(export_token));
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
       args.buffer_collection_token2(std::move(scenic_token));
 #else
       args.buffer_collection_token(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(

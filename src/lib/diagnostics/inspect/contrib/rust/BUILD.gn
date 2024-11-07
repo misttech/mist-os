@@ -13,12 +13,10 @@ rustc_library("fuchsia-inspect-contrib") {
 
   deps = [
     "//sdk/rust/zx",
-    "//src/diagnostics/persistence/fidl:persist_rust",
     "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-sync",
-    "//src/lib/injectable-time",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
@@ -30,16 +28,13 @@ rustc_library("fuchsia-inspect-contrib") {
   test_deps = [
     "//src/lib/diagnostics/inspect/format/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
     "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:strum_macros",
   ]
 
   sources = [
-    "src/auto_persist.rs",
     "src/graph/digraph.rs",
     "src/graph/edge.rs",
     "src/graph/events.rs",

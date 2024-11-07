@@ -342,6 +342,11 @@ struct vm_page {
       uint16_t mid_compress_size;
       uint16_t right_compress_size;
     } __PACKED zram;
+    struct {
+      // Optionally used by mmu code to count the number of valid mappings in this page if it is a
+      // page table.
+      uint num_mappings;
+    } __PACKED mmu;
   };
   using object_t = decltype(object);
 

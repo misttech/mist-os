@@ -213,9 +213,9 @@ where
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope<'_>>::uninit();
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
         let mut preallocated =
-            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope<'_>>(encoder, max_ord);
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl_next::Slot::new(&mut backing);
@@ -339,9 +339,9 @@ where
 
         let max_ord = self.__max_ordinal();
 
-        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope<'_>>::uninit();
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
         let mut preallocated =
-            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope<'_>>(encoder, max_ord);
+            ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
 
         for i in 1..=max_ord {
             let mut slot = ::fidl_next::Slot::new(&mut backing);
@@ -452,7 +452,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireUnionLargeArray { raw } = slot);
+        ::fidl_next::munge!(let WireUnionLargeArray { raw, _phantom: _ } = slot);
 
         match self {
             Self::A(value) => {
@@ -478,7 +478,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalUnionLargeArray { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalUnionLargeArray { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -517,18 +517,19 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionLargeArray<'buf>>
 
 #[repr(transparent)]
 pub struct WireUnionLargeArray<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireUnionLargeArrayRef<'buf> {
-    A(&'buf [::fidl_next::u32_le; 100]),
+pub enum WireUnionLargeArrayRef<'union> {
+    A(&'union [::fidl_next::u32_le; 100]),
 }
 
-pub enum WireUnionLargeArrayMut<'buf> {
-    A(&'buf mut [::fidl_next::u32_le; 100]),
+pub enum WireUnionLargeArrayMut<'union> {
+    A(&'union mut [::fidl_next::u32_le; 100]),
 }
 
-impl WireUnionLargeArray<'_> {
+impl<'buf> WireUnionLargeArray<'buf> {
     pub fn as_ref(&self) -> WireUnionLargeArrayRef<'_> {
         match self.raw.ordinal() {
             1 => WireUnionLargeArrayRef::A(unsafe { self.raw.get().deref_unchecked() }),
@@ -544,9 +545,9 @@ impl WireUnionLargeArray<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionLargeArray<'buf>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionLargeArray<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
     [::fidl_next::u32_le; 100]: ::fidl_next::Decode<___D>,
 {
@@ -554,7 +555,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, [::fidl_next::u32_le; 100]>(
                 raw, decoder,
@@ -579,7 +580,8 @@ impl<'buf> ::core::fmt::Debug for WireUnionLargeArray<'buf> {
 
 #[repr(transparent)]
 pub struct WireOptionalUnionLargeArray<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 impl<'buf> WireOptionalUnionLargeArray<'buf> {
@@ -611,6 +613,7 @@ impl<'buf> WireOptionalUnionLargeArray<'buf> {
         if self.is_some() {
             Some(WireUnionLargeArray {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -620,13 +623,13 @@ impl<'buf> WireOptionalUnionLargeArray<'buf> {
 
 impl<'buf> Default for WireOptionalUnionLargeArray<'buf> {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionLargeArray<'buf>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionLargeArray<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
     [::fidl_next::u32_le; 100]: ::fidl_next::Decode<___D>,
 {
@@ -634,7 +637,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, [::fidl_next::u32_le; 100]>(
                 raw, decoder,
@@ -675,7 +678,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireUnionSmallArray { raw } = slot);
+        ::fidl_next::munge!(let WireUnionSmallArray { raw, _phantom: _ } = slot);
 
         match self {
             Self::A(value) => {
@@ -701,7 +704,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalUnionSmallArray { raw } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalUnionSmallArray { raw, _phantom: _ } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -740,18 +743,19 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionSmallArray<'buf>>
 
 #[repr(transparent)]
 pub struct WireUnionSmallArray<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub enum WireUnionSmallArrayRef<'buf> {
-    A(&'buf [::fidl_next::u32_le; 2]),
+pub enum WireUnionSmallArrayRef<'union> {
+    A(&'union [::fidl_next::u32_le; 2]),
 }
 
-pub enum WireUnionSmallArrayMut<'buf> {
-    A(&'buf mut [::fidl_next::u32_le; 2]),
+pub enum WireUnionSmallArrayMut<'union> {
+    A(&'union mut [::fidl_next::u32_le; 2]),
 }
 
-impl WireUnionSmallArray<'_> {
+impl<'buf> WireUnionSmallArray<'buf> {
     pub fn as_ref(&self) -> WireUnionSmallArrayRef<'_> {
         match self.raw.ordinal() {
             1 => WireUnionSmallArrayRef::A(unsafe { self.raw.get().deref_unchecked() }),
@@ -767,9 +771,9 @@ impl WireUnionSmallArray<'_> {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSmallArray<'buf>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionSmallArray<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
     [::fidl_next::u32_le; 2]: ::fidl_next::Decode<___D>,
 {
@@ -777,7 +781,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, [::fidl_next::u32_le; 2]>(
                 raw, decoder,
@@ -802,7 +806,8 @@ impl<'buf> ::core::fmt::Debug for WireUnionSmallArray<'buf> {
 
 #[repr(transparent)]
 pub struct WireOptionalUnionSmallArray<'buf> {
-    raw: ::fidl_next::RawWireUnion<'buf>,
+    raw: ::fidl_next::RawWireUnion,
+    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 impl<'buf> WireOptionalUnionSmallArray<'buf> {
@@ -834,6 +839,7 @@ impl<'buf> WireOptionalUnionSmallArray<'buf> {
         if self.is_some() {
             Some(WireUnionSmallArray {
                 raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
+                _phantom: ::core::marker::PhantomData,
             })
         } else {
             None
@@ -843,13 +849,13 @@ impl<'buf> WireOptionalUnionSmallArray<'buf> {
 
 impl<'buf> Default for WireOptionalUnionSmallArray<'buf> {
     fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null() }
+        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSmallArray<'buf>
+unsafe impl<'buf, ___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionSmallArray<'buf>
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder<'buf>,
 
     [::fidl_next::u32_le; 2]: ::fidl_next::Decode<___D>,
 {
@@ -857,7 +863,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, [::fidl_next::u32_le; 2]>(
                 raw, decoder,

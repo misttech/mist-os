@@ -284,11 +284,11 @@ void profiler::Sampler::CollectSamples(async_dispatcher_t* dispatcher, async::Ta
 zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   std::map<zx_koid_t, std::vector<profiler::Module>> contexts;
-  zx::result<> res =
-      targets_.ForEachProcess([&contexts](cpp20::span<const zx_koid_t>,
-                                          const ProcessTarget& target) mutable -> zx::result<> {
+  zx::result<> res = targets_.ForEachProcess(
+      [&contexts, this](cpp20::span<const zx_koid_t>,
+                        const ProcessTarget& target) mutable -> zx::result<> {
         zx::result<std::vector<profiler::Module>> modules =
-            profiler::GetProcessModules(target.handle.borrow(), target.pid);
+            targets_.GetProcessModules(target.handle);
         if (modules.is_ok()) {
           contexts[target.pid] = *modules;
         }

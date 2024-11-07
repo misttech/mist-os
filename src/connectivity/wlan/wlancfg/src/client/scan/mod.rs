@@ -50,8 +50,8 @@ pub enum ScanReason {
     RoamSearch,
 }
 
-#[async_trait]
-pub trait ScanRequestApi: Send + Sync {
+#[async_trait(?Send)]
+pub trait ScanRequestApi {
     async fn perform_scan(
         &self,
         scan_reason: ScanReason,
@@ -73,7 +73,7 @@ pub enum ApiScanRequest {
     ),
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl ScanRequestApi for ScanRequester {
     async fn perform_scan(
         &self,
@@ -98,7 +98,7 @@ impl ScanRequestApi for ScanRequester {
 
 /// Create a future representing the scan manager loop.
 pub async fn serve_scanning_loop(
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
     telemetry_sender: TelemetrySender,
     location_sensor_updater: impl ScanResultUpdate,
@@ -169,8 +169,8 @@ pub async fn serve_scanning_loop(
 }
 
 /// Allows for consumption of updated scan results.
-#[async_trait]
-pub trait ScanResultUpdate: Sync + Send {
+#[async_trait(?Send)]
+pub trait ScanResultUpdate {
     async fn update_scan_results(&self, scan_results: Vec<types::ScanResult>);
 }
 
@@ -237,7 +237,7 @@ async fn sme_scan(
 /// returns a ScanErrorCode::Cancelled.
 async fn perform_scan(
     scan_request: fidl_sme::ScanRequest,
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
     telemetry_sender: TelemetrySender,
 ) -> (fidl_sme::ScanRequest, Result<Vec<types::ScanResult>, types::ScanError>) {
@@ -308,7 +308,7 @@ async fn perform_scan(
 /// The location sensor module uses scan results to help determine the
 /// device's location, for use by the Emergency Location Provider.
 pub struct LocationSensorUpdater {}
-#[async_trait]
+#[async_trait(?Send)]
 impl ScanResultUpdate for LocationSensorUpdater {
     async fn update_scan_results(&self, scan_results: Vec<types::ScanResult>) {
         async fn send_results(scan_results: Vec<fidl_policy::ScanResult>) -> Result<(), Error> {
@@ -500,7 +500,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl IfaceManagerApi for FakeIfaceManager {
         async fn disconnect(
             &mut self,
@@ -605,7 +605,7 @@ mod tests {
             )
         }
     }
-    #[async_trait]
+    #[async_trait(?Send)]
     impl ScanResultUpdate for MockScanResultConsumer {
         async fn update_scan_results(&self, scan_results: Vec<types::ScanResult>) {
             if *self.stalled.lock().await {

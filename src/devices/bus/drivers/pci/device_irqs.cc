@@ -188,9 +188,9 @@ zx::result<zx::interrupt> Device::MapInterrupt(uint32_t which_irq) {
   return zx::ok(std::move(interrupt));
 }
 
-zx_status_t Device::SignalLegacyIrq(zx_time_t timestamp) {
+zx_status_t Device::SignalLegacyIrq(zx_instant_boot_t timestamp) {
   InspectIncrementLegacySignalCount();
-  return irqs_.legacy.trigger(/*options=*/0, zx::time(timestamp));
+  return irqs_.legacy.trigger(/*options=*/0, zx::time_boot(timestamp));
 }
 
 zx_status_t Device::AckLegacyIrq() {

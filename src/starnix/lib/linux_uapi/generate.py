@@ -59,6 +59,44 @@ impl<T> From<uaddr> for uref<T> {
         Self { addr, _phantom: Default::default() }
     }
 }
+
+#[repr(transparent)]
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct uaddr32 {
+    pub addr: u32,
+}
+
+impl From<uaddr32> for uaddr {
+    fn from(addr32: uaddr32) -> Self {
+        Self { addr: addr32.addr as u64 }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[repr(transparent)]
+pub struct uref32<T> {
+    pub addr: uaddr32,
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> From<uaddr32> for uref32<T> {
+    fn from(addr: uaddr32) -> Self {
+        Self { addr, _phantom: Default::default() }
+    }
+}
+
+impl<T> From<uaddr32> for uref<T> {
+    fn from(addr: uaddr32) -> Self {
+        Self { addr: addr.into(), _phantom: Default::default() }
+    }
+}
+
+impl<T> From<uref32<T>> for uref<T> {
+    fn from(ur: uref32<T>) -> Self {
+        Self { addr: ur.addr.into(), _phantom: Default::default() }
+    }
+}
+
 """
 )
 
@@ -212,6 +250,17 @@ REPLACEMENTS = [
         r"\n#\[derive\(Debug, Copy, Clone(, FromBytes)?\)\]\n",
         "\n#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]\n",
     ),
+    # Convert atomic wrapper.
+    (r": StdAtomic([UI])(8|16|32|64)", ": std::sync::atomic::Atomic\\1\\2"),
+    # Remove __bindgen_missing from the start of constants defined in missing_includes.h
+    (r"const __bindgen_missing_([a-zA-Z_0-9]+)", "const \\1"),
+    # Convert atomic wrapper.
+    (r": StdAtomic([UI])(8|16|32|64)", ": std::sync::atomic::Atomic\\1\\2"),
+    # Remove __bindgen_missing from the start of constants defined in missing_includes.h
+    (r"const __bindgen_missing_([a-zA-Z_0-9]+)", "const \\1"),
+]
+
+REPLACEMENTS_PTR = [
     # Use uaddr/uref in place of pointers for compat with zerocopy traits. Because
     # the target of the pointer is in userspace anyway, treating it as an opaque
     # pointer is harmless.
@@ -221,11 +270,22 @@ REPLACEMENTS = [
         "uaddr",
     ),
     (r"([:=]) \*(const|mut) ([a-z_][a-zA-Z_0-9:]*)", "\\1 uref<\\3>"),
-    # Convert atomic wrapper.
-    (r": StdAtomic([UI])(8|16|32|64)", ": std::sync::atomic::Atomic\\1\\2"),
-    # Remove __bindgen_missing from the start of constants defined in missing_includes.h
-    (r"const __bindgen_missing_([a-zA-Z_0-9]+)", "const \\1"),
 ]
+
+ARCH32_REPLACEMENTS_PTR = [
+    # Use uaddr/uref in place of pointers for compat with zerocopy traits. Because
+    # the target of the pointer is in userspace anyway, treating it as an opaque
+    # pointer is harmless.
+    # For arch32, we only use 64-bit width when dealing with AsBytes union
+    # padding.
+    (r"\*mut crate::types::arch32::c_void", "uaddr32"),
+    (
+        r'::std::option::Option<unsafe extern "C" fn\([a-zA-Z_0-9: ]*\)>',
+        "uaddr32",
+    ),
+    (r"([:=]) \*(const|mut) ([a-z_][a-zA-Z_0-9:]*)", "\\1 uref32<\\3>"),
+]
+
 
 INPUT_FILE = "src/starnix/lib/linux_uapi/wrapper.h"
 
@@ -272,6 +332,11 @@ ARCH_INFO = [
         "third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64",
     ),
     ArchInfo(
+        "arm",
+        "arm-linux-gnueabihf",
+        "third_party/android/platform/bionic/libc/kernel/uapi/asm-arm",
+    ),
+    ArchInfo(
         "riscv64",
         "riscv64-linux-gnu",
         "third_party/android/platform/bionic/libc/kernel/uapi/asm-riscv",
@@ -282,7 +347,6 @@ bindgen = Bindgen()
 bindgen.opaque_types = OPAQUE_TYPES
 bindgen.std_derives = STD_DERIVES
 bindgen.set_auto_derive_traits(AUTO_DERIVE_TRAITS)
-bindgen.set_replacements(REPLACEMENTS)
 bindgen.ignore_functions = True
 bindgen.type_blocklist = TYPE_BLOCKLIST
 bindgen.no_debug_types = NO_DEBUG_TYPES
@@ -290,7 +354,12 @@ bindgen.no_copy_types = NO_COPY_TYPES
 bindgen.enable_stdlib_include_dirs = False
 
 for arch in ARCH_INFO:
-    bindgen.c_types_prefix = "crate::types"
+    if arch.name == "arm":
+        bindgen.c_types_prefix = "crate::types::arch32"
+        bindgen.set_replacements(REPLACEMENTS + ARCH32_REPLACEMENTS_PTR)
+    else:
+        bindgen.c_types_prefix = "crate::types"
+        bindgen.set_replacements(REPLACEMENTS + REPLACEMENTS_PTR)
     bindgen.clang_target = arch.clang_target
     bindgen.raw_lines = RAW_LINES
     bindgen.include_dirs = INCLUDE_DIRS + [arch.include]

@@ -12,7 +12,7 @@ driver_bind_rules("serial_bind") {
   deps = [ "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_bindlib" ]
 }
 
-fuchsia_driver("serial-driver") {
+fuchsia_cc_driver("serial-driver") {
   output_name = "serial"
   configs += [
     "//build/config:all_source",

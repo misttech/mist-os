@@ -80,6 +80,7 @@ impl Pipe {
     }
 
     pub fn open(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         pipe: &Arc<Mutex<Self>>,
         flags: OpenFlags,
@@ -136,7 +137,7 @@ impl Pipe {
                 WaitCallback::none(),
             );
             std::mem::drop(pipe_locked);
-            match waiter.wait(current_task) {
+            match waiter.wait(locked, current_task) {
                 Err(e) => {
                     return Err(e);
                 }
@@ -411,7 +412,12 @@ pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), 
 
 struct PipeFs;
 impl FileSystemOps for PipeFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(PIPEFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
@@ -433,7 +439,12 @@ impl FileOps for PipeFileObject {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         self.on_close(file.flags());
     }
 

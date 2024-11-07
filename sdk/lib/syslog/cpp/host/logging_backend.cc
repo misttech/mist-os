@@ -158,6 +158,22 @@ namespace {
 void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
   g_log_settings.min_log_level = std::min(FUCHSIA_LOG_FATAL, settings.min_log_level);
 
+  const char* raw_severity_from_env = std::getenv("FUCHSIA_HOST_LOG_MIN_SEVERITY");
+  if (raw_severity_from_env) {
+    std::string severity_from_env(raw_severity_from_env);
+    if (severity_from_env == "FATAL") {
+      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_FATAL, g_log_settings.min_log_level);
+    } else if (severity_from_env == "ERROR") {
+      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_ERROR, g_log_settings.min_log_level);
+    } else if (severity_from_env == "INFO") {
+      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_INFO, g_log_settings.min_log_level);
+    } else if (severity_from_env == "DEBUG") {
+      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_DEBUG, g_log_settings.min_log_level);
+    } else if (severity_from_env == "TRACE") {
+      g_log_settings.min_log_level = std::min(FUCHSIA_LOG_TRACE, g_log_settings.min_log_level);
+    }
+  }
+
   if (g_log_settings.log_file != settings.log_file) {
     if (!settings.log_file.empty()) {
       int fd = open(settings.log_file.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);

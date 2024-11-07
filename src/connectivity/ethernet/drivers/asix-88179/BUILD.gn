@@ -24,7 +24,7 @@ driver_bind_rules("fake_usb_ax88179_bind") {
   ]
 }
 
-fuchsia_driver("asix-88179-driver") {
+fuchsia_cc_driver("asix-88179-driver") {
   output_name = "asix-88179"
   configs += [
     "//build/config:all_source",
@@ -70,7 +70,7 @@ fidl("asix-88179-test-helper") {
   enable_hlcpp = true
 }
 
-fuchsia_driver("fake-asix-88179-driver") {
+fuchsia_cc_driver("fake-asix-88179-driver") {
   testonly = true
   output_name = "fake-asix-88179"
   configs += [

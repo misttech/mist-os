@@ -68,9 +68,11 @@ async fn main() -> Result<(), Error> {
 
     let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<service::FshostShutdownResponder>(1);
     let (watcher, device_stream) = Watcher::new(if config.storage_host {
-        let mut sources =
-            vec![Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand))
-                as Box<dyn WatchSource>];
+        let mut sources = vec![
+            Box::new(PathSource::new(DEV_CLASS_BLOCK, PathSourceType::Block))
+                as Box<dyn WatchSource>,
+            Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand)) as Box<dyn WatchSource>,
+        ];
         sources.extend(
             fuchsia_fs::directory::open_in_namespace(VOLUME_SERVICE_PATH, fio::Flags::empty())
                 .map(|d| Box::new(DirSource::new(d)) as Box<dyn WatchSource>),
@@ -119,17 +121,7 @@ async fn main() -> Result<(), Error> {
         "mnt" => vfs::pseudo_directory! {},
     };
     if config.storage_host {
-        let gpt = env.gpt_exposed_dir()?;
-        let (partitions, server_end) =
-            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let options = fio::Options::default();
-        gpt.open3(
-            "partitions",
-            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE,
-            &options,
-            server_end.into_channel(),
-        )?;
-        export.add_entry("partitions", remote_dir(partitions)).unwrap();
+        export.add_entry("gpt", remote_dir(env.gpt_exposed_dir()?)).unwrap();
     }
     let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));
     let svc_dir = vfs::pseudo_directory! {
@@ -147,6 +139,12 @@ async fn main() -> Result<(), Error> {
             .add_entry(
                 fidl_fuchsia_update_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
                 fxblob::blobfs_verifier_service(),
+            )
+            .unwrap();
+        svc_dir
+            .add_entry(
+                fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker::PROTOCOL_NAME,
+                fxblob::ota_health_check_service(),
             )
             .unwrap();
     }

@@ -15,6 +15,7 @@ use starnix_uapi::{errno, error};
 use std::cell::{RefCell, RefMut};
 use std::ffi::CString;
 use std::future::Future;
+use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::Weak;
 use std::task::{Context, Poll};
@@ -209,7 +210,10 @@ impl<F: Future<Output = ()> + 'static> Future for WrappedFuture<F> {
         let result = self.project().1.poll(cx);
 
         if let Some(kernel) = kernel.upgrade() {
-            kernel.kthreads.system_task().trigger_delayed_releaser();
+            kernel
+                .kthreads
+                .system_task()
+                .trigger_delayed_releaser(kernel.kthreads.unlocked_for_async().deref_mut());
         }
         result
     }

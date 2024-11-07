@@ -14,6 +14,7 @@ use std::sync::{mpsc, Arc};
 
 use futures::task::AtomicWaker;
 
+use crate::decoder::InternalHandleDecoder;
 use crate::protocol::Transport;
 use crate::{Chunk, DecodeError, Decoder, CHUNK_SIZE};
 
@@ -123,6 +124,16 @@ pub struct RecvBuffer {
     chunks_taken: usize,
 }
 
+impl InternalHandleDecoder for &mut RecvBuffer {
+    fn __internal_take_handles(&mut self, _: usize) -> Result<(), DecodeError> {
+        Err(DecodeError::InsufficientHandles)
+    }
+
+    fn __internal_handles_remaining(&self) -> usize {
+        0
+    }
+}
+
 impl<'buf> Decoder<'buf> for &'buf mut RecvBuffer {
     fn take_chunks(&mut self, count: usize) -> Result<&'buf mut [Chunk], DecodeError> {
         if count > self.chunks.len() - self.chunks_taken {
@@ -144,14 +155,6 @@ impl<'buf> Decoder<'buf> for &'buf mut RecvBuffer {
         }
 
         Ok(())
-    }
-
-    fn __internal_take_handles(&mut self, _: usize) -> Result<(), DecodeError> {
-        Err(DecodeError::InsufficientHandles)
-    }
-
-    fn __internal_handles_remaining(&self) -> usize {
-        0
     }
 }
 

@@ -17,7 +17,7 @@ driver_bind_rules("registers_bind") {
   ]
 }
 
-fuchsia_driver("registers-driver") {
+fuchsia_cc_driver("registers-driver") {
   output_name = "registers"
   sources = [ "registers.cc" ]
   deps = [

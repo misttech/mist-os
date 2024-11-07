@@ -51,7 +51,7 @@ impl FsRegistry {
     ) -> Option<Result<FileSystemHandle, Errno>> {
         let create_fs = self.registry.lock().get(fs_type).map(Arc::clone)?;
         Some(create_fs(locked, current_task, options).and_then(|fs| {
-            security::file_system_resolve_security(&current_task, &fs)?;
+            security::file_system_resolve_security(locked, &current_task, &fs)?;
             Ok(fs)
         }))
     }

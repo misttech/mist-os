@@ -194,6 +194,22 @@ Realm& Realm::AddCapability(fuchsia::component::decl::Capability capability) {
 }
 #endif
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
+Realm& Realm::AddCollection(fuchsia::component::decl::Collection collection) {
+  fuchsia::component::test::Realm_AddCollection_Result result;
+  ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
+      "Realm/AddCollection", realm_proxy_->AddCollection(std::move(collection), &result), result);
+  return *this;
+}
+Realm& Realm::AddEnvironment(fuchsia::component::decl::Environment environment) {
+  fuchsia::component::test::Realm_AddEnvironment_Result result;
+  ZX_COMPONENT_ASSERT_STATUS_AND_RESULT_OK(
+      "Realm/AddEnvironment", realm_proxy_->AddEnvironment(std::move(environment), &result),
+      result);
+  return *this;
+}
+#endif
+
 void Realm::ReplaceComponentDecl(const std::string& child_name,
                                  fuchsia::component::decl::Component decl) {
   fuchsia::component::test::Realm_ReplaceComponentDecl_Result result;

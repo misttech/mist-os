@@ -100,7 +100,7 @@ pub struct FhoEnvironment {
 
     /// This should not be public, as the daemon is (slowly) being phased out where possible.
     #[deprecated]
-    pub injector: Arc<dyn Injector>,
+    pub injector: Option<Arc<dyn Injector>>,
 }
 
 impl FhoEnvironment {
@@ -144,14 +144,18 @@ impl FhoEnvironment {
 
 pub async fn connection_behavior(
     ffx: &FfxCommandLine,
-    injector: &Arc<dyn Injector>,
+    injector: &Option<Arc<dyn Injector>>,
     env: &EnvironmentContext,
 ) -> Result<FhoConnectionBehavior> {
     if ffx.global.strict {
         let connector = Overnet::<ffx_target::ssh_connector::SshConnector>::new(env).await?;
         Ok(crate::from_env::FhoConnectionBehavior::DirectConnector(Rc::new(connector)))
     } else {
-        Ok(crate::from_env::FhoConnectionBehavior::DaemonConnector(injector.clone()))
+        if let Some(daemon_injector) = injector {
+            Ok(crate::from_env::FhoConnectionBehavior::DaemonConnector(daemon_injector.clone()))
+        } else {
+            return_bug!("Cannot initialize connection, the daemon injector is not pare of the execution environment.")
+        }
     }
 }
 
@@ -196,7 +200,7 @@ impl FhoEnvironment {
             DaemonVersionCheck::SameVersionInfo(build_info),
         )
         .await?;
-        let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
+        let injector: Option<Arc<dyn ffx_core::Injector>> = Some(Arc::new(injector));
         #[allow(deprecated)] // injector field.
         let env = FhoEnvironment {
             behavior: crate::from_env::connection_behavior(&ffx, &injector, &context).await?,

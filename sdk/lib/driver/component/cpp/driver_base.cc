@@ -51,12 +51,12 @@ DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args,
     }
   }
 #endif
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
   zx::result val = fdf_internal::ProgramValue(program(), "service_connect_validation");
   if (val.is_ok() && val.value() == "true") {
     EnableServiceValidator();
   }
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(25)
 }
 
 void DriverBase::InitializeAndServe(
@@ -67,7 +67,7 @@ void DriverBase::InitializeAndServe(
   ZX_ASSERT(outgoing_->Serve(std::move(outgoing_directory_request)).is_ok());
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
 void DriverBase::EnableServiceValidator() {
   if (start_args_.node_offers().has_value()) {
     incoming_->SetServiceValidator(
@@ -76,7 +76,7 @@ void DriverBase::EnableServiceValidator() {
     FDF_LOGL(INFO, *logger_, "No node_offers available, not able to enable service validation.");
   }
 }
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(25)
 
 void DriverBase::InitInspectorExactlyOnce(inspect::Inspector inspector) {
   std::call_once(init_inspector_once_, [&] {

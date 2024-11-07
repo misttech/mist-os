@@ -12,6 +12,7 @@
                 // informationial purposes.
                 "/core/test_manager/chromium-system-tests:**",
                 "/core/test_manager/chromium-tests:**",
+                "/core/test_manager/component-framework-tests:**",
                 "/core/test_manager/cts-tests:**",
                 "/core/test_manager/devices-tests:**",
                 "/core/test_manager/drm-tests:**",
@@ -36,6 +37,7 @@
                 "/core/test_manager/rust_test_create_raw_processes_runner",
                 "/core/testing/rust_test_create_raw_processes_runner",
                 "/core/test_manager/fuzz_starnix_test_runner",
+                "/core/testing/component-framework-tests:**",
             ],
         },
         capability_policy: [
@@ -193,6 +195,7 @@
                 target_monikers: [
                     "/core/sshd-host/shell:**",
                     "/core/testing/vfs-compliance-tests:**",
+                    "/core/testing/component-framework-tests:**",
 
                     // We allow tests to access ambient executability in the same
                     // way that we're permissive with use of the components v1
@@ -201,6 +204,7 @@
                     "/core/test_manager/**",
 
                     // This protocol is used by `ffx component explore` in eng-only builds.
+                    "/bootstrap/debug-dash-launcher",
                     "/core/debug-dash-launcher",
 
                     // Allow Lavapipe only on Eng builds.
@@ -216,10 +220,12 @@
                     // debug-dash-launcher is used in engineering builds to launch
                     // dash shells. It uses PackageResolver to add tool package directories
                     // into the dash environment.
+                    "/bootstrap/debug-dash-launcher",
                     "/core/debug-dash-launcher",
 
                     // process is used in engineering builds to launch
                     // shell binaries. It uses PackageResolver to resolve tools from packages.
+                    "/bootstrap/process_resolver",
                     "/core/process_resolver",
                 ],
             },
@@ -292,6 +298,7 @@
                     "/core/sshd-host/shell:**",
                     "/core/system-update-checker",
                     "/core/test_manager",
+                    "/core/testing/component-framework-tests:**",
                 ],
             },
             {

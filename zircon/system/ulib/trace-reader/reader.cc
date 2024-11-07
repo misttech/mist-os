@@ -326,7 +326,7 @@ bool TraceReader::ReadEventRecord(Chunk& record, RecordHeader header) {
       break;
     }
     case EventType::kDurationComplete: {
-      std::optional end_time = record.ReadUint64();
+      std::optional end_time = record.ReadInt64();
       if (!end_time.has_value()) {
         return false;
       }
@@ -487,7 +487,7 @@ bool TraceReader::ReadSchedulerRecord(Chunk& record, RecordHeader header) {
     auto cpu_number = ContextSwitchRecordFields::CpuNumber::Get<trace_cpu_number_t>(header);
     auto thread_state = ContextSwitchRecordFields::ThreadState::Get<ThreadState>(header);
 
-    std::optional timestamp = record.ReadUint64();
+    std::optional timestamp = record.ReadInt64();
     if (!timestamp.has_value()) {
       return false;
     }
@@ -517,7 +517,7 @@ bool TraceReader::ReadSchedulerRecord(Chunk& record, RecordHeader header) {
     auto argument_count = ContextSwitchRecordFields::ArgumentCount::Get<size_t>(header);
     auto cpu_number = ContextSwitchRecordFields::CpuNumber::Get<trace_cpu_number_t>(header);
 
-    std::optional timestamp = record.ReadUint64();
+    std::optional timestamp = record.ReadInt64();
     if (!timestamp.has_value()) {
       return false;
     }

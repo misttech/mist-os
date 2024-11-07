@@ -18,6 +18,7 @@
         {
             protocol: [
                 "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.memory.attribution.Provider",
                 "fuchsia.starnix.container.Controller",
             ],
         },
@@ -49,6 +50,7 @@
         {
             protocol: [
                 "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.memory.attribution.Provider",
                 "fuchsia.starnix.container.Controller",
             ],
             from: "self",

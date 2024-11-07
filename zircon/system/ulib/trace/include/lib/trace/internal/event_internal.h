@@ -153,8 +153,8 @@ __BEGIN_CDECLS
 #define TRACE_INTERNAL_DECLARE_DURATION_SCOPE(variable, args_variable, category_literal,         \
                                               name_literal, args...)                             \
   TRACE_INTERNAL_ALLOCATE_ARGS(args_variable, args);                                             \
-  __attribute__((cleanup(trace_internal_cleanup_duration_scope)))                                \
-      trace_internal_duration_scope_t variable;                                                  \
+  __attribute__((                                                                                \
+      cleanup(trace_internal_cleanup_duration_scope))) trace_internal_duration_scope_t variable; \
   do {                                                                                           \
     static trace_site_t TRACE_INTERNAL_SITE_STATE;                                               \
     trace_string_ref_t TRACE_INTERNAL_CATEGORY_REF;                                              \
@@ -375,7 +375,7 @@ static inline void trace_internal_make_duration_scope(trace_internal_duration_sc
                                                       size_t num_args) {
   scope->category_literal = category_literal;
   scope->name_literal = name_literal;
-  scope->start_time = (trace_ticks_t)zx_ticks_get();
+  scope->start_time = (trace_ticks_t)zx_ticks_get_boot();
   scope->args = args;
   scope->num_args = num_args;
 }

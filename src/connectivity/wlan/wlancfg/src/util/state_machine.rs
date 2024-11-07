@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use futures::future::{Future, FutureExt, FutureObj};
+use futures::future::{Future, FutureExt, LocalFutureObj};
 use futures::ready;
 use futures::task::{Context, Poll};
 use std::convert::Infallible;
 use std::fmt::Debug;
-use std::marker::Sync;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug)]
 pub struct ExitReason(pub Result<(), anyhow::Error>);
 
-pub struct State<E>(FutureObj<'static, Result<State<E>, E>>);
+pub struct State<E>(LocalFutureObj<'static, Result<State<E>, E>>);
 
 pub struct StateMachine<E> {
     cur_state: State<E>,
@@ -38,14 +37,14 @@ impl<E> Future for StateMachine<E> {
 pub trait IntoStateExt<E>: Future<Output = Result<State<E>, E>> {
     fn into_state(self) -> State<E>
     where
-        Self: Sized + Send + 'static,
+        Self: Sized + 'static,
     {
-        State(FutureObj::new(Box::new(self)))
+        State(LocalFutureObj::new(Box::new(self)))
     }
 
     fn into_state_machine(self) -> StateMachine<E>
     where
-        Self: Sized + Send + 'static,
+        Self: Sized + 'static,
     {
         StateMachine { cur_state: self.into_state() }
     }
@@ -58,7 +57,7 @@ impl<F, E> IntoStateExt<E> for F where F: Future<Output = Result<State<E>, E>> {
 #[derive(Clone)]
 pub struct StateMachineStatusPublisher<S>(Arc<RwLock<S>>);
 
-impl<S: Clone + Debug + Send + Sync> StateMachineStatusPublisher<S> {
+impl<S: Clone + Debug> StateMachineStatusPublisher<S> {
     pub fn publish_status(&self, status: S) {
         match self.0.write() {
             Ok(mut writer) => *writer = status,
@@ -70,7 +69,7 @@ impl<S: Clone + Debug + Send + Sync> StateMachineStatusPublisher<S> {
 #[derive(Clone)]
 pub struct StateMachineStatusReader<S>(Arc<RwLock<S>>);
 
-impl<S: Clone + Debug + Send + Sync> StateMachineStatusReader<S> {
+impl<S: Clone + Debug> StateMachineStatusReader<S> {
     pub fn read_status(&self) -> Result<S, anyhow::Error> {
         match self.0.read() {
             Ok(reader) => Ok(reader.clone()),

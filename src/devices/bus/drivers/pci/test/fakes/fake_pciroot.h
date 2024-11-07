@@ -9,6 +9,7 @@
 #include <lib/fake-bti/bti.h>
 #include <lib/fake-resource/resource.h>
 #include <lib/zx/bti.h>
+#include <lib/zx/channel.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls/resource.h>

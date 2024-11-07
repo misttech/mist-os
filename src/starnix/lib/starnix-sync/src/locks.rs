@@ -5,7 +5,7 @@
 // Use these crates so that we don't need to make the dependencies conditional.
 use {fuchsia_sync as _, lock_api as _, tracing_mutex as _};
 
-use crate::{LockBefore, LockFor, Locked, RwLockFor};
+use crate::{LockAfter, LockBefore, LockFor, Locked, RwLockFor, UninterruptibleLock};
 use core::marker::PhantomData;
 use std::{any, fmt};
 
@@ -66,24 +66,24 @@ pub fn ordered_lock<'a, T>(
 /// A wrapper for mutex that requires a `Locked` context to acquire.
 /// This context must be of a level that precedes `L` in the lock ordering graph
 /// where `L` is a level associated with this mutex.
-pub struct OrderedMutex<T, L> {
+pub struct OrderedMutex<T, L: LockAfter<UninterruptibleLock>> {
     mutex: Mutex<T>,
     _phantom: PhantomData<L>,
 }
 
-impl<T: Default, L> Default for OrderedMutex<T, L> {
+impl<T: Default, L: LockAfter<UninterruptibleLock>> Default for OrderedMutex<T, L> {
     fn default() -> Self {
         Self { mutex: Default::default(), _phantom: Default::default() }
     }
 }
 
-impl<T: fmt::Debug, L> fmt::Debug for OrderedMutex<T, L> {
+impl<T: fmt::Debug, L: LockAfter<UninterruptibleLock>> fmt::Debug for OrderedMutex<T, L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OrderedMutex({:?}, {})", self.mutex, any::type_name::<L>())
     }
 }
 
-impl<T, L> LockFor<L> for OrderedMutex<T, L> {
+impl<T, L: LockAfter<UninterruptibleLock>> LockFor<L> for OrderedMutex<T, L> {
     type Data = T;
     type Guard<'a> = MutexGuard<'a, T> where T: 'a, L: 'a;
     fn lock(&self) -> Self::Guard<'_> {
@@ -91,7 +91,7 @@ impl<T, L> LockFor<L> for OrderedMutex<T, L> {
     }
 }
 
-impl<T, L> OrderedMutex<T, L> {
+impl<T, L: LockAfter<UninterruptibleLock>> OrderedMutex<T, L> {
     pub const fn new(t: T) -> Self {
         Self { mutex: Mutex::new(t), _phantom: PhantomData }
     }
@@ -116,7 +116,7 @@ impl<T, L> OrderedMutex<T, L> {
 
 /// Lock two OrderedMutex of the same level in the consistent order. Returns both
 /// guards and a new locked context.
-pub fn lock_both<'a, T, L, P>(
+pub fn lock_both<'a, T, L: LockAfter<UninterruptibleLock>, P>(
     locked: &'a mut Locked<'_, P>,
     m1: &'a OrderedMutex<T, L>,
     m2: &'a OrderedMutex<T, L>,
@@ -130,24 +130,24 @@ where
 /// A wrapper for an RwLock that requires a `Locked` context to acquire.
 /// This context must be of a level that precedes `L` in the lock ordering graph
 /// where `L` is a level associated with this RwLock.
-pub struct OrderedRwLock<T, L> {
+pub struct OrderedRwLock<T, L: LockAfter<UninterruptibleLock>> {
     rwlock: RwLock<T>,
     _phantom: PhantomData<L>,
 }
 
-impl<T: Default, L> Default for OrderedRwLock<T, L> {
+impl<T: Default, L: LockAfter<UninterruptibleLock>> Default for OrderedRwLock<T, L> {
     fn default() -> Self {
         Self { rwlock: Default::default(), _phantom: Default::default() }
     }
 }
 
-impl<T: fmt::Debug, L> fmt::Debug for OrderedRwLock<T, L> {
+impl<T: fmt::Debug, L: LockAfter<UninterruptibleLock>> fmt::Debug for OrderedRwLock<T, L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OrderedRwLock({:?}, {})", self.rwlock, any::type_name::<L>())
     }
 }
 
-impl<T, L> RwLockFor<L> for OrderedRwLock<T, L> {
+impl<T, L: LockAfter<UninterruptibleLock>> RwLockFor<L> for OrderedRwLock<T, L> {
     type Data = T;
     type ReadGuard<'a> = RwLockReadGuard<'a, T> where T: 'a, L: 'a;
     type WriteGuard<'a> = RwLockWriteGuard<'a, T> where T: 'a, L: 'a;
@@ -159,7 +159,7 @@ impl<T, L> RwLockFor<L> for OrderedRwLock<T, L> {
     }
 }
 
-impl<T, L> OrderedRwLock<T, L> {
+impl<T, L: LockAfter<UninterruptibleLock>> OrderedRwLock<T, L> {
     pub const fn new(t: T) -> Self {
         Self { rwlock: RwLock::new(t), _phantom: PhantomData }
     }
@@ -231,7 +231,7 @@ mod test {
         //! Lock ordering tree:
         //! Unlocked -> A -> B -> C
         //!          -> D -> E -> F
-        use crate::Unlocked;
+        use crate::{LockAfter, UninterruptibleLock, Unlocked};
         use lock_ordering_macro::lock_ordering;
         lock_ordering! {
             Unlocked => A,
@@ -241,6 +241,13 @@ mod test {
             D => E,
             E => F,
         }
+
+        impl LockAfter<UninterruptibleLock> for A {}
+        impl LockAfter<UninterruptibleLock> for B {}
+        impl LockAfter<UninterruptibleLock> for C {}
+        impl LockAfter<UninterruptibleLock> for D {}
+        impl LockAfter<UninterruptibleLock> for E {}
+        impl LockAfter<UninterruptibleLock> for F {}
     }
 
     use lock_levels::{A, B, C, D, E, F};

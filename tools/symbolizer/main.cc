@@ -4,9 +4,10 @@
 
 #include <lib/fit/defer.h>
 
-#include <fstream>
 #include <iostream>
 
+#include "lib/syslog/cpp/log_settings.h"
+#include "lib/syslog/cpp/macros.h"
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/zxdb/client/symbol_server_impl.h"
 #include "src/developer/debug/zxdb/common/curl.h"
@@ -68,6 +69,16 @@ int Main(int argc, const char* argv[]) {
     return EXIT_FAILURE;
   }
 
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"symbolizer"});
+  if (options.verbose) {
+    builder.WithMinLogSeverity(FUCHSIA_LOG_DEBUG);
+    FX_LOGS(DEBUG) << "Verbose logging enabled.";
+  } else {
+    builder.WithMinLogSeverity(FUCHSIA_LOG_FATAL);
+  }
+  builder.BuildAndInitialize();
+
   if (options.requested_version) {
     std::cout << "Version: " << debug_ipc::kCurrentProtocolVersion << std::endl;
     return EXIT_SUCCESS;
@@ -83,7 +94,9 @@ int Main(int argc, const char* argv[]) {
     return AuthMode();
   }
 
+  FX_LOGS(DEBUG) << "Initializing implementation...";
   SymbolizerImpl symbolizer(options);
+  FX_LOGS(DEBUG) << "Creating log parser...";
   LogParser parser(std::cin, std::cout, &symbolizer);
 
   while (parser.ProcessNextLine()) {
@@ -91,7 +104,7 @@ int Main(int argc, const char* argv[]) {
   }
 
   // Calling Reset at the end to make sure symbolize event is sent.
-  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown, {});
+  symbolizer.Reset(false, Symbolizer::ResetType::kUnknown);
 
   return EXIT_SUCCESS;
 }

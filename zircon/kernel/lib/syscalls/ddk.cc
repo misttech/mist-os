@@ -580,7 +580,7 @@ zx_status_t sys_interrupt_ack(zx_handle_t inth) {
 }
 
 // zx_status_t zx_interrupt_wait
-zx_status_t sys_interrupt_wait(zx_handle_t handle, user_out_ptr<zx_instant_mono_t> out_timestamp) {
+zx_status_t sys_interrupt_wait(zx_handle_t handle, user_out_ptr<zx_instant_boot_t> out_timestamp) {
   LTRACEF("handle %x\n", handle);
 
   zx_status_t status;
@@ -591,7 +591,7 @@ zx_status_t sys_interrupt_wait(zx_handle_t handle, user_out_ptr<zx_instant_mono_
     return status;
   }
 
-  zx_instant_mono_t timestamp;
+  zx_instant_boot_t timestamp;
   status = interrupt->WaitForInterrupt(&timestamp);
   if (status == ZX_OK && out_timestamp) {
     status = out_timestamp.copy_to_user(timestamp);
@@ -617,7 +617,7 @@ zx_status_t sys_interrupt_destroy(zx_handle_t handle) {
 
 // zx_status_t zx_interrupt_trigger
 zx_status_t sys_interrupt_trigger(zx_handle_t handle, uint32_t options,
-                                  zx_instant_mono_t timestamp) {
+                                  zx_instant_boot_t timestamp) {
   LTRACEF("handle %x\n", handle);
 
   if (options) {

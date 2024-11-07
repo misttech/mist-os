@@ -118,9 +118,21 @@ pub struct Callbacks {
     pub on_requests: unsafe extern "C" fn(
         context: *mut c_void,
         session: *const Session,
-        requests: *const Request,
+        requests: *mut Request,
         request_count: usize,
     ),
+    pub log: unsafe extern "C" fn(context: *mut c_void, message: *const c_char, message_len: usize),
+}
+
+impl Callbacks {
+    #[allow(dead_code)]
+    fn log(&self, msg: &str) {
+        let msg = msg.as_bytes();
+        // SAFETY: This is safe if `context` and `log` are good.
+        unsafe {
+            (self.log)(self.context, msg.as_ptr() as *const c_char, msg.len());
+        }
+    }
 }
 
 /// cbindgen:no-export
@@ -245,7 +257,7 @@ impl Session {
                 (self.manager.callbacks.on_requests)(
                     self.manager.callbacks.context,
                     self,
-                    decoded_requests[0].as_ptr(),
+                    decoded_requests[0].as_mut_ptr(),
                     count,
                 );
             }
@@ -281,6 +293,7 @@ impl Session {
 
     fn terminate(&self) {
         let _ = self.fifo.signal_handle(zx::Signals::empty(), zx::Signals::USER_0);
+        self.abort_handle.abort();
     }
 }
 

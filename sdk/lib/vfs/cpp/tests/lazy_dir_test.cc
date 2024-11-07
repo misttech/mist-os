@@ -6,7 +6,7 @@
 // //src/storage/lib/vfs/cpp and //src/storage/conformance.
 
 #include <fcntl.h>
-#include <fuchsia/io/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/io.h>
@@ -82,12 +82,11 @@ class LazyDirTest : public ::gtest::RealLoopFixture {
     root_dir_ = std::make_unique<vfs::PseudoDir>();
     test_dir_ = std::make_shared<TestLazyDir>();
     root_dir_->AddSharedEntry("test_lazy_dir", test_dir_);
-    zx::channel server;
-    ASSERT_EQ(zx::channel::create(0, &root_client_, &server), ZX_OK);
-    ASSERT_EQ(root_dir_->Serve(
-                  fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
-                  std::move(server)),
+    auto [root_client, root_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(root_dir_->Serve(fuchsia_io::kPermReadable | fuchsia_io::kPermWritable,
+                               std::move(root_server)),
               ZX_OK);
+    root_client_ = std::move(root_client);
   }
 
   TestLazyDir& test_dir() { return *test_dir_; }
@@ -97,7 +96,8 @@ class LazyDirTest : public ::gtest::RealLoopFixture {
   fbl::unique_fd open_test_dir_fd() {
     ZX_ASSERT_MSG(root_client_.is_valid(), "open_test_dir_fd() can only be called once per test!");
     fbl::unique_fd root_fd;
-    zx_status_t status = fdio_fd_create(root_client_.release(), root_fd.reset_and_get_address());
+    zx_status_t status =
+        fdio_fd_create(root_client_.TakeChannel().release(), root_fd.reset_and_get_address());
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to create fd: %s", zx_status_get_string(status));
 
     fbl::unique_fd fd(openat(root_fd.get(), "test_lazy_dir", O_DIRECTORY));
@@ -108,7 +108,7 @@ class LazyDirTest : public ::gtest::RealLoopFixture {
  private:
   std::unique_ptr<vfs::PseudoDir> root_dir_;
   std::shared_ptr<TestLazyDir> test_dir_;
-  zx::channel root_client_;
+  fidl::ClientEnd<fuchsia_io::Directory> root_client_;
 };
 
 TEST_F(LazyDirTest, ValidateEntries) {

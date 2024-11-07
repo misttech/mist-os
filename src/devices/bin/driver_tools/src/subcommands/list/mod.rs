@@ -8,7 +8,6 @@ use anyhow::{Context, Result};
 use args::ListCommand;
 use bind::debugger::debug_dump::dump_bind_rules;
 use fidl_fuchsia_driver_development as fdd;
-use fuchsia_driver_dev::Device;
 use futures::join;
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
@@ -65,11 +64,7 @@ pub async fn list(
         let mut driver_to_devices = HashMap::<String, Vec<String>>::new();
         for device in device_info.into_iter() {
             let driver = device.bound_driver_url.clone();
-            let device: Device = device.into();
-            let device_name = match device {
-                Device::V1(ref info) => &info.get_v1_info()?.topological_path,
-                Device::V2(ref info) => &info.get_v2_info()?.moniker,
-            };
+            let device_name = device.moniker.as_ref();
             if let (Some(driver), Some(device_name)) = (driver, device_name) {
                 driver_to_devices
                     .entry(driver.to_string())
@@ -275,10 +270,7 @@ mod tests {
                         bound_driver_url: Some(
                             "fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm".to_owned(),
                         ),
-                        versioned_info: Some(fdd::VersionedNodeInfo::V2(fdd::V2NodeInfo {
-                            moniker: Some("dev.sys.foo".to_owned()),
-                            ..Default::default()
-                        })),
+                        moniker: Some("dev.sys.foo".to_owned()),
                         ..Default::default()
                     }],
                     iterator,

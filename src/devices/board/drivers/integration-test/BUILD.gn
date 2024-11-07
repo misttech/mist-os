@@ -20,7 +20,7 @@ driver_bind_rules("test-bus-bind") {
   ]
 }
 
-fuchsia_driver("integration-test-driver") {
+fuchsia_cc_driver("integration-test-driver") {
   testonly = true
   output_name = "integration-test"
   configs += [ "//build/config:all_source" ]

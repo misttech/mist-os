@@ -20,7 +20,7 @@
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pch.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace intel_display {
 
@@ -235,8 +235,8 @@ bool PchEngine::WaitForPanelPowerState(PchPanelPowerState power_state, int timeo
   // The subtraction and division are safe because `wait_granularity_us` is
   // guaranteed to be non-negative.
   int poll_intervals = (timeout_us + wait_granularity_us - 1) / wait_granularity_us;
-  return PollUntil([&] { return PanelPowerState() == power_state; }, wait_granularity,
-                   poll_intervals);
+  return display::PollUntil([&] { return PanelPowerState() == power_state; }, wait_granularity,
+                            poll_intervals);
 }
 
 PchClockParameters PchEngine::ClockParameters() const {

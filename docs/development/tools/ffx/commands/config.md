@@ -101,7 +101,6 @@ The file format is a JSON object:
 Default configurations are provided through GN build rules across all
 subcommands and are hard-coded and immutable.
 
-
 ## Value representations
 
 The values stored in the ffx configuration are encoded as JSON values.
@@ -114,6 +113,7 @@ The values stored in the ffx configuration are encoded as JSON values.
 * Object
 
 ### String interpolation
+
 Some strings can include placeholders that are interpolated. This allows properties
 to be set relative to directories, or resolve values from the running process
 environment. 
@@ -125,12 +125,14 @@ Placeholders defined by ffx are:
 * `$CACHE` - the directory to use to store cached data.
 * `$CONFIG` - the directory to store configuration data.
 * `$DATA` - the directory to store persistent data.
+* `$SHARED_DATA` - the directory for persistent data that is shared between all
+  isolates and instances of `ffx` on the current host machine. This is used for
+  data that is used to manage global state, such as processes that are opening
+  TCP/IP ports.
 * `$FIND_WORKSPACE_ROOT` - the first parent directory containing a Bazel workspace.
 * `$HOME` - the home directory of the current user.
 * `$RUNTIME` - the directory to store all runtime information. On Linux this is
   typically `$HOME/.local/share/Fuchsia/ffx`.
-
-
 
 Additionally, any string consisting of `$` followed by a name in all-capitals,
 digits, and other allowed characters is resolved from the process environment.

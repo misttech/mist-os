@@ -366,10 +366,10 @@ impl RecordsImplLayout for IgmpMembershipReportV3 {
     type Error = ParseError;
 }
 
-impl<'a> RecordsImpl<'a> for IgmpMembershipReportV3 {
-    type Record = GroupRecord<&'a [u8]>;
+impl RecordsImpl for IgmpMembershipReportV3 {
+    type Record<'a> = GroupRecord<&'a [u8]>;
 
-    fn parse_with_context<BV: BufferView<&'a [u8]>>(
+    fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
         data: &mut BV,
         _ctx: &mut usize,
     ) -> RecordParseResult<GroupRecord<&'a [u8]>, ParseError> {

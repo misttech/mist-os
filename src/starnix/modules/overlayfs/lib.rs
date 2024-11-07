@@ -21,8 +21,8 @@ use starnix_core::vfs::{
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore,
-    Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
+    BeforeFsNodeAppend, FileOpsCore, FsNodeAppend, LockEqualOrBefore, Locked, RwLock,
+    RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -139,8 +139,16 @@ impl ActiveEntry {
     /// Sets an xattr to mark the directory referenced by `entry` as opaque. Directories that are
     /// marked as opaque in the upper FS are not merged with the corresponding directories in the
     /// lower FS.
-    fn set_opaque_xattr(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+    fn set_opaque_xattr<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.entry().node.set_xattr(
+            locked,
             current_task,
             self.mount(),
             OPAQUE_DIR_XATTR.into(),
@@ -150,8 +158,12 @@ impl ActiveEntry {
     }
 
     /// Checks if the `entry` is marked as opaque.
-    fn is_opaque_node(&self, current_task: &CurrentTask) -> bool {
+    fn is_opaque_node<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> bool
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         match self.entry().node.get_xattr(
+            locked,
             current_task,
             self.mount(),
             OPAQUE_DIR_XATTR.into(),
@@ -329,7 +341,7 @@ impl OverlayNode {
             let cred = info.cred();
 
             let res = if info.mode.is_lnk() {
-                let link_target = lower.entry().node.readlink(current_task)?;
+                let link_target = lower.entry().node.readlink(locked, current_task)?;
                 let link_path = match &link_target {
                     SymlinkTarget::Node(_) => return error!(EIO),
                     SymlinkTarget::Path(path) => path,
@@ -504,7 +516,7 @@ impl OverlayNode {
                 }
 
                 // Mark the directory as opaque. Children can be removed after this.
-                dir.set_opaque_xattr(current_task)?;
+                dir.set_opaque_xattr(locked, current_task)?;
                 let _ = self.upper_is_opaque.set(());
 
                 // Finally, remove the children.
@@ -597,7 +609,7 @@ impl FsNodeOps for OverlayNodeOps {
             Some(upper) if upper.is_whiteout() => return error!(ENOENT),
             Some(upper) => {
                 let is_dir = upper.entry().node.is_dir();
-                let is_opaque = !is_dir || upper.is_opaque_node(current_task);
+                let is_opaque = !is_dir || upper.is_opaque_node(locked, current_task);
                 (is_dir, is_opaque)
             }
             None => (false, false),
@@ -678,7 +690,7 @@ impl FsNodeOps for OverlayNodeOps {
                 )?;
 
                 // Set opaque attribute to ensure the new directory is not merged with lower.
-                entry.set_opaque_xattr(current_task)?;
+                entry.set_opaque_xattr(locked, current_task)?;
 
                 Ok(entry)
             })?;
@@ -716,8 +728,13 @@ impl FsNodeOps for OverlayNodeOps {
         Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
-    fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
-        self.node.main_entry().entry().node.readlink(current_task)
+    fn readlink(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
+        self.node.main_entry().entry().node.readlink(locked, current_task)
     }
 
     fn link(
@@ -774,12 +791,20 @@ impl FsNodeOps for OverlayNodeOps {
 
     fn fetch_and_refresh_info<'a>(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+        let real_info = self
+            .node
+            .main_entry()
+            .entry()
+            .node
+            .fetch_and_refresh_info(locked, current_task)?
+            .clone();
         let mut lock = info.write();
-        *lock = self.node.main_entry().entry().node.fetch_and_refresh_info(current_task)?.clone();
+        *lock = real_info;
         Ok(RwLockWriteGuard::downgrade(lock))
     }
 
@@ -921,6 +946,7 @@ impl FileOps for OverlayDirectory {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -1065,16 +1091,11 @@ pub struct OverlayStack {
 }
 
 impl OverlayStack {
-    fn new_fs<L>(
-        locked: &mut Locked<'_, L>,
+    fn new_fs(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-    {
+    ) -> Result<FileSystemHandle, Errno> {
         match options.params.get("redirect_dir".as_bytes()) {
             None => (),
             Some(o) if o == "off" => (),
@@ -1214,8 +1235,13 @@ struct OverlayFs {
 }
 
 impl FileSystemOps for OverlayFs {
-    fn statfs(&self, _fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
-        self.stack.upper_fs.statfs(current_task)
+    fn statfs(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
+        self.stack.upper_fs.statfs(locked, current_task)
     }
 
     fn name(&self) -> &'static FsStr {
@@ -1224,6 +1250,7 @@ impl FileSystemOps for OverlayFs {
 
     fn rename(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -1233,7 +1260,6 @@ impl FileSystemOps for OverlayFs {
         renamed: &FsNodeHandle,
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461648): Propagate Locked through FileSystemOps; needs to be before FileOpsCore
         let renamed = OverlayNode::from_fs_node(renamed)?;
         if renamed.has_lower() && renamed.main_entry().entry().node.is_dir() {
             // Return EXDEV for directory renames. Potentially they may be handled with the
@@ -1241,19 +1267,19 @@ impl FileSystemOps for OverlayFs {
             // See https://docs.kernel.org/filesystems/overlayfs.html#renaming-directories
             return error!(EXDEV);
         }
-        renamed.ensure_upper(&mut locked, current_task)?;
+        renamed.ensure_upper(locked, current_task)?;
 
         let old_parent_overlay = OverlayNode::from_fs_node(old_parent)?;
-        let old_parent_upper = old_parent_overlay.ensure_upper(&mut locked, current_task)?;
+        let old_parent_upper = old_parent_overlay.ensure_upper(locked, current_task)?;
 
         let new_parent_overlay = OverlayNode::from_fs_node(new_parent)?;
-        let new_parent_upper = new_parent_overlay.ensure_upper(&mut locked, current_task)?;
+        let new_parent_upper = new_parent_overlay.ensure_upper(locked, current_task)?;
 
         let need_whiteout =
-            old_parent_overlay.lower_entry_exists(&mut locked, current_task, old_name)?;
+            old_parent_overlay.lower_entry_exists(locked, current_task, old_name)?;
 
         DirEntry::rename(
-            &mut locked,
+            locked,
             current_task,
             old_parent_upper.entry(),
             old_parent_upper.mount(),
@@ -1266,7 +1292,7 @@ impl FileSystemOps for OverlayFs {
 
         // If the old node existed in lower FS, then override it in the upper FS with a whiteout.
         if need_whiteout {
-            match old_parent_upper.create_whiteout(&mut locked, current_task, old_name) {
+            match old_parent_upper.create_whiteout(locked, current_task, old_name) {
                 Err(e) => log_warn!("overlayfs: failed to create whiteout for {old_name}: {e}"),
                 Ok(_) => (),
             }
@@ -1281,17 +1307,12 @@ impl FileSystemOps for OverlayFs {
 /// Helper used to resolve directories passed in mount options. The directory is resolved in the
 /// namespace of the calling process, but only `DirEntry` is returned (detached from the
 /// namespace). The corresponding file systems may be unmounted before overlayfs that uses them.
-fn resolve_dir_param<L>(
-    locked: &mut Locked<'_, L>,
+fn resolve_dir_param(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     params: &MountParams,
     name: &FsStr,
-) -> Result<ActiveEntry, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ActiveEntry, Errno> {
     let path = params.get(&**name).ok_or_else(|| {
         log_error!("overlayfs: {name} was not specified");
         errno!(EINVAL)

@@ -149,6 +149,15 @@ filegroup(
             ":cc-compiler-prebuilts",
             ":libunwind-headers",
             ":libcxx-headers-" + cpu,
+            # Adding :libcxx-libraries-* here is a workaround for b/360235447, b/354016617.
+            # The clang driver became sensitive to the existence of runtime
+            # libdirs for compiling -- there is now logic that probes for
+            # the existence of libdirs when computing the set of include dirs.
+            # Including the runtime libdirs allows the driver to select
+            # the correct multilib variant of include dirs.
+            # If when the toolchain reverts this behavior, this workaround
+            # can be removed.
+            ":libcxx-libraries-" + cpu,
         ] + [
             _FUCHSIA_SYSROOT_HEADERS_FILEGROUPS[cpu],
         ],

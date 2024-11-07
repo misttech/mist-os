@@ -12,14 +12,16 @@ from typing import Any, Iterable, Iterator, Self, Sequence, TypeAlias
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-_CPU_USAGE_EVENT_NAME: str = "cpu_usage"
+_CPU_USAGE_EVENT_NAME = "cpu_usage"
 _DEFAULT_PERCENT_CUTOFF = 0.0
 
-CpuBreakdown: TypeAlias = list[dict[str, trace_metrics.JsonType]]
+Breakdown: TypeAlias = list[dict[str, trace_metrics.JSON]]
 
 
 class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
     """Computes CPU utilization metrics, both structured and freeform."""
+
+    FREEFORM_METRICS_FILENAME = "cpu_breakdown"
 
     def __init__(
         self,
@@ -99,26 +101,24 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
 
     def process_freeform_metrics(
         self, model: trace_model.Model
-    ) -> CpuBreakdown | tuple[str, CpuBreakdown]:
+    ) -> tuple[str, Breakdown]:
         """
         Given trace_model.Model, iterates through all the SchedulingRecords and calculates the
         duration for each Process's Threads, and saves them by CPU.
-
-        TODO(b/376097015): Return type is a union to support cross-repo dependencies.
 
         Args:
             model: The input trace model.
 
         Returns:
             str: stable identifier to use in freeform metrics file name.
-            CpuBreakdown: Per-process, per-thread CPU usage breakdown.
+            Breakdown: Per-process, per-thread CPU usage breakdown.
         """
         (breakdown, _) = self.process_metrics_and_get_total_time(model)
-        return breakdown
+        return self.FREEFORM_METRICS_FILENAME, breakdown
 
     def process_metrics_and_get_total_time(
         self, model: trace_model.Model
-    ) -> tuple[CpuBreakdown, float]:
+    ) -> tuple[Breakdown, float]:
         """
         Given trace_model.Model, iterates through all the SchedulingRecords and calculates the
         duration for each Process's Threads, and saves them by CPU.
@@ -127,7 +127,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
             model: The input trace model.
 
         Returns:
-            CpuBreakdown: Per-process, per-thread CPU usage breakdown.
+            Breakdown: Per-process, per-thread CPU usage breakdown.
             float: The total duration of the trace.
         """
         # Map tids to names.
@@ -148,7 +148,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
         # compared to the total CPU duration.
         # If the percent spent is at or above our cutoff, add metric to
         # breakdown.
-        full_breakdown: list[dict[str, trace_metrics.JsonType]] = []
+        full_breakdown: list[dict[str, trace_metrics.JSON]] = []
         for tid, breakdown in durations.tid_to_durations.items():
             if tid in tid_to_thread_name:
                 for cpu, duration in breakdown.items():
@@ -156,7 +156,7 @@ class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
                         duration / durations.cpu_to_total_duration[cpu] * 100
                     )
                     if percent >= self._percent_cutoff:
-                        metric: dict[str, trace_metrics.JsonType] = {
+                        metric: dict[str, trace_metrics.JSON] = {
                             "process_name": tid_to_process_name[tid],
                             "thread_name": tid_to_thread_name[tid],
                             "tid": tid,
@@ -273,18 +273,15 @@ class DurationsBreakdown:
         return durations
 
 
-def group_by_process_name(
-    breakdown: list[dict[str, trace_metrics.JsonType]]
-) -> list[dict[str, trace_metrics.JsonType]]:
+def group_by_process_name(breakdown: Breakdown) -> Breakdown:
     """
     Given a breakdown, group the metrics by process_name only,
     ignoring thread name.
     """
-    consolidated_breakdown: list[dict[str, trace_metrics.JsonType]] = []
     breakdown.sort(key=lambda m: (m["cpu"], m["process_name"]))
     if not breakdown:
         return []
-    consolidated_breakdown = [breakdown[0]]
+    consolidated_breakdown: Breakdown = [breakdown[0]]
     for metric in breakdown[1:]:
         if (
             metric["cpu"] == consolidated_breakdown[-1]["cpu"]

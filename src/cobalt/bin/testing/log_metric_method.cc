@@ -6,6 +6,8 @@
 
 namespace cobalt {
 
+namespace {
+
 std::string LogMetricMethodToString(LogMetricMethod metric_method) {
   switch (metric_method) {
     case LogMetricMethod::kDefault:
@@ -26,6 +28,8 @@ std::string LogMetricMethodToString(LogMetricMethod metric_method) {
       return "Invalid LogMetricMethod";
   }
 }
+
+}  // namespace
 
 std::ostream& operator<<(std::ostream& os, LogMetricMethod metric_method) {
   return os << LogMetricMethodToString(metric_method);

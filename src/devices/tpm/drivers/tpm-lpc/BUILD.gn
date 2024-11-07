@@ -42,7 +42,7 @@ common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
-fuchsia_driver("fuchsia_driver") {
+fuchsia_cc_driver("fuchsia_driver") {
   output_name = "tpm-lpc"
   sources = [ "tpm-lpc.cc" ]
   deps = common_deps

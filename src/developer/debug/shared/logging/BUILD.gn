@@ -2,12 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/cpp/sdk_source_set.gni")
-
 # This library contains utilities useful to debug all clients of the zxdb suite.
-sdk_source_set("logging") {
-  category = "internal"
-
+source_set("logging") {
   public = [
     "debug.h",
     "file_line_function.h",

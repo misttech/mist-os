@@ -67,6 +67,11 @@ impl DirentCache {
         self.inner.lock().unwrap().limit
     }
 
+    /// Returns the number of elements in the cache.
+    pub fn len(&self) -> usize {
+        self.inner.lock().unwrap().lru.len()
+    }
+
     /// Lookup directory entry by name and directory object id.
     pub fn lookup(&self, key: &(u64, &str)) -> Option<Arc<dyn FxNode>> {
         assert_ne!(key.0, INVALID_OBJECT_ID, "Looked up dirent key reserved for timer.");

@@ -19,7 +19,7 @@ alias url_scheme = string:MAX_URL_SCHEME_LENGTH;
 /// segment) represents a sequence of nested dictionaries.
 /// The "basename" (last segment) identifies a capability in the last nested
 /// dictionary.
-@available(added=HEAD)
+@available(added=25)
 alias dictionary_path = string:MAX_PATH_LENGTH;
 
 /// `DeliveryType` may be used when declaring a capability, and specifies under

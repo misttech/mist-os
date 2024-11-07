@@ -11,7 +11,7 @@ driver_bind_rules("pl031_rtc_bind") {
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
 
-fuchsia_driver("pl031-rtc-driver") {
+fuchsia_cc_driver("pl031-rtc-driver") {
   output_name = "pl031-rtc"
   configs += [
     "//build/config:all_source",

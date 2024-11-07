@@ -212,9 +212,10 @@ impl TestFixture {
         // hold references to the volume which we want to unwrap.
         volume.volume().terminate().await;
 
-        Arc::try_unwrap(volume.into_volume())
-            .map_err(|_| "References to volume still exist")
-            .unwrap();
+        if volume.into_volume().try_unwrap().is_none() {
+            tracing::error!("References to volume still exist; hanging");
+            let () = std::future::pending().await;
+        }
 
         // We have to reopen the filesystem briefly to fsck it. (We could fsck before closing, but
         // there might be pending operations that go through after fsck but before we close the

@@ -1030,7 +1030,16 @@ impl Component {
                             cache_eviction_policy_override: EvictionPolicyOverride::None,
                             startup_profiling_seconds: 0,
                         },
-                        component_type: ComponentType::default(),
+                        component_type: ComponentType::DynamicChild {
+                            // Use a separate collection for blobfs because it needs additional
+                            // capabilities routed to it (e.g. VmexResource) and we don't want
+                            // to route those capabilities to other filesystems.
+                            collection_name: if self.0 == "blobfs" {
+                                "blobfs-collection".to_string()
+                            } else {
+                                fs_management::FS_COLLECTION_NAME.to_string()
+                            },
+                        },
                     }
                 }
             }

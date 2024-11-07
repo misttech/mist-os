@@ -10,8 +10,6 @@ pub struct ResourceBinding {
 
 pub struct ResourceBindings {
     pub handle: ResourceBinding,
-    pub server_end: ResourceBinding,
-    pub client_end: ResourceBinding,
 }
 
 impl Default for ResourceBindings {
@@ -19,18 +17,8 @@ impl Default for ResourceBindings {
         Self {
             handle: ResourceBinding {
                 wire_path: "::fidl_next::WireHandle".to_string(),
-                optional_wire_path: "::fidl_next::OptionalWireHandle".to_string(),
+                optional_wire_path: "::fidl_next::WireOptionalHandle".to_string(),
                 natural_path: "::fidl_next::Handle".to_string(),
-            },
-            server_end: ResourceBinding {
-                wire_path: "::fidl_next::WireServerEnd".to_string(),
-                optional_wire_path: "::fidl_next::OptionalWireServerEnd".to_string(),
-                natural_path: "::fidl_next::ServerEnd".to_string(),
-            },
-            client_end: ResourceBinding {
-                wire_path: "::fidl_next::WireClientEnd".to_string(),
-                optional_wire_path: "::fidl_next::OptionalWireClientEnd".to_string(),
-                natural_path: "::fidl_next::ClientEnd".to_string(),
             },
         }
     }

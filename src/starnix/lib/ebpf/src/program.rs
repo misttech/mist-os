@@ -384,7 +384,7 @@ impl EbpfProgram<()> {
 mod test {
     use super::*;
     use crate::conformance::test::parse_asm;
-    use crate::{FieldMapping, FieldType};
+    use crate::{FieldMapping, FieldType, NullVerifierLogger};
     use linux_uapi::*;
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -563,6 +563,30 @@ mod test {
                 u32::MAX - 2,
                 "BPF math does not work",
             );
+        }
+    }
+
+    // Test BPF_MSH cBPF instruction.
+    #[test]
+    fn test_ld_msh() {
+        let test_prg = [
+            // X <- 4 * (P[0] & 0xf)
+            sock_filter { code: (BPF_LDX | BPF_MSH | BPF_B) as u16, jt: 0, jf: 0, k: 0 },
+            // A <- X
+            sock_filter { code: (BPF_MISC | BPF_TXA) as u16, jt: 0, jf: 0, k: 0 },
+            // ret A
+            sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
+        ];
+
+        let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
+
+        for i in [0x00, 0x01, 0x07, 0x15, 0xff].iter() {
+            with_prg_assert_result(
+                &prg,
+                seccomp_data { nr: *i, ..Default::default() },
+                4 * (*i & 0xf) as u32,
+                "BPF math does not work",
+            )
         }
     }
 

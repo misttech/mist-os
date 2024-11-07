@@ -66,6 +66,25 @@ type GetStructuredConfigError = flexible enum {
     NO_CONFIG = 4;
 };
 
+/// Errors that can be returned by the ConfigOverride protocol.
+@available(added=HEAD)
+type ConfigOverrideError = flexible enum {
+    /// Could not find an instance matching the given moniker.
+    INSTANCE_NOT_FOUND = 1;
+
+    /// The given moniker could not be parsed.
+    BAD_MONIKER = 2;
+
+    /// The given moniker matches an instance, but the instance is not resolved.
+    INSTANCE_NOT_RESOLVED = 3;
+
+    /// There is no structured configuration associated with this instance.
+    NO_CONFIG = 4;
+
+    /// Could not find a structured configuration field with the given key.
+    KEY_NOT_FOUND = 5;
+};
+
 /// Errors that can be returned by the GetAllInstances call.
 type GetAllInstancesError = flexible enum {
     /// Could not find the scope root instance.
@@ -100,12 +119,17 @@ type OpenError = flexible enum {
     BAD_DIR_TYPE = 7;
 
     /// The given path could not be parsed by component manager.
+    @available(removed=25)
     BAD_PATH = 8;
 
     /// Serving the requested directory requires starting the instance, but the
     /// instance failed to start.
-    @available(added=19)
+    @available(added=19, removed=25)
     INSTANCE_FAILED_TO_START = 9;
+
+    /// Instance matching moniker was destroyed.
+    @available(added=25)
+    INSTANCE_DESTROYED = 10;
 };
 
 /// Errors that can be returned by the ConstructNamespace call.
@@ -280,7 +304,7 @@ closed protocol RealmQuery {
     }) error ConstructNamespaceError;
 
     /// Makes an fuchsia.io.Directory/Open call on a directory in an instance.
-    @available(added=11)
+    @available(added=11, removed=25)
     strict Open(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         dir_type OpenDirType;
@@ -290,6 +314,14 @@ closed protocol RealmQuery {
         object server_end:fuchsia.io.Node;
     }) -> () error OpenError;
 
+    /// Opens the specified directory in an instance.
+    @available(added=25)
+    strict OpenDirectory(resource struct {
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        dir_type OpenDirType;
+        object server_end:fuchsia.io.Directory;
+    }) -> () error OpenError;
+
     /// Connects to the StorageAdmin protocol of a storage declared by an instance.
     @available(added=11)
     strict ConnectToStorageAdmin(resource struct {
@@ -297,6 +329,33 @@ closed protocol RealmQuery {
         storage_name fuchsia.component.decl.name;
         server_end server_end:StorageAdmin;
     }) -> () error ConnectToStorageAdminError;
+};
+
+/// Manages structured configuration override values for components.
+@available(added=HEAD)
+@discoverable
+open protocol ConfigOverride {
+    /// Sets structured configuration fields with override values for the
+    /// component instance identified by moniker.
+    @available(added=HEAD)
+    flexible SetStructuredConfig(struct {
+        /// The moniker of the component that should use the structured config
+        /// override.  This moniker is relative to the realm that uses this
+        /// protocol.
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+        fields vector<fuchsia.component.decl.ConfigOverride>:MAX;
+    }) -> () error ConfigOverrideError;
+
+    /// Unsets structured configuration overrides for the component instance
+    /// identified by moniker.  If an empty moniker is supplied, then all
+    /// structured configuration overrides will be cleared.
+    @available(added=HEAD)
+    flexible UnsetStructuredConfig(struct {
+        /// The moniker of the component that should use the structured config
+        /// override.  This moniker is relative to the realm that uses this
+        /// protocol.
+        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
+    }) -> () error ConfigOverrideError;
 };
 
 /// An iterator over all instances in the realm

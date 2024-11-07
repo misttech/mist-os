@@ -129,7 +129,7 @@ impl Listener {
 
     /// Send all messages currently in the provided buffer to this listener. Attempts to batch up
     /// to the message size limit. Returns early if the listener appears to be unhealthy.
-    async fn backfill<'a>(&mut self, mut messages: Vec<Arc<LogsData>>) {
+    async fn backfill(&mut self, mut messages: Vec<Arc<LogsData>>) {
         messages.sort_by_key(|m| m.metadata.timestamp);
 
         // Initialize batch size to the size of the vector header.

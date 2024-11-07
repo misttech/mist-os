@@ -17,7 +17,7 @@ driver_bind_rules("clock-bind") {
   ]
 }
 
-fuchsia_driver("clock-driver") {
+fuchsia_cc_driver("clock-driver") {
   output_name = "clock"
   configs += [
     "//build/config:all_source",

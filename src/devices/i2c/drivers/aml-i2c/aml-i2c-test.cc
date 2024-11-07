@@ -148,7 +148,7 @@ class FakeAmlI2cController {
       // Start flag -- process the token list (saving the target address and/or data if needed),
       // then trigger the interrupt.
       ProcessTokenList();
-      irq_->trigger(0, zx::clock::get_monotonic());
+      irq_->trigger(0, zx::clock::get_boot());
     }
     reg_values_[kControlReg / sizeof(uint32_t)] = static_cast<uint32_t>(value);
   }

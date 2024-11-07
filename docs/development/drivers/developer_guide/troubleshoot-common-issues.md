@@ -586,7 +586,7 @@ The `binary` field value needs to follow the format `driver/<driver_output>.so` 
 build file, for example:
 
 ```
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "simple"
   sources = [ "simple_driver.cc" ]
   deps = [

@@ -199,10 +199,6 @@ def collect_labels_from_dir(args: argparse.Namespace) -> Sequence[str]:
 
 
 def collect_labels_from_scope(bazel_exe: str, scope: str) -> Sequence[str]:
-    # The debug_agent causes bazel queries to fail. This line can be
-    # removed when it is fixed.
-    scope = scope + " - //src/developer/debug/debug_agent:pkg_fuchsia_package"
-
     try:
         return run(
             bazel_exe,

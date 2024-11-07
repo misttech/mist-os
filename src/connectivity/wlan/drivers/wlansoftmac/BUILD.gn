@@ -49,7 +49,7 @@ source_set("source_set") {
   ]
 }
 
-fuchsia_driver("wlansoftmac_driver-driver") {
+fuchsia_cc_driver("wlansoftmac_driver-driver") {
   output_name = "wlansoftmac"
   deps = [ ":source_set" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]

@@ -6,14 +6,18 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use super::{CompIdent, DeclType, Enum, Library, Struct, Table, Union};
+use super::{
+    CompIdent, Const, DeclType, Enum, Library, Struct, Table, TypeAlias, TypeShape, Union,
+};
 
 /// A FIDL JSON IR schema.
 #[derive(Deserialize)]
 pub struct Schema {
     pub name: String,
-    // #[serde(deserialize_with = "crate::de::index")]
-    // pub const_declarations: Vec<Const>,
+    #[serde(deserialize_with = "crate::de::index")]
+    pub alias_declarations: HashMap<CompIdent, TypeAlias>,
+    #[serde(deserialize_with = "crate::de::index")]
+    pub const_declarations: HashMap<CompIdent, Const>,
     // pub bits_declarations: Vec<Bits>,
     #[serde(deserialize_with = "crate::de::index")]
     pub enum_declarations: HashMap<CompIdent, Enum>,
@@ -21,13 +25,12 @@ pub struct Schema {
     // pub service_declarations: Vec<Service>,
     #[serde(deserialize_with = "crate::de::index")]
     pub struct_declarations: HashMap<CompIdent, Struct>,
-    #[serde(deserialize_with = "crate::de::index")]
-    pub external_struct_declarations: HashMap<CompIdent, Struct>,
+    // #[serde(deserialize_with = "crate::de::index")]
+    // pub external_struct_declarations: HashMap<CompIdent, Struct>,
     #[serde(deserialize_with = "crate::de::index")]
     pub table_declarations: HashMap<CompIdent, Table>,
     #[serde(deserialize_with = "crate::de::index")]
     pub union_declarations: HashMap<CompIdent, Union>,
-    // pub type_alias_declarations: Vec<TypeAlias>,
     pub declaration_order: Vec<CompIdent>,
     pub declarations: HashMap<CompIdent, DeclType>,
     #[serde(deserialize_with = "crate::de::index")]
@@ -41,6 +44,30 @@ impl Schema {
             self.declarations.get(ident)
         } else {
             self.library_dependencies.get(library)?.declarations.get(ident).map(|decl| &decl.kind)
+        }
+    }
+
+    pub fn get_type_shape(&self, ident: &CompIdent) -> Option<&TypeShape> {
+        let library = ident.library();
+        if library == self.name {
+            match self.declarations.get(ident)? {
+                DeclType::Struct => Some(&self.struct_declarations.get(ident)?.shape),
+                DeclType::Table => Some(&self.table_declarations.get(ident)?.shape),
+                DeclType::Union => Some(&self.union_declarations.get(ident)?.shape),
+                // Enums don't include a type shape because we can technically get that information
+                // from its underlying integer type
+                DeclType::Enum => None,
+                DeclType::Bits | DeclType::NewType => todo!(),
+                // These aren't types and don't have type shapes
+                DeclType::Alias
+                | DeclType::Const
+                | DeclType::Resource
+                | DeclType::Overlay
+                | DeclType::Protocol
+                | DeclType::Service => None,
+            }
+        } else {
+            self.library_dependencies.get(library)?.declarations.get(ident)?.shape.as_ref()
         }
     }
 }

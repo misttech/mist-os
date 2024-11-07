@@ -284,7 +284,12 @@ impl FileOps for InotifyFileObject {
         }
     }
 
-    fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         let dir_entries = {
             let mut state = self.state.lock();
             state.watches.drain().map(|(_key, value)| value).collect::<Vec<_>>()

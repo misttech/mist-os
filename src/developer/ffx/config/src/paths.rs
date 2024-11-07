@@ -86,6 +86,10 @@ impl EnvironmentContext {
         }
     }
 
+    pub fn get_shared_data_path(&self) -> Result<PathBuf> {
+        get_shared_data_base_path().and_then(|base| Ok(base.join("shared")))
+    }
+
     pub fn get_analytics_path(&self) -> Option<PathBuf> {
         if self.has_no_environment() {
             return None;
@@ -202,8 +206,31 @@ fn get_data_base() -> Result<PathBuf> {
     }
 }
 
+fn get_state_base() -> Result<PathBuf> {
+    if cfg!(target_os = "macos") {
+        let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+        home.push("Library");
+        Ok(home)
+    } else {
+        var("XDG_STATE_HOME").map(PathBuf::from).or_else(|_| {
+            let mut home = home::home_dir().ok_or(anyhow!("cannot find home directory"))?;
+            home.push(".local");
+            home.push("share");
+            Ok(home)
+        })
+    }
+}
+
 fn get_data_base_path() -> Result<PathBuf> {
     let mut path = get_data_base()?;
+    path.push("Fuchsia");
+    path.push("ffx");
+    create_dir_all(&path)?;
+    Ok(path)
+}
+
+fn get_shared_data_base_path() -> Result<PathBuf> {
+    let mut path = get_state_base()?;
     path.push("Fuchsia");
     path.push("ffx");
     create_dir_all(&path)?;

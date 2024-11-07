@@ -38,9 +38,11 @@ class ServerAndClient {
     // Server end
     zx_status_t status = loop_.StartThread("MetricsBufferTest");
     ZX_ASSERT(status == ZX_OK);
-    fidl::InterfaceHandle<fuchsia::io::Directory> aux_service_directory;
+
+    auto [aux_svc_client, aux_svc_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     sync_completion_t server_create_done;
-    status = async::PostTask(dispatcher_, [this, &aux_service_directory, &server_create_done] {
+    status = async::PostTask(dispatcher_, [this, aux_svc_server = std::move(aux_svc_server),
+                                           &server_create_done]() mutable {
       outgoing_aux_service_directory_parent_.emplace();
       zx_status_t status =
           outgoing_aux_service_directory_parent_
@@ -58,10 +60,8 @@ class ServerAndClient {
       outgoing_aux_service_directory_ =
           outgoing_aux_service_directory_parent_->GetOrCreateDirectory("svc");
       ZX_ASSERT(outgoing_aux_service_directory_);
-      status = outgoing_aux_service_directory_->Serve(
-
-          fuchsia::io::OpenFlags::DIRECTORY, aux_service_directory.NewRequest().TakeChannel(),
-          dispatcher_);
+      status = outgoing_aux_service_directory_->Serve(fuchsia_io::wire::kPermReadable,
+                                                      std::move(aux_svc_server), dispatcher_);
       ZX_ASSERT(status == ZX_OK);
       sync_completion_signal(&server_create_done);
     });
@@ -70,8 +70,7 @@ class ServerAndClient {
 
     // Client end
     ZX_ASSERT(!aux_service_directory_);
-    aux_service_directory_ =
-        std::make_shared<sys::ServiceDirectory>(std::move(aux_service_directory));
+    aux_service_directory_ = std::make_shared<sys::ServiceDirectory>(aux_svc_client.TakeChannel());
     ZX_ASSERT(aux_service_directory_);
   }
 

@@ -55,48 +55,30 @@ impl fmt::Display for ShowResult {
 }
 
 /// Prints the inspect hierarchies that match the given selectors.
+/// See https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect#userspace_tools for more.
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "show")]
 pub struct ShowCommand {
-    #[argh(option)]
-    /// the name of the manifest file that we are interested in. If this is provided, the output
-    /// will only contain monikers for components whose url contains the provided name.
-    pub manifest: Option<String>,
-
     #[argh(positional)]
-    /// selectors representing the Inspect data that should be queried.
-    ///
+    /// queries for accessing Inspect data.
     /// If no selectors are provided, Inspect data for the whole system will be returned.
-    ///
-    /// This command accepts the following as a selector:
-    ///
-    /// - A component moniker, for example, `core/network/netstack`. Doesn't work if
-    ///   `--manifest` is passed.
-    /// - A component selector, for example, `core/network/*`. Doesn't work if `--manifest`
-    ///   is passed.
-    /// - A tree selector, for example, `core/network/netstack:root/path/to/*:property`
-    ///
-    /// To learn more about selectors see
-    /// https://fuchsia.dev/fuchsia-src/reference/diagnostics/selectors.
-    ///
-    /// The following characters in a selector must be escaped with `\`: `*`, `:`, `\`, `/` and
-    /// whitespace.
-    ///
-    /// When `*` or other characters cause ambiguity with your shell, make sure to wrap the
-    /// selector in single or double quotes. For example:
-    /// `ffx inspect show "bootstrap/boot-drivers:*:root/path/to\:some:prop"`
     pub selectors: Vec<String>,
 
     #[argh(option)]
+    /// DEPRECATED: use `--component` instead.
+    pub manifest: Option<String>,
+
+    #[argh(option)]
+    /// a fuzzy-search query. May include URL, moniker, or manifest fragments. No selector-escaping
+    /// for moniker is needed in this query. Selectors following --component should omit the
+    /// component selector, as they will be spliced together by the tool with the correct escaping.
+    pub component: Option<String>,
+
+    #[argh(option)]
     /// A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to.
+    /// This can be copied from the output of `ffx inspect list-accessors`.
     /// The selector will be in the form of:
     /// <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName
-    ///
-    /// Typically this is the output of `iquery list-accessors`.
-    ///
-    /// For example: `bootstrap/archivist:expose:fuchsia.diagnostics.FeedbackArchiveAccessor`
-    /// means that the command will connect to the `FeedbackArchiveAccecssor`
-    /// exposed by `bootstrap/archivist`.
     pub accessor: Option<String>,
 
     #[argh(option)]
@@ -110,13 +92,25 @@ impl Command for ShowCommand {
     type Result = ShowResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        let selectors = utils::get_selectors_for_manifest(
-            &self.manifest,
-            self.selectors,
-            &self.accessor,
-            provider,
-        )
-        .await?;
+        if self.manifest.is_some() {
+            eprintln!(
+                "WARNING: option `--manifest` is deprecated, please use `--component` instead"
+            );
+        }
+        let selectors = if let Some(component) = self.component {
+            utils::process_component_query_with_partial_selectors(
+                component,
+                self.selectors.into_iter(),
+                provider,
+            )
+            .await?
+        } else if let Some(manifest) = self.manifest {
+            utils::get_selectors_for_manifest(manifest, self.selectors, &self.accessor, provider)
+                .await?
+        } else {
+            utils::process_fuzzy_inputs(self.selectors, provider).await?
+        };
+
         let selectors = utils::expand_selectors(selectors, self.name)?;
 
         let inspect_data_iter =

@@ -11,6 +11,7 @@ declare_args() {
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 
 common_deps = [
@@ -160,8 +161,19 @@ network_unified_binary("bin") {
 
   # Only add the netstack3 configs to the bin, not GUB because O3 in the default
   # config causes binary size increases here.
-  bin_add_configs = [ ":netstack3_configs" ]
+  bin_add_configs = [
+    ":netstack3_configs",
+    ":netstack3_debug_configs",
+  ]
   add_configs = []
+
+  # Build debug on the larger builders to prevent build time from becoming
+  # unreasonably large.
+  if (is_debug) {
+    _concurrent_jobs = concurrent_jobs.rust_highmem
+    bin_add_configs += _concurrent_jobs.configs
+    bin_build_job_vars = _concurrent_jobs.vars
+  }
 
   # Profile the binary and GUB library builds when requested.
   if (netstack3_profile_rustc) {
@@ -184,6 +196,23 @@ config("netstack3_configs") {
     configs = [
       # Always optimize speed, even if it increases size.
       "//build/config:optimize_speed",
+    ]
+
+    # Add thinlto config if lto variants are not used.
+    if (!is_lto_variant) {
+      # Allow cross-crate optimization since netstack3 is split between multiple
+      # crates.
+      configs += [ "//build/config/lto:thinlto" ]
+    }
+  }
+}
+
+config("netstack3_debug_configs") {
+  if (is_debug) {
+    configs = [
+      # Minor optimizations that remove a lot of indirection and make zero-cost
+      # closer to zero-cost.
+      "//build/config:optimize_debug",
     ]
 
     # Add thinlto config if lto variants are not used.

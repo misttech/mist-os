@@ -44,6 +44,11 @@ fuchsia_component("manager-component") {
 }
 
 # TODO(https://fxbug.dev/376122561): Add support for assembling prod system props.
+resource("tee-system-properties") {
+  sources = [ "config/system_properties.json5" ]
+  outputs = [ "data/properties/system_properties" ]
+}
+
 resource("test-tee-system-properties") {
   sources = [ "config/test_system_properties.json5" ]
   outputs = [ "data/properties/system_properties" ]
@@ -59,7 +64,10 @@ fuchsia_component("manager-realm-test-component") {
 }
 
 fuchsia_package("ta-manager") {
-  deps = [ ":manager-component" ]
+  deps = [
+    ":manager-component",
+    ":tee-system-properties",
+  ]
 }
 
 fuchsia_package("ta-manager-realm-test") {

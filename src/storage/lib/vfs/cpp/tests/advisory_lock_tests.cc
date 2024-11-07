@@ -52,10 +52,10 @@ class FlockTest : public testing::Test {
  protected:
   fbl::RefPtr<fs::RemoteDir> GetRemoteDir() {
     auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    EXPECT_EQ(ZX_OK, fdio_open(kTmpfsPath,
-                               static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |
-                                                     fuchsia_io::wire::OpenFlags::kRightExecutable),
-                               server.TakeChannel().release()));
+    EXPECT_EQ(ZX_OK, fdio_open3(kTmpfsPath,
+                                static_cast<uint64_t>(fuchsia_io::wire::kPermReadable |
+                                                      fuchsia_io::wire::kPermExecutable),
+                                server.TakeChannel().release()));
     return fbl::MakeRefCounted<fs::RemoteDir>(std::move(client));
   }
 

@@ -494,16 +494,14 @@ pub(crate) async fn images_metadata(
 async fn image_packages(
     proxy: &fio::DirectoryProxy,
 ) -> Result<ImagePackagesManifest, ImagePackagesError> {
-    let file = fuchsia_fs::directory::open_file_deprecated(
-        proxy,
-        "images.json",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .map_err(|e| match e {
-        fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND) => ImagePackagesError::NotFound,
-        e => ImagePackagesError::Open(e),
-    })?;
+    let file = fuchsia_fs::directory::open_file(proxy, "images.json", fio::PERM_READABLE)
+        .await
+        .map_err(|e| match e {
+            fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND) => {
+                ImagePackagesError::NotFound
+            }
+            e => ImagePackagesError::Open(e),
+        })?;
 
     let contents = fuchsia_fs::file::read(&file).await.map_err(ImagePackagesError::Read)?;
 

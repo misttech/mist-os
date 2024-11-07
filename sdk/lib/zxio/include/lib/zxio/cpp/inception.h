@@ -36,12 +36,4 @@ zx_status_t zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node> node,
                                        fuchsia_io::wire::Representation& representation,
                                        zxio_storage_alloc allocator, void** out_context);
 
-// Like zxio_create_with_allocator but the caller supplies information about
-// |channel| provided by the server through an OnOpen event.
-//
-// Always consumes |node|. May mutate |info| on success.
-zx_status_t zxio_create_with_allocator_deprecated(fidl::ClientEnd<fuchsia_io::Node> node,
-                                                  fuchsia_io::wire::NodeInfoDeprecated& info,
-                                                  zxio_storage_alloc allocator, void** out_context);
-
 #endif  // LIB_ZXIO_CPP_INCEPTION_H_

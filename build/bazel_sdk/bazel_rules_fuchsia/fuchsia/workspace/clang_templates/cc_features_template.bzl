@@ -222,7 +222,14 @@ _flag_groups = struct(
         # Relativize paths to source files and linker inputs to avoid
         # leaking absolute paths, and ensure consistency
         # between local and remote compiling/linking.
-        # TODO(b/358472850): relativize paths for compilation
+        cflags = [
+            "-ffile-compilation-dir=.",
+            "-no-canonical-prefixes",
+        ],
+        ccflags = [
+            "-ffile-compilation-dir=.",
+            "-no-canonical-prefixes",
+        ],
         ldflags = [
             "-no-canonical-prefixes",
         ],
@@ -280,6 +287,7 @@ _default_compile_flags_feature = feature(
                 _flag_groups.ffp_contract_off,
                 _flag_groups.auto_var_init,
                 _flag_groups.thread_safety_annotations,
+                _flag_groups.relpath_debug_info,
             ]),
         ),
         # These are ccflags that will be added to all builds
@@ -290,6 +298,7 @@ _default_compile_flags_feature = feature(
                 _flag_groups.no_exceptions,
                 _flag_groups.no_rtti,
                 _flag_groups.symbol_visibility_hidden,
+                _flag_groups.relpath_debug_info,
             ]),
         ),
         # These are cflags that will be added to dbg builds

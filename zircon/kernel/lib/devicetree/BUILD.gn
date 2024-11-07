@@ -12,13 +12,14 @@ zx_library("devicetree") {
     "devicetree-node-path.cc",
     "devicetree.cc",
   ]
-  deps = [ "//zircon/system/ulib/fbl" ]
+  deps = [
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zircon-internal:headers",
+  ]
 
   public_deps = [
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/fbl:headers",
-    "//zircon/system/ulib/zircon-internal:headers",
-    "//zircon/system/ulib/zx:headers",
   ]
   if (is_kernel) {
     public_deps += [

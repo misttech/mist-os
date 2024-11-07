@@ -5,15 +5,14 @@
 """Computes metrics from memory traces."""
 
 import collections
-from typing import List
 
 from trace_processing import trace_metrics, trace_model, trace_utils
 
 MEMORY_SYSTEM_CATEGORY = "memory:kernel"
-KERNEL_EVENT_NAMES = ("kmem_stats", "kmem_stats_compression")
+KERNEL_EVENT_NAMES = ("kmem_stats_a", "kmem_stats_b", "kmem_stats_compression")
 
 
-def standard_metrics_json(values: List[int | float]) -> trace_metrics.JsonType:
+def standard_metrics_json(values: list[int | float]) -> trace_metrics.JSON:
     """Returns a json object holding the standard metric value keyed by metric name."""
     metrics = trace_utils.standard_metrics_set(
         values=values,
@@ -51,9 +50,11 @@ class MemoryMetricsProcessor(trace_metrics.MetricsProcessor):
     }
     """
 
+    FREEFORM_METRICS_FILENAME = "memory"
+
     def process_freeform_metrics(
         self, model: trace_model.Model
-    ) -> trace_metrics.JsonType | tuple[str, trace_metrics.JsonType]:
+    ) -> tuple[str, trace_metrics.JSON]:
         series_by_name = collections.defaultdict(list)
         for event in trace_utils.filter_events(
             model.all_events(),
@@ -64,9 +65,12 @@ class MemoryMetricsProcessor(trace_metrics.MetricsProcessor):
                 for name, value in event.args.items():
                     series_by_name[name].append(value)
 
-        return dict(
-            kernel={
-                name: standard_metrics_json(series)
-                for name, series in series_by_name.items()
-            }
+        return (
+            self.FREEFORM_METRICS_FILENAME,
+            dict(
+                kernel={
+                    name: standard_metrics_json(series)
+                    for name, series in series_by_name.items()
+                }
+            ),
         )

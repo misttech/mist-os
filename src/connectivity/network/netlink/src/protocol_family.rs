@@ -934,15 +934,19 @@ pub mod route {
                         }
                     };
                     for ip_version in ip_versions.into_iter() {
-                        let request = RuleRequest {
-                                args: RuleRequestArgs::DumpRules,
-                                ip_version,
-                                sequence_number: req_header.sequence_number,
-                                client: client.clone(),
-                        };
                         let (completer, receiver) = oneshot::channel();
-                        unified_request_sink.send(UnifiedRequest::RuleRequest(request, completer))
-                            .await.expect("event loop should never terminate");
+                        net_types::for_any_ip_version!(ip_version, I, {
+                            unified_request_sink.send(
+                                UnifiedRequest::rule_request::<I>(RuleRequest {
+                                    args: RuleRequestArgs::DumpRules,
+                                    _ip_version_marker: <I as Ip>::VERSION_MARKER,
+                                    sequence_number: req_header.sequence_number,
+                                    client: client.clone(),
+                                },
+                                completer,
+                            )).await.expect("event loop should never terminate");
+                        });
+
                         match receiver.await.expect("completer should not be dropped") {
                             Ok(()) => {},
                             Err(e) => {
@@ -973,15 +977,18 @@ pub mod route {
                             return;
                         }
                     };
-                    let request = RuleRequest {
-                            args: RuleRequestArgs::New(msg),
-                            ip_version,
-                            sequence_number: req_header.sequence_number,
-                            client: client.clone(),
-                    };
                     let (completer, receiver) = oneshot::channel();
-                    unified_request_sink.send(UnifiedRequest::RuleRequest(request, completer))
-                        .await.expect("event loop should never terminate");
+                    net_types::for_any_ip_version!(ip_version, I, {
+                        let request = RuleRequest {
+                                args: RuleRequestArgs::New(msg),
+                                _ip_version_marker: <I as Ip>::VERSION_MARKER,
+                                sequence_number: req_header.sequence_number,
+                                client: client.clone(),
+                        };
+                        unified_request_sink.send(
+                            UnifiedRequest::rule_request::<I>(request, completer)
+                            ).await.expect("event loop should never terminate");
+                    });
                     match receiver.await.expect("completer should not be dropped") {
                         Ok(()) => if expects_ack {
                             client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
@@ -1004,15 +1011,18 @@ pub mod route {
                             return;
                         }
                     };
-                    let request = RuleRequest {
-                            args: RuleRequestArgs::Del(msg),
-                            ip_version,
-                            sequence_number: req_header.sequence_number,
-                            client: client.clone(),
-                    };
                     let (completer, receiver) = oneshot::channel();
-                    unified_request_sink.send(UnifiedRequest::RuleRequest(request, completer))
-                        .await.expect("event loop should never terminate");
+                    net_types::for_any_ip_version!(ip_version, I, {
+                        let request = RuleRequest {
+                                args: RuleRequestArgs::Del(msg),
+                                _ip_version_marker: <I as Ip>::VERSION_MARKER,
+                                sequence_number: req_header.sequence_number,
+                                client: client.clone(),
+                        };
+                        unified_request_sink.send(
+                            UnifiedRequest::rule_request::<I>(request, completer)
+                            ).await.expect("event loop should never terminate");
+                    });
                     match receiver.await.expect("completer should not be dropped") {
                         Ok(()) => if expects_ack {
                             client.send_unicast(netlink_packet::new_error(Ok(()), req_header))
@@ -2952,18 +2962,19 @@ mod test {
             }
         }
 
-        fn handle_request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
+        fn handle_request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip>(
             &mut self,
-            actual_request: RuleRequest<S>,
+            actual_request: RuleRequest<S, I>,
         ) -> Result<(), Errno> {
             let Self { requests_and_responses } = self;
             let FakeRuleRequestResponse { expected_request_args, expected_ip_version, response } =
                 requests_and_responses.lock().unwrap().pop_front().expect(
                     "FakeRuleRequest handler should have a fake request/response pre-configured",
                 );
-            let RuleRequest { args, ip_version, sequence_number: _, client: _ } = actual_request;
+            let RuleRequest { args, _ip_version_marker, sequence_number: _, client: _ } =
+                actual_request;
             assert_eq!(args, expected_request_args);
-            assert_eq!(ip_version, expected_ip_version);
+            assert_eq!(I::VERSION, expected_ip_version);
             response
         }
     }
@@ -3247,7 +3258,13 @@ mod test {
                 rules_request_handler,
                 |mut rules_request_handler, req| async move {
                     match req {
-                        UnifiedRequest::RuleRequest(request, completer) => {
+                        UnifiedRequest::RuleV4Request(request, completer) => {
+                            completer
+                                .send(rules_request_handler.handle_request(request))
+                                .expect("send should succeed");
+                            rules_request_handler
+                        }
+                        UnifiedRequest::RuleV6Request(request, completer) => {
                             completer
                                 .send(rules_request_handler.handle_request(request))
                                 .expect("send should succeed");
@@ -3581,7 +3598,8 @@ mod test {
                                     UnifiedRequest::RoutesV4Request(request) => request,
                                     UnifiedRequest::InterfacesRequest(_)
                                     | UnifiedRequest::RoutesV6Request(_)
-                                    | UnifiedRequest::RuleRequest(_, _) => {
+                                    | UnifiedRequest::RuleV4Request(_, _)
+                                    | UnifiedRequest::RuleV6Request(_, _) => {
                                         panic!("not RoutesV4Request")
                                     }
                                 };
@@ -3599,7 +3617,8 @@ mod test {
                                     UnifiedRequest::RoutesV6Request(request) => request,
                                     UnifiedRequest::InterfacesRequest(_)
                                     | UnifiedRequest::RoutesV4Request(_)
-                                    | UnifiedRequest::RuleRequest(_, _) => {
+                                    | UnifiedRequest::RuleV4Request(_, _)
+                                    | UnifiedRequest::RuleV6Request(_, _) => {
                                         panic!("not RoutesV6Request")
                                     }
                                 };

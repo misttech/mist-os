@@ -12,6 +12,7 @@
             protocol: [
                 "fuchsia.component.EventStream",
                 "fuchsia.component.sandbox.Factory",
+                "fuchsia.sys2.ConfigOverride",
                 "fuchsia.sys2.LifecycleController",
                 "fuchsia.sys2.RealmQuery",
             ],
@@ -31,6 +32,7 @@
             protocol: [
                 "fuchsia.component.EventStream",
                 "fuchsia.component.sandbox.Factory",
+                "fuchsia.sys2.ConfigOverride",
                 "fuchsia.sys2.LifecycleController",
                 "fuchsia.sys2.RealmQuery",
             ],

@@ -262,7 +262,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
         std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
         std::make_pair(kFontsProvider, kFontsProviderUrl),
         std::make_pair(kIntl, kIntlUrl),
-        std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
+        std::make_pair(kMemoryPressureSignaler, kMemoryPressureSignalerUrl),
         std::make_pair(kFakeCobalt, kFakeCobaltUrl),
         std::make_pair(kNetstack, kNetstackUrl),
         std::make_pair(kTextManager, kTextManagerUrl),
@@ -322,7 +322,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
             .source = ParentRef(),
             .targets =
                 {
-                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
+                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureSignaler},
                     ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
                     ChildRef{kFakeCobalt},
                     // Not including kNetstack here, since it emits spurious
@@ -360,7 +360,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
          .targets = {target}},
         {.capabilities = {Protocol{
              fidl::DiscoverableProtocolName<fuchsia_memorypressure::Provider>}},
-         .source = ChildRef{kMemoryPressureProvider},
+         .source = ChildRef{kMemoryPressureSignaler},
          .targets = {target}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_net_interfaces::State>}},
          .source = ChildRef{kNetstack},
@@ -375,33 +375,18 @@ class WebEngineTest : public ui_testing::PortableUITest,
         {.capabilities = {Protocol{
              fidl::DiscoverableProtocolName<fuchsia_metrics::MetricEventLoggerFactory>}},
          .source = ChildRef{kFakeCobalt},
-         .targets = {ChildRef{kMemoryPressureProvider}}},
+         .targets = {ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>},
                           Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>}},
          .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}, target}},
+         .targets = {ChildRef{kMemoryPressureSignaler}, target}},
         {.capabilities =
              {Protocol{fidl::DiscoverableProtocolName<fuchsia_kernel::RootJobForInspect>},
               Protocol{fidl::DiscoverableProtocolName<fuchsia_kernel::Stats>},
               Protocol{fidl::DiscoverableProtocolName<fuchsia_scheduler::RoleManager>},
               Protocol{fidl::DiscoverableProtocolName<fuchsia_tracing_provider::Registry>}},
          .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kCaptureOnPressureChange}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kImminentOomCaptureDelay}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kCriticalCaptureDelay}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kWarningCaptureDelay}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kNormalCaptureDelay}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
+         .targets = {ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_posix_socket::Provider>}},
          .source = ChildRef{kNetstack},
          .targets = {target}},
@@ -460,13 +445,8 @@ class WebEngineTest : public ui_testing::PortableUITest,
   static constexpr auto kIntl = "intl";
   static constexpr auto kIntlUrl = "#meta/intl_property_manager.cm";
 
-  static constexpr auto kMemoryPressureProvider = "memory_pressure_provider";
-  static constexpr auto kMemoryPressureProviderUrl = "#meta/memory_monitor.cm";
-  static constexpr auto kCaptureOnPressureChange = "fuchsia.memory.CaptureOnPressureChange";
-  static constexpr auto kImminentOomCaptureDelay = "fuchsia.memory.ImminentOomCaptureDelay";
-  static constexpr auto kCriticalCaptureDelay = "fuchsia.memory.CriticalCaptureDelay";
-  static constexpr auto kWarningCaptureDelay = "fuchsia.memory.WarningCaptureDelay";
-  static constexpr auto kNormalCaptureDelay = "fuchsia.memory.NormalCaptureDelay";
+  static constexpr auto kMemoryPressureSignaler = "memory_pressure_signaler";
+  static constexpr auto kMemoryPressureSignalerUrl = "#meta/memory_pressure_signaler.cm";
 
   static constexpr auto kNetstack = "netstack";
   static constexpr auto kNetstackUrl = "#meta/netstack.cm";

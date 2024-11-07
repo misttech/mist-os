@@ -129,19 +129,6 @@ func decodeSuccessCases(gidlDecodeSuccesses []ir.DecodeSuccess, schema mixer.Sch
 	return decodeSuccessCases, nil
 }
 
-func handleTypeName(subtype fidlgen.HandleSubtype) string {
-	switch subtype {
-	case fidlgen.HandleSubtypeNone:
-		return "Handle"
-	case fidlgen.HandleSubtypeChannel:
-		return "Channel"
-	case fidlgen.HandleSubtypeEvent:
-		return "Event"
-	default:
-		panic(fmt.Sprintf("unsupported handle subtype: %s", subtype))
-	}
-}
-
 func buildHandleDefs(defs []ir.HandleDef) string {
 	if len(defs) == 0 {
 		return ""
@@ -149,7 +136,19 @@ func buildHandleDefs(defs []ir.HandleDef) string {
 	var builder strings.Builder
 	builder.WriteString("[\n")
 	for _, d := range defs {
-		builder.WriteString(fmt.Sprintf("create_handle(fuchsia_controller_py.%s),\n", handleTypeName(d.Subtype)))
+		var subtype = d.Subtype
+		switch subtype {
+		case fidlgen.HandleSubtypeNone:
+			builder.WriteString(fmt.Sprintf("fuchsia_controller_py.Handle.create(),\n"))
+		case fidlgen.HandleSubtypeChannel:
+			// Discard other end of the channel since this only tests message encoding.
+			builder.WriteString(fmt.Sprintf("fuchsia_controller_py.Channel.create()[0],\n"))
+		case fidlgen.HandleSubtypeEvent:
+			// Discard other end of the event since this only tests message encoding.
+			builder.WriteString(fmt.Sprintf("fuchsia_controller_py.Event.create()[0],\n"))
+		default:
+			panic(fmt.Sprintf("unsupported handle subtype: %s", subtype))
+		}
 	}
 	builder.WriteString("]")
 	return builder.String()

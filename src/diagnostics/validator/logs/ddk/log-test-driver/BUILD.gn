@@ -30,7 +30,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("log-test-driver-driver") {
+fuchsia_cc_driver("log-test-driver-driver") {
   testonly = true
   output_name = "log-test-driver"
   deps = [

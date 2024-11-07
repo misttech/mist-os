@@ -15,7 +15,7 @@ type Capability = flexible union {
     6: resolver Resolver;
     @available(added=8)
     8: event_stream EventStream;
-    @available(added=HEAD)
+    @available(added=25)
     9: dictionary Dictionary;
     @available(added=20)
     10: config Configuration;
@@ -159,7 +159,7 @@ type EventStream = table {
 
 /// Declares a dictionary capability.
 // TODO(https://fxbug.dev/300503731): Add doc link
-@available(added=HEAD)
+@available(added=25)
 type Dictionary = table {
     /// (Required) The name of this dictionary.
     ///

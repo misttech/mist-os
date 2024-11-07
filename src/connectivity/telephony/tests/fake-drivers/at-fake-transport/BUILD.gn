@@ -17,7 +17,7 @@ group("tests") {
   deps = [ ":at_fake_bind_test" ]
 }
 
-fuchsia_driver("fake_at_driver-driver") {
+fuchsia_cc_driver("fake_at_driver-driver") {
   output_name = "at-fake-transport"
   testonly = true
 

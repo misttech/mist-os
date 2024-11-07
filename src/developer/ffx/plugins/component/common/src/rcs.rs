@@ -27,6 +27,16 @@ pub async fn connect_to_realm_query(
     Ok(realm_query)
 }
 
+/// Obtain the root ConfigOverride protocol using the RemoteControl protocol.
+pub async fn connect_to_config_override(
+    rcs_proxy: &rc::RemoteControlProxy,
+) -> Result<fsys::ConfigOverrideProxy> {
+    let config_override = rcs::root_config_override(&rcs_proxy, std::time::Duration::from_secs(15))
+        .await
+        .map_err(|err| ffx_error!("Could not open ConfigOverride: {err}"))?;
+    Ok(config_override)
+}
+
 /// Obtain the root RouteValidator protocol using the RemoteControl protocol.
 pub async fn connect_to_route_validator(
     rcs_proxy: &rc::RemoteControlProxy,

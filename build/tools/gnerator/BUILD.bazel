@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
 
 go_library(
     name = "gnerator_lib",
@@ -10,10 +11,7 @@ go_library(
         "gnerator.go",
     ],
     importpath = "go.fuchsia.dev/fuchsia/build/tools/gnerator",
-    target_compatible_with = [
-        "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
-    ],
+    target_compatible_with = HOST_CONSTRAINTS,
     deps = [
         "//third_party/golibs:go.starlark.net/syntax",
     ],
@@ -24,10 +22,7 @@ go_binary(
     srcs = [
         "cmd/main.go",
     ],
-    target_compatible_with = [
-        "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
-    ],
+    target_compatible_with = HOST_CONSTRAINTS,
     deps = [
         ":gnerator_lib",
         "//third_party/golibs:go.starlark.net/starlark",
@@ -43,10 +38,7 @@ go_test(
     embed = [
         ":gnerator_lib",
     ],
-    target_compatible_with = [
-        "@platforms//os:linux",
-        "@platforms//cpu:x86_64",
-    ],
+    target_compatible_with = HOST_CONSTRAINTS,
     deps = [
         "//third_party/golibs:github.com/google/go-cmp/cmp",
         "//third_party/golibs:go.starlark.net/starlark",

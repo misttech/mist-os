@@ -31,7 +31,6 @@ group("host_tools") {
   testonly = true
   public_deps = [
     "//src/performance/trace2json($host_toolchain)",
-    "//src/performance/traceutil($host_toolchain)",
     "//src/sys/pkg/bin/far:host($host_toolchain)",
     "//src/sys/pkg/bin/pm:host",
     "//tools/check-licenses:host($host_toolchain)",

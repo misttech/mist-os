@@ -180,6 +180,10 @@ mod inner_access {
             }
         }
 
+        pub fn rwx() -> Self {
+            Access::EXEC | Access::WRITE | Access::READ
+        }
+
         pub fn is_nontrivial(&self) -> bool {
             *self != Self::EXIST
         }

@@ -533,7 +533,7 @@ TEST_F(Gt6853Test, ReadReport) {
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(std::move(reader_client));
   WaitForNextReader();
 
-  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
+  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_boot()));
 
   WaitForTouchDataRead();
 
@@ -766,7 +766,7 @@ TEST_F(Gt6853Test, LatencyMeasurements) {
   WaitForNextReader();
 
   for (int i = 0; i < 5; i++) {
-    EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
+    EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_boot()));
     WaitForTouchDataRead();
   }
 

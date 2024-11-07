@@ -244,12 +244,7 @@ where
             fuchsia_async::Timer::new(std::time::Duration::from_secs(backoff)).await;
         }
         prev_boot_id = connection.boot_id;
-        cmd.maybe_set_interest(
-            &connection.log_settings_client,
-            realm_query,
-            formatter.writer().stderr(),
-        )
-        .await?;
+        cmd.maybe_set_interest(&connection.log_settings_client, realm_query).await?;
         formatter.set_boot_timestamp(Timestamp::from_nanos(
             connection.boot_timestamp.try_into().unwrap(),
         ));

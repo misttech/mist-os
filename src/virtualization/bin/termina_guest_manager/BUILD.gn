@@ -104,7 +104,6 @@ source_set("lib") {
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
-    "//src/storage/lib/vfs/cpp",
     "//src/virtualization/bin/guest_manager:lib",
     "//src/virtualization/lib/grpc",
     "//src/virtualization/lib/guest_config",

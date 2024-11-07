@@ -19,7 +19,6 @@ use {
 
 static PKGFS_BOOT_ARG_KEY: &'static str = "zircon.system.pkgfs.cmd";
 static PKGFS_BOOT_ARG_VALUE_PREFIX: &'static str = "bin/pkgsvr+";
-static SHELL_COMMANDS_BIN_PATH: &'static str = "shell-commands-bin";
 
 // When this feature is enabled, the base-resolver integration tests will start Fxblob.
 #[cfg(feature = "use_fxblob")]
@@ -279,7 +278,6 @@ impl TestEnvBuilder {
                     .capability(Capability::protocol::<fspace::ManagerMarker>())
                     .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
                     .capability(Capability::protocol::<fcomponent_resolution::ResolverMarker>())
-                    .capability(Capability::directory(SHELL_COMMANDS_BIN_PATH))
                     .capability(Capability::directory("pkgfs"))
                     .capability(Capability::directory("system"))
                     .capability(Capability::directory("pkgfs-packages"))
@@ -357,15 +355,6 @@ impl TestEnv {
         context: fcomponent_resolution::Context,
     ) -> Result<fcomponent_resolution::Component, fcomponent_resolution::ResolverError> {
         self.component_resolver().resolve_with_context(url, &context).await.unwrap()
-    }
-
-    fn shell_commands_bin(&self) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_directory_async(
-            self.realm_instance.root.get_exposed_dir(),
-            SHELL_COMMANDS_BIN_PATH,
-            fio::PERM_READABLE | fio::PERM_EXECUTABLE,
-        )
-        .expect("open shell-commands-bin")
     }
 
     fn package_cache(&self) -> fpkg::PackageCacheProxy {
@@ -613,31 +602,6 @@ async fn resolve_with_context_component() {
     assert_eq!(config_values, None);
     assert!(resolution_context.is_some());
     assert_eq!(abi_revision, Some(0xeccea2f70acd6fc0));
-}
-
-#[fuchsia::test]
-async fn shell_commands_bin_dir() {
-    let shell_commands = fuchsia_pkg_testing::PackageBuilder::new("shell-commands")
-        .add_resource_at("bin/a-file", &b"the-content"[..])
-        .build()
-        .await
-        .unwrap();
-    let env = TestEnvBuilder::new().await.static_packages(&[&shell_commands]).await.build().await;
-
-    assert_eq!(
-        fuchsia_fs::file::read(
-            &fuchsia_fs::directory::open_file(
-                &env.shell_commands_bin(),
-                "a-file",
-                fio::PERM_READABLE
-            )
-            .await
-            .unwrap()
-        )
-        .await
-        .unwrap(),
-        b"the-content".to_vec()
-    );
 }
 
 #[fuchsia::test]

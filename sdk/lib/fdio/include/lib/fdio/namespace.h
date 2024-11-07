@@ -191,7 +191,7 @@ zx_status_t fdio_ns_open(fdio_ns_t* ns, const char* path, uint32_t flags, zx_han
 //
 //   * `ZX_ERR_NOT_FOUND`: A prefix of `path` cannot be found in `ns`.
 zx_status_t fdio_ns_open3(fdio_ns_t* ns, const char* path, uint64_t flags, zx_handle_t request)
-    ZX_AVAILABLE_SINCE(24);
+    ZX_AVAILABLE_SINCE(16);
 
 // Connects to a service at `path` relative to the root of `ns` asynchronously.
 //

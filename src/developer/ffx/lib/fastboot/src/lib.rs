@@ -17,6 +17,7 @@ pub mod test {
     use crate::file_resolver::FileResolver;
     use anyhow::{anyhow, Result};
     use async_trait::async_trait;
+    use chrono::Duration;
     use ffx_fastboot_interface::fastboot_interface::{
         Fastboot, FastbootError, FastbootInterface, RebootEvent, UploadProgress, Variable,
     };
@@ -114,6 +115,7 @@ pub mod test {
             _partition_name: &str,
             _path: &str,
             listener: Sender<UploadProgress>,
+            _timeout: Duration,
         ) -> Result<(), FastbootError> {
             listener.send(UploadProgress::OnStarted { size: 1 }).await.map_err(|e| anyhow!(e))?;
             listener

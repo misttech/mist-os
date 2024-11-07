@@ -4,7 +4,6 @@
 
 use crate::test_topology;
 use anyhow::Error;
-use archivist_lib::constants;
 use diagnostics_assertions::{assert_data_tree, assert_json_diff, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use difference::assert_diff;
@@ -27,6 +26,9 @@ static PIPELINE_SINGLE_VALUE_GOLDEN: &str =
 static PIPELINE_ALL_GOLDEN: &str = include_str!("../../test_data/pipeline_reader_all_golden.json");
 static PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN: &str =
     include_str!("../../test_data/pipeline_reader_nonoverlapping_selectors_golden.json");
+
+const LOWPAN_ARCHIVE_ACCESSOR_NAME: &str = "fuchsia.diagnostics.LoWPANArchiveAccessor";
+const FEEDBACK_ARCHIVE_ACCESSOR_NAME: &str = "fuchsia.diagnostics.FeedbackArchiveAccessor";
 
 #[fuchsia::test]
 async fn read_components_inspect() {
@@ -341,7 +343,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     )
     .await;
 
-    assert!(pipeline_is_filtered(realm_proxy, 1, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(pipeline_is_filtered(realm_proxy, 1, FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
@@ -371,7 +373,7 @@ async fn feedback_disabled_pipeline() -> Result<(), Error> {
 
     writer.emit_example_inspect_data().await.unwrap();
 
-    assert!(!pipeline_is_filtered(realm_proxy, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(!pipeline_is_filtered(realm_proxy, 2, FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
@@ -396,7 +398,7 @@ async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
 
     writer.emit_example_inspect_data().await.unwrap();
 
-    assert!(!pipeline_is_filtered(realm_proxy, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(!pipeline_is_filtered(realm_proxy, 2, FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
@@ -455,25 +457,21 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     )
     .await;
 
-    assert!(pipeline_is_filtered(realm_proxy, 1, constants::LOWPAN_ARCHIVE_ACCESSOR_NAME).await);
+    assert!(pipeline_is_filtered(realm_proxy, 1, LOWPAN_ARCHIVE_ACCESSOR_NAME).await);
 
     Ok(())
 }
 
 async fn connect_to_feedback_accessor(realm_proxy: &RealmProxyClient) -> ArchiveAccessorProxy {
     realm_proxy
-        .connect_to_named_protocol::<ArchiveAccessorMarker>(
-            "fuchsia.diagnostics.FeedbackArchiveAccessor",
-        )
+        .connect_to_named_protocol::<ArchiveAccessorMarker>(FEEDBACK_ARCHIVE_ACCESSOR_NAME)
         .await
         .unwrap()
 }
 
 async fn connect_to_lowpan_accessor(realm_proxy: &RealmProxyClient) -> ArchiveAccessorProxy {
     realm_proxy
-        .connect_to_named_protocol::<ArchiveAccessorMarker>(
-            "fuchsia.diagnostics.LoWPANArchiveAccessor",
-        )
+        .connect_to_named_protocol::<ArchiveAccessorMarker>(LOWPAN_ARCHIVE_ACCESSOR_NAME)
         .await
         .unwrap()
 }

@@ -81,6 +81,7 @@ impl FileOps for GrallocFile {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _current_offset: starnix_uapi::off_t,

@@ -21,7 +21,7 @@ driver_bind_rules("ti_tas27xx-bind") {
   ]
 }
 
-fuchsia_driver("tas27xx-driver") {
+fuchsia_cc_driver("tas27xx-driver") {
   output_name = "tas27xx"
   configs += [
     "//build/config:all_source",

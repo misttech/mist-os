@@ -699,7 +699,6 @@ func bootTestSpec(basename string) build.TestSpec {
 			OS:         "fuchsia",
 			CPU:        "x64",
 			Label:      fmt.Sprintf("//src/something:%s(//build/toolchain/fuchsia:x64)", basename),
-			Isolated:   true,
 		},
 		Envs: []build.Environment{
 			{
@@ -709,6 +708,7 @@ func bootTestSpec(basename string) build.TestSpec {
 			},
 		},
 		ProductBundle: "boot-test_product_bundle",
+		IsBootTest:    true,
 	}
 }
 

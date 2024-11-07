@@ -18,6 +18,7 @@ use zx::sys::{
 };
 use zx::{AsHandleRef as _, Channel, Handle, Status};
 
+use crate::decoder::InternalHandleDecoder;
 use crate::fuchsia::{HandleDecoder, HandleEncoder};
 use crate::protocol::Transport;
 use crate::{Chunk, DecodeError, Decoder, Encoder, CHUNK_SIZE};
@@ -223,7 +224,9 @@ impl<'buf> Decoder<'buf> for &'buf mut RecvBuffer {
 
         Ok(())
     }
+}
 
+impl InternalHandleDecoder for &mut RecvBuffer {
     fn __internal_take_handles(&mut self, count: usize) -> Result<(), DecodeError> {
         if count > self.buffer.handles.len() - self.handles_taken {
             return Err(DecodeError::InsufficientHandles);

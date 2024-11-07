@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <fuchsia/io/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/vfs/cpp/composed_service_dir.h>
@@ -44,26 +44,21 @@ class ComposedServiceDirTest : public ::gtest::RealLoopFixture {
                                                         MakeService(service, /*fallback*/ true)));
     }
 
-    zx::channel fallback_client, fallback_server;
-    ASSERT_EQ(zx::channel::create(0, &fallback_client, &fallback_server), ZX_OK);
-    ASSERT_EQ(fallback_dir_->Serve(
-                  fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
-                  std::move(fallback_server)),
-              ZX_OK);
-    root_->SetFallback(fidl::ClientEnd<fuchsia_io::Directory>{std::move(fallback_client)});
+    auto [fallback_client, fallback_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(fallback_dir_->Serve(fuchsia_io::kPermReadable, std::move(fallback_server)), ZX_OK);
+    root_->SetFallback(std::move(fallback_client));
 
-    zx::channel root_server;
-    ASSERT_EQ(zx::channel::create(0, &root_client_, &root_server), ZX_OK);
-    ASSERT_EQ(root_->Serve(
-                  fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
-                  std::move(root_server)),
-              ZX_OK);
+    auto [root_client, root_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(root_->Serve(fuchsia_io::kPermReadable, std::move(root_server)), ZX_OK);
+    root_client_ = std::move(root_client);
   }
 
-  const zx::channel& root_client() { return root_client_; }
+  const fidl::ClientEnd<fuchsia_io::Directory>& root_client() { return root_client_; }
 
   auto& connection_attempts() { return connection_attempts_; }
   auto& fallback_attempts() { return fallback_attempts_; }
+
+  vfs::ComposedServiceDir* root() { return root_.get(); }
 
  private:
   fit::function<void(zx::channel channel, async_dispatcher_t* dispatcher)> MakeService(
@@ -79,9 +74,9 @@ class ComposedServiceDirTest : public ::gtest::RealLoopFixture {
 
   std::unique_ptr<vfs::ComposedServiceDir> root_;
   std::unique_ptr<vfs::PseudoDir> fallback_dir_;
-  zx::channel root_client_;
   std::map<std::string_view, size_t, std::less<>> connection_attempts_;
   std::map<std::string_view, size_t, std::less<>> fallback_attempts_;
+  fidl::ClientEnd<fuchsia_io::Directory> root_client_;
 };
 
 TEST_F(ComposedServiceDirTest, Connect) {
@@ -90,7 +85,8 @@ TEST_F(ComposedServiceDirTest, Connect) {
       for (const auto& service : kServices) {
         zx::channel client, server;
         ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
-        ASSERT_EQ(fdio_service_connect_at(root_client().get(), service.data(), server.release()),
+        ASSERT_EQ(fdio_service_connect_at(root_client().channel().get(), service.data(),
+                                          server.release()),
                   ZX_OK);
       }
     }
@@ -98,7 +94,8 @@ TEST_F(ComposedServiceDirTest, Connect) {
       for (const auto& service : kFallbackServices) {
         zx::channel client, server;
         ASSERT_EQ(zx::channel::create(0, &client, &server), ZX_OK);
-        ASSERT_EQ(fdio_service_connect_at(root_client().get(), service.data(), server.release()),
+        ASSERT_EQ(fdio_service_connect_at(root_client().channel().get(), service.data(),
+                                          server.release()),
                   ZX_OK);
       }
     }
@@ -115,6 +112,40 @@ TEST_F(ComposedServiceDirTest, Connect) {
   EXPECT_EQ(fallback_attempts()["service_a"], 0u);
   EXPECT_EQ(fallback_attempts()["service_b"], 0u);
   EXPECT_EQ(fallback_attempts()["service_c"], kFallbackServiceConnections);
+}
+
+TEST_F(ComposedServiceDirTest, ServeFailsWithInvalidArgs) {
+  // Serve should fail with an invalid channel.
+  ASSERT_EQ(root()->Serve(fuchsia_io::kPermReadable, {}), ZX_ERR_BAD_HANDLE);
+  // Serve should fail with an invalid set of flags.
+  {
+    auto [root_client, root_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(root()->Serve(static_cast<fuchsia_io::Flags>(~0ull), std::move(root_server)),
+              ZX_ERR_INVALID_ARGS);
+  }
+  // Non-directory protocols are disallowed.
+  {
+    auto [root_client, root_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(root()->Serve(fuchsia_io::Flags::kProtocolFile, std::move(root_server)),
+              ZX_ERR_INVALID_ARGS);
+  }
+}
+
+TEST_F(ComposedServiceDirTest, ServeFailsWithDifferentDispatcher) {
+  zx::channel root_client, root_server;
+  // We should be able to serve the same node multiple times as long as we use the same dispatcher.
+  for (size_t i = 0; i < 3; ++i) {
+    auto [root_client, root_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(root()->Serve(fuchsia_io::kPermReadable, std::move(root_server)), ZX_OK);
+  }
+  // Serve should fail with a different dispatcher. Only one dispatcher may be registered to serve
+  // a given node.
+  {
+    async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+    auto [root_client, root_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(root()->Serve(fuchsia_io::kPermReadable, std::move(root_server), loop.dispatcher()),
+              ZX_ERR_INVALID_ARGS);
+  }
 }
 
 }  // namespace

@@ -69,7 +69,7 @@ pub(crate) struct PhyContainer {
     recoveries: EventHistory<recovery::RecoveryAction>,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 pub trait PhyManagerApi {
     /// Checks to see if this PHY is already accounted for.  If it is not, queries its PHY
     /// attributes and places it in the hash map.
@@ -288,7 +288,7 @@ impl PhyManager {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl PhyManagerApi for PhyManager {
     async fn add_phy(&mut self, phy_id: u16) -> Result<(), PhyManagerError> {
         let supported_mac_roles = self

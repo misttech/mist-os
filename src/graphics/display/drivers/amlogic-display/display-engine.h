@@ -27,6 +27,7 @@
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/hot-plug-detection.h"
 #include "src/graphics/display/drivers/amlogic-display/image-info.h"
+#include "src/graphics/display/drivers/amlogic-display/structured_config.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu.h"
@@ -41,15 +42,18 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   // Factory method for production use.
   //
   // `incoming` must be non-null.
+  // `visual_debug_level` used to enable colorful blackscreen.
   static zx::result<std::unique_ptr<DisplayEngine>> Create(
-      std::shared_ptr<fdf::Namespace> incoming);
+      std::shared_ptr<fdf::Namespace> incoming, structured_config::Config structured_config);
 
   // Creates an uninitialized `DisplayEngine` instance.
   //
   // `incoming` must be non-null.
+  // `visual_debug_level` used to enable colorful blackscreen.
   //
   // Production code should use `DisplayEngine::Create()` instead.
-  explicit DisplayEngine(std::shared_ptr<fdf::Namespace> incoming);
+  DisplayEngine(std::shared_ptr<fdf::Namespace> incoming,
+                structured_config::Config structured_config);
 
   DisplayEngine(const DisplayEngine&) = delete;
   DisplayEngine(DisplayEngine&&) = delete;
@@ -274,6 +278,8 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   std::unique_ptr<VsyncReceiver> vsync_receiver_;
 
   fit::function<bool(fuchsia_images2::wire::PixelFormat format)> format_support_check_ = nullptr;
+
+  structured_config::Config structured_config_;
 };
 
 }  // namespace amlogic_display

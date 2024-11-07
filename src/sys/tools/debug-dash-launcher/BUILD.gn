@@ -5,12 +5,22 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
+fuchsia_component_manifest("manifest") {
+  component_name = "debug-dash-launcher"
+  manifest = "meta/debug_dash_launcher.cml"
+}
+
+fuchsia_structured_config_rust_lib("debug_dash_launcher_config") {
+  cm_label = ":manifest"
+}
+
 rustc_binary("bin") {
   output_name = "debug-dash-launcher"
   edition = "2021"
   with_unit_tests = true
 
   deps = [
+    ":debug_dash_launcher_config",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.dash:fuchsia.dash_rust",
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
@@ -60,8 +70,7 @@ rustc_binary("bin") {
 }
 
 fuchsia_component("component") {
-  component_name = "debug_dash_launcher"
-  manifest = "meta/debug_dash_launcher.cml"
+  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 

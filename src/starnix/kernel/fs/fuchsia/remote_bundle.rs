@@ -134,7 +134,12 @@ impl RemoteBundle {
 }
 
 impl FileSystemOps for RemoteBundle {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         const REMOTE_BUNDLE_FS_MAGIC: u32 = u32::from_be_bytes(*b"bndl");
         Ok(default_statfs(REMOTE_BUNDLE_FS_MAGIC))
     }
@@ -184,6 +189,7 @@ impl FsNodeOps for File {
 
     fn fetch_and_refresh_info<'a>(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -209,6 +215,7 @@ impl FsNodeOps for File {
 
     fn get_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -221,6 +228,7 @@ impl FsNodeOps for File {
 
     fn list_xattrs(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _size: usize,
@@ -333,6 +341,7 @@ impl FileOps for DirectoryObject {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -437,6 +446,7 @@ impl FsNodeOps for DirectoryObject {
 
     fn get_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -449,6 +459,7 @@ impl FsNodeOps for DirectoryObject {
 
     fn list_xattrs(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _size: usize,
@@ -464,7 +475,12 @@ struct SymlinkObject;
 impl FsNodeOps for SymlinkObject {
     fs_node_impl_symlink!();
 
-    fn readlink(&self, node: &FsNode, _current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    fn readlink(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        node: &FsNode,
+        _current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let target =
@@ -474,6 +490,7 @@ impl FsNodeOps for SymlinkObject {
 
     fn get_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -486,6 +503,7 @@ impl FsNodeOps for SymlinkObject {
 
     fn list_xattrs(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _size: usize,
@@ -531,7 +549,7 @@ mod test {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let (server, client) = zx::Channel::create();
-        fdio::open("/pkg", rights, server).expect("failed to open /pkg");
+        fdio::open_deprecated("/pkg", rights, server).expect("failed to open /pkg");
         let fs = RemoteBundle::new_fs(
             &kernel,
             &fio::DirectorySynchronousProxy::new(client),
@@ -564,7 +582,7 @@ mod test {
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&current_task, &test_dir.mount, "user.a".into(), usize::MAX)
+                .get_xattr(&mut locked, &current_task, &test_dir.mount, "user.a".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             "apple"
@@ -572,7 +590,7 @@ mod test {
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&current_task, &test_dir.mount, "user.b".into(), usize::MAX)
+                .get_xattr(&mut locked, &current_task, &test_dir.mount, "user.b".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             "ball"
@@ -580,7 +598,7 @@ mod test {
         assert_eq!(
             test_file
                 .node()
-                .list_xattrs(&current_task, usize::MAX)
+                .list_xattrs(&mut locked, &current_task, usize::MAX)
                 .expect("list_xattr failed")
                 .unwrap()
                 .into_iter()
@@ -600,7 +618,7 @@ mod test {
             .expect("lookup failed");
 
         if let SymlinkTarget::Path(target) =
-            test_symlink.readlink(&current_task).expect("readlink failed")
+            test_symlink.readlink(&mut locked, &current_task).expect("readlink failed")
         {
             assert_eq!(&target, "file");
         } else {

@@ -19,7 +19,7 @@ use futures::{StreamExt, TryStreamExt};
 use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
 use starnix_kernel_runner::{
     create_component_from_stream, serve_component_runner, serve_container_controller,
-    serve_memory_attribution_provider, Container, ContainerServiceConfig,
+    serve_memory_attribution_provider_elfkernel, Container, ContainerServiceConfig,
 };
 use starnix_logging::{log_debug, trace_instant, CATEGORY_STARNIX, NAME_START_KERNEL};
 use {
@@ -197,7 +197,7 @@ async fn main() -> Result<(), Error> {
                     .expect("failed to start container controller");
             }
             KernelServices::MemoryAttributionProvider(stream) => {
-                serve_memory_attribution_provider(stream, &container.wait().await.kernel)
+                serve_memory_attribution_provider_elfkernel(stream, container.wait().await)
                     .await
                     .expect("failed to start memory attribution provider");
             }

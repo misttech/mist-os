@@ -15,7 +15,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker as _, ServerEnd};
 use fidl_fuchsia_hardware_tee::{DeviceConnectorMarker, DeviceConnectorProxy};
 use fidl_fuchsia_tee::{self as fuchsia_tee, DeviceInfoMarker};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_fs::{directory as vfs, OpenFlags};
+use fuchsia_fs::directory as vfs;
 use futures::prelude::*;
 use futures::select;
 use futures::stream::FusedStream;
@@ -124,7 +124,7 @@ async fn enumerate_tee_devices() -> Result<Vec<PathBuf>, Error> {
 }
 
 async fn create_watcher(path: &str) -> Result<vfs::Watcher, Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(path, OpenFlags::RIGHT_READABLE)?;
+    let dir = fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::PERM_READABLE)?;
     let watcher = vfs::Watcher::new(&dir).await?;
     Ok(watcher)
 }

@@ -1032,7 +1032,7 @@ common --enable_bzlmod=false
         os.path.join("workspace", "fuchsia_build_generated", "args.json"),
         os.path.join(gn_output_dir, "args.json"),
     )
-    # LINT.ThenChange(//build/bazel/repository_rules.bzl)
+    # LINT.ThenChange(//build/bazel/repository_rules/fuchsia_build_info_repository.bzl)
 
     # LINT.IfChange
     # Create a symlink to the git host executable to make it accessible
@@ -1064,6 +1064,12 @@ common --enable_bzlmod=false
 
     # LINT.IfChange
     generated_repositories_inputs["fuchsia_in_tree_idk"] = all_in_tree_idk_metas
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
+
+    # LINT.IfChange
+    generated_repositories_inputs[
+        "fuchsia_internal_only_idk"
+    ] = all_internal_only_idk_metas
     # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
@@ -1106,7 +1112,9 @@ common --enable_bzlmod=false
     ] = fuchsia_icu_config_files
     # LINT.ThenChange(../BUILD.gn)
 
+    # LINT.IfChange
     generated_repositories_inputs["boringssl"] = boringssl_content_files
+    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     for repo_name in sorted(generated_repositories_inputs.keys()):
         repo_inputs = generated_repositories_inputs[repo_name]

@@ -13,6 +13,7 @@
 #include "third_party/abseil-cpp/absl/strings/match.h"
 
 namespace cobalt::test {
+namespace {
 
 using testing::ContainsRegex;
 
@@ -296,4 +297,5 @@ TEST(JSONHelper, CanRead) {
   }
 }
 
+}  // namespace
 }  // namespace cobalt::test

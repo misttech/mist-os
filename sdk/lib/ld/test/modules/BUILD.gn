@@ -66,9 +66,15 @@ per_test_suffices = [
   "GlobalDep",
   "GlobalPrecedence",
   "GlobalPrecedenceDeps",
+  "UpdateModeToGlobal",
+  "GlobalModuleOrdering",
+  "GlobalModuleOrderingMultiDlopen",
+  "GlobalModuleOrderingOfDeps",
   "RelativeRelocPrecedence",
   "RootPrecedenceInDepResolution",
   "PrecedenceInDepResolution",
+  "StartupModulesBasic",
+  "StartupModulesPriorityOverGlobal",
 ]
 
 # This reaches all the runtime deps of //sdk/lib/dl/test:dl-unittests.
@@ -91,6 +97,18 @@ group("dl-test-data.deps") {
       deps += [ "$test.$suffix.module" ]
     }
   }
+}
+
+# These are the shared_library() targets to be included as startup modules for
+# //sdk/lib/dl/test:dl-unittests.
+group("dl-unittest.deps") {
+  visibility = [ "//sdk/lib/dl/test:*" ]
+  testonly = true
+  deps = [
+    ":has-foo-v1.StartupModulesPriorityOverGlobal",
+    ":ld-dep-foo-v1.StartupModulesBasic",
+    ":ld-dep-foo-v2.StartupModulesBasic",
+  ]
 }
 
 # This rolls up resource() equivalent metadata from $deps and applies $prefix.
@@ -1353,25 +1371,25 @@ foreach(test, [ "" ] + per_test_suffices) {
     ]
   }
 
-  test_dep("foo-v1$suffix") {
-    symbol_name = "foo$sym_suffix"
-    value = 2
+  test_shared_library("ld-dep-foo-v1$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo-v1.cc" ]
   }
 
-  test_dep("foo-v2$suffix") {
-    symbol_name = "foo$sym_suffix"
-    value = 7
+  test_shared_library("ld-dep-foo-v2$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo-v2.cc" ]
   }
 
   test_shared_library("has-foo-v1$suffix") {
     defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
-    sources = [ "foo.cc" ]
+    sources = [ "call-foo-v1.cc" ]
     deps = [ ":ld-dep-foo-v1$suffix" ]
   }
 
   test_shared_library("has-foo-v2$suffix") {
     defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
-    sources = [ "foo.cc" ]
+    sources = [ "call-foo-v2.cc" ]
     deps = [ ":ld-dep-foo-v2$suffix" ]
   }
 

@@ -5,7 +5,6 @@
 #ifndef SRC_DEVELOPER_FORENSICS_CRASH_REPORTS_PRODUCT_QUOTAS_H_
 #define SRC_DEVELOPER_FORENSICS_CRASH_REPORTS_PRODUCT_QUOTAS_H_
 
-#include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
 #include <lib/zx/clock.h>
 
@@ -15,6 +14,7 @@
 
 #include "src/developer/forensics/crash_reports/product.h"
 #include "src/developer/forensics/utils/utc_clock_ready_watcher.h"
+#include "src/developer/forensics/utils/utc_time_provider.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/lib/timekeeper/clock.h"
 #include "third_party/rapidjson/include/rapidjson/document.h"
@@ -29,8 +29,7 @@ namespace crash_reports {
 // remaining.
 class ProductQuotas {
  public:
-  ProductQuotas(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
-                std::optional<uint64_t> quota, std::string quota_filepath,
+  ProductQuotas(timekeeper::Clock* clock, std::optional<uint64_t> quota, std::string quota_filepath,
                 UtcClockReadyWatcherBase* utc_clock_ready_watcher, zx::duration reset_time_offset);
   ProductQuotas(const ProductQuotas&) = delete;
   ProductQuotas(ProductQuotas&&) = delete;
@@ -53,12 +52,13 @@ class ProductQuotas {
 
   // Keep waiting on the clock handle until the clock has started.
   void OnClockStart();
+  void ResetIfPastDeadline();
 
-  async_dispatcher_t* dispatcher_;
   timekeeper::Clock* clock_;
   std::optional<uint64_t> quota_;
   const std::string quota_filepath_;
   UtcClockReadyWatcherBase* utc_clock_ready_watcher_;
+  UtcTimeProvider utc_provider_;
 
   rapidjson::Document quota_json_;
   std::map<std::string, uint64_t> remaining_quotas_;
@@ -66,8 +66,10 @@ class ProductQuotas {
   // Should be exactly midnight UTC of a date, i.e. multiples of zx::hour(24). This is the value
   // currently saved in |quota_json_|.
   std::optional<timekeeper::time_utc> next_reset_utc_time_;
+
+  // The actual boot time that the next reset is expected to occur, including offset.
+  zx::time_boot next_reset_boot_time_;
   zx::duration reset_time_offset_;
-  async::TaskClosureMethod<ProductQuotas, &ProductQuotas::Reset> reset_task_{this};
   fxl::WeakPtrFactory<ProductQuotas> ptr_factory_{this};
 };
 

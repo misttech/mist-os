@@ -1506,17 +1506,10 @@ mod tests {
             },
         });
 
-        // Set the default network and act like it isn't known to the socketproxy.
-        // This will initiate a reconnect to the proxy and the state to be reset.
+        // Set the default network and act like it isn't known to the socketproxy
+        // because of the `NetworkRegistrySetDefaultError::NotFound`. This will
+        // initiate a reconnect to the proxy and the state to be reset.
         manager.set_default_network_id(Some(network_id));
-        assert_data_tree!(inspector, root: {
-            nmfs: contains {
-                default_ids_set: {
-                    seen: 1u64,
-                    sent: 0u64,
-                },
-            },
-        });
 
         // During this period `replay_network_events()` should be called from
         // another thread and the inspect values should be updated.

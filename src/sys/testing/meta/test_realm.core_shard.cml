@@ -39,6 +39,11 @@
             from: "parent",
             to: "#testing",
         },
+        {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "#pkg-resolver",
+            to: "#testing",
+        },
 
         // Needed for IO compliance tests for CM capabiltiies.
         {
@@ -149,7 +154,7 @@
         },
         {
             protocol: "fuchsia.memorypressure.Provider",
-            from: "#memory_monitor",
+            from: "#memory_pressure_signaler",
             to: "#testing",
             source_availability: "unknown",
         },

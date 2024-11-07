@@ -12,7 +12,7 @@ driver_bind_rules("bind") {
   deps = [ "//examples/drivers/bind/bindlib:gizmo.example" ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "simple_dfv1"
   sources = [ "simple_driver.cc" ]
   deps = [

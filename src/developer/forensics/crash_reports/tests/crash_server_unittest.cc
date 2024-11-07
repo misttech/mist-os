@@ -43,7 +43,7 @@ const Report kReport{/*report_id=*/0,
                      /*attachments=*/{},
                      /*snapshot_uuid=*/kSnapshotUuid,
                      /*minidump=*/std::nullopt};
-constexpr zx::time kUptime(zx::sec(86).get());
+constexpr zx::time_boot kUptime(zx::sec(86).get());
 
 class CrashServerTest : public UnitTestFixture {
  protected:

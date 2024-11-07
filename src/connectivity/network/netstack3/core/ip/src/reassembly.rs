@@ -235,7 +235,7 @@ pub trait FragmentablePacket {
 
 impl<B: SplitByteSlice> FragmentablePacket for Ipv4Packet<B> {
     fn fragment_data(&self) -> (u32, u16, bool) {
-        (u32::from(self.id()), self.fragment_offset(), self.mf_flag())
+        (u32::from(self.id()), self.fragment_offset().into_raw(), self.mf_flag())
     }
 }
 
@@ -245,7 +245,7 @@ impl<B: SplitByteSlice> FragmentablePacket for Ipv6Packet<B> {
             if let Ipv6ExtensionHeaderData::Fragment { fragment_data } = ext_hdr.data() {
                 return (
                     fragment_data.identification(),
-                    fragment_data.fragment_offset(),
+                    fragment_data.fragment_offset().into_raw(),
                     fragment_data.m_flag(),
                 );
             }
@@ -820,7 +820,7 @@ mod tests {
     };
     use netstack3_base::{CtxPair, IntoCoreTimerCtx};
     use packet::{Buf, ParsablePacket, ParseBuffer, Serializer};
-    use packet_formats::ip::{IpProto, Ipv6ExtHdrType};
+    use packet_formats::ip::{FragmentOffset, IpProto, Ipv6ExtHdrType};
     use packet_formats::ipv4::Ipv4PacketBuilder;
     use packet_formats::ipv6::Ipv6PacketBuilder;
 
@@ -963,7 +963,7 @@ mod tests {
     ) {
         let mut builder = get_ipv4_builder();
         builder.id(fragment_id);
-        builder.fragment_offset(fragment_offset);
+        builder.fragment_offset(FragmentOffset::new(fragment_offset).unwrap());
         builder.mf_flag(m_flag);
         let body =
             generate_body_fragment(fragment_id, fragment_offset, usize::from(FRAGMENT_BLOCK_SIZE));
@@ -1528,7 +1528,7 @@ mod tests {
         // `FRAGMENT_BLOCK_SIZE` and more flag is `true`).
         let mut builder = get_ipv4_builder();
         builder.id(fragment_id);
-        builder.fragment_offset(1);
+        builder.fragment_offset(FragmentOffset::new(1).unwrap());
         builder.mf_flag(true);
         // Body with 1 byte less than `FRAGMENT_BLOCK_SIZE` so it is not a
         // multiple of `FRAGMENT_BLOCK_SIZE`.
@@ -1546,7 +1546,7 @@ mod tests {
         // allowed to not be a multiple of `FRAGMENT_BLOCK_SIZE`.
         let mut builder = get_ipv4_builder();
         builder.id(fragment_id);
-        builder.fragment_offset(1);
+        builder.fragment_offset(FragmentOffset::new(1).unwrap());
         builder.mf_flag(false);
         // Body with 1 byte less than `FRAGMENT_BLOCK_SIZE` so it is not a
         // multiple of `FRAGMENT_BLOCK_SIZE`.

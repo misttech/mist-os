@@ -6,7 +6,7 @@
 use crate::bootfs::BootfsSvc;
 use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_time as ftime;
-use fuchsia_fs::{file, OpenFlags};
+use fuchsia_fs::{file, PERM_READABLE};
 use fuchsia_runtime::{UtcClock, UtcInstant};
 use futures::prelude::*;
 use std::sync::Arc;
@@ -41,7 +41,7 @@ impl UtcInstantMaintainer {
 async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<UtcInstant, Error> {
     let file_contents: String;
     if bootfs.is_none() {
-        let file_proxy = file::open_in_namespace_deprecated(path, OpenFlags::RIGHT_READABLE)
+        let file_proxy = file::open_in_namespace(path, PERM_READABLE)
             .context("failed to open backstop time file from disk")?;
         file_contents = file::read_to_string(&file_proxy)
             .await

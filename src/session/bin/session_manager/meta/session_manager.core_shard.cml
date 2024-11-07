@@ -107,7 +107,7 @@
         },
         {
             protocol: [ "fuchsia.memorypressure.Provider" ],
-            from: "#memory_monitor",
+            from: "#memory_pressure_signaler",
             to: "#session-manager",
         },
         {
@@ -443,8 +443,9 @@
             subdir: "packages",
         },
         {
-            directory: "bin",
+            directory: "base-bin",
             from: "parent",
+            as: "bin",
             to: "#session-manager",
         },
         {

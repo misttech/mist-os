@@ -160,7 +160,7 @@ fuchsia_test_package("web-semantics-test") {
   deps = [
     "//src/connectivity/network:netstack-for-tests",
     "//src/developer/build_info/testing:fake-build-info-component",
-    "//src/developer/memory/monitor:component",
+    "//src/developer/memory/pressure_signaler:component",
     "//src/fonts:font_provider_hermetic_for_test",
     "//src/testing/fidl/intl_property_manager:intl_property_manager_component",
     "//src/ui/a11y/lib/semantics/tests/web_client:component",

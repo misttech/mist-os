@@ -470,7 +470,7 @@ TEST_F(FocaltechTest, Touch) {
                                expected_report + std::min(i + 8, sizeof(expected_report))));
     }
   });
-  irq_.trigger(0, zx::clock::get_monotonic());
+  irq_.trigger(0, zx::clock::get_boot());
 
   {
     auto result = reader->ReadInputReports();

@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl::endpoints::create_proxy;
 use fidl_fidl_examples_routing_echo::EchoMarker;
 use fuchsia_async::DurationExt;
 use fuchsia_component::client::*;
-use {
-    fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync,
-};
+use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 async fn get_manifest(query: &fsys::RealmQueryProxy, moniker: &str) -> fcdecl::Component {
     let iterator = query.get_resolved_declaration(moniker).await.unwrap().unwrap();
@@ -86,16 +83,9 @@ pub async fn echo_server() {
     let err = query.get_structured_config("./echo_server").await.unwrap().unwrap_err();
     assert_eq!(err, fsys::GetStructuredConfigError::InstanceNotResolved);
 
-    let (_, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+    let (_, server_end) = create_proxy().unwrap();
     let err = query
-        .open(
-            "./echo_server",
-            fsys::OpenDirType::PackageDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory("./echo_server", fsys::OpenDirType::PackageDir, server_end)
         .await
         .unwrap()
         .unwrap_err();
@@ -129,17 +119,9 @@ pub async fn echo_server() {
     assert!(uses.len() == 1 || uses.len() == 2, "{uses:?}");
     assert_eq!(exposes.len(), 2);
 
-    let (pkg_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let server_end = ServerEnd::new(server_end.into_channel());
+    let (pkg_dir, server_end) = create_proxy().unwrap();
     query
-        .open(
-            "./echo_server",
-            fsys::OpenDirType::PackageDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory("./echo_server", fsys::OpenDirType::PackageDir, server_end)
         .await
         .unwrap()
         .unwrap();
@@ -167,17 +149,9 @@ pub async fn echo_server() {
         ]
     );
 
-    let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let server_end = ServerEnd::new(server_end.into_channel());
+    let (exposed_dir, server_end) = create_proxy().unwrap();
     query
-        .open(
-            "./echo_server",
-            fsys::OpenDirType::ExposedDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory("./echo_server", fsys::OpenDirType::ExposedDir, server_end)
         .await
         .unwrap()
         .unwrap();
@@ -195,18 +169,9 @@ pub async fn echo_server() {
             },
         ]
     );
-
-    let (ns_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let server_end = ServerEnd::new(server_end.into_channel());
+    let (ns_dir, server_end) = create_proxy().unwrap();
     query
-        .open(
-            "./echo_server",
-            fsys::OpenDirType::NamespaceDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory("./echo_server", fsys::OpenDirType::NamespaceDir, server_end)
         .await
         .unwrap()
         .unwrap();
@@ -225,19 +190,8 @@ pub async fn echo_server() {
         ]
     );
 
-    let (svc_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let server_end = ServerEnd::new(server_end.into_channel());
-    query
-        .open(
-            "./echo_server",
-            fsys::OpenDirType::NamespaceDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            "svc",
-            server_end,
-        )
+    let svc_dir = fuchsia_fs::directory::open_directory(&ns_dir, "svc", fuchsia_fs::PERM_READABLE)
         .await
-        .unwrap()
         .unwrap();
     let entries = fuchsia_fs::directory::readdir(&svc_dir).await.unwrap();
     // Extra entry (for debugdata) is possible on coverage builds.
@@ -251,40 +205,30 @@ pub async fn echo_server() {
         "{entries:?}"
     );
 
-    let (echo, server_end) = create_proxy::<EchoMarker>().unwrap();
-    let server_end = ServerEnd::new(server_end.into_channel());
+    let (outgoing_dir, server_end) = create_proxy().unwrap();
     query
-        .open(
-            "./echo_server",
-            fsys::OpenDirType::OutgoingDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            "svc/fidl.examples.routing.echo.Echo",
-            server_end,
-        )
+        .open_directory("./echo_server", fsys::OpenDirType::OutgoingDir, server_end)
         .await
         .unwrap()
         .unwrap();
+
+    let echo = connect_to_protocol_at_dir_svc::<EchoMarker>(&outgoing_dir).unwrap();
     let reply = echo.echo_string(Some("test")).await.unwrap();
     assert_eq!(reply.unwrap(), "test");
 
-    let (elf_dir, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    let server_end = ServerEnd::new(server_end.into_channel());
+    let (runtime_dir, server_end) = create_proxy().unwrap();
     query
-        .open(
-            "./echo_server",
-            fsys::OpenDirType::RuntimeDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            "elf",
-            server_end,
-        )
+        .open_directory("./echo_server", fsys::OpenDirType::RuntimeDir, server_end)
         .await
         .unwrap()
         .unwrap();
 
     // ELF runner doesn't doesn't fully populate the runtime_dir before it begins serving it, so
     // poll in a loop.
+    let elf_dir =
+        fuchsia_fs::directory::open_directory(&runtime_dir, "elf", fuchsia_fs::PERM_READABLE)
+            .await
+            .unwrap();
     let expected_entries = vec![
         fuchsia_fs::directory::DirEntry {
             name: "job_id".to_string(),

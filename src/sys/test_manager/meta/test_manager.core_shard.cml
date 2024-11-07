@@ -112,9 +112,7 @@
             to: "#test_manager",
         },
         {
-            protocol: [
-                "fuchsia.tracing.controller.Provisioner",
-            ],
+            protocol: [ "fuchsia.tracing.controller.Provisioner" ],
             from: "#trace_manager",
             to: "#test_manager",
             source_availability: "unknown",
@@ -152,7 +150,7 @@
         },
         {
             protocol: "fuchsia.memorypressure.Provider",
-            from: "#memory_monitor",
+            from: "#memory_pressure_signaler",
             to: "#test_manager",
             source_availability: "unknown",
         },

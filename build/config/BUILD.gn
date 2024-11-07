@@ -454,13 +454,13 @@ config("download_outputs") {
 # optimization level by remove default_optimize and manually applying one of
 # the configs below.
 
+# This is the default optimization level for "debug" builds.
 config("optimize_none") {
   cflags = [ "-O0" ]
   ldflags = cflags
   rustflags = [ "-Copt-level=0" ]
 }
 
-# This is the default optimization level for "debug" builds.
 config("optimize_debug") {
   cflags = [ "-Og" ]
   ldflags = cflags
@@ -821,9 +821,15 @@ config("default_warnings") {
     ]
   }
 
-  # TODO(https://fxbug.dev/331282813): Disable "-Wdeprecated-pragma" which
-  # warns for deprecated std::errc constants.
-  configs = [ ":Wno-deprecated-pragma" ]
+  configs = [
+    # TODO(https://fxbug.dev/331282813): Disable "-Wdeprecated-pragma" which
+    # warns for deprecated std::errc constants.
+    ":Wno-deprecated-pragma",
+
+    # TODO(https://fxbug.dev/376323001): Disable "-Wnontrivial-memaccess" until
+    # all instances are fixed.
+    ":Wno-nontrivial-memaccess",
+  ]
 }
 
 # Code that goes into the SDK or otherwise contributes to the SDK surface area
@@ -1343,7 +1349,7 @@ config("werror") {
 
     # New versions of C++ often include new deprecations, so treat them as
     # warnings by default.
-    if ((defined(experimental_cxx_version) && experimental_cxx_version >= 20) ||
+    if (experimental_cxx_version != false ||
         # TODO(https://fxbug.dev/327227416): Remove after addressing
         # Xcode-specific deprecation warnings.
         is_mac) {
@@ -1521,6 +1527,14 @@ tlsdesc = {
 
     can_enable = true
     can_disable = true
+  } else if (current_cpu == "arm") {
+    enable_dialect = "gnu2"
+    disable_dialect = "gnu"
+    have_tlsdesc = 1
+
+    # On arm64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under GCC, but is always enabled for Clang.
+    can_enable = is_gcc
+    can_disable = is_gcc
   }
 }
 
@@ -1558,6 +1572,14 @@ config("Wno-deprecated-pragma") {
   }
 }
 
+# TODO(https://fxbug.dev/376323001): Disable "-Wnontrivial-memaccess" until
+# all instances are fixed.
+config("Wno-nontrivial-memaccess") {
+  if (!is_gcc) {
+    cflags = [ "-Wno-nontrivial-memaccess" ]
+  }
+}
+
 # Adding this config directly to a linking target ensures that any deps on
 # ifs_shared_library() `.as-needed` targets don't bring link stubs into the
 # link.  This should be used for a relocatable link, along with a metadata
@@ -1577,6 +1599,14 @@ group("test_executable_deps") {
   # consideration.
   if (is_host && is_linux) {
     deps += [ "//build/config/sanitizers:sanitizers_use_symbolizer_markup" ]
+  }
+}
+
+config("crel") {
+  # TODO(drewry) arm doesn't like this so far.
+  if (is_elf && !is_gcc && current_cpu != "arm") {
+    cflags = [ "-Wa,--crel,--allow-experimental-crel" ]
+    asmflags = cflags
   }
 }
 

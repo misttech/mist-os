@@ -65,7 +65,7 @@ source_set("sources") {
   ]
 }
 
-fuchsia_driver("aml-gpu-driver") {
+fuchsia_cc_driver("aml-gpu-driver") {
   output_name = "aml-gpu"
   deps = [ ":sources" ]
 }

@@ -19,7 +19,7 @@ driver_bind_rules("post-init-bind") {
   ]
 }
 
-fuchsia_driver("post-init-driver") {
+fuchsia_cc_driver("post-init-driver") {
   output_name = "post-init"
   sources = [
     "display.cc",

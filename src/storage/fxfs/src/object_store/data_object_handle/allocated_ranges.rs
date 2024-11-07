@@ -5,17 +5,31 @@
 use std::ops::Range;
 use std::sync::Mutex;
 
+/// Whether this particular logical file range is in overwrite or CoW mode. Overwrite mode ranges
+/// have overwrite extents already allocated, and should use multi_overwrite. CoW mode ranges
+/// should use multi_write, and might or might not have extents in the region already.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RangeType {
     Cow(Range<u64>),
     Overwrite(Range<u64>),
 }
 
+/// AllocatedRanges tracks the logical ranges of a file which are pre-allocated using allocate, in
+/// other words, the ranges of the file with overwrite extents. It's used by PagedObjectHandle to
+/// split writes to CoW ranges and writes to overwrite ranges into separate batches so they can
+/// have different transaction options.
+///
+/// It has a mutex on the list of ranges to make sure checking for overlaps and adding new ranges
+/// don't collide. When getting an iterator of overlapping ranges, the lock is held until the
+/// iterator is dropped.
 #[derive(Debug)]
 pub struct AllocatedRanges {
     ranges: Mutex<Vec<Range<u64>>>,
 }
 
+/// An iterator over the types of ranges within a particular query range. The range types can be
+/// CoW or overwrite. The lock inside AllocatedRanges is held until this is dropped so be careful
+/// with it across await points.
 pub struct RangeOverlapIter<'a> {
     query_range: Range<u64>,
     index: usize,
@@ -63,6 +77,7 @@ impl AllocatedRanges {
         self.ranges.lock().unwrap().clear();
     }
 
+    /// Returns an iterator which slices up the query range into subranges of particular types.
     pub fn overlap<'a>(&'a self, query_range: Range<u64>) -> RangeOverlapIter<'a> {
         let ranges = self.ranges.lock().unwrap();
         let index = match ranges.binary_search_by_key(&query_range.start, |r| r.end) {
@@ -74,9 +89,9 @@ impl AllocatedRanges {
         RangeOverlapIter { query_range, index, ranges }
     }
 
-    // Apply range takes a single, valid file range and inserts it into the list of ranges it's
-    // storing. This list of ranges, so it's easy to insert and search, is kept sorted and merged,
-    // so that the list has no overlapping ranges.
+    /// Apply range takes a single, valid file range and inserts it into the list of ranges it's
+    /// storing. This list of ranges, so it's easy to insert and search, is kept sorted and merged,
+    /// so that the list has no overlapping ranges.
     pub fn apply_range(&self, new_range: Range<u64>) {
         Self::apply_range_to(self.ranges.lock().unwrap().as_mut(), new_range)
     }
@@ -110,6 +125,29 @@ impl AllocatedRanges {
             merge_index += 1;
         }
         ranges.drain(merge_start + 1..merge_index);
+    }
+
+    /// For when a file is truncated. Drop any ranges past the cutoff point. If a range covers the
+    /// cutoff point, it is modified to end at the cutoff.
+    pub fn truncate(&self, cutoff: u64) {
+        let mut ranges = self.ranges.lock().unwrap();
+        let mut index = match ranges.binary_search_by_key(&cutoff, |r| r.end) {
+            // If the cutoff is exactly at the end of a range, that range doesn't change, so start
+            // with the next one.
+            Ok(pos) => pos + 1,
+            Err(pos) => pos,
+        };
+        // If the index points at the end of the list, the cutoff is after all the ranges.
+        if index == ranges.len() {
+            return;
+        }
+        // Handle the cutoff being partway through a range.
+        if ranges[index].start < cutoff {
+            ranges[index].end = cutoff;
+            index += 1;
+        }
+
+        ranges.truncate(index);
     }
 }
 
@@ -245,5 +283,45 @@ mod tests {
 
         ranges.apply_range(0..100);
         assert_eq!(ranges.overlap(0..100).collect::<Vec<_>>(), vec![RangeType::Overwrite(0..100)]);
+    }
+
+    #[fuchsia::test]
+    fn test_trim_ranges() {
+        struct Case {
+            applied: Vec<Range<u64>>,
+            cutoff: u64,
+            expected: Vec<Range<u64>>,
+        }
+
+        let cases = [
+            Case { applied: vec![], cutoff: 10, expected: vec![] },
+            Case { applied: vec![0..20], cutoff: 0, expected: vec![] },
+            Case { applied: vec![0..20], cutoff: 10, expected: vec![0..10] },
+            Case { applied: vec![0..20], cutoff: 20, expected: vec![0..20] },
+            Case { applied: vec![0..20], cutoff: 30, expected: vec![0..20] },
+            Case { applied: vec![0..20, 30..50], cutoff: 0, expected: vec![] },
+            Case { applied: vec![0..20, 30..50], cutoff: 10, expected: vec![0..10] },
+            Case { applied: vec![0..20, 30..50], cutoff: 30, expected: vec![0..20] },
+            Case { applied: vec![0..20, 30..50], cutoff: 40, expected: vec![0..20, 30..40] },
+            Case { applied: vec![30..50, 60..80, 90..100], cutoff: 29, expected: vec![] },
+            Case { applied: vec![30..50, 60..80, 90..100], cutoff: 30, expected: vec![] },
+            Case { applied: vec![30..50, 60..80, 90..100], cutoff: 31, expected: vec![30..31] },
+            Case {
+                applied: vec![30..50, 60..80, 90..100],
+                cutoff: 70,
+                expected: vec![30..50, 60..70],
+            },
+            Case {
+                applied: vec![30..50, 60..80, 90..100],
+                cutoff: 110,
+                expected: vec![30..50, 60..80, 90..100],
+            },
+        ];
+
+        for (i, case) in cases.into_iter().enumerate() {
+            let ranges = AllocatedRanges::new(case.applied);
+            ranges.truncate(case.cutoff);
+            assert_eq!(*ranges.ranges.lock().unwrap(), case.expected, "failed case # {}", i);
+        }
     }
 }

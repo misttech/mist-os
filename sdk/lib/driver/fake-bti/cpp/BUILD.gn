@@ -16,7 +16,6 @@ sdk_source_set("cpp") {
   stable = false
   sdk_name = "driver_fake_bti_cpp"
   include_base = "//sdk"
-  testonly = true
 
   sources = [
     "fake-bti.cc",
@@ -25,10 +24,7 @@ sdk_source_set("cpp") {
 
   public_deps = [ "//zircon/system/ulib/zx" ]
 
-  deps = [
-    "//sdk/lib/driver/fake-object/cpp",
-    "//zircon/system/ulib/zircon-internal",
-  ]
+  deps = [ "//sdk/lib/driver/fake-object/cpp" ]
 
   public_configs = [ "//sdk/config" ]
 }

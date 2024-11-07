@@ -404,7 +404,7 @@ TEST_F(Tcs3400Test, GetInputReports) {
 
   SetLightDataRegisters(0x00f8, 0xe79d, 0xa5e4, 0xfb1b);
 
-  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
+  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_boot()));
 
   // Wait for the driver to read out the data registers. At this point the interrupt has been ack'd
   // and it is safe to trigger again.
@@ -429,11 +429,11 @@ TEST_F(Tcs3400Test, GetInputReports) {
   }
 
   SetLightDataRegisters(0x67f3, 0xbe39, 0x21e9, 0x319a);
-  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
+  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_boot()));
   WaitForLightDataRead();
 
   SetLightDataRegisters(0xa5df, 0x0101, 0xc776, 0xc531);
-  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
+  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_boot()));
   WaitForLightDataRead();
 
   // The previous illuminance value did not cross a threshold, so there should only be one report to
@@ -525,7 +525,7 @@ TEST_F(Tcs3400Test, GetMultipleInputReports) {
 
   for (const auto& values : kExpectedLightValues) {
     SetLightDataRegisters(values[0], values[1], values[2], values[3]);
-    EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
+    EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_boot()));
     WaitForLightDataRead();
   }
 
@@ -578,7 +578,7 @@ TEST_F(Tcs3400Test, GetInputReportsMultipleReaders) {
 
   SetLightDataRegisters(0x00f8, 0xe79d, 0xa5e4, 0xfb1b);
 
-  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
+  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_boot()));
 
   for (auto& reader : readers) {
     const auto response = reader->ReadInputReports();
@@ -630,7 +630,7 @@ TEST_F(Tcs3400Test, InputReportSaturatedSensor) {
     incoming->fake_i2c_.SetRegister(TCS_I2C_STATUS, 0x0 | TCS_I2C_STATUS_ASAT);
   });
 
-  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_monotonic()));
+  EXPECT_OK(gpio_interrupt_.trigger(0, zx::clock::get_boot()));
 
   WaitForLightDataRead();
 

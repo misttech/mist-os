@@ -1020,7 +1020,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock()) override;
 
-  // Page fault in an address within the mapping.
+  // Page fault in an address within the mapping. The requested address must be paged aligned.
   // If this returns ZX_ERR_SHOULD_WAIT, then the caller should wait on |page_request|
   // and try again.
   zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, MultiPageRequest* page_request)

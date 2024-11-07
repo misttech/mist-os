@@ -53,11 +53,11 @@ core/archivist
 ...
 ```
 
-#### `--manifest`
+#### `--component`
 
-The name that you specified for the manifest file. If this is specified, the
-output only contains monikers for components whose URL contains the specified
-name.
+A fuzzy-search query that can include URL fragments and moniker fragments. Accompanying positional-
+argument selectors should omit the component selector, as it will be generated from the search
+results.
 
 #### `--with-url`
 
@@ -121,11 +121,10 @@ core/timekeeper:root/current:utc_nanos
 core/timekeeper:root:start_time_monotonic_nanos
 ```
 
-#### `--manifest`
+#### `--component`
 
-The name that you specified for the manifest file. If this is specified, the
-output only contains monikers for components whose URL contains the specified
-name.
+A fuzzy-search query against running components, including URL and moniker fragments. If this is
+specified, the output only contains monikers for components whose URL contains the specified name.
 
 #### `--help`
 
@@ -153,11 +152,11 @@ core/timekeeper:
       utc_nanos = 1591119246552989779
 ```
 
-#### `--manifest`
+#### `--component`
 
-The name that you specified for the manifest file. If this is specified, the
-output only contains monikers for components whose URL contains the specified
-name.
+A fuzzy-search query that can include URL fragments and moniker fragments. Accompanying positional-
+argument selectors should omit the component selector, as it will be generated from the search
+results.
 
 #### `--file`
 

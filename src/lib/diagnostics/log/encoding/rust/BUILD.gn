@@ -36,7 +36,7 @@ rustc_library("rust") {
   ]
 
   visibility = [
-    "//src/diagnostics/archivist:*",
+    "//src/diagnostics/archivist/*",
     "//src/diagnostics/archivist/tests/integration/realm_factory/puppet:*",
     "//src/diagnostics/validator/logs/*",
     "//src/lib/diagnostics/log/*",

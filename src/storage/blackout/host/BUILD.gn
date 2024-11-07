@@ -16,10 +16,6 @@ group("blackout_all") {
     ":blackout_emulator_stable",
     ":blackout_emulator_unstable",
     ":blackout_fail",
-    ":blackout_starnix_arm64_stable",
-    ":blackout_starnix_arm64_unstable",
-    ":blackout_starnix_vim3_stable",
-    ":blackout_starnix_vim3_unstable",
     ":blackout_workbench_vim3_stable",
     ":blackout_workbench_vim3_unstable",
   ]
@@ -53,36 +49,6 @@ group("blackout_workbench_vim3_stable") {
 }
 
 group("blackout_workbench_vim3_unstable") {
-  testonly = true
-  deps = []
-}
-
-group("blackout_starnix_vim3_unstable") {
-  testonly = true
-  deps = [
-    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
-    # Fxfs tests
-    # ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
-    # "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
-  ]
-}
-
-group("blackout_starnix_vim3_stable") {
-  testonly = true
-  deps = []
-}
-
-group("blackout_starnix_arm64_unstable") {
-  testonly = true
-  deps = [
-    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
-    # Fxfs tests
-    # ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
-    # "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
-  ]
-}
-
-group("blackout_starnix_arm64_stable") {
   testonly = true
   deps = []
 }
@@ -218,40 +184,5 @@ if (is_host) {
     }
     environments = [ vim3_env ]
     timeout_secs = 360
-  }
-
-  python_mobly_test("blackout_fxfs_tree_idle_suspend_timer_resume") {
-    main_source = "blackout.py"
-    libraries = [
-      "//src/storage/blackout/fidl/fuchsia.blackout.test:fuchsia.blackout.test_host_test_data(${toolchain_variant.base})",
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
-    ]
-    params = {
-      # Blackout args
-      component_name = "/core/ffx-laboratory:blackout-target"
-      component_url = "fuchsia-pkg://fuchsia.com/blackout-fxfs-tree#meta/blackout-fxfs-tree-component.cm"
-      load_generation_duration = 30
-
-      # The load generation for blackout normally continues forever, because the purpose is to test
-      # reboot scenarios, but in suspend/resume, the storage driver will continue responding to
-      # requests by waking up, responding to a single request, and going back to sleep, forever,
-      # meaning load generation continuing while the driver is suspended causes quite a lot of work
-      # and isn't useful as a test. See https://fxbug.dev/355511475 for some more details.
-      destroy_after_test = true
-
-      # TODO(https://fxbug.dev/338452001): the vim3 bootloader currently resets the gpt partition
-      # table if it isn't the exact hard-coded partition table it expects, so we use the label of a
-      # 32MiB partition that isn't used so it doesn't get blown away on reboot. Once the bootloader
-      # doesn't do that, we can use our own partition (in other words, delete the following line
-      # once the bug is resolved).
-      device_label = "factory"
-
-      # test case revive args
-      test_case_revive = true
-      fuchsia_device_operation = "idle-suspend-timer-resume"
-      resume_timer_duration_sec = 3
-    }
-    environments = [ vim3_env ]
   }
 }

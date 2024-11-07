@@ -124,8 +124,9 @@
         // ...and the rest of these are capabilities provided by components for each other
         {
             directory: [
-                "bin",
+                "base-bin",
                 "blob",
+                "boot-bin",
                 "build-info",
                 "config-data",
                 "data",
@@ -204,6 +205,12 @@
             availability: "same_as_target",
         },
         {
+            protocol: "fuchsia.sys2.ConfigOverride",
+            from: "framework",
+            as: "fuchsia.sys2.ConfigOverride.root",
+            to: "#core",
+        },
+        {
             protocol: "fuchsia.sys2.RealmExplorer",
             from: "framework",
             as: "fuchsia.sys2.RealmExplorer.root",
@@ -266,6 +273,23 @@
             from: "#core",
             as: "toolbox-core",
             to: "#toolbox",
+        },
+        {
+            protocol: [ "fuchsia.process.Resolver" ],
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+        },
+
+        // The source of this protocol, debug-dash-launcher,
+        // may not be available on all products.
+        // Used by console-launcher.
+        {
+            protocol: "fuchsia.dash.Launcher",
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            availability: "optional",
         },
     ],
     environments: [

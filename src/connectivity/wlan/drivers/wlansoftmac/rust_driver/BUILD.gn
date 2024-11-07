@@ -23,7 +23,7 @@ rustc_library("wlansoftmac-rust") {
     "//src/connectivity/wlan/lib/sme:wlan-sme",
     "//src/connectivity/wlan/lib/trace:wlan-trace",
     "//src/diagnostics/persistence/fidl:persist_rust",
-    "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/contrib/auto_persist",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

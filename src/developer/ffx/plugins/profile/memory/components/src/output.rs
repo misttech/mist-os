@@ -90,7 +90,7 @@ impl PluginOutput {
             populated_scaled: 0.0,
             populated_total: 0,
             attributor: principal
-                .attributor
+                .parent
                 .as_ref()
                 .map(|p| principals.get(p))
                 .flatten()
@@ -148,8 +148,14 @@ impl PluginOutput {
                     len: _,
                 }) = resource
                 {
-                    let process = resources.get(&process_mapped).unwrap().borrow();
-                    output.processes.push(format!("{} ({})", process.name.clone(), process.koid));
+                    if let Some(process_ref) = resources.get(&process_mapped) {
+                        let process = process_ref.borrow();
+                        output.processes.push(format!(
+                            "{} ({})",
+                            process.name.clone(),
+                            process.koid
+                        ));
+                    }
                 }
             }
         }
@@ -342,10 +348,8 @@ impl Display for KernelStatistics {
         writeln!(w, "    ipc:   {}", format_bytes(self.ipc as f64))?;
         if let Some(zram) = self.zram_compressed_total {
             writeln!(w, "    zram:  {}", format_bytes(zram as f64))?;
-            writeln!(w, "    other: {}", format_bytes((self.other - zram) as f64))?;
-        } else {
-            writeln!(w, "    other: {}", format_bytes(self.other as f64))?;
         }
+        writeln!(w, "    other: {}", format_bytes(self.other as f64))?;
         writeln!(w)
     }
 }

@@ -19,31 +19,6 @@
 #include <zircon/availability.h>
 #include <zircon/types.h>
 
-#include <algorithm>
-#include <functional>
-
-#include "sdk/lib/zxio/vector.h"
-
-template <typename F>
-zx_status_t zxio_vmo_do_vector(size_t start, size_t length, size_t* offset,
-                               const zx_iovec_t* vector, size_t vector_count, size_t* out_actual,
-                               F fn) {
-  if (*offset > length) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  return zxio_do_vector(vector, vector_count, out_actual,
-                        [&](void* buffer, size_t capacity, size_t* out_actual) {
-                          capacity = std::min(capacity, length - *offset);
-                          zx_status_t status = fn(buffer, start + *offset, capacity);
-                          if (status != ZX_OK) {
-                            return status;
-                          }
-                          *offset += capacity;
-                          *out_actual = capacity;
-                          return ZX_OK;
-                        });
-}
-
 // A utility which helps implementing the C-style |zxio_ops_t| ops table
 // from a C++ class. The specific backend implementation should inherit
 // from |HasIo| as the first base class, ensuring that the |zxio_t| part
@@ -96,6 +71,16 @@ constexpr void HasIo::CheckLayout() {
   static_assert(offsetof(HasIo, io_) == 0);
   static_assert(alignof(HasIo) == alignof(zxio_t));
 }
+
+// Implementation of |zxio_ops_t::readv| for a channel that speaks fuchsia.io/Readable.
+zx_status_t RemoteReadv(const fidl::UnownedClientEnd<fuchsia_io::Readable>& client_end,
+                        const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
+                        size_t* out_actual);
+
+// Implementation of |zxio_ops_t::writev| for a channel that speaks fuchsia.io/Writable.
+zx_status_t RemoteWritev(const fidl::UnownedClientEnd<fuchsia_io::Writable>& client_end,
+                         const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
+                         size_t* out_actual);
 
 uint32_t zxio_node_protocols_to_posix_type(zxio_node_protocols_t protocols);
 

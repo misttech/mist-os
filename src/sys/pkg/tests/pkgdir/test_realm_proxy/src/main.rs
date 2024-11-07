@@ -52,7 +52,7 @@ async fn main() -> Result<(), Error> {
         vfs::execution_scope::ExecutionScope::new(),
         blobfs_client,
         *test_package.hash(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         server,
     )
     .await?;

@@ -13,7 +13,7 @@ use tracing::error;
 use vfs::common::send_on_open_with_error;
 use vfs::directory::entry::EntryInfo;
 use vfs::directory::entry_container::Directory;
-use vfs::ObjectRequestRef;
+use vfs::{ObjectRequest, ObjectRequestRef};
 
 mod meta_as_dir;
 mod meta_subdir;
@@ -224,13 +224,9 @@ impl NonMetaStorage for fio::DirectoryProxy {
         &self,
         hash: &fuchsia_hash::Hash,
     ) -> Result<zx::Vmo, NonMetaStorageError> {
-        let proxy = fuchsia_fs::directory::open_file_deprecated(
-            self,
-            &hash.to_string(),
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .map_err(NonMetaStorageError::OpenBlob)?;
+        let proxy = fuchsia_fs::directory::open_file(self, &hash.to_string(), fio::PERM_READABLE)
+            .await
+            .map_err(NonMetaStorageError::OpenBlob)?;
         proxy
             .get_backing_memory(fio::VmoFlags::PRIVATE_CLONE | fio::VmoFlags::READ)
             .await
@@ -252,7 +248,7 @@ pub fn serve(
     scope: vfs::execution_scope::ExecutionScope,
     non_meta_storage: impl NonMetaStorage,
     meta_far: fuchsia_hash::Hash,
-    flags: fio::OpenFlags,
+    flags: fio::Flags,
     server_end: ServerEnd<fio::DirectoryMarker>,
 ) -> impl futures::Future<Output = Result<(), Error>> {
     serve_path(
@@ -275,7 +271,7 @@ pub async fn serve_path(
     scope: vfs::execution_scope::ExecutionScope,
     non_meta_storage: impl NonMetaStorage,
     meta_far: fuchsia_hash::Hash,
-    flags: fio::OpenFlags,
+    flags: fio::Flags,
     path: VfsPath,
     server_end: ServerEnd<fio::NodeMarker>,
 ) -> Result<(), Error> {
@@ -283,7 +279,7 @@ pub async fn serve_path(
         Ok(d) => d,
         Err(e) => {
             let () = send_on_open_with_error(
-                flags.contains(fio::OpenFlags::DESCRIBE),
+                flags.contains(fio::Flags::FLAG_SEND_REPRESENTATION),
                 server_end,
                 (&e).into(),
             );
@@ -291,7 +287,8 @@ pub async fn serve_path(
         }
     };
 
-    root_dir.open(scope, flags, path, server_end);
+    ObjectRequest::new3(flags, &fio::Options::default(), server_end.into_channel())
+        .handle(|request| root_dir.open3(scope, path, flags, request));
     Ok(())
 }
 
@@ -399,7 +396,7 @@ mod tests {
             vfs::execution_scope::ExecutionScope::new(),
             blobfs_client,
             metafar_blob.merkle,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
             server_end,
         )
         .await
@@ -426,7 +423,7 @@ mod tests {
             vfs::execution_scope::ExecutionScope::new(),
             blobfs_client,
             metafar_blob.merkle,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
             VfsPath::validate_and_split(".").unwrap(),
             server_end.into_channel().into(),
         )
@@ -454,7 +451,7 @@ mod tests {
             vfs::execution_scope::ExecutionScope::new(),
             blobfs_client,
             metafar_blob.merkle,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
             VfsPath::validate_and_split("meta").unwrap(),
             server_end.into_channel().into(),
         )
@@ -480,7 +477,7 @@ mod tests {
                 vfs::execution_scope::ExecutionScope::new(),
                 blobfs_client,
                 metafar_blob.merkle,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
+                fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
                 VfsPath::validate_and_split("not-present").unwrap(),
                 server_end.into_channel().into(),
             )
@@ -503,7 +500,7 @@ mod tests {
                 vfs::execution_scope::ExecutionScope::new(),
                 blobfs_client,
                 Hash::from([0u8; 32]),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
+                fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
                 VfsPath::validate_and_split(".").unwrap(),
                 server_end.into_channel().into(),
             )

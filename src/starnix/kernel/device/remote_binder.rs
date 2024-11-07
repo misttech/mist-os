@@ -111,7 +111,12 @@ impl FileOps for RemoteBinderFileOps {
         Ok(FdEvents::empty())
     }
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         self.0.close();
     }
 
@@ -892,7 +897,11 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     }
 
     /// Returns the next TaskRequest that `current_task` must handle, waiting if none is available.
-    fn get_next_task(&self, current_task: &CurrentTask) -> Result<TaskRequest, Errno> {
+    fn get_next_task(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+    ) -> Result<TaskRequest, Errno> {
         loop {
             let mut state = self.lock();
             // Exit immediately if requested.
@@ -925,7 +934,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             let waiter = Waiter::new();
             state.waiters.wait_async_value(&waiter, tid as u64);
             std::mem::drop(state);
-            waiter.wait(current_task)?;
+            waiter.wait(locked, current_task)?;
         }
     }
 
@@ -1033,7 +1042,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<(), Errno> {
         self.lock().register_waiting_task(current_task.get_tid());
         loop {
-            let interruption = match self.get_next_task(current_task)? {
+            let interruption = match self.get_next_task(locked, current_task)? {
                 TaskRequest::Open { path, process_accessor, process, responder } => {
                     let result = self.open(locked, current_task, path, process_accessor, process);
                     let interruption = must_interrupt(&result);

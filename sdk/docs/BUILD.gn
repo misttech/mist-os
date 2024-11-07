@@ -42,7 +42,7 @@ sdk_documentation("docs") {
 sdk_documentation("firmware") {
   name = "firmware"
 
-  # TODO(https://fxbug.dev/331962496): Determine an appropriate solution for building firmware SDK.
+  # TODO(https://fxbug.dev/331991540): Determine an appropriate solution for building Firmware SDK.
   category = "internal"
 
   files = [

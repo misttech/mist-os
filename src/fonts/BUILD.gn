@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/components/fuchsia_structured_config.gni")
 import("//build/rust/rustc_binary.gni")
@@ -180,6 +181,11 @@ fuchsia_package("fonts_hermetic_for_test") {
   deps = [ ":font_provider_hermetic_for_test" ]
 }
 
+export_fuchsia_package_to_bazel("fonts_hermetic_for_test.bazel_input") {
+  testonly = true
+  package = ":fonts_hermetic_for_test"
+}
+
 fuchsia_test_package("font_provider_unit_tests") {
   test_components = [ ":font_provider_unit_tests_cmp" ]
 }
@@ -198,6 +204,11 @@ fuchsia_component("fonts_configurable_for_test_component") {
 fuchsia_package("fonts_configurable_for_test") {
   testonly = true
   deps = [ ":fonts_configurable_for_test_component" ]
+}
+
+export_fuchsia_package_to_bazel("fonts_configurable_for_test.bazel_input") {
+  testonly = true
+  package = ":fonts_configurable_for_test"
 }
 
 # Deprecated.

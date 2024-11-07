@@ -22,9 +22,6 @@ class AndroidDevicePartitioner : public DevicePartitioner {
 
   bool SupportsPartition(const PartitionSpec& spec) const override;
 
-  zx::result<std::unique_ptr<PartitionClient>> AddPartition(
-      const PartitionSpec& spec) const override;
-
   zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const override;
 
@@ -32,9 +29,7 @@ class AndroidDevicePartitioner : public DevicePartitioner {
 
   zx::result<> WipeFvm() const override;
 
-  zx::result<> InitPartitionTables() const override;
-
-  zx::result<> WipePartitionTables() const override;
+  zx::result<> ResetPartitionTables() const override;
 
   zx::result<> ValidatePayload(const PartitionSpec& spec,
                                std::span<const uint8_t> data) const override;
@@ -46,7 +41,7 @@ class AndroidDevicePartitioner : public DevicePartitioner {
  private:
   AndroidDevicePartitioner(std::unique_ptr<GptDevicePartitioner> gpt,
                            std::shared_ptr<Context> context)
-      : gpt_(std::move(gpt)), context_(context) {}
+      : gpt_(std::move(gpt)), context_(std::move(context)) {}
 
   std::unique_ptr<GptDevicePartitioner> gpt_;
   std::shared_ptr<Context> context_;

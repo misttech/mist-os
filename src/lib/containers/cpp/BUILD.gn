@@ -3,12 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
-sdk_source_set("cpp") {
-  category = "internal"
-
+source_set("cpp") {
   public = [
     "circular_deque.h",
     "vector_buffer.h",

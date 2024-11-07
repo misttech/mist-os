@@ -56,7 +56,7 @@ template("camera_controller_driver") {
   }
   driver_target = "${package_name}_driver"
 
-  fuchsia_driver(driver_target) {
+  fuchsia_cc_driver(driver_target) {
     output_name = package_name
     deps = [ "//src/camera/drivers/controller:source" ]
     if (defined(invoker.deps)) {

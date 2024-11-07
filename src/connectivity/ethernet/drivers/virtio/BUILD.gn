@@ -52,7 +52,7 @@ source_set("virtio_netdevice_lib") {
   ]
 }
 
-fuchsia_driver("virtio_netdevice-driver") {
+fuchsia_cc_driver("virtio_netdevice-driver") {
   output_name = "virtio_netdevice"
   sources = [ "netdevice_driver.cc" ]
   deps = [

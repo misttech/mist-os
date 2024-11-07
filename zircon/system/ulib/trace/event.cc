@@ -8,7 +8,7 @@
 namespace {
 
 struct EventHelper {
-  EventHelper(trace_context_t* context, const char* name_literal) : ticks(zx_ticks_get()) {
+  EventHelper(trace_context_t* context, const char* name_literal) : ticks(zx_ticks_get_boot()) {
     trace_context_register_current_thread(context, &thread_ref);
     trace_context_register_string_literal(context, name_literal, &name_ref);
   }

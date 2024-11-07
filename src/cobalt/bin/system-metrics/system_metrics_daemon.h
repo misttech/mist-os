@@ -13,16 +13,16 @@
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/sys/cpp/component_context.h>
+#include <lib/zx/time.h>
 
-#include <chrono>
 #include <memory>
 #include <unordered_map>
 
 #include "src/cobalt/bin/system-metrics/activity_listener.h"
 #include "src/cobalt/bin/system-metrics/cpu_stats_fetcher.h"
-#include "src/cobalt/bin/utils/clock.h"
+#include "src/lib/timekeeper/clock.h"
 #include "third_party/cobalt/src/lib/client/cpp/buckets_config.h"
-#include "third_party/cobalt/src/public/lib/clock_interfaces.h"
 
 // A daemon to send system metrics to Cobalt.
 //
@@ -76,7 +76,7 @@ class SystemMetricsDaemon {
   // pass a non-null |logger| which may be a local mock that does not use FIDL.
   SystemMetricsDaemon(async_dispatcher_t* dispatcher, sys::ComponentContext* context,
                       fuchsia::metrics::MetricEventLogger_Sync* logger,
-                      std::unique_ptr<cobalt::util::SteadyClockInterface> clock,
+                      std::unique_ptr<timekeeper::Clock> clock,
                       std::unique_ptr<cobalt::CpuStatsFetcher> cpu_stats_fetcher,
                       std::unique_ptr<cobalt::ActivityListener> activity_listener,
                       std::string activation_file_prefix);
@@ -123,7 +123,7 @@ class SystemMetricsDaemon {
       int64_t bucket_floor, int32_t num_buckets, int32_t step_size);
 
   // Returns the amount of time since SystemMetricsDaemon started.
-  std::chrono::seconds GetUpTime();
+  zx::duration GetUpTime();
 
   // Logs one or more UpPing events depending on how long the device has been
   // up.
@@ -139,7 +139,7 @@ class SystemMetricsDaemon {
   // also logged. Etc.
   //
   // Returns the amount of time before this method needs to be invoked again.
-  std::chrono::seconds LogFuchsiaUpPing(std::chrono::seconds uptime);
+  zx::duration LogFuchsiaUpPing(zx::duration uptime);
 
   // Logs one FuchsiaLifetimeEvent event of type "Boot".
   //
@@ -155,18 +155,18 @@ class SystemMetricsDaemon {
   // hours and logs an event for the fuchsia_uptime metric.
   //
   // Returns the amount of time before this method needs to be invoked again.
-  // This is the number of seconds until the uptime reaches the next full hour.
-  std::chrono::seconds LogFuchsiaUptime();
+  // This is the amount of time until the uptime reaches the next full hour.
+  zx::duration LogFuchsiaUptime();
 
   // Fetches and logs system-wide CPU usage.
   //
   // Returns the amount of time before this method needs to be invoked again.
-  std::chrono::seconds LogCpuUsage();
+  zx::duration LogCpuUsage();
 
   // Logs active minutes since the last call.
   //
   // Returns the amount of time before this method needs to be invoked again.
-  std::chrono::seconds LogActiveTime();
+  zx::duration LogActiveTime();
 
   // Helper function to store the fetched CPU data and store until flush.
   void StoreCpuData(double cpu_percentage);  // histogram, flush every 10 min
@@ -183,8 +183,8 @@ class SystemMetricsDaemon {
   fuchsia::metrics::MetricEventLoggerFactorySyncPtr factory_;
   fuchsia::metrics::MetricEventLoggerSyncPtr logger_fidl_proxy_;
   fuchsia::metrics::MetricEventLogger_Sync* logger_;
-  std::chrono::steady_clock::time_point start_time_;
-  std::unique_ptr<cobalt::util::SteadyClockInterface> clock_;
+  zx::time_boot start_time_;
+  std::unique_ptr<timekeeper::Clock> clock_;
   std::unique_ptr<cobalt::CpuStatsFetcher> cpu_stats_fetcher_;
   std::unique_ptr<cobalt::ActivityListener> activity_listener_;
   fuchsia::ui::activity::State current_state_ = fuchsia::ui::activity::State::UNKNOWN;
@@ -201,8 +201,8 @@ class SystemMetricsDaemon {
   double cpu_usage_max_ = 0;
   size_t cpu_array_index_ = 0;
 
-  std::chrono::steady_clock::time_point active_start_time_;
-  std::chrono::steady_clock::duration unlogged_active_duration_;
+  zx::time_boot active_start_time_;
+  zx::duration unlogged_active_duration_;
   std::mutex active_time_mutex_;
 
   template <typename T>

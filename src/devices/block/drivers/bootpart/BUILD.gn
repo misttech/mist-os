@@ -14,7 +14,7 @@ driver_bind_rules("bootpart_bind") {
   deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
-fuchsia_driver("bootpart-driver") {
+fuchsia_cc_driver("bootpart-driver") {
   output_name = "bootpart"
   configs += [
     "//build/config:all_source",

@@ -15,7 +15,6 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
-use fuchsia_fs::OpenFlags;
 use futures::StreamExt;
 use std::collections::BTreeMap;
 use tracing::info;
@@ -152,8 +151,10 @@ async fn open_sysrq_trigger(realm: &RealmInstance) -> FileProxy {
     // Some clients of the file[0] truncate it on open[1] despite not having contents.
     // [0] https://cs.android.com/android/platform/superproject/main/+/main:system/core/init/reboot.cpp;l=391;drc=97047b54e952e2d08b10e6d37d510ca653cace00
     // [1] https://cs.android.com/android/platform/superproject/main/+/main:system/libbase/file.cpp;l=274;drc=4b992a8da56ea5777f9364033a85ad89af680e10
-    let flags = OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE | OpenFlags::TRUNCATE;
-    fuchsia_fs::directory::open_file_deprecated(
+    let flags = fuchsia_fs::PERM_WRITABLE
+        | fuchsia_fs::Flags::FLAG_MAYBE_CREATE
+        | fuchsia_fs::Flags::FILE_TRUNCATE;
+    fuchsia_fs::directory::open_file(
         realm.root.get_exposed_dir(),
         "/fs_root/proc/sysrq-trigger",
         flags,

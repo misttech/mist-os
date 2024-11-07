@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fidl_pipe::{create_overnet_socket, FidlPipe};
-use crate::overnet_connector::OvernetConnector;
+use crate::fidl_pipe::FidlPipe;
+use crate::target_connector::TargetConnector;
 use anyhow::Result;
 use async_lock::Mutex;
 use compat_info::CompatibilityInfo;
@@ -53,16 +53,11 @@ impl Connection {
     /// This function will only ever return a `ConnectionStartError` or `InternalError`, both of
     /// which are considered fatal (e.g. there is no means to reattempt connecting to the device).
     #[tracing::instrument(level = "debug")]
-    pub async fn new(connector: impl OvernetConnector + 'static) -> Result<Self, ConnectionError> {
-        let node = overnet_core::Router::new(None)?;
-        let socket = create_overnet_socket(node.clone())
-            .map_err(|e| ConnectionError::InternalError(e.into()))?;
-        let (overnet_reader, overnet_writer) = tokio::io::split(socket);
+    pub async fn new(connector: impl TargetConnector + 'static) -> Result<Self, ConnectionError> {
         let connector_debug_string = format!("{connector:?}");
-        let fidl_pipe =
-            FidlPipe::start_internal(overnet_reader, overnet_writer, connector).await.map_err(
-                |e| ConnectionError::ConnectionStartError(connector_debug_string, e.to_string()),
-            )?;
+        let (fidl_pipe, node) = FidlPipe::start_internal(connector).await.map_err(|e| {
+            ConnectionError::ConnectionStartError(connector_debug_string, e.to_string())
+        })?;
         Ok(Self { overnet: OvernetClient { node }, fidl_pipe, rcs_info: Default::default() })
     }
 
@@ -171,7 +166,7 @@ impl OvernetClient {
 
 pub mod testing {
     use super::*;
-    use crate::overnet_connector::{OvernetConnection, OvernetConnectionError};
+    use crate::target_connector::{OvernetConnection, TargetConnection, TargetConnectionError};
     use async_channel::Receiver;
     use fidl_fuchsia_developer_remotecontrol as rcs_fidl;
     use fuchsia_async::Task;
@@ -279,14 +274,14 @@ pub mod testing {
         }
     }
 
-    impl OvernetConnector for FakeOvernet {
+    impl TargetConnector for FakeOvernet {
         const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
             if let FakeOvernetBehavior::FailNonFatalOnce = self.behavior {
                 if !self.already_failed {
                     self.already_failed = true;
                     async_io::Timer::after(Duration::from_secs(5)).await;
-                    return Err(OvernetConnectionError::NonFatal(anyhow::anyhow!(
+                    return Err(TargetConnectionError::NonFatal(anyhow::anyhow!(
                         "awww, we have to try again (for testing, of course)!"
                     )));
                 }
@@ -325,14 +320,14 @@ pub mod testing {
                 }
             });
             let (circuit_reader, circuit_writer) = tokio::io::split(circuit_socket);
-            Ok(OvernetConnection {
+            Ok(TargetConnection::Overnet(OvernetConnection {
                 output: Box::new(tokio::io::BufReader::new(circuit_reader)),
                 input: Box::new(circuit_writer),
                 errors: self.error_receiver.clone(),
                 compat: None,
                 main_task: Some(rcs_task),
                 ssh_host_address: None,
-            })
+            }))
         }
     }
 }

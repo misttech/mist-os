@@ -13,21 +13,19 @@ use crate::vfs::pipe::{Pipe, PipeHandle};
 use crate::vfs::rw_queue::{RwQueue, RwQueueReadGuard};
 use crate::vfs::socket::SocketHandle;
 use crate::vfs::{
-    checked_add_offset_and_length, inotify, DefaultDirEntryOps, DirEntryOps, FileObject, FileOps,
-    FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardState,
-    FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps, RecordLockCommand,
-    RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
+    checked_add_offset_and_length, inotify, CurrentTaskAndLocked, DefaultDirEntryOps, DirEntryOps,
+    FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
+    FileWriteGuardState, FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps,
+    RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
 };
 use bitflags::bitflags;
 use fuchsia_runtime::UtcInstant;
 use linux_uapi::XATTR_SECURITY_PREFIX;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, track_stub};
-#[cfg(any(test, debug_assertions))]
-use starnix_sync::Unlocked;
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore,
-    Locked, Mutex, RwLock, RwLockReadGuard,
+    BeforeFsNodeAppend, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore, Locked, Mutex,
+    RwLock, RwLockReadGuard, Unlocked,
 };
 use starnix_types::ownership::Releasable;
 use starnix_types::time::{timespec_from_time, NANOS_PER_SECOND};
@@ -37,7 +35,7 @@ use starnix_uapi::auth::{
     CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::errors::{Errno, EACCES};
+use starnix_uapi::errors::{Errno, EACCES, ENOTSUP};
 use starnix_uapi::file_mode::{mode, Access, AccessCheck, FileMode};
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
@@ -363,6 +361,7 @@ impl FileObject {
     /// See flock(2).
     pub fn flock(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         operation: FlockOperation,
     ) -> Result<(), Errno> {
@@ -428,7 +427,7 @@ impl FileObject {
             let waiter = Waiter::new();
             flock_info.wait_queue.wait_async(&waiter);
             std::mem::drop(flock_info);
-            waiter.wait(current_task)?;
+            waiter.wait(locked, current_task)?;
         }
     }
 }
@@ -571,6 +570,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Delegate the access check to the node.
     fn check_access(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
@@ -672,6 +672,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Reads the symlink from this node.
     fn readlink(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
@@ -758,6 +759,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Return a read guard for the updated information.
     fn fetch_and_refresh_info<'a>(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -797,6 +799,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// 0, and lesser than the required size.
     fn get_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -808,6 +811,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Set an extended attribute on the node.
     fn set_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -819,6 +823,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
 
     fn remove_xattr(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -831,6 +836,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// return an ERANGE error if max_size is not 0, and lesser than the required size.
     fn list_xattrs(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _max_size: usize,
@@ -839,7 +845,12 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     }
 
     /// Called when the FsNode is freed by the Kernel.
-    fn forget(&self, _node: &FsNode, _current_task: &CurrentTask) -> Result<(), Errno> {
+    fn forget(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+    ) -> Result<(), Errno> {
         Ok(())
     }
 
@@ -897,11 +908,11 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _owner: starnix_uapi::auth::FsCred,
         ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("mkdir failed: {:?}", name))
         }
 
         fn mknod(
@@ -909,12 +920,12 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _dev: starnix_uapi::device_type::DeviceType,
             _owner: starnix_uapi::auth::FsCred,
         ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("mknod failed: {:?}", name))
         }
 
         fn create_symlink(
@@ -922,11 +933,11 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _target: &starnix_core::vfs::FsStr,
             _owner: starnix_uapi::auth::FsCred,
         ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("symlink failed: {:?}", name))
         }
 
         fn link(
@@ -934,10 +945,10 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut Locked<'_, FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _child: &starnix_core::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("link failed: {:?}", name))
         }
 
         fn unlink(
@@ -945,10 +956,10 @@ macro_rules! fs_node_impl_dir_readonly {
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
-            _name: &starnix_core::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _child: &starnix_core::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
-            starnix_uapi::error!(EROFS)
+            starnix_uapi::error!(EROFS, format!("unlink failed: {:?}", name))
         }
     };
 }
@@ -997,6 +1008,7 @@ macro_rules! fs_node_impl_xattr_delegate {
     ($self:ident, $delegate:expr) => {
         fn get_xattr(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &starnix_core::vfs::FsStr,
@@ -1007,6 +1019,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn set_xattr(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &starnix_core::vfs::FsStr,
@@ -1018,6 +1031,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn remove_xattr(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &starnix_core::vfs::FsStr,
@@ -1027,6 +1041,7 @@ macro_rules! fs_node_impl_xattr_delegate {
 
         fn list_xattrs(
             &$self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             _size: usize,
@@ -1257,8 +1272,15 @@ impl FsNode {
     }
 
     /// Returns an error if this node is encrypted and locked.
-    pub fn fail_if_locked(&self, current_task: &CurrentTask) -> Result<(), Errno> {
-        let node_info = self.fetch_and_refresh_info(current_task)?;
+    pub fn fail_if_locked<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let node_info = self.fetch_and_refresh_info(locked, current_task)?;
         if let Some(wrapping_key_id) = node_info.wrapping_key_id {
             let encryption_keys = current_task.kernel().encryption_keys.read();
             // Fail if the user tries to create a child in a locked encrypted directory.
@@ -1289,12 +1311,13 @@ impl FsNode {
 
     pub fn record_lock(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         file: &FileObject,
         cmd: RecordLockCommand,
         flock: uapi::flock,
     ) -> Result<Option<uapi::flock>, Errno> {
-        self.record_locks.lock(current_task, file, cmd, flock)
+        self.record_locks.lock(locked, current_task, file, cmd, flock)
     }
 
     /// Release all record locks acquired by the given owner.
@@ -1319,18 +1342,14 @@ impl FsNode {
         self.ops().create_file_ops(&mut locked, self, current_task, flags)
     }
 
-    pub fn open<L>(
+    pub fn open(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         flags: OpenFlags,
         access_check: AccessCheck,
-    ) -> Result<Box<dyn FileOps>, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<Box<dyn FileOps>, Errno> {
         // If O_PATH is set, there is no need to create a real FileOps because
         // most file operations are disabled.
         if flags.contains(OpenFlags::PATH) {
@@ -1344,6 +1363,7 @@ impl FsNode {
             }
 
             self.check_access(
+                locked,
                 current_task,
                 mount,
                 access,
@@ -1385,7 +1405,7 @@ impl FsNode {
                     DeviceMode::Block,
                 )
             }
-            FileMode::IFIFO => Pipe::open(current_task, self.fifo.as_ref().unwrap(), flags),
+            FileMode::IFIFO => Pipe::open(locked, current_task, self.fifo.as_ref().unwrap(), flags),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
             _ => self.create_file_ops(locked, current_task, flags),
@@ -1403,6 +1423,7 @@ impl FsNode {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::EXEC,
@@ -1427,6 +1448,7 @@ impl FsNode {
     {
         assert!(mode & FileMode::IFMT != FileMode::EMPTY, "mknod called without node type.");
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -1468,7 +1490,9 @@ impl FsNode {
             let mut locked = locked.cast_locked::<FileOpsCore>();
             self.ops().mknod(&mut locked, self, current_task, name, mode, dev, owner)?
         };
-        security::fs_node_init_on_create(current_task, &new_node, self)?;
+
+        self.init_new_node_security_on_create(locked, current_task, &new_node)?;
+
         Ok(new_node)
     }
 
@@ -1485,6 +1509,7 @@ impl FsNode {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -1495,19 +1520,65 @@ impl FsNode {
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let new_node =
             self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)?;
-        security::fs_node_init_on_create(current_task, &new_node, self)?;
+
+        self.init_new_node_security_on_create(&mut locked, current_task, &new_node)?;
+
         Ok(new_node)
     }
 
-    pub fn create_tmpfile(
+    /// Requests that the LSM initialise a security label for the `new_node`, and optionally provide
+    /// an extended attribute to write to the file to persist it.  If no LSM is enabled, no extended
+    /// attribute returned, or if the filesystem does not support extended attributes, then the call
+    /// returns success. All other failure modes return an `Errno` that should be early-returned.
+    fn init_new_node_security_on_create<L>(
         &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        new_node: &FsNode,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        security::fs_node_init_on_create(current_task, &new_node, self)?
+            .map(|xattr| {
+                match new_node.ops().set_xattr(
+                    &mut locked,
+                    &new_node,
+                    current_task,
+                    xattr.name,
+                    xattr.value.as_slice().into(),
+                    XattrOp::Create,
+                ) {
+                    Err(e) => {
+                        if e.code == ENOTSUP {
+                            // This should only occur if a task has an "fscreate" context set, and
+                            // creates a new file in a filesystem that does not support xattrs.
+                            Ok(())
+                        } else {
+                            Err(e)
+                        }
+                    }
+                    result => result,
+                }
+            })
+            .unwrap_or_else(|| Ok(()))
+    }
+
+    pub fn create_tmpfile<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         mut mode: FileMode,
         mut owner: FsCred,
         link_behavior: FsNodeLinkBehavior,
-    ) -> Result<FsNodeHandle, Errno> {
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -1521,9 +1592,16 @@ impl FsNode {
 
     // This method does not attempt to update the atime of the node.
     // Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
-    pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    pub fn readlink<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // TODO(qsr): Is there a permission check here?
-        self.ops().readlink(self, current_task)
+        self.ops().readlink(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
     pub fn link<L>(
@@ -1538,6 +1616,7 @@ impl FsNode {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -1571,6 +1650,7 @@ impl FsNode {
             // access to the existing file.
             child
                 .check_access(
+                    locked,
                     current_task,
                     mount,
                     Access::READ | Access::WRITE,
@@ -1618,6 +1698,7 @@ impl FsNode {
     {
         // The user must be able to search and write to the directory.
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::EXEC | Access::WRITE,
@@ -1664,12 +1745,16 @@ impl FsNode {
             return error!(EISDIR);
         }
 
-        self.check_access(
-            current_task,
-            mount,
-            Access::WRITE,
-            CheckAccessReason::InternalPermissionChecks,
-        )?;
+        {
+            let mut locked = locked.cast_locked::<M>();
+            self.check_access(
+                &mut locked,
+                current_task,
+                mount,
+                Access::WRITE,
+                CheckAccessReason::InternalPermissionChecks,
+            )?;
+        }
 
         self.truncate_common(locked, strategy, current_task, length)
     }
@@ -1867,20 +1952,31 @@ impl FsNode {
     /// Check whether the node can be accessed in the current context with the specified access
     /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
     /// owner or is in the file's group.
-    pub fn check_access(
+    pub fn check_access<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         access: Access,
         reason: CheckAccessReason,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if access.contains(Access::WRITE) {
             mount.check_readonly_filesystem()?;
         }
         if access.contains(Access::EXEC) && !self.is_dir() {
             mount.check_noexec_filesystem()?;
         }
-        self.ops.check_access(self, current_task, access, &self.info, reason)
+        self.ops.check_access(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            access,
+            &self.info,
+            reason,
+        )
     }
 
     /// Check whether the stick bit, `S_ISVTX`, forbids the `current_task` from removing the given
@@ -2067,8 +2163,15 @@ impl FsNode {
         self.fs().dev_id
     }
 
-    pub fn stat(&self, current_task: &CurrentTask) -> Result<uapi::stat, Errno> {
-        let info = self.fetch_and_refresh_info(current_task)?;
+    pub fn stat<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<uapi::stat, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let info = self.fetch_and_refresh_info(locked, current_task)?;
 
         let time_to_kernel_timespec_pair = |t| {
             let timespec { tv_sec, tv_nsec } = timespec_from_time(t);
@@ -2111,17 +2214,21 @@ impl FsNode {
         }
     }
 
-    pub fn statx(
+    pub fn statx<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         flags: StatxFlags,
         mask: u32,
-    ) -> Result<statx, Errno> {
+    ) -> Result<statx, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // Ignore mask for now and fill in all of the fields.
         let info = if flags.contains(StatxFlags::AT_STATX_DONT_SYNC) {
             self.info()
         } else {
-            self.fetch_and_refresh_info(current_task)?
+            self.fetch_and_refresh_info(locked, current_task)?
         };
         if mask & STATX__RESERVED == STATX__RESERVED {
             return error!(EINVAL);
@@ -2195,85 +2302,122 @@ impl FsNode {
         Ok(())
     }
 
-    pub fn get_xattr(
+    pub fn get_xattr<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         max_size: usize,
-    ) -> Result<ValueOrSize<FsString>, Errno> {
+    ) -> Result<ValueOrSize<FsString>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // Based on the man page for xattr(7), read access permissions to security attributes
         // depend on the security module. If there isn't any, read access is always allowed.
         if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
-            return security::fs_node_getsecurity(current_task, self, name, max_size);
+            return security::fs_node_getsecurity(locked, current_task, self, name, max_size);
         }
         security::check_fs_node_getxattr_access(current_task, self, name)?;
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::READ,
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(ENODATA))?;
-        self.ops().get_xattr(self, current_task, name, max_size)
+        self.ops().get_xattr(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            name,
+            max_size,
+        )
     }
 
-    pub fn set_xattr(
+    pub fn set_xattr<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         value: &FsStr,
         op: XattrOp,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // Based on the man page for xattr(7), write access permissions to security attributes
         // depend on the security module. If there isn't any, write access is limited to
         // processed with the CAP_SYS_ADMIN capability.
         if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
-            return security::fs_node_setsecurity(current_task, self, name, value, op);
+            return security::fs_node_setsecurity(locked, current_task, self, name, value, op);
         }
         security::check_fs_node_setxattr_access(current_task, self, name, value, op)?;
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().set_xattr(self, current_task, name, value, op)
+        self.ops().set_xattr(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            name,
+            value,
+            op,
+        )
     }
 
-    pub fn remove_xattr(
+    pub fn remove_xattr<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // TODO: Is removing security.* xattrs allowed at all?
         security::check_fs_node_removexattr_access(current_task, self, name)?;
         self.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().remove_xattr(self, current_task, name)
+        self.ops().remove_xattr(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, name)
     }
 
-    pub fn list_xattrs(
+    pub fn list_xattrs<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         max_size: usize,
-    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         security::check_fs_node_listxattr_access(current_task, self)?;
-        Ok(self.ops().list_xattrs(self, current_task, max_size)?.map(|mut v| {
-            v.retain(|name| {
-                self.check_trusted_attribute_access(current_task, name.as_ref(), || errno!(EPERM))
+        Ok(self
+            .ops()
+            .list_xattrs(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, max_size)?
+            .map(|mut v| {
+                v.retain(|name| {
+                    self.check_trusted_attribute_access(current_task, name.as_ref(), || {
+                        errno!(EPERM)
+                    })
                     .is_ok()
-            });
-            v
-        }))
+                });
+                v
+            }))
     }
 
     /// Returns current `FsNodeInfo`.
@@ -2282,11 +2426,20 @@ impl FsNode {
     }
 
     /// Refreshes the `FsNodeInfo` if necessary and returns a read guard.
-    pub fn fetch_and_refresh_info(
+    pub fn fetch_and_refresh_info<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
-    ) -> Result<RwLockReadGuard<'_, FsNodeInfo>, Errno> {
-        self.ops().fetch_and_refresh_info(self, current_task, &self.info)
+    ) -> Result<RwLockReadGuard<'_, FsNodeInfo>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.ops().fetch_and_refresh_info(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            &self.info,
+        )
     }
 
     pub fn update_info<F, T>(&self, mutator: F) -> T
@@ -2365,6 +2518,7 @@ impl FsNode {
         if !has_owner_priviledge {
             if set_current_time {
                 self.check_access(
+                    locked,
                     current_task,
                     mount,
                     Access::WRITE,
@@ -2417,13 +2571,16 @@ impl std::fmt::Debug for FsNode {
 }
 
 impl Releasable for FsNode {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
 
-    fn release(self, current_task: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+        let (locked, current_task) = context;
         if let Some(fs) = self.fs.upgrade() {
             fs.remove_node(&self);
         }
-        if let Err(err) = self.ops.forget(&self, current_task) {
+        if let Err(err) =
+            self.ops.forget(&mut locked.cast_locked::<FileOpsCore>(), &self, current_task)
+        {
             log_error!("Error on FsNodeOps::forget: {err:?}");
         }
     }
@@ -2499,7 +2656,7 @@ mod tests {
             info.time_modify = UtcInstant::from_nanos(3);
             info.rdev = DeviceType::new(13, 13);
         });
-        let stat = node.stat(&current_task).expect("stat");
+        let stat = node.stat(&mut locked, &current_task).expect("stat");
 
         assert_eq!(stat.st_mode, FileMode::IFSOCK.bits());
         assert_eq!(stat.st_size, 1);
@@ -2559,13 +2716,18 @@ mod tests {
             .expect("create_node")
             .entry
             .node;
-        let check_access = |uid: uid_t, gid: gid_t, perm: u32, access: Access| {
+        let check_access = |locked: &mut Locked<'_, Unlocked>,
+                            uid: uid_t,
+                            gid: gid_t,
+                            perm: u32,
+                            access: Access| {
             node.update_info(|info| {
                 info.mode = mode!(IFREG, perm);
                 info.uid = uid;
                 info.gid = gid;
             });
             node.check_access(
+                locked,
                 &current_task,
                 &MountInfo::detached(),
                 access,
@@ -2573,45 +2735,45 @@ mod tests {
             )
         };
 
-        assert_eq!(check_access(0, 0, 0o700, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(0, 0, 0o700, Access::READ), error!(EACCES));
-        assert_eq!(check_access(0, 0, 0o700, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o700, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o700, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o700, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(0, 0, 0o070, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(0, 0, 0o070, Access::READ), error!(EACCES));
-        assert_eq!(check_access(0, 0, 0o070, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o070, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o070, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o070, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(0, 0, 0o007, Access::EXEC), Ok(()));
-        assert_eq!(check_access(0, 0, 0o007, Access::READ), Ok(()));
-        assert_eq!(check_access(0, 0, 0o007, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o007, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o007, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 0, 0o007, Access::WRITE), Ok(()));
 
-        assert_eq!(check_access(1, 0, 0o700, Access::EXEC), Ok(()));
-        assert_eq!(check_access(1, 0, 0o700, Access::READ), Ok(()));
-        assert_eq!(check_access(1, 0, 0o700, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o700, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o700, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o700, Access::WRITE), Ok(()));
 
-        assert_eq!(check_access(1, 0, 0o100, Access::EXEC), Ok(()));
-        assert_eq!(check_access(1, 0, 0o100, Access::READ), error!(EACCES));
-        assert_eq!(check_access(1, 0, 0o100, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o100, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o100, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o100, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(1, 0, 0o200, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(1, 0, 0o200, Access::READ), error!(EACCES));
-        assert_eq!(check_access(1, 0, 0o200, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o200, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o200, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o200, Access::WRITE), Ok(()));
 
-        assert_eq!(check_access(1, 0, 0o400, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(1, 0, 0o400, Access::READ), Ok(()));
-        assert_eq!(check_access(1, 0, 0o400, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o400, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o400, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 1, 0, 0o400, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(0, 2, 0o700, Access::EXEC), error!(EACCES));
-        assert_eq!(check_access(0, 2, 0o700, Access::READ), error!(EACCES));
-        assert_eq!(check_access(0, 2, 0o700, Access::WRITE), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o700, Access::EXEC), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o700, Access::READ), error!(EACCES));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o700, Access::WRITE), error!(EACCES));
 
-        assert_eq!(check_access(0, 2, 0o070, Access::EXEC), Ok(()));
-        assert_eq!(check_access(0, 2, 0o070, Access::READ), Ok(()));
-        assert_eq!(check_access(0, 2, 0o070, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o070, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o070, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 2, 0o070, Access::WRITE), Ok(()));
 
-        assert_eq!(check_access(0, 3, 0o070, Access::EXEC), Ok(()));
-        assert_eq!(check_access(0, 3, 0o070, Access::READ), Ok(()));
-        assert_eq!(check_access(0, 3, 0o070, Access::WRITE), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 3, 0o070, Access::EXEC), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 3, 0o070, Access::READ), Ok(()));
+        assert_eq!(check_access(&mut locked, 0, 3, 0o070, Access::WRITE), Ok(()));
     }
 
     #[::fuchsia::test]
@@ -2643,6 +2805,7 @@ mod tests {
         // should fail.
         assert_eq!(
             node.set_xattr(
+                &mut locked,
                 &current_task,
                 &MountInfo::detached(),
                 "security.name".into(),
@@ -2682,6 +2845,7 @@ mod tests {
         // should fail.
         assert_eq!(
             node.set_xattr(
+                &mut locked,
                 &current_task,
                 &MountInfo::detached(),
                 "trusted.name".into(),
@@ -2721,6 +2885,7 @@ mod tests {
         // Setting the label should succeed even without write access to the file.
         assert_eq!(
             node.set_xattr(
+                &mut locked,
                 &current_task,
                 &MountInfo::detached(),
                 "security.name".into(),
@@ -2735,7 +2900,13 @@ mod tests {
 
         // Getting the label should succeed even without read access to the file.
         assert_eq!(
-            node.get_xattr(&current_task, &MountInfo::detached(), "security.name".into(), 4096),
+            node.get_xattr(
+                &mut locked,
+                &current_task,
+                &MountInfo::detached(),
+                "security.name".into(),
+                4096
+            ),
             Ok(ValueOrSize::Value("security_label".into()))
         );
     }

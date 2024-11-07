@@ -55,8 +55,13 @@ struct LayeredFileSystemOps {
 }
 
 impl FileSystemOps for LayeredFileSystemOps {
-    fn statfs(&self, _fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
-        self.fs.base_fs.statfs(current_task)
+    fn statfs(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
+        self.fs.base_fs.statfs(locked, current_task)
     }
     fn name(&self) -> &'static FsStr {
         self.fs.base_fs.name()
@@ -109,6 +114,7 @@ impl FileOps for LayeredFileOps {
 
     fn seek(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
@@ -118,7 +124,11 @@ impl FileOps for LayeredFileOps {
         if new_offset >= self.fs.mappings.len() as off_t {
             new_offset = self
                 .root_file
-                .seek(current_task, SeekTarget::Set(new_offset - self.fs.mappings.len() as off_t))?
+                .seek(
+                    locked,
+                    current_task,
+                    SeekTarget::Set(new_offset - self.fs.mappings.len() as off_t),
+                )?
                 .checked_add(self.fs.mappings.len() as off_t)
                 .ok_or_else(|| errno!(EINVAL))?;
         }

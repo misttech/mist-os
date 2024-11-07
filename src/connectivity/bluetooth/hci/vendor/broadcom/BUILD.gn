@@ -57,7 +57,7 @@ source_set("common") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-fuchsia_driver("bt-hci-broadcom-driver") {
+fuchsia_cc_driver("bt-hci-broadcom-driver") {
   output_name = "bt-hci-broadcom"
   deps = [ ":common" ]
 }

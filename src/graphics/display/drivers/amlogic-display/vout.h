@@ -42,7 +42,8 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   // Returns a non-null pointer to the Vout instance outputting HDMI signal on
   // success.
   static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(fdf::Namespace& incoming,
-                                                          inspect::Node node);
+                                                          inspect::Node node,
+                                                          uint8_t visual_debug_level);
 
   // Sets only the display size, feature bits and panel settings for testing.
   // Returns a non-null pointer to the Vout instance on success.
@@ -56,7 +57,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
        uint32_t height, const PanelConfig* panel_config, inspect::Node node);
 
   // Creates a Vout instance that outputs HDMI signal.
-  Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node);
+  Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node, uint8_t visual_debug_level);
 
   Vout(Vout&&) = delete;
   Vout(const Vout&) = delete;
@@ -144,6 +145,8 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
     display::DisplayTiming current_display_timing_;
   } hdmi_;
+
+  uint8_t visual_debug_level_;
 };
 
 }  // namespace amlogic_display

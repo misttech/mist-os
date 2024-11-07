@@ -139,6 +139,7 @@ pub mod ioctl {
     };
     use crate::vfs::{FileObject, FileWriteGuardMode};
     use num_traits::FromPrimitive;
+    use starnix_sync::{FileOpsCore, LockBefore, Locked};
     use starnix_syscalls::{SyscallResult, SUCCESS};
     use starnix_uapi::errors::Errno;
     use starnix_uapi::user_address::{UserAddress, UserRef};
@@ -146,19 +147,23 @@ pub mod ioctl {
     use zerocopy::IntoBytes;
 
     /// ioctl handler for FS_IOC_ENABLE_VERITY.
-    pub fn enable(
+    pub fn enable<L>(
+        locked: &mut Locked<'_, L>,
         task: &CurrentTask,
         arg: UserAddress,
         file: &FileObject,
-    ) -> Result<SyscallResult, Errno> {
+    ) -> Result<SyscallResult, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         if file.can_write() {
             return error!(ETXTBSY);
         }
-        let block_size = file.name.entry.node.fs().statfs(task)?.f_bsize as u32;
+        let block_size = file.name.entry.node.fs().statfs(locked, task)?.f_bsize as u32;
         // Nb: Lock order is important here.
         let args: fsverity_enable_arg = task.read_object(arg.into())?;
         let mut descriptor = fsverity_descriptor_from_enable_arg(task, block_size, &args)?;
-        descriptor.data_size = file.node().fetch_and_refresh_info(task)?.size as u64;
+        descriptor.data_size = file.node().fetch_and_refresh_info(locked, task)?.size as u64;
         // The "Exec" writeguard mode means 'no writers'.
         let _guard = file.node().create_write_guard(FileWriteGuardMode::Exec)?;
         let mut fsverity = file.node().fsverity.lock();
@@ -175,17 +180,21 @@ pub mod ioctl {
     }
 
     /// ioctl handler for FS_IOC_MEASURE_VERITY.
-    pub fn measure(
+    pub fn measure<L>(
+        locked: &mut Locked<'_, L>,
         task: &CurrentTask,
         arg: UserAddress,
         file: &FileObject,
-    ) -> Result<SyscallResult, Errno> {
+    ) -> Result<SyscallResult, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let header_ref = UserRef::<uapi::fsverity_digest>::new(arg);
         let digest_addr = header_ref.next().addr();
         let header = task.read_object(header_ref.clone())?;
         match &*file.node().fsverity.lock() {
             FsVerityState::FsVerity => {
-                let block_size = file.name.entry.node.fs().statfs(task)?.f_bsize as u32;
+                let block_size = file.name.entry.node.fs().statfs(locked, task)?.f_bsize as u32;
                 if !block_size.is_power_of_two() {
                     return error!(EINVAL);
                 }

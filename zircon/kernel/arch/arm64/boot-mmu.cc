@@ -12,6 +12,7 @@
 #include <arch/defines.h>
 #include <fbl/algorithm.h>
 #include <vm/physmap.h>
+#include <vm/pmm.h>
 
 // Early boot time page table creation code, called from start.S while running in physical address
 // space with the mmu disabled. This code should be position independent as long as it sticks to
@@ -241,4 +242,34 @@ zx_status_t arm64_boot_map_v(const vaddr_t vaddr, const paddr_t paddr, const siz
 
   return _arm64_boot_map(arm64_get_kernel_ptable(), vaddr, paddr, len, flags, alloc, phys_to_virt,
                          allow_large_pages);
+}
+
+// Walk all the page tables allocated in the boot process and move them from the WIRED to the MMU
+// state and correctly set their mapping count. This will allow post boot arch aspace modifications
+// that expect a valid mapping count to behave correctly.
+void arm64_boot_mmu_unwire() {
+  const size_t num_pages = boot_page_table_offset / PAGE_SIZE;
+  const paddr_t paddr_base = boot_page_tables_pa - boot_page_table_offset;
+
+  auto process_page = [](paddr_t paddr) {
+    const pte_t* table = reinterpret_cast<const pte_t*>(paddr_to_physmap(paddr));
+    vm_page_t* page = Pmm::Node().PaddrToPage(paddr);
+    DEBUG_ASSERT(page);
+    DEBUG_ASSERT(page->state() == vm_page_state::WIRED);
+
+    uint count = 0;
+    for (size_t j = 0; j < MMU_KERNEL_PAGE_TABLE_ENTRIES; j++) {
+      if ((table[j] & MMU_PTE_DESCRIPTOR_MASK) != MMU_PTE_DESCRIPTOR_INVALID) {
+        count++;
+      }
+    }
+    page->set_state(vm_page_state::MMU);
+    page->mmu.num_mappings = count;
+  };
+
+  for (size_t i = 0; i < num_pages; i++) {
+    const paddr_t paddr = paddr_base + i * PAGE_SIZE;
+    process_page(paddr);
+  }
+  process_page(arm64_get_kernel_ptable_phys());
 }

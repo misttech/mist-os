@@ -7,30 +7,33 @@ use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
 use crate::policy::{
-    parse_policy_by_value, AccessVector, AccessVectorComputer, ClassId, FsUseLabelAndType,
-    FsUseType, Policy, SecurityContext,
+    parse_policy_by_value, AccessDecision, AccessVector, AccessVectorComputer, ClassId,
+    FsUseLabelAndType, FsUseType, Policy,
 };
+use crate::sid_table::SidTable;
 use crate::sync::Mutex;
 use crate::{
     AbstractObjectClass, ClassPermission, FileClass, FileSystemLabel, FileSystemLabelingScheme,
     FileSystemMountOptions, InitialSid, NullessByteStr, ObjectClass, Permission, SeLinuxStatus,
-    SeLinuxStatusPublisher, SecurityId, FIRST_UNUSED_SID,
+    SeLinuxStatusPublisher, SecurityId,
 };
 
 use anyhow::Context as _;
 use std::collections::HashMap;
-use std::num::NonZeroU32;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
 const ROOT_PATH: &'static str = "/";
 
-struct LoadedPolicy {
+struct ActivePolicy {
     /// Parsed policy structure.
-    parsed: Policy<ByValue<Vec<u8>>>,
+    parsed: Arc<Policy<ByValue<Vec<u8>>>>,
 
     /// The binary policy that was previously passed to `load_policy()`.
     binary: Vec<u8>,
+
+    /// Allocates and maintains the mapping between `SecurityId`s (SIDs) and Security Contexts.
+    sid_table: SidTable,
 }
 
 #[derive(Default)]
@@ -68,14 +71,8 @@ impl SeLinuxBooleans {
 }
 
 struct SecurityServerState {
-    /// Cache of SecurityIds (SIDs) used to refer to Security Contexts.
-    sids: HashMap<SecurityId, SecurityContext>,
-
-    /// Identifier to allocate to the next new Security Context.
-    next_sid: NonZeroU32,
-
     /// Describes the currently active policy.
-    policy: Option<Arc<LoadedPolicy>>,
+    active_policy: Option<ActivePolicy>,
 
     /// Holds active and pending states for each boolean defined by policy.
     booleans: SeLinuxBooleans,
@@ -93,48 +90,23 @@ struct SecurityServerState {
 }
 
 impl SecurityServerState {
-    /// Looks up `security_context`, adding it if not found, and returns the SID.
-    fn security_context_to_sid(&mut self, security_context: SecurityContext) -> SecurityId {
-        match self.sids.iter().find(|(_, sc)| **sc == security_context) {
-            Some((sid, _)) => *sid,
-            None => {
-                // Create and insert a new SID for `security_context`.
-                let sid = SecurityId(self.next_sid);
-                self.next_sid = self.next_sid.checked_add(1).expect("exhausted SID namespace");
-                assert!(
-                    self.sids.insert(sid, security_context).is_none(),
-                    "impossible error: SID already exists."
-                );
-                sid
-            }
-        }
-    }
-
-    /// Returns the `SecurityContext` associated with `sid`.
-    /// If `sid` was invalidated by a policy reload then the "unlabeled" context is returned instead.
-    ///
-    /// # Panics
-    ///
-    /// This API panics if called before a policy has been loaded.
-    fn sid_to_security_context(&self, sid: SecurityId) -> &SecurityContext {
-        self.sids.get(&sid).unwrap_or_else(|| {
-            self.sids
-                .get(&SecurityId::initial(InitialSid::Unlabeled))
-                .expect("requires policy to be loaded")
-        })
-    }
-
-    /// Returns the `SecurityContext` associated with `sid`, unless `sid` was invalidated by a
-    /// policy reload. Query implementations should use `sid_to_security_context()`.
-    fn try_sid_to_security_context(&self, sid: SecurityId) -> Option<&SecurityContext> {
-        self.sids.get(&sid)
-    }
-
     fn deny_unknown(&self) -> bool {
-        self.policy.as_ref().map_or(true, |p| p.parsed.handle_unknown() != HandleUnknown::Allow)
+        self.active_policy
+            .as_ref()
+            .map_or(true, |p| p.parsed.handle_unknown() != HandleUnknown::Allow)
     }
     fn reject_unknown(&self) -> bool {
-        self.policy.as_ref().map_or(false, |p| p.parsed.handle_unknown() == HandleUnknown::Reject)
+        self.active_policy
+            .as_ref()
+            .map_or(false, |p| p.parsed.handle_unknown() == HandleUnknown::Reject)
+    }
+
+    fn expect_active_policy(&self) -> &ActivePolicy {
+        &self.active_policy.as_ref().expect("policy should be loaded")
+    }
+
+    fn expect_active_policy_mut(&mut self) -> &mut ActivePolicy {
+        self.active_policy.as_mut().expect("policy should be loaded")
     }
 }
 
@@ -153,9 +125,7 @@ impl SecurityServer {
     pub fn new() -> Arc<Self> {
         let avc_manager = AvcManager::new();
         let state = Mutex::new(SecurityServerState {
-            sids: HashMap::new(),
-            next_sid: NonZeroU32::new(FIRST_UNUSED_SID).unwrap(),
-            policy: None,
+            active_policy: None,
             booleans: SeLinuxBooleans::default(),
             status_publisher: None,
             enforcing: false,
@@ -184,11 +154,14 @@ impl SecurityServer {
         &self,
         security_context: NullessByteStr<'_>,
     ) -> Result<SecurityId, anyhow::Error> {
-        let mut state = self.state.lock();
-        let policy = &state.policy.as_ref().ok_or(anyhow::anyhow!("no policy loaded"))?.parsed;
-        let context =
-            policy.parse_security_context(security_context).map_err(anyhow::Error::from)?;
-        Ok(state.security_context_to_sid(context))
+        let mut locked_state = self.state.lock();
+        let active_policy =
+            locked_state.active_policy.as_mut().ok_or(anyhow::anyhow!("no policy loaded"))?;
+        let context = active_policy
+            .parsed
+            .parse_security_context(security_context)
+            .map_err(anyhow::Error::from)?;
+        Ok(active_policy.sid_table.security_context_to_sid(&context))
     }
 
     /// Returns the Security Context string for the requested `sid`.
@@ -196,9 +169,10 @@ impl SecurityServer {
     /// is the case for e.g. the `/proc/*/attr/` filesystem and `security.selinux` extended
     /// attribute values.
     pub fn sid_to_security_context(&self, sid: SecurityId) -> Option<Vec<u8>> {
-        let state = self.state.lock();
-        let context = state.try_sid_to_security_context(sid)?;
-        Some(state.policy.as_ref()?.parsed.serialize_security_context(context))
+        let locked_state = self.state.lock();
+        let active_policy = locked_state.active_policy.as_ref()?;
+        let context = active_policy.sid_table.try_sid_to_security_context(sid)?;
+        Some(active_policy.parsed.serialize_security_context(context))
     }
 
     /// Applies the supplied policy to the security server.
@@ -206,42 +180,20 @@ impl SecurityServer {
         // Parse the supplied policy, and reject the load operation if it is
         // malformed or invalid.
         let (parsed, binary) = parse_policy_by_value(binary_policy)?;
-        let parsed = parsed.validate()?;
-
-        // Bundle the binary policy together with a parsed copy for the
-        // [`SecurityServer`] to use to answer queries. This will fail if the
-        // supplied policy cannot be parsed due to being malformed, or if the
-        // parsed policy is not valid.
-        let policy = Arc::new(LoadedPolicy { parsed, binary });
+        let parsed = Arc::new(parsed.validate()?);
 
         // Replace any existing policy and push update to `state.status_publisher`.
         self.with_state_and_update_status(|state| {
-            // Remap any existing Security Contexts to use Ids defined by the new policy.
-            // TODO(b/330677360): Replace serialize/parse with an efficient implementation.
-            assert_eq!(state.policy.is_none(), state.sids.is_empty());
-            let new_sids = state.sids.iter().filter_map(|(sid, context)| {
-                let context_str =
-                    state.policy.as_ref().unwrap().parsed.serialize_security_context(context);
-                let new_context =
-                    policy.parsed.parse_security_context(context_str.as_slice().into());
-                new_context.ok().map(|context| (*sid, context))
-            });
-            state.sids = HashMap::from_iter(new_sids);
-
-            // Replace the "initial" SID's associated Contexts.
-            let initial_sids = InitialSid::all_variants();
-            let mut initial_contexts = Vec::with_capacity(initial_sids.len());
-            for id in initial_sids {
-                let security_context = policy.parsed.initial_context(id);
-                initial_contexts.push((SecurityId::initial(id), security_context));
-            }
-            state.sids.extend(initial_contexts);
+            let sid_table = if let Some(previous_active_policy) = &state.active_policy {
+                SidTable::new_from_previous(parsed.clone(), &previous_active_policy.sid_table)
+            } else {
+                SidTable::new(parsed.clone())
+            };
 
             // TODO(b/324265752): Determine whether SELinux booleans need to be retained across
             // policy (re)loads.
             state.booleans.reset(
-                policy
-                    .parsed
+                parsed
                     .conditional_booleans()
                     .iter()
                     // TODO(b/324392507): Relax the UTF8 requirement on policy strings.
@@ -249,7 +201,7 @@ impl SecurityServer {
                     .collect(),
             );
 
-            state.policy = Some(policy);
+            state.active_policy = Some(ActivePolicy { parsed, binary, sid_table });
             state.policy_change_count += 1;
         });
 
@@ -258,12 +210,12 @@ impl SecurityServer {
 
     /// Returns the active policy in binary form.
     pub fn get_binary_policy(&self) -> Vec<u8> {
-        self.state.lock().policy.as_ref().map_or(Vec::new(), |p| p.binary.clone())
+        self.state.lock().active_policy.as_ref().map_or(Vec::new(), |p| p.binary.clone())
     }
 
     /// Returns true if a policy has been loaded.
     pub fn has_policy(&self) -> bool {
-        self.state.lock().policy.is_some()
+        self.state.lock().active_policy.is_some()
     }
 
     /// Set to enforcing mode if `enforce` is true, permissive mode otherwise.
@@ -316,9 +268,7 @@ impl SecurityServer {
     pub fn class_names(&self) -> Result<Vec<Vec<u8>>, ()> {
         let locked_state = self.state.lock();
         let names = locked_state
-            .policy
-            .as_ref()
-            .unwrap()
+            .expect_active_policy()
             .parsed
             .classes()
             .iter()
@@ -331,9 +281,7 @@ impl SecurityServer {
     pub fn class_id_by_name(&self, name: &str) -> Result<ClassId, ()> {
         let locked_state = self.state.lock();
         Ok(locked_state
-            .policy
-            .as_ref()
-            .unwrap()
+            .expect_active_policy()
             .parsed
             .classes()
             .iter()
@@ -345,7 +293,7 @@ impl SecurityServer {
     /// Returns the class identifier of a class, if it exists.
     pub fn class_permissions_by_name(&self, name: &str) -> Result<Vec<(u32, Vec<u8>)>, ()> {
         let locked_state = self.state.lock();
-        locked_state.policy.as_ref().unwrap().parsed.find_class_permissions_by_name(name)
+        locked_state.expect_active_policy().parsed.find_class_permissions_by_name(name)
     }
 
     /// Determines the appropriate [`FileSystemLabel`] for a mounted filesystem given this security
@@ -357,27 +305,26 @@ impl SecurityServer {
         mount_options: &FileSystemMountOptions,
     ) -> FileSystemLabel {
         let mut locked_state = self.state.lock();
+        let active_policy = locked_state.expect_active_policy_mut();
 
         let mountpoint_sid_from_mount_option =
-            sid_from_mount_option(&mut locked_state, &mount_options.context);
+            sid_from_mount_option(active_policy, &mount_options.context);
         let fs_sid_from_mount_option =
-            sid_from_mount_option(&mut locked_state, &mount_options.fs_context);
+            sid_from_mount_option(active_policy, &mount_options.fs_context);
         let def_sid_from_mount_option =
-            sid_from_mount_option(&mut locked_state, &mount_options.def_context);
+            sid_from_mount_option(active_policy, &mount_options.def_context);
         let root_sid_from_mount_option =
-            sid_from_mount_option(&mut locked_state, &mount_options.root_context);
-
-        let loaded_policy = locked_state.policy.as_ref().unwrap();
+            sid_from_mount_option(active_policy, &mount_options.root_context);
 
         if let Some(mountpoint_sid) = mountpoint_sid_from_mount_option {
             // `mount_options.context` is set, so the file-system and the nodes it contains
             // have the specified read-only security label set.
             FileSystemLabel { sid: mountpoint_sid, scheme: FileSystemLabelingScheme::Mountpoint }
         } else if let Some(FsUseLabelAndType { context, use_type }) =
-            loaded_policy.parsed.fs_use_label_and_type(fs_type)
+            active_policy.parsed.fs_use_label_and_type(fs_type)
         {
             // There is an `fs_use` statement for this file-system type in the policy.
-            let fs_sid_from_policy = locked_state.security_context_to_sid(context);
+            let fs_sid_from_policy = active_policy.sid_table.security_context_to_sid(&context);
             let fs_sid = fs_sid_from_mount_option.unwrap_or(fs_sid_from_policy);
             FileSystemLabel {
                 sid: fs_sid,
@@ -389,10 +336,10 @@ impl SecurityServer {
                 },
             }
         } else if let Some(context) =
-            loaded_policy.parsed.genfscon_label_for_fs_and_path(fs_type, ROOT_PATH.into(), None)
+            active_policy.parsed.genfscon_label_for_fs_and_path(fs_type, ROOT_PATH.into(), None)
         {
             // There is a `genfscon` statement for this file-system type in the policy.
-            let genfscon_sid = locked_state.security_context_to_sid(context);
+            let genfscon_sid = active_policy.sid_table.security_context_to_sid(&context);
             let fs_sid = fs_sid_from_mount_option.unwrap_or(genfscon_sid);
             FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon }
         } else {
@@ -424,13 +371,13 @@ impl SecurityServer {
         class_id: Option<ClassId>,
     ) -> Option<SecurityId> {
         let mut locked_state = self.state.lock();
-        let security_context = locked_state
-            .policy
-            .as_ref()
-            .unwrap()
-            .parsed
-            .genfscon_label_for_fs_and_path(fs_type, node_path.into(), class_id)?;
-        Some(locked_state.security_context_to_sid(security_context))
+        let active_policy = locked_state.expect_active_policy_mut();
+        let security_context = active_policy.parsed.genfscon_label_for_fs_and_path(
+            fs_type,
+            node_path.into(),
+            class_id,
+        )?;
+        Some(active_policy.sid_table.security_context_to_sid(&security_context))
     }
 
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
@@ -440,41 +387,40 @@ impl SecurityServer {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
-        let state = self.state.lock();
+    ) -> AccessDecision {
+        let locked_state = self.state.lock();
 
-        let policy = match &state.policy {
-            Some(policy) => policy,
-            // Policy is "allow all" when no policy is loaded, regardless of enforcing state.
-            None => return AccessVector::ALL,
+        let active_policy = match &locked_state.active_policy {
+            Some(active_policy) => active_policy,
+            // All permissions are allowed when no policy is loaded, regardless of enforcing state.
+            None => return AccessDecision::allow(AccessVector::ALL),
         };
 
         // Policy is loaded, so `sid_to_security_context()` will not panic.
-        let source_context = state.sid_to_security_context(source_sid);
-        let target_context = state.sid_to_security_context(target_sid);
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
         // Access decisions are currently based solely on explicit "allow" rules.
         // TODO: https://fxbug.dev/372400976 - Include permissions from matched "constraints"
         // rules in the policy.
-        // TODO: https://fxbug.dev/372401676 - Include permissions from "attribute"s associated
-        // with the source & target types via "typeattribute" rules.
         // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules are respected.
         match target_class {
-            AbstractObjectClass::System(target_class) => policy.parsed.compute_explicitly_allowed(
-                source_context.type_(),
-                target_context.type_(),
-                target_class,
-            ),
-            AbstractObjectClass::Custom(target_class) => policy
-                .parsed
-                .compute_explicitly_allowed_custom(
+            AbstractObjectClass::System(target_class) => {
+                active_policy.parsed.compute_explicitly_allowed(
+                    source_context.type_(),
+                    target_context.type_(),
+                    target_class,
+                )
+            }
+            AbstractObjectClass::Custom(target_class) => {
+                active_policy.parsed.compute_explicitly_allowed_custom(
                     source_context.type_(),
                     target_context.type_(),
                     &target_class,
                 )
-                .unwrap_or(AccessVector::NONE),
+            }
             // No meaningful policy can be determined without target class.
-            _ => AccessVector::NONE,
+            _ => AccessDecision::allow(AccessVector::NONE),
         }
     }
 
@@ -486,24 +432,23 @@ impl SecurityServer {
         target_sid: SecurityId,
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        let mut state = self.state.lock();
-
-        let policy = match &state.policy {
-            Some(policy) => policy,
+        let mut locked_state = self.state.lock();
+        let active_policy = match &mut locked_state.active_policy {
+            Some(active_policy) => active_policy,
             None => {
                 return Err(anyhow::anyhow!("no policy loaded")).context("computing new file sid")
             }
         };
 
         // Policy is loaded, so `sid_to_security_context()` will not panic.
-        let source_context = state.sid_to_security_context(source_sid);
-        let target_context = state.sid_to_security_context(target_sid);
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
-        policy
+        active_policy
             .parsed
             .new_file_security_context(source_context, target_context, &file_class)
             // TODO(http://b/334968228): check that transitions are allowed.
-            .map(|sc| state.security_context_to_sid(sc.into()))
+            .map(|sc| active_policy.sid_table.security_context_to_sid(&sc))
             .map_err(anyhow::Error::from)
             .context("computing new file security context from policy")
     }
@@ -514,18 +459,17 @@ impl SecurityServer {
         target_sid: SecurityId,
         target_class: ObjectClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        let mut state = self.state.lock();
-
-        let policy = state.policy.as_ref().expect("policy should be loaded");
+        let mut locked_state = self.state.lock();
+        let active_policy = locked_state.expect_active_policy_mut();
 
         // Policy is loaded, so `sid_to_security_context()` will not panic.
-        let source_context = state.sid_to_security_context(source_sid);
-        let target_context = state.sid_to_security_context(target_sid);
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
-        policy
+        active_policy
             .parsed
             .new_security_context(source_context, target_context, &target_class)
-            .map(|sc| state.security_context_to_sid(sc.into()))
+            .map(|sc| active_policy.sid_table.security_context_to_sid(&sc))
             .map_err(anyhow::Error::from)
             .context("computing new security context from policy")
     }
@@ -535,13 +479,11 @@ impl SecurityServer {
     /// that the policy entry for the `TypeId` of `bounded_sid` has the `TypeId` of `parent_sid`
     /// specified in its `bounds`.
     pub fn is_bounded_by(&self, bounded_sid: SecurityId, parent_sid: SecurityId) -> bool {
-        let state = self.state.lock();
-        let bounded_type = state.sid_to_security_context(bounded_sid).type_();
-        let parent_type = state.sid_to_security_context(parent_sid).type_();
-        state
-            .policy
-            .as_ref()
-            .map_or(false, |policy| policy.parsed.is_bounded_by(bounded_type, parent_type))
+        let locked_state = self.state.lock();
+        let active_policy = locked_state.expect_active_policy();
+        let bounded_type = active_policy.sid_table.sid_to_security_context(bounded_sid).type_();
+        let parent_type = active_policy.sid_table.sid_to_security_context(parent_sid).type_();
+        active_policy.parsed.is_bounded_by(bounded_type, parent_type)
     }
 
     /// Assign a [`SeLinuxStatusPublisher`] to be used for pushing updates to the security server's
@@ -572,14 +514,14 @@ impl SecurityServer {
     /// Runs the supplied function with locked `self`, and then updates the SELinux status file
     /// associated with `self.state.status_publisher`, if any.
     fn with_state_and_update_status(&self, f: impl FnOnce(&mut SecurityServerState)) {
-        let mut state = self.state.lock();
-        f(state.deref_mut());
+        let mut locked_state = self.state.lock();
+        f(locked_state.deref_mut());
         let new_value = SeLinuxStatus {
-            is_enforcing: state.enforcing,
-            change_count: state.policy_change_count,
-            deny_unknown: state.deny_unknown(),
+            is_enforcing: locked_state.enforcing,
+            change_count: locked_state.policy_change_count,
+            deny_unknown: locked_state.deny_unknown(),
         };
-        if let Some(status_publisher) = &mut state.status_publisher {
+        if let Some(status_publisher) = &mut locked_state.status_publisher {
             status_publisher.set_status(new_value);
         }
     }
@@ -591,20 +533,8 @@ impl Query for SecurityServer {
         source_sid: SecurityId,
         target_sid: SecurityId,
         target_class: AbstractObjectClass,
-    ) -> AccessVector {
+    ) -> AccessDecision {
         self.compute_access_vector(source_sid, target_sid, target_class)
-    }
-
-    fn is_permissive(&self, source_sid: SecurityId) -> bool {
-        let state = self.state.lock();
-        if !state.enforcing {
-            true
-        } else if let Some(policy) = &state.policy {
-            let source_context = state.sid_to_security_context(source_sid);
-            policy.parsed.is_permissive(source_context.type_())
-        } else {
-            true
-        }
     }
 }
 
@@ -613,7 +543,7 @@ impl AccessVectorComputer for SecurityServer {
         &self,
         permissions: &[P],
     ) -> Option<AccessVector> {
-        match &self.state.lock().policy {
+        match &self.state.lock().active_policy {
             Some(policy) => policy.parsed.access_vector_from_permissions(permissions),
             None => Some(AccessVector::NONE),
         }
@@ -623,15 +553,13 @@ impl AccessVectorComputer for SecurityServer {
 /// Computes a [`SecurityId`] given a non-[`None`] value for one of the four
 /// "context" mount options (https://man7.org/linux/man-pages/man8/mount.8.html).
 fn sid_from_mount_option(
-    state: &mut SecurityServerState,
+    active_policy: &mut ActivePolicy,
     mount_option: &Option<Vec<u8>>,
 ) -> Option<SecurityId> {
     if let Some(label) = mount_option.as_ref() {
         Some(
-            if let Some(context) =
-                state.policy.as_ref().unwrap().parsed.parse_security_context(label.into()).ok()
-            {
-                state.security_context_to_sid(context)
+            if let Some(context) = active_policy.parsed.parse_security_context(label.into()).ok() {
+                active_policy.sid_table.security_context_to_sid(&context)
             } else {
                 // The mount option is present-but-not-valid: we use `Unlabeled`.
                 SecurityId::initial(InitialSid::Unlabeled)
@@ -646,7 +574,9 @@ fn sid_from_mount_option(
 mod tests {
     use super::*;
 
-    use crate::ProcessPermission;
+    use crate::permission_check::PermissionCheckResult;
+    use crate::sid_table::testing::allocate_sid;
+    use crate::{CommonFilePermission, ProcessPermission};
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const TESTS_BINARY_POLICY: &[u8] =
@@ -663,64 +593,12 @@ mod tests {
     }
 
     #[test]
-    fn sid_to_security_context() {
-        let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy();
-        let sid = security_server
-            .security_context_to_sid(security_context.into())
-            .expect("creating SID from security context should succeed");
-        assert_eq!(
-            security_server.sid_to_security_context(sid).expect("sid not found"),
-            security_context
-        );
-    }
-
-    #[test]
-    fn sids_for_different_security_contexts_differ() {
-        let security_server = security_server_with_tests_policy();
-        let sid1 = security_server
-            .security_context_to_sid(b"user0:object_r:type0:s0".into())
-            .expect("creating SID from security context should succeed");
-        let sid2 = security_server
-            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
-            .expect("creating SID from security context should succeed");
-        assert_ne!(sid1, sid2);
-    }
-
-    #[test]
-    fn sids_for_same_security_context_are_equal() {
-        let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy();
-        let sid_count_before = security_server.state.lock().sids.len();
-        let sid1 = security_server
-            .security_context_to_sid(security_context.into())
-            .expect("creating SID from security context should succeed");
-        let sid2 = security_server
-            .security_context_to_sid(security_context.into())
-            .expect("creating SID from security context should succeed");
-        assert_eq!(sid1, sid2);
-        assert_eq!(security_server.state.lock().sids.len(), sid_count_before + 1);
-    }
-
-    #[test]
-    fn sids_allocated_outside_initial_range() {
-        let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy();
-        let sid_count_before = security_server.state.lock().sids.len();
-        let sid = security_server
-            .security_context_to_sid(security_context.into())
-            .expect("creating SID from security context should succeed");
-        assert_eq!(security_server.state.lock().sids.len(), sid_count_before + 1);
-        assert!(sid.0.get() >= FIRST_UNUSED_SID);
-    }
-
-    #[test]
     fn compute_access_vector_allows_all() {
         let security_server = SecurityServer::new();
         let sid1 = SecurityId::initial(InitialSid::Kernel);
         let sid2 = SecurityId::initial(InitialSid::Unlabeled);
         assert_eq!(
-            security_server.compute_access_vector(sid1, sid2, ObjectClass::Process.into()),
+            security_server.compute_access_vector(sid1, sid2, ObjectClass::Process.into()).allow,
             AccessVector::ALL
         );
     }
@@ -1060,7 +938,7 @@ mod tests {
         // Synthesize a SID with no Security Context in the SID table, which would be the case if the
         // SID had been allocated, but then removed because a policy load invalidated the Context.
         let unlabeled_sid =
-            SecurityId(NonZeroU32::new(security_server.state.lock().next_sid.into()).unwrap());
+            allocate_sid(&mut security_server.state.lock().expect_active_policy_mut().sid_table);
 
         let permission_check = security_server.as_permission_check();
 
@@ -1100,11 +978,31 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
+        // Since the permission is granted by policy, the check will not be audit logged.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::Fork),
+            PermissionCheckResult { permit: true, audit: false }
+        );
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself, but
-        // the security server is configured to be permissive.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
+        // the security server is configured to be permissive. Because the permission was not
+        // granted by the policy, the check will be audit logged.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit),
+            PermissionCheckResult { permit: true, audit: true }
+        );
+
+        // Test policy is built with "deny unknown" behaviour, and has no "blk_file" class defined.
+        // This permission should be treated like a defined permission that is not allowed to the
+        // source, and both allowed and audited here.
+        assert_eq!(
+            permission_check.has_permission(
+                sid,
+                sid,
+                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+            ),
+            PermissionCheckResult { permit: true, audit: true }
+        );
     }
 
     #[test]
@@ -1118,10 +1016,28 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork).permit);
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::Fork),
+            PermissionCheckResult { permit: true, audit: false }
+        );
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself.
-        assert!(!permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit).permit);
+        // Permission denials are audit logged in enforcing mode.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit),
+            PermissionCheckResult { permit: false, audit: true }
+        );
+
+        // Test policy is built with "deny unknown" behaviour, and has no "blk_file" class defined.
+        // This permission should therefore be denied, and the denial audited.
+        assert_eq!(
+            permission_check.has_permission(
+                sid,
+                sid,
+                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+            ),
+            PermissionCheckResult { permit: false, audit: true }
+        );
     }
 
     #[test]
@@ -1140,28 +1056,61 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants process-getsched permission to both of the test domains.
-        assert!(
-            permission_check
-                .has_permission(permissive_sid, permissive_sid, ProcessPermission::GetSched)
-                .permit
+        assert_eq!(
+            permission_check.has_permission(
+                permissive_sid,
+                permissive_sid,
+                ProcessPermission::GetSched
+            ),
+            PermissionCheckResult { permit: true, audit: false }
         );
-        assert!(
-            permission_check
-                .has_permission(non_permissive_sid, non_permissive_sid, ProcessPermission::GetSched)
-                .permit
+        assert_eq!(
+            permission_check.has_permission(
+                non_permissive_sid,
+                non_permissive_sid,
+                ProcessPermission::GetSched
+            ),
+            PermissionCheckResult { permit: true, audit: false }
         );
 
         // Test policy does not grant process-getsched permission to the test domains on one another.
         // The permissive domain will be granted the permission, since it is marked permissive.
-        assert!(
-            permission_check
-                .has_permission(permissive_sid, non_permissive_sid, ProcessPermission::GetSched)
-                .permit
+        assert_eq!(
+            permission_check.has_permission(
+                permissive_sid,
+                non_permissive_sid,
+                ProcessPermission::GetSched
+            ),
+            PermissionCheckResult { permit: true, audit: true }
         );
-        assert!(
-            !permission_check
-                .has_permission(non_permissive_sid, permissive_sid, ProcessPermission::GetSched)
-                .permit
+        assert_eq!(
+            permission_check.has_permission(
+                non_permissive_sid,
+                permissive_sid,
+                ProcessPermission::GetSched
+            ),
+            PermissionCheckResult { permit: false, audit: true }
+        );
+
+        // Test policy has "deny unknown" behaviour and does not define the "blk_file" class, so
+        // access to a permission on it will depend on whether the source is permissive.
+        // The target domain is irrelevant, since the class/permission do not exist, so the non-
+        // permissive SID is used for both checks.
+        assert_eq!(
+            permission_check.has_permission(
+                permissive_sid,
+                non_permissive_sid,
+                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+            ),
+            PermissionCheckResult { permit: true, audit: true }
+        );
+        assert_eq!(
+            permission_check.has_permission(
+                non_permissive_sid,
+                non_permissive_sid,
+                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+            ),
+            PermissionCheckResult { permit: false, audit: true }
         );
     }
 }

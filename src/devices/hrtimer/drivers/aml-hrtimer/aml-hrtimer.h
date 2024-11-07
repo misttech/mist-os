@@ -10,6 +10,7 @@
 #include <lib/driver/devfs/cpp/connector.h>
 
 #include "src/devices/hrtimer/drivers/aml-hrtimer/aml-hrtimer-server.h"
+#include "src/devices/hrtimer/drivers/aml-hrtimer/aml_hrtimer_config.h"
 
 namespace hrtimer {
 
@@ -28,6 +29,7 @@ class AmlHrtimer : public fdf::DriverBase {
 
   AmlHrtimer(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)),
+        config_(take_config<aml_hrtimer_config::Config>()),
         devfs_connector_(fit::bind_member<&AmlHrtimer::Serve>(this)) {}
 
   zx::result<> Start() override;
@@ -35,10 +37,6 @@ class AmlHrtimer : public fdf::DriverBase {
 
   // For unit testing.
   inspect::Inspector& inspect() { return inspector().inspector(); }
-
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>>& element_control() {
-    return server_->element_control();
-  }
   bool HasWaitCompleter(size_t timer_index) {
     return server_ && server_->HasWaitCompleter(timer_index);
   }
@@ -54,9 +52,8 @@ class AmlHrtimer : public fdf::DriverBase {
     bindings_.AddBinding(dispatcher(), std::move(server), server_.get(),
                          fidl::kIgnoreBindingClosure);
   }
-  zx::result<PowerConfiguration> GetPowerConfiguration(
-      const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev);
 
+  aml_hrtimer_config::Config config_;
   std::unique_ptr<AmlHrtimerServer> server_;
   fidl::ServerBindingGroup<fuchsia_hardware_hrtimer::Device> bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;

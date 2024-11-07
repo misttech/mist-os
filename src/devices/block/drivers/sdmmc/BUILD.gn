@@ -89,7 +89,7 @@ source_set("sdmmc-driver-source") {
   ]
 }
 
-fuchsia_driver("sdmmc-driver") {
+fuchsia_cc_driver("sdmmc-driver") {
   output_name = "sdmmc"
   sources = [ "driver-export.cc" ]
   deps = [ ":sdmmc-driver-source" ]

@@ -22,36 +22,38 @@ namespace fio = fuchsia_io;
 
 using OpenTest = FilesystemTest;
 
-fidl::ClientEnd<fio::Directory> CreateDirectory(fio::wire::OpenFlags dir_flags,
+fidl::ClientEnd<fio::Directory> CreateDirectory(fio::wire::Flags dir_flags,
                                                 const std::string& path) {
   EXPECT_EQ(mkdir(path.c_str(), 0755), 0);
 
   auto endpoints = fidl::Endpoints<fio::Directory>::Create();
-  EXPECT_EQ(
-      fdio_open(path.c_str(), static_cast<uint32_t>(dir_flags | fio::wire::OpenFlags::kDirectory),
-                endpoints.server.TakeChannel().release()),
-      ZX_OK);
+  EXPECT_EQ(fdio_open3(path.c_str(),
+                       static_cast<uint64_t>(dir_flags | fio::wire::Flags::kProtocolDirectory),
+                       endpoints.server.TakeChannel().release()),
+            ZX_OK);
 
   return std::move(endpoints.client);
 }
 
-zx_status_t OpenFileWithCreate(const fidl::ClientEnd<fio::Directory>& dir,
-                               const std::string& path) {
-  fio::wire::OpenFlags child_flags =
-      fio::wire::OpenFlags::kCreate | fio::wire::OpenFlags::kRightReadable |
-      fio::wire::OpenFlags::kNotDirectory | fio::wire::OpenFlags::kDescribe;
-  auto child_endpoints = fidl::Endpoints<fio::Node>::Create();
-  auto open_res = fidl::WireCall(dir)->Open(child_flags, {}, fidl::StringView::FromExternal(path),
-                                            std::move(child_endpoints.server));
-  EXPECT_EQ(open_res.status(), ZX_OK);
-  fidl::WireSyncClient child{std::move(child_endpoints.client)};
+zx_status_t OpenFileWithMaybeCreate(const fidl::ClientEnd<fio::Directory>& dir,
+                                    const std::string& path) {
+  fio::wire::Flags flags = fio::wire::Flags::kProtocolFile | fio::wire::Flags::kFlagMaybeCreate |
+                           fio::wire::Flags::kFlagSendRepresentation;
+  auto file_endpoints = fidl::Endpoints<fio::Node>::Create();
+  auto open_result = fidl::WireCall(dir)->Open3(fidl::StringView::FromExternal(path), flags, {},
+                                                file_endpoints.server.TakeChannel());
+  EXPECT_EQ(open_result.status(), ZX_OK);
+  fidl::WireSyncClient child{std::move(file_endpoints.client)};
 
   class EventHandler : public fidl::testing::WireSyncEventHandlerTestBase<fio::Node> {
    public:
     EventHandler() = default;
     zx_status_t status() const { return status_; }
 
-    void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) override { status_ = event->s; }
+    void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* representation) override {
+      EXPECT_EQ(representation->Which(), fio::wire::Representation::Tag::kFile);
+      status_ = ZX_OK;
+    }
 
     void NotImplemented_(const std::string& name) override { FAIL() << "Unexpected " << name; }
 
@@ -60,88 +62,98 @@ zx_status_t OpenFileWithCreate(const fidl::ClientEnd<fio::Directory>& dir,
   };
 
   EventHandler event_handler;
-  auto handle_res = child.HandleOneEvent(event_handler);
-  EXPECT_EQ(handle_res.status(), ZX_OK);
-
+  auto status = child.HandleOneEvent(event_handler);
+  if (!status.ok()) {
+    EXPECT_NE(status.reason(), fidl::Reason::kUnexpectedMessage);
+    return status.status();
+  }
   return event_handler.status();
 }
 
 TEST_P(OpenTest, OpenFileWithCreateCreatesInReadWriteDir) {
-  fio::wire::OpenFlags flags =
-      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable;
+  fio::wire::Flags flags = fio::wire::kPermReadable | fio::wire::kPermWritable;
   auto parent = CreateDirectory(flags, GetPath("a"));
-  EXPECT_EQ(OpenFileWithCreate(parent, "b"), ZX_OK);
+  EXPECT_EQ(OpenFileWithMaybeCreate(parent, "b"), ZX_OK);
 }
 
 TEST_P(OpenTest, OpenFileWithCreateFailsInReadOnlyDir) {
-  fio::wire::OpenFlags flags = fio::wire::OpenFlags::kRightReadable;
+  fio::wire::Flags flags = fio::wire::kPermReadable;
   auto parent = CreateDirectory(flags, GetPath("a"));
-  EXPECT_EQ(OpenFileWithCreate(parent, "b"), ZX_ERR_ACCESS_DENIED);
+  EXPECT_EQ(OpenFileWithMaybeCreate(parent, "b"), ZX_ERR_ACCESS_DENIED);
 }
 
-TEST_P(OpenTest, OpenFileWithCreateCreatesInReadWriteDirPosixOpen) {
-  // kOpenFlagPosixWritable expand the rights of the directory connection to include write rights if
-  // the parent connection has them.
-  fio::wire::OpenFlags flags =
-      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable;
-  auto parent = CreateDirectory(flags, GetPath("a"));
+TEST_P(OpenTest, OpenFileWithCreateCreatesInReadWriteDirWithPermInheritWrite) {
+  fio::wire::Flags parent_flags = fio::wire::kPermReadable | fio::wire::kPermWritable;
+  auto parent = CreateDirectory(parent_flags, GetPath("a"));
 
-  flags = fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kPosixWritable |
-          fio::wire::OpenFlags::kDirectory;
+  // kPermInheritWrite expand the rights of the directory connection to include write rights if the
+  // parent connection has them.
+  fio::wire::Flags flags = fio::wire::kPermReadable | fio::wire::Flags::kPermInheritWrite |
+                           fio::wire::Flags::kProtocolDirectory;
   std::string path = ".";
-  auto clone_endpoints = fidl::Endpoints<fio::Node>::Create();
-  auto clone_res = fidl::WireCall(parent)->Open(flags, {}, fidl::StringView::FromExternal(path),
-                                                std::move(clone_endpoints.server));
-  ASSERT_EQ(clone_res.status(), ZX_OK);
-  fidl::ClientEnd<fio::Directory> clone_dir(clone_endpoints.client.TakeChannel());
+  auto endpoints = fidl::Endpoints<fio::Node>::Create();
+  auto result = fidl::WireCall(parent)->Open3(fidl::StringView::FromExternal(path), flags, {},
+                                              endpoints.server.TakeChannel());
+  ASSERT_EQ(result.status(), ZX_OK);
+  fidl::ClientEnd<fio::Directory> dir(endpoints.client.TakeChannel());
 
-  EXPECT_EQ(OpenFileWithCreate(clone_dir, "b"), ZX_OK);
+  // Should not be able to open a file with `dir` if the connection did not have write permissions.
+  EXPECT_EQ(OpenFileWithMaybeCreate(dir, "b"), ZX_OK);
 }
 
-TEST_P(OpenTest, OpenFileWithCreateFailsInReadOnlyDirPosixOpen) {
-  fio::wire::OpenFlags flags = fio::wire::OpenFlags::kRightReadable;
-  auto parent = CreateDirectory(flags, GetPath("a"));
+TEST_P(OpenTest, OpenFileWithCreateFailsInReadOnlyDirWithPermInheritWrite) {
+  fio::wire::Flags parent_flags = fio::wire::kPermReadable;
+  auto parent = CreateDirectory(parent_flags, GetPath("a"));
 
-  flags = fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kPosixWritable |
-          fio::wire::OpenFlags::kDirectory;
+  // kPermInheritWrite expand the rights of the directory connection to include write rights if the
+  // parent connection has them. As the parent directory only has read permissions, the resulting
+  // connection will not have write permissions.
+  fio::wire::Flags flags = fio::wire::kPermReadable | fio::wire::Flags::kPermInheritWrite |
+                           fio::wire::Flags::kProtocolDirectory;
   std::string path = ".";
   auto clone_endpoints = fidl::Endpoints<fio::Node>::Create();
-  auto clone_res = fidl::WireCall(parent)->Open(flags, {}, fidl::StringView::FromExternal(path),
-                                                std::move(clone_endpoints.server));
-  ASSERT_EQ(clone_res.status(), ZX_OK);
+  auto clone_result = fidl::WireCall(parent)->Open3(fidl::StringView::FromExternal(path), flags, {},
+                                                    clone_endpoints.server.TakeChannel());
+  ASSERT_EQ(clone_result.status(), ZX_OK);
   fidl::ClientEnd<fio::Directory> clone_dir(clone_endpoints.client.TakeChannel());
 
-  EXPECT_EQ(OpenFileWithCreate(clone_dir, "b"), ZX_ERR_ACCESS_DENIED);
+  // Opening a file should fail as `clone_dir` as we expect the connection to not have write
+  // permissions.
+  EXPECT_EQ(OpenFileWithMaybeCreate(clone_dir, "b"), ZX_ERR_ACCESS_DENIED);
 }
 
 TEST_P(OpenTest, OpenFileWithCreateFailsInReadWriteDirPosixClone) {
-  // kOpenFlagPosixWritable only does the rights expansion with the open call though.
-  fio::wire::OpenFlags flags =
-      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable;
+  fio::wire::Flags flags = fio::wire::kPermReadable | fio::wire::kPermWritable;
   auto parent = CreateDirectory(flags, GetPath("a"));
 
-  flags = fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kPosixWritable |
-          fio::wire::OpenFlags::kDirectory;
+  // kOpenFlagPosixWritable only does the rights expansion with the open call if the parent
+  // connection has them.
+  fio::wire::OpenFlags flags_deprecated = fio::wire::OpenFlags::kRightReadable |
+                                          fio::wire::OpenFlags::kPosixWritable |
+                                          fio::wire::OpenFlags::kDirectory;
   auto clone_endpoints = fidl::Endpoints<fio::Node>::Create();
-  auto clone_res = fidl::WireCall(parent)->Clone(flags, std::move(clone_endpoints.server));
+  auto clone_res =
+      fidl::WireCall(parent)->Clone(flags_deprecated, std::move(clone_endpoints.server));
   ASSERT_EQ(clone_res.status(), ZX_OK);
   fidl::ClientEnd<fio::Directory> clone_dir(clone_endpoints.client.TakeChannel());
 
-  EXPECT_EQ(OpenFileWithCreate(clone_dir, "b"), ZX_ERR_ACCESS_DENIED);
+  EXPECT_EQ(OpenFileWithMaybeCreate(clone_dir, "b"), ZX_ERR_ACCESS_DENIED);
 }
 
 TEST_P(OpenTest, OpenFileWithCreateFailsInReadOnlyDirPosixClone) {
-  fio::wire::OpenFlags flags = fio::wire::OpenFlags::kRightReadable;
+  fio::wire::Flags flags = fio::wire::kPermReadable;
   auto parent = CreateDirectory(flags, GetPath("a"));
 
-  flags = fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kPosixWritable |
-          fio::wire::OpenFlags::kDirectory;
+  fio::wire::OpenFlags flags_deprecated = fio::wire::OpenFlags::kRightReadable |
+                                          fio::wire::OpenFlags::kPosixWritable |
+                                          fio::wire::OpenFlags::kDirectory;
   auto clone_endpoints = fidl::Endpoints<fio::Node>::Create();
-  auto clone_res = fidl::WireCall(parent)->Clone(flags, std::move(clone_endpoints.server));
+  auto clone_res =
+      fidl::WireCall(parent)->Clone(flags_deprecated, std::move(clone_endpoints.server));
   ASSERT_EQ(clone_res.status(), ZX_OK);
   fidl::ClientEnd<fio::Directory> clone_dir(clone_endpoints.client.TakeChannel());
 
-  EXPECT_EQ(OpenFileWithCreate(clone_dir, "b"), ZX_ERR_ACCESS_DENIED);
+  EXPECT_EQ(OpenFileWithMaybeCreate(clone_dir, "b"), ZX_ERR_ACCESS_DENIED);
 }
 
 INSTANTIATE_TEST_SUITE_P(/*no prefix*/, OpenTest, testing::ValuesIn(AllTestFilesystems()),

@@ -142,6 +142,7 @@ fuchsia_unittest_package("cpu-manager-tests") {
     ":astro",
     ":bin_test",
     ":sherlock",
+    ":vim3",
   ]
 }
 
@@ -153,4 +154,9 @@ node_config("astro") {
 node_config("sherlock") {
   source = "node_config/sherlock_node_config.json5"
   output = "sherlock_node_config.json5"
+}
+
+node_config("vim3") {
+  source = "node_config/vim3_node_config.json5"
+  output = "vim3_node_config.json5"
 }

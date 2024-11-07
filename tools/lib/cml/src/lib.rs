@@ -175,13 +175,13 @@ impl<'a> CapabilityId<'a> {
             return Ok(Self::used_services_from(Self::get_one_or_many_svc_paths(
                 n,
                 alias,
-                use_.capability_type(),
+                use_.capability_type().unwrap(),
             )?));
         } else if let Some(n) = use_.protocol() {
             return Ok(Self::used_protocols_from(Self::get_one_or_many_svc_paths(
                 n,
                 alias,
-                use_.capability_type(),
+                use_.capability_type().unwrap(),
             )?));
         } else if let Some(_) = use_.directory.as_ref() {
             if use_.path.is_none() {
@@ -240,7 +240,7 @@ impl<'a> CapabilityId<'a> {
             return Ok(Self::services_from(Self::get_one_or_many_names(
                 n,
                 None,
-                capability.capability_type(),
+                capability.capability_type().unwrap(),
             )?));
         } else if let Some(n) = capability.protocol() {
             if n.is_many() && capability.path.is_some() {
@@ -251,13 +251,13 @@ impl<'a> CapabilityId<'a> {
             return Ok(Self::protocols_from(Self::get_one_or_many_names(
                 n,
                 None,
-                capability.capability_type(),
+                capability.capability_type().unwrap(),
             )?));
         } else if let Some(n) = capability.directory() {
             return Ok(Self::directories_from(Self::get_one_or_many_names(
                 n,
                 None,
-                capability.capability_type(),
+                capability.capability_type().unwrap(),
             )?));
         } else if let Some(n) = capability.storage() {
             if capability.storage_id.is_none() {
@@ -268,37 +268,37 @@ impl<'a> CapabilityId<'a> {
             return Ok(Self::storages_from(Self::get_one_or_many_names(
                 n,
                 None,
-                capability.capability_type(),
+                capability.capability_type().unwrap(),
             )?));
         } else if let Some(n) = capability.runner() {
             return Ok(Self::runners_from(Self::get_one_or_many_names(
                 n,
                 None,
-                capability.capability_type(),
+                capability.capability_type().unwrap(),
             )?));
         } else if let Some(n) = capability.resolver() {
             return Ok(Self::resolvers_from(Self::get_one_or_many_names(
                 n,
                 None,
-                capability.capability_type(),
+                capability.capability_type().unwrap(),
             )?));
         } else if let Some(n) = capability.event_stream() {
             return Ok(Self::event_streams_from(Self::get_one_or_many_names(
                 n,
                 None,
-                capability.capability_type(),
+                capability.capability_type().unwrap(),
             )?));
         } else if let Some(n) = capability.dictionary() {
             return Ok(Self::dictionaries_from(Self::get_one_or_many_names(
                 n,
                 None,
-                capability.capability_type(),
+                capability.capability_type().unwrap(),
             )?));
         } else if let Some(n) = capability.config() {
             return Ok(Self::configurations_from(Self::get_one_or_many_names(
                 n,
                 None,
-                capability.capability_type(),
+                capability.capability_type().unwrap(),
             )?));
         }
 
@@ -334,55 +334,55 @@ impl<'a> CapabilityId<'a> {
             return Ok(Self::services_from(Self::get_one_or_many_names(
                 n,
                 alias,
-                clause.capability_type(),
+                clause.capability_type().unwrap(),
             )?));
         } else if let Some(n) = clause.protocol() {
             return Ok(Self::protocols_from(Self::get_one_or_many_names(
                 n,
                 alias,
-                clause.capability_type(),
+                clause.capability_type().unwrap(),
             )?));
         } else if let Some(n) = clause.directory() {
             return Ok(Self::directories_from(Self::get_one_or_many_names(
                 n,
                 alias,
-                clause.capability_type(),
+                clause.capability_type().unwrap(),
             )?));
         } else if let Some(n) = clause.storage() {
             return Ok(Self::storages_from(Self::get_one_or_many_names(
                 n,
                 alias,
-                clause.capability_type(),
+                clause.capability_type().unwrap(),
             )?));
         } else if let Some(n) = clause.runner() {
             return Ok(Self::runners_from(Self::get_one_or_many_names(
                 n,
                 alias,
-                clause.capability_type(),
+                clause.capability_type().unwrap(),
             )?));
         } else if let Some(n) = clause.resolver() {
             return Ok(Self::resolvers_from(Self::get_one_or_many_names(
                 n,
                 alias,
-                clause.capability_type(),
+                clause.capability_type().unwrap(),
             )?));
         } else if let Some(event_stream) = clause.event_stream() {
             return Ok(Self::event_streams_from(Self::get_one_or_many_names(
                 event_stream,
                 alias,
-                clause.capability_type(),
+                clause.capability_type().unwrap(),
             )?));
         } else if let Some(n) = clause.dictionary() {
             return Ok(Self::dictionaries_from(Self::get_one_or_many_names(
                 n,
                 alias,
-                clause.capability_type(),
+                clause.capability_type().unwrap(),
             )?));
         } else if let Some(n) = clause.config() {
             return Ok(Self::configurations_from(Self::get_one_or_many_names(
                 n,
                 alias,
-                clause.capability_type(),
+                clause.capability_type().unwrap(),
             )?));
         }
 
@@ -1456,8 +1456,8 @@ where
         self.sort_by(|a, b| {
             // Sort by capability type, then by the name of the first entry for
             // that type.
-            let a_type = a.capability_type();
-            let b_type = b.capability_type();
+            let a_type = a.capability_type().unwrap();
+            let b_type = b.capability_type().unwrap();
             a_type.cmp(b_type).then_with(|| {
                 let a_names = a.names();
                 let b_names = b.names();
@@ -1536,7 +1536,7 @@ fn compute_diff<T: CapabilityClause>(ours: &mut T, theirs: &mut T) {
     }
 
     // Return early if the types don't match.
-    if ours.capability_type() != theirs.capability_type() {
+    if ours.capability_type().unwrap() != theirs.capability_type().unwrap() {
         return;
     }
 
@@ -3446,8 +3446,58 @@ pub trait CapabilityClause: Clone + PartialEq + std::fmt::Debug {
     /// Returns the name of the capability for display purposes.
     /// If `service()` returns `Some`, the capability name must be "service", etc.
     ///
-    /// Panics if a capability keyword is not set.
-    fn capability_type(&self) -> &'static str;
+    /// Returns an error if the capability name is not set, or if there is more than one.
+    fn capability_type(&self) -> Result<&'static str, Error> {
+        let mut types = Vec::new();
+        if self.service().is_some() {
+            types.push("service");
+        }
+        if self.protocol().is_some() {
+            types.push("protocol");
+        }
+        if self.directory().is_some() {
+            types.push("directory");
+        }
+        if self.storage().is_some() {
+            types.push("storage");
+        }
+        if self.event_stream().is_some() {
+            types.push("event_stream");
+        }
+        if self.runner().is_some() {
+            types.push("runner");
+        }
+        if self.config().is_some() {
+            types.push("config");
+        }
+        if self.resolver().is_some() {
+            types.push("resolver");
+        }
+        if self.dictionary().is_some() {
+            types.push("dictionary");
+        }
+        match types.len() {
+            0 => {
+                let supported_keywords = self
+                    .supported()
+                    .into_iter()
+                    .map(|k| format!("\"{}\"", k))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                Err(Error::validate(format!(
+                    "`{}` declaration is missing a capability keyword, one of: {}",
+                    self.decl_type(),
+                    supported_keywords,
+                )))
+            }
+            1 => Ok(types[0]),
+            _ => Err(Error::validate(format!(
+                "{} declaration has multiple capability types defined: {:?}",
+                self.decl_type(),
+                types
+            ))),
+        }
+    }
 
     /// Returns true if this capability type allows the ::Many variant of OneOrMany.
     fn are_many_names_allowed(&self) -> bool;
@@ -3482,7 +3532,7 @@ pub trait CapabilityClause: Clone + PartialEq + std::fmt::Debug {
             _ => Some(OneOrMany::Many(names)),
         };
 
-        let cap_type = self.capability_type();
+        let cap_type = self.capability_type().unwrap();
         if cap_type == "protocol" {
             self.set_protocol(names);
         } else if cap_type == "service" {
@@ -3614,29 +3664,6 @@ impl CapabilityClause for Capability {
     }
     fn set_availability(&mut self, _a: Option<Availability>) {}
 
-    fn capability_type(&self) -> &'static str {
-        if self.service.is_some() {
-            "service"
-        } else if self.protocol.is_some() {
-            "protocol"
-        } else if self.directory.is_some() {
-            "directory"
-        } else if self.storage.is_some() {
-            "storage"
-        } else if self.runner.is_some() {
-            "runner"
-        } else if self.resolver.is_some() {
-            "resolver"
-        } else if self.event_stream.is_some() {
-            "event_stream"
-        } else if self.dictionary.is_some() {
-            "dictionary"
-        } else if self.config.is_some() {
-            "config"
-        } else {
-            panic!("Capability: Missing capability name")
-        }
-    }
     fn decl_type(&self) -> &'static str {
         "capability"
     }
@@ -3654,7 +3681,7 @@ impl CapabilityClause for Capability {
         ]
     }
     fn are_many_names_allowed(&self) -> bool {
-        ["service", "protocol", "event_stream"].contains(&self.capability_type())
+        ["service", "protocol", "event_stream"].contains(&self.capability_type().unwrap())
     }
 }
 
@@ -3728,13 +3755,6 @@ impl CapabilityClause for DebugRegistration {
     }
     fn set_availability(&mut self, _a: Option<Availability>) {}
 
-    fn capability_type(&self) -> &'static str {
-        if self.protocol.is_some() {
-            "protocol"
-        } else {
-            panic!("Debug: Missing capability name")
-        }
-    }
     fn decl_type(&self) -> &'static str {
         "debug"
     }
@@ -3742,7 +3762,7 @@ impl CapabilityClause for DebugRegistration {
         &["service", "protocol"]
     }
     fn are_many_names_allowed(&self) -> bool {
-        ["protocol"].contains(&self.capability_type())
+        ["protocol"].contains(&self.capability_type().unwrap())
     }
 }
 
@@ -3838,26 +3858,6 @@ impl CapabilityClause for Use {
         self.availability = a;
     }
 
-    fn capability_type(&self) -> &'static str {
-        if self.service.is_some() {
-            "service"
-        } else if self.protocol.is_some() {
-            "protocol"
-        } else if self.directory.is_some() {
-            "directory"
-        } else if self.storage.is_some() {
-            "storage"
-        } else if self.event_stream.is_some() {
-            "event_stream"
-        } else if self.runner.is_some() {
-            "runner"
-        } else if self.config.is_some() {
-            "config"
-        } else {
-            panic!("Use: Missing capability name")
-        }
-    }
-
     fn decl_type(&self) -> &'static str {
         "use"
     }
@@ -3865,7 +3865,7 @@ impl CapabilityClause for Use {
         &["service", "protocol", "directory", "storage", "event_stream", "runner", "config"]
     }
     fn are_many_names_allowed(&self) -> bool {
-        ["service", "protocol", "event_stream"].contains(&self.capability_type())
+        ["service", "protocol", "event_stream"].contains(&self.capability_type().unwrap())
     }
 }
 
@@ -3987,27 +3987,6 @@ impl CapabilityClause for Expose {
     }
     fn set_availability(&mut self, _a: Option<Availability>) {}
 
-    fn capability_type(&self) -> &'static str {
-        if self.service.is_some() {
-            "service"
-        } else if self.protocol.is_some() {
-            "protocol"
-        } else if self.directory.is_some() {
-            "directory"
-        } else if self.runner.is_some() {
-            "runner"
-        } else if self.resolver.is_some() {
-            "resolver"
-        } else if self.event_stream.is_some() {
-            "event_stream"
-        } else if self.dictionary.is_some() {
-            "dictionary"
-        } else if self.config.is_some() {
-            "config"
-        } else {
-            panic!("Expose: Missing capability name")
-        }
-    }
     fn decl_type(&self) -> &'static str {
         "expose"
     }
@@ -4034,7 +4013,7 @@ impl CapabilityClause for Expose {
             "dictionary",
             "config",
         ]
-        .contains(&self.capability_type())
+        .contains(&self.capability_type().unwrap())
     }
 }
 
@@ -4156,29 +4135,6 @@ impl CapabilityClause for Offer {
         self.availability = a;
     }
 
-    fn capability_type(&self) -> &'static str {
-        if self.service.is_some() {
-            "service"
-        } else if self.protocol.is_some() {
-            "protocol"
-        } else if self.directory.is_some() {
-            "directory"
-        } else if self.storage.is_some() {
-            "storage"
-        } else if self.runner.is_some() {
-            "runner"
-        } else if self.resolver.is_some() {
-            "resolver"
-        } else if self.event_stream.is_some() {
-            "event_stream"
-        } else if self.dictionary.is_some() {
-            "dictionary"
-        } else if self.config.is_some() {
-            "config"
-        } else {
-            panic!("Offer: Missing capability name")
-        }
-    }
     fn decl_type(&self) -> &'static str {
         "offer"
     }
@@ -4205,7 +4161,7 @@ impl CapabilityClause for Offer {
             "event_stream",
             "config",
         ]
-        .contains(&self.capability_type())
+        .contains(&self.capability_type().unwrap())
     }
 }
 

@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_LIB_FTL_FTLN_FTLNP_H_
 #define SRC_STORAGE_LIB_FTL_FTLN_FTLNP_H_
 
+#include <stdint.h>
 #include <zircon/compiler.h>
 
 #include "src/storage/lib/ftl/ftl.h"
@@ -178,10 +179,10 @@ struct ftln {
   ui32 start_pn;     // First page on device for volume.
   void* ndm;         // Pointer to NDM this FTL belongs to.
 
-  ui32 flags;       // Holds various FTL flags.
-  ui32* bdata;      // Block metadata: flags and counts.
-  ui8* blk_wc_lag;  // Amount block erase counts lag 'high_wc'.
-  ui32* mpns;       // Array holding phy page # of map pages.
+  ui32 flags;    // Holds various FTL flags.
+  ui32* bdata;   // Block metadata: flags and counts.
+  ui32* blk_wc;  // Block wear/erase counts.
+  ui32* mpns;    // Array holding phy page # of map pages.
 
   FTLMC* map_cache;       // Handle to map page cache.
   ui32 free_vpn;          // Next free page for volume page write.
@@ -191,6 +192,7 @@ struct ftln {
   ui32 num_free_blks;     // Number of free blocks.
   ui32 num_map_pgs;       // Number of pages holding map data.
   ui32 high_wc;           // Highest block wear count.
+  ui32 low_wc;            // Lowest block wear count.
   ui32 high_bc;           // Highest map block write count.
   ui32 max_rc;            // Per block read wear limit.
   ui32 max_rc_blk;        // If not -1, # of block w/high read cnt.
@@ -205,7 +207,6 @@ struct ftln {
   ui32 vol_pg_writes;     // Metrics: sum of volume page writes.
   ui32 fl_pg_writes;      // Metrics: sum of flash page writes.
   ui32 recycle_needed;    // # times recycle needed in FtlnRecCheck().
-  ui32 wc_lag_sum;        // Sum of block wear count 'lag' values.
   ftl_ndm_stats stats;    // Driver call counts.
   FtlWearData wear_data;  // Wear leveling metrics.
 

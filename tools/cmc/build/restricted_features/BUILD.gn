@@ -7,11 +7,6 @@ group("structured_config") {
   # Available to all components in fuchsia.git
 }
 
-# The allowlist of components that can use dictionaries in CML.
-group("dictionaries") {
-  # Available to all components in fuchsia.git
-}
-
 # The allowlist of components that can define dynamic dictionaries in CML.
 group("dynamic_dictionaries") {
   visibility = [

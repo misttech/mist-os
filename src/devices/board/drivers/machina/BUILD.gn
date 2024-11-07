@@ -19,7 +19,7 @@ group("tests") {
   deps = [ ":machina_board_bind_test" ]
 }
 
-fuchsia_driver("machina-driver") {
+fuchsia_cc_driver("machina-driver") {
   output_name = "machina"
   configs += [
     "//build/config:all_source",

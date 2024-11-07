@@ -17,7 +17,7 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
+#include "src/graphics/display/lib/driver-utils/scoped-value-change.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace intel_display {
@@ -78,15 +78,15 @@ class PowerControllerTest : public ::testing::Test {
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 
-  ScopedValueChange<int> previous_timeout_change_;
-  ScopedValueChange<int> voltage_level_reply_timeout_change_;
-  ScopedValueChange<int> voltage_level_timeout_change_;
-  ScopedValueChange<int> typec_blocking_reply_timeout_change_;
-  ScopedValueChange<int> typec_blocking_timeout_change_;
-  ScopedValueChange<int> system_agent_enablement_reply_timeout_change_;
-  ScopedValueChange<int> system_agent_enablement_timeout_change_;
-  ScopedValueChange<int> memory_subsystem_info_reply_timeout_change_;
-  ScopedValueChange<int> memory_latency_reply_timeout_change_;
+  display::ScopedValueChange<int> previous_timeout_change_;
+  display::ScopedValueChange<int> voltage_level_reply_timeout_change_;
+  display::ScopedValueChange<int> voltage_level_timeout_change_;
+  display::ScopedValueChange<int> typec_blocking_reply_timeout_change_;
+  display::ScopedValueChange<int> typec_blocking_timeout_change_;
+  display::ScopedValueChange<int> system_agent_enablement_reply_timeout_change_;
+  display::ScopedValueChange<int> system_agent_enablement_timeout_change_;
+  display::ScopedValueChange<int> memory_subsystem_info_reply_timeout_change_;
+  display::ScopedValueChange<int> memory_latency_reply_timeout_change_;
 };
 
 TEST_F(PowerControllerTest, TransactImmediateSuccess) {

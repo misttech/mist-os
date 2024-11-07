@@ -1,6 +1,7 @@
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/fuzz.gni")
@@ -79,6 +80,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-subscriber",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   test_deps = [
@@ -116,9 +118,6 @@ rustc_library("lib") {
     "src/inspect/servers/inspect_sink.rs",
     "src/inspect/servers/mod.rs",
     "src/lib.rs",
-    "src/logs/budget.rs",
-    "src/logs/buffer.rs",
-    "src/logs/buffer/arc_list.rs",
     "src/logs/container.rs",
     "src/logs/debuglog.rs",
     "src/logs/error.rs",
@@ -131,6 +130,7 @@ rustc_library("lib") {
     "src/logs/servers/log.rs",
     "src/logs/servers/log_settings.rs",
     "src/logs/servers/mod.rs",
+    "src/logs/shared_buffer.rs",
     "src/logs/socket.rs",
     "src/logs/stats.rs",
     "src/logs/stored_message.rs",
@@ -248,10 +248,16 @@ fuchsia_package("archivist-for-embedding") {
     "//bundles/buildbot/*",
 
     # TODO(crbug.com/1408597): Remove once the Chromium tests package the fakes.
+    ":archivist-for-embedding.bazel_input.archive",
+    "//build/bazel/assembly:verify_assembly_configs",
     "//products/terminal:*",
     "//src/chromium:chromium_test_base_deps",
   ]
   deps = [ ":archivist-for-embedding-bundle" ]
+}
+
+export_fuchsia_package_to_bazel("archivist-for-embedding.bazel_input") {
+  package = ":archivist-for-embedding"
 }
 
 rustc_fuzzer("convert_debuglog_to_log_message_fuzzer") {

@@ -9,7 +9,6 @@ namespace dl {
 RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
   if (auto it = std::find(modules_.begin(), modules_.end(), name); it != modules_.end()) {
     // TODO(https://fxbug.dev/328135195): increase reference count.
-    // TODO(https://fxbug.dev/326120230): update flags
     RuntimeModule& found = *it;
     return &found;
   }
@@ -19,6 +18,9 @@ RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
 fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule& root,
                                                              const char* ref) {
   Diagnostics diag;
+  // The root module's name is included in symbol not found errors.
+  ld::ScopedModuleDiagnostics root_diag{diag, root.name().str()};
+
   elfldltl::SymbolName name{ref};
   // TODO(https://fxbug.dev/338229633): use elfldltl::MakeSymbolResolver.
   for (const RuntimeModule& module : root.module_tree()) {
@@ -33,6 +35,26 @@ fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(const RuntimeModule
   }
   diag.UndefinedSymbol(ref);
   return diag.take_error();
+}
+
+void RuntimeDynamicLinker::MakeGlobal(const ModuleTree& module_tree) {
+  // This iterates through the `module_tree`, promoting any modules that are not
+  // already global. When a module is promoted, it is looked up in the dynamic
+  // linker's `modules_` list and moved to the back of that doubly-linked list.
+  // Note, that this loop does not change the ordering of the `module_tree`.
+  for (const RuntimeModule& loaded_module : module_tree) {
+    // If the loaded module is already global, then its load order does not
+    // change in modules_.
+    if (loaded_module.is_global()) {
+      continue;
+    }
+    // TODO(https://fxbug.dev/374810148): Introduce non-const version of ModuleTree.
+    RuntimeModule& promoted = const_cast<RuntimeModule&>(loaded_module);
+    promoted.set_global();
+    // Move the promoted module to the back of the dynamic linker's modules_
+    // list.
+    modules_.push_back(modules_.erase(promoted));
+  }
 }
 
 }  // namespace dl

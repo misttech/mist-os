@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 use crate::access_vector_cache::{Fixed, Locked, Query, DEFAULT_SHARED_SIZE};
-use crate::policy::AccessVectorComputer;
+use crate::policy::{AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
 use crate::security_server::SecurityServer;
 use crate::{ClassPermission, Permission, SecurityId};
+
+#[cfg(target_os = "fuchsia")]
+use fuchsia_inspect_contrib::profile_duration;
 
 use std::sync::Weak;
 
@@ -48,6 +51,7 @@ impl<'a> PermissionCheck<'a> {
         permission: P,
     ) -> PermissionCheckResult {
         has_permission(
+            self.security_server.is_enforcing(),
             self.access_vector_cache,
             self.security_server,
             source_sid,
@@ -65,28 +69,45 @@ impl<'a> PermissionCheck<'a> {
 
 /// Internal implementation of the `has_permission()` API, in terms of the `Query` and `AccessVectorComputer` traits.
 fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    is_enforcing: bool,
     query: &impl Query,
     access_vector_computer: &impl AccessVectorComputer,
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: P,
 ) -> PermissionCheckResult {
+    #[cfg(target_os = "fuchsia")]
+    profile_duration!("libselinux.check_permission");
     let target_class = permission.class();
-    let has_permission = if let Some(permission_access_vector) =
+
+    let decision = query.query(source_sid, target_sid, target_class.into());
+
+    let mut result = if let Some(permission_access_vector) =
         access_vector_computer.access_vector_from_permissions(&[permission])
     {
-        let permitted_access_vector = query.query(source_sid, target_sid, target_class.into());
-        permission_access_vector & permitted_access_vector == permission_access_vector
+        let permit = permission_access_vector & decision.allow == permission_access_vector;
+        let audit = if permit {
+            permission_access_vector & decision.auditallow == permission_access_vector
+        } else {
+            permission_access_vector & decision.auditdeny == permission_access_vector
+        };
+        PermissionCheckResult { permit, audit }
     } else {
-        false
+        PermissionCheckResult { permit: false, audit: true }
     };
-    // TODO: https://fxbug.dev/362706116 - Apply "dontaudit" and "auditallow" here.
-    let audit = !has_permission;
-    if has_permission {
-        PermissionCheckResult { permit: true, audit }
-    } else {
-        PermissionCheckResult { permit: query.is_permissive(source_sid), audit }
+
+    if !result.permit {
+        if !is_enforcing {
+            // If the security server is not currently enforcing then permit all access.
+            result.permit = true;
+        } else if decision.flags & SELINUX_AVD_FLAGS_PERMISSIVE != 0 {
+            // If the access decision indicates that the source domain is permissive then permit
+            // all access.
+            result.permit = true;
+        }
     }
+
+    result
 }
 
 #[cfg(test)]
@@ -94,7 +115,7 @@ mod tests {
     use super::*;
     use crate::access_vector_cache::DenyAll;
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
-    use crate::policy::AccessVector;
+    use crate::policy::{AccessDecision, AccessVector};
     use crate::{AbstractObjectClass, ProcessPermission};
 
     use std::any::Any;
@@ -149,12 +170,8 @@ mod tests {
             source_sid: SecurityId,
             target_sid: SecurityId,
             target_class: AbstractObjectClass,
-        ) -> AccessVector {
+        ) -> AccessDecision {
             self.0.query(source_sid, target_sid, target_class)
-        }
-
-        fn is_permissive(&self, _source_sid: SecurityId) -> bool {
-            false
         }
     }
 
@@ -179,12 +196,8 @@ mod tests {
             _source_sid: SecurityId,
             _target_sid: SecurityId,
             _target_class: AbstractObjectClass,
-        ) -> AccessVector {
-            AccessVector::ALL
-        }
-
-        fn is_permissive(&self, _source_sid: SecurityId) -> bool {
-            false
+        ) -> AccessDecision {
+            AccessDecision::allow(AccessVector::ALL)
         }
     }
 
@@ -211,12 +224,20 @@ mod tests {
             // DenyAllPermissions denies.
             assert_eq!(
                 PermissionCheckResult { permit: false, audit: true },
-                has_permission(&deny_all, &deny_all, *A_TEST_SID, *A_TEST_SID, permission.clone())
+                has_permission(
+                    /*is_enforcing=*/ true,
+                    &deny_all,
+                    &deny_all,
+                    *A_TEST_SID,
+                    *A_TEST_SID,
+                    permission.clone()
+                )
             );
             // AllowAllPermissions allows.
             assert_eq!(
                 PermissionCheckResult { permit: true, audit: false },
                 has_permission(
+                    /*is_enforcing=*/ true,
                     &allow_all,
                     &allow_all,
                     *A_TEST_SID,

@@ -165,13 +165,12 @@ if (allowed_device_types == []) {
 #     [string] The name of a product bundle describing the system against which
 #     the test should be run (describing the test itself in the case of boot
 #     tests). Associated product bundle artifacts can be looked up with this
-#     name in the product bundle build API module. This value is only respected
-#     when `isolated` is true.
+#     name in the product bundle build API module.
 #
 #   bootup_timeout_secs (optional)
 #     [int] The timeout in seconds the test expects the provided product_bundle
 #     and environment it's run against will take to boot up. This value is only
-#     respected when `isolated` is true.
+#     respected when `is_boot_test` is true.
 #
 #   expects_ssh (optional, default: True)
 #     [bool] Whether the test is expected to run against a product bundle that
@@ -224,6 +223,10 @@ if (allowed_device_types == []) {
 #
 #   isolated (optional)
 #     [bool] Whether the test needs to be run in isolation to other tests.
+#
+#   is_boot_test (optional)
+#     [bool] Whether the test is a boot test. This implies isolated=true and requires a
+#     `product_bundle` to be provided.
 #
 #   timeout_secs (optional)
 #     [int] The timeout in seconds for the test.
@@ -431,9 +434,17 @@ template("test_spec") {
                              "product_bundle",
                              "bootup_timeout_secs",
                              "expects_ssh",
+                             "is_boot_test",
                            ])
     if (!defined(expects_ssh)) {
       expects_ssh = true
+    }
+    if (defined(is_boot_test) && is_boot_test) {
+      assert(defined(product_bundle),
+             "product bundle must be provided for boot tests.")
+    } else {
+      assert(!defined(bootup_timeout_secs),
+             "bootup_timeout_secs is only respected if is_boot_test=true.")
     }
     test = {
       forward_variables_from(invoker,
@@ -452,12 +463,6 @@ template("test_spec") {
                                "build_rule",
                                "has_generated_manifest",
                              ])
-      if (!defined(isolated) || !isolated) {
-        assert(!defined(product_bundle),
-               "product_bundle is only respected if isolated=true.")
-        assert(!defined(bootup_timeout_secs),
-               "bootup_timeout_secs is only respected if isolated=true.")
-      }
       if (defined(_parallel)) {
         parallel = _parallel
       }

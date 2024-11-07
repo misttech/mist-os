@@ -8,7 +8,7 @@
 
 #include <cstddef>
 
-power_management::PowerModel MakeFakeEnergyModel(size_t power_levels) {
+power_management::EnergyModel MakeFakeEnergyModel(size_t power_levels) {
   fbl::Vector<zx_processor_power_level_t> levels;
   levels.resize(power_levels);
 
@@ -29,7 +29,7 @@ power_management::PowerModel MakeFakeEnergyModel(size_t power_levels) {
     }
   }
 
-  auto model = power_management::PowerModel::Create(levels, transitions);
+  auto model = power_management::EnergyModel::Create(levels, transitions);
   ZX_ASSERT(model.is_ok());
   return std::move(model).value();
 }

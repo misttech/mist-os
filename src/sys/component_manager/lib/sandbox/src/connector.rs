@@ -87,7 +87,7 @@ mod tests {
 
     // NOTE: sending-and-receiving tests are written in `receiver.rs`.
 
-    /// Tests that a Sender can be cloned by cloning its FIDL token.
+    /// Tests that a Connector can be cloned by cloning its FIDL token.
     /// and capabilities sent to the original and clone arrive at the same Receiver.
     #[fuchsia::test]
     async fn fidl_clone() {

@@ -21,7 +21,7 @@ $ fx test --min-severity-logs=DEBUG touch-input-test -- --verbose=2
 ### Add trace metrics to the test
 
 This test suite uses the category `touch-input-test` to log trace events. Any new categories added
-to a test will need to be included in the `fx traceutil record` command below.
+to a test will need to be included in the `ffx trace start` command below.
 
 Trace event types can be found in
 [`libtrace`](//zircon/system/ulib/trace/include/lib/trace/event.h).

@@ -133,6 +133,7 @@ impl<'a> ConfigQuery<'a> {
                 .recursive_map(&|val| runtime(&ctx, val))
                 .recursive_map(&|val| cache(&ctx, val))
                 .recursive_map(&|val| data(&ctx, val))
+                .recursive_map(&|val| shared_data(&ctx, val))
                 .recursive_map(&|val| config(&ctx, val))
                 .recursive_map(&|val| home(&ctx, val))
                 .recursive_map(&|val| build(&ctx, val))

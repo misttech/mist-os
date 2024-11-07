@@ -22,16 +22,15 @@ rustc_binary("starnix_runner_bin") {
   deps = [
     ":starnix_runner_config",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
-    "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
     "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//sdk/rust/zx",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/trace/rust:trace-provider",
     "//src/starnix/lib/kernel_manager",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]

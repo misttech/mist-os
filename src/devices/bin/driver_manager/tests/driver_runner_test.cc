@@ -1348,7 +1348,7 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
   ASSERT_EQ(false, callback_called);
 
   {
-    tracker_three.ReportSuccessfulBind(std::string_view("node_name"), {},
+    tracker_three.ReportSuccessfulBind(std::string_view("node_name"),
                                        std::vector{
                                            fdfw::CompositeParent{{
                                                .composite = fdfw::CompositeInfo{{

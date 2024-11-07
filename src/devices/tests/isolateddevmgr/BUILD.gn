@@ -19,7 +19,7 @@ fidl("fuchsia.device.manager.test") {
   sources = [ "metadata.test.fidl" ]
 }
 
-fuchsia_driver("isolateddevmgr-test-driver-driver") {
+fuchsia_cc_driver("isolateddevmgr-test-driver-driver") {
   testonly = true
   output_name = "isolateddevmgr-test-driver"
   sources = [ "test-driver.cc" ]

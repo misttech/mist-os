@@ -1,0 +1,1033 @@
+[
+    {
+        "kind": "const",
+        "name": "fuchsia.wlan.softmac/WLAN_MAC_MAX_RATES",
+        "type": "uint32",
+        "value": "263"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.aid",
+        "ordinal": "2",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.bssid",
+        "ordinal": "1",
+        "type": "array<uint8,6>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.capability_info",
+        "ordinal": "8",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.channel",
+        "ordinal": "4",
+        "type": "fuchsia.wlan.common/WlanChannel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.ht_cap",
+        "ordinal": "9",
+        "type": "fuchsia.wlan.ieee80211/HtCapabilities"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.ht_op",
+        "ordinal": "10",
+        "type": "fuchsia.wlan.ieee80211/HtOperation"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.listen_interval",
+        "ordinal": "3",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.qos",
+        "ordinal": "5",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.rates",
+        "ordinal": "7",
+        "type": "vector<uint8>:263"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.vht_cap",
+        "ordinal": "11",
+        "type": "fuchsia.wlan.ieee80211/VhtCapabilities"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.vht_op",
+        "ordinal": "12",
+        "type": "fuchsia.wlan.ieee80211/VhtOperation"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig.wmm_params",
+        "ordinal": "6",
+        "type": "fuchsia.wlan.common/WlanWmmParameters"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanAssociationConfig"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanKeyConfiguration.cipher_oui",
+        "ordinal": "2",
+        "type": "array<uint8,3>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanKeyConfiguration.cipher_type",
+        "ordinal": "3",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanKeyConfiguration.key",
+        "ordinal": "7",
+        "type": "vector<uint8>:32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanKeyConfiguration.key_idx",
+        "ordinal": "6",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanKeyConfiguration.key_type",
+        "ordinal": "4",
+        "type": "fuchsia.wlan.common/WlanKeyType"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanKeyConfiguration.peer_addr",
+        "ordinal": "5",
+        "type": "array<uint8,6>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanKeyConfiguration.protection",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.softmac/WlanProtection"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanKeyConfiguration.rsc",
+        "ordinal": "8",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanKeyConfiguration"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.softmac/WlanProtection.NONE",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.softmac/WlanProtection.RX",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.softmac/WlanProtection.RX_TX",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.wlan.softmac/WlanProtection.TX",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.wlan.softmac/WlanProtection",
+        "strictness": "strict",
+        "type": "uint8"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfo.channel",
+        "ordinal": "5",
+        "type": "fuchsia.wlan.common/WlanChannel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfo.data_rate",
+        "ordinal": "4",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfo.mcs",
+        "ordinal": "6",
+        "type": "uint8"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfo.phy",
+        "ordinal": "3",
+        "type": "fuchsia.wlan.common/WlanPhyType"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfo.rssi_dbm",
+        "ordinal": "7",
+        "type": "int8"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfo.rx_flags",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.softmac/WlanRxInfoFlags"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfo.snr_dbh",
+        "ordinal": "8",
+        "type": "int16"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfo.valid_fields",
+        "ordinal": "2",
+        "type": "fuchsia.wlan.softmac/WlanRxInfoValid"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanRxInfo"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoFlags.FCS_INVALID",
+        "value": "1"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoFlags.FRAME_BODY_PADDING_4",
+        "value": "2"
+    },
+    {
+        "kind": "bits",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoFlags",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoValid.CHAN_WIDTH",
+        "value": "4"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoValid.DATA_RATE",
+        "value": "2"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoValid.MCS",
+        "value": "8"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoValid.PHY",
+        "value": "1"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoValid.RSSI",
+        "value": "16"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoValid.SNR",
+        "value": "32"
+    },
+    {
+        "kind": "bits",
+        "name": "fuchsia.wlan.softmac/WlanRxInfoValid",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxPacket.info",
+        "ordinal": "2",
+        "type": "fuchsia.wlan.softmac/WlanRxInfo"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanRxPacket.mac_frame",
+        "ordinal": "1",
+        "type": "vector<uint8>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanRxPacket"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.CancelScan",
+        "strictness": "strict",
+        "ordinal": "1116195150833796438",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacCancelScanRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_CancelScan_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.ClearAssociation",
+        "strictness": "strict",
+        "ordinal": "6349361631995144157",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacClearAssociationRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_ClearAssociation_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.DisableBeaconing",
+        "strictness": "strict",
+        "ordinal": "3675978600451650566",
+        "direction": "two_way",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_DisableBeaconing_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.EnableBeaconing",
+        "strictness": "strict",
+        "ordinal": "7797279575008232822",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacEnableBeaconingRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_EnableBeaconing_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.InstallKey",
+        "strictness": "strict",
+        "ordinal": "9073901901271765297",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanKeyConfiguration",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_InstallKey_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.JoinBss",
+        "strictness": "strict",
+        "ordinal": "1384570275096918638",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacJoinBssRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_JoinBss_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.NotifyAssociationComplete",
+        "strictness": "strict",
+        "ordinal": "4859382055070455501",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacBridgeNotifyAssociationCompleteRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmacBridge_NotifyAssociationComplete_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.Query",
+        "strictness": "strict",
+        "ordinal": "1739262895986872221",
+        "direction": "two_way",
+        "response": "fuchsia.wlan.softmac/WlanSoftmacQueryResponse",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.QueryDiscoverySupport",
+        "strictness": "strict",
+        "ordinal": "1619460779886205102",
+        "direction": "two_way",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_QueryDiscoverySupport_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.QueryMacSublayerSupport",
+        "strictness": "strict",
+        "ordinal": "8287401737475715189",
+        "direction": "two_way",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_QueryMacSublayerSupport_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.QuerySecuritySupport",
+        "strictness": "strict",
+        "ordinal": "245758128983860052",
+        "direction": "two_way",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_QuerySecuritySupport_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.QuerySpectrumManagementSupport",
+        "strictness": "strict",
+        "ordinal": "3782312148840818623",
+        "direction": "two_way",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_QuerySpectrumManagementSupport_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.QueueTx",
+        "strictness": "strict",
+        "ordinal": "5586869193528047453",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacQueueTxRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_QueueTx_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.SetChannel",
+        "strictness": "strict",
+        "ordinal": "1334027919878930126",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacSetChannelRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_SetChannel_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.Start",
+        "strictness": "strict",
+        "ordinal": "1961483520709241233",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacStartRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_Start_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.StartActiveScan",
+        "strictness": "strict",
+        "ordinal": "5230626379270681886",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_StartActiveScan_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.StartPassiveScan",
+        "strictness": "strict",
+        "ordinal": "6224812005195285435",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacStartPassiveScanRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_StartPassiveScan_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.Stop",
+        "strictness": "strict",
+        "ordinal": "4242417023395500801",
+        "direction": "two_way"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac.UpdateWmmParameters",
+        "strictness": "strict",
+        "ordinal": "7517119592462153612",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacUpdateWmmParametersRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmac_UpdateWmmParameters_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac",
+        "openness": "closed",
+        "transport": "driver"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.band",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.common/WlanBand"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.basic_rate_count",
+        "ordinal": "2",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.basic_rate_list",
+        "ordinal": "3",
+        "type": "array<uint8,12>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.basic_rates",
+        "ordinal": "10",
+        "type": "vector<uint8>:12"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.ht_caps",
+        "ordinal": "5",
+        "type": "fuchsia.wlan.ieee80211/HtCapabilities"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.ht_supported",
+        "ordinal": "4",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.operating_channel_count",
+        "ordinal": "8",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.operating_channel_list",
+        "ordinal": "9",
+        "type": "array<uint8,256>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.operating_channels",
+        "ordinal": "11",
+        "type": "vector<uint8>:256"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.vht_caps",
+        "ordinal": "7",
+        "type": "fuchsia.wlan.ieee80211/VhtCapabilities"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability.vht_supported",
+        "ordinal": "6",
+        "type": "bool"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBandCapability"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBridge.NotifyAssociationComplete",
+        "strictness": "strict",
+        "ordinal": "4859382055070455501",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacBridgeNotifyAssociationCompleteRequest",
+        "response": "fuchsia.wlan.softmac/WlanSoftmacBridge_NotifyAssociationComplete_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBridge",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBridgeNotifyAssociationCompleteRequest.assoc_cfg",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.softmac/WlanAssociationConfig"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacBridgeNotifyAssociationCompleteRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacCancelScanRequest.scan_id",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacCancelScanRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacClearAssociationRequest.peer_addr",
+        "ordinal": "1",
+        "type": "array<uint8,6>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacClearAssociationRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacEnableBeaconingRequest.beacon_interval",
+        "ordinal": "3",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacEnableBeaconingRequest.packet_template",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.softmac/WlanTxPacket"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacEnableBeaconingRequest.tim_ele_offset",
+        "ordinal": "2",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacEnableBeaconingRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfc.NotifyScanComplete",
+        "strictness": "strict",
+        "ordinal": "8090122776424072236",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacIfcNotifyScanCompleteRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfc.Recv",
+        "strictness": "strict",
+        "ordinal": "8543670084973101734",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacIfcRecvRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfc.ReportTxResult",
+        "strictness": "strict",
+        "ordinal": "6356200790479397018",
+        "direction": "two_way",
+        "request": "fuchsia.wlan.softmac/WlanSoftmacIfcReportTxResultRequest"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfc",
+        "openness": "closed",
+        "transport": "driver"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfcNotifyScanCompleteRequest.scan_id",
+        "ordinal": "2",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfcNotifyScanCompleteRequest.status",
+        "ordinal": "1",
+        "type": "int32"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfcNotifyScanCompleteRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfcRecvRequest.packet",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.softmac/WlanRxPacket"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfcRecvRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfcReportTxResultRequest.tx_result",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.common/WlanTxResult"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacIfcReportTxResultRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacJoinBssRequest.join_request",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.common/JoinBssRequest"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacJoinBssRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacQueryResponse.band_caps",
+        "ordinal": "5",
+        "type": "vector<fuchsia.wlan.softmac/WlanSoftmacBandCapability>:16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacQueryResponse.hardware_capability",
+        "ordinal": "4",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacQueryResponse.mac_role",
+        "ordinal": "2",
+        "type": "fuchsia.wlan.common/WlanMacRole"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacQueryResponse.sta_addr",
+        "ordinal": "1",
+        "type": "array<uint8,6>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacQueryResponse.supported_phys",
+        "ordinal": "3",
+        "type": "vector<fuchsia.wlan.common/WlanPhyType>:64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacQueryResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacQueueTxRequest.packet",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.softmac/WlanTxPacket"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacQueueTxRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacSetChannelRequest.channel",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.common/WlanChannel"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacSetChannelRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest.channels",
+        "ordinal": "1",
+        "type": "vector<uint8>:256"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest.ies",
+        "ordinal": "4",
+        "type": "vector<uint8>:11454"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest.mac_header",
+        "ordinal": "3",
+        "type": "vector<uint8>:28"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest.max_channel_time",
+        "ordinal": "6",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest.max_probes_per_channel",
+        "ordinal": "9",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest.min_channel_time",
+        "ordinal": "5",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest.min_home_time",
+        "ordinal": "7",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest.min_probes_per_channel",
+        "ordinal": "8",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest.ssids",
+        "ordinal": "2",
+        "type": "vector<fuchsia.wlan.ieee80211/CSsid>:84"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartActiveScanRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartPassiveScanRequest.channels",
+        "ordinal": "1",
+        "type": "vector<uint8>:256"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartPassiveScanRequest.max_channel_time",
+        "ordinal": "3",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartPassiveScanRequest.min_channel_time",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartPassiveScanRequest.min_home_time",
+        "ordinal": "4",
+        "type": "int64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartPassiveScanRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartRequest.ifc",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.wlan.softmac/WlanSoftmacIfc"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacStartRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacUpdateWmmParametersRequest.ac",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.ieee80211/WlanAccessCategory"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacUpdateWmmParametersRequest.params",
+        "ordinal": "2",
+        "type": "fuchsia.wlan.common/WlanWmmParameters"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmacUpdateWmmParametersRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_QueryDiscoverySupport_Response.resp",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.common/DiscoverySupport"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_QueryDiscoverySupport_Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_QueryMacSublayerSupport_Response.resp",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.common/MacSublayerSupport"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_QueryMacSublayerSupport_Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_QuerySecuritySupport_Response.resp",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.common/SecuritySupport"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_QuerySecuritySupport_Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_QuerySpectrumManagementSupport_Response.resp",
+        "ordinal": "1",
+        "type": "fuchsia.wlan.common/SpectrumManagementSupport"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_QuerySpectrumManagementSupport_Response"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_StartActiveScan_Response.scan_id",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_StartActiveScan_Response"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_StartPassiveScan_Response.scan_id",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_StartPassiveScan_Response"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_Start_Response.sme_channel",
+        "ordinal": "1",
+        "type": "zx/Handle:CHANNEL"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanSoftmac_Start_Response",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfo.channel_bandwidth",
+        "ordinal": "5",
+        "type": "fuchsia.wlan.common/ChannelBandwidth"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfo.mcs",
+        "ordinal": "6",
+        "type": "uint8"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfo.phy",
+        "ordinal": "4",
+        "type": "fuchsia.wlan.common/WlanPhyType"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfo.tx_flags",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfo.tx_vector_idx",
+        "ordinal": "3",
+        "type": "uint16"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfo.valid_fields",
+        "ordinal": "2",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanTxInfo"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoFlags.FAVOR_RELIABILITY",
+        "value": "2"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoFlags.PROTECTED",
+        "value": "1"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoFlags.QOS",
+        "value": "4"
+    },
+    {
+        "kind": "bits",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoFlags",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoValid.CHANNEL_BANDWIDTH",
+        "value": "8"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoValid.DATA_RATE",
+        "value": "1"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoValid.MCS",
+        "value": "16"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoValid.PHY",
+        "value": "4"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoValid.TX_VECTOR_IDX",
+        "value": "2"
+    },
+    {
+        "kind": "bits",
+        "name": "fuchsia.wlan.softmac/WlanTxInfoValid",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanTxPacket.info",
+        "ordinal": "2",
+        "type": "fuchsia.wlan.softmac/WlanTxInfo"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.wlan.softmac/WlanTxPacket.mac_frame",
+        "ordinal": "1",
+        "type": "vector<uint8>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.wlan.softmac/WlanTxPacket"
+    },
+    {
+        "kind": "library",
+        "name": "fuchsia.wlan.softmac"
+    }
+]

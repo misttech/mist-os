@@ -12,10 +12,11 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <lib/zx/resource.h>
+#include <lib/zx/time.h>
 #include <sys/statvfs.h>
 #include <zircon/status.h>
 
-#include <chrono>
+#include <algorithm>
 #include <fstream>
 #include <memory>
 #include <utility>
@@ -23,9 +24,10 @@
 
 #include "src/cobalt/bin/system-metrics/cpu_stats_fetcher_impl.h"
 #include "src/cobalt/bin/system-metrics/metrics_registry.cb.h"
-#include "src/cobalt/bin/utils/clock.h"
 #include "src/cobalt/bin/utils/error_utils.h"
 #include "src/lib/cobalt/cpp/metric_event_builder.h"
+#include "src/lib/timekeeper/clock.h"
+#include "src/lib/timekeeper/system_clock.h"
 
 using cobalt::ErrorToString;
 using cobalt::IntegerBuckets;
@@ -37,7 +39,6 @@ using fuchsia::metrics::MetricEvent;
 using fuchsia_system_metrics::FuchsiaLifetimeEventsMigratedMetricDimensionEvents;
 using fuchsia_system_metrics::FuchsiaUpPingMigratedMetricDimensionUptime;
 using fuchsia_system_metrics::FuchsiaUptimeMigratedMetricDimensionUptimeRange;
-using std::chrono::steady_clock;
 
 constexpr char kActivationFileSuffix[] = "activation";
 
@@ -45,8 +46,8 @@ namespace {
 
 // Given a number of seconds, return the number of seconds before the next
 // multiple of 1 hour.
-std::chrono::seconds SecondsBeforeNextHour(std::chrono::seconds uptime) {
-  return std::chrono::seconds(3600 - (uptime.count() % 3600));
+zx::duration SecondsBeforeNextHour(zx::duration uptime) {
+  return zx::sec(3600 - (uptime.to_secs() % 3600));
 }
 
 }  // namespace
@@ -54,7 +55,7 @@ std::chrono::seconds SecondsBeforeNextHour(std::chrono::seconds uptime) {
 SystemMetricsDaemon::SystemMetricsDaemon(async_dispatcher_t* dispatcher,
                                          sys::ComponentContext* context)
     : SystemMetricsDaemon(
-          dispatcher, context, nullptr, std::make_unique<cobalt::RealSteadyClock>(),
+          dispatcher, context, nullptr, std::make_unique<timekeeper::SystemClock>(),
           std::unique_ptr<cobalt::CpuStatsFetcher>(new cobalt::CpuStatsFetcherImpl()),
           std::make_unique<cobalt::ActivityListener>(
               fit::bind_member<&SystemMetricsDaemon::UpdateState>(this)),
@@ -67,14 +68,13 @@ SystemMetricsDaemon::SystemMetricsDaemon(async_dispatcher_t* dispatcher,
 
 SystemMetricsDaemon::SystemMetricsDaemon(
     async_dispatcher_t* dispatcher, sys::ComponentContext* context,
-    fuchsia::metrics::MetricEventLogger_Sync* logger,
-    std::unique_ptr<cobalt::util::SteadyClockInterface> clock,
+    fuchsia::metrics::MetricEventLogger_Sync* logger, std::unique_ptr<timekeeper::Clock> clock,
     std::unique_ptr<cobalt::CpuStatsFetcher> cpu_stats_fetcher,
     std::unique_ptr<cobalt::ActivityListener> activity_listener, std::string activation_file_prefix)
     : dispatcher_(dispatcher),
       context_(context),
       logger_(logger),
-      start_time_(clock->now()),
+      start_time_(clock->BootNow()),
       clock_(std::move(clock)),
       cpu_stats_fetcher_(std::move(cpu_stats_fetcher)),
       activity_listener_(std::move(activity_listener)),
@@ -90,7 +90,7 @@ SystemMetricsDaemon::SystemMetricsDaemon(
       metric_cpu_node_(platform_metric_node_.CreateChild(kCPUNodeName)),
       inspect_cpu_max_(metric_cpu_node_.CreateDoubleArray(kReadingCPUMax, kCPUArraySize)),
       inspect_cpu_mean_(metric_cpu_node_.CreateDoubleArray(kReadingCPUMean, kCPUArraySize)),
-      unlogged_active_duration_(std::chrono::steady_clock::duration::zero()) {}
+      unlogged_active_duration_(zx::duration(0)) {}
 
 void SystemMetricsDaemon::StartLogging() {
   TRACE_DURATION("system_metrics", "SystemMetricsDaemon::StartLogging");
@@ -103,10 +103,10 @@ void SystemMetricsDaemon::StartLogging() {
 }
 
 void SystemMetricsDaemon::RepeatedlyLogUpPing() {
-  std::chrono::seconds uptime = GetUpTime();
-  std::chrono::seconds seconds_to_sleep = LogFuchsiaUpPing(uptime);
+  const zx::duration uptime = GetUpTime();
+  const zx::duration seconds_to_sleep = LogFuchsiaUpPing(uptime);
   async::PostDelayedTask(
-      dispatcher_, [this]() { RepeatedlyLogUpPing(); }, zx::sec(seconds_to_sleep.count() + 5));
+      dispatcher_, [this]() { RepeatedlyLogUpPing(); }, seconds_to_sleep + zx::sec(5));
 }
 
 void SystemMetricsDaemon::LogLifetimeEvents() {
@@ -129,9 +129,8 @@ void SystemMetricsDaemon::LogLifetimeEventActivation() {
 }
 
 void SystemMetricsDaemon::RepeatedlyLogUptime() {
-  std::chrono::seconds seconds_to_sleep = LogFuchsiaUptime();
-  async::PostDelayedTask(
-      dispatcher_, [this]() { RepeatedlyLogUptime(); }, zx::sec(seconds_to_sleep.count()));
+  const zx::duration seconds_to_sleep = LogFuchsiaUptime();
+  async::PostDelayedTask(dispatcher_, [this]() { RepeatedlyLogUptime(); }, seconds_to_sleep);
 }
 
 void SystemMetricsDaemon::RepeatedlyLogCpuUsage() {
@@ -139,15 +138,13 @@ void SystemMetricsDaemon::RepeatedlyLogCpuUsage() {
       fuchsia_system_metrics::kCpuPercentageMigratedIntBucketsFloor,
       fuchsia_system_metrics::kCpuPercentageMigratedIntBucketsNumBuckets,
       fuchsia_system_metrics::kCpuPercentageMigratedIntBucketsStepSize);
-  std::chrono::seconds seconds_to_sleep = LogCpuUsage();
-  async::PostDelayedTask(
-      dispatcher_, [this]() { RepeatedlyLogCpuUsage(); }, zx::sec(seconds_to_sleep.count()));
+  const zx::duration seconds_to_sleep = LogCpuUsage();
+  async::PostDelayedTask(dispatcher_, [this]() { RepeatedlyLogCpuUsage(); }, seconds_to_sleep);
 }
 
 void SystemMetricsDaemon::RepeatedlyLogActiveTime() {
-  std::chrono::seconds seconds_to_sleep = LogActiveTime();
-  async::PostDelayedTask(
-      dispatcher_, [this]() { RepeatedlyLogActiveTime(); }, zx::sec(seconds_to_sleep.count()));
+  const zx::duration seconds_to_sleep = LogActiveTime();
+  async::PostDelayedTask(dispatcher_, [this]() { RepeatedlyLogActiveTime(); }, seconds_to_sleep);
 }
 
 std::unique_ptr<IntegerBucketConfig> SystemMetricsDaemon::InitializeLinearBucketConfig(
@@ -160,16 +157,15 @@ std::unique_ptr<IntegerBucketConfig> SystemMetricsDaemon::InitializeLinearBucket
   return IntegerBucketConfig::CreateFromProto(bucket_proto);
 }
 
-std::chrono::seconds SystemMetricsDaemon::GetUpTime() {
+zx::duration SystemMetricsDaemon::GetUpTime() {
   // Note(rudominer) We are using the startime of the SystemMetricsDaemon
   // as a proxy for the system start time. This is fine as long as we don't
   // start seeing systematic restarts of the SystemMetricsDaemon. If that
   // starts happening we should look into how to capture actual boot time.
-  std::chrono::steady_clock::time_point now = clock_->now();
-  return std::chrono::duration_cast<std::chrono::seconds>(now - start_time_);
+  return clock_->BootNow() - start_time_;
 }
 
-std::chrono::seconds SystemMetricsDaemon::LogFuchsiaUpPing(std::chrono::seconds uptime) {
+zx::duration SystemMetricsDaemon::LogFuchsiaUpPing(zx::duration uptime) {
   TRACE_DURATION("system_metrics", "SystemMetricsDaemon::LogFuchsiaUpPing");
 
   typedef FuchsiaUpPingMigratedMetricDimensionUptime Uptime;
@@ -192,7 +188,7 @@ std::chrono::seconds SystemMetricsDaemon::LogFuchsiaUpPing(std::chrono::seconds 
     FX_LOGS(ERROR) << "No logger present. Reconnecting...";
     InitializeLogger();
     // Something went wrong. Pause for 5 minutes.
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
 
   fuchsia::metrics::MetricEventLogger_LogOccurrence_Result result;
@@ -200,121 +196,122 @@ std::chrono::seconds SystemMetricsDaemon::LogFuchsiaUpPing(std::chrono::seconds 
   if (ReinitializeIfPeerClosed(logger_->LogOccurrence(
           fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId, 1, {Uptime::Up}, &result)) !=
       ZX_OK) {
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogOccurrence() returned error=" << ErrorToString(result.err());
   }
-  if (uptime < std::chrono::minutes(1)) {
+  if (uptime < zx::min(1)) {
     // If we have been up for less than a minute, come back here after it
     // has been a minute.
-    return std::chrono::minutes(1) - uptime;
+    return zx::min(1) - uptime;
   }
   // Log UpOneMinute
   if (ReinitializeIfPeerClosed(
           logger_->LogOccurrence(fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId, 1,
                                  {Uptime::UpOneMinute}, &result)) != ZX_OK) {
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogOccurrence() returned error=" << ErrorToString(result.err());
   }
-  if (uptime < std::chrono::minutes(10)) {
+  if (uptime < zx::min(10)) {
     // If we have been up for less than 10 minutes, come back here after it
     // has been 10 minutes.
-    return std::chrono::minutes(10) - uptime;
+    return zx::min(10) - uptime;
   }
   // Log UpTenMinutes
   if (ReinitializeIfPeerClosed(
           logger_->LogOccurrence(fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId, 1,
                                  {Uptime::UpTenMinutes}, &result)) != ZX_OK) {
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogOccurrence() returned error=" << ErrorToString(result.err());
   }
-  if (uptime < std::chrono::hours(1)) {
+  if (uptime < zx::hour(1)) {
     // If we have been up for less than an hour, come back here after it has
     // has been an hour.
-    return std::chrono::hours(1) - uptime;
+    return zx::hour(1) - uptime;
   }
   // Log UpOneHour
   if (ReinitializeIfPeerClosed(
           logger_->LogOccurrence(fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId, 1,
                                  {Uptime::UpOneHour}, &result)) != ZX_OK) {
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogOccurrence() returned error=" << ErrorToString(result.err());
   }
-  if (uptime < std::chrono::hours(12)) {
+  if (uptime < zx::hour(12)) {
     // If we have been up for less than 12 hours, come back here after *one*
     // hour. Notice this time we don't wait 12 hours to come back. The reason
     // is that it may be close to the end of the day. When the new day starts
     // we want to come back in a reasonable amount of time (we consider
     // one hour to be reasonable) so that we can log the earlier events
     // in the new day.
-    return std::chrono::hours(1);
+    return zx::hour(1);
   }
   // Log UpTwelveHours.
   if (ReinitializeIfPeerClosed(
           logger_->LogOccurrence(fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId, 1,
                                  {Uptime::UpTwelveHours}, &result)) != ZX_OK) {
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogOccurrence() returned error=" << ErrorToString(result.err());
   }
-  if (uptime < std::chrono::hours(24)) {
+  if (uptime < zx::hour(24)) {
     // As above, come back in one hour.
-    return std::chrono::hours(1);
+    return zx::hour(1);
   }
   // Log UpOneDay.
   if (ReinitializeIfPeerClosed(
           logger_->LogOccurrence(fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId, 1,
                                  {Uptime::UpOneDay}, &result)) != ZX_OK) {
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogOccurrence() returned error=" << ErrorToString(result.err());
   }
-  if (uptime < std::chrono::hours(72)) {
-    return std::chrono::hours(1);
+  if (uptime < zx::hour(72)) {
+    return zx::hour(1);
   }
   // Log UpThreeDays.
   if (ReinitializeIfPeerClosed(
           logger_->LogOccurrence(fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId, 1,
                                  {Uptime::UpThreeDays}, &result)) != ZX_OK) {
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogOccurrence() returned error=" << ErrorToString(result.err());
   }
-  if (uptime < std::chrono::hours(144)) {
-    return std::chrono::hours(1);
+  if (uptime < zx::hour(144)) {
+    return zx::hour(1);
   }
   // Log UpSixDays.
   if (ReinitializeIfPeerClosed(
           logger_->LogOccurrence(fuchsia_system_metrics::kFuchsiaUpPingMigratedMetricId, 1,
                                  {Uptime::UpSixDays}, &result)) != ZX_OK) {
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogOccurrence() returned error=" << ErrorToString(result.err());
   }
   // As above, come back in one hour.
-  return std::chrono::hours(1);
+  return zx::hour(1);
 }
 
-std::chrono::seconds SystemMetricsDaemon::LogFuchsiaUptime() {
-  std::chrono::seconds uptime = GetUpTime();
+zx::duration SystemMetricsDaemon::LogFuchsiaUptime() {
+  const zx::duration uptime = GetUpTime();
   if (!logger_) {
     FX_LOGS(ERROR) << "No logger present. Reconnecting...";
     InitializeLogger();
     // Something went wrong. Pause for 5 minutes.
-    return std::chrono::minutes(5);
+    return zx::min(5);
   }
-  auto up_hours = std::chrono::duration_cast<std::chrono::hours>(uptime).count();
+
+  const int64_t up_hours = uptime.to_hours();
   uint32_t event_code = (up_hours < 336)
                             ? FuchsiaUptimeMigratedMetricDimensionUptimeRange::LessThanTwoWeeks
                             : event_code =
@@ -383,35 +380,35 @@ bool SystemMetricsDaemon::LogFuchsiaLifetimeEventActivation() {
   return true;
 }
 
-std::chrono::seconds SystemMetricsDaemon::LogCpuUsage() {
+zx::duration SystemMetricsDaemon::LogCpuUsage() {
   TRACE_DURATION("system_metrics", "SystemMetricsDaemon::LogCpuUsage");
   if (!logger_) {
     FX_LOGS(ERROR) << "No logger present. Reconnecting...";
     InitializeLogger();
-    return std::chrono::minutes(1);
+    return zx::min(1);
   }
   double cpu_percentage;
   switch (cpu_stats_fetcher_->FetchCpuPercentage(&cpu_percentage)) {
     case cobalt::FetchCpuResult::Ok:
       StoreCpuData(cpu_percentage);
-      return std::chrono::seconds(1);
+      return zx::sec(1);
     case cobalt::FetchCpuResult::FirstDataPoint:
-      return std::chrono::seconds(1);
+      return zx::sec(1);
     case cobalt::FetchCpuResult::Error:
-      return std::chrono::minutes(1);
+      return zx::min(1);
   }
 }
 
-std::chrono::seconds SystemMetricsDaemon::LogActiveTime() {
+zx::duration SystemMetricsDaemon::LogActiveTime() {
   TRACE_DURATION("system_metrics", "SystemMetricsDaemon::LogActiveTime");
   std::lock_guard<std::mutex> lock(active_time_mutex_);
 
   if (!logger_) {
     FX_LOGS(ERROR) << "No logger present. Reconnecting...";
     InitializeLogger();
-    return std::chrono::minutes(1);
+    return zx::min(1);
   }
-  std::chrono::steady_clock::time_point now = clock_->now();
+  const zx::time_boot now = clock_->BootNow();
   if (current_state_ == fuchsia::ui::activity::State::ACTIVE) {
     unlogged_active_duration_ += (now - active_start_time_);
     active_start_time_ = now;
@@ -420,17 +417,15 @@ std::chrono::seconds SystemMetricsDaemon::LogActiveTime() {
   // Log even if no active time has elapsed, so we will get an accurate count of devices with
   // no activity during the day.
   fuchsia::metrics::MetricEventLogger_LogInteger_Result result;
-  ReinitializeIfPeerClosed(logger_->LogInteger(
-      fuchsia_system_metrics::kActiveTimeMetricId,
-      std::chrono::duration_cast<std::chrono::seconds>(unlogged_active_duration_).count(), {},
-      &result));
+  ReinitializeIfPeerClosed(logger_->LogInteger(fuchsia_system_metrics::kActiveTimeMetricId,
+                                               unlogged_active_duration_.to_secs(), {}, &result));
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogInteger() returned error=" << ErrorToString(result.err());
   } else {
-    unlogged_active_duration_ = std::chrono::steady_clock::duration::zero();
+    unlogged_active_duration_ = zx::duration(0);
   }
 
-  return std::chrono::minutes(15);
+  return zx::min(15);
 }
 
 void SystemMetricsDaemon::StoreCpuData(double cpu_percentage) {
@@ -446,9 +441,7 @@ void SystemMetricsDaemon::StoreCpuData(double cpu_percentage) {
   }
 
   cpu_usage_accumulator_ += cpu_percentage;
-  if (cpu_percentage > cpu_usage_max_) {
-    cpu_usage_max_ = cpu_percentage;
-  }
+  cpu_usage_max_ = std::max(cpu_percentage, cpu_usage_max_);
   // Every 10 (kInspectSamplePeriod) seconds, write to inspect
   const size_t kInspectSamplePeriod = 10;
   if (cpu_data_stored_ % kInspectSamplePeriod == 0) {
@@ -494,10 +487,10 @@ void SystemMetricsDaemon::UpdateState(fuchsia::ui::activity::State state) {
     return;
   }
   if (state == fuchsia::ui::activity::State::ACTIVE) {
-    active_start_time_ = clock_->now();
+    active_start_time_ = clock_->BootNow();
   } else {
-    unlogged_active_duration_ += (clock_->now() - active_start_time_);
-    active_start_time_ = std::chrono::steady_clock::time_point();
+    unlogged_active_duration_ += (clock_->BootNow() - active_start_time_);
+    active_start_time_ = zx::time_boot(0);
   }
   current_state_ = state;
 }

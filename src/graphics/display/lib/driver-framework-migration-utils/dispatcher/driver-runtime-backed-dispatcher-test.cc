@@ -122,7 +122,7 @@ TEST_F(DriverDispatcherTest, HandleIrq) {
   status = virtual_interrupt.duplicate(ZX_RIGHT_SAME_RIGHTS, &virtual_interrupt_driver_dup);
   ASSERT_OK(status);
 
-  zx::time latest_handled_irq_timestamp;
+  zx::time_boot latest_handled_irq_timestamp;
   libsync::Completion irq_handler_invoked;
   libsync::Completion irq_handler_canceled;
 
@@ -136,7 +136,7 @@ TEST_F(DriverDispatcherTest, HandleIrq) {
       irq_handler_canceled.Signal();
       return;
     }
-    latest_handled_irq_timestamp = zx::time(interrupt->timestamp);
+    latest_handled_irq_timestamp = zx::time_boot(interrupt->timestamp);
     irq_handler_invoked.Signal();
 
     // Acknowledges the interrupt so that it can be triggered again.
@@ -148,7 +148,7 @@ TEST_F(DriverDispatcherTest, HandleIrq) {
   ASSERT_OK(start_irq_handler_result.status_value());
 
   // Manually trigger the virtual interrupt.
-  static constexpr zx::time kIrqTimestamp1 = zx::time(0x12345678);
+  static constexpr zx::time_boot kIrqTimestamp1 = zx::time_boot(0x12345678);
   status = virtual_interrupt.trigger(0u, kIrqTimestamp1);
   ASSERT_OK(status);
 
@@ -158,7 +158,7 @@ TEST_F(DriverDispatcherTest, HandleIrq) {
 
   // Manually trigger the virtual interrupt again.
   irq_handler_invoked.Reset();
-  static constexpr zx::time kIrqTimestamp2 = zx::time(0x23456789);
+  static constexpr zx::time_boot kIrqTimestamp2 = zx::time_boot(0x23456789);
   status = virtual_interrupt.trigger(0u, kIrqTimestamp2);
   ASSERT_OK(status);
 

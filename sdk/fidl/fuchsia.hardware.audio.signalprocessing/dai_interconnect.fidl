@@ -8,7 +8,6 @@ using zx;
 /// If the driver reports a `plug_detect_capabilities` equal to HARDWIRED, then the driver should
 /// respond to `WatchElementState` only the first time it is called for a given interconnect, with
 /// `plugged` set to true and `plug_state_time` set to time '0'.
-@available(added=12)
 type PlugState = table {
     /// Indicates whether the interconnect is currently plugged in.
     ///
@@ -23,7 +22,6 @@ type PlugState = table {
 };
 
 /// Plug detection capabilities for the interconnect.
-@available(added=12)
 type PlugDetectCapabilities = flexible enum {
     /// Interconnect is hardwired (will always be plugged in).
     HARDWIRED = 0;
@@ -33,7 +31,7 @@ type PlugDetectCapabilities = flexible enum {
 };
 
 /// Endpoint types.
-@available(added=12, removed=20)
+@available(removed=20)
 type EndpointType = flexible enum : uint8 {
     /// The endpoint represents a ring buffer.
     /// A ring buffer processing element's id allows for multi-ring buffer topologies to
@@ -46,7 +44,7 @@ type EndpointType = flexible enum : uint8 {
 };
 
 /// Parameters for an `Element` with `type` equal to `ENDPOINT`.
-@available(added=12, removed=20)
+@available(removed=20)
 type Endpoint = table {
     /// Specifies what the endpoint represents.
     ///
@@ -59,7 +57,7 @@ type Endpoint = table {
 };
 
 /// State for an `Element` with `type` equal to `ENDPOINT`.
-@available(added=12, removed=20)
+@available(removed=20)
 type EndpointElementState = table {
     /// If included the plug detect state for this endpoint.
     ///

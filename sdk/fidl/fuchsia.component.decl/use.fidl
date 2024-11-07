@@ -36,7 +36,7 @@ type UseService = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     6: source_dictionary dictionary_path;
 
     /// (Required) The path where the capability should be installed in the
@@ -79,7 +79,7 @@ type UseProtocol = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     6: source_dictionary dictionary_path;
 
     /// (Required) The path where the capability should be installed in the component's
@@ -119,7 +119,7 @@ type UseDirectory = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     8: source_dictionary dictionary_path;
 
     /// (Required) The path where the capability should be installed in the
@@ -218,7 +218,6 @@ type UseRunner = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
     3: source_dictionary dictionary_path;
 };
 
@@ -255,6 +254,6 @@ type UseConfiguration = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     7: source_dictionary dictionary_path;
 };

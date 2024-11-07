@@ -37,7 +37,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> SherlockPartitioner::Initialize(
 
   auto partitioner = WrapUnique(new SherlockPartitioner(std::move(status_or_gpt->gpt)));
   if (status_or_gpt->initialize_partition_tables) {
-    if (auto status = partitioner->InitPartitionTables(); status.is_error()) {
+    if (auto status = partitioner->ResetPartitionTables(); status.is_error()) {
       return status.take_error();
     }
   }
@@ -78,12 +78,6 @@ bool SherlockPartitioner::SupportsPartition(const PartitionSpec& spec) const {
       PartitionSpec(paver::Partition::kFuchsiaVolumeManager)};
   return std::any_of(std::cbegin(supported_specs), std::cend(supported_specs),
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
-}
-
-zx::result<std::unique_ptr<PartitionClient>> SherlockPartitioner::AddPartition(
-    const PartitionSpec& spec) const {
-  ERROR("Cannot add partitions to a sherlock device\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx::result<std::unique_ptr<PartitionClient>> SherlockPartitioner::FindPartition(
@@ -169,7 +163,7 @@ zx::result<std::unique_ptr<PartitionClient>> SherlockPartitioner::FindPartition(
   }
 
   const auto filter = [&legacy_type, &part_name,
-                       &secondary_part_name](const gpt_partition_t& part) {
+                       &secondary_part_name](const GptPartitionMetadata& part) {
     // Only filter by partition name instead of name + type due to bootloader bug (b/173801312)
     return FilterByType(part, legacy_type) || FilterByName(part, part_name) ||
            FilterByName(part, secondary_part_name);
@@ -178,17 +172,13 @@ zx::result<std::unique_ptr<PartitionClient>> SherlockPartitioner::FindPartition(
   if (status.is_error()) {
     return status.take_error();
   }
-  return zx::ok(std::move(status->partition));
+  return zx::ok(std::move(*status));
 }
 
 zx::result<> SherlockPartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
-zx::result<> SherlockPartitioner::InitPartitionTables() const {
+zx::result<> SherlockPartitioner::ResetPartitionTables() const {
   ERROR("Initializing gpt partitions from paver is not supported on sherlock\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
-zx::result<> SherlockPartitioner::WipePartitionTables() const {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 

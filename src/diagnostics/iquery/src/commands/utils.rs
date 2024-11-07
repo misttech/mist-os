@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::commands::types::DiagnosticsProvider;
-use crate::commands::{Command, ListCommand};
+use crate::commands::types::{Command, DiagnosticsProvider};
+use crate::commands::ListCommand;
 use crate::types::Error;
 use cm_rust::SourceName;
 use component_debug::realm::*;
@@ -18,14 +18,11 @@ static EXPECTED_PROTOCOL_RE: LazyLock<Regex> =
 
 /// Returns the selectors for a component whose url contains the `manifest` string.
 pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
-    manifest: &Option<String>,
+    manifest: String,
     tree_selectors: Vec<String>,
     accessor: &Option<String>,
     provider: &P,
-) -> Result<Vec<String>, Error> {
-    let Some(manifest) = manifest.as_ref() else {
-        return Ok(tree_selectors);
-    };
+) -> Result<Vec<Selector>, Error> {
     let list_command = ListCommand {
         manifest: Some(manifest.clone()),
         with_url: false,
@@ -41,74 +38,128 @@ pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
     if monikers.is_empty() {
         Err(Error::ManifestNotFound(manifest.clone()))
     } else if tree_selectors.is_empty() {
-        Ok(monikers.into_iter().map(|moniker| format!("{}:root", moniker)).collect())
+        Ok(monikers
+            .into_iter()
+            .map(|moniker| {
+                let selector_string = format!("{moniker}:root");
+                selectors::parse_verbose(&selector_string)
+                    .map_err(|e| Error::ParseSelector(selector_string, e.into()))
+            })
+            .collect::<Result<Vec<_>, _>>()?)
     } else {
         Ok(monikers
             .into_iter()
             .flat_map(|moniker| {
-                tree_selectors
-                    .iter()
-                    .map(move |tree_selector| format!("{}:{}", moniker, tree_selector))
+                tree_selectors.iter().map(move |tree_selector| {
+                    let selector_string = format!("{moniker}:{tree_selector}");
+                    selectors::parse_verbose(&selector_string)
+                        .map_err(|e| Error::ParseSelector(selector_string, e.into()))
+                })
             })
-            .collect())
+            .collect::<Result<Vec<_>, _>>()?)
     }
 }
 
-enum MonikerOrSelector {
-    Moniker,
-    Selector,
-}
-
-/// Checks whether the input string is just a moniker or a full selector
-fn moniker_or_selector(untokenized_selector: &str) -> Result<MonikerOrSelector, Error> {
-    if untokenized_selector.is_empty() {
-        return Err(Error::InvalidSelector("selector strings cannot be empty".to_string()));
+async fn fuzzy_search(
+    query: &str,
+    realm_query: &fsys2::RealmQueryProxy,
+) -> Result<Instance, Error> {
+    let mut instances = component_debug::query::get_instances_from_query(query, &realm_query)
+        .await
+        .map_err(|e| Error::FuzzyMatchRealmQuery(e.into()))?;
+    if instances.len() == 0 {
+        return Err(Error::SearchParameterNotFound(query.to_string()));
+    } else if instances.len() > 1 {
+        return Err(Error::FuzzyMatchTooManyMatches(
+            instances.into_iter().map(|i| i.moniker.to_string()).collect(),
+        ));
     }
 
-    let mut segment_count = 1;
-    let mut found_character_in_current_segment = false;
-    let mut unparsed_selector_iter = untokenized_selector.char_indices();
+    Ok(instances.pop().unwrap())
+}
 
-    while let Some((_, selector_char)) = unparsed_selector_iter.next() {
-        match selector_char {
-            escape if escape == selectors::ESCAPE_CHARACTER => {
-                if unparsed_selector_iter.next().is_none() {
-                    return Err(Error::InvalidSelector(format!(
-                        "escape character with no escapee: {}",
-                        untokenized_selector
-                    )));
-                }
+pub async fn process_fuzzy_inputs<P: DiagnosticsProvider>(
+    queries: impl IntoIterator<Item = String>,
+    provider: &P,
+) -> Result<Vec<Selector>, Error> {
+    let mut queries = queries.into_iter().peekable();
+    if queries.peek().is_none() {
+        return Ok(vec![]);
+    }
 
-                found_character_in_current_segment = true;
-            }
-            selector_delimiter if selector_delimiter == selectors::SELECTOR_DELIMITER => {
-                if !found_character_in_current_segment {
-                    return Err(Error::InvalidSelector(format!(
-                        "cannot have empty strings delimited by {}",
-                        selectors::SELECTOR_DELIMITER
-                    )));
+    let realm_query = provider.connect_realm_query().await?;
+    let mut results = vec![];
+    for value in queries {
+        match fuzzy_search(&value, &realm_query).await {
+            // try again in case this is a fully escaped moniker or selector
+            Err(Error::SearchParameterNotFound(_)) => {
+                // In case they included a tree-selector segment, attempt to parse but don't bail
+                // on failure
+                if let Ok(selector) = selectors::parse_verbose(&value) {
+                    results.push(selector);
+                } else {
+                    // Note the lack of `sanitize_moniker_for_selectors`. `value` is assumed to
+                    // either
+                    //   A) Be a component that isn't running; therefore the selector being
+                    //      right or wrong is irrelevant
+                    //   B) Already be sanitized by the caller
+                    let selector_string = format!("{}:root", value);
+                    results.push(
+                        selectors::parse_verbose(&selector_string)
+                            .map_err(|e| Error::ParseSelector(selector_string, e.into()))?,
+                    )
                 }
-                segment_count += 1;
-                found_character_in_current_segment = false;
             }
-            _ => found_character_in_current_segment = true,
+            Err(e) => return Err(e),
+            Ok(instance) => {
+                let selector_string = format!(
+                    "{}:root",
+                    selectors::sanitize_moniker_for_selectors(instance.moniker.to_string()),
+                );
+                results.push(
+                    selectors::parse_verbose(&selector_string)
+                        .map_err(|e| Error::ParseSelector(selector_string, e.into()))?,
+                )
+            }
         }
     }
 
-    // ensure that a delimiter wasn't the last thing found
-    if !found_character_in_current_segment {
-        return Err(Error::InvalidSelector(format!(
-            "cannot have empty strings delimited by {}: {}",
-            selectors::SELECTOR_DELIMITER,
-            untokenized_selector
-        )));
+    Ok(results)
+}
+
+/// Returns the selectors for a component whose url, manifest, or moniker contains the
+/// `component` string.
+pub async fn process_component_query_with_partial_selectors<P: DiagnosticsProvider>(
+    component: String,
+    tree_selectors: impl Iterator<Item = String>,
+    provider: &P,
+) -> Result<Vec<Selector>, Error> {
+    let mut tree_selectors = tree_selectors.into_iter().peekable();
+    let realm_query = provider.connect_realm_query().await?;
+    let instance = fuzzy_search(component.as_str(), &realm_query).await?;
+
+    let mut results = vec![];
+    if tree_selectors.peek().is_none() {
+        let selector_string = format!(
+            "{}:root",
+            selectors::sanitize_moniker_for_selectors(instance.moniker.to_string())
+        );
+        results
+            .push(selectors::parse_verbose(&selector_string).map_err(Error::PartialSelectorHint)?);
+    } else {
+        for s in tree_selectors {
+            let selector_string = format!(
+                "{}:{}",
+                selectors::sanitize_moniker_for_selectors(instance.moniker.to_string()),
+                s
+            );
+            results.push(
+                selectors::parse_verbose(&selector_string).map_err(Error::PartialSelectorHint)?,
+            )
+        }
     }
 
-    if segment_count == 1 {
-        Ok(MonikerOrSelector::Moniker)
-    } else {
-        Ok(MonikerOrSelector::Selector)
-    }
+    Ok(results)
 }
 
 fn add_tree_name(mut selector: Selector, tree_name: String) -> Selector {
@@ -132,7 +183,7 @@ fn add_tree_name(mut selector: Selector, tree_name: String) -> Selector {
 
 /// Expand selectors.
 pub fn expand_selectors(
-    selectors: Vec<String>,
+    selectors: Vec<Selector>,
     tree_name: Option<String>,
 ) -> Result<Vec<Selector>, Error> {
     let mut result = vec![];
@@ -148,29 +199,11 @@ pub fn expand_selectors(
         return Ok(vec![selector]);
     }
 
-    for selector in selectors {
-        match moniker_or_selector(&selector)? {
-            MonikerOrSelector::Selector => match selectors::parse_verbose(&selector) {
-                Ok(mut selector) => {
-                    if let Some(tree_name) = &tree_name {
-                        selector = add_tree_name(selector, tree_name.clone());
-                    }
-                    result.push(selector)
-                }
-                Err(e) => return Err(Error::ParseSelector(selector, e.into())),
-            },
-            MonikerOrSelector::Moniker => {
-                match selectors::parse_verbose(&format!("{}:*", selector)) {
-                    Ok(mut selector) => {
-                        if let Some(tree_name) = &tree_name {
-                            selector = add_tree_name(selector, tree_name.clone());
-                        }
-                        result.push(selector)
-                    }
-                    Err(e) => return Err(Error::ParseSelector(selector, e.into())),
-                }
-            }
+    for mut selector in selectors {
+        if let Some(tree_name) = &tree_name {
+            selector = add_tree_name(selector, tree_name.clone());
         }
+        result.push(selector)
     }
 
     Ok(result)
@@ -251,16 +284,14 @@ mod test {
         let name = Some("abc".to_string());
 
         let expected = vec![
-            parse_verbose("core/one:[name=abc]*").unwrap(),
             parse_verbose("core/one:[name=abc]root").unwrap(),
             parse_verbose("core/one:[name=xyz, name=abc]root").unwrap(),
         ];
 
         let actual = expand_selectors(
             vec![
-                "core/one".to_string(),
-                "core/one:root".to_string(),
-                "core/one:[name=xyz]root".to_string(),
+                parse_verbose("core/one:root").unwrap(),
+                parse_verbose("core/one:[name=xyz]root").unwrap(),
             ],
             name.clone(),
         )
@@ -269,16 +300,14 @@ mod test {
         assert_eq!(actual, expected);
 
         let expected = vec![
-            parse_verbose("core/one:*").unwrap(),
             parse_verbose("core/one:root").unwrap(),
             parse_verbose("core/one:[name=xyz]root").unwrap(),
         ];
 
         let actual = expand_selectors(
             vec![
-                "core/one".to_string(),
-                "core/one:root".to_string(),
-                "core/one:[name=xyz]root".to_string(),
+                parse_verbose("core/one:root").unwrap(),
+                parse_verbose("core/one:[name=xyz]root").unwrap(),
             ],
             None,
         )
@@ -291,5 +320,172 @@ mod test {
         assert_eq!(actual, expected);
 
         assert_eq!(expand_selectors(vec![], None).unwrap(), vec![]);
+    }
+
+    struct FakeProvider(Vec<&'static str>);
+
+    impl DiagnosticsProvider for FakeProvider {
+        async fn snapshot<D: diagnostics_data::DiagnosticsData>(
+            &self,
+            _: &Option<String>,
+            _: impl IntoIterator<Item = Selector>,
+        ) -> Result<Vec<diagnostics_data::Data<D>>, Error> {
+            unreachable!("unimplemented");
+        }
+
+        async fn get_accessor_paths(&self) -> Result<Vec<String>, Error> {
+            unreachable!("unimplemented");
+        }
+
+        async fn connect_realm_query(&self) -> Result<fsys2::RealmQueryProxy, Error> {
+            let mut builder = iquery_test_support::MockRealmQueryBuilder::default();
+            for name in &self.0 {
+                builder = builder.when(name).moniker(name).add();
+            }
+
+            Ok(Rc::new(builder.build()).get_proxy().await)
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_process_fuzzy_inputs_success() {
+        let actual = process_fuzzy_inputs(
+            ["moniker1".to_string()],
+            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+        )
+        .await
+        .unwrap();
+
+        let expected = vec![parse_verbose("core/moniker1:root").unwrap()];
+
+        assert_eq!(actual, expected);
+
+        let actual = process_fuzzy_inputs(
+            ["moniker1:collection".to_string()],
+            &FakeProvider(vec!["core/moniker1:collection", "core/moniker1", "core/moniker2"]),
+        )
+        .await
+        .unwrap();
+
+        let expected = vec![parse_verbose(r"core/moniker1\:collection:root").unwrap()];
+
+        assert_eq!(actual, expected);
+
+        let actual = process_fuzzy_inputs(
+            [r"core/moniker1\:collection".to_string()],
+            &FakeProvider(vec!["core/moniker1:collection"]),
+        )
+        .await
+        .unwrap();
+
+        let expected = vec![parse_verbose(r"core/moniker1\:collection:root").unwrap()];
+
+        assert_eq!(actual, expected);
+
+        let actual = process_fuzzy_inputs(
+            ["core/moniker1:root:prop".to_string()],
+            &FakeProvider(vec!["core/moniker1:collection", "core/moniker1"]),
+        )
+        .await
+        .unwrap();
+
+        let expected = vec![parse_verbose(r"core/moniker1:root:prop").unwrap()];
+
+        assert_eq!(actual, expected);
+
+        let actual = process_fuzzy_inputs(
+            ["core/moniker1".to_string(), "core/moniker2".to_string()],
+            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+        )
+        .await
+        .unwrap();
+
+        let expected = vec![
+            parse_verbose(r"core/moniker1:root").unwrap(),
+            parse_verbose(r"core/moniker2:root").unwrap(),
+        ];
+
+        assert_eq!(actual, expected);
+
+        let actual = process_fuzzy_inputs(
+            ["moniker1".to_string(), "moniker2".to_string()],
+            &FakeProvider(vec!["core/moniker1"]),
+        )
+        .await
+        .unwrap();
+
+        let expected = vec![
+            parse_verbose(r"core/moniker1:root").unwrap(),
+            // fallback is to assume that moniker2 is a valid moniker
+            parse_verbose("moniker2:root").unwrap(),
+        ];
+
+        assert_eq!(actual, expected);
+
+        let actual = process_fuzzy_inputs(
+            ["core/moniker1:root:prop".to_string(), "core/moniker2".to_string()],
+            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+        )
+        .await
+        .unwrap();
+
+        let expected = vec![
+            parse_verbose(r"core/moniker1:root:prop").unwrap(),
+            parse_verbose(r"core/moniker2:root").unwrap(),
+        ];
+
+        assert_eq!(actual, expected);
+    }
+
+    #[fuchsia::test]
+    async fn test_process_fuzzy_inputs_failures() {
+        let actual =
+            process_fuzzy_inputs(["moniker ".to_string()], &FakeProvider(vec!["moniker"])).await;
+
+        assert_matches!(actual, Err(Error::ParseSelector(_, _)));
+
+        let actual = process_fuzzy_inputs(
+            ["moniker".to_string()],
+            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+        )
+        .await;
+
+        assert_matches!(actual, Err(Error::FuzzyMatchTooManyMatches(_)));
+    }
+
+    #[fuchsia::test]
+    async fn test_fuzzy_component_search() {
+        let actual = process_component_query_with_partial_selectors(
+            "moniker1".to_string(),
+            [].into_iter(),
+            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+        )
+        .await
+        .unwrap();
+
+        let expected = vec![parse_verbose(r"core/moniker1:root").unwrap()];
+
+        assert_eq!(actual, expected);
+
+        let actual = process_component_query_with_partial_selectors(
+            "moniker1".to_string(),
+            ["root/foo:bar".to_string()].into_iter(),
+            &FakeProvider(vec!["core/moniker1", "core/moniker2"]),
+        )
+        .await
+        .unwrap();
+
+        let expected = vec![parse_verbose(r"core/moniker1:root/foo:bar").unwrap()];
+
+        assert_eq!(actual, expected);
+
+        let actual = process_component_query_with_partial_selectors(
+            "moniker1".to_string(),
+            ["root/foo:bar".to_string()].into_iter(),
+            &FakeProvider(vec!["core/moniker2", "core/moniker3"]),
+        )
+        .await;
+
+        assert_matches!(actual, Err(Error::SearchParameterNotFound(_)));
     }
 }

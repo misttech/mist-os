@@ -10,9 +10,9 @@ use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::allocator::{self, AllocatorKey, AllocatorValue};
 use crate::object_store::graveyard::Graveyard;
 use crate::object_store::{
-    AttributeKey, ChildValue, EncryptionKeys, ExtendedAttributeValue, ExtentKey, ExtentValue,
-    ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,
-    ObjectValue, ProjectProperty, RootDigest, DEFAULT_DATA_ATTRIBUTE_ID,
+    AttributeKey, ChildValue, EncryptionKeys, ExtendedAttributeValue, ExtentKey, ExtentMode,
+    ExtentValue, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
+    ObjectStore, ObjectValue, ProjectProperty, RootDigest, DEFAULT_DATA_ATTRIBUTE_ID,
     EXTENDED_ATTRIBUTE_RANGE_END, EXTENDED_ATTRIBUTE_RANGE_START, FSVERITY_MERKLE_ATTRIBUTE_ID,
 };
 use crate::range::RangeExt;
@@ -23,11 +23,26 @@ use std::cell::UnsafeCell;
 use std::collections::btree_map::BTreeMap;
 use std::ops::Range;
 
+// Information about a specific attribute.
+#[derive(Debug)]
+struct ScannedAttribute {
+    // ID of the attribute. Most commonly zero, which is the attribute value regular data is stored
+    // in, but others are used for extended attributes and merkle trees.
+    attribute_id: u64,
+    // The logical size of this attribute according to its metadata.
+    size: u64,
+    // The attribute metadata claims to have at least one extents with an Overwrite or
+    // OverwritePartial ExtentMode. None for attributes that don't care about overwrite extents,
+    // like VerifiedAttribute.
+    has_overwrite_extents_flag: Option<bool>,
+    // An overwrite extent was found for this attribute.
+    observed_overwrite_extents: bool,
+}
+
 // Information for scanned objects about their allocated attributes.
 #[derive(Debug)]
 struct ScannedAttributes {
-    // A list of attribute IDs found for the object, along with their logical size.
-    attributes: Vec<(u64, u64)>,
+    attributes: Vec<ScannedAttribute>,
     // A list of attributes that have been tombstoned.
     tombstoned_attributes: Vec<u64>,
     // The object's allocated size, according to its metadata.
@@ -326,14 +341,19 @@ impl<'a> ScannedStore<'a> {
             }
             ObjectKeyData::Attribute(attribute_id, AttributeKey::Attribute) => {
                 match value {
-                    ObjectValue::Attribute { size, .. } => {
+                    ObjectValue::Attribute { size, has_overwrite_extents } => {
                         match self.objects.get_mut(&key.object_id) {
                             Some(
                                 ScannedObject::File(ScannedFile { attributes, .. })
                                 | ScannedObject::Directory(ScannedDir { attributes, .. })
                                 | ScannedObject::Symlink(ScannedSymlink { attributes, .. }),
                             ) => {
-                                attributes.attributes.push((attribute_id, *size));
+                                attributes.attributes.push(ScannedAttribute {
+                                    attribute_id,
+                                    size: *size,
+                                    has_overwrite_extents_flag: Some(*has_overwrite_extents),
+                                    observed_overwrite_extents: false,
+                                });
                             }
                             Some(ScannedObject::Graveyard) => { /* NOP */ }
                             Some(ScannedObject::Tombstone) => {
@@ -362,7 +382,12 @@ impl<'a> ScannedStore<'a> {
                                 is_verified,
                                 ..
                             })) => {
-                                attributes.attributes.push((attribute_id, *size));
+                                attributes.attributes.push(ScannedAttribute {
+                                    attribute_id,
+                                    size: *size,
+                                    has_overwrite_extents_flag: None,
+                                    observed_overwrite_extents: false,
+                                });
                                 let hash_size = match &fsverity_metadata.root_digest {
                                     RootDigest::Sha256(root_hash) => root_hash.len(),
                                     RootDigest::Sha512(root_hash) => root_hash.len(),
@@ -696,6 +721,7 @@ impl<'a> ScannedStore<'a> {
         range: &Range<u64>,
         device_offset: u64,
         bs: u64,
+        is_overwrite_extent: bool,
     ) -> Result<(), Error> {
         if range.start % bs > 0 || range.end % bs > 0 {
             self.fsck.error(FsckError::MisalignedExtent(
@@ -728,20 +754,23 @@ impl<'a> ScannedStore<'a> {
                     in_graveyard,
                     ..
                 } = attributes;
-                match attributes.iter().find(|(attr_id, _)| *attr_id == attribute_id) {
-                    Some((_, size)) => {
+                match attributes.iter_mut().find(|attribute| attribute.attribute_id == attribute_id)
+                {
+                    Some(attribute) => {
                         if !*in_graveyard
                             && !tombstoned_attributes.contains(&attribute_id)
-                            && range.end > round_up(*size, bs).unwrap()
+                            && range.end > round_up(attribute.size, bs).unwrap()
                         {
                             self.fsck.error(FsckError::ExtentExceedsLength(
                                 self.store_id,
                                 object_id,
                                 attribute_id,
-                                *size,
+                                attribute.size,
                                 range.into(),
                             ))?;
                         }
+                        attribute.observed_overwrite_extents =
+                            attribute.observed_overwrite_extents || is_overwrite_extent;
                     }
                     None => {
                         self.fsck.warning(FsckWarning::ExtentForMissingAttribute(
@@ -920,7 +949,7 @@ async fn scan_extents_and_directory_children<'a>(
                 ..
             } => {
                 // Ignore deleted extents.
-                if let ExtentValue::Some { device_offset, .. } = extent {
+                if let ExtentValue::Some { device_offset, mode, .. } = extent {
                     let size = range.length().unwrap_or(0);
                     allocated_bytes += size;
 
@@ -938,8 +967,18 @@ async fn scan_extents_and_directory_children<'a>(
                         [FragmentationStats::get_histogram_bucket_for_size(size)] += 1;
                     extent_count += 1;
 
+                    let is_overwrite_extent =
+                        matches!(mode, ExtentMode::Overwrite | ExtentMode::OverwritePartial(_));
+
                     scanned
-                        .process_extent(*object_id, *attribute_id, range, *device_offset, bs)
+                        .process_extent(
+                            *object_id,
+                            *attribute_id,
+                            range,
+                            *device_offset,
+                            bs,
+                            is_overwrite_extent,
+                        )
                         .await?;
                 };
             }
@@ -1002,12 +1041,13 @@ fn validate_attributes(
 
     if is_file {
         let data_attribute =
-            attributes.iter().find(|(attr_id, _)| *attr_id == DEFAULT_DATA_ATTRIBUTE_ID);
+            attributes.iter().find(|attribute| attribute.attribute_id == DEFAULT_DATA_ATTRIBUTE_ID);
         match data_attribute {
             None => fsck.error(FsckError::MissingDataAttribute(store_id, object_id))?,
-            Some((_, data_size)) => {
-                let merkle_attribute =
-                    attributes.iter().find(|(attr_id, _)| *attr_id == FSVERITY_MERKLE_ATTRIBUTE_ID);
+            Some(data_attribute) => {
+                let merkle_attribute = attributes
+                    .iter()
+                    .find(|attribute| attribute.attribute_id == FSVERITY_MERKLE_ATTRIBUTE_ID);
 
                 // Note a merkle attribute can exist for a non-verified file in the case that the
                 // power cut while we were writing the merkle attribute across multiple txns. In
@@ -1018,21 +1058,21 @@ fn validate_attributes(
                     ))?;
                 }
 
-                if let (Some((_, size)), Some(hash_size)) = (merkle_attribute, is_verified) {
+                if let (Some(merkle_attribute), Some(hash_size)) = (merkle_attribute, is_verified) {
                     // If the file is empty, the merkle tree should just be a single hash.
-                    let expected_size = if *data_size == 0 {
+                    let expected_size = if data_attribute.size == 0 {
                         hash_size as u64
                     // Else, use ceiling integer division in case data_size is not a multiple of
                     // block size.
                     } else {
-                        ((data_size + (block_size - 1)) / block_size) * hash_size as u64
+                        ((data_attribute.size + (block_size - 1)) / block_size) * hash_size as u64
                     };
-                    if *size != expected_size {
+                    if merkle_attribute.size != expected_size {
                         fsck.error(FsckError::IncorrectMerkleTreeSize(
                             store_id,
                             object_id,
                             expected_size,
-                            *size,
+                            merkle_attribute.size,
                         ))?;
                     }
                 }
@@ -1042,13 +1082,17 @@ fn validate_attributes(
 
     // Attributes queued for tombstoning must exist.
     for attr in tombstoned_attributes {
-        if attributes.iter().find(|(attr_id, _)| *attr_id == *attr).is_none() {
+        if attributes.iter().find(|attribute| attribute.attribute_id == *attr).is_none() {
             fsck.error(FsckError::TombstonedAttributeDoesNotExist(store_id, object_id, *attr))?
         }
     }
 
     for expected_attribute_id in extended_attributes {
-        if attributes.iter().find(|(attr_id, _)| attr_id == expected_attribute_id).is_none() {
+        if attributes
+            .iter()
+            .find(|attribute| attribute.attribute_id == *expected_attribute_id)
+            .is_none()
+        {
             fsck.error(FsckError::MissingAttributeForExtendedAttribute(
                 store_id,
                 object_id,
@@ -1057,15 +1101,44 @@ fn validate_attributes(
         }
     }
 
-    for (attr_id, _) in attributes {
-        if *attr_id >= EXTENDED_ATTRIBUTE_RANGE_START && *attr_id < EXTENDED_ATTRIBUTE_RANGE_END {
+    for attribute in attributes {
+        if attribute.attribute_id >= EXTENDED_ATTRIBUTE_RANGE_START
+            && attribute.attribute_id < EXTENDED_ATTRIBUTE_RANGE_END
+        {
             // For all the attributes in the extended attribute range, make sure there is an
             // extended attribute record for them.
-            if extended_attributes.iter().find(|xattr_id| attr_id == *xattr_id).is_none() {
+            if extended_attributes
+                .iter()
+                .find(|xattr_id| attribute.attribute_id == **xattr_id)
+                .is_none()
+            {
                 fsck.warning(FsckWarning::OrphanedExtendedAttribute(
-                    store_id, object_id, *attr_id,
+                    store_id,
+                    object_id,
+                    attribute.attribute_id,
                 ))?;
             }
+        }
+
+        if attribute
+            .has_overwrite_extents_flag
+            .is_some_and(|has_flag| has_flag && !attribute.observed_overwrite_extents)
+        {
+            fsck.error(FsckError::MissingOverwriteExtents(
+                store_id,
+                object_id,
+                attribute.attribute_id,
+            ))?;
+        }
+        if attribute
+            .has_overwrite_extents_flag
+            .is_some_and(|has_flag| !has_flag && attribute.observed_overwrite_extents)
+        {
+            fsck.error(FsckError::OverwriteExtentFlagUnset(
+                store_id,
+                object_id,
+                attribute.attribute_id,
+            ))?;
         }
     }
 

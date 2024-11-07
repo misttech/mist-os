@@ -10,7 +10,7 @@ driver_bind_rules("test-parent-bind") {
   disable_autobind = true
 }
 
-fuchsia_driver("test-parent-sys_driver") {
+fuchsia_cc_driver("test-parent-sys_driver") {
   output_name = "test-parent-sys"
   sources = [ "test-parent.cc" ]
   deps = [

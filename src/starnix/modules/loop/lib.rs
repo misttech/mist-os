@@ -91,6 +91,7 @@ impl LoopDeviceState {
 
     fn set_backing_file(
         &mut self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         backing_file: FileHandle,
     ) -> Result<(), Errno> {
@@ -98,7 +99,7 @@ impl LoopDeviceState {
             return error!(EBUSY);
         }
         self.backing_file = Some(backing_file);
-        self.update_size_limit(current_task)?;
+        self.update_size_limit(locked, current_task)?;
         Ok(())
     }
 
@@ -112,9 +113,13 @@ impl LoopDeviceState {
         self.init = info.lo_init;
     }
 
-    fn update_size_limit(&mut self, current_task: &CurrentTask) -> Result<(), Errno> {
+    fn update_size_limit(
+        &mut self,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+    ) -> Result<(), Errno> {
         if let Some(backing_file) = &self.backing_file {
-            let backing_stat = backing_file.node().stat(current_task)?;
+            let backing_stat = backing_file.node().stat(locked, current_task)?;
             self.size_limit = backing_stat.st_size as u64;
         }
         Ok(())
@@ -423,7 +428,7 @@ impl FileOps for LoopDeviceFile {
                 let fd = arg.into();
                 let backing_file = current_task.files.get(fd)?;
                 let mut state = self.device.state.lock();
-                state.set_backing_file(current_task, backing_file)?;
+                state.set_backing_file(locked, current_task, backing_file)?;
                 Ok(SUCCESS)
             }
             LOOP_CLR_FD => {
@@ -498,7 +503,7 @@ impl FileOps for LoopDeviceFile {
             LOOP_SET_CAPACITY => {
                 let mut state = self.device.state.lock();
                 state.check_bound()?;
-                state.update_size_limit(current_task)?;
+                state.update_size_limit(locked, current_task)?;
                 Ok(SUCCESS)
             }
             LOOP_SET_DIRECT_IO => {
@@ -520,7 +525,7 @@ impl FileOps for LoopDeviceFile {
                 check_block_size(config.block_size)?;
                 let mut state = self.device.state.lock();
                 if let Ok(backing_file) = current_task.files.get(fd) {
-                    state.set_backing_file(current_task, backing_file)?;
+                    state.set_backing_file(locked, current_task, backing_file)?;
                 }
                 state.block_size = config.block_size;
                 state.set_info(&config.info);
@@ -876,14 +881,12 @@ mod tests {
         let test_data_path = "/pkg/data/testfile.txt";
         let expected_contents = std::fs::read(test_data_path).unwrap();
 
-        let txt_channel: zx::Channel = fuchsia_fs::file::open_in_namespace_deprecated(
-            test_data_path,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap()
-        .into_channel()
-        .unwrap()
-        .into();
+        let txt_channel: zx::Channel =
+            fuchsia_fs::file::open_in_namespace(test_data_path, fio::PERM_READABLE)
+                .unwrap()
+                .into_channel()
+                .unwrap()
+                .into();
 
         spawn_kernel_and_run(move |locked, current_task| {
             let backing_file =
@@ -913,14 +916,12 @@ mod tests {
             [expected_offset as usize..(expected_offset + expected_size_limit) as usize]
             .to_vec();
 
-        let txt_channel: zx::Channel = fuchsia_fs::file::open_in_namespace_deprecated(
-            &test_data_path,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap()
-        .into_channel()
-        .unwrap()
-        .into();
+        let txt_channel: zx::Channel =
+            fuchsia_fs::file::open_in_namespace(&test_data_path, fio::PERM_READABLE)
+                .unwrap()
+                .into_channel()
+                .unwrap()
+                .into();
 
         spawn_kernel_and_run(move |locked, current_task| {
             let backing_file =

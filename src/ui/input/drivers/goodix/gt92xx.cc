@@ -111,7 +111,7 @@ int Gt92xxDevice::Thread() {
   } __PACKED;
 
   zx_status_t status;
-  zx::time timestamp;
+  zx::time_boot timestamp;
   zxlogf(INFO, "gt92xx: entering irq thread");
   while (true) {
     status = irq_.wait(&timestamp);
@@ -160,7 +160,7 @@ int Gt92xxDevice::Thread() {
         }
         readers_.SendReportToAllReaders(report);
 
-        const zx::duration latency = zx::clock::get_monotonic() - timestamp;
+        const zx::duration latency = zx::clock::get_boot() - timestamp;
 
         total_latency_ += latency;
         report_count_++;

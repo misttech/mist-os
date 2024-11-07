@@ -7,7 +7,6 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
@@ -45,7 +44,10 @@ using OneWayResult = fit::result<fidl::OneWayStatus>;
 }  // namespace
 
 ImagePipeSurfaceDisplay::ImagePipeSurfaceDisplay()
-    : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+    : client_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+      listener_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+
+ImagePipeSurfaceDisplay::~ImagePipeSurfaceDisplay() { listener_loop_.Shutdown(); }
 
 bool ImagePipeSurfaceDisplay::Init() {
   {
@@ -151,26 +153,28 @@ bool ImagePipeSurfaceDisplay::Init() {
       return false;
     }
 
-    display_coordinator_.Bind(std::move(coordinator_client), loop_.dispatcher(), this);
+    display_coordinator_.Bind(std::move(coordinator_client), client_loop_.dispatcher(), this);
     display_coordinator_listener_ = std::make_unique<DisplayCoordinatorListener>(
         std::move(listener_server),
         fit::bind_member(this, &ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged),
-        /* on_vsync= */ nullptr,
-        /* on_client_ownership_change= */ nullptr, *loop_.dispatcher());
+        fit::bind_member(this, &ImagePipeSurfaceDisplay::ControllerOnVsync),
+        /* on_client_ownership_change= */ nullptr, *listener_loop_.dispatcher());
   }
 
   while (!have_display_) {
-    loop_.Run(zx::time::infinite(), true);
+    listener_loop_.Run(zx::time::infinite(), true);
     if (display_connection_exited_)
       return false;
   }
+  listener_loop_.StartThread("ImagePipeSurfaceDisplay-coordinator-listener", nullptr);
+
   return true;
 }
 
 bool ImagePipeSurfaceDisplay::WaitForAsyncMessage() {
   got_message_response_ = false;
   while (!got_message_response_ && !display_connection_exited_) {
-    loop_.Run(zx::time::infinite(), true);
+    client_loop_.Run(zx::time::infinite(), true);
   }
   return !display_connection_exited_;
 }
@@ -211,6 +215,54 @@ void ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged(
   supported_image_properties_ =
       SupportedImageProperties{.formats = {formats.begin(), formats.end()}};
   have_display_ = true;
+}
+
+void ImagePipeSurfaceDisplay::ControllerOnVsync(
+    fuchsia_hardware_display_types::DisplayId, zx::time timestamp,
+    fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+    fuchsia_hardware_display::VsyncAckCookie cookie) {
+  // Minimize the time spent holding the mutex by gathering fences to signal, but not immediately
+  // signaling them.
+  std::vector<zx::event> events_to_signal;
+  {
+    std::scoped_lock lock(mutex_);
+
+    while (!pending_release_fences_.empty() &&
+           applied_config_stamp.value() > pending_release_fences_.front().config_stamp.value()) {
+      events_to_signal.push_back(std::move(pending_release_fences_.front().release_fence));
+      pending_release_fences_.pop();
+    }
+
+    const bool should_disable_vsyncs = pending_release_fences_.empty() ||
+                                       last_applied_config_stamp_ == applied_config_stamp.value();
+    if (should_disable_vsyncs) {
+      receiving_vsyncs_ = false;
+
+      OneWayResult result = display_coordinator_->EnableVsync(false);
+      if (result.is_error()) {
+        // We're probably irrevocably broken at this point, but this can't hurt.
+        receiving_vsyncs_ = true;
+
+        fprintf(stderr, "%s: EnableVsync(false) failed: %s\n", kTag,
+                result.error_value().FormatDescription().c_str());
+      }
+    }
+  }
+
+  // Signal the events accumulated above.
+  for (auto& evt : events_to_signal) {
+    evt.signal(0, ZX_EVENT_SIGNALED);
+  }
+
+  // Non-zero cookies must be acknowledged immediately, others need not be acknowledged.
+  // See `coordinator.fidl`.
+  if (cookie.value() != 0) {
+    OneWayResult result = display_coordinator_->AcknowledgeVsync(cookie.value());
+    if (result.is_error()) {
+      fprintf(stderr, "%s: AcknowledgeVsync failed: %s\n", kTag,
+              result.error_value().FormatDescription().c_str());
+    }
+  }
 }
 
 bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable* pDisp,
@@ -312,10 +364,10 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
   static constexpr uint32_t kImageTilingType = kImageTilingTypeXTiled;
 #elif defined(__aarch64__)
   static constexpr uint32_t kImageTilingType =
-      fuchsia_hardware_display_types::wire::kImageTilingTypeLinear;
+      fuchsia_hardware_display_types::kImageTilingTypeLinear;
 #else
   static constexpr uint32_t kImageTilingType =
-      fuchsia_hardware_display_types::wire::kImageTilingTypeLinear;
+      fuchsia_hardware_display_types::kImageTilingTypeLinear;
   // Unsupported display.
   return false;
 #endif
@@ -618,6 +670,14 @@ bool ImagePipeSurfaceDisplay::CreateImage(VkDevice device, VkLayerDispatchTable*
     }
   }
 
+  // Assert that `CreateImage()` hasn't already been called.  If it has, the current implementation
+  // won't properly clean up resources from previous `CreateImage()` calls.
+  if (layer_id_.value() != fuchsia_hardware_display_types::kInvalidDispId) {
+    fprintf(stderr,
+            "%s: CreateImage() stomping existing layer_id_; see https://fxbug.dev/374201213\n",
+            kTag);
+  }
+
   display_coordinator_->CreateLayer().ThenExactlyOnce(
       [this, &status](fidl::Result<DisplayCoordinator::CreateLayer>& result) {
         if (result.is_ok()) {
@@ -709,33 +769,15 @@ void ImagePipeSurfaceDisplay::PresentImage(
     }
   }
 
-  fuchsia_hardware_display::EventId signal_event_id = {
-      fuchsia_hardware_display_types::kInvalidDispId};
-  if (release_fences.size()) {
-    zx::event event = static_cast<FuchsiaEvent*>(release_fences[0].get())->Take();
-
-    zx_info_handle_basic_t info;
-    zx_status_t status =
-        event.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-    if (status != ZX_OK) {
-      fprintf(stderr, "%s: failed to get event id: %d\n", kTag, status);
-      // Note: don't return on failure, because we want to release fences afterward.
-    } else {
-      signal_event_id.value(info.koid);
-      OneWayResult result = display_coordinator_->ImportEvent({std::move(event), signal_event_id});
-      if (result.is_error()) {
-        fprintf(stderr, "%s: ImportEvent failed for release_fence: %s\n", kTag,
-                result.error_value().FormatDescription().c_str());
-        // Note: don't return on failure, because we want to release fences afterward.
-      }
-    }
-  }
-
   // image_id is also used in DisplayController interface.
-  const fuchsia_hardware_display::ImageId fidl_image_id(image_id);
+  const fuchsia_hardware_display::ImageId fidl_image_id = {image_id};
   {
     OneWayResult result = display_coordinator_->SetLayerImage(
-        {layer_id_, fidl_image_id, wait_event_id, signal_event_id});
+        {{.layer_id = layer_id_,
+          .image_id = fidl_image_id,
+          .wait_event_id = wait_event_id,
+          .signal_event_id = {fuchsia_hardware_display_types::kInvalidDispId}}});
+
     if (result.is_error()) {
       fprintf(stderr, "%s: SetLayerImage failed: %s\n", kTag,
               result.error_value().FormatDescription().c_str());
@@ -743,12 +785,43 @@ void ImagePipeSurfaceDisplay::PresentImage(
     }
   }
 
+  const fuchsia_hardware_display_types::ConfigStamp new_config_stamp = NextConfigStamp();
   {
-    OneWayResult result = display_coordinator_->ApplyConfig();
+    std::scoped_lock lock(mutex_);
+
+    // Apply the config while the mutex is locked.  This avoids a race condition where the vsync for
+    // this config could be received before we enqueue the pending release fences below.
+    fuchsia_hardware_display::CoordinatorApplyConfig3Request request;
+    request.stamp(new_config_stamp);
+    OneWayResult result = display_coordinator_->ApplyConfig3(std::move(request));
     if (result.is_error()) {
       fprintf(stderr, "%s: ApplyConfig failed: %s\n", kTag,
               result.error_value().FormatDescription().c_str());
       // Note: don't return on failure, because we want to release fences afterward.
+    }
+
+    // If there are unsignaled release fences, we want them to be released when the just-applied
+    // config is latched, so we need to start receiving vsync events if we aren't already.
+    const bool should_enable_vsyncs = !pending_release_fences_.empty() && !receiving_vsyncs_;
+
+    if (!release_fences.empty()) {
+      // We only handle 1 fence, so if more are provided then we wouldn't behave as expected.
+      zx::event release_fence = static_cast<FuchsiaEvent*>(release_fences[0].get())->Take();
+      ZX_ASSERT(release_fences.size() == 1);
+      pending_release_fences_.push(
+          {.config_stamp = new_config_stamp, .release_fence = std::move(release_fence)});
+    }
+
+    if (should_enable_vsyncs) {
+      receiving_vsyncs_ = true;
+      OneWayResult result = display_coordinator_->EnableVsync(true);
+      if (result.is_error()) {
+        // We're probably irrevocably broken at this point, but this can't hurt.
+        receiving_vsyncs_ = false;
+
+        fprintf(stderr, "%s: EnableVsync(true) failed: %s\n", kTag,
+                result.error_value().FormatDescription().c_str());
+      }
     }
   }
 
@@ -756,14 +829,6 @@ void ImagePipeSurfaceDisplay::PresentImage(
     OneWayResult result = display_coordinator_->ReleaseEvent(wait_event_id);
     if (result.is_error()) {
       fprintf(stderr, "%s: ReleaseEvent failed for wait event: %s\n", kTag,
-              result.error_value().FormatDescription().c_str());
-    }
-  }
-
-  if (signal_event_id.value() != fuchsia_hardware_display_types::kInvalidDispId) {
-    OneWayResult result = display_coordinator_->ReleaseEvent(signal_event_id);
-    if (result.is_error()) {
-      fprintf(stderr, "%s: ReleaseEvent failed for signal event: %s\n", kTag,
               result.error_value().FormatDescription().c_str());
     }
   }

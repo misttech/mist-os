@@ -85,6 +85,7 @@ pub(crate) mod errno {
         pub(crate) const ENOENT: Errno = const_unwrap_option(Errno::new(-libc::ENOENT));
         pub(crate) const ENOTSUP: Errno = const_unwrap_option(Errno::new(-libc::ENOTSUP));
         pub(crate) const ESRCH: Errno = const_unwrap_option(Errno::new(-libc::ESRCH));
+        pub(crate) const ETOOMANYREFS: Errno = const_unwrap_option(Errno::new(-libc::ETOOMANYREFS));
 
         /// Construct a new [`Errno`] from the given negative integer.
         ///

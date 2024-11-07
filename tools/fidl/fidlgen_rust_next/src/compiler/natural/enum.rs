@@ -38,7 +38,7 @@ pub fn emit_enum<W: Write>(
 
     for member in &e.members {
         let member_name = snake_to_camel(&member.name);
-        let value = &member.constant.value;
+        let value = &member.value.value;
 
         writeln!(out, "{member_name} = {value},")?;
     }
@@ -74,7 +74,7 @@ pub fn emit_enum<W: Write>(
 
     for member in &e.members {
         let member_name = snake_to_camel(&member.name);
-        let value = &member.constant.value;
+        let value = &member.value.value;
 
         writeln!(out, "{name}::{member_name} => {value},")?;
     }
@@ -106,7 +106,7 @@ pub fn emit_enum<W: Write>(
     )?;
 
     for member in &e.members {
-        let value = &member.constant.value;
+        let value = &member.value.value;
         let member_name = snake_to_camel(&member.name);
 
         write!(out, "{value} => {name}::{member_name},")?;

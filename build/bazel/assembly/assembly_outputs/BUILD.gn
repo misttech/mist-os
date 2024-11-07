@@ -56,7 +56,7 @@ if (use_bazel_images_only) {
     deps = []
     if (use_bringup_assembly) {
       deps += [ ":verify_bringup" ]
-    } else if (build_info_product == "core") {
+    } else if (build_info_product == "terminal") {
       deps += [ ":verify_fuchsia" ]
     }
   }

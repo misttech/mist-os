@@ -46,21 +46,27 @@ source_set("amlogic-clk-driver-source") {
     "aml-g12b-blocks.h",
     "aml-gxl-blocks.h",
     "aml-sm1-blocks.h",
+    "meson-cpu-clock.cc",
+    "meson-cpu-clock.h",
+    "meson-pll-clock.cc",
+    "meson-pll-clock.h",
+    "meson-rate-clock.h",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.clock.measure:fuchsia.hardware.clock.measure_cpp",
+    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/amlogic",
     "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/zircon-internal",
   ]
   deps = [
-    "//src/devices/lib/driver",
+    "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/sync",
@@ -68,7 +74,7 @@ source_set("amlogic-clk-driver-source") {
   ]
 }
 
-fuchsia_driver("amlogic-clk-driver") {
+fuchsia_cc_driver("amlogic-clk-driver") {
   output_name = "amlogic-clk"
   deps = [
     ":aml-clk-bind",
@@ -93,16 +99,11 @@ test("amlogic-clk-test-bin") {
   sources = [ "aml-clk-test.cc" ]
   deps = [
     ":amlogic-clk-driver-source",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/fake-platform-device/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
-    "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
     "//src/lib/testing/predicates",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
   ]

@@ -198,7 +198,7 @@ pub async fn start_component(
                     current_task.fs().root(),
                     cwd_path.as_ref(),
                 )?;
-                current_task.fs().chdir(current_task, cwd)?;
+                current_task.fs().chdir(locked, current_task, cwd)?;
 
                 current_task.set_creds(credentials);
 
@@ -486,7 +486,7 @@ impl MountRecord {
             rights,
         )?;
 
-        security::file_system_resolve_security(system_task, &fs)?;
+        security::file_system_resolve_security(locked, system_task, &fs)?;
 
         // Fuchsia doesn't specify mount flags in the incoming namespace, so we need to make
         // up some flags.

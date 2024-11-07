@@ -48,9 +48,10 @@
     offer: [
         {
             directory: [
-                "bin",
+                "base-bin",
                 "blob",
                 "boot",
+                "boot-bin",
                 "build-info",
                 "config-data",
                 "data",
@@ -158,6 +159,7 @@
                 "fuchsia.stash.SecureStore",
                 "fuchsia.stash.Store",
                 "fuchsia.stash.Store2",
+                "fuchsia.sys2.ConfigOverride.root",
                 "fuchsia.sys2.CrashIntrospect",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmExplorer.root",

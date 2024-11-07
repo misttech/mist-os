@@ -53,7 +53,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   for (auto&& [koid, job] : tasks.jobs) {
     TRACE_DURATION("cpu_profiler", "PopulateTargets/EachJob");
-    zx::result<profiler::JobTarget> job_target = profiler::MakeJobTarget(std::move(job));
+    zx::result<profiler::JobTarget> job_target = tree.MakeJobTarget(std::move(job));
     if (job_target.is_error()) {
       // A job might exit in the time between us walking the tree and attempting to find its
       // children. Skip it in this case.
@@ -74,8 +74,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
       // children. Skip it in this case.
       continue;
     }
-    zx::result<profiler::ProcessTarget> process_target =
-        profiler::MakeProcessTarget(std::move(process));
+    zx::result<profiler::ProcessTarget> process_target = tree.MakeProcessTarget(std::move(process));
     if (process_target.is_error()) {
       continue;
     }
@@ -111,12 +110,16 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
     profiler::ProcessTarget process_target{std::move(process), pid,
                                            std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
     FX_LOGS(DEBUG) << "Collecting process modules for process " << pid << ".";
-    elf_search::ForEachModule(process_target.handle,
-                              [&process_target](const elf_search::ModuleInfo& info) {
-                                process_target.unwinder_data->modules.emplace_back(
-                                    info.vaddr, &process_target.unwinder_data->memory,
-                                    unwinder::Module::AddressMode::kProcess);
-                              });
+    zx::result<std::vector<profiler::Module>> modules =
+        tree.GetProcessModules(process_target.handle);
+    if (modules.is_error()) {
+      return zx::error(modules.error_value());
+    }
+    for (const auto& module : *modules) {
+      process_target.unwinder_data->modules.emplace_back(module.vaddr,
+                                                         &process_target.unwinder_data->memory,
+                                                         unwinder::Module::AddressMode::kProcess);
+    }
 
     if (zx::result<> res = tree.AddProcess(std::move(process_target)); res.is_error()) {
       // If the process already exists, then we'll just append to the existing one below
@@ -142,11 +145,11 @@ zx::result<zx_koid_t> ReadElfJobId(const fidl::SyncClient<fuchsia_io::Directory>
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
-  fit::result<fidl::OneWayStatus> res = directory->Open(
-      {{.flags = fuchsia_io::OpenFlags::kRightReadable,
-        .mode = {},
-        .path = "elf/job_id",
-        .object = fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel())}});
+  fit::result<fidl::OneWayStatus> res =
+      directory->Open3({{.path = "elf/job_id",
+                         .flags = fuchsia_io::kPermReadable,
+                         .options = {},
+                         .object = endpoints->server.TakeChannel()}});
   if (res.is_error()) {
     return zx::error(ZX_ERR_IO);
   }
@@ -176,23 +179,17 @@ zx::result<zx_koid_t> MonikerToJobId(const std::string& moniker) {
     FX_LOGS(WARNING) << "Unable to connect to RealmQuery. Attaching by moniker isn't supported!";
     return client_end.take_error();
   }
-  zx::result<fidl::Endpoints<fuchsia_io::Directory>> directory_endpoints =
-      fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (directory_endpoints.is_error()) {
-    FX_LOGS(WARNING) << "Unable to create directory endpoints";
-    return directory_endpoints.take_error();
-  }
-  fidl::SyncClient<fuchsia_io::Directory> directory_client{std::move(directory_endpoints->client)};
+  auto [directory_client_endpoint, directory_server] =
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
+  fidl::SyncClient<fuchsia_io::Directory> directory_client{std::move(directory_client_endpoint)};
   fidl::SyncClient realm_query_client{std::move(*client_end)};
 
-  fidl::Result<fuchsia_sys2::RealmQuery::Open> open_result = realm_query_client->Open({{
-      .moniker = moniker,
-      .dir_type = fuchsia_sys2::OpenDirType::kRuntimeDir,
-      .flags = fuchsia_io::OpenFlags::kRightReadable,
-      .mode = {},
-      .path = ".",
-      .object = fidl::ServerEnd<fuchsia_io::Node>{directory_endpoints->server.TakeChannel()},
-  }});
+  fidl::Result<fuchsia_sys2::RealmQuery::OpenDirectory> open_result =
+      realm_query_client->OpenDirectory({{
+          .moniker = moniker,
+          .dir_type = fuchsia_sys2::OpenDirType::kRuntimeDir,
+          .object = std::move(directory_server),
+      }});
   if (open_result.is_error()) {
     FX_LOGS(WARNING) << "Unable to open the runtime directory of " << moniker << ": "
                      << open_result.error_value();
@@ -482,7 +479,7 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
     }
     for (auto& [koid, handle] : handles->jobs) {
       if (koid == job_id) {
-        zx::result<JobTarget> target = MakeJobTarget(zx::job(handle.release()));
+        zx::result<JobTarget> target = targets_.MakeJobTarget(zx::job(handle.release()));
         if (target.is_error()) {
           FX_PLOGS(ERROR, target.status_value()) << "Failed to make target for: " << moniker;
           return;

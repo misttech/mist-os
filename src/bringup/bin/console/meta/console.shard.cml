@@ -17,6 +17,10 @@
             url: "fuchsia-boot:///console-launcher#meta/console-launcher.cm",
             startup: "eager",
         },
+        {
+            name: "boot-shell-commands",
+            url: "fuchsia-boot:///boot-shell-commands#meta/shell-commands.cm",
+        },
     ],
     offer: [
         {
@@ -81,6 +85,7 @@
         // querying protocols.
         {
             protocol: [
+                "fuchsia.sys2.ConfigOverride.root",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",
@@ -191,9 +196,16 @@
             source_availability: "unknown",
         },
         {
-            directory: "shell-commands-bin",
-            from: "#pkg-cache",
-            as: "bin",
+            directory: "bin",
+            from: "#pkg-shell-commands",
+            as: "base-bin",
+            to: "#console-launcher",
+            source_availability: "unknown",
+        },
+        {
+            directory: "bin",
+            from: "#boot-shell-commands",
+            as: "boot-bin",
             to: "#console-launcher",
             source_availability: "unknown",
         },
@@ -323,6 +335,13 @@
             to: "#console-launcher",
             availability: "optional",
             source_availability: "unknown",
+        },
+    ],
+    expose: [
+        {
+            directory: "bin",
+            from: "#boot-shell-commands",
+            as: "boot-bin",
         },
     ],
 }

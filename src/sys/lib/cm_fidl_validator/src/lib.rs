@@ -33,13 +33,13 @@ impl HasAvailability for fdecl::OfferService {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
+#[cfg(fuchsia_api_level_at_least = "25")]
 macro_rules! get_source_dictionary {
     ($decl:ident) => {
         $decl.source_dictionary.as_ref()
     };
 }
-#[cfg(fuchsia_api_level_less_than = "HEAD")]
+#[cfg(fuchsia_api_level_less_than = "25")]
 macro_rules! get_source_dictionary {
     ($decl:ident) => {
         None
@@ -172,7 +172,7 @@ fn validate_capabilities(
 ) -> Result<(), ErrorList> {
     let mut ctx = ValidationContext::default();
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[cfg(fuchsia_api_level_at_least = "25")]
     ctx.load_dictionary_names(capabilities.iter().filter_map(|capability| match capability {
         fdecl::Capability::Dictionary(dictionary_decl) => Some(dictionary_decl),
         _ => None,
@@ -288,7 +288,7 @@ struct ValidationContext<'a> {
     all_directories: HashSet<&'a str>,
     all_runners: HashSet<&'a str>,
     all_resolvers: HashSet<&'a str>,
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[cfg(fuchsia_api_level_at_least = "25")]
     all_dictionaries: HashMap<&'a str, &'a fdecl::Dictionary>,
 
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -346,6 +346,60 @@ impl<'a> fmt::Display for DependencyNode<'a> {
     }
 }
 
+fn ref_to_dependency_node<'a>(ref_: Option<&'a fdecl::Ref>) -> Option<DependencyNode<'a>> {
+    match ref_? {
+        fdecl::Ref::Self_(_) => Some(DependencyNode::Self_),
+        fdecl::Ref::Child(fdecl::ChildRef { name, collection }) => {
+            Some(DependencyNode::Child(name, collection.as_ref().map(|s| s.as_str())))
+        }
+        fdecl::Ref::Collection(fdecl::CollectionRef { name }) => {
+            Some(DependencyNode::Collection(name))
+        }
+        fdecl::Ref::Capability(fdecl::CapabilityRef { name }) => {
+            Some(DependencyNode::Capability(name))
+        }
+        fdecl::Ref::Framework(_)
+        | fdecl::Ref::Parent(_)
+        | fdecl::Ref::Debug(_)
+        | fdecl::Ref::VoidType(_) => None,
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        fdecl::Ref::Environment(_) => None,
+        _ => None,
+    }
+}
+
+fn generate_dependency_graph<'a>(
+    strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
+    decl: &'a fdecl::Component,
+) {
+    if let Some(uses) = decl.uses.as_ref() {
+        for use_ in uses.iter() {
+            let (dependency_type, source) = match use_ {
+                fdecl::Use::Service(u) => (u.dependency_type, &u.source),
+                fdecl::Use::Protocol(u) => (u.dependency_type, &u.source),
+                fdecl::Use::Directory(u) => (u.dependency_type, &u.source),
+                fdecl::Use::EventStream(u) => (Some(fdecl::DependencyType::Strong), &u.source),
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                fdecl::Use::Runner(u) => (Some(fdecl::DependencyType::Strong), &u.source),
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                fdecl::Use::Config(u) => (Some(fdecl::DependencyType::Strong), &u.source),
+                // Storage can only be used from parent, which we don't track.
+                fdecl::Use::Storage(_) => continue,
+                _ => continue,
+            };
+            if dependency_type != Some(fdecl::DependencyType::Strong) {
+                continue;
+            }
+            if let Some(fdecl::Ref::Self_(_)) = &source {
+                continue;
+            }
+            if let Some(source_node) = ref_to_dependency_node(source.as_ref()) {
+                strong_dependencies.add_edge(source_node, DependencyNode::Self_);
+            }
+        }
+    }
+}
+
 impl<'a> ValidationContext<'a> {
     fn validate(
         mut self,
@@ -373,7 +427,7 @@ impl<'a> ValidationContext<'a> {
 
         // Validate "capabilities" and build the set of all capabilities.
         if let Some(capabilities) = decl.capabilities.as_ref() {
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            #[cfg(fuchsia_api_level_at_least = "25")]
             self.load_dictionary_names(capabilities.iter().filter_map(
                 |capability| match capability {
                     fdecl::Capability::Dictionary(dictionary_decl) => Some(dictionary_decl),
@@ -431,6 +485,7 @@ impl<'a> ValidationContext<'a> {
         self.validate_config(decl.config.as_ref(), decl.uses.as_ref());
 
         // Check that there are no strong cyclical dependencies
+        generate_dependency_graph(&mut self.strong_dependencies, &decl);
         if let Err(e) = self.strong_dependencies.topological_sort() {
             self.errors.push(Error::dependency_cycle(e.format_cycle()));
         }
@@ -690,7 +745,7 @@ impl<'a> ValidationContext<'a> {
                     self.errors.push(Error::CapabilityMustBeBuiltin(DeclType::EventStream))
                 }
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            #[cfg(fuchsia_api_level_at_least = "25")]
             fdecl::Capability::Dictionary(dictionary) => {
                 self.validate_dictionary_decl(&dictionary);
             }
@@ -1032,14 +1087,7 @@ impl<'a> ValidationContext<'a> {
         dependency_type: Option<&fdecl::DependencyType>,
         availability: Option<&'a fdecl::Availability>,
     ) {
-        if let Some(dep) =
-            self.validate_use_source(decl, source, source_dictionary, dependency_type)
-        {
-            self.add_strong_dep(
-                self.source_dependency_from_ref(source_name, source_dictionary, source),
-                Some(dep),
-            );
-        }
+        self.validate_use_source(decl, source, source_dictionary);
 
         check_name(source_name, decl, "source_name", &mut self.errors);
         if source_dictionary.is_some() {
@@ -1076,28 +1124,21 @@ impl<'a> ValidationContext<'a> {
         decl: DeclType,
         source: Option<&'a fdecl::Ref>,
         source_dictionary: Option<&'a String>,
-        dependency_type: Option<&fdecl::DependencyType>,
-    ) -> Option<DependencyNode<'a>> {
+    ) {
         match (source, source_dictionary) {
             // These sources support source_dictionary.
             (Some(fdecl::Ref::Parent(_)), _) => {}
             (Some(fdecl::Ref::Self_(_)), _) => {}
             (Some(fdecl::Ref::Child(child)), _) => {
-                if self.validate_child_ref(decl, "source", &child, OfferType::Static)
-                    && dependency_type == Some(&fdecl::DependencyType::Strong)
-                {
-                    return Some(DependencyNode::Self_);
-                }
+                self.validate_child_ref(decl, "source", &child, OfferType::Static);
+                return;
             }
             // These sources don't.
             (Some(fdecl::Ref::Framework(_)), None) => {}
             (Some(fdecl::Ref::Debug(_)), None) => {}
             (Some(fdecl::Ref::Capability(c)), None) => {
-                if self.validate_source_capability(&c, decl, "source")
-                    && dependency_type == Some(&fdecl::DependencyType::Strong)
-                {
-                    return Some(DependencyNode::Self_);
-                }
+                self.validate_source_capability(&c, decl, "source");
+                return;
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             (Some(fdecl::Ref::Environment(_)), None) => {}
@@ -1106,7 +1147,6 @@ impl<'a> ValidationContext<'a> {
             // Any combination that was not recognized above must be invalid.
             (_, _) => self.errors.push(Error::invalid_field(decl, "source")),
         }
-        None
     }
 
     fn validate_child_decl(&mut self, child: &'a fdecl::Child) {
@@ -1500,7 +1540,7 @@ impl<'a> ValidationContext<'a> {
     // Dictionaries can reference other dictionaries in the same manifest, so before processing any
     // dictionary declarations this function should be called to do a first pass to pre-populate
     // the dictionary map.
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[cfg(fuchsia_api_level_at_least = "25")]
     fn load_dictionary_names(&mut self, dictionaries: impl Iterator<Item = &'a fdecl::Dictionary>) {
         for dictionary in dictionaries {
             let decl = DeclType::Dictionary;
@@ -1514,7 +1554,7 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[cfg(fuchsia_api_level_at_least = "25")]
     fn validate_dictionary_decl(&mut self, dictionary: &'a fdecl::Dictionary) {
         let decl = DeclType::Dictionary;
         if let Some(path) = dictionary.source_path.as_ref() {
@@ -1864,7 +1904,7 @@ impl<'a> ValidationContext<'a> {
                     prev_target_ids,
                 );
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            #[cfg(fuchsia_api_level_at_least = "25")]
             fdecl::Expose::Dictionary(e) => {
                 let decl = DeclType::ExposeDictionary;
                 self.validate_expose_fields(
@@ -2220,7 +2260,7 @@ impl<'a> ValidationContext<'a> {
             fdecl::Offer::EventStream(e) => {
                 self.validate_event_stream_offer_fields(e, offer_type);
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+            #[cfg(fuchsia_api_level_at_least = "25")]
             fdecl::Offer::Dictionary(o) => {
                 let decl = DeclType::OfferDictionary;
                 self.validate_offer_fields(
@@ -2589,7 +2629,7 @@ impl<'a> ValidationContext<'a> {
             }
             Some(fdecl::Ref::Capability(c)) => {
                 // Only offers to dictionary capabilities are valid.
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 if let Some(d) = self.all_dictionaries.get(&c.name.as_str()) {
                     if d.source_path.is_some() {
                         // If `source_path` is present that means this is an offer into a
@@ -2599,7 +2639,7 @@ impl<'a> ValidationContext<'a> {
                 } else {
                     self.errors.push(Error::invalid_field(decl, "target"));
                 }
-                #[cfg(not(fuchsia_api_level_at_least = "HEAD"))]
+                #[cfg(not(fuchsia_api_level_at_least = "25"))]
                 {
                     let _ = c;
                     self.errors.push(Error::invalid_field(decl, "target"));
@@ -2699,7 +2739,7 @@ impl<'a> ValidationContext<'a> {
         };
         match source_dictionary {
             Some(source_dictionary) => {
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 {
                     use cm_types::IterablePath;
                     if let Ok(path) = cm_types::RelativePath::new(source_dictionary) {
@@ -2715,7 +2755,7 @@ impl<'a> ValidationContext<'a> {
                         }
                     }
                 }
-                #[cfg(not(fuchsia_api_level_at_least = "HEAD"))]
+                #[cfg(not(fuchsia_api_level_at_least = "25"))]
                 let _ = source_dictionary;
             }
             None => {
@@ -2746,7 +2786,7 @@ impl<'a> ValidationContext<'a> {
                 Some(DependencyNode::Capability(name.as_str()))
             }
             fdecl::Ref::Self_(_) => {
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 if let Some(source_dictionary) = source_dictionary {
                     let root_dict = source_dictionary.split('/').next().unwrap();
                     if self.all_dictionaries.contains_key(root_dict) {
@@ -2765,7 +2805,7 @@ impl<'a> ValidationContext<'a> {
                 } else {
                     Some(DependencyNode::Self_)
                 }
-                #[cfg(not(fuchsia_api_level_at_least = "HEAD"))]
+                #[cfg(not(fuchsia_api_level_at_least = "25"))]
                 {
                     let _ = source_dictionary;
                     if let Some(source_name) = source_name {
@@ -2835,7 +2875,7 @@ impl<'a> ValidationContext<'a> {
         &self.all_resolvers
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[cfg(fuchsia_api_level_at_least = "25")]
     fn dictionary_checker(&self) -> &dyn Container {
         &self.all_dictionaries
     }

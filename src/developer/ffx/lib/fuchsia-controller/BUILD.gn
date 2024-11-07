@@ -24,8 +24,6 @@ gidl("conformance_tests_py") {
 }
 
 python_host_test("fuchsia_controller_conformance_tests") {
-  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
-  enable_mypy = false
   libraries = [
     ":fidl_bindings",
     ":fuchsia_controller_py",
@@ -214,7 +212,7 @@ group("tests") {
   }
 }
 
-group("e2e_tests") {
+group("host_tests") {
   testonly = true
   deps = []
 

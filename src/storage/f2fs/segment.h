@@ -393,7 +393,8 @@ class SegmentManager {
   void SetInuse(uint32_t segno) __TA_REQUIRES(segmap_lock_);
   void SetTestAndFree(uint32_t segno) __TA_EXCLUDES(segmap_lock_);
   void SetTestAndInuse(uint32_t segno) __TA_EXCLUDES(segmap_lock_);
-  int GetSsrSegment(CursegType type) __TA_EXCLUDES(seglist_lock_) __TA_REQUIRES(sentry_lock_);
+  zx::result<> GetSsrSegment(CursegType type) __TA_EXCLUDES(seglist_lock_)
+      __TA_REQUIRES(sentry_lock_);
   bool IsCurSeg(uint32_t segno) {
     return (segno == CURSEG_I(CursegType::kCursegHotData)->segno) ||
            (segno == CURSEG_I(CursegType::kCursegWarmData)->segno) ||

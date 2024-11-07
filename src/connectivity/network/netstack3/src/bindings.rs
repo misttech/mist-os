@@ -655,9 +655,10 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
                 );
                 self.notify_address_update(&device, addr.into(), state);
             }
-            IpDeviceEvent::EnabledChanged { device, ip_enabled } => {
-                self.notify_interface_update(&device, InterfaceUpdate::OnlineChanged(ip_enabled))
-            }
+            IpDeviceEvent::EnabledChanged { device, ip_enabled } => self.notify_interface_update(
+                &device,
+                InterfaceUpdate::IpEnabledChanged { version: I::VERSION, enabled: ip_enabled },
+            ),
             IpDeviceEvent::AddressPropertiesChanged { device, addr, valid_until } => self
                 .notify_interface_update(
                     &device,
@@ -1021,7 +1022,6 @@ impl Netstack {
                 port_class: fidl_fuchsia_net_interfaces_ext::PortClass::Loopback,
             },
         );
-        events.notify(InterfaceUpdate::OnlineChanged(true)).expect("interfaces worker not running");
 
         let loopback_info = LoopbackInfo {
             static_common_info: StaticCommonInfo { authorization_token: zx::Event::create() },

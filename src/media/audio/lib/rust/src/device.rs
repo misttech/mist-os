@@ -662,13 +662,10 @@ pub async fn list_devfs(
 
     for device_type in TYPES {
         let subdir_name = device_type.devfs_class();
-        let subdir = fuchsia_fs::directory::open_directory_deprecated(
-            dev_class,
-            subdir_name,
-            fio::OpenFlags::empty(),
-        )
-        .await
-        .map_err(|err| ListDevfsError::Open { name: subdir_name.to_string(), err })?;
+        let subdir =
+            fuchsia_fs::directory::open_directory(dev_class, subdir_name, fio::Flags::empty())
+                .await
+                .map_err(|err| ListDevfsError::Open { name: subdir_name.to_string(), err })?;
         let entries = fuchsia_fs::directory::readdir(&subdir)
             .await
             .map_err(|err| ListDevfsError::Readdir { name: subdir_name.to_string(), err })?;

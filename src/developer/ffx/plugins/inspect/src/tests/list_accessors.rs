@@ -13,7 +13,7 @@ async fn test_list_accessors() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = ListAccessorsCommand {};
     run_command(
-        setup_fake_rcs(),
+        setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![]),
         ListAccessorsCommand::from(cmd),
         &mut writer,

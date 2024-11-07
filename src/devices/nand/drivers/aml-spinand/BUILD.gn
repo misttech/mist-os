@@ -5,7 +5,7 @@
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
-fuchsia_driver("aml-spinand-driver") {
+fuchsia_cc_driver("aml-spinand-driver") {
   output_name = "aml-spinand"
   deps = [
     ":common",

@@ -5,6 +5,7 @@
 use crate::device::DeviceTag;
 use crate::environment::{Container, Environment, Filesystem, FilesystemLauncher, FxfsContainer};
 use anyhow::{anyhow, Context, Error, Result};
+use fidl_fuchsia_update_verify as fupdate;
 use fs_management::filesystem::ServingMultiVolumeFilesystem;
 use fuchsia_async::TimeoutExt;
 use futures::lock::Mutex;
@@ -15,27 +16,46 @@ use zx::{self as zx, MonotonicDuration};
 
 /// Make a new vfs service node that implements fuchsia.update.verify.BlobfsVerifier
 pub fn blobfs_verifier_service() -> Arc<service::Service> {
-    service::host(
-        move |mut stream: fidl_fuchsia_update_verify::BlobfsVerifierRequestStream| async move {
-            while let Some(request) = stream.next().await {
-                match request {
-                    Ok(fidl_fuchsia_update_verify::BlobfsVerifierRequest::Verify {
-                        responder,
-                        ..
-                    }) => {
-                        // TODO(https://fxbug.dev/42077105): Implement by calling out to Fxfs' blob volume.
-                        responder.send(Ok(())).unwrap_or_else(|e| {
-                            tracing::error!("failed to send Verify response. error: {:?}", e);
-                        });
-                    }
-                    Err(e) => {
-                        tracing::error!("BlobfsVerifier server failed: {:?}", e);
-                        return;
-                    }
+    service::host(move |mut stream: fupdate::BlobfsVerifierRequestStream| async move {
+        while let Some(request) = stream.next().await {
+            match request {
+                Ok(fupdate::BlobfsVerifierRequest::Verify { responder, .. }) => {
+                    // TODO(https://fxbug.dev/42077105): Implement by calling out
+                    // to Fxfs' blob volume.
+                    responder.send(Ok(())).unwrap_or_else(|e| {
+                        tracing::error!("failed to send Verify response. error: {:?}", e);
+                    });
+                }
+                Err(e) => {
+                    tracing::error!("BlobfsVerifier server failed: {:?}", e);
+                    return;
                 }
             }
-        },
-    )
+        }
+    })
+}
+
+/// Make a new vfs service node that implements fuchsia.update.ComponentOtaHealthCheck
+pub fn ota_health_check_service() -> Arc<service::Service> {
+    service::host(move |mut stream: fupdate::ComponentOtaHealthCheckRequestStream| async move {
+        while let Some(request) = stream.next().await {
+            match request {
+                Ok(fupdate::ComponentOtaHealthCheckRequest::GetHealthStatus {
+                    responder, ..
+                }) => {
+                    // TODO(https://fxbug.dev/42077105): Implement by calling out
+                    // to Fxfs' blob volume.
+                    responder.send(fupdate::HealthStatus::Healthy).unwrap_or_else(|e| {
+                        tracing::error!("failed to send GetHealthStatus response. error: {:?}", e);
+                    });
+                }
+                Err(e) => {
+                    tracing::error!("ComponentOtaHealthCheck server failed: {:?}", e);
+                    return;
+                }
+            }
+        }
+    })
 }
 
 const FIND_PARTITION_DURATION: MonotonicDuration = MonotonicDuration::from_seconds(10);

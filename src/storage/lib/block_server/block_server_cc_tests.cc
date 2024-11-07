@@ -51,7 +51,7 @@ class TestInterface : public Interface {
     }).detach();
   }
 
-  void OnRequests(Session& session, std::span<const Request> requests) override {
+  void OnRequests(const Session& session, std::span<Request> requests) override {
     for (const Request& request : requests) {
       switch (request.operation.tag) {
         case Operation::Tag::Read:
@@ -198,6 +198,43 @@ TEST(BlockServer, AsyncTermination) {
   });
 
   sync_completion_wait(&completion, ZX_TIME_INFINITE);
+}
+
+TEST(BlockServer, FailedOnNewSession) {
+  class TestInterfaceWithFailedOnNewSession : public TestInterface {
+   public:
+    void OnNewSession(Session session) override {
+      // Do nothing.
+    }
+  };
+
+  fidl::ServerEnd<fvolume::Volume> server_end;
+  zx::result client_end = fidl::CreateEndpoints(&server_end);
+  ASSERT_EQ(client_end.status_value(), ZX_OK);
+
+  TestInterfaceWithFailedOnNewSession test_interface;
+
+  std::unique_ptr<block_client::RemoteBlockDevice> client;
+
+  {
+    BlockServer block_server(
+        PartitionInfo{
+            .start_block = 0,
+            .block_count = kBlocks,
+            .block_size = kBlockSize,
+            .type_guid = {1, 2, 3, 4},
+            .instance_guid = {5, 6, 7, 8},
+            .name = "partition",
+        },
+        &test_interface);
+
+    block_server.Serve(std::move(server_end));
+
+    auto client_result = block_client::RemoteBlockDevice::Create(*std::move(client_end));
+    EXPECT_EQ(client_result.status_value(), ZX_ERR_PEER_CLOSED);
+  }
+
+  EXPECT_EQ(test_interface.threads_running(), 0);
 }
 
 TEST(BlockServer, FullFifo) {
@@ -354,6 +391,25 @@ TEST(BlockServer, Group) {
   EXPECT_EQ(response.status, ZX_OK);
   EXPECT_EQ(response.group, 1234);
   EXPECT_EQ(response.reqid, 999u);
+}
+
+TEST(BlockServer, SplitRequest) {
+  Request request = {.operation = {.tag = Operation::Tag::Read,
+                                   .read = {
+                                       .device_block_offset = 10,
+                                       .block_count = 20,
+                                       .vmo_offset = 4096,
+                                   }}};
+
+  Request head = SplitRequest(request, 5, 512);
+
+  EXPECT_EQ(head.operation.read.device_block_offset, 10u);
+  EXPECT_EQ(head.operation.read.block_count, 5u);
+  EXPECT_EQ(head.operation.read.vmo_offset, 4096u);
+
+  EXPECT_EQ(request.operation.read.device_block_offset, 15u);
+  EXPECT_EQ(request.operation.read.block_count, 15u);
+  EXPECT_EQ(request.operation.read.vmo_offset, 6656u);
 }
 
 }  // namespace

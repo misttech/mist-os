@@ -23,7 +23,7 @@ use packet_formats::igmp::messages::{
 };
 use packet_formats::igmp::{IgmpMessage, IgmpPacketBuilder, MessageType};
 use packet_formats::ip::Ipv4Proto;
-use packet_formats::ipv4::options::{Ipv4Option, Ipv4OptionData};
+use packet_formats::ipv4::options::Ipv4Option;
 use packet_formats::ipv4::{
     Ipv4OptionsTooLongError, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions,
 };
@@ -171,7 +171,7 @@ impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::Dev
                 return;
             }
         } {
-            error!("Error occurred when handling IGMPv2 message: {}", e);
+            debug!("Error occurred when handling IGMPv2 message: {}", e);
         }
     }
 }
@@ -403,7 +403,7 @@ where
         IgmpPacketBuilder::<EmptyBuf, M>::new_with_resp_time(group_addr.get(), max_resp_time);
     let builder = match Ipv4PacketBuilderWithOptions::new(
         Ipv4PacketBuilder::new(src_ip, dst_ip, 1, Ipv4Proto::Igmp),
-        &[Ipv4Option { copied: true, data: Ipv4OptionData::RouterAlert { data: 0 } }],
+        &[Ipv4Option::RouterAlert { data: 0 }],
     ) {
         Err(Ipv4OptionsTooLongError) => return Err(IgmpError::SendFailure { addr: *group_addr }),
         Ok(builder) => builder,

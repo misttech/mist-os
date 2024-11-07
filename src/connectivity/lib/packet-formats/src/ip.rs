@@ -444,3 +444,96 @@ create_protocol_enum!(
         _,  "IPv6 EXTENSION HEADER {}";
     }
 );
+
+/// An IP fragment offset.
+///
+/// Represents a fragment offset found in an IP header. The offset is expressed
+/// in units of 8 octets and must be smaller than `1 << 13`.
+///
+/// This is valid for both IPv4 ([RFC 791 Section 3.1]) and IPv6 ([RFC 8200
+/// Section 4.5]) headers.
+///
+/// [RFC 791 Section 3.1]: https://datatracker.ietf.org/doc/html/rfc791#section-3.1
+/// [RFC 8200 Section 4.5]: https://datatracker.ietf.org/doc/html/rfc8200#section-4.5
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Copy, Clone)]
+pub struct FragmentOffset(u16);
+
+impl FragmentOffset {
+    /// The zero fragment offset.
+    pub const ZERO: FragmentOffset = FragmentOffset(0);
+
+    /// Creates a new offset from a raw u16 value.
+    ///
+    /// Returns `None` if `offset` is not smaller than `1 << 13`.
+    pub const fn new(offset: u16) -> Option<Self> {
+        if offset < 1 << 13 {
+            Some(Self(offset))
+        } else {
+            None
+        }
+    }
+
+    /// Creates a new offset from a raw u16 value masking to only the lowest 13
+    /// bits.
+    pub(crate) fn new_with_lsb(offset: u16) -> Self {
+        Self(offset & 0x1FFF)
+    }
+
+    /// Creates a new offset from a raw u16 value masking to only the highest 13
+    /// bits.
+    pub(crate) fn new_with_msb(offset: u16) -> Self {
+        Self(offset >> 3)
+    }
+
+    /// Creates a new offset from a raw bytes value.
+    ///
+    /// Returns `None` if `offset_bytes` is not a multiple of `8`.
+    pub const fn new_with_bytes(offset_bytes: u16) -> Option<Self> {
+        if offset_bytes & 0x7 == 0 {
+            // NOTE: check for length above ensures this fits in a u16.
+            Some(Self(offset_bytes >> 3))
+        } else {
+            None
+        }
+    }
+
+    /// Consumes `self` returning the raw offset value in 8-octets multiples.
+    pub const fn into_raw(self) -> u16 {
+        self.0
+    }
+
+    /// Consumes `self` returning the total number of bytes represented by this
+    /// offset.
+    ///
+    /// Equal to 8 times the raw offset value.
+    pub fn into_bytes(self) -> u16 {
+        // NB: Shift can't overflow because `FragmentOffset` is guaranteed to
+        // fit in 13 bits.
+        self.0 << 3
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fragment_offset_raw() {
+        assert_eq!(FragmentOffset::new(1), Some(FragmentOffset(1)));
+        assert_eq!(FragmentOffset::new(1 << 13), None);
+    }
+
+    #[test]
+    fn fragment_offset_bytes() {
+        assert_eq!(FragmentOffset::new_with_bytes(0), Some(FragmentOffset(0)));
+        for i in 1..=7 {
+            assert_eq!(FragmentOffset::new_with_bytes(i), None);
+        }
+        assert_eq!(FragmentOffset::new_with_bytes(8), Some(FragmentOffset(1)));
+        assert_eq!(FragmentOffset::new_with_bytes(core::u16::MAX), None);
+        assert_eq!(
+            FragmentOffset::new_with_bytes(core::u16::MAX & !0x7),
+            Some(FragmentOffset((1 << 13) - 1)),
+        );
+    }
+}

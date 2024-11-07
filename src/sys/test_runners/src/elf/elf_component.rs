@@ -609,11 +609,11 @@ mod tests {
     use std::sync::Weak;
 
     fn create_ns_from_current_ns(
-        dir_paths: Vec<(&str, fio::OpenFlags)>,
+        dir_paths: Vec<(&str, fio::Flags)>,
     ) -> Result<Namespace, NamespaceError> {
         let mut ns = vec![];
         for (path, permission) in dir_paths {
-            let chan = fuchsia_fs::directory::open_in_namespace_deprecated(path, permission)
+            let chan = fuchsia_fs::directory::open_in_namespace(path, permission)
                 .unwrap()
                 .into_channel()
                 .unwrap()
@@ -636,10 +636,8 @@ mod tests {
     }
 
     async fn sample_test_component() -> Result<Arc<Component>, Error> {
-        let ns = create_ns_from_current_ns(vec![(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )])?;
+        let ns =
+            create_ns_from_current_ns(vec![("/pkg", fio::PERM_READABLE | fio::PERM_EXECUTABLE)])?;
 
         Ok(Arc::new(
             Component::create_for_tests(BuilderArgs {

@@ -316,7 +316,7 @@ impl<B: SplitByteSlice> MessageBody for OriginalPacket<B> {
     }
 }
 
-impl<B: SplitByteSlice, O: for<'a> OptionsImpl<'a>> MessageBody for Options<B, O> {
+impl<B: SplitByteSlice, O: OptionsImpl> MessageBody for Options<B, O> {
     type B = B;
     fn parse(bytes: B) -> ParseResult<Options<B, O>> {
         Self::parse(bytes).map_err(|_e| debug_err!(ParseError::Format, "unable to parse options"))

@@ -6,15 +6,19 @@ library fuchsia.device;
 using zx;
 
 /// Maxmium length for a device name
+@available(added=HEAD)
 const MAX_DEVICE_NAME_LEN uint64 = 32;
 /// Maximum length of a device path
+@available(added=HEAD)
 const MAX_DEVICE_PATH_LEN uint64 = 1024;
 /// Maxmium length for a driver name
+@available(added=HEAD)
 const MAX_DRIVER_NAME_LEN uint64 = 32;
 /// Maximum length for a driver path
+@available(added=HEAD)
 const MAX_DRIVER_PATH_LEN uint64 = 1024;
 
-@deprecated("devices will be services in the future")
+@available(added=7, deprecated=7, note="Devices will be services in the future.")
 type DeviceSignal = strict bits : uint32 {
     /// Indicates the device is ready for reading.
     READABLE = 0x01000000; // ZX_USER_SIGNAL_0
@@ -37,6 +41,7 @@ type DeviceSignal = strict bits : uint32 {
 /// Please use that version of this protocol.
 /// Also, see //sdk/fidl/fuchsia.device.fs/README.md
 /// for future plans for DevFS.
+@available(added=HEAD)
 closed protocol Controller {
     /// Connect to the underlying device's FIDL protocol.
     /// This connection will not be multiplexed with fuchsia.device.Controller

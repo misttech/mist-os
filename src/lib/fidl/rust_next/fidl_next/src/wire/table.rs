@@ -12,7 +12,7 @@ use crate::{
 #[repr(C)]
 pub struct WireTable<'buf> {
     len: u64_le,
-    ptr: WirePointer<'buf, WireEnvelope<'buf>>,
+    ptr: WirePointer<'buf, WireEnvelope>,
 }
 
 impl<'buf> WireTable<'buf> {
@@ -29,14 +29,14 @@ impl<'buf> WireTable<'buf> {
     pub fn decode_with<D: Decoder<'buf> + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
-        f: impl Fn(i64, Slot<'_, WireEnvelope<'buf>>, &mut D) -> Result<(), DecodeError>,
+        f: impl Fn(i64, Slot<'_, WireEnvelope>, &mut D) -> Result<(), DecodeError>,
     ) -> Result<(), DecodeError> {
         munge!(let Self { len, mut ptr } = slot);
 
         let len = len.to_native();
         if WirePointer::is_encoded_present(ptr.as_mut())? {
-            let mut envelopes = decoder.take_slice_slot::<WireEnvelope<'_>>(len as usize)?;
-            let envelopes_ptr = envelopes.as_mut_ptr().cast::<WireEnvelope<'_>>();
+            let mut envelopes = decoder.take_slice_slot::<WireEnvelope>(len as usize)?;
+            let envelopes_ptr = envelopes.as_mut_ptr().cast::<WireEnvelope>();
 
             for i in 0..len as usize {
                 let mut envelope = envelopes.index(i);
@@ -55,7 +55,7 @@ impl<'buf> WireTable<'buf> {
     }
 
     /// Returns a reference to the envelope for the given ordinal, if any.
-    pub fn get(&self, ordinal: usize) -> Option<&WireEnvelope<'buf>> {
+    pub fn get(&self, ordinal: usize) -> Option<&WireEnvelope> {
         if ordinal == 0 || ordinal > self.len.to_native() as usize {
             return None;
         }
@@ -65,7 +65,7 @@ impl<'buf> WireTable<'buf> {
     }
 
     /// Returns a mutable reference to the envelope for the given ordinal, if any.
-    pub fn get_mut(&mut self, ordinal: usize) -> Option<&mut WireEnvelope<'buf>> {
+    pub fn get_mut(&mut self, ordinal: usize) -> Option<&mut WireEnvelope> {
         if ordinal == 0 || ordinal > self.len.to_native() as usize {
             return None;
         }

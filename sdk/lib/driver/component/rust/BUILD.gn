@@ -40,6 +40,8 @@ rustc_library("rust") {
     "src/incoming.rs",
     "src/lib.rs",
     "src/macros.rs",
+    "src/node.rs",
+    "src/node/properties.rs",
     "src/server.rs",
   ]
 }

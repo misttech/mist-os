@@ -159,7 +159,12 @@ impl BpfFs {
 }
 
 impl FileSystemOps for BpfFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(BPF_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
@@ -168,6 +173,7 @@ impl FileSystemOps for BpfFs {
 
     fn rename(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,

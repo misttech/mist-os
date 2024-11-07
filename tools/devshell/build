@@ -73,6 +73,7 @@ source "${_script_dir}/lib/vars.sh" || exit 1
 source "${_script_dir}/lib/build_api_client.sh" || exit $?
 fx-config-read
 
+# shellcheck source=/dev/null
 source "${_script_dir}/lib/metrics.sh" || exit $?
 
 shopt -s extglob
@@ -120,6 +121,12 @@ function main {
   local log_file is_logging fint_params_path
   local has_ninja_options no_checks
   local verbose
+
+  # When tracing, increase verbosity.
+  if [[ -o xtrace ]]; then
+    verbose="true"
+  fi
+
   is_logging=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -297,40 +304,73 @@ function main {
     exec > >(tee -a "${log_file}") 2>&1
   fi
 
-  # A change to any of these might mean things are now done differently enough
-  # that ninja's automatic re-gen rule might not be triggered or might not work
-  # properly if it is triggered.  So preemptively force a re-gen if that seems
-  # like a plausible possibility.
-  local -r landmines=("$PREBUILT_GN"
-                      "$FUCHSIA_DIR/tools/devshell/build"
-                      "$FUCHSIA_DIR/tools/devshell/lib/vars.sh"
-                      "${FUCHSIA_BUILD_DIR}/args.gn"
-                     )
-  local mine
-  for mine in "${landmines[@]}"; do
-    if [[ "$mine" -nt "${FUCHSIA_BUILD_DIR}/build.ninja" && -z "${no_checks}" ]]; then
-      if [[ "${is_logging}" = true ]]; then
-        echo -e "\\n------ RUNNING gn gen ------"
-      fi
-      echo >&2 "Re-running gn gen first ($mine changed)"
-      fx-gen || return
-      break
-    fi
-  done
+  # A list of reasons to run `fx-gen` when needed.
+  local need_fx_gen_for=()
 
-  if [[ ! -d "$FUCHSIA_BUILD_DIR" ]]; then
-    if [[ "${is_logging}" = true ]]; then
-      echo -e "\\n------ RUNNING gn gen ------"
+  if [[ -z "${no_checks}" ]]; then
+    # A change to any of these might mean things are now done differently enough
+    # that ninja's automatic re-gen rule might not be triggered or might not work
+    # properly if it is triggered.  So preemptively force a re-gen if that seems
+    # like a plausible possibility.
+    local -r landmines=("$PREBUILT_GN"
+                        "$FUCHSIA_DIR/tools/devshell/build"
+                        "$FUCHSIA_DIR/tools/devshell/lib/vars.sh"
+                        "${FUCHSIA_BUILD_DIR}/args.gn"
+                      )
+    local mine
+    for mine in "${landmines[@]}"; do
+      if [[ "$mine" -nt "${FUCHSIA_BUILD_DIR}/build.ninja" ]]; then
+        need_fx_gen_for+=("$mine changed")
+      fi
+    done
+
+    if [[ ! -d "$FUCHSIA_BUILD_DIR" ]]; then
+      need_fx_gen_for+=("$FUCHSIA_BUILD_DIR missing")
     fi
-    echo >&2 "Re-running gn gen first (missing $FUCHSIA_BUILD_DIR)"
-    fx-gen || return
-  elif [[ -z "${no_checks}" ]]; then
+
     # We have a build directory, execute force clean checker, usually a no-op
-    "$FUCHSIA_DIR/scripts/fuchsia-vendored-python" \
+    local _verbose_opt=()
+    if [[ -n "$verbose" ]]; then
+      _verbose_opt=(--verbose)
+    fi
+    local -r force_clean_status_file="$(mktemp --tmpdir force_clean_status.XXXXXX)"
+    "$FUCHSIA_DIR/scripts/fuchsia-vendored-python" -S \
       "$FUCHSIA_DIR/build/force_clean/force_clean_if_needed.py" \
+      "${_verbose_opt[@]}" \
       --gn-bin "$PREBUILT_GN" \
       --checkout-dir "$FUCHSIA_DIR" \
-      --build-dir "$FUCHSIA_BUILD_DIR"
+      --build-dir "$FUCHSIA_BUILD_DIR" \
+      --output-status="${force_clean_status_file}" || return "$?"
+
+    local force_clean_status
+    force_clean_status="$(< "${force_clean_status_file}")"
+    rm "${force_clean_status_file}"
+
+    if [[ "${is_logging}" == true ]]; then
+      echo "force_clean status: ${force_clean_status}"
+    fi
+    case "${force_clean_status}" in
+      clean:*)
+        need_fx_gen_for+=("${force_clean_status}")
+        ;;
+    esac
+
+    if [[ "${#need_fx_gen_for[@]}" != 0 ]]; then
+      if [[ "${is_logging}" == true ]]; then
+        echo -e "\\n------ RUNNING gn gen ------"
+      fi
+      if [[ "${#need_fx_gen_for[@]}" == 1 ]]; then
+        # A single reason goes on a single line.
+        echo >&2 "Re-running 'fx gen' first (${need_fx_gen_for[*]})"
+      else
+        # For multiple reasons, print one per line before the header.
+        printf >&2 "Re-running 'fx gen' first:\n\n"
+        for reason in "${need_fx_gen_for[@]}"; do
+          printf >&2 "  %s\n" "$reason"
+        done
+      fi
+      fx-gen || return "$?"
+    fi
   fi
 
   local status
@@ -370,7 +410,7 @@ function main {
     local rbe_wrapper=()
     if fx-rbe-enabled
     then
-      rbe_wrapper=("${RBE_WRAPPER[@]}")
+      rbe_wrapper=("${RBE_WRAPPER[@]}" -- )
     fi
 
     # It's not ideal that we resort to constructing the textproto file as a

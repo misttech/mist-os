@@ -30,6 +30,7 @@ fuchsia_driver_bind_bytecode(
 fuchsia_package_resource_collection(
     name = "vim3-devicetree-visitors",
     resources = [
+        "@internal_sdk//pkg/devicetree-adc-visitor",
         "@internal_sdk//pkg/devicetree-aml-usb-phy-visitor",
         "@internal_sdk//pkg/devicetree-amlogic-canvas-visitor",
         "@internal_sdk//pkg/devicetree-arm-gic",
@@ -81,8 +82,6 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//bind/fuchsia.sdio:fuchsia.sdio_cc",
         "@fuchsia_sdk//fidl/fuchsia.buttons:fuchsia.buttons_cpp",
         "@fuchsia_sdk//fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
-        "@fuchsia_sdk//fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cc",
-        "@fuchsia_sdk//fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_bindlib_cc",

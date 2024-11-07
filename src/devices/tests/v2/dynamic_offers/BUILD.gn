@@ -24,7 +24,7 @@ driver_bind_rules("root_bind") {
   bind_output = "root.bindbc"
 }
 
-fuchsia_driver("root_driver") {
+fuchsia_cc_driver("root_driver") {
   testonly = true
   output_name = "dynamic_offers_root"
   sources = [ "root_driver.cc" ]
@@ -57,7 +57,7 @@ driver_bind_rules("dynamic_offers_leaf_bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("leaf_driver") {
+fuchsia_cc_driver("leaf_driver") {
   testonly = true
   output_name = "dynamic_offers_leaf"
   sources = [ "leaf_driver.cc" ]

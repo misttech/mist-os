@@ -20,7 +20,6 @@ zx_library("fake-object") {
   ]
   public_deps = [
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
 }

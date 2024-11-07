@@ -142,8 +142,12 @@ group("e2e_tests") {
     # tests that must have a target present, the other can be run without a
     # target present.
     ":ffx-e2e-with-target($host_toolchain)",
-    ":ffx-e2e-without-target($host_toolchain)",
   ]
+}
+
+group("host_tests") {
+  testonly = true
+  deps = [ ":ffx-e2e-without-target($host_toolchain)" ]
 }
 
 group("tests") {

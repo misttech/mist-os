@@ -11,7 +11,7 @@ After booting a target, run the application from a shell.  The application will
 start, and then wait up to 5 seconds for the tracing framework to start.  Once
 the application is waiting, a trace can be taken using
 
-`fx traceutil record -duration 1s`
+`ffx trace start --duration 1`
 
 by default, the kernel:sched category should be enabled which should produce
 trace events for priority inheritance interactions which produce a meaningful

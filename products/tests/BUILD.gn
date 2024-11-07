@@ -31,8 +31,9 @@ product_assembly_configuration("minimal_boot_user") {
     }
   }
   product = {
-    session_url =
-        "fuchsia-pkg://fuchsia.com/memory-budget-session#meta/log-start.cm"
+    session = {
+      url = "fuchsia-pkg://fuchsia.com/memory-budget-session#meta/log-start.cm"
+    }
   }
   base_packages = [
     {

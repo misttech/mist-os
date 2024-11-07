@@ -5,7 +5,6 @@
 library fuchsia.hardware.hrtimer;
 
 using zx;
-using fuchsia.power.broker;
 using fuchsia.power.system;
 
 /// Maximum count of timers supported by this protocol, arbitrary,
@@ -153,16 +152,16 @@ open protocol Device {
     ///
     /// A driver supporting this call must be able to get a lease on a power element that keeps
     /// the system from suspending. This lease is returned to the client via the `keep_alive`
-    /// LeaseControl channel field. When `keep_alive` is closed, then the driver lease keeping the
+    /// LeaseToken channel field. When `keep_alive` is closed, then the driver lease keeping the
     /// system from suspending will be dropped. Hence, to guarantee that the system is not
-    /// suspended by the Power Framework a client must either keep this `keep_alive` channel for
+    /// suspended by the Power Framework a client must either keep this `keep_alive` token for
     /// as long as the system needs to not suspend, or a client must get its own lease from the
     /// Power Framework to prevent suspension before it drops `keep_alive`.
     ///
     /// If the specified `id` is invalid, then this call will return `INVALID_ARGS`.
     /// If this method is not supported for the given `id`, then this call will return
     /// `NOT_SUPPORTED`.
-    /// If the driver does not have a `keep_alive` channel to provide to the client, then this
+    /// If the driver does not have a `keep_alive` token to provide to the client, then this
     /// call will return `BAD_STATE`.
     /// If the driver encounters an internal error, then this call will return `INTERNAL_ERROR`.
     flexible StartAndWait(struct {
@@ -170,7 +169,7 @@ open protocol Device {
         resolution Resolution;
         ticks uint64;
     }) -> (resource struct {
-        keep_alive client_end:fuchsia.power.broker.LeaseControl;
+        keep_alive fuchsia.power.system.LeaseToken;
     }) error DriverError;
 
     /// Start timer `id` and wait for it to expire after `ticks` ticks.

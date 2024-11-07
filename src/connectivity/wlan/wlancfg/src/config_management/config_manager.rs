@@ -43,8 +43,8 @@ pub struct SavedNetworksManager {
 /// networks with the same name.
 type NetworkConfigMap = HashMap<NetworkIdentifier, Vec<NetworkConfig>>;
 
-#[async_trait]
-pub trait SavedNetworksManagerApi: Send + Sync {
+#[async_trait(?Send)]
+pub trait SavedNetworksManagerApi {
     /// Attempt to remove the NetworkConfig described by the specified NetworkIdentifier and
     /// Credential. Return true if a NetworkConfig is remove and false otherwise.
     async fn remove(
@@ -209,7 +209,7 @@ impl SavedNetworksManager {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl SavedNetworksManagerApi for SavedNetworksManager {
     async fn remove(
         &self,
@@ -1640,7 +1640,7 @@ mod tests {
 
         let _task = {
             let read_from_stash = read_from_stash.clone();
-            fasync::Task::spawn(async move {
+            fasync::Task::local(async move {
                 while let Some(request) = request_stream.next().await {
                     match request.unwrap() {
                         fidl_stash::SecureStoreRequest::Identify { .. } => {}

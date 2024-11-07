@@ -70,6 +70,10 @@ zx_status_t vfs_internal_node_serve(vfs_internal_node_t* vnode, async_dispatcher
 // `dispatcher` must be used on subsequent calls to this method for a given `vnode` otherwise
 // returns `ZX_ERR_INVALID_ARGS`.
 //
+// `flags` must not include fuchsia.io/Flags.FLAG_*_CREATE, since object creation requires a path
+// and object type. Objects can be created by serving a connection to a directory and calling
+// fuchsia.io/Directory.Open3 on the resulting channel.
+//
 // This function is thread-safe.
 zx_status_t vfs_internal_node_serve3(vfs_internal_node_t* vnode, async_dispatcher_t* dispatcher,
                                      zx_handle_t channel, uint64_t flags);

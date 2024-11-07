@@ -220,6 +220,21 @@
             "selector": "bootstrap/power-broker:root/fuchsia.inspect.Stats:current_size",
             "metric_id": 7,
             "metric_type": "Integer"
+        },
+        {
+            "selector": "bootstrap/power-broker:root/fuchsia.inspect.Stats:utilization_per_ten_k",
+            "metric_id": 8,
+            "metric_type": "Integer"
+        },
+        {
+            "selector": "bootstrap/power-broker:root/broker/topology/fuchsia.inspect.Graph/stats:event_capacity",
+            "metric_id": 9,
+            "metric_type": "Integer"
+        },
+        {
+            "selector": "bootstrap/power-broker:root/broker/topology/fuchsia.inspect.Graph/stats:at_capacity_history_duration_ns",
+            "metric_id": 10,
+            "metric_type": "Integer"
         }
     ],
     "poll_rate_sec": 600,

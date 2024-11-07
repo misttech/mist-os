@@ -40,7 +40,12 @@ pub fn trace_fs(
 pub struct TraceFs;
 
 impl FileSystemOps for TraceFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(TRACEFS_MAGIC))
     }
 
@@ -55,8 +60,7 @@ impl TraceFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-
-        let trace_event_queue = Arc::new(TraceEventQueue::new()?);
+        let trace_event_queue = Arc::new(TraceEventQueue::new(&kernel.inspect_node)?);
         let fs = FileSystem::new(kernel, CacheMode::Uncached, TraceFs, options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
 

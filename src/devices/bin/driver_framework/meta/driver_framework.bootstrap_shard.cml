@@ -85,6 +85,15 @@
             from: "parent",
             to: "#boot-drivers",
         },
+
+        // `VisualDebuggingLevel` to driver to change display configuration.
+        {
+            config: "fuchsia.ui.VisualDebuggingLevel",
+            from: "parent",
+            as: "fuchsia.display.VisualDebuggingLevel",
+            to: "#boot-drivers",
+            availability: "optional",
+        },
         {
             config: [
                 "fuchsia.platform.bus.SoftwareDeviceIds",

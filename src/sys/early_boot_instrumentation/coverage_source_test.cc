@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.boot/cpp/markers.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.debugdata/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -41,22 +41,19 @@
 namespace early_boot_instrumentation {
 namespace {
 
-constexpr auto kFlags = fuchsia::io::OpenFlags::RIGHT_READABLE;
+constexpr auto kServeFlags = fuchsia_io::kPermReadable;
 
 // Serve vmos from arbitrary paths in the local namespace.
 class FakeBootItemsFixture : public testing::Test {
  public:
   // Root path from where to serve the hierarchy.
   void Serve(const std::string& path) {
-    zx::channel dir_server, dir_client;
-    ASSERT_EQ(zx::channel::create(0, &dir_server, &dir_client), 0);
-
+    auto [dir_client, dir_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     fdio_ns_t* root_ns = nullptr;
     path_ = path;
     ASSERT_EQ(fdio_ns_get_installed(&root_ns), ZX_OK);
-    ASSERT_EQ(fdio_ns_bind(root_ns, path.c_str(), dir_client.release()), ZX_OK);
-
-    ASSERT_EQ(debugdata_dir_.Serve(kFlags, std::move(dir_server), loop_.dispatcher()), ZX_OK);
+    ASSERT_EQ(fdio_ns_bind(root_ns, path.c_str(), dir_client.TakeChannel().release()), ZX_OK);
+    ASSERT_EQ(debugdata_dir_.Serve(kServeFlags, std::move(dir_server), loop_.dispatcher()), ZX_OK);
     loop_.StartThread("kernel_data_dir");
   }
 

@@ -68,6 +68,7 @@ inline uint64_t CpuToLe(uint64_t x) { return x; }
 #endif
 
 constexpr uint32_t kPageSize = PAGE_SIZE;
+constexpr size_t kNumCheckpointHeaderBlocks = 2;
 constexpr uint32_t kBitsPerByte = 8;
 constexpr uint32_t kShiftForBitSize = 3;
 constexpr uint32_t kF2fsSuperMagic = 0xF2F52010;

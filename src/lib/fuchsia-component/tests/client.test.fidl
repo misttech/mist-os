@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 library fuchsia.component.client.test;
 
-/// A discoverable service.
+/// A discoverable protocol.
 @discoverable
-closed protocol ServiceA {
+closed protocol ProtocolA {
     /// Does nothing.
     strict Foo() -> ();
 };
 
-/// Yet another discoverable service.
+/// Yet another discoverable protocol.
 @discoverable
-closed protocol ServiceB {
+closed protocol ProtocolB {
     /// Does nothing.
     strict Foo() -> ();
 };
@@ -20,3 +20,9 @@ closed protocol ServiceB {
 /// An empty protocol.
 @discoverable
 closed protocol EmptyProtocol {};
+
+/// A service with protocols in it
+service Service {
+    first client_end:ProtocolA;
+    second client_end:ProtocolB;
+};

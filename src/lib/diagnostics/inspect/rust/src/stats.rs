@@ -41,6 +41,7 @@ use futures::FutureExt;
 const FUCHSIA_INSPECT_STATS: &str = "fuchsia.inspect.Stats";
 const CURRENT_SIZE_KEY: &str = "current_size";
 const MAXIMUM_SIZE_KEY: &str = "maximum_size";
+const UTILIZATION_PER_TEN_K_KEY: &str = "utilization_per_ten_k";
 const TOTAL_DYNAMIC_CHILDREN_KEY: &str = "total_dynamic_children";
 const ALLOCATED_BLOCKS_KEY: &str = "allocated_blocks";
 const DEALLOCATED_BLOCKS_KEY: &str = "deallocated_blocks";
@@ -77,6 +78,7 @@ pub struct StatsNode {
     stats_root: Node,
     current_size: UintProperty,
     maximum_size: UintProperty,
+    utilization_per_ten_k: UintProperty,
     total_dynamic_children: UintProperty,
     allocated_blocks: UintProperty,
     deallocated_blocks: UintProperty,
@@ -104,6 +106,9 @@ impl StatsNode {
             self.current_size.atomic_update(|_| {
                 self.current_size.set(stats.current_size as u64);
                 self.maximum_size.set(stats.maximum_size as u64);
+                self.utilization_per_ten_k.set(
+                    ((stats.current_size as f64) / (stats.maximum_size as f64) * 10000.0) as u64,
+                );
                 self.total_dynamic_children.set(stats.total_dynamic_children as u64);
                 self.allocated_blocks.set(stats.allocated_blocks as u64);
                 self.deallocated_blocks.set(stats.deallocated_blocks as u64);
@@ -117,6 +122,7 @@ impl StatsNode {
         lifetime.record(self.stats_root);
         lifetime.record(self.current_size);
         lifetime.record(self.maximum_size);
+        lifetime.record(self.utilization_per_ten_k);
         lifetime.record(self.total_dynamic_children);
         lifetime.record(self.allocated_blocks);
         lifetime.record(self.deallocated_blocks);
@@ -133,6 +139,10 @@ impl StatsNode {
                 root_of_instrumented_inspector,
                 current_size: stats_root.create_uint(CURRENT_SIZE_KEY, stats.current_size as u64),
                 maximum_size: stats_root.create_uint(MAXIMUM_SIZE_KEY, stats.maximum_size as u64),
+                utilization_per_ten_k: stats_root.create_uint(
+                    UTILIZATION_PER_TEN_K_KEY,
+                    ((stats.current_size as f64) / (stats.maximum_size as f64) * 10000.0) as u64,
+                ),
                 total_dynamic_children: stats_root
                     .create_uint(TOTAL_DYNAMIC_CHILDREN_KEY, stats.total_dynamic_children as u64),
                 allocated_blocks: stats_root
@@ -166,6 +176,7 @@ mod tests {
             "fuchsia.inspect.Stats": {
                 current_size: 4096u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                utilization_per_ten_k: 156u64,
                 total_dynamic_children: 1u64,  // snapshot was taken before adding any lazy node.
                 allocated_blocks: 4u64,
                 deallocated_blocks: 0u64,
@@ -188,6 +199,7 @@ mod tests {
             "fuchsia.inspect.Stats": {
                 current_size: 4096u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                utilization_per_ten_k: 156u64,
                 total_dynamic_children: 2u64,
                 allocated_blocks: 7u64,
                 deallocated_blocks: 0u64,
@@ -207,6 +219,7 @@ mod tests {
             "fuchsia.inspect.Stats": {
                 current_size: 61440u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                utilization_per_ten_k: 2343u64,
                 total_dynamic_children: 2u64,
                 allocated_blocks: 309u64,
                 // 2 blocks are deallocated because of the "drop" int block and its
@@ -224,6 +237,7 @@ mod tests {
             "fuchsia.inspect.Stats": {
                 current_size: 262144u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                utilization_per_ten_k: 10000u64,
                 total_dynamic_children: 2u64,
                 allocated_blocks: 665u64,
                 // 2 additional blocks are deallocated because of the failed allocation
@@ -241,6 +255,7 @@ mod tests {
             "fuchsia.inspect.Stats": {
                 current_size: 4096u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                utilization_per_ten_k: 156u64,
                 total_dynamic_children: 0u64,
                 allocated_blocks: 3u64,
                 deallocated_blocks: 0u64,
@@ -256,6 +271,7 @@ mod tests {
             "fuchsia.inspect.Stats": {
                 current_size: 4096u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                utilization_per_ten_k: 156u64,
                 total_dynamic_children: 0u64,
                 allocated_blocks: 3u64,
                 deallocated_blocks: 0u64,
@@ -270,8 +286,9 @@ mod tests {
             "fuchsia.inspect.Stats": {
                 current_size: 4096u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                utilization_per_ten_k: 156u64,
                 total_dynamic_children: 0u64,
-                allocated_blocks: 17u64,
+                allocated_blocks: 19u64,
                 deallocated_blocks: 0u64,
                 failed_allocations: 0u64,
             }
@@ -290,6 +307,7 @@ mod tests {
             "fuchsia.inspect.Stats": {
                 current_size: 4096u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
+                utilization_per_ten_k: 156u64,
                 total_dynamic_children: 0u64,
                 allocated_blocks: 3u64,
                 deallocated_blocks: 0u64,

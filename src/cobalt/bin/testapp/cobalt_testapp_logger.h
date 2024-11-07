@@ -39,15 +39,15 @@ class CobaltTestAppLogger {
                      ExperimentArm arm = kNone);
 
   // Synchronously invokes LogInteger() using the given parameters.
-  bool LogInteger(uint32_t metric_id, std::vector<uint32_t> indices, int64_t value);
+  bool LogInteger(uint32_t metric_id, std::vector<uint32_t> indices, int64_t value) const;
 
   // Synchronously invokes LogIntegerHistogram() using the given parameters.
   bool LogIntegerHistogram(uint32_t metric_id, std::vector<uint32_t> indices,
-                           const std::map<uint32_t, uint64_t>& histogram_map);
+                           const std::map<uint32_t, uint64_t>& histogram_map) const;
 
   // Synchronously invokes LogString() using the given parameters.
   bool LogString(uint32_t metric_id, std::vector<uint32_t> indices,
-                 const std::string& string_value);
+                 const std::string& string_value) const;
 
   // If |use_network_| is false this method returns true immediately.
   //
@@ -57,7 +57,7 @@ class CobaltTestAppLogger {
   //
   // We use the method RequestSendSoon() to ask the Cobalt FIDL Service to send
   // the Observations soon and return the status.
-  bool CheckForSuccessfulSend();
+  bool CheckForSuccessfulSend() const;
 
   // Set the component moniker used by the current Cobalt instance that is being tested.
   void SetCobaltUnderTestMoniker(const std::string& cobalt_under_test_moniker) {

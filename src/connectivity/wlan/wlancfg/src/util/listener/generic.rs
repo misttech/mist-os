@@ -4,14 +4,14 @@
 
 use crate::util::future_with_metadata::FutureWithMetadata;
 use futures::channel::mpsc;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::prelude::*;
 use futures::select;
 use futures::stream::FuturesUnordered;
 
 pub trait Listener<F> {
     /// Sends an update to the listener.  Returns itself boxed if the update was sent successfully.
-    fn notify_listener(self, update: F) -> BoxFuture<'static, Option<Box<Self>>>;
+    fn notify_listener(self, update: F) -> LocalBoxFuture<'static, Option<Box<Self>>>;
 }
 
 pub trait CurrentStateCache {

@@ -492,7 +492,7 @@ pub trait BpfVisitor {
         context: &mut Self::Context<'a>,
         dst: Register,
         src: Register,
-        offset: i16,
+        offset: i32,
         register_offset: Option<Register>,
         width: DataWidth,
     ) -> Result<(), String>;
@@ -968,16 +968,13 @@ pub trait BpfVisitor {
                     BPF_IND => Some(instruction.src_reg()),
                     _ => return invalid_op_code(),
                 };
-                if instruction.off < 0 {
-                    return Err(format!("negative offset for load packet"));
-                }
                 return self.load_from_packet(
                     context,
                     // Store the result in r0
                     0,
                     // Read the packet from r6
                     6,
-                    instruction.off,
+                    instruction.imm,
                     register_offset,
                     width,
                 );

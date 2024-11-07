@@ -64,7 +64,7 @@ _SOURCES = [
   "driver-registration.cc",
 ]
 
-fuchsia_driver("aml-suspend-driver") {
+fuchsia_cc_driver("aml-suspend-driver") {
   output_name = "aml-suspend"
   sources = _SOURCES
   deps = _DEPS
@@ -93,7 +93,7 @@ driver_bind_rules("aml-suspend-bind-with-fake-syscall") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("aml-suspend-driver-with-fake-syscall") {
+fuchsia_cc_driver("aml-suspend-driver-with-fake-syscall") {
   testonly = true
   output_name = "aml-suspend-with-fake-syscall"
   sources = _SOURCES

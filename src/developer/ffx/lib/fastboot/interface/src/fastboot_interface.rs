@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::Duration;
 use tokio::sync::mpsc::Sender;
 
 pub trait FastbootInterface: std::fmt::Debug + Fastboot {}
@@ -21,6 +22,7 @@ pub trait Fastboot {
         partition_name: &str,
         path: &str,
         listener: Sender<UploadProgress>,
+        timeout: Duration,
     ) -> Result<(), FastbootError>;
 
     async fn erase(&mut self, partition_name: &str) -> Result<(), FastbootError>;
@@ -120,9 +122,6 @@ pub enum FastbootError {
 pub enum FlashError {
     #[error("{}", .0)]
     Error(#[from] anyhow::Error),
-
-    #[error("{}", .0)]
-    ConfigError(#[from] ffx_config::api::ConfigError),
 
     #[error("{}", .0)]
     IoError(#[from] std::io::Error),

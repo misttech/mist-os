@@ -41,7 +41,7 @@ common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
-fuchsia_driver("control_driver-driver") {
+fuchsia_cc_driver("control_driver-driver") {
   output_name = "goldfish_control"
 
   sources = [

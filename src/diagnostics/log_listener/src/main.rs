@@ -9,7 +9,7 @@
 
 use anyhow::Error;
 use async_trait::async_trait;
-use ffx_writer::{Format, MachineWriter, ToolIO};
+use ffx_writer::{Format, MachineWriter};
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryMarker;
@@ -18,7 +18,7 @@ use log_command as log_utils;
 use log_command::log_formatter;
 use log_formatter::{
     dump_logs_from_socket as read_logs_from_socket, DefaultLogFormatter, LogEntry, Symbolize,
-    Timestamp, WriterContainer,
+    Timestamp,
 };
 use log_utils::log_formatter::BootTimeAccessor;
 use log_utils::{LogCommand, LogSubCommand};
@@ -86,7 +86,7 @@ async fn main() -> Result<(), Error> {
         &cmd,
         MachineWriter::new(if cmd.json { Some(Format::Json) } else { None }),
     );
-    cmd.maybe_set_interest(&log_settings, &realm_proxy, formatter.writer().stderr()).await?;
+    cmd.maybe_set_interest(&log_settings, &realm_proxy).await?;
     formatter.set_boot_timestamp(boot_ts);
     let _ = read_logs_from_socket(
         fuchsia_async::Socket::from_socket(receiver),

@@ -16,14 +16,11 @@
 #include <asm/socket.h>
 #include <asm/stat.h>
 #include <asm/statfs.h>
-#include <asm/ucontext.h>
 #include <linux/aio_abi.h>
 #include <linux/android/binder.h>
 #include <linux/ashmem.h>
 #include <linux/audit.h>
 #include <linux/auxvec.h>
-#include <linux/bpf.h>
-#include <linux/bpf_perf_event.h>
 #include <linux/capability.h>
 #include <linux/close_range.h>
 #include <linux/dm-ioctl.h>
@@ -98,6 +95,11 @@
 #include <linux/wait.h>
 #include <linux/xattr.h>
 
+#ifndef __arm__
+#include <asm/ucontext.h>
+#include <linux/bpf.h>
+#include <linux/bpf_perf_event.h>
+
 #ifndef __KERNEL__
 #define __KERNEL__ 1
 #define __HAS_KERNEL__ 0
@@ -111,11 +113,21 @@
 #endif
 #undef __HAS_KERNEL__
 
+#endif  // #ifndef __arm__
+
 // Data shared between Starnix and a vDSO implementation.
 #include "src/starnix/kernel/vdso/vvar-data.h"
 
 #ifdef __x86_64__
 #include <asm/prctl.h>
+#endif
+
+#ifdef __arm__
+// Hand-crafted file in stub which provides
+//   __NR_arch32_[name]
+// when the implementation of [name] differs
+// between 32-bit and 64-bit.
+#include <arm-arch32-syscalls.h>
 #endif
 
 #include <fcntl.h>

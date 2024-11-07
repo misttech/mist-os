@@ -35,7 +35,7 @@ type DriverStartArgs = resource table {
     8: node_name string:MAX;
 
     /// Node offers of the node the driver is bound to.
-    @available(added=NEXT)
+    @available(added=25)
     10: node_offers NodeOffersVector;
 
     /// Node properties of the node the driver is bound to.

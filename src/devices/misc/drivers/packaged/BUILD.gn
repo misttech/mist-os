@@ -9,7 +9,7 @@ group("packaged") {
   deps = [ ":package" ]
 }
 
-fuchsia_driver("lib") {
+fuchsia_cc_driver("lib") {
   output_name = "packaged_driver"
   sources = [ "packaged_driver.cc" ]
   deps = [

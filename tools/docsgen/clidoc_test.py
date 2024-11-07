@@ -32,7 +32,6 @@ WANT_NAMES = [
     "clidoc/minfs.md",
     "clidoc/pm.md",
     "clidoc/symbolizer.md",
-    "clidoc/triage.md",
     "clidoc/zbi.md",
     "clidoc/zxdb.md",
 ]

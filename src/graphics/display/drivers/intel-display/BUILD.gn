@@ -88,9 +88,6 @@ source_set("common_srcs") {
     "registers-typec.h",
     "registers.h",
     "tiling.h",
-    "util/poll-until.h",
-    "util/scoped-value-change.cc",
-    "util/scoped-value-change.h",
   ]
   public_deps = [
     ":intel-display-bind",
@@ -119,6 +116,7 @@ source_set("common_srcs") {
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
     "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/driver-utils",
     "//src/lib/ddk:ddk-hw-headers",
     "//src/lib/fxl",
     "//src/lib/zbitl",
@@ -133,7 +131,7 @@ source_set("common_srcs") {
   ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "intel-display"
   deps = [ ":common_srcs" ]
 }
@@ -190,8 +188,6 @@ test("intel-display-tests") {
     "registers-transcoder-unittest.cc",
     "registers-typec-unittest.cc",
     "registers-unittest.cc",
-    "util/poll-until-unittest.cc",
-    "util/scoped-value-change-unittest.cc",
   ]
   deps = [
     ":common_srcs",

@@ -56,9 +56,9 @@ if (is_host) {
       "src/connection.rs",
       "src/fidl_pipe.rs",
       "src/lib.rs",
-      "src/overnet_connector.rs",
       "src/resolve.rs",
       "src/ssh_connector.rs",
+      "src/target_connector.rs",
     ]
   }
 }

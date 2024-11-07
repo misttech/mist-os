@@ -47,9 +47,9 @@ TEST_F(TraceManagerTest, RegisterProviderWithFdio) {
 
   FX_LOGS(DEBUG) << "Providers registered";
 
-  ConnectToControllerService();
+  ConnectToProvisionerService();
   std::vector<controller::ProviderInfo> providers;
-  controller()->GetProviders([&providers](controller::Controller_GetProviders_Result result) {
+  provisioner()->GetProviders([&providers](controller::Provisioner_GetProviders_Result result) {
     ASSERT_TRUE(result.is_response());
     providers = std::move(result.response().providers);
   });
@@ -77,7 +77,7 @@ TEST_F(TraceManagerTest, RegisterProviderWithFdio) {
 }
 
 TEST_F(TraceManagerTest, AddFakeProviders) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   FakeProvider* provider1;
   ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider1));
@@ -95,7 +95,7 @@ TEST_F(TraceManagerTest, AddFakeProviders) {
   FX_LOGS(DEBUG) << "Providers registered";
 
   std::vector<controller::ProviderInfo> providers;
-  controller()->GetProviders([&providers](controller::Controller_GetProviders_Result result) {
+  provisioner()->GetProviders([&providers](controller::Provisioner_GetProviders_Result result) {
     ASSERT_TRUE(result.is_response());
     providers = std::move(result.response().providers);
   });
@@ -123,7 +123,7 @@ TEST_F(TraceManagerTest, AddFakeProviders) {
 }
 
 TEST_F(TraceManagerTest, GetKnownCategories) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   FakeProvider* provider1;
   ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider1));
@@ -151,8 +151,8 @@ TEST_F(TraceManagerTest, GetKnownCategories) {
   FX_LOGS(DEBUG) << "Providers registered";
 
   std::vector<fuchsia::tracing::KnownCategory> known_categories;
-  controller()->GetKnownCategories(
-      [&known_categories](controller::Controller_GetKnownCategories_Result result) {
+  provisioner()->GetKnownCategories(
+      [&known_categories](controller::Provisioner_GetKnownCategories_Result result) {
         ASSERT_TRUE(result.is_response());
         known_categories = std::move(result.response().categories);
       });
@@ -173,7 +173,7 @@ TEST_F(TraceManagerTest, GetKnownCategories) {
 }
 
 TEST_F(TraceManagerTest, GetKnownCategoriesTimeout) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   FakeProvider* provider1;
   ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider1));
@@ -212,8 +212,8 @@ TEST_F(TraceManagerTest, GetKnownCategoriesTimeout) {
   provider2->MarkUnresponsive();
   provider3->MarkUnresponsive();
   std::vector<fuchsia::tracing::KnownCategory> known_categories;
-  controller()->GetKnownCategories(
-      [&known_categories](controller::Controller_GetKnownCategories_Result result) {
+  provisioner()->GetKnownCategories(
+      [&known_categories](controller::Provisioner_GetKnownCategories_Result result) {
         ASSERT_TRUE(result.is_response());
         known_categories = std::move(result.response().categories);
       });

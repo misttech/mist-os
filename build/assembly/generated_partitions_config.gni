@@ -262,7 +262,7 @@ template("generated_partitions_config") {
         {
           label = get_label_info(target_name, "label_with_toolchain")
           name = invoker.hw_revision
-          outdir = rebase_path(outputs[0], root_build_dir)
+          outdir = rebase_path(output_path, root_build_dir)
         },
       ]
     }

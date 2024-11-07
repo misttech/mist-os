@@ -211,7 +211,7 @@
     },
     {
         "name": "EngTools",
-        "process": "/boot/bin/sh|/pkg/bin/sshd|memory_monitor\\.cm|overnetstack\\.cm|remote.*|sh:console|sshd-host\\.cm",
+        "process": "/boot/bin/sh|/pkg/bin/sshd|memory_monitor\\.cm|overnetstack\\.cm|memory_pressure_signaler\\.cm|remote.*|sh:console|sshd-host\\.cm",
         "vmo": "",
         "event_code": 64
     },

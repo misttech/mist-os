@@ -147,6 +147,34 @@ TEST(RobustFutexTest, RobustListLimitIsEnforced) {
   EXPECT_TRUE(helper.WaitForChildren());
 }
 
+struct unaligned_robust_list_entry {
+  struct robust_list *next;
+  char unused;
+  int futex;
+} __attribute__((packed, aligned(4)));
+static_assert(offsetof(unaligned_robust_list_entry, futex) % 4 != 0,
+              "futex lock offset must be unaligned");
+
+TEST(RobustFutexTest, RobustListEnforcesAlignment) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    unaligned_robust_list_entry entry = {.next = nullptr, .unused = 0, .futex = 0};
+    robust_list_head head = {.list = {.next = nullptr},
+                             .futex_offset = offsetof(unaligned_robust_list_entry, futex),
+                             .list_op_pending = nullptr};
+
+    std::thread t([&entry, &head]() {
+      head.list.next = reinterpret_cast<struct robust_list *>(&entry);
+      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      entry.futex = static_cast<int>(syscall(SYS_gettid));
+      entry.next = reinterpret_cast<struct robust_list *>(&head);
+    });
+    t.join();
+    // The entry was not modified.
+    EXPECT_EQ(0, entry.futex & FUTEX_OWNER_DIED);
+  });
+}
+
 TEST(RobustFutexTest, DoesNotModifyReadOnlyMapping) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([] {
@@ -293,6 +321,19 @@ TEST(FutexTest, FutexAddressHasToBeAligned) {
     EXPECT_EQ(-1, futex_requeue(addr, 0, 0, addr + 4 + i));
     EXPECT_EQ(errno, EINVAL);
   }
+}
+
+TEST(FutexTest, FutexAddressOutOfRange) {
+  uintptr_t addr = static_cast<uintptr_t>(-4);  // not in userspace
+
+  auto futex_basic = [](uintptr_t addr, uint32_t op, uint32_t val) {
+    return syscall(SYS_futex, addr, op, val, NULL, NULL, 0);
+  };
+
+  EXPECT_EQ(-1, futex_basic(addr, FUTEX_WAIT, 0));
+  EXPECT_EQ(errno, EFAULT);
+  EXPECT_EQ(-1, futex_basic(addr, FUTEX_WAIT_PRIVATE, 0));
+  EXPECT_EQ(errno, EFAULT);
 }
 
 TEST(FutexTest, FutexWaitOnRemappedMemory) {

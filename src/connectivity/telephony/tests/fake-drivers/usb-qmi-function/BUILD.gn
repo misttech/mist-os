@@ -17,7 +17,7 @@ group("tests") {
   deps = [ ":usb_qmi_function_bind_test" ]
 }
 
-fuchsia_driver("qmi_function-driver") {
+fuchsia_cc_driver("qmi_function-driver") {
   output_name = "qmi-function"
   testonly = true
 

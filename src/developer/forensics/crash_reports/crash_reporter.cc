@@ -115,7 +115,7 @@ CrashReporter::CrashReporter(
       queue_(dispatcher_, services_, info_context, tags_, report_store, crash_server_),
       snapshot_collector_(dispatcher, clock_, data_provider, report_store->GetSnapshotStore(),
                           &queue_, snapshot_collector_window_duration),
-      product_quotas_(dispatcher_, clock_, build_type_config.daily_per_product_crash_report_quota,
+      product_quotas_(clock_, build_type_config.daily_per_product_crash_report_quota,
                       feedback::kProductQuotasPath, &utc_clock_ready_watcher_,
                       product_quota_reset_offset),
       info_(info_context),

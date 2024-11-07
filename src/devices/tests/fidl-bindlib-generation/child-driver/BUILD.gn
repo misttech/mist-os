@@ -16,7 +16,7 @@ driver_bind_rules("child_driver_bind") {
   ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "fidl-bindlib-generation-child"
   sources = [ "child_driver.cc" ]

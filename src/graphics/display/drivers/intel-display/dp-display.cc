@@ -41,8 +41,8 @@
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace intel_display {
 namespace {
@@ -1233,8 +1233,8 @@ bool DpDisplay::LinkTrainingSetupTigerLake() {
       .WriteTo(mmio_space());
 
   // Wait for DDI Buffer to be enabled, timeout after 1 ms.
-  if (!PollUntil([&] { return !buffer_control.ReadFrom(mmio_space()).is_idle(); }, zx::usec(1),
-                 1000)) {
+  if (!display::PollUntil([&] { return !buffer_control.ReadFrom(mmio_space()).is_idle(); },
+                          zx::usec(1), 1000)) {
     FDF_LOG(ERROR, "DDI_BUF_CTL DDI idle status timeout");
     return false;
   }
@@ -1860,8 +1860,8 @@ bool DpDisplay::InitDdi() {
 
   // 5. Enable power for this DDI.
   controller()->power()->SetDdiIoPowerState(ddi_id(), /* enable */ true);
-  if (!PollUntil([&] { return controller()->power()->GetDdiIoPowerState(ddi_id()); }, zx::usec(1),
-                 20)) {
+  if (!display::PollUntil([&] { return controller()->power()->GetDdiIoPowerState(ddi_id()); },
+                          zx::usec(1), 20)) {
     FDF_LOG(ERROR, "Failed to enable IO power for ddi");
     return false;
   }

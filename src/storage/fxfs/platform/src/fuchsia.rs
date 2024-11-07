@@ -21,7 +21,7 @@ mod symlink;
 pub mod volume;
 pub mod volumes_directory;
 
-#[cfg(test)]
-mod testing;
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
 
 pub use remote_crypt::RemoteCrypt;

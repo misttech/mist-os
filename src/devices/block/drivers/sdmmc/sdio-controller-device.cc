@@ -577,7 +577,7 @@ void SdioControllerDevice::InBandInterruptCallback() {
 }
 
 void SdioControllerDevice::SdioIrqHandler() {
-  const zx::time irq_time = zx::clock::get_monotonic();
+  const zx::time_boot irq_time = zx::clock::get_boot();
 
   if (shutdown_) {
     return;

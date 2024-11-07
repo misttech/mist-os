@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod budget;
-pub mod buffer;
 pub mod container;
 pub mod debuglog;
 pub mod error;
@@ -12,6 +10,7 @@ pub mod multiplex;
 pub mod repository;
 pub mod serial;
 pub mod servers;
+pub mod shared_buffer;
 pub mod socket;
 pub mod stats;
 pub mod stored_message;

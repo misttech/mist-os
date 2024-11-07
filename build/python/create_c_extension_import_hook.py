@@ -22,7 +22,7 @@ def main():
         required=True,
     )
     parser.add_argument(
-        "--shlib_source",
+        "--shlib",
         help="Path to the shared library",
         required=True,
     )
@@ -31,45 +31,32 @@ def main():
         help="Path to gen directory, used to stage temp directories",
         required=True,
     )
-    parser.add_argument("--output", help="Path to output", required=True)
-    parser.add_argument(
-        "--depfile",
-        help="Path to the depfile to generate",
-        type=argparse.FileType("w"),
-        required=True,
-    )
 
     args = parser.parse_args()
     app_dir = os.path.join(args.gen_dir, args.target_name)
     os.makedirs(app_dir, exist_ok=True)
     main_file = os.path.join(app_dir, "__init__.py")
-    shlib_source_dir = os.path.dirname(args.shlib_source)
-    if not shlib_source_dir:
-        shlib_source_dir = os.path.join(".")
-    shlib_source = os.path.basename(args.shlib_source)
 
-    # Making this a list in the event that there are more deps.
-    deps = " ".join([f"{args.shlib_source}.so"])
-    args.depfile.write(f"{args.output}: {deps}\n")
+    shlib = os.path.basename(args.shlib)
+    shlib_dir = os.path.dirname(args.shlib)
     with open(main_file, "w", encoding="utf-8") as main_file_out:
         main_file_out.write(
             f"""
 from importlib.abc import Loader
 import importlib.util
 import importlib.machinery
-import os
 
 def _init() -> object:
     finder = importlib.machinery.PathFinder()
-    spec = finder.find_spec('{shlib_source}', path=['{shlib_source_dir}', os.getcwd()])
+    spec = finder.find_spec('{shlib}', path=['{shlib_dir}'])
     if spec is None:
-        raise Exception('Couldn\\'t load library "{shlib_source}" from {shlib_source_dir} or CWD"')
+        raise Exception('Couldn\\'t load library "{shlib}.so" from {shlib_dir}"')
     mod = importlib.util.module_from_spec(spec)
     assert isinstance(spec.loader, Loader)
     spec.loader.exec_module(mod)
     return mod
 
-__all__ = list(_init().__dict__.keys())
+globals().update(_init().__dict__)
 """
         )
     return 0

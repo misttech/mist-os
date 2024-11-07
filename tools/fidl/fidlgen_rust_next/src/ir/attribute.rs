@@ -18,7 +18,7 @@ pub struct Attributes {
 impl Attributes {
     /// Get the doc string from the attributes, if any.
     pub fn doc_string(&self) -> Option<&str> {
-        Some(self.attributes.get("doc")?.args.get("value")?.constant.value.as_str())
+        Some(self.attributes.get("doc")?.args.get("value")?.value.value.as_str())
     }
 }
 
@@ -40,8 +40,7 @@ impl Index for Attribute {
 #[derive(Clone, Debug, Deserialize)]
 pub struct AttributeArg {
     pub name: String,
-    #[serde(rename = "value")]
-    pub constant: Constant,
+    pub value: Constant,
 }
 
 impl Index for AttributeArg {

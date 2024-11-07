@@ -39,10 +39,9 @@ pub(crate) async fn open_from_path(
     proxy: &fio::DirectoryProxy,
     path: &str,
 ) -> Result<fmem::Buffer, OpenImageError> {
-    let file =
-        fuchsia_fs::directory::open_file_deprecated(proxy, path, fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .map_err(|err| OpenImageError::OpenPath { path: path.to_string(), err })?;
+    let file = fuchsia_fs::directory::open_file(proxy, path, fio::PERM_READABLE)
+        .await
+        .map_err(|err| OpenImageError::OpenPath { path: path.to_string(), err })?;
 
     let vmo = file
         .get_backing_memory(fio::VmoFlags::READ)

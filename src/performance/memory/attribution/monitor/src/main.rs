@@ -31,7 +31,10 @@ enum Service {
 
 const INTROSPECTOR_PATH: &str = "/svc/fuchsia.component.Introspector.root";
 
-#[fuchsia::main]
+// Enable debug trace:
+// 1. set `logging_minimum_severity = "debug"`
+// 2. run `fx log --severity trace --moniker core/memory_monitor2`
+#[fuchsia::main(logging_minimum_severity = "info")]
 async fn main() -> Result<(), Error> {
     let mut service_fs = ServiceFs::new();
 
@@ -53,12 +56,21 @@ async fn main() -> Result<(), Error> {
         root_job.get_koid().context("Unable to get the root job's koid")?,
     );
 
+    let kernel_stats = connect_to_protocol::<fkernel::StatsMarker>()
+        .context("Failed to connect to the kernel stats provider")?;
+
+    // Watch trace category and trace kernel memory stats, until this variable goes out of scope.
+    let _kernel_trace_service = fuchsia_async::Task::spawn(traces::kernel::serve_forever(
+        traces::watcher::subscribe(),
+        kernel_stats.clone(),
+    ));
+
     service_fs
         .for_each_concurrent(None, |stream| async {
             match stream {
                 Service::MemoryMonitor(stream) => {
                     if let Err(error) =
-                        serve_client_stream(stream, attribution_client.clone()).await
+                        serve_client_stream(stream, &kernel_stats, attribution_client.clone()).await
                     {
                         warn!(%error);
                     }
@@ -72,6 +84,7 @@ async fn main() -> Result<(), Error> {
 
 async fn serve_client_stream(
     mut stream: fattribution_plugin::MemoryMonitorRequestStream,
+    kernel_stats: &fidl_fuchsia_kernel::StatsProxy,
     attribution_client: Arc<attribution_client::AttributionClient>,
 ) -> Result<(), Error> {
     // Connect to root job
@@ -81,8 +94,7 @@ async fn serve_client_stream(
             .get()
             .await?,
     ) as Box<dyn resources::Job>;
-    let kernel_stats = connect_to_protocol::<fkernel::StatsMarker>()
-        .context("Failed to connect to the kernel stats provider")?;
+
     while let Some(request) = stream.next().await.transpose()? {
         match request {
             fattribution_plugin::MemoryMonitorRequest::GetSnapshot { snapshot, control_handle } => {

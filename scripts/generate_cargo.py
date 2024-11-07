@@ -433,6 +433,13 @@ def write_toml_file(
                 if dep_features := get_features(
                     project.targets[dep]["rustflags"]
                 ):
+                    # Filter out features that break our unusual build until they're properly fixed
+                    # upstream
+                    # TODO(376501054): fix ahash upstream and then remove this.
+                    if crate_name == "ahash":
+                        dep_features = [
+                            f for f in dep_features if f != "folded_multiply"
+                        ]
                     fout.write("features = %s\n" % json.dumps(dep_features))
                 if crate_name in features:
                     # Make the dependency optional if there is a feature with

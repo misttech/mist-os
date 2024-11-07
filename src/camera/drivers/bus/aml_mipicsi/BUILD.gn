@@ -46,7 +46,7 @@ source_set("aml_mipi_driver_source") {
   ]
 }
 
-fuchsia_driver("aml_mipicsi_driver-driver") {
+fuchsia_cc_driver("aml_mipicsi_driver-driver") {
   output_name = "aml_mipicsi"
   deps = [
     ":aml_mipi_bind",

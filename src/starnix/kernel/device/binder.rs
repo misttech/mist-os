@@ -21,10 +21,10 @@ use crate::task::{
 use crate::vfs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    BinderDriverReleaser, CacheMode, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
-    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
-    VecDirectory, VecDirectoryEntry,
+    BinderDriverReleaser, CacheMode, CurrentTaskAndLocked, DirectoryEntryType, FdFlags, FdNumber,
+    FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FileWriteGuardRef, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+    FsString, NamespaceNode, SpecialNode, VecDirectory, VecDirectoryEntry,
 };
 use bitflags::bitflags;
 use fidl::endpoints::ClientEnd;
@@ -176,7 +176,12 @@ impl FileOps for BinderConnection {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         self.close(current_task.kernel());
     }
 
@@ -316,7 +321,12 @@ impl FileOps for BinderConnection {
         error!(EOPNOTSUPP)
     }
 
-    fn flush(&self, _file: &FileObject, current_task: &CurrentTask) {
+    fn flush(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         // Errors are not meaningful on flush.
         let Ok(binder_process) = self.proc(current_task) else { return };
         release_after!(binder_process, current_task.kernel(), {
@@ -458,9 +468,9 @@ struct ActiveTransaction {
 }
 
 impl Releasable for ActiveTransaction {
-    type Context<'a> = ();
+    type Context<'a: 'b, 'b> = ();
 
-    fn release(self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         self.state.release(context);
     }
 }
@@ -487,9 +497,9 @@ struct TransactionState {
 }
 
 impl Releasable for TransactionState {
-    type Context<'a> = ();
+    type Context<'a: 'b, 'b> = ();
 
-    fn release(self, _: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, _: Self::Context<'a, 'b>) {
         log_trace!("Releasing binder TransactionState");
         let mut drop_actions = RefCountActions::default();
         // Release the owned objects unconditionally.
@@ -552,8 +562,8 @@ struct TransientTransactionState<'a> {
 }
 
 impl<'a> Releasable for TransientTransactionState<'a> {
-    type Context<'b> = ();
-    fn release(self, _: Self::Context<'_>) {
+    type Context<'b: 'c, 'c> = ();
+    fn release<'b: 'c, 'c>(self, _: Self::Context<'b, 'c>) {
         for fd in &self.transient_fds {
             let _: Result<(), Errno> = self.accessor.close_fd(*fd);
         }
@@ -1045,9 +1055,9 @@ impl<'a> BinderProcessGuard<'a> {
 }
 
 impl Releasable for BinderProcess {
-    type Context<'a> = &'a Kernel;
+    type Context<'a: 'b, 'b> = &'a Kernel;
 
-    fn release(self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         log_trace!("Releasing BinderProcess id={}", self.identifier);
         let state = self.state.into_inner();
         // Notify any subscribers that the objects this process owned are now dead.
@@ -1365,8 +1375,8 @@ struct HandleTable {
 /// The HandleTable is released at the time the BinderProcess is released. At this moment, any
 /// reference to object owned by another BinderProcess need to be clean.
 impl Releasable for HandleTable {
-    type Context<'a> = ();
-    fn release(self, _: ()) {
+    type Context<'a: 'b, 'b> = ();
+    fn release<'a: 'b, 'b>(self, _: ()) {
         for (_, r) in self.table.into_iter() {
             let mut actions = RefCountActions::default();
             r.clean_refs(&mut actions);
@@ -1556,9 +1566,9 @@ impl DerefMut for RefCountActions {
 }
 
 impl Releasable for RefCountActions {
-    type Context<'a> = ();
+    type Context<'a: 'b, 'b> = ();
 
-    fn release(self, _context: ()) {
+    fn release<'a: 'b, 'b>(self, _context: ()) {
         for object in self.objects.into_iter() {
             object.apply_deferred_refcounts();
         }
@@ -1700,9 +1710,9 @@ impl BinderThread {
 }
 
 impl Releasable for BinderThread {
-    type Context<'a> = &'a Kernel;
+    type Context<'a: 'b, 'b> = &'a Kernel;
 
-    fn release(self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         self.state.into_inner().release(context);
     }
 }
@@ -1820,9 +1830,9 @@ impl BinderThreadState {
 }
 
 impl Releasable for BinderThreadState {
-    type Context<'a> = &'a Kernel;
+    type Context<'a: 'b, 'b> = &'a Kernel;
 
-    fn release(self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         log_trace!("Dropping BinderThreadState id={}", self.tid);
         // If there are any transactions queued, we need to tell the caller that this thread is now
         // dead.
@@ -2364,9 +2374,9 @@ struct RefGuardInner<R: RefReleaser> {
 }
 
 impl<R: RefReleaser> Releasable for RefGuardInner<R> {
-    type Context<'a> = &'a mut RefCountActions;
+    type Context<'a: 'b, 'b> = &'a mut RefCountActions;
 
-    fn release(self, context: &mut RefCountActions) {
+    fn release<'a: 'b, 'b>(self, context: &mut RefCountActions) {
         R::dec_ref(&self.binder_object, context);
     }
 }
@@ -2397,9 +2407,9 @@ impl<R: RefReleaser> RefGuard<R> {
 }
 
 impl<R: RefReleaser> Releasable for RefGuard<R> {
-    type Context<'a> = &'a mut RefCountActions;
+    type Context<'a: 'b, 'b> = &'a mut RefCountActions;
 
-    fn release(self, context: &mut RefCountActions) {
+    fn release<'a: 'b, 'b>(self, context: &mut RefCountActions) {
         self.0.release(context);
     }
 }
@@ -2621,9 +2631,9 @@ impl From<SchedulerPolicy> for SchedulerGuard {
 }
 
 impl Releasable for SchedulerGuard {
-    type Context<'a> = &'a Task;
+    type Context<'a: 'b, 'b> = &'a Task;
 
-    fn release(self, task: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, task: Self::Context<'a, 'b>) {
         if let Some(policy) = self.0 {
             let policy = ReleaseGuard::take(policy);
             if let Err(e) = task.set_scheduler_policy(policy) {
@@ -3078,11 +3088,12 @@ pub struct BinderDriver {
 }
 
 impl Releasable for BinderDriver {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
 
-    fn release(mut self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
+        let (_locked, current_task) = context;
         for binder_process in std::mem::take(self.procs.get_mut()).into_values() {
-            binder_process.release(context.kernel());
+            binder_process.release(current_task.kernel());
         }
     }
 }
@@ -4228,6 +4239,7 @@ impl BinderDriver {
             0,
             length,
             prot_flags,
+            prot_flags.to_access(),
             mapping_options,
             MappingName::File(filename.into_active()),
             FileWriteGuardRef(None),
@@ -4519,7 +4531,12 @@ impl From<Errno> for TransactionError {
 
 pub struct BinderFs;
 impl FileSystemOps for BinderFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(BINDERFS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
@@ -7062,14 +7079,11 @@ pub mod tests {
 
     // Open the binder device, which creates an instance of the binder device associated with
     // the process.
-    fn open_binder_fd<L>(
-        locked: &mut Locked<'_, L>,
+    fn open_binder_fd(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         binder_driver: &BinderDevice,
-    ) -> FileHandle
-    where
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
         let node = fs.create_node(
             &current_task,
@@ -7105,7 +7119,7 @@ pub mod tests {
 
             // Close the file descriptor.
             std::mem::drop(binder_fd);
-            current_task.trigger_delayed_releaser();
+            current_task.trigger_delayed_releaser(&mut locked);
 
             // Verify that the process state no longer exists.
             binder_driver.find_process(identifier).expect_err("process was not cleaned up");

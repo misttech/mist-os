@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
@@ -131,6 +132,10 @@ fuchsia_package("terminal") {
     ":terminal_component",
     ":vsh-terminal",
   ]
+}
+
+export_fuchsia_package_to_bazel("terminal.bazel_input") {
+  package = ":terminal"
 }
 
 fuchsia_test_component("terminal_tests_component") {

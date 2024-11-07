@@ -9,8 +9,10 @@ use crate::client::types;
 use crate::config_management::SavedNetworksManagerApi;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::pseudo_energy::EwmaSignalData;
+use async_trait::async_trait;
+use futures::lock::Mutex;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{error, info};
 use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
 
 /// Minimum wait time between roam scans if there are no new roam reasons. The time between roam
@@ -34,12 +36,17 @@ const MIN_SNR_IMPROVEMENT_TO_ROAM: f64 = 3.0;
 /// TODO(https://fxbug.dev/42165706): Tune smoothing factor.
 pub const STATIONARY_ROAMING_EWMA_SMOOTHING_FACTOR: usize = 10;
 
+// Roams will not be considered if more than this many roams have been attempted in the last day.
+pub const NUM_MAX_ROAMS_PER_DAY: usize = 5;
+
 pub struct StationaryMonitor {
     pub connection_data: RoamingConnectionData,
     pub telemetry_sender: TelemetrySender,
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
     // The time between scans has a back off that resets at the beginning of a connection.
     time_between_scans: zx::MonotonicDuration,
+    /// To be used to limit how often roams can happen to avoid thrashing between APs.
+    past_roams: Arc<Mutex<PastRoamList>>,
 }
 
 impl StationaryMonitor {
@@ -49,6 +56,7 @@ impl StationaryMonitor {
         credential: Credential,
         telemetry_sender: TelemetrySender,
         saved_networks: Arc<dyn SavedNetworksManagerApi>,
+        past_roams: Arc<Mutex<PastRoamList>>,
     ) -> Self {
         let connection_data = RoamingConnectionData::new(
             ap_state.clone(),
@@ -61,7 +69,7 @@ impl StationaryMonitor {
             ),
         );
         let time_between_scans = TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE_MIN;
-        Self { connection_data, telemetry_sender, saved_networks, time_between_scans }
+        Self { connection_data, telemetry_sender, saved_networks, time_between_scans, past_roams }
     }
 
     // Handle signal report indiciations. Update internal connection data, if necessary. Returns
@@ -98,6 +106,19 @@ impl StationaryMonitor {
     }
 
     fn should_roam_scan_after_signal_report(&mut self) -> RoamTriggerDataOutcome {
+        // If there have been too many roam attempts in the past 24 hours, do not attempt roaming.
+        if let Some(past_roams) = self.past_roams.try_lock() {
+            if past_roams
+                .get_recent(fasync::MonotonicInstant::now() - TIMESPAN_TO_LIMIT_SCANS)
+                .len()
+                >= NUM_MAX_ROAMS_PER_DAY
+            {
+                return RoamTriggerDataOutcome::Noop;
+            }
+        } else {
+            error!("Unexpectedly failed to get lock on recent roam attempts data");
+        }
+
         // Determine any roam reasons based on the signal thresholds.
         let mut roam_reasons: Vec<RoamReason> = vec![];
         roam_reasons.append(&mut check_signal_thresholds(
@@ -150,8 +171,7 @@ impl StationaryMonitor {
     }
 }
 
-use async_trait::async_trait;
-#[async_trait]
+#[async_trait(?Send)]
 impl RoamMonitorApi for StationaryMonitor {
     async fn handle_roam_trigger_data(
         &mut self,
@@ -184,6 +204,7 @@ impl RoamMonitorApi for StationaryMonitor {
             );
             return Ok(false);
         }
+
         Ok(true)
     }
 }
@@ -225,6 +246,7 @@ mod test {
         monitor: StationaryMonitor,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         saved_networks: Arc<FakeSavedNetworksManager>,
+        past_roams: Arc<Mutex<PastRoamList>>,
     }
 
     fn setup_test() -> TestValues {
@@ -232,6 +254,7 @@ mod test {
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let saved_networks = Arc::new(FakeSavedNetworksManager::new());
+        let past_roams = Arc::new(Mutex::new(PastRoamList::new(NUM_MAX_ROAMS_PER_DAY)));
         // Set the fake saved networks manager to respond that the network is not single BSS by
         // default since most tests are for cases where roaming should be considered.
         saved_networks.set_is_single_bss_response(false);
@@ -240,21 +263,24 @@ mod test {
             telemetry_sender,
             saved_networks: saved_networks.clone(),
             time_between_scans: MIN_TIME_BETWEEN_ROAM_SCANS,
+            past_roams: past_roams.clone(),
         };
-        TestValues { monitor, telemetry_receiver, saved_networks }
+        TestValues { monitor, telemetry_receiver, saved_networks, past_roams }
     }
 
     fn setup_test_with_data(connection_data: RoamingConnectionData) -> TestValues {
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let saved_networks = Arc::new(FakeSavedNetworksManager::new());
+        let past_roams = Arc::new(Mutex::new(PastRoamList::new(NUM_MAX_ROAMS_PER_DAY)));
         let monitor = StationaryMonitor {
             connection_data,
             telemetry_sender,
             saved_networks: saved_networks.clone(),
             time_between_scans: MIN_TIME_BETWEEN_ROAM_SCANS,
+            past_roams: past_roams.clone(),
         };
-        TestValues { monitor, telemetry_receiver, saved_networks }
+        TestValues { monitor, telemetry_receiver, saved_networks, past_roams }
     }
 
     /// This runs handle_roam_trigger_data with run_until_stalled and expects it to finish.
@@ -810,5 +836,52 @@ mod test {
             run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
 
         assert_eq!(trigger_result, RoamTriggerDataOutcome::Noop);
+    }
+
+    #[fuchsia::test]
+    fn test_roam_not_considered_if_attempted_too_many_times_today() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let first_roam_time = fasync::MonotonicInstant::now();
+        exec.set_fake_time(first_roam_time);
+
+        // Send a signal report that would trigger a roam scan if the limit were not hit.
+        let rssi = LOCAL_ROAM_THRESHOLD_RSSI_5G - 5.0;
+        let snr = LOCAL_ROAM_THRESHOLD_SNR_5G - 5.0;
+        let connection_data = RoamingConnectionData {
+            signal_data: EwmaSignalData::new(rssi, snr, 10),
+            ..generate_random_roaming_connection_data()
+        };
+        let mut test_values = setup_test_with_data(connection_data);
+
+        // Record enough roam attempts to prevent roaming for a while.
+        for _ in 0..NUM_MAX_ROAMS_PER_DAY {
+            test_values.past_roams.try_lock().unwrap().add(RoamEvent::new_roam_now());
+            exec.set_fake_time(fasync::MonotonicInstant::after(TIME_BETWEEN_ROAM_SCANS_MAX));
+        }
+
+        let trigger_data =
+            RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
+                rssi_dbm: rssi as i8,
+                snr_db: snr as i8,
+            });
+
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            TIME_BETWEEN_ROAM_SCANS_MAX + zx::MonotonicDuration::from_seconds(1),
+        ));
+
+        // The limit on roams per day has been hit, no roam scan should be recommended.
+        let should_roam_scan_result =
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
+        assert_eq!(should_roam_scan_result, RoamTriggerDataOutcome::Noop);
+
+        // Set the time to be a bit after the first roam scan, and check that a roam would happen.
+        exec.set_fake_time(
+            first_roam_time
+                + zx::MonotonicDuration::from_hours(24)
+                + zx::MonotonicDuration::from_seconds(1),
+        );
+        let should_roam_scan_result =
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone());
+        assert_variant!(should_roam_scan_result, RoamTriggerDataOutcome::RoamSearch { .. });
     }
 }

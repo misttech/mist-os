@@ -226,9 +226,9 @@ group("functional_tests") {
 
   if (host_os != "mac") {
     public_deps += [
-      "honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests/test_wlan:tests",
-      "honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests/test_wlan_policy:tests",
-      "honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests/test_wlan_policy_ap:tests",
+      "honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests:tests",
+      "honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests:tests",
+      "honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests:tests",
       "honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:tests",
       "tests/functional_tests:tests",
     ]

@@ -30,6 +30,11 @@ pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
 
 const RETRY_DELAY_MS: i64 = 300;
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+const FORMAT: Format = Format::Cbor;
+#[cfg(fuchsia_api_level_less_than = "HEAD")]
+const FORMAT: Format = Format::Json;
+
 /// Errors that this library can return
 #[derive(Debug, Error)]
 pub enum Error {
@@ -51,6 +56,7 @@ pub enum Error {
     #[error("Failed to read json received")]
     ReadJson(#[source] serde_json::Error),
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[error("Failed to read cbor received")]
     ReadCbor(#[source] serde_cbor::Error),
 
@@ -165,6 +171,7 @@ impl CheckResponse for serde_json::Value {
     }
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl SerializableValue for serde_cbor::Value {
     const FORMAT_OF_VALUE: Format = Format::Cbor;
 }
@@ -304,7 +311,7 @@ impl ArchiveReader {
     where
         D: DiagnosticsData,
     {
-        let data_future = self.snapshot_inner::<D, Data<D>>(Format::Cbor);
+        let data_future = self.snapshot_inner::<D, Data<D>>(FORMAT);
         let data = match self.timeout {
             Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
             None => data_future.await?,
@@ -318,7 +325,7 @@ impl ArchiveReader {
     where
         D: DiagnosticsData + 'static,
     {
-        let iterator = self.batch_iterator::<D>(StreamMode::SnapshotThenSubscribe, Format::Cbor)?;
+        let iterator = self.batch_iterator::<D>(StreamMode::SnapshotThenSubscribe, FORMAT)?;
         Ok(Subscription::new(iterator))
     }
 
@@ -447,6 +454,7 @@ where
                         data.vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
                         serde_json::from_slice(&buf).map_err(Error::ReadJson)?
                     }
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
                     FormattedContent::Cbor(vmo) => {
                         let mut buf =
                             vec![0; vmo.get_content_size().expect("Always returns Ok") as usize];

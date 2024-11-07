@@ -8,7 +8,6 @@ pub mod client;
 use crate::{MlmeEventStream, MlmeStream, Station};
 use anyhow::format_err;
 use fidl::endpoints::ServerEnd;
-use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::mpsc;
 use futures::future::FutureObj;
 use futures::prelude::*;
@@ -21,7 +20,7 @@ use tracing::{error, info, warn};
 use wlan_common::timer::{self, ScheduledEvent};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_inspect_auto_persist as auto_persist,
 };
 
 pub type ClientSmeServer = mpsc::UnboundedSender<client::Endpoint>;

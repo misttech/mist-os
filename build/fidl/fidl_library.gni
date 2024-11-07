@@ -239,9 +239,6 @@ template("fidl_library") {
   # on unstable libraries.
   # Treat such libraries as unversioned until each is resolved.
   _unversioned_libraries_used_by_sdk_prebuilts_or_ctf = [
-    # TODO(https://fxbug.dev/330947474): Resolve fdio dependency on library.
-    "fuchsia.device",
-
     # TODO(https://fxbug.dev/364294648): Resolve heapdump instrumentation dependency on library.
     "fuchsia.memory.heapdump.process",
 
@@ -330,7 +327,8 @@ template("fidl_library") {
   _is_documentation_example = library_name == "fuchsia.examples.docs"
 
   # TODO(https://fxbug.dev/365602428): Determine an appropriate state for these libraries.
-  _is_test_versioned_in_fuchsia = library_name == "fuchsia.element.test" ||
+  _is_test_versioned_in_fuchsia = library_name == "fuchsia.archivist.test" ||
+                                  library_name == "fuchsia.element.test" ||
                                   library_name == "fuchsia.intl.test" ||
                                   library_name == "fuchsia.settings.test"
 

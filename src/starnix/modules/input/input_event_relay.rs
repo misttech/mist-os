@@ -184,10 +184,7 @@ impl InputEventsRelay {
                         previous_event_disposition =
                             touch_events.iter().map(make_response_for_fidl_event).collect();
 
-                        let mut num_converted_events: u64 = 0;
                         let mut num_ignored_events: u64 = 0;
-                        let mut num_unexpected_events: u64 = 0;
-                        let mut new_events: VecDeque<uapi::input_event> = VecDeque::new();
 
                         // 1 vec may contains events from different device.
                         let (events_by_device, ignored_events) =
@@ -198,6 +195,10 @@ impl InputEventsRelay {
                             let mut devs = slf.devices.lock();
 
                             let dev = devs.get_mut(&device_id).unwrap_or(&mut default_touch_device);
+
+                            let mut num_converted_events: u64 = 0;
+                            let mut num_unexpected_events: u64 = 0;
+                            let mut new_events: VecDeque<uapi::input_event> = VecDeque::new();
 
                             let last_event_time_ns: i64;
                             if let InputDeviceType::Touch(ref mut converter) = dev.device_type {
@@ -242,7 +243,7 @@ impl InputEventsRelay {
                                         );
                                     }
 
-                                    inner.events.append(&mut new_events);
+                                    inner.events.extend(new_events.clone());
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
 
@@ -513,6 +514,7 @@ mod test {
     use starnix_core::testing::create_kernel_task_and_unlocked;
     use starnix_core::vfs::{FileHandle, FileObject, VecOutputBuffer};
     use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
+    use starnix_types::time::timeval_from_time;
     use starnix_uapi::errors::{Errno, EAGAIN};
     use starnix_uapi::input_id;
     use starnix_uapi::open_flags::OpenFlags;
@@ -614,10 +616,20 @@ mod test {
         pointer_id: u32,
         device_id: u32,
     ) -> TouchEvent {
+        make_touch_event_with_phase_device_id_position(phase, pointer_id, device_id, 0.0, 0.0)
+    }
+
+    fn make_touch_event_with_phase_device_id_position(
+        phase: EventPhase,
+        pointer_id: u32,
+        device_id: u32,
+        x: f32,
+        y: f32,
+    ) -> TouchEvent {
         TouchEvent {
             timestamp: Some(0),
             pointer_sample: Some(TouchPointerSample {
-                position_in_viewport: Some([0.0, 0.0]),
+                position_in_viewport: Some([x, y]),
                 phase: Some(phase),
                 interaction: Some(TouchInteractionId { pointer_id, device_id, interaction_id: 0 }),
                 ..Default::default()
@@ -655,6 +667,42 @@ mod test {
             Err(e) => panic!("unexpected result {:?} on iteration {}", e, i),
         })
         .collect()
+    }
+
+    fn create_test_touch_device(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        input_relay: Arc<InputEventsRelay>,
+        device_id: u32,
+    ) -> FileHandle {
+        let open_files: OpenedFiles = Arc::new(Mutex::new(vec![]));
+        input_relay.add_touch_device(device_id, open_files.clone());
+        let device_file = Arc::new(InputFile::new_touch(
+            input_id { bustype: 0, vendor: 0, product: 0, version: 0 },
+            1000,
+            1000,
+            None,
+        ));
+        open_files.lock().push(Arc::downgrade(&device_file));
+
+        FileObject::new(
+            &current_task,
+            Box::new(device_file),
+            current_task
+                .lookup_path_from_root(locked, ".".into())
+                .expect("failed to get namespace node for root"),
+            OpenFlags::empty(),
+        )
+        .expect("FileObject::new failed")
+    }
+
+    fn make_uapi_input_event(ty: u32, code: u32, value: i32) -> uapi::input_event {
+        uapi::input_event {
+            time: timeval_from_time(zx::MonotonicInstant::from_nanos(0)),
+            type_: ty as u16,
+            code: code as u16,
+            value,
+        }
     }
 
     #[::fuchsia::test]
@@ -695,24 +743,8 @@ mod test {
         assert_ne!(events.len(), 0);
 
         // add a device, mock uinput.
-        let open_files: OpenedFiles = Arc::new(Mutex::new(vec![]));
-        input_relay.add_touch_device(DEVICE_ID, open_files.clone());
-        let device_id_10_file = Arc::new(InputFile::new_touch(
-            input_id { bustype: 0, vendor: 0, product: 0, version: 0 },
-            1000,
-            1000,
-            None,
-        ));
-        open_files.lock().push(Arc::downgrade(&device_id_10_file));
-        let device_id_10_file_object = FileObject::new(
-            &current_task,
-            Box::new(device_id_10_file),
-            current_task
-                .lookup_path_from_root(&mut locked, ".".into())
-                .expect("failed to get namespace node for root"),
-            OpenFlags::empty(),
-        )
-        .expect("FileObject::new failed");
+        let device_id_10_file =
+            create_test_touch_device(&mut locked, &current_task, input_relay.clone(), DEVICE_ID);
 
         answer_next_watch_request(
             &mut touch_source_stream,
@@ -730,9 +762,85 @@ mod test {
         // Default device should not receive events because they matched device id 10.
         assert_eq!(events.len(), 0);
 
-        let events = read_uapi_events(&mut locked, &device_id_10_file_object, &current_task);
+        let events = read_uapi_events(&mut locked, &device_id_10_file, &current_task);
         // file of device id 10 should receive events.
         assert_ne!(events.len(), 0);
+    }
+
+    #[::fuchsia::test]
+    async fn route_touch_event_by_device_id_multi_device_events_in_one_sequence() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (
+            input_relay,
+            _touch_device,
+            _keyboard_device,
+            _input_file,
+            _keyboard_file,
+            mut touch_source_stream,
+            _keyboard_stream,
+            _device_listener_stream,
+        ) = start_input_relays(&mut locked, &current_task);
+
+        const DEVICE_ID_10: u32 = 10;
+        const DEVICE_ID_11: u32 = 11;
+
+        let device_id_10_file =
+            create_test_touch_device(&mut locked, &current_task, input_relay.clone(), DEVICE_ID_10);
+
+        let device_id_11_file =
+            create_test_touch_device(&mut locked, &current_task, input_relay.clone(), DEVICE_ID_11);
+
+        // 2 pointer down on different touch device.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![
+                make_touch_event_with_phase_device_id_position(
+                    EventPhase::Add,
+                    1,
+                    DEVICE_ID_10,
+                    10.0,
+                    20.0,
+                ),
+                make_touch_event_with_phase_device_id_position(
+                    EventPhase::Add,
+                    2,
+                    DEVICE_ID_11,
+                    30.0,
+                    40.0,
+                ),
+            ],
+        )
+        .await;
+
+        answer_next_watch_request(&mut touch_source_stream, vec![]).await;
+
+        let events_10 = read_uapi_events(&mut locked, &device_id_10_file, &current_task);
+        let events_11 = read_uapi_events(&mut locked, &device_id_11_file, &current_task);
+        assert_eq!(events_10.len(), events_11.len());
+
+        assert_eq!(
+            events_10,
+            vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 10),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 20),
+                make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
+            ]
+        );
+
+        assert_eq!(
+            events_11,
+            vec![
+                make_uapi_input_event(uapi::EV_KEY, uapi::BTN_TOUCH, 1),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_SLOT, 0),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_TRACKING_ID, 2),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_X, 30),
+                make_uapi_input_event(uapi::EV_ABS, uapi::ABS_MT_POSITION_Y, 40),
+                make_uapi_input_event(uapi::EV_SYN, uapi::SYN_REPORT, 0),
+            ]
+        );
     }
 
     #[::fuchsia::test]
@@ -900,5 +1008,154 @@ mod test {
 
         std::mem::drop(buttons_listener); // Close Zircon channel.
         std::mem::drop(device_listener_stream); // Close Zircon channel.
+    }
+
+    #[::fuchsia::test]
+    async fn touch_device_multi_reader() {
+        // Set up resources.
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (
+            _input_relay,
+            touch_device,
+            _keyboard_device,
+            touch_reader1,
+            _keyboard_file,
+            mut touch_source_stream,
+            _keyboard_stream,
+            _device_listener_stream,
+        ) = start_input_relays(&mut locked, &current_task);
+
+        let touch_reader2 = touch_device
+            .open_test(&mut locked, &current_task)
+            .expect("Failed to create input file");
+
+        const DEVICE_ID: u32 = 10;
+
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_touch_event_with_phase_device_id(EventPhase::Add, 1, DEVICE_ID)],
+        )
+        .await;
+
+        // Wait for another `Watch` to ensure input_file done processing the first reply.
+        // Use an empty `TouchEvent`, to minimize the chance that this event creates unexpected
+        // `uapi::input_event`s.
+        answer_next_watch_request(
+            &mut touch_source_stream,
+            vec![make_empty_touch_event(DEVICE_ID)],
+        )
+        .await;
+
+        // Consume all of the `uapi::input_event`s that are available.
+        let events_from_reader1 = read_uapi_events(&mut locked, &touch_reader1, &current_task);
+        let events_from_reader2 = read_uapi_events(&mut locked, &touch_reader2, &current_task);
+        assert_ne!(events_from_reader1.len(), 0);
+        assert_eq!(events_from_reader1.len(), events_from_reader2.len());
+    }
+
+    #[::fuchsia::test]
+    async fn keyboard_device_multi_reader() {
+        // Set up resources.
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (
+            _input_relay,
+            _touch_device,
+            keyboard_device,
+            _touch_file,
+            keyboard_reader1,
+            _touch_source_stream,
+            mut keyboard_stream,
+            _device_listener_stream,
+        ) = start_input_relays(&mut locked, &current_task);
+
+        let keyboard_reader2 = keyboard_device
+            .open_test(&mut locked, &current_task)
+            .expect("Failed to create input file");
+
+        const DEVICE_ID: u32 = 10;
+
+        let keyboard_listener = match keyboard_stream.next().await {
+            Some(Ok(fuiinput::KeyboardRequest::AddListener {
+                view_ref: _,
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let key_event = fuiinput::KeyEvent {
+            timestamp: Some(0),
+            type_: Some(fuiinput::KeyEventType::Pressed),
+            key: Some(fidl_fuchsia_input::Key::A),
+            device_id: Some(DEVICE_ID),
+            ..Default::default()
+        };
+
+        let _ = keyboard_listener.on_key_event(&key_event).await;
+
+        // Consume all of the `uapi::input_event`s that are available.
+        let events_from_reader1 = read_uapi_events(&mut locked, &keyboard_reader1, &current_task);
+        let events_from_reader2 = read_uapi_events(&mut locked, &keyboard_reader2, &current_task);
+        assert_ne!(events_from_reader1.len(), 0);
+        assert_eq!(events_from_reader1.len(), events_from_reader2.len());
+    }
+
+    #[::fuchsia::test]
+    async fn media_button_device_multi_reader() {
+        // Set up resources.
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (
+            _input_relay,
+            _touch_device,
+            keyboard_device,
+            _touch_file,
+            keyboard_reader1,
+            _touch_source_stream,
+            _keyboard_stream,
+            mut device_listener_stream,
+        ) = start_input_relays(&mut locked, &current_task);
+
+        let keyboard_reader2 = keyboard_device
+            .open_test(&mut locked, &current_task)
+            .expect("Failed to create input file");
+
+        const DEVICE_ID: u32 = 10;
+
+        let power_pressed_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(true),
+            function: Some(false),
+            device_id: Some(DEVICE_ID),
+            ..Default::default()
+        };
+
+        let buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let _ = buttons_listener.on_event(&power_pressed_event).await;
+
+        // Consume all of the `uapi::input_event`s that are available.
+        let events_from_reader1 = read_uapi_events(&mut locked, &keyboard_reader1, &current_task);
+        let events_from_reader2 = read_uapi_events(&mut locked, &keyboard_reader2, &current_task);
+        assert_ne!(events_from_reader1.len(), 0);
+        assert_eq!(events_from_reader1.len(), events_from_reader2.len());
     }
 }

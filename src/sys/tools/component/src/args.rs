@@ -41,6 +41,7 @@ pub enum ComponentSubcommand {
     Storage(StorageArgs),
     Collection(CollectionArgs),
     Explore(ExploreArgs),
+    Config(ConfigArgs),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -311,4 +312,56 @@ pub struct ExploreArgs {
     /// nested: nests all instance directories under subdirs (default)
     /// namespace: sets the instance namespace as the root (works better for tools)
     pub ns_layout: DashNamespaceLayout,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "config", description = "Same as `ffx component config`")]
+pub struct ConfigArgs {
+    #[argh(subcommand)]
+    pub subcommand: ConfigSubcommand,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand)]
+pub enum ConfigSubcommand {
+    Set(SetArgs),
+    Unset(UnsetArgs),
+    List(ConfigListArgs),
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "set", description = "Same as `ffx component config set`")]
+pub struct SetArgs {
+    #[argh(positional)]
+    /// component URL, moniker or instance ID. Partial matches allowed.
+    pub query: String,
+    #[argh(positional)]
+    /// key-value pairs of the configuration capability to be overridden. Takes
+    /// the form 'key="value"'.
+    pub key_values: Vec<String>,
+    #[argh(switch, short = 'r')]
+    /// if enabled, component instance will be immediately reloaded so overrides
+    /// take effect.
+    pub reload: bool,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "unset", description = "Same as `ffx component config unset`")]
+pub struct UnsetArgs {
+    #[argh(positional)]
+    /// component URL, moniker or instance ID. Partial matches allowed. If
+    /// empty, unsets structured config overrides for all components.
+    pub query: Option<String>,
+    #[argh(switch, short = 'r')]
+    /// if enabled, component instance will be immediately reloaded so overrides
+    /// take effect.
+    pub reload: bool,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "list", description = "Same as `ffx component config list`")]
+pub struct ConfigListArgs {
+    #[argh(positional)]
+    /// component URL, moniker or instance ID. Partial matches allowed.
+    pub query: String,
 }

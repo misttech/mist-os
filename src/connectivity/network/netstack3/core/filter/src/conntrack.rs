@@ -81,6 +81,16 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Table<I, BT, E> {
     }
 
     /// Returns a [`Connection`] for the flow indexed by `tuple`, if one exists.
+    pub(crate) fn get_shared_connection(
+        &self,
+        tuple: &Tuple<I>,
+    ) -> Option<Arc<ConnectionShared<I, BT, E>>> {
+        let guard = self.inner.lock();
+        let conn = guard.table.get(&tuple)?;
+        Some(conn.clone())
+    }
+
+    /// Returns a [`Connection`] for the flow indexed by `tuple`, if one exists.
     pub fn get_connection(&self, tuple: &Tuple<I>) -> Option<Connection<I, BT, E>> {
         let guard = self.inner.lock();
         let conn = guard.table.get(&tuple)?;
@@ -126,8 +136,11 @@ where
     let _ = bindings_ctx.schedule_timer(GC_INTERVAL, timer);
 }
 
-impl<I: IpExt, BC: FilterBindingsContext, E: Default + Send + Sync + PartialEq + 'static>
-    Table<I, BC, E>
+impl<
+        I: IpExt,
+        BC: FilterBindingsContext,
+        E: Default + Send + Sync + Debug + PartialEq + CompatibleWith + 'static,
+    > Table<I, BC, E>
 {
     pub(crate) fn new<CC: CoreTimerContext<FilterTimerId<I>, BC>>(bindings_ctx: &mut BC) -> Self {
         Self {
@@ -229,9 +242,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default + Send + Sync + PartialEq +
                     .get(&exclusive.inner.reply_tuple)
                     .expect("checked that tuple is in table and table is locked")
             };
-            // `inner` contains the original and reply tuples along with any NAT
-            // that is configured for the connection.
-            if conn.inner == exclusive.inner {
+            if conn.compatible_with(&exclusive) {
                 return Ok((false, Some(conn.clone())));
             }
 
@@ -867,7 +878,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionExclusive<I, BT, E> {
 }
 
 impl<I: IpExt, BC: FilterBindingsContext, E: Default> ConnectionExclusive<I, BC, E> {
-    fn from_deconstructed_packet(
+    pub(crate) fn from_deconstructed_packet(
         bindings_ctx: &BC,
         PacketMetadata { tuple, transport_data }: &PacketMetadata<I>,
     ) -> Option<Self> {
@@ -997,6 +1008,17 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
     }
 }
 
+impl<I: IpExt, BT: FilterBindingsTypes, E: CompatibleWith> ConnectionShared<I, BT, E> {
+    /// Returns whether the provided exclusive connection is compatible with this
+    /// one, to the extent that a shared reference to this tracked connection could
+    /// be adopted in place of the exclusive connection.
+    pub(crate) fn compatible_with(&self, conn: &ConnectionExclusive<I, BT, E>) -> bool {
+        self.inner.original_tuple == conn.inner.original_tuple
+            && self.inner.reply_tuple == conn.inner.reply_tuple
+            && self.inner.external_data.compatible_with(&conn.inner.external_data)
+    }
+}
+
 impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for ConnectionShared<I, BT, E> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         inspector.delegate_inspectable(&self.inner);
@@ -1004,17 +1026,25 @@ impl<I: IpExt, BT: FilterBindingsTypes, E: Inspectable> Inspectable for Connecti
     }
 }
 
+/// Allows a caller to check whether a given connection tracking entry (or some
+/// configuration owned by that entry) is compatible with another.
+pub trait CompatibleWith {
+    /// Returns whether the provided entity is compatible with this entity in the
+    /// context of connection tracking.
+    fn compatible_with(&self, other: &Self) -> bool;
+}
+
 /// A struct containing relevant fields extracted from the IP and transport
 /// headers that means we only have to touch the incoming IpPacket once. Also
 /// acts as a witness type that the tuple and transport data have the same
 /// transport protocol.
-struct PacketMetadata<I: IpExt> {
+pub(crate) struct PacketMetadata<I: IpExt> {
     tuple: Tuple<I>,
     transport_data: TransportPacketData,
 }
 
 impl<I: IpExt> PacketMetadata<I> {
-    fn new<P: IpPacket<I>>(packet: &P) -> Option<Self> {
+    pub(crate) fn new<P: IpPacket<I>>(packet: &P) -> Option<Self> {
         let transport_packet_data = packet.maybe_transport_packet().transport_packet_data()?;
 
         let tuple = Tuple::from_packet_and_transport_data(packet, &transport_packet_data);
@@ -1091,6 +1121,12 @@ mod tests {
 
         fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
             None
+        }
+    }
+
+    impl CompatibleWith for () {
+        fn compatible_with(&self, (): &()) -> bool {
+            true
         }
     }
 

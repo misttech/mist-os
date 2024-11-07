@@ -47,9 +47,10 @@
         // Directories in shell namespace
         {
             directory: [
-                "bin",
+                "base-bin",
                 "blob",
                 "boot",
+                "boot-bin",
                 "build-info",
                 "dev-topological",
                 "pkgfs",
@@ -152,6 +153,7 @@
         // Used by component + iquery shell tool, in use for bringup.
         {
             protocol: [
+                "fuchsia.sys2.ConfigOverride.root",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",
@@ -663,12 +665,17 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.memory.inspection.Collector",
+            from: "#memory_monitor",
+            to: "#sshd-host",
+            source_availability: "unknown",
+        },
+        {
             protocol: [
                 "fuchsia.memory.debug.MemoryPressure",
-                "fuchsia.memory.inspection.Collector",
                 "fuchsia.memorypressure.Provider",
             ],
-            from: "#memory_monitor",
+            from: "#memory_pressure_signaler",
             to: "#sshd-host",
             source_availability: "unknown",
         },

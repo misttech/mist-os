@@ -93,6 +93,7 @@ source_set("common_srcs") {
     "vsync-receiver.h",
   ]
   public_deps = [
+    ":structured-config",
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
@@ -132,7 +133,7 @@ source_set("common_srcs") {
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
-fuchsia_driver("amlogic-display-driver") {
+fuchsia_cc_driver("amlogic-display-driver") {
   output_name = "amlogic-display"
   sources = [
     "display-device-driver.cc",
@@ -152,16 +153,32 @@ fuchsia_driver("amlogic-display-driver") {
   ]
 }
 
-fuchsia_driver_component("amlogic-display") {
+fuchsia_component_manifest("amlogic-display-manifest") {
   component_name = "amlogic-display"
+  manifest = "meta/amlogic-display.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("structured-config") {
+  cm_label = ":amlogic-display-manifest"
+}
+
+fuchsia_structured_config_values("structured-config-values") {
+  cm_label = ":amlogic-display-manifest"
+  values = {
+    visual_debugging_level = 0
+  }
+}
+
+fuchsia_driver_component("amlogic-display") {
+  cm_label = ":amlogic-display-manifest"
   info = "meta/amlogic-display-info.json"
   deps = [ ":amlogic-display-driver" ]
-  manifest = "meta/amlogic-display.cml"
 }
 
 fuchsia_driver_package("package") {
   package_name = "amlogic-display"
   driver_components = [ ":amlogic-display" ]
+  deps = [ ":structured-config-values" ]
 }
 
 test("amlogic-display-test") {
@@ -198,6 +215,7 @@ test("amlogic-display-test") {
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/devices/testing/mock-mmio-range",
+    "//src/graphics/display/lib/driver-utils",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

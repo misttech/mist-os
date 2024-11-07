@@ -383,7 +383,7 @@ class E1000Test : public ::testing::Test {
       E1000_WRITE_REG(&adapter_->hw, E1000_STATUS, link_online ? E1000_STATUS_LU : 0);
       // Set interrupt status to indicate a link status change.
       E1000_WRITE_REG(&adapter_->hw, E1000_ICR, E1000_ICR_LSC);
-      env.interrupt_->trigger(0, zx::time(zx_clock_get_monotonic()));
+      env.interrupt_->trigger(0, zx::time_boot(zx_clock_get_boot()));
 
       // Store a pointer to the fake PCI for waiting. We can't wait on the environment dispatcher
       // because that's what the fake PCI uses for serving the ack request.
@@ -734,7 +734,7 @@ TEST_F(E1000Test, InterruptCompletesTx) {
   driver_test().RunInEnvironmentTypeContext([this](TestFixtureEnvironment& env) {
     // Set interrupt status to indicate TX descriptor write back.
     E1000_WRITE_REG(&adapter_->hw, E1000_ICR, E1000_ICR_TXDW);
-    env.interrupt_->trigger(0, zx::time(zx_clock_get_monotonic()));
+    env.interrupt_->trigger(0, zx::time_boot(zx_clock_get_boot()));
   });
 
   netdev_ifc_.WaitUntilCompleteTxCalled();
@@ -789,7 +789,7 @@ TEST_F(E1000Test, InterruptCompletesRx) {
   driver_test().RunInEnvironmentTypeContext([this](TestFixtureEnvironment& env) {
     // Set interrupt status to indicate RX timer interrupt.
     E1000_WRITE_REG(&adapter_->hw, E1000_ICR, E1000_ICR_RXT0);
-    env.interrupt_->trigger(0, zx::time(zx_clock_get_monotonic()));
+    env.interrupt_->trigger(0, zx::time_boot(zx_clock_get_boot()));
   });
 
   netdev_ifc_.WaitUntilCompleteRxCalled();

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/test.gni")
 import("//tools/cmc/build/expect_includes.gni")
@@ -60,6 +61,11 @@ fuchsia_package("fake-coordinator-connector") {
   testonly = true
   package_name = "fake-display-coordinator-connector"
   deps = [ ":component" ]
+}
+
+export_fuchsia_package_to_bazel("fake-coordinator-connector.bazel_input") {
+  testonly = true
+  package = ":fake-coordinator-connector"
 }
 
 expect_includes("shard-includes") {

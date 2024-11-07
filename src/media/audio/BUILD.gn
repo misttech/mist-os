@@ -21,19 +21,19 @@ group("audio") {
   ]
 }
 
-fuchsia_fuzzer_component("audio-core-config-fuzzer-component") {
+fuchsia_fuzzer_component("audio-core-config-fuzzer") {
   manifest = "audio_core/shared/meta/audio_core_config_fuzzer.cml"
   deps = [ "audio_core/shared:audio_core_config_fuzzer" ]
 }
 
-fuchsia_fuzzer_package("audio-fuzzers") {
-  cpp_fuzzer_components = [ ":audio-core-config-fuzzer-component" ]
+fuchsia_fuzzer_package("audio_fuzzers") {
+  cpp_fuzzer_components = [ ":audio-core-config-fuzzer" ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":audio-fuzzers",
+    ":audio_fuzzers",
     "audio_core:tests",
     "consumer:tests",
     "drivers:tests",

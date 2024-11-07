@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_sync::Mutex;
-use std::collections::BTreeSet;
-
 use crate::task::{CurrentTask, WaitQueue, Waiter};
 use crate::vfs::{FdTableId, FileObject, FileObjectId};
+use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::errors::{Errno, EAGAIN};
 use starnix_uapi::{
     __kernel_off_t, c_short, errno, error, pid_t, uapi, F_GETLK, F_OFD_GETLK, F_OFD_SETLK,
     F_OFD_SETLKW, F_RDLCK, F_SETLK, F_SETLKW, F_UNLCK, F_WRLCK, SEEK_CUR, SEEK_END, SEEK_SET,
 };
+use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RecordLength {
@@ -425,6 +424,7 @@ impl RecordLocks {
     /// overwrite the content of the flock struct passed by the user.
     pub fn lock(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         file: &FileObject,
         cmd: RecordLockCommand,
@@ -463,7 +463,7 @@ impl RecordLocks {
                                 // TODO(qsr): Check deadlocks.
                                 if let Some(waiter) = waiter {
                                     std::mem::drop(state);
-                                    waiter.wait(current_task)?;
+                                    waiter.wait(locked, current_task)?;
                                 }
                             }
                             result => return result.map(|_| None),

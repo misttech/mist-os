@@ -202,14 +202,8 @@ group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
 
 group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
   testonly = true
-  public_deps = [
-    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
-    # "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume($host_toolchain)",
-    # "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_without_duration_check($host_toolchain)",
-    # "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_starnix($host_toolchain)",
-
-    "honeydew/tests/functional_tests:starnix_vim3_unstable_tests",
-  ]
+  public_deps =
+      [ "honeydew/tests/functional_tests:starnix_vim3_unstable_tests" ]
 }
 
 group("starnix_vim3_staging_tests") {
@@ -237,12 +231,6 @@ group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
   public_deps = [
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
-
-    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
-    # "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume($host_toolchain)",
-    # "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_without_duration_check($host_toolchain)",
-    # "honeydew/honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:system_power_state_controller_test_on_starnix($host_toolchain)",
-
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_unstable_tests",
@@ -286,15 +274,15 @@ group("smart_display_nelson_staging_tests") {
 ############################## WLAN Test groups - Start ###############################
 group("wlan_core_vim3_stable_sl4f_tests") {
   testonly = true
-  public_deps = [ "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests/test_wlan_policy:test_wlan_policy_sl4f" ]
+  public_deps = [ "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests:test_wlan_policy_sl4f" ]
 }
 group("wlan_core_vim3_unstable_sl4f_tests") {
   testonly = true
   public_deps = [
-    "honeydew/honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests/test_wlan:test_wlan_sl4f",
-    "honeydew/honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests/test_wlan:wlan_test_fc($host_toolchain)",
-    "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests/test_wlan_policy:wlan_policy_test_fc($host_toolchain)",
-    "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests/test_wlan_policy_ap:wlan_policy_ap_test_fc($host_toolchain)",
+    "honeydew/honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests:test_wlan_sl4f",
+    "honeydew/honeydew/affordances/connectivity/wlan/wlan/tests/functional_tests:wlan_test_fc($host_toolchain)",
+    "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy/tests/functional_tests:wlan_policy_test_fc($host_toolchain)",
+    "honeydew/honeydew/affordances/connectivity/wlan/wlan_policy_ap/tests/functional_tests:wlan_policy_ap_test_fc($host_toolchain)",
   ]
 }
 group("wlan_core_vim3_staging_sl4f_tests") {

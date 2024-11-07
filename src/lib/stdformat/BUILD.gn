@@ -1,0 +1,132 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//build/components.gni")
+import("//build/test.gni")
+
+config("config") {
+  include_dirs = [
+    "../..",
+    get_label_info("..", "target_gen_dir"),
+  ]
+}
+
+source_set("stdformat") {
+  public_configs = [ ":config" ]
+
+  public = [ "print.h" ]
+
+  sources = [ "internal/print.h" ]
+
+  public_deps = [ "//sdk/lib/stdcompat" ]
+
+  # Since this doesn't actually compile any code, don't let it contribute any
+  # implicit link inputs from default configs.
+  configs = []
+}
+
+stdformat_cxx_versions = [
+  20,
+  23,
+]
+
+stdformat_tests = [ "stdformat-polyfills" ]
+foreach(cxx_version, stdformat_cxx_versions) {
+  stdformat_tests += [ "stdformat-$cxx_version" ]
+}
+
+group("tests") {
+  testonly = true
+
+  # All the Fuchsia tests are collected into a single package.
+  deps = [ ":stdformat-tests" ]
+
+  # Add each individual test's host build.
+  foreach(test, stdformat_tests) {
+    deps += [ ":$test-unit-test($host_toolchain)" ]
+  }
+}
+
+stdformat_test_sources = [ "print_test.cc" ]
+
+group("stdformat-test-deps") {
+  testonly = true
+  visibility = [ ":*" ]
+  public_deps = [
+    ":stdformat",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/sys/test_runners/gtest:death_test",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+# This target will be forced to compile using stdformat provided polyfills and no inline variables.
+test("stdformat-polyfills-no-inline-variables-unit-test") {
+  sources = stdformat_test_sources
+  deps = [ ":stdformat-test-deps" ]
+  configs += [
+    ":stdformat-select-polyfills",
+    ":stdformat-no-inline-variables",
+    ":stdformat-Wundef",
+  ]
+}
+
+fuchsia_unittest_component("stdformat-polyfills-no-inline-variables-test") {
+  deps = [ ":stdformat-polyfills-no-inline-variables-unit-test" ]
+}
+
+# This target will be forced to compile using stdformat provided polyfills.
+test("stdformat-polyfills-unit-test") {
+  sources = stdformat_test_sources
+  deps = [ ":stdformat-test-deps" ]
+  configs += [
+    ":stdformat-select-polyfills",
+    ":stdformat-Wundef",
+  ]
+}
+
+fuchsia_unittest_component("stdformat-polyfills-test") {
+  deps = [ ":stdformat-polyfills-unit-test" ]
+}
+
+# These targets will let the feature-test macros pick the std implementation if
+# available.  They test all the available C++ modes, not just the default one
+# configured in the build.
+
+foreach(cxx_version, stdformat_cxx_versions) {
+  test("stdformat-$cxx_version-unit-test") {
+    sources = stdformat_test_sources
+    deps = [ ":stdformat-test-deps" ]
+    configs += [
+      ":stdformat-c++-$cxx_version",
+      ":stdformat-Wundef",
+    ]
+  }
+
+  fuchsia_unittest_component("stdformat-$cxx_version-test") {
+    deps = [ ":stdformat-$cxx_version-unit-test" ]
+  }
+
+  config("stdformat-c++-$cxx_version") {
+    visibility = [ ":*" ]
+    cflags_cc = [ "-std=c++$cxx_version" ]
+  }
+}
+
+fuchsia_test_package("stdformat-tests") {
+  test_components = []
+  foreach(test, stdformat_tests) {
+    test_components += [ ":$test-test" ]
+  }
+}
+
+config("stdformat-Wundef") {
+  visibility = [ ":*" ]
+  cflags = [ "-Wundef" ]
+}
+
+config("stdformat-select-polyfills") {
+  visibility = [ ":*" ]
+  defines = [ "LIB_STDFORMAT_USE_POLYFILLS" ]
+}

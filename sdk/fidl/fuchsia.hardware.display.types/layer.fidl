@@ -213,13 +213,32 @@ type PrimaryLayer = struct {
     display_destination fuchsia.math.RectU;
 };
 
-type ColorLayer = struct {
-    /// The format of `color` bytes.
+/// A color constant.
+type Color = struct {
+    /// The format of pixel data stored in `bytes`.
+    ///
+    /// The format must use a single plane. The encoding of one pixel
+    /// must fit within the `bytes` array.
     format fuchsia.images2.PixelFormat;
 
-    /// The color to use for the layer. The color is little-endian, and is
-    /// guaranteed to be of the exact size of one pixel in `format`.
-    color vector<uint8>:MAX;
+    /// The constant color, expressed as one pixel encoded using `format`.
+    ///
+    /// The pixel is encoded using little-endian byte ordering and zero padding.
+    /// In other words, the bytes obtained by encoding the pixel using `format`
+    /// are stored starting at the first byte in the array. If the pixel
+    /// requires fewer bytes per pixel than the array size, any unused bytes
+    /// (towards the end of the array) must be set to 0 (zero).
+    bytes array<uint8, 8>;
+    // The array fits the largest color representations that would be useful in
+    // the context of display engine hardware. The display engine hardware we're
+    // familiar with has pixel processing pipelines that support 4 color
+    // channels (3 color channels plus one alpha channel), and operate with
+    // precisions of 10-12 bits per channel.
+};
+
+type ColorLayer = struct {
+    /// The color to use for the layer.
+    color Color;
 };
 
 type LayerConfig = strict union {

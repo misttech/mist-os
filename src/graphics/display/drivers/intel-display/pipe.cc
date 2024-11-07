@@ -22,10 +22,10 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace {
 
@@ -148,8 +148,8 @@ void Pipe::ResetTranscoder(TranscoderId transcoder_id, registers::Platform platf
   // Here we wait for 60 msecs, which is enough to guarantee to include two
   // whole frames in ~50 fps.
   constexpr size_t kTransConfStatusWaitTimeoutMs = 60;
-  if (!PollUntil([&] { return !transcoder_config.ReadFrom(mmio_space).enabled(); }, zx::msec(1),
-                 kTransConfStatusWaitTimeoutMs)) {
+  if (!display::PollUntil([&] { return !transcoder_config.ReadFrom(mmio_space).enabled(); },
+                          zx::msec(1), kTransConfStatusWaitTimeoutMs)) {
     // Because this is a logical "reset", we only log failures rather than
     // crashing the driver.
     FDF_LOG(WARNING, "Failed to reset transcoder");

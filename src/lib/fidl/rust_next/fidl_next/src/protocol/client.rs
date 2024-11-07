@@ -218,7 +218,7 @@ impl<T: Transport> TransactionFuture<'_, T> {
     }
 }
 
-impl<'a, T: Transport> Future for TransactionFuture<'a, T> {
+impl<T: Transport> Future for TransactionFuture<'_, T> {
     type Output = Result<MessageBuffer<T>, ProtocolError<T::Error>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

@@ -2,32 +2,24 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/cpp/sdk_source_set.gni")
+import("//build/cpp/library_headers.gni")
 
-_include_dir = "include"
-config("safemath.config") {
-  include_dirs = [ _include_dir ]
-}
-
-sdk_source_set("safemath") {
-  category = "internal"
-
-  public = [
-    "include/safemath/checked_math.h",
-    "include/safemath/checked_math_impl.h",
-    "include/safemath/clamped_math.h",
-    "include/safemath/clamped_math_impl.h",
-    "include/safemath/math_constants.h",
-    "include/safemath/ranges.h",
-    "include/safemath/safe_conversions.h",
-    "include/safemath/safe_conversions_arm_impl.h",
-    "include/safemath/safe_conversions_impl.h",
-    "include/safemath/safe_math.h",
-    "include/safemath/safe_math_arm_impl.h",
-    "include/safemath/safe_math_clang_gcc_impl.h",
-    "include/safemath/safe_math_shared_impl.h",
+library_headers("safemath") {
+  headers = [
+    "safemath/checked_math.h",
+    "safemath/checked_math_impl.h",
+    "safemath/clamped_math.h",
+    "safemath/clamped_math_impl.h",
+    "safemath/math_constants.h",
+    "safemath/ranges.h",
+    "safemath/safe_conversions.h",
+    "safemath/safe_conversions_arm_impl.h",
+    "safemath/safe_conversions_impl.h",
+    "safemath/safe_math.h",
+    "safemath/safe_math_arm_impl.h",
+    "safemath/safe_math_clang_gcc_impl.h",
+    "safemath/safe_math_shared_impl.h",
   ]
-  public_configs = [ ":safemath.config" ]
 
   assert(!is_kernel,
          "This header library cannot be used with a kernel-specific toolchain!")

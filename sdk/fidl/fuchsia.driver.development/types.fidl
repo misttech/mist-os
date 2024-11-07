@@ -5,50 +5,10 @@ library fuchsia.driver.development;
 
 using fuchsia.component.decl;
 using fuchsia.driver.framework;
-using fuchsia.driver.legacy;
 using fuchsia.url;
 using zx;
 
 const NODE_MONIKER_MAX uint32 = 1024;
-
-@available(added=17, deprecated=18)
-type V1DeviceInfo = table {
-    /// The topological path of the driver.
-    1: topological_path string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
-
-    /// Path to the driver shared library.
-    2: bound_driver_libname string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
-
-    /// Properties of the device.
-    3: property_list fuchsia.driver.legacy.DevicePropertyList;
-
-    /// Tracks the state of the device.
-    4: flags fuchsia.driver.legacy.DeviceFlags;
-
-    /// Banjo protocol ID
-    5: protocol_id uint32;
-
-    /// Banjo protocol name
-    6: protocol_name string:MAX;
-};
-
-type V2NodeInfo = table {
-    /// The collection-relative moniker of the node.
-    1: moniker string:NODE_MONIKER_MAX;
-
-    /// Properties of the node.
-    2: node_property_list
-            vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
-
-    /// Component offers to the node.
-    3: offer_list vector<fuchsia.component.decl.Offer>:MAX;
-};
-
-@available(added=17, deprecated=18)
-type VersionedNodeInfo = flexible union {
-    1: v1 V1DeviceInfo;
-    2: v2 V2NodeInfo;
-};
 
 type NodeInfo = table {
     /// Unique ID identifying the node.
@@ -66,10 +26,6 @@ type NodeInfo = table {
     /// URL to the driver component manifest
     5: bound_driver_url fuchsia.url.Url;
 
-    /// Information specific to the driver framework version in use.
-    @available(added=17, deprecated=18)
-    6: versioned_info VersionedNodeInfo;
-
     /// The collection-relative moniker of the node.
     @available(added=18)
     7: moniker string:NODE_MONIKER_MAX;
@@ -85,7 +41,7 @@ type NodeInfo = table {
 
     /// Whether the node is in a quarantined state. That is, the |bound_driver_url| has failed to
     /// start, and the node is no longer running its driver instance.
-    @available(added=NEXT)
+    @available(added=25)
     10: quarantined bool;
 };
 
@@ -94,19 +50,15 @@ type NodeBindingInfo = table {
     /// Full topological name of the node.
     1: node_name string:NODE_MONIKER_MAX;
     /// This is the component url for the driver that bound to the node.
-    /// If this is present, then |composite_parents| and |legacy_composite_parents| must not be.
+    /// If this is present, then |composite_parents| must not be.
     2: driver_url fuchsia.url.Url;
     /// The composite parents that this node binded to.
-    /// Can be present alongside |legacy_composite_parents|, but not |driver_url|.
+    /// If this is present, then |driver_url| must not be.
     3: composite_parents vector<fuchsia.driver.framework.CompositeParent>:MAX;
-    /// The legacy composite parents that this node binded to.
-    /// Can be present alongside |composite_parents|, but not |driver_url|.
-    4: legacy_composite_parents vector<fuchsia.driver.legacy.CompositeParent>:MAX;
 };
 
-/// Contains information for either a composite or legacy composite.
+/// Contains information for a composite.
 type CompositeInfo = strict union {
-    1: legacy_composite fuchsia.driver.legacy.CompositeInfo;
     2: composite fuchsia.driver.framework.CompositeInfo;
 };
 
@@ -142,8 +94,6 @@ type RestartRematchFlags = flexible bits : uint32 {
     /// are nodes that are affected by the restart of the requested driver, for example when
     /// it is a colocated parent.
     NON_REQUESTED = 0x0002;
-    /// Rematch nodes that are legacy composite nodes.
-    LEGACY_COMPOSITE = 0x0004;
     /// Rematch nodes that are created as part of a completed composite spec.
     COMPOSITE_SPEC = 0x0008;
 };

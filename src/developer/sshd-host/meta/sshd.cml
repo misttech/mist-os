@@ -26,11 +26,6 @@
             path: "/config/data",
         },
         {
-            directory: "bin",
-            rights: [ "rx*" ],
-            path: "/bin",
-        },
-        {
             directory: "blob",
             rights: [ "rw*" ],
             path: "/blob",
@@ -39,6 +34,11 @@
             directory: "boot",
             rights: [ "rx*" ],
             path: "/boot",
+        },
+        {
+            directory: "boot-bin",
+            rights: [ "rx*" ],
+            path: "/boot-bin",
         },
         {
             directory: "build-info",
@@ -70,6 +70,11 @@
             directory: "pkgfs",
             rights: [ "rx*" ],
             path: "/pkgfs",
+        },
+        {
+            directory: "base-bin",
+            rights: [ "rx*" ],
+            path: "/bin",
         },
         {
             directory: "system",
@@ -168,6 +173,7 @@
                 "fuchsia.stash.SecureStore",
                 "fuchsia.stash.Store",
                 "fuchsia.stash.Store2",
+                "fuchsia.sys2.ConfigOverride.root",
                 "fuchsia.sys2.CrashIntrospect",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmExplorer.root",

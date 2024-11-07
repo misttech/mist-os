@@ -106,6 +106,7 @@ impl FileOps for RemoteBlockDeviceFile {
     // devices).
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -329,11 +330,11 @@ mod tests {
         assert_eq!(buf.data(), &[0u8; 512]);
 
         let mut buf = VecInputBuffer::from(vec![1u8; 512]);
-        file.seek(&current_task, SeekTarget::Set(0)).expect("seek failed");
+        file.seek(&mut locked, &current_task, SeekTarget::Set(0)).expect("seek failed");
         file.write(&mut locked, &current_task, &mut buf).expect("write failed.");
 
         let mut buf = VecOutputBuffer::new(512);
-        file.seek(&current_task, SeekTarget::Set(0)).expect("seek failed");
+        file.seek(&mut locked, &current_task, SeekTarget::Set(0)).expect("seek failed");
         file.read(&mut locked, &current_task, &mut buf).expect("read failed.");
         assert_eq!(buf.data(), &[1u8; 512]);
     }
@@ -351,7 +352,7 @@ mod tests {
         let device = registry.open(0).expect("open failed.");
         let file = Anon::new_file(&current_task, device.create_file_ops(), OpenFlags::RDWR);
 
-        file.seek(&current_task, SeekTarget::End(0)).expect("seek failed");
+        file.seek(&mut locked, &current_task, SeekTarget::End(0)).expect("seek failed");
         let mut buf = VecOutputBuffer::new(512);
         assert_eq!(file.read(&mut locked, &current_task, &mut buf).expect("read failed."), 0);
 

@@ -145,6 +145,9 @@ fn contains_unescaped(target: &str, forbidden: &str) -> bool {
     false
 }
 
+/// Checks if the payload of an already-parsed `StringSelector::Pattern` is
+/// indeed valid.
+/// Does not validate correctly for patterns in the selector *language*
 fn validate_pattern(pattern: &str) -> Result<(), ValidationError> {
     if pattern.is_empty() {
         return Err(ValidationError::EmptyStringPattern);
@@ -153,12 +156,6 @@ fn validate_pattern(pattern: &str) -> Result<(), ValidationError> {
     let mut errors = vec![];
     if contains_unescaped(pattern, "**") {
         errors.push(StringPatternError::UnescapedGlob);
-    }
-    if contains_unescaped(pattern, ":") {
-        errors.push(StringPatternError::UnescapedColon);
-    }
-    if contains_unescaped(pattern, "/") {
-        errors.push(StringPatternError::UnescapedForwardSlash);
     }
     if !errors.is_empty() {
         return Err(ValidationError::InvalidStringPattern(pattern.to_string(), errors));
@@ -291,17 +288,11 @@ mod tests {
     static SHARED_FAILING_TEST_CASES: LazyLock<Vec<(Vec<&'static str>, &'static str)>> =
         LazyLock::new(|| {
             vec![
-                // Slashes aren't allowed in path nodes.
-                (vec![r#"/"#], r#"a"#),
-                // Colons aren't allowed in path nodes.
-                (vec![r#":"#], r#"a"#),
                 // Checking that path nodes ending with offlimits
                 // chars are still identified.
-                (vec![r#"asdasd:"#], r#"a"#),
                 (vec![r#"a**"#], r#"a"#),
                 // Checking that path nodes starting with offlimits
                 // chars are still identified.
-                (vec![r#":asdasd"#], r#"a"#),
                 (vec![r#"**a"#], r#"a"#),
                 // Neither moniker segments nor node paths
                 // are allowed to be empty.
@@ -315,7 +306,6 @@ mod tests {
             // All failing validators due to property selectors are
             // unique since the component validator doesn't look at them.
             (vec![r#"a"#], r#"**"#),
-            (vec![r#"a"#], r#"/"#),
         ];
 
         fn create_tree_selector(node_path: &[&str], property: &str) -> fdiagnostics::TreeSelector {

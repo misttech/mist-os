@@ -387,7 +387,6 @@ async fn main_inner() -> Result<(), Error> {
             "build-info" => base_package_entry("build-info").await?,
             "config-data" => base_package_entry("config-data").await?,
             "root_ssl_certificates" => base_package_entry("root_ssl_certificates").await?,
-            "shell-commands" => base_package_entry("shell-commands").await?,
             "system_image" => base_package_entry("system_image").await?,
         }
     };

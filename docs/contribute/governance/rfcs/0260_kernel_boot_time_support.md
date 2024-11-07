@@ -34,6 +34,7 @@ _Reviewers:_
 
 - adamperry@google.com
 - andresoportus@google.com
+- cja@google.com
 - fmil@google.com
 - gkalsi@google.com
 - harshanv@google.com
@@ -41,6 +42,7 @@ _Reviewers:_
 - maniscalco@google.com
 - mcgrathr@google.com
 - miguelfrde@google.com
+- surajmalhotra@google.com
 - tgales@google.com
 - tmandry@google.com
 
@@ -236,6 +238,118 @@ a `zx_instant_boot_t` and therefore will be a point on `ZX_CLOCK_BOOT`.
 The [crashlog] currently reports an `uptime` field that utilizes monotonic time.
 Seeing as monotonic time does not include periods of suspension, this should be
 modified to use boot time and its type should be updated to `zx_instant_boot_t`.
+
+### Interrupt API Changes
+
+#### Interrupt Syscalls
+
+The Zircon Interrupt API contains two syscalls that operate on monotonic
+timestamps:
+
+```
+// Current function signatures.
+
+// Allows users to wait on an interrupt, and returns the timestamp at which the
+// interrupt was triggered.
+zx_status_t zx_interrupt_wait(zx_handle_t handle,
+                              zx_time_t* out_timestamp);
+
+// Triggers a virtual interrupt at the given timestamp.
+zx_status_t zx_interrupt_trigger(zx_handle_t handle,
+                                 uint32_t options,
+                                 zx_time_t timestamp);
+```
+
+This presents a problem because interrupts can fire during periods of
+suspension, in which the monotonic clock will be paused. Therefore, these
+timestamps must switch to using the boot timeline. Concretely, the syscall
+signatures will be changed to:
+
+```
+// Proposed function signatures.
+
+zx_status_t zx_interrupt_wait(zx_handle_t handle,
+                              zx_instant_boot_t* out_timestamp);
+zx_status_t zx_interrupt_trigger(zx_handle_t handle,
+                                 uint32_t options,
+                                 zx_instant_boot_t timestamp);
+```
+
+Since both `zx_instant_boot_t` and `zx_time_t` are aliases of `int64_t`, this
+change can be accomplished with a simple search and replace.
+
+#### `libzx` Wrappers
+
+The `libzx` library provides C++ wrappers around the `zx_interrupt_wait` and
+`zx_interrupt_trigger` syscalls. These wrappers will need to be updated to use
+the new boot timestamps. Because these wrappers use strong types for timestamps
+on different timelines, this will require migrating all callsites to use boot
+time.
+
+### Port Packet Changes
+
+There are a couple port packets that contain timestamps that will need to be
+modified.
+
+#### `zx_packet_interrupt_t`
+
+The `zx_interrupt_bind` syscall allows users to bind or unbind an interrupt
+object to a port. When a bound interrupt is triggered, a packet of type
+`ZX_PKT_TYPE_INTERRUPT` is queued on the given port. That packet has the
+following structure:
+
+```
+typedef struct zx_packet_interrupt {
+  // Timestamp at which the interrupt was triggered.
+  zx_time_t timestamp;
+  // ..some reserved fields...
+} zx_packet_interrupt_t;
+```
+
+The `timestamp` field must switch to using boot time (and therefore become a
+`zx_instant_boot_t`) for the same reason the timestamp returned by
+`zx_interrupt_wait` must be on the boot timeline.
+
+#### `zx_packet_signal_t`
+
+This packet is queued to a port that is bound to an object using the
+`zx_object_wait_async` syscall, which has the following signature:
+
+```
+zx_status_t zx_object_wait_async(zx_handle_t handle,
+                                 zx_handle_t port,
+                                 uint64_t key,
+                                 zx_signals_t signals,
+                                 uint32_t options);
+```
+
+When a signal in the set of `signals` is asserted on `handle`, and if the
+caller passed `ZX_WAIT_ASYNC_TIMESTAMP` in the `options` field, the resulting
+packet is enqueued to the port:
+
+```
+typedef struct zx_packet_signal {
+  // ... other fields ...
+  uint64_t timestamp;
+  // ... reserved fields ...
+} zx_packet_signal_t;
+```
+
+The `timestamp` field records when the signal was asserted. Depending on the
+type of object we're waiting on, it would make sense for the timestamp to be on
+different timelines. For example, we'd want a boot timestamp when waiting on a
+boot timer.
+
+So, we propose the following:
+
+1. Add a new flag to the `zx_object_wait_async` syscall called
+  `ZX_WAIT_ASYNC_BOOT_TIMESTAMP`, which signals that the `timestamp` field
+  should utilize the boot timeline.
+1. Switch the type of `timestamp` to the polymorphic alias `zx_time_t`.
+
+We will audit all existing usages of the `ZX_WAIT_ASYNC_TIMESTAMP` flag and
+ensure that any caller that needs boot timestamps is migrated over before we
+pause the monotonic clock.
 
 ## Implementation
 

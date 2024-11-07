@@ -78,7 +78,7 @@ impl ToolEnv {
             ffx: self.ffx_cmd_line,
             context,
             behavior: crate::FhoConnectionBehavior::DaemonConnector(injector.clone()),
-            injector,
+            injector: Some(injector),
             lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
         }
     }

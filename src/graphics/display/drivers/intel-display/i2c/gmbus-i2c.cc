@@ -10,7 +10,7 @@
 
 #include "src/graphics/display/drivers/intel-display/i2c/gmbus-gpio.h"
 #include "src/graphics/display/drivers/intel-display/registers-gmbus.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace intel_display {
 
@@ -203,7 +203,7 @@ zx_status_t GMBusI2c::I2cImplTransact(const i2c_impl_op_t* ops, size_t size) {
         // scope of the AutoLock.
         fdf::MmioBuffer& mmio_space = *mmio_space_;
 
-        if (!PollUntil(
+        if (!display::PollUntil(
                 [&]() {
                   return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
                 },
@@ -292,7 +292,7 @@ bool GMBusI2c::I2cFinish() {
   // thread-safety, because the scope of the alias is smaller than the method
   // scope, and the method is guaranteed to hold the lock.
   fdf::MmioBuffer& mmio_space = *mmio_space_;
-  bool idle = PollUntil(
+  bool idle = display::PollUntil(
       [&] { return !registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_active(); },
       zx::msec(1), 100);
 
@@ -315,7 +315,7 @@ bool GMBusI2c::I2cWaitForHwReady() {
   // scope, and the method is guaranteed to hold the lock.
   fdf::MmioBuffer& mmio_space = *mmio_space_;
 
-  if (!PollUntil(
+  if (!display::PollUntil(
           [&] {
             gmbus_controller_status.ReadFrom(&mmio_space);
             return gmbus_controller_status.nack_occurred() || gmbus_controller_status.is_ready();
@@ -340,7 +340,7 @@ bool GMBusI2c::I2cClearNack() {
   // scope, and the method is guaranteed to hold the lock.
   fdf::MmioBuffer& mmio_space = *mmio_space_;
 
-  if (!PollUntil(
+  if (!display::PollUntil(
           [&] {
             return !registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_active();
           },

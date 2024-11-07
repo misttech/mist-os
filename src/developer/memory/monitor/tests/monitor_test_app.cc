@@ -90,8 +90,12 @@ std::unique_ptr<memory::MockOS> CreateMockOS() {
                                              .value_count = 1,
                                              .ret = ZX_OK};
 
-  const memory::GetInfoResponse vmo_1_info = {
-      handle_process_1, ZX_INFO_PROCESS_VMOS, &_vmo_1, sizeof(_vmo_1), 1, ZX_OK};
+  const memory::GetInfoResponse vmo_1_info = {.handle = handle_process_1,
+                                              .topic = ZX_INFO_PROCESS_VMOS,
+                                              .values = &_vmo_1,
+                                              .value_size = sizeof(_vmo_1),
+                                              .value_count = 1,
+                                              .ret = ZX_OK};
   return std::make_unique<memory::MockOS>(
       memory::OsResponses{.get_info = {vmo_0_info, vmo_1_info, zram_stat, stat_resp}});
 }
@@ -102,7 +106,7 @@ int main(int argc, const char** argv) {
   auto capture_maker = memory::CaptureMaker::Create(CreateMockOS()).value();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   monitor::Monitor app(sys::ComponentContext::CreateAndServeOutgoingDirectory(), fxl::CommandLine{},
-                       loop.dispatcher(), false, false, false, memory_monitor_config::Config{},
+                       loop.dispatcher(), false, false, memory_monitor_config::Config{},
                        std::move(capture_maker));
   loop.Run();
   return 0;

@@ -10,7 +10,6 @@ use crate::{MlmeEventStream, MlmeSink, MlmeStream};
 use fidl::endpoints::{RequestStream, ServerEnd};
 use fidl_fuchsia_wlan_common::BssDescription as BssDescriptionFidl;
 use fidl_fuchsia_wlan_sme::{self as fidl_sme, ClientSmeRequest, TelemetryRequest};
-use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::select;
@@ -21,7 +20,7 @@ use tracing::error;
 use wlan_common::scan::write_vmo;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_inspect_auto_persist as auto_persist,
 };
 
 pub type Endpoint = ServerEnd<fidl_sme::ClientSmeMarker>;

@@ -17,10 +17,20 @@
 namespace forensics::feedback {
 namespace {
 
+ErrorOrString GetRuntime(timekeeper::Clock* clock) {
+  const auto runtime = FormatDuration(zx::duration(clock->MonotonicNow().to_timespec()));
+  if (!runtime) {
+    FX_LOGS(ERROR) << "Got negative runtime from timekeeper::Clock::MonotonicNow()";
+    return ErrorOrString(Error::kBadValue);
+  }
+
+  return ErrorOrString(*runtime);
+}
+
 ErrorOrString GetUptime(timekeeper::Clock* clock) {
-  const auto uptime = FormatDuration(zx::duration(clock->MonotonicNow().to_timespec()));
+  const auto uptime = FormatDuration(zx::duration(clock->BootNow().to_timespec()));
   if (!uptime) {
-    FX_LOGS(ERROR) << "Got negative uptime from timekeeper::Clock::Now()";
+    FX_LOGS(ERROR) << "Got negative uptime from timekeeper::Clock::BootNow()";
     return ErrorOrString(Error::kBadValue);
   }
 
@@ -43,6 +53,7 @@ TimeProvider::TimeProvider(async_dispatcher_t* dispatcher, zx::unowned_clock clo
 
 std::set<std::string> TimeProvider::GetKeys() const {
   return {
+      kDeviceRuntimeKey,
       kDeviceUptimeKey,
       kDeviceUtcTimeKey,
   };
@@ -58,6 +69,7 @@ Annotations TimeProvider::Get() {
   }();
 
   return {
+      {kDeviceRuntimeKey, GetRuntime(clock_.get())},
       {kDeviceUptimeKey, GetUptime(clock_.get())},
       {kDeviceUtcTimeKey, utc_time},
   };

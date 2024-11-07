@@ -4,7 +4,6 @@
 
 use std::io::{Error, Write};
 
-use crate::compiler::query::IsWireStatic;
 use crate::compiler::util::emit_doc_string;
 use crate::compiler::wire::{emit_type, emit_type_check};
 use crate::compiler::Compiler;
@@ -17,7 +16,7 @@ pub fn emit_struct<W: Write>(
 ) -> Result<(), Error> {
     let s = &compiler.schema.struct_declarations[ident];
 
-    let is_static = compiler.query::<IsWireStatic>(ident);
+    let is_static = s.shape.max_out_of_line == 0;
 
     let name = s.name.type_name();
     let params = if is_static { "" } else { "<'buf>" };

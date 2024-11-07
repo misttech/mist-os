@@ -20,7 +20,7 @@ use self::scan::{DiscoveryScan, ScanScheduler};
 use self::state::{ClientState, ConnectCommand};
 use crate::responder::Responder;
 use crate::{Config, MlmeRequest, MlmeSink, MlmeStream};
-use fuchsia_inspect_contrib::auto_persist::{self, AutoPersist};
+use fuchsia_inspect_auto_persist::{self as auto_persist, AutoPersist};
 use futures::channel::{mpsc, oneshot};
 use ieee80211::{Bssid, MacAddrBytes, Ssid};
 use std::sync::Arc;

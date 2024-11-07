@@ -1498,10 +1498,10 @@ impl Task {
 }
 
 impl Releasable for Task {
-    type Context<'a> = (ThreadState, &'a mut Locked<'a, TaskRelease>);
+    type Context<'a: 'b, 'b> = (ThreadState, &'b mut Locked<'a, TaskRelease>);
 
-    fn release(mut self, context: (ThreadState, &mut Locked<'_, TaskRelease>)) {
-        let (thread_state, _) = context;
+    fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
+        let (thread_state, locked) = context;
 
         *self.proc_pid_directory_cache.get_mut() = None;
 
@@ -1519,7 +1519,7 @@ impl Releasable for Task {
         let current_task = CurrentTask::new(OwnedRef::new(self), thread_state);
 
         // Apply any delayed releasers left.
-        current_task.trigger_delayed_releaser();
+        current_task.trigger_delayed_releaser(locked);
 
         // Drop the task now that is has been released. This requires to take it fro the OwnedRef
         // and from the resulting ReleaseGuard.

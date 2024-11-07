@@ -43,7 +43,7 @@ source_set("common") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-fuchsia_driver("bt-transport-uart-driver") {
+fuchsia_cc_driver("bt-transport-uart-driver") {
   output_name = "bt-transport-uart"
   configs += [
     "//build/config:all_source",

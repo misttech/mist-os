@@ -121,79 +121,6 @@ open protocol Session {
     });
 };
 
-// Copy of the existing controller to keep things working until all references
-// are to it are removed
-@discoverable
-protocol Controller {
-    /// Requests to initialize tracing with the specified `config`.
-    ///
-    /// A bad request will terminate the connection.
-    ///
-    /// The trace controller emits trace data to `output` as a sequence of
-    /// binary formatted trace records.  Traces obtained from different providers
-    /// are delimited by metadata records within the stream.
-    flexible InitializeTracing(resource struct {
-        config TraceConfig;
-        output zx.Handle:SOCKET;
-    });
-
-    /// Requests to terminate tracing.
-    ///
-    /// If tracing has not yet stopped it is stopped first.
-    /// If `options.write_results` is true, then the trace controller
-    /// continues to transfer any remaining data to the output socket
-    /// until finished, then closes the output.
-    flexible TerminateTracing(struct {
-        options TerminateOptions;
-    }) -> (struct {
-        result TerminateResult;
-    });
-
-    /// Requests to start tracing with the specified `options`.
-    ///
-    /// If tracing has already started then the request is ignored,
-    /// except to send back an error code.
-    ///
-    /// The trace controller acknowledges the request when all
-    /// registered providers have been started or after
-    /// `TraceConfig.start_timeout_milliseconds` milliseconds.
-    /// One useful reason for the has-started acknowledgement is that the
-    /// trace program can start a program to trace knowing that all the
-    /// providers are started.
-    flexible StartTracing(struct {
-        options StartOptions;
-    }) -> () error StartErrorCode;
-
-    /// Requests to stop tracing.
-    ///
-    /// If tracing has already stopped then this does nothing.
-    /// Returning a result lets callers know when it's ok to, for example,
-    /// start tracing again.
-    flexible StopTracing(struct {
-        options StopOptions;
-    }) -> ();
-
-    /// Return the set of registered providers.
-    flexible GetProviders() -> (struct {
-        providers vector<ProviderInfo>:MAX_NUM_PROVIDERS;
-    });
-
-    // Gets the known categories.
-    flexible GetKnownCategories() -> (struct {
-        categories vector<fuchsia.tracing.KnownCategory>:fuchsia.tracing.MAX_NUM_KNOWN_CATEGORIES;
-    });
-
-    /// Event sent when the session state changes.
-    flexible -> OnSessionStateChange(struct {
-        state SessionState;
-    });
-
-    /// Returns the next alert when it arrives.
-    flexible WatchAlert() -> (struct {
-        alert_name AlertName;
-    });
-};
-
 // Individual providers can be tuned with this.
 type ProviderSpec = table {
     1: name fuchsia.tracing.ProviderName;
@@ -219,15 +146,6 @@ type TraceConfig = table {
 
     /// Overrides for particular providers.
     5: provider_specs vector<ProviderSpec>:MAX_NUM_PROVIDERS;
-};
-
-/// Options to be passed with the TerminateTracing request.
-/// This determines whether any pending data is written to the output
-/// socket before it is closed.
-type TerminateOptions = table {
-    /// If true then write trace results.
-    /// If false then discard trace results.
-    1: write_results bool;
 };
 
 /// Statistics data per provider collected over the course of the tracing session

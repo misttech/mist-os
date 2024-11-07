@@ -30,9 +30,14 @@ def _instantiate_local_path(ctx, manifests):
     local_paths = ctx.attr.local_paths
     for local_path in local_paths:
         # Copies the SDK from a local Fuchsia platform build.
-        local_sdk_path = workspace_path(ctx, local_path)
-        ctx.report_progress("Copying local SDK from %s" % local_sdk_path)
-        local_sdk = ctx.path(local_sdk_path)
+        if local_path[0] == "@":
+            # Assume this is a file path inside the repository, e.g. @fuchsia_idk//:BUILD.bazel
+            local_sdk = ctx.path(Label(local_path)).dirname
+            ctx.report_progress("Copying local IDK from %s" % local_sdk)
+        else:
+            local_sdk_path = workspace_path(ctx, local_path)
+            ctx.report_progress("Copying local SDK from %s" % local_sdk_path)
+            local_sdk = ctx.path(local_sdk_path)
         if not local_sdk.exists:
             fail("Cannot find SDK in local Fuchsia build: %s\n\nPlease build it with\n\n\t\t'fx build generate_fuchsia_sdk_repository'" % local_sdk)
 
@@ -80,6 +85,12 @@ def _get_starlark_runtime_for(ctx, copy_content_strategy):
     """
 
     def _workspace_path(path):
+        if path.startswith("@"):
+            # This must point to a file inside the directory of interest.
+            # e.g. @<repo_name>//:BUILD.bazel --> path to external/repo_name
+            # This is necessary for parent_sdk_local_paths handling.
+            return ctx.path(Label(path)).dirname
+
         return ctx.path(workspace_path(ctx, path))
 
     def _label_to_path(label):

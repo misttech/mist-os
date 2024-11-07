@@ -15,7 +15,7 @@ use fidl_fuchsia_memory_debug::MemoryPressureProxy;
 pub struct MemorySignalTool {
     #[command]
     cmd: SignalCommand,
-    #[with(moniker("/core/memory_monitor"))]
+    #[with(moniker("/core/memory_pressure_signaler"))]
     debugger_proxy: MemoryPressureProxy,
 }
 

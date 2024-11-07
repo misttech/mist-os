@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fbl/auto_lock.h>
-
 #include "src/devices/usb/drivers/dwc3/dwc3-regs.h"
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
 namespace dwc3 {
 
 void Dwc3::CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   auto* mmio = get_mmio();
   const uint8_t ep_num = ep.ep_num;
@@ -27,7 +25,7 @@ void Dwc3::CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id) {
 }
 
 void Dwc3::CmdEpSetConfig(const Endpoint& ep, bool modify) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
 
   auto* mmio = get_mmio();
   const uint8_t ep_num = ep.ep_num;
@@ -57,7 +55,7 @@ void Dwc3::CmdEpSetConfig(const Endpoint& ep, bool modify) {
 }
 
 void Dwc3::CmdEpTransferConfig(const Endpoint& ep) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
   const uint8_t ep_num = ep.ep_num;
 
@@ -68,7 +66,7 @@ void Dwc3::CmdEpTransferConfig(const Endpoint& ep) {
 }
 
 void Dwc3::CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
   const uint8_t ep_num = ep.ep_num;
 
@@ -91,7 +89,7 @@ void Dwc3::CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys) {
 }
 
 void Dwc3::CmdEpEndTransfer(const Endpoint& ep) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
 
   const uint32_t ep_num = ep.ep_num;
@@ -115,7 +113,7 @@ void Dwc3::CmdEpEndTransfer(const Endpoint& ep) {
 }
 
 void Dwc3::CmdEpSetStall(const Endpoint& ep) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
 
   const uint32_t ep_num = ep.ep_num;
@@ -136,7 +134,7 @@ void Dwc3::CmdEpSetStall(const Endpoint& ep) {
 }
 
 void Dwc3::CmdEpClearStall(const Endpoint& ep) {
-  fbl::AutoLock lock(&lock_);
+  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
 
   const uint32_t ep_num = ep.ep_num;

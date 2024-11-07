@@ -110,22 +110,18 @@ async fn main() -> Result<()> {
 async fn resource_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>> {
     use fidl::endpoints::Proxy as _;
     let path = format!("/pkg/data/{name}");
-    let file =
-        fuchsia_fs::file::open_in_namespace_deprecated(&path, fio::OpenFlags::RIGHT_READABLE)
-            .with_context(|| format!("opening resource file: {path}"))?
-            .into_client_end()
-            .unwrap();
+    let file = fuchsia_fs::file::open_in_namespace(&path, fuchsia_fs::PERM_READABLE)
+        .with_context(|| format!("opening resource file: {path}"))?
+        .into_client_end()
+        .unwrap();
     Ok(file)
 }
 
 /// Creates a file channel from a file name.
 fn sound_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>> {
     let (client_end, server_end) = fidl::endpoints::create_endpoints();
-    let () = fuchsia_fs::file::open_channel_in_namespace_deprecated(
-        name,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        server_end,
-    )?;
+    let () =
+        fuchsia_fs::file::open_channel_in_namespace(name, fuchsia_fs::PERM_READABLE, server_end)?;
     Ok(client_end)
 }
 

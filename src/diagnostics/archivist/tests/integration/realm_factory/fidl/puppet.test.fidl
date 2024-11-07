@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
+@available(added=25)
 library fuchsia.archivist.test;
 
 using fuchsia.diagnostics;
@@ -95,6 +95,7 @@ open protocol InspectWriter {
     flexible EmitExampleInspectData() -> ();
 
     /// Escrow the current inspect data and immediately exit afterwards.
+    @available(added=HEAD)
     flexible EscrowAndExit(table {
         1: name string:fuchsia.inspect.MAX_NAME_LENGTH;
     }) -> (resource table {

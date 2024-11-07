@@ -5,6 +5,7 @@
 use super::events::GraphEventsTracker;
 use super::{Metadata, Vertex, VertexId};
 use fuchsia_inspect as inspect;
+use futures::FutureExt;
 use std::marker::PhantomData;
 
 /// A directed graph on top of Inspect.
@@ -13,6 +14,7 @@ pub struct Digraph<I> {
     _node: inspect::Node,
     topology_node: inspect::Node,
     events_tracker: Option<GraphEventsTracker>,
+    _stats_node: Option<inspect::LazyNode>,
     _phantom: PhantomData<I>,
 }
 
@@ -41,12 +43,29 @@ where
     pub fn new(parent: &inspect::Node, options: DigraphOpts) -> Digraph<I> {
         let node = parent.create_child("fuchsia.inspect.Graph");
         let mut events_tracker = None;
+        let mut _stats_node = None;
         if options.max_events > 0 {
             let list_node = node.create_child("events");
             events_tracker = Some(GraphEventsTracker::new(list_node, options.max_events));
+            let accessor_0 = events_tracker.as_ref().unwrap().history_stats_accessor();
+            _stats_node = Some(node.create_lazy_child("stats", move || {
+                let accessor_1 = accessor_0.clone();
+                async move {
+                    let inspector = inspect::Inspector::default();
+                    let root = inspector.root();
+                    root.record_uint("event_capacity", options.max_events as u64);
+                    let duration = accessor_1.history_duration().into_nanos();
+                    root.record_int("history_duration_ns", duration);
+                    if accessor_1.at_capacity() {
+                        root.record_int("at_capacity_history_duration_ns", duration);
+                    }
+                    Ok(inspector)
+                }
+                .boxed()
+            }));
         }
         let topology_node = node.create_child("topology");
-        Digraph { _node: node, topology_node, events_tracker, _phantom: PhantomData }
+        Digraph { _node: node, topology_node, events_tracker, _stats_node, _phantom: PhantomData }
     }
 
     /// Add a new vertex to the graph identified by the given ID and with the given initial
@@ -69,9 +88,29 @@ mod tests {
     use super::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_inspect::reader::snapshot::Snapshot;
-    use fuchsia_inspect::Inspector;
+    use fuchsia_inspect::{DiagnosticsHierarchyGetter, Inspector};
     use inspect_format::{BlockIndex, BlockType};
     use std::collections::BTreeSet;
+
+    fn history_duration_from_events(
+        inspector: &inspect::Inspector,
+        first_index: &str,
+        last_index: &str,
+    ) -> i64 {
+        let first_path = &["fuchsia.inspect.Graph", "events", first_index, "@time"];
+        let first_time = inspector
+            .get_diagnostics_hierarchy()
+            .get_property_by_path(first_path)
+            .and_then(|p| p.int())
+            .unwrap();
+        let last_path = &["fuchsia.inspect.Graph", "events", last_index, "@time"];
+        let last_time = inspector
+            .get_diagnostics_hierarchy()
+            .get_property_by_path(last_path)
+            .and_then(|p| p.int())
+            .unwrap();
+        last_time - first_time
+    }
 
     #[fuchsia::test]
     fn test_simple_graph() {
@@ -201,7 +240,7 @@ mod tests {
                         },
                         "relationships": {}
                     },
-                }
+                },
             }
         });
 
@@ -254,6 +293,10 @@ mod tests {
                          "vertex_id": "test-node",
                          "meta": {}
                     },
+                },
+                stats: {
+                    event_capacity: 8u64,
+                    history_duration_ns: 0i64,
                 }
             }
         });
@@ -268,6 +311,7 @@ mod tests {
         vertex.meta().set_and_track("uintvec_property", vec![15u64, 31u64, 63u64]);
         vertex.meta().set_and_track("doublevec_property", vec![15.0, 31.0, 63.0]);
 
+        let mut history_duration = history_duration_from_events(&inspector, "1", "8");
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
                 topology: {
@@ -342,7 +386,12 @@ mod tests {
                         update: vec![15.0, 31.0, 63.0],
                         vertex_id: "test-node"
                     }
-                }
+                },
+                stats: {
+                    event_capacity: 8u64,
+                    history_duration_ns: history_duration,
+                    at_capacity_history_duration_ns: history_duration,
+                },
             }
         });
 
@@ -356,6 +405,7 @@ mod tests {
         vertex.meta().remove_and_track("uintvec_property");
         vertex.meta().remove_and_track("doublevec_property");
 
+        history_duration = history_duration_from_events(&inspector, "9", "16");
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
                 topology: {
@@ -413,6 +463,11 @@ mod tests {
                         key: "doublevec_property",
                         vertex_id: "test-node"
                     }
+                },
+                "stats": {
+                    event_capacity: 8u64,
+                    history_duration_ns: history_duration,
+                    at_capacity_history_duration_ns: history_duration,
                 }
             }
         });
@@ -657,7 +712,7 @@ mod tests {
 
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
-                "topology": {}
+                "topology": {},
             }
         });
     }
@@ -722,6 +777,7 @@ mod tests {
             ],
         );
 
+        let mut history_duration = history_duration_from_events(&inspector, "0", "2");
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
                 "events": {
@@ -749,6 +805,10 @@ mod tests {
                             "some-property": 10i64,
                         }
                     },
+                },
+                "stats": {
+                    event_capacity: 5u64,
+                    history_duration_ns: history_duration,
                 },
                 "topology": {
                     "test-node-1": {
@@ -788,6 +848,7 @@ mod tests {
         //This change must roll out one event since it'll be the 6th one and we only track 5 events.
         vertex_one.meta().set("level", 3u64);
 
+        history_duration = history_duration_from_events(&inspector, "1", "5");
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
                 "events": {
@@ -829,6 +890,11 @@ mod tests {
                         "vertex_id": "test-node-1",
                     },
                 },
+                "stats": {
+                    event_capacity: 5u64,
+                    history_duration_ns: history_duration,
+                    at_capacity_history_duration_ns: history_duration,
+                },
                 "topology": {
                     "test-node-1": {
                         "meta": {
@@ -861,6 +927,8 @@ mod tests {
         drop(vertex_one);
         drop(vertex_two);
 
+        // The list size is 5, so the events range from "4" to "8".
+        history_duration = history_duration_from_events(&inspector, "4", "8");
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
                 "events": contains {
@@ -879,6 +947,11 @@ mod tests {
                         "event": "remove_vertex",
                         "vertex_id": "test-node-2",
                     }
+                },
+                "stats": {
+                    event_capacity: 5u64,
+                    history_duration_ns: history_duration,
+                    at_capacity_history_duration_ns: history_duration,
                 },
                 "topology": {}
             }
@@ -921,6 +994,10 @@ mod tests {
                         }
                     }
                 },
+                "stats": {
+                    event_capacity: 3u64,
+                    history_duration_ns: 0i64,
+                },
                 "topology": {
                     "test-node": {
                         "meta": {
@@ -943,6 +1020,7 @@ mod tests {
         vertex.meta().set("nested/int", 5i64);
         vertex.meta().set("nested/nested2/boolean", true);
 
+        let history_duration = history_duration_from_events(&inspector, "0", "1");
         assert_data_tree!(inspector, root: {
             "fuchsia.inspect.Graph": {
                 "events": {
@@ -954,6 +1032,10 @@ mod tests {
                         "event": "update_key",
                         "vertex_id": "test-node",
                     },
+                },
+                "stats": {
+                    event_capacity: 3u64,
+                    history_duration_ns: history_duration,
                 },
                 "topology": {
                     "test-node": {

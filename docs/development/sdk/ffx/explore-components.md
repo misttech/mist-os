@@ -212,7 +212,7 @@ Instead, the following alternatives are recommended:
 -  Route capabilities explicitly from the child to the parent component.
 -  Explore the child component itself.
 
-### How is this different from ffx component run? {:#how-is-his-different-from-ffx-component-run}
+### How is this different from ffx component run? {:#how-is-this-different-from-ffx-component-run}
 
 The [`ffx component run`][ffx-component-run] command creates and starts a component
 in a specified collection within the component topology. However, `ffx component run`

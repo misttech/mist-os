@@ -23,7 +23,7 @@ use packet::{
     GrowBufferMut, InnerPacketBuilder, MaybeParsed, PacketBuilder, PacketConstraints,
     ParsablePacket, ParseMetadata, ReusableBuffer, SerializeError, SerializeTarget, Serializer,
 };
-use zerocopy::byteorder::network_endian::U16;
+use zerocopy::byteorder::network_endian::{U16, U32};
 use zerocopy::{
     FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, SplitByteSliceMut, Unaligned,
 };
@@ -31,18 +31,18 @@ use zerocopy::{
 use crate::error::{IpParseError, IpParseErrorAction, IpParseResult, ParseError};
 use crate::icmp::Icmpv6ParameterProblemCode;
 use crate::ip::{
-    DscpAndEcn, IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto, Nat64Error,
-    Nat64TranslationResult,
+    DscpAndEcn, FragmentOffset, IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType,
+    Ipv6Proto, Nat64Error, Nat64TranslationResult,
 };
 use crate::ipv4::{Ipv4PacketBuilder, HDR_PREFIX_LEN};
-use crate::ipv6::ext_hdrs::{HopByHopOption, HopByHopOptionData};
 use crate::tcp::{TcpParseArgs, TcpSegment};
 use crate::udp::{UdpPacket, UdpParseArgs};
 
 use ext_hdrs::{
     is_valid_next_header, is_valid_next_header_upper_layer, ExtensionHeaderOptionAction,
-    Ipv6ExtensionHeader, Ipv6ExtensionHeaderData, Ipv6ExtensionHeaderImpl,
-    Ipv6ExtensionHeaderParsingContext, Ipv6ExtensionHeaderParsingError, IPV6_FRAGMENT_EXT_HDR_LEN,
+    HopByHopOption, HopByHopOptionData, Ipv6ExtensionHeader, Ipv6ExtensionHeaderData,
+    Ipv6ExtensionHeaderImpl, Ipv6ExtensionHeaderParsingContext, Ipv6ExtensionHeaderParsingError,
+    IPV6_FRAGMENT_EXT_HDR_LEN,
 };
 
 /// Length of the IPv6 fixed header.
@@ -59,6 +59,14 @@ const NEXT_HEADER_OFFSET: u8 = 6;
 // representable value is `core::u8::MAX` and it means the header has
 // that many 8-octets, not including the first 8 octets.
 const IPV6_HBH_OPTIONS_MAX_LEN: usize = (core::u8::MAX as usize) * 8 + 8;
+
+/// The maximum payload length after an IPv6 header.
+///
+/// The maximum IPv6 payload is the total number of bytes after the fixed header
+/// and must fit in a u16 as defined in [RFC 8200 Section 3].
+///
+/// [RFC 8200 Section 3]: https://datatracker.ietf.org/doc/html/rfc8200#section-3.
+const IPV6_MAX_PAYLOAD_LENGTH: usize = core::u16::MAX as usize;
 
 /// Convert an extension header parsing error to an IP packet
 /// parsing error.
@@ -653,7 +661,7 @@ impl<B: SplitByteSlice> Ipv6Packet<B> {
 
             // TODO(https://fxbug.dev/42174049): This needs an update once
             // we don't return early for fragment_header_present case.
-            builder.fragment_offset(0);
+            builder.fragment_offset(FragmentOffset::ZERO);
             builder.mf_flag(false);
 
             builder
@@ -999,6 +1007,110 @@ impl<B: SplitByteSliceMut> Ipv6PacketRaw<B> {
     }
 }
 
+/// A next header that may be either a next layer header or an IPv6 extension
+/// header.
+pub enum NextHeader {
+    /// A next layer header follows.
+    NextLayer(Ipv6Proto),
+    /// An extension header follows.
+    Extension(Ipv6ExtHdrType),
+}
+
+impl From<NextHeader> for u8 {
+    fn from(next_hdr: NextHeader) -> Self {
+        match next_hdr {
+            NextHeader::NextLayer(n) => n.into(),
+            NextHeader::Extension(e) => e.into(),
+        }
+    }
+}
+
+mod sealed {
+    use super::*;
+    /// A marker trait for IPv6 headers that can be serialized before header
+    /// `T`.
+    ///
+    /// This trait is used to enforce IPv6 extension header ordering according
+    /// to [RFC 8200 Section 4.1].
+    ///
+    /// [RFC 8200 Section 4.1]: https://datatracker.ietf.org/doc/html/rfc8200#section-4.1
+    pub trait Ipv6HeaderBefore<T> {}
+
+    impl<'a, O, T> Ipv6HeaderBefore<T> for &'a O where O: Ipv6HeaderBefore<T> {}
+
+    /// A trait abstracting all types of IPv6 header builders.
+    pub trait Ipv6HeaderBuilder {
+        /// Returns an immutable reference to the fixed header builder.
+        fn fixed_header(&self) -> &Ipv6PacketBuilder;
+
+        /// Returns the total header length of the extension headers, including
+        /// previous extension headers, but excluding the fixed header size.
+        fn extension_headers_len(&self) -> usize;
+
+        /// Serializes the header into `buffer`.
+        ///
+        /// `next_header` is the header immediately after the current one.
+        /// `payload_len` is the total size of the frame after this header.
+        fn serialize_header<B: SplitByteSliceMut, BV: BufferViewMut<B>>(
+            &self,
+            buffer: &mut BV,
+            next_header: NextHeader,
+            payload_len: usize,
+        );
+    }
+}
+use sealed::{Ipv6HeaderBefore, Ipv6HeaderBuilder};
+
+impl<'a, O> Ipv6HeaderBuilder for &'a O
+where
+    O: Ipv6HeaderBuilder,
+{
+    fn fixed_header(&self) -> &Ipv6PacketBuilder {
+        O::fixed_header(self)
+    }
+
+    fn extension_headers_len(&self) -> usize {
+        O::extension_headers_len(self)
+    }
+
+    fn serialize_header<B: SplitByteSliceMut, BV: BufferViewMut<B>>(
+        &self,
+        buffer: &mut BV,
+        next_header: NextHeader,
+        payload_len: usize,
+    ) {
+        O::serialize_header(self, buffer, next_header, payload_len)
+    }
+}
+
+/// A helper macro to implement `PacketBuilder` methods for implementers of
+/// `Ipv6HeaderBuilder`.
+///
+/// This can't be a blanket impl because `PacketBuilder` is a foreign trait.
+macro_rules! impl_packet_builder {
+    {} => {
+        fn constraints(&self) -> PacketConstraints {
+            let ext_headers = self.extension_headers_len();
+            let header_len = IPV6_FIXED_HDR_LEN + ext_headers;
+            let footer_len = 0;
+            let min_body_len = 0;
+            // Extension headers take from the IPv6 available payload size.
+            // See RFC 8200 Section 3 for details.
+            let max_body_len = IPV6_MAX_PAYLOAD_LENGTH - ext_headers;
+            PacketConstraints::new(header_len, footer_len, min_body_len, max_body_len)
+        }
+
+        fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
+            let mut bv = &mut target.header;
+            self.serialize_header(
+                &mut bv,
+                NextHeader::NextLayer(self.fixed_header().proto()),
+                body.len(),
+            );
+        }
+    }
+}
+
 /// A builder for IPv6 packets.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Ipv6PacketBuilder {
@@ -1051,6 +1163,48 @@ impl Ipv6PacketBuilder {
     }
 }
 
+impl Ipv6HeaderBuilder for Ipv6PacketBuilder {
+    fn fixed_header(&self) -> &Ipv6PacketBuilder {
+        self
+    }
+
+    fn extension_headers_len(&self) -> usize {
+        0
+    }
+
+    fn serialize_header<B: SplitByteSliceMut, BV: BufferViewMut<B>>(
+        &self,
+        buffer: &mut BV,
+        next_header: NextHeader,
+        payload_len: usize,
+    ) {
+        buffer
+            .write_obj_front(&FixedHeader::new(
+                self.dscp_and_ecn,
+                self.flowlabel,
+                {
+                    // The caller promises to supply a body whose length
+                    // does not exceed max_body_len. Doing this as a
+                    // debug_assert (rather than an assert) is fine because,
+                    // with debug assertions disabled, we'll just write an
+                    // incorrect header value, which is acceptable if the
+                    // caller has violated their contract.
+                    debug_assert!(payload_len <= core::u16::MAX as usize);
+                    payload_len as u16
+                },
+                next_header.into(),
+                self.hop_limit,
+                self.src_ip,
+                self.dst_ip,
+            ))
+            .expect("not enough bytes for IPv6 fixed header");
+    }
+}
+
+impl PacketBuilder for Ipv6PacketBuilder {
+    impl_packet_builder! {}
+}
+
 /// A builder for Ipv6 packets with HBH Options.
 #[derive(Debug, Clone)]
 pub struct Ipv6PacketBuilderWithHbhOptions<'a, I> {
@@ -1098,47 +1252,6 @@ fn next_multiple_of_eight(x: usize) -> usize {
     (x + 7) & (!7)
 }
 
-impl Ipv6PacketBuilder {
-    fn serialize_fixed_hdr<B: SplitByteSliceMut, BV: BufferViewMut<B>>(
-        &self,
-        mut buffer: BV,
-        payload_len: usize,
-        next_hdr: u8,
-    ) {
-        buffer
-            .write_obj_front(&FixedHeader::new(
-                self.dscp_and_ecn,
-                self.flowlabel,
-                {
-                    // The caller promises to supply a body whose length
-                    // does not exceed max_body_len. Doing this as a
-                    // debug_assert (rather than an assert) is fine because,
-                    // with debug assertions disabled, we'll just write an
-                    // incorrect header value, which is acceptable if the
-                    // caller has violated their contract.
-                    debug_assert!(payload_len <= core::u16::MAX as usize);
-                    payload_len as u16
-                },
-                next_hdr,
-                self.hop_limit,
-                self.src_ip,
-                self.dst_ip,
-            ))
-            .expect("not enough bytes for IPv6 fixed header");
-    }
-}
-
-impl PacketBuilder for Ipv6PacketBuilder {
-    fn constraints(&self) -> PacketConstraints {
-        // TODO(joshlf): Update when we support serializing extension headers
-        PacketConstraints::new(IPV6_FIXED_HDR_LEN, 0, 0, (1 << 16) - 1)
-    }
-
-    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
-        self.serialize_fixed_hdr(&mut target.header, body.len(), self.proto.into());
-    }
-}
-
 impl IpPacketBuilder<Ipv6> for Ipv6PacketBuilder {
     fn new(src_ip: Ipv6Addr, dst_ip: Ipv6Addr, ttl: u8, proto: Ipv6Proto) -> Self {
         Ipv6PacketBuilder::new(src_ip, dst_ip, ttl, proto)
@@ -1169,39 +1282,47 @@ impl IpPacketBuilder<Ipv6> for Ipv6PacketBuilder {
     }
 }
 
+impl<'a, I> Ipv6HeaderBuilder for Ipv6PacketBuilderWithHbhOptions<'a, I>
+where
+    I: Iterator + Clone,
+    I::Item: Borrow<HopByHopOption<'a>>,
+{
+    fn fixed_header(&self) -> &Ipv6PacketBuilder {
+        &self.prefix_builder
+    }
+
+    fn extension_headers_len(&self) -> usize {
+        self.prefix_builder.extension_headers_len() + self.aligned_hbh_len()
+    }
+
+    fn serialize_header<B: SplitByteSliceMut, BV: BufferViewMut<B>>(
+        &self,
+        buffer: &mut BV,
+        next_header: NextHeader,
+        payload_len: usize,
+    ) {
+        let aligned_hbh_len = self.aligned_hbh_len();
+        // The next header in the fixed header now should be 0 (Hop-by-Hop Extension Header)
+        self.prefix_builder.serialize_header(
+            buffer,
+            NextHeader::Extension(Ipv6ExtHdrType::HopByHopOptions),
+            payload_len + aligned_hbh_len,
+        );
+        // take the first two bytes to write in proto and length information.
+        let mut hbh_header = buffer.take_front(aligned_hbh_len).unwrap();
+        let hbh_header = hbh_header.as_mut();
+        hbh_header[0] = next_header.into();
+        hbh_header[1] = u8::try_from((aligned_hbh_len - 8) / 8).expect("extension header too big");
+        self.hbh_options.serialize_into(&mut hbh_header[2..]);
+    }
+}
+
 impl<'a, I> PacketBuilder for Ipv6PacketBuilderWithHbhOptions<'a, I>
 where
     I: Iterator + Clone,
     I::Item: Borrow<HopByHopOption<'a>>,
 {
-    fn constraints(&self) -> PacketConstraints {
-        let header_len = IPV6_FIXED_HDR_LEN + self.aligned_hbh_len();
-        PacketConstraints::new(header_len, 0, 0, (1 << 16) - 1)
-    }
-
-    fn serialize(&self, target: &mut SerializeTarget<'_>, body: FragmentedBytesMut<'_, '_>) {
-        let aligned_hbh_len = self.aligned_hbh_len();
-        // The next header in the fixed header now should be 0 (Hop-by-Hop Extension Header)
-        self.prefix_builder.serialize_fixed_hdr(
-            &mut target.header,
-            body.len() + aligned_hbh_len,
-            0,
-        );
-        // header implements BufferViewMut
-        let mut header = &mut target.header;
-        let mut hbh_extension_header = header
-            .take_back_zero(aligned_hbh_len)
-            .expect("too few bytes for Hop-by-Hop extension header");
-        let mut hbh_pointer = &mut hbh_extension_header;
-        // take the first two bytes to write in proto and length information.
-        let next_header_and_len = hbh_pointer.take_front_zero(2).unwrap();
-        next_header_and_len[0] = self.prefix_builder.proto.into();
-        next_header_and_len[1] =
-            u8::try_from((aligned_hbh_len - 8) / 8).expect("extension header too big");
-        // After the first two bytes, we can serialize our real options.
-        let options = hbh_pointer.take_rest_front_zero();
-        self.hbh_options.serialize_into(options);
-    }
+    impl_packet_builder! {}
 }
 
 impl<'a, Item> IpPacketBuilder<Ipv6>
@@ -1241,6 +1362,88 @@ where
     fn set_dscp_and_ecn(&mut self, dscp_and_ecn: DscpAndEcn) {
         self.prefix_builder.set_dscp_and_ecn(dscp_and_ecn)
     }
+}
+
+/// An IPv6 packet builder that includes the fragmentation header.
+///
+/// `Ipv6PacketBuilderWithFragmentHeader` wraps another compatible packet
+/// builder to attach the fragment header on it.
+///
+/// See [RFC 8200 Section 2.5] for the fragment header format.
+///
+/// [RFC 8200 Section 2.5]: https://datatracker.ietf.org/doc/html/rfc8200#section-4.5
+#[derive(Debug, Eq, PartialEq)]
+pub struct Ipv6PacketBuilderWithFragmentHeader<B> {
+    header_builder: B,
+    fragment_offset: FragmentOffset,
+    more_fragments: bool,
+    identification: u32,
+}
+
+impl<B: Ipv6HeaderBefore<Self>> Ipv6PacketBuilderWithFragmentHeader<B> {
+    /// Creates a new `Ipv6PacketBuilderWithFragmentHeader`.
+    pub fn new(
+        header_builder: B,
+        fragment_offset: FragmentOffset,
+        more_fragments: bool,
+        identification: u32,
+    ) -> Self {
+        Self { header_builder, fragment_offset, more_fragments, identification }
+    }
+}
+
+impl<B> Ipv6HeaderBefore<Ipv6PacketBuilderWithFragmentHeader<B>> for Ipv6PacketBuilder {}
+impl<B, I> Ipv6HeaderBefore<Ipv6PacketBuilderWithFragmentHeader<B>>
+    for Ipv6PacketBuilderWithHbhOptions<'_, I>
+{
+}
+
+/// A marker trait for all header builder types that can be used to construct
+/// and serialize IPv6 headers using [`Ipv6PacketBuilderWithFragmentHeader`].
+pub trait Ipv6PacketBuilderBeforeFragment:
+    Ipv6HeaderBefore<Ipv6PacketBuilderWithFragmentHeader<Self>> + Ipv6HeaderBuilder + Sized
+{
+}
+impl<B> Ipv6PacketBuilderBeforeFragment for B where
+    B: Ipv6HeaderBefore<Ipv6PacketBuilderWithFragmentHeader<Self>> + Ipv6HeaderBuilder + Sized
+{
+}
+
+impl<B: Ipv6HeaderBuilder> Ipv6HeaderBuilder for Ipv6PacketBuilderWithFragmentHeader<B> {
+    fn fixed_header(&self) -> &Ipv6PacketBuilder {
+        self.header_builder.fixed_header()
+    }
+
+    fn extension_headers_len(&self) -> usize {
+        self.header_builder.extension_headers_len() + IPV6_FRAGMENT_EXT_HDR_LEN
+    }
+
+    fn serialize_header<BB: SplitByteSliceMut, BV: BufferViewMut<BB>>(
+        &self,
+        buffer: &mut BV,
+        next_header: NextHeader,
+        payload_len: usize,
+    ) {
+        let Self { header_builder, fragment_offset, more_fragments, identification } = self;
+        let payload_len = payload_len + IPV6_FRAGMENT_EXT_HDR_LEN;
+        header_builder.serialize_header(
+            buffer,
+            NextHeader::Extension(Ipv6ExtHdrType::Fragment),
+            payload_len,
+        );
+        buffer.write_obj_front(&u8::from(next_header)).unwrap();
+        // Reserved.
+        let _: BB = buffer.take_front_zero(1).unwrap();
+        let more_fragments = u16::from(*more_fragments);
+        buffer
+            .write_obj_front(&U16::new(fragment_offset.into_raw() << 3 | more_fragments))
+            .unwrap();
+        buffer.write_obj_front(&U32::new(*identification)).unwrap();
+    }
+}
+
+impl<B: Ipv6HeaderBuilder> PacketBuilder for Ipv6PacketBuilderWithFragmentHeader<B> {
+    impl_packet_builder! {}
 }
 
 /// Reassembles a fragmented packet into a parsed IP packet.
@@ -1302,6 +1505,7 @@ pub(crate) fn reassemble_fragmented_packet<
 mod tests {
     use assert_matches::assert_matches;
     use packet::{Buf, FragmentedBuffer, ParseBuffer};
+    use test_case::test_case;
 
     use crate::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
     use crate::testutil::*;
@@ -2270,7 +2474,7 @@ mod tests {
         ipv4_builder.dscp_and_ecn(IP_DSCP_AND_ECN);
         ipv4_builder.df_flag(false);
         ipv4_builder.mf_flag(false);
-        ipv4_builder.fragment_offset(0);
+        ipv4_builder.fragment_offset(FragmentOffset::ZERO);
 
         let mut ipv6_builder =
             Ipv6PacketBuilder::new(DEFAULT_SRC_IP, DEFAULT_DST_IP, IP_TTL, proto_v6);
@@ -2455,6 +2659,65 @@ mod tests {
         assert_eq!(
             expected_v4_pkt_buf.to_flattened_vec(),
             translated_v4_pkt_buf.to_flattened_vec()
+        );
+    }
+
+    #[test_case(new_builder(), true; "fixed header more frags")]
+    #[test_case(Ipv6PacketBuilderWithHbhOptions::new(
+        new_builder(),
+        &[HopByHopOption {
+            action: ExtensionHeaderOptionAction::SkipAndContinue,
+            mutable: false,
+            data: HopByHopOptionData::RouterAlert { data: 0 },
+        }]).unwrap(), false; "hbh last frag")]
+    fn ipv6_packet_builder_with_fragment_header<
+        B: Ipv6HeaderBuilder + Ipv6HeaderBefore<Ipv6PacketBuilderWithFragmentHeader<B>> + Debug,
+    >(
+        inner: B,
+        more_fragments: bool,
+    ) {
+        const PAYLOAD: [u8; 10] = [0, 1, 2, 3, 3, 4, 5, 7, 8, 9];
+        let fragment_offset = FragmentOffset::new(13).unwrap();
+        let identification = 0xABCDABCD;
+        let builder = Ipv6PacketBuilderWithFragmentHeader::new(
+            inner,
+            fragment_offset,
+            more_fragments,
+            identification,
+        );
+        let mut serialized = PAYLOAD
+            .into_serializer()
+            .encapsulate(builder)
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b();
+        let packet = serialized.parse::<Ipv6Packet<_>>().unwrap();
+        assert!(packet.fragment_header_present());
+        assert_eq!(packet.proto(), Ipv6Proto::Proto(IpProto::Tcp));
+        let fragment_data = packet
+            .extension_hdrs
+            .into_iter()
+            .find_map(|ext_hdr| match ext_hdr.into_data() {
+                Ipv6ExtensionHeaderData::Fragment { fragment_data } => Some(fragment_data),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(fragment_data.fragment_offset(), fragment_offset);
+        assert_eq!(fragment_data.identification(), identification);
+        assert_eq!(fragment_data.m_flag(), more_fragments);
+    }
+
+    // Tests that the PacketBuilder implementations correct the maximum body
+    // length in PacketConstraints to remove any extension header bytes used.
+    #[test]
+    fn extension_headers_take_from_max_body_size() {
+        let builder = new_builder();
+        assert_eq!(builder.constraints().max_body_len(), IPV6_MAX_PAYLOAD_LENGTH);
+        let builder =
+            Ipv6PacketBuilderWithFragmentHeader::new(builder, FragmentOffset::ZERO, false, 1234);
+        assert_eq!(
+            builder.constraints().max_body_len(),
+            IPV6_MAX_PAYLOAD_LENGTH - IPV6_FRAGMENT_EXT_HDR_LEN
         );
     }
 }

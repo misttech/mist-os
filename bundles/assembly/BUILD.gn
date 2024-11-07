@@ -419,12 +419,33 @@ assembly_input_bundle("bootstrap_userdebug") {
 #
 assembly_input_bundle("embeddable_eng") {
   testonly = true
-  bootfs_files_labels = [
-    # tools
-    "//src/bringup/bin/bootpkg:bootfs",
-    "//src/devices/bin/driver_tools:bootfs",
-    "//src/devices/bin/lsdev:bootfs",
-    "//src/diagnostics/iquery:bootfs",
+  bootfs_packages = [
+    "//src/bringup/bin/bootpkg:package",
+    "//src/devices/bin/driver_tools:package",
+    "//src/devices/bin/lsdev:package",
+    "//src/diagnostics/iquery:package",
+  ]
+  shell_commands = [
+    {
+      bootfs_package = true
+      package = "bootpkg"
+      components = [ "bootpkg" ]
+    },
+    {
+      bootfs_package = true
+      package = "driver"
+      components = [ "driver" ]
+    },
+    {
+      bootfs_package = true
+      package = "lsdev"
+      components = [ "lsdev" ]
+    },
+    {
+      bootfs_package = true
+      package = "iquery"
+      components = [ "iquery" ]
+    },
   ]
 }
 
@@ -1394,14 +1415,7 @@ assembly_input_bundle("core_realm_eng") {
             # The process_resolver core shard (either the base-resolver or
             # pkg-resolver variant) should only be present in
             # the `core_realm_development_access` AIB, but it's required
-            # here until optional exposes are available, as the
-            # `fuchsia.process.Resolver` capability is routed to the
-            # `/bootstrap/console-launcher` component which is currently
-            # present on all build-types (but is not needed on user, as
-            # there is no reachable console there).
-            # Note that the `process-resolver` component itself is not
-            # present except when the `core_realm_development_access` is
-            # added to the system.
+            # here to avoid a userdebug and eng variant of that AIB.
             #
             # eng uses the pkg-resolver, as opposed to the base-resolver,
             # to support ephemeral resolution of shell packages.
@@ -1440,14 +1454,7 @@ assembly_input_bundle("core_realm_user_and_userdebug") {
             # The process_resolver core shard (either the base-resolver or
             # pkg-resolver variant) should only be present in
             # the `core_realm_development_access` AIB, but it's required
-            # here until optional exposes are available, as the
-            # `fuchsia.process.Resolver` capability is routed to the
-            # `/bootstrap/console-launcher` component which is currently
-            # present on all build-types (but is not needed on user, as
-            # there is no reachable console there).
-            # Note that the `process-resolver` component itself is not
-            # present except when the `core_realm_development_access` is
-            # added to the system.
+            # here to avoid a userdebug and eng variant of that AIB.
             #
             # user and userdebug only have the base-resolver, not the
             # pkg-resolver.
@@ -1519,6 +1526,7 @@ assembly_input_bundle("core_realm_development_access") {
     {
       package = "remote-control"
       components = [
+        "fdomain_runner",
         "remote_control_runner",
         "remote_control_bin",
       ]
@@ -1544,6 +1552,51 @@ assembly_input_bundle("core_realm_development_access_userdebug") {
 # suitable for eng builds.
 assembly_input_bundle("core_realm_development_access_eng") {
   config_data_labels = [ "//src/developer/sshd-host:config_eng" ]
+}
+
+assembly_input_bundle("bootstrap_realm_development_access") {
+  bootfs_packages = [
+    "//src/sys/process-resolver",
+    "//src/sys/tools/debug-dash-launcher",
+  ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "bootstrap"
+      components = [
+        {
+          component_name = "bootstrap"
+          shards = [
+            "//src/sys/process-resolver/meta/process_resolver.bootstrap_shard.cml",
+            "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.bootstrap_shard.cml",
+          ]
+        },
+      ]
+    },
+    {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = [
+            "//src/sys/process-resolver/meta/process_resolver.root_shard.cml",
+            "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.root_shard.cml",
+          ]
+        },
+      ]
+    },
+    {
+      bootfs_package = true
+      name = "toolbox"
+      components = [
+        {
+          component_name = "toolbox"
+          shards = [ "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.toolbox_shard.cml" ]
+        },
+      ]
+    },
+  ]
 }
 
 assembly_input_bundle("bootstrap_realm_vsock_development_access") {
@@ -1761,6 +1814,9 @@ assembly_input_bundle("common_standard") {
 
     # Connectivity
     "//src/connectivity/network/mdns/service:mdns",
+
+    # Memory pressure monitoring
+    "//src/developer/memory/pressure_signaler",
   ]
 
   config_data = [
@@ -1845,6 +1901,7 @@ assembly_input_bundle("common_standard") {
             "//src/intl/tzdata_provider/meta/tzdata_provider.core_shard.cml",
             "//src/sys/cache_manager/meta/cache_manager.core_shard.cml",
             "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
+            "//src/developer/memory/pressure_signaler/meta/memory_pressure_signaler.core_shard.cml",
           ]
         },
       ]
@@ -2427,6 +2484,27 @@ assembly_input_bundle("adb_support") {
   ]
 }
 
+# Core Nanohub support. Does not include driver. Driver should be included separately.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: minimal
+# valid build-types: all
+#
+assembly_input_bundle("nanohub_support") {
+  base_packages = [ "//src/starnix/modules/socket-tunnel:sockettunnel" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/starnix/modules/socket-tunnel/meta/sockettunnel.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # This AIB enables testing support, and is meant to be used with either the
 # `common_standard_eng` and `common_standard_userdebug` AIBs.
 #
@@ -2657,6 +2735,27 @@ assembly_input_bundle("fshost_common") {
           source = "//sdk/lib/syslog/use.shard.cml"
           destination = "syslog/use.shard.cml"
         },
+        {
+          source = "//src/storage/lib/fs_management/client.shard.cml"
+          destination = "src/storage/lib/fs_management/client.shard.cml"
+        },
+        {
+          source = "//src/storage/fshost/meta/storage_host_minfs_base.shard.cml"
+          destination =
+              "src/storage/fshost/meta/storage_host_minfs_base.shard.cml"
+        },
+        {
+          source = "//sdk/lib/trace/client.shard.cml"
+          destination = "trace/client.shard.cml"
+        },
+        {
+          source = "//sdk/lib/trace/offer.shard.cml"
+          destination = "trace/offer.shard.cml"
+        },
+        {
+          source = "//sdk/lib/trace/use.shard.cml"
+          destination = "trace/use.shard.cml"
+        },
       ]
     },
   ]
@@ -2738,6 +2837,33 @@ assembly_input_bundle("fshost_storage_host") {
     "//src/storage/storage-host:package",
     "//src/storage/fxfs:package",
     "//src/storage/fxfs-crypt:package",
+  ]
+}
+
+# AIB containing the fshost with storage_host with fvm and minfs.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_storage_host_fvm_minfs") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [ "//src/storage/fshost/meta/storage_host_minfs.cml" ]
+        },
+      ]
+    },
+  ]
+  bootfs_packages = [
+    "//src/storage/storage-host:package",
+    "//src/storage/blobfs/bin:package",
+    "//src/storage/minfs/bin:package",
+    "//src/storage/fvm:package",
   ]
 }
 

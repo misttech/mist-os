@@ -71,7 +71,7 @@ test("usb-hci-test") {
   ]
 }
 
-fuchsia_driver("fuchsia_driver") {
+fuchsia_cc_driver("fuchsia_driver") {
   output_name = "usb-hci-test-driver"
 
   sources = [ "usb-hci-test-driver.cc" ]

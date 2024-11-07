@@ -35,7 +35,7 @@ common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "acpi-battery"
   sources = [ "acpi_battery.cc" ]
   deps = common_deps + [ "//src/devices/lib/driver" ]

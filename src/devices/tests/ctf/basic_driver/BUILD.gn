@@ -36,7 +36,7 @@ driver_bind_rules("bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("basic-driver") {
+fuchsia_cc_driver("basic-driver") {
   testonly = true
   output_name = "ctf_basic_driver"
   sources = [ "src/basic_driver.cc" ]

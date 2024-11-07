@@ -12,3 +12,8 @@ group("tests") {
     "pipeline_test",
   ]
 }
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ "integration:ctf-tests" ]
+}

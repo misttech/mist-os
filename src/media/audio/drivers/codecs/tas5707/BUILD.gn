@@ -13,7 +13,7 @@ driver_bind_rules("ti_tas5707-bind") {
   deps = [ "//src/devices/bind/fuchsia.ti.platform" ]
 }
 
-fuchsia_driver("tas5707-driver") {
+fuchsia_cc_driver("tas5707-driver") {
   output_name = "tas5707"
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   sources = [ "tas5707.cc" ]

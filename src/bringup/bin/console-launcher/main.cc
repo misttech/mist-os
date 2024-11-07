@@ -159,8 +159,7 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
       FX_PLOGS(FATAL, endpoints.status_value()) << "failed to create endpoints";
     }
 
-    if (zx_status_t status =
-            vfs.ServeDirectory(root, std::move(endpoints->server), fs::Rights::All());
+    if (zx_status_t status = vfs.ServeDirectory(root, std::move(endpoints->server));
         status != ZX_OK) {
       FX_PLOGS(FATAL, status) << "failed to serve root directory";
     }
@@ -260,8 +259,7 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
     if (directory.is_error()) {
       FX_PLOGS(FATAL, directory.status_value()) << "failed to create directory endpoints";
     }
-    if (zx_status_t status =
-            vfs.ServeDirectory(root, std::move(directory->server), fs::Rights::All());
+    if (zx_status_t status = vfs.ServeDirectory(root, std::move(directory->server));
         status != ZX_OK) {
       FX_PLOGS(FATAL, status) << "failed to serve root directory";
     }

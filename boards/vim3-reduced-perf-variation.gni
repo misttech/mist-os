@@ -26,3 +26,4 @@
 import("vim3.gni")
 
 board_configuration_label = "//boards/vim3:reduced_perf_variation"
+bazel_product_bundle_board = "vim3_reduced_perf_variation"

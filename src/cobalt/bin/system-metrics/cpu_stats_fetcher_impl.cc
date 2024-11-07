@@ -35,6 +35,9 @@ bool CpuStatsFetcherImpl::FetchCpuStats() {
     InitializeKernelStats();
     return false;
   }
+
+  // The fuchsia.kernel/Stats protocol will not include CPU data from during suspension so this
+  // should remain on the monotonic timeline.
   cpu_fetch_time_ = std::chrono::high_resolution_clock::now();
   auto result = stats_service_.buffer(cpu_stats_buffer_->view())->GetCpuStats();
   if (result.status() != ZX_OK) {

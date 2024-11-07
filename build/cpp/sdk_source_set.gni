@@ -89,34 +89,32 @@ template("sdk_source_set") {
   valid_categories = [
     # "excluded" is deprecated.
     # "experimental" is deprecated.
-    "internal",  # TODO(https://fxbug.dev/333907192): Disable once @internal_sdk
-                 # is removed.
-
+    # "internal" is deprecated; only specific legacy cases below are allowed.
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.
     "partner",
-
     # "public" is not yet implemented.
   ]
 
-  # Remove categories that should not be used in new targets.
-  valid_categories_for_error_message = valid_categories - [ "internal" ]
+  # TODO(https://fxbug.dev/372986936): Remove once all uses have been removed.
+  is_internal = invoker.category == "internal"
 
-  # TODO(https://fxbug.dev/331991540): Remove once Firmware SDK no longer uses.
-  valid_categories += [ "firmware_sdk" ]
+  # Atoms for the Firmware SDK, which is not a real IDK, use this template,
+  # but none of the supported categories are appropriate. Specifically, this
+  # template contains special logic related to the Bazel SDK for "internal"
+  # category (based on `is_internal`). Thus, allow "firmware_sdk" in this
+  # template then convert it to "internal" when defining the `sdk_atom()`.
+  # TODO(https://fxbug.dev/331991540): Remove once "firmware_sdk" is obsolete.
+  make_internal_atom = is_internal || invoker.category == "firmware_sdk"
 
   assert(
       valid_categories + [ invoker.category ] - [ invoker.category ] !=
-          valid_categories,
-      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories_for_error_message}.")
-
-  is_internal = invoker.category == "internal"
+          valid_categories || make_internal_atom,
+      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories}.")
 
   # Internal source sets may also specify an sdk_name.
   assert(
-      defined(invoker.sdk_name) || is_internal ||
-          # TODO(https://fxbug.dev/331991540): Remove once no longer used.
-          invoker.category == "firmware_sdk",
+      defined(invoker.sdk_name) || make_internal_atom,
       "Source sets in the IDK must specify a name that is meaningful in that context.")
 
   if (defined(invoker.sdk_name)) {
@@ -137,16 +135,12 @@ template("sdk_source_set") {
 
   sdk_id = "sdk://${sdk_root_path}"
 
-  if (invoker.category == "internal" ||
-      # TODO(https://fxbug.dev/331991540): Remove once no longer used.
-      invoker.category == "firmware_sdk") {
+  if (make_internal_atom) {
     assert(!defined(invoker.stable) || !invoker.stable)
     is_stable = false
-    is_exempt_from_unstable_allowlist = true
   } else {
     assert(defined(invoker.stable), "Must specify stability.")
     is_stable = invoker.stable
-    is_exempt_from_unstable_allowlist = false
   }
   assert(!is_stable || invoker.category == "partner")
 
@@ -198,13 +192,14 @@ template("sdk_source_set") {
     # Ensure that 'sdk_source_set()' targets are included in the appropriate
     # allowlist. The allowlist target's `visibility` list ensures that the
     # target using this template is in the allowlist.
-    if (is_stable) {
+    if (make_internal_atom) {
+      deps += [ "//build/sdk:internal_source_sets_allowlist" ]
+    } else if (is_stable) {
       assert(
           invoker.category == "partner",
           "Create a separate allowlist when adding support for other categories.")
       deps += [ "//build/sdk:partner_idk_source_sets_allowlist" ]
-      not_needed([ "is_exempt_from_unstable_allowlist" ])
-    } else if (!is_exempt_from_unstable_allowlist) {
+    } else {
       assert(
           invoker.category == "partner",
           "Create a separate allowlist when adding support for other categories.")
@@ -404,15 +399,8 @@ template("sdk_source_set") {
                              "sdk_area",
                            ])
 
-    # Atoms for the Firmware SDK, which is not a real IDK, use this template,
-    # but none of the supported categories are appropriate. Specifically, this
-    # template contains special logic related to the Bazel SDK for "internal"
-    # category. Thus, allow "firmware_sdk" in this template then convert it
-    # to "internal" for the atom.
-    # TODO(https://fxbug.dev/331991540): Determine an appropriate solution for
-    # building the firmware SDK and simply forward `category` above.
     category = invoker.category
-    if (category == "firmware_sdk") {
+    if (make_internal_atom) {
       category = "internal"
     }
 

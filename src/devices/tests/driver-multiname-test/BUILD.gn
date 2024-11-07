@@ -59,7 +59,7 @@ driver_bind_rules("parent_device_bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("parent_device") {
+fuchsia_cc_driver("parent_device") {
   testonly = true
   output_name = "parent_device"
   sources = [

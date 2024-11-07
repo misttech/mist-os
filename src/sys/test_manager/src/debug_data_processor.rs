@@ -10,8 +10,8 @@ use fidl_fuchsia_test_manager::LaunchError;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::LocalComponentHandles;
-use fuchsia_fs::directory::open_channel_in_namespace_deprecated;
-use fuchsia_fs::OpenFlags;
+use fuchsia_fs::directory::open_channel_in_namespace;
+use fuchsia_fs::{PERM_READABLE, PERM_WRITABLE};
 use futures::channel::mpsc;
 use futures::future::FutureExt;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
@@ -118,9 +118,9 @@ impl DebugDataProcessor {
         };
 
         let (directory_proxy, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        open_channel_in_namespace_deprecated(
+        open_channel_in_namespace(
             &debug_directory_path,
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            PERM_READABLE | PERM_WRITABLE,
             server_end,
         )?;
 
@@ -170,9 +170,9 @@ impl DebugDataProcessor {
         };
 
         let (directory_proxy, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        open_channel_in_namespace_deprecated(
+        open_channel_in_namespace(
             &debug_directory_path,
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            PERM_READABLE | PERM_WRITABLE,
             server_end,
         )?;
 
@@ -301,6 +301,7 @@ mod test {
     use fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
     };
+    use fuchsia_fs::Flags;
     use futures::TryFutureExt;
     use maplit::hashset;
     use std::collections::HashSet;
@@ -354,10 +355,10 @@ mod test {
         }
 
         for ftest_debug::DebugVmo { data_sink, test_url, .. } in collected_vmos {
-            let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
+            let file = fuchsia_fs::directory::open_file_async(
                 &dir,
                 &data_sink,
-                OpenFlags::CREATE | OpenFlags::RIGHT_WRITABLE,
+                Flags::FLAG_MAYBE_CREATE | PERM_WRITABLE,
             )
             .expect("open file");
             fuchsia_fs::file::write(&file, &test_url).await.expect("write file");

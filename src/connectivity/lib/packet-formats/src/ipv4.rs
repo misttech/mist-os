@@ -29,7 +29,7 @@ use zerocopy::{
 
 use crate::error::{IpParseError, IpParseResult, ParseError};
 use crate::ip::{
-    DscpAndEcn, IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto, Nat64Error,
+    DscpAndEcn, FragmentOffset, IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto, Nat64Error,
     Nat64TranslationResult,
 };
 use crate::ipv6::Ipv6PacketBuilder;
@@ -166,9 +166,8 @@ pub trait Ipv4Header {
     }
 
     /// The fragment offset.
-    fn fragment_offset(&self) -> u16 {
-        ((u16::from(self.get_header_prefix().flags_frag_off[0] & 0x1F)) << 8)
-            | u16::from(self.get_header_prefix().flags_frag_off[1])
+    fn fragment_offset(&self) -> FragmentOffset {
+        FragmentOffset::new_with_lsb(U16::from_bytes(self.get_header_prefix().flags_frag_off).get())
     }
 
     /// The fragment type.
@@ -177,7 +176,7 @@ pub trait Ipv4Header {
     /// `p.fragment_offset() == 0` and [`Ipv4FragmentType::NonInitialFragment`]
     /// otherwise.
     fn fragment_type(&self) -> Ipv4FragmentType {
-        match self.fragment_offset() {
+        match self.fragment_offset().into_raw() {
             0 => Ipv4FragmentType::InitialFragment,
             _ => Ipv4FragmentType::NonInitialFragment,
         }
@@ -358,7 +357,7 @@ impl<B: SplitByteSlice> Ipv4Packet<B> {
             id: self.id(),
             dscp_and_ecn: self.dscp_and_ecn(),
             flags: 0,
-            frag_off: self.fragment_offset(),
+            frag_off: self.fragment_offset().into_raw(),
             ttl: self.ttl(),
             proto: self.hdr_prefix.proto.into(),
             src_ip: self.src_ip(),
@@ -882,13 +881,8 @@ impl Ipv4PacketBuilder {
     }
 
     /// Set the fragment offset.
-    ///
-    /// # Panics
-    ///
-    /// `fragment_offset` panics if `fragment_offset` is greater than 2^13 - 1.
-    pub fn fragment_offset(&mut self, fragment_offset: u16) {
-        assert!(fragment_offset < 1 << 13, "invalid fragment offset: {}", fragment_offset);
-        self.frag_off = fragment_offset;
+    pub fn fragment_offset(&mut self, fragment_offset: FragmentOffset) {
+        self.frag_off = fragment_offset.into_raw();
     }
 }
 
@@ -1053,30 +1047,13 @@ pub mod options {
 
     /// An IPv4 header option.
     ///
-    /// An IPv4 header option comprises metadata about the option (which is stored
-    /// in the kind byte) and the option itself.
-    ///
     /// See [Wikipedia] or [RFC 791] for more details.
     ///
     /// [Wikipedia]: https://en.wikipedia.org/wiki/IPv4#Options
     /// [RFC 791]: https://tools.ietf.org/html/rfc791#page-15
     #[derive(PartialEq, Eq, Debug, Clone)]
-    pub struct Ipv4Option<'a> {
-        /// Whether this option needs to be copied into all fragments of a
-        /// fragmented packet.
-        pub copied: bool,
-        /// IPv4 option data.
-        // TODO(joshlf): include "Option Class"? The variable-length option data.
-        pub data: Ipv4OptionData<'a>,
-    }
-
-    /// The data associated with an IPv4 header option.
-    ///
-    /// `Ipv4OptionData` represents the variable-length data field of an IPv4 header
-    /// option.
     #[allow(missing_docs)]
-    #[derive(PartialEq, Eq, Debug, Clone)]
-    pub enum Ipv4OptionData<'a> {
+    pub enum Ipv4Option<'a> {
         /// Used to tell routers to inspect the packet.
         ///
         /// Used by IGMP host messages per [RFC 2236 section 2].
@@ -1095,7 +1072,20 @@ pub mod options {
         // forwarding.
         //
         // `data`'s length is in the range [0, 38].
-        Unrecognized { kind: u8, len: u8, data: &'a [u8] },
+        Unrecognized { kind: u8, data: &'a [u8] },
+    }
+
+    impl<'a> Ipv4Option<'a> {
+        /// Returns whether this option should be copied on all fragments.
+        pub fn copied(&self) -> bool {
+            match self {
+                // The router alert option is copied on all fragments. See
+                // https://datatracker.ietf.org/doc/html/rfc2113#section-2.1.
+                // It is embedded in our definition of OPTION_KIND_RTRALRT.
+                Ipv4Option::RouterAlert { .. } => true,
+                Ipv4Option::Unrecognized { kind, .. } => *kind & (1 << 7) != 0,
+            }
+        }
     }
 
     /// An implementation of [`OptionsImpl`] for IPv4 options.
@@ -1112,23 +1102,17 @@ pub mod options {
         const NOP: Option<u8> = Some(1);
     }
 
-    impl<'a> OptionsImpl<'a> for Ipv4OptionsImpl {
-        type Option = Ipv4Option<'a>;
+    impl OptionsImpl for Ipv4OptionsImpl {
+        type Option<'a> = Ipv4Option<'a>;
 
-        fn parse(kind: u8, data: &'a [u8]) -> Result<Option<Ipv4Option<'a>>, OptionParseErr> {
-            let copied = kind & (1 << 7) > 0;
+        fn parse<'a>(kind: u8, data: &'a [u8]) -> Result<Option<Ipv4Option<'a>>, OptionParseErr> {
             match kind {
                 self::OPTION_KIND_EOL | self::OPTION_KIND_NOP => {
                     unreachable!("records::options::Options promises to handle EOL and NOP")
                 }
                 self::OPTION_KIND_RTRALRT => {
                     if data.len() == OPTION_RTRALRT_LEN {
-                        Ok(Some(Ipv4Option {
-                            copied,
-                            data: Ipv4OptionData::RouterAlert {
-                                data: NetworkEndian::read_u16(data),
-                            },
-                        }))
+                        Ok(Some(Ipv4Option::RouterAlert { data: NetworkEndian::read_u16(data) }))
                     } else {
                         Err(OptionParseErr)
                     }
@@ -1137,14 +1121,7 @@ pub mod options {
                     if data.len() > 38 {
                         Err(OptionParseErr)
                     } else {
-                        Ok(Some(Ipv4Option {
-                            copied,
-                            data: Ipv4OptionData::Unrecognized {
-                                kind,
-                                len: data.len() as u8,
-                                data,
-                            },
-                        }))
+                        Ok(Some(Ipv4Option::Unrecognized { kind, data }))
                     }
                 }
             }
@@ -1155,25 +1132,24 @@ pub mod options {
         type Layout = Ipv4OptionsImpl;
 
         fn serialized_len(&self) -> usize {
-            match self.data {
-                Ipv4OptionData::RouterAlert { .. } => OPTION_RTRALRT_LEN,
-                Ipv4OptionData::Unrecognized { len, .. } => len as usize,
+            match self {
+                Ipv4Option::RouterAlert { .. } => OPTION_RTRALRT_LEN,
+                Ipv4Option::Unrecognized { data, .. } => data.len(),
             }
         }
 
         fn option_kind(&self) -> u8 {
-            let number = match self.data {
-                Ipv4OptionData::RouterAlert { .. } => OPTION_KIND_RTRALRT,
-                Ipv4OptionData::Unrecognized { kind, .. } => kind,
-            };
-            number | ((self.copied as u8) << 7)
+            match self {
+                Ipv4Option::RouterAlert { .. } => OPTION_KIND_RTRALRT,
+                Ipv4Option::Unrecognized { kind, .. } => *kind,
+            }
         }
 
         fn serialize_into(&self, mut buffer: &mut [u8]) {
-            match self.data {
-                Ipv4OptionData::Unrecognized { data, .. } => buffer.copy_from_slice(data),
-                Ipv4OptionData::RouterAlert { data } => {
-                    (&mut buffer).write_obj_front(&U16::new(data)).unwrap()
+            match self {
+                Ipv4Option::Unrecognized { data, .. } => buffer.copy_from_slice(data),
+                Ipv4Option::RouterAlert { data } => {
+                    (&mut buffer).write_obj_front(&U16::new(*data)).unwrap()
                 }
             };
         }
@@ -1189,7 +1165,7 @@ pub mod options {
         #[test]
         fn test_serialize_router_alert() {
             let mut buffer = [0u8; 4];
-            let option = Ipv4Option { copied: true, data: Ipv4OptionData::RouterAlert { data: 0 } };
+            let option = Ipv4Option::RouterAlert { data: 0 };
             <Ipv4Option<'_> as RecordBuilder>::serialize_into(&option, &mut buffer);
             assert_eq!(buffer[0], 148);
             assert_eq!(buffer[1], 4);
@@ -1202,8 +1178,7 @@ pub mod options {
             let mut buffer: Vec<u8> = vec![148, 4, 0, 0];
             let options = Options::<_, Ipv4OptionsImpl>::parse(buffer.as_mut()).unwrap();
             let rtralt = options.iter().next().unwrap();
-            assert!(rtralt.copied);
-            assert_eq!(rtralt.data, Ipv4OptionData::RouterAlert { data: 0 });
+            assert_eq!(rtralt, Ipv4Option::RouterAlert { data: 0 });
         }
     }
 }
@@ -1419,7 +1394,7 @@ mod tests {
     fn test_fragment_type() {
         fn test_fragment_type_helper(fragment_offset: u16, expect_fragment_type: Ipv4FragmentType) {
             let mut builder = new_builder();
-            builder.fragment_offset(fragment_offset);
+            builder.fragment_offset(FragmentOffset::new(fragment_offset).unwrap());
 
             let mut buf = [0; IPV4_MIN_HDR_LEN]
                 .into_serializer()
@@ -1442,7 +1417,7 @@ mod tests {
         builder.id(0x0405);
         builder.df_flag(true);
         builder.mf_flag(true);
-        builder.fragment_offset(0x0607);
+        builder.fragment_offset(FragmentOffset::new(0x0607).unwrap());
 
         let mut buf = (&[0, 1, 2, 3, 3, 4, 5, 7, 8, 9])
             .into_serializer()
@@ -1462,7 +1437,7 @@ mod tests {
         assert_eq!(packet.id(), 0x0405);
         assert!(packet.df_flag());
         assert!(packet.mf_flag());
-        assert_eq!(packet.fragment_offset(), 0x0607);
+        assert_eq!(packet.fragment_offset().into_raw(), 0x0607);
         assert_eq!(packet.fragment_type(), Ipv4FragmentType::NonInitialFragment);
     }
 
@@ -1481,7 +1456,7 @@ mod tests {
         assert_eq!(packet.id(), 0);
         assert!(packet.df_flag());
         assert_eq!(packet.mf_flag(), false);
-        assert_eq!(packet.fragment_offset(), 0);
+        assert_eq!(packet.fragment_offset().into_raw(), 0);
         assert_eq!(packet.fragment_type(), Ipv4FragmentType::InitialFragment);
     }
 
@@ -1580,7 +1555,7 @@ mod tests {
         ipv4_builder.id(0x0405);
         ipv4_builder.df_flag(true);
         ipv4_builder.mf_flag(false);
-        ipv4_builder.fragment_offset(0);
+        ipv4_builder.fragment_offset(FragmentOffset::ZERO);
 
         let mut ipv6_builder =
             Ipv6PacketBuilder::new(DEFAULT_V6_SRC_IP, DEFAULT_V6_DST_IP, IP_TTL, proto_v6);

@@ -69,9 +69,9 @@ class Fake8042 {
   void SendDataAndIrq(bool port2, uint8_t byte) {
     SendData(byte);
     if (port2) {
-      port2_irq_.trigger(0, zx::clock::get_monotonic());
+      port2_irq_.trigger(0, zx::clock::get_boot());
     } else {
-      port1_irq_.trigger(0, zx::clock::get_monotonic());
+      port1_irq_.trigger(0, zx::clock::get_boot());
     }
   }
 

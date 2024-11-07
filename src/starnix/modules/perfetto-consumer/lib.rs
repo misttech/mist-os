@@ -102,7 +102,7 @@ impl FrameReader {
             while self.file.query_events(locked, current_task)? & FdEvents::POLLIN
                 != FdEvents::POLLIN
             {
-                waiter.wait(current_task)?;
+                waiter.wait(locked, current_task)?;
             }
             self.file.read(locked, current_task, &mut self.read_buffer)?;
             self.data.extend(self.read_buffer.data());

@@ -3,6 +3,10 @@ ffx/component/capability.golden
 ffx/component/collection.golden
 ffx/component/collection/list.golden
 ffx/component/collection/show.golden
+ffx/component/config.golden
+ffx/component/config/list.golden
+ffx/component/config/set.golden
+ffx/component/config/unset.golden
 ffx/component/copy.golden
 ffx/component/create.golden
 ffx/component/debug.golden

@@ -38,6 +38,10 @@ source "$script_dir"/../../build/rbe/common-setup.sh
 project_root="$default_project_root"
 
 readonly detail_diff="$project_root"/build/rbe/detail-diff.sh
+readonly detail_diff_opts=(
+  "-l=first"
+  "-r=second"
+)
 
 # json formatting (as pipe): jq . < stdin > stdout
 readonly jq="$project_root"/prebuilt/third_party/jq/"$HOST_PLATFORM"/bin/jq
@@ -75,12 +79,12 @@ function diff_text() {
 
 function diff_binary() {
   # cmp is faster, as it terminates at first byte difference.
-  cmp "$1" "$2" || "$detail_diff" "$1" "$2"
+  cmp "$1" "$2" || "$detail_diff" "${detail_diff_opts[@]}" "$1" "$2"
 }
 
 function diff_zip() {
   # cmp is faster, as it terminates at first byte difference.
-  cmp "$1" "$2" || "$detail_diff" "$1" "$2"
+  cmp "$1" "$2" || "$detail_diff" "${detail_diff_opts[@]}" "$1" "$2"
 }
 
 function exe_unstripped_expect() {
@@ -387,6 +391,9 @@ function diff_file_relpath() {
     *.blk) expect=unknown; diff_binary "$left" "$right" ;;
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
     *.zbi) expect=unknown; diff_binary "$left" "$right" ;;
+
+    # fidldoc.zip bears timestamps of its contents (nondeterministic)
+    fidldoc.zip) expect=diff; diff_zip "$left" "$right" ;;
 
     *.pyz | *.zip) expect=match; diff_zip "$left" "$right" ;;
     # Most archives carry timestamp information of their contents.

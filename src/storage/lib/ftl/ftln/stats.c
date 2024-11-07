@@ -24,8 +24,8 @@ static void flush_bstat(CFTLN ftl, int* blk0, int* blke, int b, const char* type
   else {
     printf("B = %4u", *blk0);
     if (*blk0 == *blke) {
-      printf(" - used = %2u, wc lag = %3d, rc = %8u", NUM_USED(ftl->bdata[*blk0]),
-             ftl->blk_wc_lag[*blk0], GET_RC(ftl->bdata[*blk0]));
+      printf(" - used = %2u, wear = %6u, rc = %8u", NUM_USED(ftl->bdata[*blk0]), ftl->blk_wc[*blk0],
+             GET_RC(ftl->bdata[*blk0]));
       printf(" - %s BLOCK\n", type);
     } else {
       printf("-%-4u", *blke);
@@ -61,8 +61,8 @@ void FtlnBlkStats(CFTLN ftl) {
     else if (IS_MAP_BLK(ftl->bdata[b])) {
       flush_bstat(ftl, &free0, &freee, -1, "FREE");
       flush_bstat(ftl, &vol0, &vole, -1, "VOLUME");
-      printf("B = %4u - used = %2u, wc lag = %3d, rc = %8u - ", b, NUM_USED(ftl->bdata[b]),
-             ftl->blk_wc_lag[b], GET_RC(ftl->bdata[b]));
+      printf("B = %4u - used = %2u, wear = %6u, rc = %8u - ", b, NUM_USED(ftl->bdata[b]),
+             ftl->blk_wc[b], GET_RC(ftl->bdata[b]));
       printf("MAP BLOCK\n");
     }
 
@@ -72,8 +72,8 @@ void FtlnBlkStats(CFTLN ftl) {
       if (ftln_debug() <= 1) {
         flush_bstat(ftl, &vol0, &vole, b, "VOLUME");
       } else {
-        printf("B = %4u - used = %2u, wc lag = %3d, rc = %8u - ", b, NUM_USED(ftl->bdata[b]),
-               ftl->blk_wc_lag[b], GET_RC(ftl->bdata[b]));
+        printf("B = %4u - used = %2u, wear = %6d, rc = %8u - ", b, NUM_USED(ftl->bdata[b]),
+               ftl->blk_wc[b], GET_RC(ftl->bdata[b]));
         printf("VOLUME BLOCK\n");
       }
     }

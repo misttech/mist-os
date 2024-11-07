@@ -30,10 +30,11 @@
 #include "src/storage/lib/paver/test/test-utils.h"
 #include "src/storage/lib/paver/x64.h"
 
-namespace {
+namespace abr {
 
 using device_watcher::RecursiveWaitForFile;
 using driver_integration_test::IsolatedDevmgr;
+using paver::KolaGptEntryAttributes;
 
 TEST(AstroAbrTests, CreateFails) {
   IsolatedDevmgr devmgr;
@@ -62,7 +63,7 @@ TEST(SherlockAbrTests, CreateFails) {
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
   ASSERT_NOT_OK(
-      paver::SherlockAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
+      paver::SherlockAbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
 }
 
 TEST(KolaAbrTests, CreateFails) {
@@ -76,7 +77,7 @@ TEST(KolaAbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(paver::KolaAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
+  ASSERT_NOT_OK(paver::KolaAbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
 }
 
 TEST(LuisAbrTests, CreateFails) {
@@ -90,7 +91,7 @@ TEST(LuisAbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(paver::LuisAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
+  ASSERT_NOT_OK(paver::LuisAbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
 }
 
 TEST(X64AbrTests, CreateFails) {
@@ -104,7 +105,7 @@ TEST(X64AbrTests, CreateFails) {
 
   zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
   ASSERT_OK(devices);
-  ASSERT_NOT_OK(paver::X64AbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
+  ASSERT_NOT_OK(paver::X64AbrClientFactory().Create(*devices, devmgr.RealmExposedDir(), nullptr));
 }
 
 class CurrentSlotUuidTest : public zxtest::Test {
@@ -116,34 +117,42 @@ class CurrentSlotUuidTest : public zxtest::Test {
   static constexpr uint8_t kTestUuid[GPT_GUID_LEN] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
                                                       0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
                                                       0xcc, 0xdd, 0xee, 0xff};
-  CurrentSlotUuidTest() {
-    IsolatedDevmgr::Args args;
-    args.disable_block_watcher = true;
+  void SetUp() override {
+    args_.disable_block_watcher = true;
 
-    ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
+    ASSERT_OK(IsolatedDevmgr::Create(&args_, &devmgr_));
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
     ASSERT_NO_FATAL_FAILURE(
         BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, kDiskBlocks, kBlockSize, &disk_));
   }
 
-  void CreateDiskWithPartition(const char* partition) {
+  zx::result<std::unique_ptr<gpt::GptDevice>> CreateGptDevice() {
     zx::result new_connection = GetNewConnections(disk_->block_controller_interface());
-    ASSERT_OK(new_connection);
+    if (new_connection.is_error()) {
+      return new_connection.take_error();
+    }
     fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(
         std::move(new_connection->device));
     zx::result remote_device = block_client::RemoteBlockDevice::Create(
         std::move(volume), std::move(new_connection->controller));
-    ASSERT_OK(remote_device);
-    zx::result gpt_result = gpt::GptDevice::Create(std::move(remote_device.value()),
-                                                   /*blocksize=*/disk_->block_size(),
-                                                   /*blocks=*/disk_->block_count());
+    if (remote_device.is_error()) {
+      return remote_device.take_error();
+    }
+    return gpt::GptDevice::Create(std::move(remote_device.value()),
+                                  /*blocksize=*/disk_->block_size(),
+                                  /*blocks=*/disk_->block_count());
+  }
+
+  void CreatePartitionOnDisk(const char* name, const uint8_t* type_guid = kZirconType) {
+    zx::result gpt_result = CreateGptDevice();
     ASSERT_OK(gpt_result);
-    gpt_ = std::move(gpt_result.value());
-    ASSERT_OK(gpt_->Sync());
-    ASSERT_OK(gpt_->AddPartition(partition, kZirconType, kTestUuid,
-                                 2 + gpt_->EntryArrayBlockCount(), 10, 0));
-    ASSERT_OK(gpt_->Sync());
+    std::unique_ptr<gpt::GptDevice> gpt = std::move(gpt_result.value());
+    ASSERT_OK(gpt->Sync());
+    static uint64_t partition_offset = 2 + gpt->EntryArrayBlockCount();
+    ASSERT_OK(gpt->AddPartition(name, type_guid, kTestUuid, partition_offset, 10, 0));
+    partition_offset += 10;  // Adjust partition offset for the next invocation of this method.
+    ASSERT_OK(gpt->Sync());
 
     fidl::WireResult result =
         fidl::WireCall(disk_->block_controller_interface())->Rebind(fidl::StringView("gpt.cm"));
@@ -155,15 +164,15 @@ class CurrentSlotUuidTest : public zxtest::Test {
                   .status_value());
   }
 
-  fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.fshost_svc_dir(); }
+  fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.RealmExposedDir(); }
 
+  IsolatedDevmgr::Args args_;
   IsolatedDevmgr devmgr_;
   std::unique_ptr<BlockDevice> disk_;
-  std::unique_ptr<gpt::GptDevice> gpt_;
 };
 
 TEST_F(CurrentSlotUuidTest, TestZirconAIsSlotA) {
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("zircon-a"));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("zircon-a"));
 
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
@@ -173,7 +182,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconAIsSlotA) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestZirconAWithUnderscore) {
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("zircon_a"));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("zircon_a"));
 
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
@@ -183,7 +192,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconAWithUnderscore) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestZirconAMixedCase) {
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("ZiRcOn-A"));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("ZiRcOn-A"));
 
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
@@ -193,7 +202,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconAMixedCase) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestZirconB) {
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("zircon_b"));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("zircon_b"));
 
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
@@ -203,7 +212,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconB) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestZirconR) {
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("ZIRCON-R"));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("ZIRCON-R"));
 
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
@@ -213,7 +222,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconR) {
 }
 
 TEST_F(CurrentSlotUuidTest, TestInvalid) {
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("ZERCON-R"));
+  ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("ZERCON-R"));
 
   zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
   ASSERT_OK(devices);
@@ -246,6 +255,168 @@ TEST(CurrentSlotTest, TestInvalid) {
   ASSERT_EQ(result.error_value(), ZX_ERR_NOT_SUPPORTED);
 }
 
+class KolaAbrClientTest : public CurrentSlotUuidTest {
+ protected:
+  static constexpr uint8_t kFvmType[GPT_GUID_LEN] = GPT_FVM_TYPE_GUID;
+  static constexpr uint8_t kVbMetaType[GPT_GUID_LEN] = GPT_VBMETA_ABR_TYPE_GUID;
+  static constexpr uint8_t kBootloaderType[GPT_GUID_LEN] = GPT_BOOTLOADER_ABR_TYPE_GUID;
+
+  void SetUp() override {
+    args_.board_name = "kola";
+    args_.boot_arg = "_a";
+    CurrentSlotUuidTest::SetUp();
+
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("boot_a", kZirconType));
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("boot_b", kBootloaderType));
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("super", kFvmType));
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("vbmeta_a", kVbMetaType));
+    ASSERT_NO_FATAL_FAILURE(CreatePartitionOnDisk("vbmeta_b", kBootloaderType));
+
+    zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
+    ASSERT_OK(devices);
+    auto abr_client =
+        paver::KolaAbrClientFactory().Create(*devices, devmgr_.RealmExposedDir(), nullptr);
+    ASSERT_OK(abr_client);
+    abr_client_ = std::move(*abr_client);
+  }
+
+  zx::result<KolaGptEntryAttributes> CheckPartitionState(uint32_t index, std::string_view name,
+                                                         const uint8_t* type_guid) {
+    zx::result gpt_result = CreateGptDevice();
+    if (gpt_result.is_error()) {
+      return gpt_result.take_error();
+    }
+    std::unique_ptr<gpt::GptDevice> gpt = std::move(gpt_result.value());
+    auto gpt_entry = gpt->GetPartition(index);
+    if (gpt_entry.is_error()) {
+      return gpt_entry.take_error();
+    }
+
+    char cstring_name[GPT_NAME_LEN / 2 + 1] = {0};
+    ::utf16_to_cstring(cstring_name, reinterpret_cast<const uint16_t*>(gpt_entry->name),
+                       sizeof(cstring_name));
+    const std::string_view partition_name = cstring_name;
+    EXPECT_EQ(partition_name, name);
+
+    EXPECT_EQ(memcmp(gpt_entry->type, type_guid, GPT_GUID_LEN), 0);
+
+    return zx::ok(KolaGptEntryAttributes{gpt_entry->flags});
+  }
+
+  void AbrClientFlush() { ASSERT_OK(abr_client_->Flush()); }
+
+  std::unique_ptr<abr::Client> abr_client_;
+};
+
+TEST_F(KolaAbrClientTest, KolaTest) {
+  // Initial active slot A.
+  ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexA));
+  ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexA));
+  AbrClientFlush();
+
+  zx::result<KolaGptEntryAttributes> attributes = CheckPartitionState(0, "boot_a", kZirconType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes->active(), true);
+  EXPECT_EQ(attributes->retry_count(), 0);
+  EXPECT_EQ(attributes->boot_success(), true);
+  EXPECT_EQ(attributes->unbootable(), false);
+  attributes = CheckPartitionState(1, "boot_b", kBootloaderType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  EXPECT_EQ(attributes->active(), false);
+  EXPECT_EQ(attributes->retry_count(), 0);
+  EXPECT_EQ(attributes->boot_success(), false);
+  EXPECT_EQ(attributes->unbootable(), true);
+  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
+  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kVbMetaType));
+  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kBootloaderType));
+
+  ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexB));
+  AbrClientFlush();
+
+  attributes = CheckPartitionState(0, "boot_a", kBootloaderType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  EXPECT_EQ(attributes->active(), false);
+  EXPECT_EQ(attributes->retry_count(), 0);
+  EXPECT_EQ(attributes->boot_success(), true);
+  EXPECT_EQ(attributes->unbootable(), false);
+  attributes = CheckPartitionState(1, "boot_b", kZirconType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes->active(), true);
+  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes->boot_success(), false);
+  EXPECT_EQ(attributes->unbootable(), false);
+  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
+  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kBootloaderType));
+  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kVbMetaType));
+
+  ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexB));
+  AbrClientFlush();
+
+  attributes = CheckPartitionState(0, "boot_a", kBootloaderType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  EXPECT_EQ(attributes->active(), false);
+  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes->boot_success(), false);
+  EXPECT_EQ(attributes->unbootable(), false);
+  attributes = CheckPartitionState(1, "boot_b", kZirconType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes->active(), true);
+  EXPECT_EQ(attributes->retry_count(), 0);
+  EXPECT_EQ(attributes->boot_success(), true);
+  EXPECT_EQ(attributes->unbootable(), false);
+  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
+  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kBootloaderType));
+  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kVbMetaType));
+
+  ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexA));
+  AbrClientFlush();
+
+  attributes = CheckPartitionState(0, "boot_a", kZirconType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes->active(), true);
+  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes->boot_success(), false);
+  EXPECT_EQ(attributes->unbootable(), false);
+  attributes = CheckPartitionState(1, "boot_b", kBootloaderType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  EXPECT_EQ(attributes->active(), false);
+  EXPECT_EQ(attributes->retry_count(), 0);
+  EXPECT_EQ(attributes->boot_success(), true);
+  EXPECT_EQ(attributes->unbootable(), false);
+  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
+  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kVbMetaType));
+  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kBootloaderType));
+
+  ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexA));
+  AbrClientFlush();
+
+  attributes = CheckPartitionState(0, "boot_a", kZirconType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority);
+  EXPECT_EQ(attributes->active(), true);
+  EXPECT_EQ(attributes->retry_count(), 0);
+  EXPECT_EQ(attributes->boot_success(), true);
+  EXPECT_EQ(attributes->unbootable(), false);
+  attributes = CheckPartitionState(1, "boot_b", kBootloaderType);
+  ASSERT_OK(attributes);
+  EXPECT_EQ(attributes->priority(), KolaGptEntryAttributes::kKolaMaxPriority - 1);
+  EXPECT_EQ(attributes->active(), false);
+  EXPECT_EQ(attributes->retry_count(), kAbrMaxTriesRemaining);
+  EXPECT_EQ(attributes->boot_success(), false);
+  EXPECT_EQ(attributes->unbootable(), false);
+  ASSERT_OK(CheckPartitionState(2, "super", kFvmType));
+  ASSERT_OK(CheckPartitionState(3, "vbmeta_a", kVbMetaType));
+  ASSERT_OK(CheckPartitionState(4, "vbmeta_b", kBootloaderType));
+}
+
 class FakePartitionClient final : public paver::PartitionClient {
  public:
   FakePartitionClient(size_t block_size, size_t partition_size)
@@ -263,6 +434,7 @@ class FakePartitionClient final : public paver::PartitionClient {
     }
     return zx::error(result_);
   }
+
   zx::result<> Read(const zx::vmo& vmo, size_t size) final {
     if (size > partition_size_) {
       return zx::error(ZX_ERR_OUT_OF_RANGE);
@@ -349,4 +521,4 @@ TEST_F(OneShotFlagsTest, Set2Flags) {
   EXPECT_TRUE(AbrIsOneShotRecoveryBootSet(abr_flags_res.value()));
 }
 
-}  // namespace
+}  // namespace abr

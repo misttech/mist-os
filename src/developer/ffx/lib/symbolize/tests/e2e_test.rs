@@ -13,7 +13,7 @@ use shared::*;
 #[fuchsia::test]
 async fn symbolize_fn_ptr() {
     info!("starting emulator...");
-    let emu = IsolatedEmulator::start("test_ffx_symbolize_lib").await.unwrap();
+    let emu = IsolatedEmulator::start("test-ffx-symbolize-lib").await.unwrap();
     let stdout = emu
         .ffx_output(&[
             // JSON output prevents the command from printing its status messages to stdout.

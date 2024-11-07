@@ -21,7 +21,7 @@ constexpr uint8_t kDefaultMaxPowerLevels = 10;
 // Makes a power model of `power_levels` using the helpers below to determine
 // the level properties. In many cases costs are defined in an arbitrary way based on
 // the level indexes.
-power_management::PowerModel MakeFakeEnergyModel(size_t power_levels);
+power_management::EnergyModel MakeFakeEnergyModel(size_t power_levels);
 
 template <typename... Cpus>
 zx_cpu_set_t MakeCpuSet(Cpus... cpus) {
@@ -35,7 +35,7 @@ zx_cpu_set_t MakeCpuSet(Cpus... cpus) {
   return set;
 }
 
-inline auto MakePowerDomain(uint32_t id, power_management::PowerModel& model, zx_cpu_set_t cpus) {
+inline auto MakePowerDomain(uint32_t id, power_management::EnergyModel& model, zx_cpu_set_t cpus) {
   return fbl::MakeRefCounted<power_management::PowerDomain>(id, cpus, std::move(model));
 }
 
@@ -46,7 +46,7 @@ inline auto MakePowerDomainHelper(uint32_t id, Cpus... cpus) {
 }
 
 template <typename... Cpus>
-inline auto MakePowerDomainHelper(uint32_t id, power_management::PowerModel& model, Cpus... cpus) {
+inline auto MakePowerDomainHelper(uint32_t id, power_management::EnergyModel& model, Cpus... cpus) {
   return MakePowerDomain(id, model, MakeCpuSet(cpus...));
 }
 

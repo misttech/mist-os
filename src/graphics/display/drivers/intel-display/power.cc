@@ -13,7 +13,7 @@
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 namespace intel_display {
 
 namespace {
@@ -36,7 +36,7 @@ bool SetPowerWellImpl(const PowerWellInfo& power_well_info, bool enable,
   if (enable) {
     power_well_reg.ReadFrom(mmio_space);
 
-    if (!PollUntil(
+    if (!display::PollUntil(
             [&] {
               return registers::PowerWellControl::Get()
                   .ReadFrom(mmio_space)
@@ -48,7 +48,7 @@ bool SetPowerWellImpl(const PowerWellInfo& power_well_info, bool enable,
       return false;
     }
 
-    if (!PollUntil(
+    if (!display::PollUntil(
             [&] {
               ZX_DEBUG_ASSERT_MSG(
                   power_well_info.fuse_dist_bit_index <= std::numeric_limits<uint32_t>::max(),

@@ -5,6 +5,8 @@
 #ifndef SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_MESON_AML_CLK_COMMON_H_
 #define SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_MESON_AML_CLK_COMMON_H_
 
+#include <cstdint>
+
 namespace aml_clk_common {
 
 enum class aml_clk_type : uint16_t {

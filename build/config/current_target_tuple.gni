@@ -13,6 +13,8 @@ if (is_fuchsia) {
 } else if (is_mistos) {
   # FIXME (Herrera) in the future it will be ${clang_cpu}-unknown-mistos
   current_target_tuple = "${clang_cpu}-unknown-fuchsia"
+} else if (current_cpu == "arm" && is_linux) {
+  current_target_tuple = "armv7-unknown-linux-gnueabihf"
 } else if (is_linux) {
   current_target_tuple = "${clang_cpu}-unknown-linux-gnu"
 } else if (is_mac) {

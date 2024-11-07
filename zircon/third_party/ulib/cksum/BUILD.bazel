@@ -23,7 +23,4 @@ cc_library(
         "include",
     ],
     target_compatible_with = ["@platforms//os:fuchsia"],
-    deps = [
-        "@internal_sdk//pkg/zircon-internal",
-    ],
 )

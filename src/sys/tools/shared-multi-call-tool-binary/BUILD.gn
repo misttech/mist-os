@@ -5,6 +5,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 
 rustc_binary("shared-multi-call-tool-binary") {
   visibility = [
@@ -40,4 +41,10 @@ rustc_binary("shared-multi-call-tool-binary") {
   configs += [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
   configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
   configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
+
+  # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
+  # enabled, shift it to the large RBE worker pool)
+  _concurrent_jobs = concurrent_jobs.link_highmem
+  configs += _concurrent_jobs.configs
+  forward_variables_from(_concurrent_jobs.vars, "*")
 }

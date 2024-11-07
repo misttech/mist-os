@@ -12,6 +12,11 @@ fuchsia_prebuilt_board_configuration(
 )
 
 fuchsia_prebuilt_board_configuration(
+    name = "x64_reduced_perf_variation",
+    files = "@gn_targets//boards/x64:reduced_perf_variation",
+)
+
+fuchsia_prebuilt_board_configuration(
     name = "arm64",
     directory = "@gn_targets//boards/arm64",
 )
@@ -19,6 +24,11 @@ fuchsia_prebuilt_board_configuration(
 fuchsia_prebuilt_board_configuration(
     name = "vim3",
     directory = "@gn_targets//boards/vim3",
+)
+
+fuchsia_prebuilt_board_configuration(
+    name = "vim3_reduced_perf_variation",
+    files = "@gn_targets//boards/vim3:reduced_perf_variation",
 )
 
 fuchsia_prebuilt_board_configuration(

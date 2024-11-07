@@ -7,7 +7,6 @@ use fidl_fuchsia_stash::StoreMarker;
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
 use settings::audio::build_audio_default_settings;
@@ -101,9 +100,11 @@ fn main() -> Result<(), Error> {
         Rc::new(Mutex::new(stash_inspect_logger)),
     );
 
-    let storage_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
+    let storage_dir = fuchsia_fs::directory::open_in_namespace(
         "/data/storage",
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE | OpenFlags::CREATE,
+        fuchsia_fs::PERM_READABLE
+            | fuchsia_fs::PERM_WRITABLE
+            | fuchsia_fs::Flags::FLAG_MAYBE_CREATE,
     )
     .context("unable to open data dir")?;
     // EnvironmentBuilder::spawn returns a future that can be awaited for the

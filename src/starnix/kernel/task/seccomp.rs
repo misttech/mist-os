@@ -432,6 +432,7 @@ impl SeccompState {
     // NB: Allow warning below so that it is clear what we are doing on KILL_PROCESS
     #[allow(clippy::wildcard_in_or_patterns)]
     pub fn do_user_defined(
+        locked: &mut Locked<'_, Unlocked>,
         result: SeccompFilterResult,
         current_task: &mut CurrentTask,
         syscall: &Syscall,
@@ -460,7 +461,8 @@ impl SeccompState {
                 Some(Err(errno_from_code!(0)))
             }
             SeccompAction::KillProcess => {
-                current_task.thread_group_exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
+                current_task
+                    .thread_group_exit(locked, ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
                 Some(Err(errno_from_code!(0)))
             }
             SeccompAction::Log => {
@@ -526,7 +528,7 @@ impl SeccompState {
                     }
 
                     // Next, wait for a response from the supervisor
-                    if let Err(e) = waiter.wait(current_task) {
+                    if let Err(e) = waiter.wait(locked, current_task) {
                         return Some(Err(e));
                     }
 
@@ -902,7 +904,12 @@ impl FileOps for SeccompNotifierFileObject {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         let mut state = self.notifier.lock();
 
         for (cookie, notification) in state.pending_notifications.iter() {
@@ -944,7 +951,7 @@ impl FileOps for SeccompNotifierFileObject {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -979,7 +986,7 @@ impl FileOps for SeccompNotifierFileObject {
                             EventHandler::None,
                         );
                     }
-                    waiter.wait(current_task)?;
+                    waiter.wait(locked, current_task)?;
                 }
                 if let Some(notif) = notif {
                     if let Err(e) =

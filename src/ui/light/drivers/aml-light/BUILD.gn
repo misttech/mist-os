@@ -21,28 +21,34 @@ driver_bind_rules("aml_light_bind") {
   ]
 }
 
-fuchsia_driver("aml-light-driver") {
-  output_name = "aml-light"
+source_set("aml-light-driver-source") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [ "aml-light.cc" ]
-  public_deps = [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp" ]
   deps = [
-    ":aml_light_bind",
+    "//sdk/lib/driver/platform-device/cpp",
+    "//src/devices/lib/driver",
+    "//zircon/system/ulib/zx",
+  ]
+  public_deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp",
-    "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_cc_driver("aml-light-driver") {
+  output_name = "aml-light"
+  deps = [
+    ":aml-light-driver-source",
+    ":aml_light_bind",
   ]
 }
 
@@ -60,30 +66,19 @@ fuchsia_driver_package("package") {
 
 test("aml-light-test") {
   output_name = "aml-light-test"
-  sources = [
-    "aml-light-test.cc",
-    "aml-light.cc",
-  ]
+  sources = [ "aml-light-test.cc" ]
   deps = [
+    ":aml-light-driver-source",
     ":aml_light_bind",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
     "//sdk/lib/async-default",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/gpio/testing/fake-gpio",
-    "//src/devices/lib/amlogic",
     "//src/devices/testing/no_ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddk:ddk-metadata-headers",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/mock-function",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }

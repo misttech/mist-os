@@ -74,7 +74,7 @@ class FakeI2cHid : public fake_i2c::FakeI2c {
 
       report_ = std::move(report);
       report_len_ = len;
-      irq_.trigger(0, zx::clock::get_monotonic());
+      irq_.trigger(0, zx::clock::get_boot());
     }
     mock_ddk::GetDriverRuntime()->PerformBlockingWork(
         [this]() { sync_completion_wait_deadline(&report_read_, zx::time::infinite().get()); });
@@ -99,7 +99,7 @@ class FakeI2cHid : public fake_i2c::FakeI2c {
     if (write_buffer[3] == kResetCommand) {
       *read_buffer_size = 0;
       pending_reset_ = true;
-      irq_.trigger(0, zx::clock::get_monotonic());
+      irq_.trigger(0, zx::clock::get_boot());
       return ZX_OK;
     }
 

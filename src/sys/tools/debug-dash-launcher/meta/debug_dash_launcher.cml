@@ -22,16 +22,27 @@
     // Capabilities used by this component.
     use: [
         {
+            config: "fuchsia.debug.ToolsPkgUrl",
+            key: "tools_pkg_url",
+            type: "string",
+            max_size: 100,
+        },
+        {
             protocol: [
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.pkg.PackageResolver-base",
                 "fuchsia.pkg.PackageResolver-boot",
-                "fuchsia.pkg.PackageResolver-full",
                 "fuchsia.process.Launcher",
                 "fuchsia.process.Resolver",
                 "fuchsia.sys2.RealmQuery",
             ],
+        },
+        {
+            protocol: [
+                "fuchsia.pkg.PackageResolver-base",
+                "fuchsia.pkg.PackageResolver-full",
+            ],
+            availability: "optional",
         },
     ],
     expose: [

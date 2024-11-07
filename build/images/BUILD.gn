@@ -323,8 +323,6 @@ group("default-images") {
   # reaching fuchsia.zbi must be excluded from the build graph.
   if (!use_bringup_assembly) {
     deps += [ "//build/images/updates" ]
-  } else {
-    deps += [ "//build/images/archive:fastboot-boot-script" ]
   }
 
   if (check_vtables_in_rodata) {

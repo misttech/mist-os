@@ -9,7 +9,6 @@ use euclid::default::Transform2D;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync, MonotonicInstant, TimeoutExt};
-use fuchsia_fs::{directory as vfs_watcher, OpenFlags};
 use futures::{TryFutureExt, TryStreamExt};
 use keymaps::usages::input3_key_to_hid_usage;
 use std::collections::HashSet;
@@ -463,16 +462,16 @@ pub(crate) async fn listen_for_user_input(internal_sender: InternalSender) -> Re
             _ => (),
         }
     }
-    let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+    let dir_proxy = fuchsia_fs::directory::open_in_namespace(
         input_devices_directory,
-        OpenFlags::RIGHT_READABLE,
+        fuchsia_fs::PERM_READABLE,
     )?;
-    let mut watcher = vfs_watcher::Watcher::new(&dir_proxy).await?;
+    let mut watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy).await?;
     fasync::Task::local(async move {
         let input_devices_directory_path = PathBuf::from("/dev/class/input-report");
         while let Some(msg) = (watcher.try_next()).await.expect("msg") {
             match msg.event {
-                vfs_watcher::WatchEvent::ADD_FILE => {
+                fuchsia_fs::directory::WatchEvent::ADD_FILE => {
                     let device_path = input_devices_directory_path.join(msg.filename);
                     match listen_to_path(&device_path, &watcher_sender).await {
                         Err(err) => {

@@ -10,7 +10,7 @@ namespace tracing {
 namespace test {
 
 TEST_F(TraceManagerTest, DuplicateInitialization) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   ASSERT_TRUE(InitializeSession());
 
@@ -19,7 +19,9 @@ TEST_F(TraceManagerTest, DuplicateInitialization) {
   ASSERT_EQ(status, ZX_OK);
 
   controller::TraceConfig config{GetDefaultTraceConfig()};
-  controller()->InitializeTracing(std::move(config), std::move(their_socket));
+  controller::SessionPtr controller_2;
+  provisioner()->InitializeTracing(controller_2.NewRequest(), std::move(config),
+                                   std::move(their_socket));
   // There's no state transition here that would trigger a call to
   // |LoopQuit()|. Nor is there a result.
   // Mostly we just want to verify things don't hang.
@@ -27,7 +29,7 @@ TEST_F(TraceManagerTest, DuplicateInitialization) {
 }
 
 TEST_F(TraceManagerTest, LargeBuffers) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   controller::TraceConfig config{GetDefaultTraceConfig()};
   config.set_buffer_size_megabytes_hint(1024);
@@ -36,7 +38,7 @@ TEST_F(TraceManagerTest, LargeBuffers) {
 }
 
 TEST_F(TraceManagerTest, InitializeWithoutProviders) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   ASSERT_TRUE(InitializeSession());
 

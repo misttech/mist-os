@@ -255,7 +255,7 @@
             availability: "same_as_target",
         },
         {
-            // Routed to session-manager via memory_monitor.core_shard.cml.
+            // Routed to session-manager via memory_pressure_signaler.core_shard.cml.
             protocol: [ "fuchsia.memorypressure.Provider" ],
             from: "parent",
             to: "#session",

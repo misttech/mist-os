@@ -4007,6 +4007,7 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
 
   zx::vmo strong_child_vmo = buffer_result->TakeStrongChildVmo();
   if (name_.has_value()) {
+    TRACE_DURATION("gfx", "strong_child_vmo.set_property", "buffer_index", index);
     status = strong_child_vmo.set_property(ZX_PROP_NAME, name->c_str(), name->size());
     if (status != ZX_OK) {
       LogInfo(FROM_HERE, "strong_child_vmo.set_property(name) failed (ignoring): %d", status);
@@ -4981,6 +4982,7 @@ fit::result<zx_status_t, std::unique_ptr<LogicalBuffer>> LogicalBuffer::Create(
 LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
                              uint32_t buffer_index, zx::vmo parent_vmo)
     : logical_buffer_collection_(logical_buffer_collection), buffer_index_(buffer_index) {
+  TRACE_DURATION("gfx", "LogicalBuffer::LogicalBuffer", "buffer_index", buffer_index_);
   auto ensure_error_set = fit::defer([this] {
     if (error_ == ZX_OK) {
       error_ = ZX_ERR_INTERNAL;

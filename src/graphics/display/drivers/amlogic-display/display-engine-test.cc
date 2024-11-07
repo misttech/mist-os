@@ -26,8 +26,10 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/amlogic-display/pixel-grid-size2d.h"
+#include "src/graphics/display/drivers/amlogic-display/structured_config.h"
 #include "src/graphics/display/drivers/amlogic-display/video-input-unit.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -379,7 +381,7 @@ class FakeSysmemTest : public testing::Test {
 
     InitializeTestEnvironment();
 
-    display_engine_ = std::make_unique<DisplayEngine>(incoming_);
+    display_engine_ = std::make_unique<DisplayEngine>(incoming_, structured_config::Config());
     display_engine_->SetFormatSupportCheck([](auto) { return true; });
     display_engine_->SetCanvasForTesting(std::move(endpoints.client));
 
@@ -447,19 +449,6 @@ class FakeSysmemTest : public testing::Test {
                                                                   std::in_place};
 };
 
-template <typename Lambda>
-bool PollUntil(Lambda predicate, zx::duration poll_interval, int max_intervals) {
-  ZX_ASSERT(max_intervals >= 0);
-
-  for (int sleeps_left = max_intervals; sleeps_left > 0; --sleeps_left) {
-    if (predicate())
-      return true;
-    zx::nanosleep(zx::deadline_after(poll_interval));
-  }
-
-  return predicate();
-}
-
 TEST_F(FakeSysmemTest, ImportBufferCollection) {
   zx::result<fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>> token1_endpoints =
       fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
@@ -480,9 +469,9 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
                 kBanjoValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
-  EXPECT_TRUE(
-      PollUntil([&]() { return !allocator_->GetActiveBufferCollectionTokenClients().empty(); },
-                zx::msec(5), 1000));
+  EXPECT_TRUE(display::PollUntil(
+      [&]() { return !allocator_->GetActiveBufferCollectionTokenClients().empty(); }, zx::msec(5),
+      1000));
 
   // Verify that the current buffer collection token is used (active).
   {
@@ -514,9 +503,9 @@ TEST_F(FakeSysmemTest, ImportBufferCollection) {
             ZX_ERR_NOT_FOUND);
   EXPECT_OK(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoValidBufferCollectionId));
 
-  EXPECT_TRUE(
-      PollUntil([&]() { return allocator_->GetActiveBufferCollectionTokenClients().empty(); },
-                zx::msec(5), 1000));
+  EXPECT_TRUE(display::PollUntil(
+      [&]() { return allocator_->GetActiveBufferCollectionTokenClients().empty(); }, zx::msec(5),
+      1000));
 
   // Verify that the current buffer collection token is released (inactive).
   {
@@ -672,7 +661,7 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
                                                                  token_client.TakeChannel()));
 
-  EXPECT_TRUE(PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
+  EXPECT_TRUE(display::PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
@@ -680,7 +669,8 @@ TEST_F(FakeSysmemTest, SysmemRequirements) {
   EXPECT_OK(display_engine_->DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
                                                                          kBanjoBufferCollectionId));
 
-  EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
+  EXPECT_TRUE(
+      display::PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
   EXPECT_TRUE(collection->set_name_called());
 }
 
@@ -707,7 +697,7 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
   EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
                                                                  token_client.TakeChannel()));
 
-  EXPECT_TRUE(PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
+  EXPECT_TRUE(display::PollUntil([&] { return collection != nullptr; }, zx::msec(5), 1000));
 
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
@@ -715,7 +705,8 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
   EXPECT_OK(display_engine_->DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
                                                                          kBanjoBufferCollectionId));
 
-  EXPECT_TRUE(PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
+  EXPECT_TRUE(
+      display::PollUntil([&] { return collection->set_constraints_called(); }, zx::msec(5), 1000));
   EXPECT_TRUE(collection->set_name_called());
 }
 

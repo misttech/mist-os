@@ -12,7 +12,10 @@
     ],
     use: [
         { protocol: "fuchsia.pkg.PackageResolver-boot" },
-        { protocol: "fuchsia.pkg.PackageResolver-pkg" },
+        {
+            protocol: "fuchsia.pkg.PackageResolver-pkg",
+            availability: "optional",
+        },
     ],
     expose: [
         {

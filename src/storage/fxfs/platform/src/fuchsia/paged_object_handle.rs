@@ -2707,4 +2707,59 @@ mod tests {
 
         fixture.close().await;
     }
+
+    #[fuchsia::test]
+    async fn test_truncate_allocated_file() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let page_size = zx::system_get_page_size() as u64;
+        file.allocate(0, page_size * 2, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        let write_data = (0..20).cycle().take(page_size as usize).collect::<Vec<_>>();
+        assert_eq!(
+            file.write_at(&write_data, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        file.resize(page_size).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        assert_eq!(
+            file.write_at(&write_data, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            page_size
+        );
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        assert_eq!(
+            file.read_at(page_size, page_size)
+                .await
+                .unwrap()
+                .map_err(zx::Status::from_raw)
+                .unwrap(),
+            write_data,
+        );
+
+        fixture.close().await;
+    }
 }

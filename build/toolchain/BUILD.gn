@@ -37,6 +37,12 @@ clang_toolchain_suite("linux_arm64") {
   use_strip = true
 }
 
+clang_toolchain_suite("linux_arm") {
+  toolchain_cpu = "arm"
+  toolchain_os = "linux"
+  use_strip = true
+}
+
 clang_toolchain_suite("linux_riscv64") {
   toolchain_cpu = "riscv64"
   toolchain_os = "linux"

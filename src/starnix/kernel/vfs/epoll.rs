@@ -379,7 +379,7 @@ impl EpollFileObject {
             // The first time through this loop we'll use the timeout passed into this function so
             // can get EINTR. But since we haven't done anything or accumulated any results yet it's
             // OK to immediately return and no information will be lost.
-            match self.waiter.wait_until(current_task, wait_deadline) {
+            match self.waiter.wait_until(locked, current_task, wait_deadline) {
                 Err(err) if err == ETIMEDOUT => break,
                 Err(err) if err == EINTR => {
                     // Terminating early will lose any events in the pending_list so that should
@@ -503,7 +503,7 @@ impl EpollFileObject {
         &self,
         current_task: &CurrentTask,
         file: &FileHandle,
-        _baton_lease: &zx::Channel,
+        _baton_lease: &zx::Handle,
     ) -> Result<(), Errno> {
         let key = as_epoll_key(file);
         let mut guard = self.state.lock();
@@ -546,7 +546,12 @@ impl FileOps for EpollFileObject {
         Ok(events)
     }
 
-    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         let guard = self.state.lock();
         for (key, _wait_object) in guard.wait_objects.iter() {
             if let ReadyItemKey::Usize(key) = key {

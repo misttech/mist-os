@@ -120,7 +120,7 @@ impl RemoteControlService {
                 Ok(())
             }
             #[cfg(any(
-                fuchsia_api_level_less_than = "NEXT",
+                fuchsia_api_level_less_than = "25",
                 fuchsia_api_level_at_least = "PLATFORM"
             ))]
             rcs::RemoteControlRequest::OpenCapability {
@@ -138,7 +138,7 @@ impl RemoteControlService {
                 )?;
                 Ok(())
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "25")]
             rcs::RemoteControlRequest::ConnectCapability {
                 moniker,
                 capability_set,
@@ -407,13 +407,10 @@ async fn check_entry_exists(
         Some(dir_idx) => {
             let dirname = &capability_name[0..dir_idx];
             let basename = &capability_name[dir_idx + 1..];
-            let nested_dir = fuchsia_fs::directory::open_directory_deprecated(
-                dir,
-                dirname,
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .map_err(|_| rcs::ConnectCapabilityError::NoMatchingCapabilities)?;
+            let nested_dir =
+                fuchsia_fs::directory::open_directory(dir, dirname, fio::PERM_READABLE)
+                    .await
+                    .map_err(|_| rcs::ConnectCapabilityError::NoMatchingCapabilities)?;
             let entries = fuchsia_fs::directory::readdir(&nested_dir)
                 .await
                 .map_err(|_| rcs::ConnectCapabilityError::CapabilityConnectFailed)?;

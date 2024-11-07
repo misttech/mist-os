@@ -1,0 +1,108 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
+    collections: [
+        {
+            name: "storage-host",
+            durability: "transient",
+        },
+    ],
+    capabilities: [
+        {
+            directory: "blob",
+            rights: [ "rw*" ],
+            path: "/fs/blob/root",
+        },
+        {
+            directory: "blob-exec",
+            rights: [
+                "execute",
+                "rw*",
+            ],
+            path: "/fs/blob/root",
+        },
+        {
+            directory: "partitions",
+            rights: [ "r*" ],
+            path: "/gpt/partitions",
+        },
+        {
+            protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            path: "/fs/blob/svc/fuchsia.fxfs.BlobCreator",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            path: "/fs/blob/svc/fuchsia.fxfs.BlobReader",
+        },
+        {
+            protocol: "fuchsia.storagehost.PartitionsAdmin",
+            path: "/gpt/fuchsia.storagehost.PartitionsAdmin",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
+        {
+            service: [
+                "fuchsia.hardware.block.volume.Service",
+                "fuchsia.hardware.ramdisk.Service",
+            ],
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "parent",
+            to: [
+                "#fvm",
+                "#storage-host",
+            ],
+            availability: "optional",
+        },
+    ],
+    expose: [
+        {
+            directory: [
+                "blob",
+                "blob-exec",
+                "partitions",
+            ],
+            from: "self",
+        },
+        {
+            directory: "volumes",
+            from: "#fvm",
+        },
+        {
+            protocol: "fuchsia.fs.startup.Volumes",
+            from: "#fvm",
+        },
+        {
+            protocol: [
+                "fuchsia.fxfs.BlobCreator",
+                "fuchsia.update.verify.BlobfsVerifier",
+            ],
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "self",
+            availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.storagehost.PartitionsAdmin",
+            from: "self",
+            availability: "same_as_target",
+        },
+    ],
+}

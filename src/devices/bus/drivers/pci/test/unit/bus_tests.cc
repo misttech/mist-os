@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
+#include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/pci/hw.h>
 #include <lib/zx/bti.h>
@@ -15,19 +15,22 @@
 #include <zircon/syscalls/object.h>
 #include <zircon/syscalls/port.h>
 
+#include <cstddef>
 #include <memory>
 
 #include <fbl/ref_ptr.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/bus/drivers/pci/bus.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_ecam.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_pciroot.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
+#include "test_helpers.h"
 
 namespace pci {
 
-class PciBusTests : public zxtest::Test {
+class PciBusTests : public ::testing::Test {
  public:
   // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
   PciBusTests() : pciroot_(0, 1), parent_(MockDevice::FakeRootParent()) {
@@ -86,7 +89,7 @@ class PciBusTests : public zxtest::Test {
 };
 
 // An encapsulated pci::Bus to allow inspection of some internal state.
-class TestBus : public inspect::InspectTestHelper, public pci::Bus {
+class TestBus : public ::pci_testing::InspectHelper, public pci::Bus {
  public:
   TestBus(zx_device_t* parent, const pciroot_protocol_t* pciroot, const pci_platform_info_t info,
           std::optional<fdf::MmioBuffer> ecam)
@@ -139,7 +142,7 @@ TEST_F(PciBusTests, BdiGetBti) {
                                              pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
-  ASSERT_EQ(bus->GetDeviceCount(), 1);
+  ASSERT_EQ(bus->GetDeviceCount(), 1u);
 
   zx::bti bti = {};
   ASSERT_EQ(bus->GetBti(nullptr, 0, &bti), ZX_ERR_INVALID_ARGS);
@@ -177,20 +180,20 @@ TEST_F(PciBusTests, BdiLinkUnlinkDevice) {
                                              pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
-  ASSERT_EQ(bus->GetDeviceCount(), 1);
+  ASSERT_EQ(bus->GetDeviceCount(), 1u);
 
   auto device = bus->GetDevice(pci_bdf_t{});
   auto reffed_device = fbl::RefPtr(bus->GetDevice(pci_bdf_t{}));
   EXPECT_EQ(bus->LinkDevice(reffed_device), ZX_ERR_ALREADY_EXISTS);
   EXPECT_OK(bus->UnlinkDevice(device));
-  EXPECT_EQ(bus->GetDeviceCount(), 0);
+  EXPECT_EQ(bus->GetDeviceCount(), 0u);
   EXPECT_EQ(bus->UnlinkDevice(device), ZX_ERR_NOT_FOUND);
 
   // Insert the device back into the bus topology so the disable / unplug
   // lifecycle runs. Otherwise, the normal teardown path of Device will assert
   // that it was never disabled.
   ASSERT_OK(bus->LinkDevice(fbl::RefPtr(device)));
-  ASSERT_EQ(bus->GetDeviceCount(), 1);
+  ASSERT_EQ(bus->GetDeviceCount(), 1u);
 }
 
 TEST_F(PciBusTests, IrqRoutingEntries) {
@@ -239,14 +242,14 @@ TEST_F(PciBusTests, LegacyIrqSignalTest) {
                                              pciroot().ecam().EcamView());
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
-  ASSERT_EQ(1, bus->GetSharedIrqCount());
+  ASSERT_EQ(1u, bus->GetSharedIrqCount());
 
   zx::interrupt dev_interrupt[2];
   // Configure both devices and map their driver facing interrupts. They have
   // different pins, but the pins are mapped to the same vector.
   for (uint8_t i = 0; i < 2; i++) {
     auto* bus_device = bus->GetDevice({0, 0, i});
-    ASSERT_OK(bus_device->SetIrqMode(fuchsia_hardware_pci::InterruptMode::kLegacy, 1));
+    ASSERT_OK(bus_device->SetIrqMode(fuchsia_hardware_pci::InterruptMode::kLegacy, 1u));
     // Map the interrupt the same way a driver would.
     auto result = bus->GetDevice({0, 0, i})->MapInterrupt(0);
     ASSERT_TRUE(result.is_ok());
@@ -262,8 +265,8 @@ TEST_F(PciBusTests, LegacyIrqSignalTest) {
   // Here we simulate triggering the hardware vector and track it all the way to
   // the interrupt event a downstream driver bound to this device would get.
   // Timestamps of the original vector must match.
-  zx::time receive_time;
-  zx::time trigger_time = zx::clock::get_monotonic();
+  zx::time_boot receive_time;
+  zx::time_boot trigger_time = zx::clock::get_boot();
   pciroot().ecam().get({0, 0, 1}).device.set_status(PCI_STATUS_INTERRUPT);
   ASSERT_OK(interrupt.trigger(0, trigger_time));
 
@@ -316,7 +319,7 @@ TEST_F(PciBusTests, LegacyIrqNoAckTest) {
   ASSERT_OK(dev_interrupt.bind(port, 1, ZX_INTERRUPT_BIND));
   ASSERT_FALSE(check_disabled());
 
-  zx::time current_time = zx::clock::get_monotonic();
+  zx::time_boot current_time = zx::clock::get_boot();
   uint32_t irq_cnt = 0;
   zx_port_packet_t packet;
   while (irq_cnt < kMaxIrqsPerNoAckPeriod) {
@@ -343,7 +346,7 @@ TEST_F(PciBusTests, ObeysHeaderTypeMultiFn) {
       std::make_unique<TestBus>(parent(), pciroot().proto(), pciroot().info(), std::nullopt);
   ASSERT_OK(owned_bus->Initialize());
   auto* bus = owned_bus.release();
-  ASSERT_EQ(bus->GetDeviceCount(), 3);
+  ASSERT_EQ(bus->GetDeviceCount(), 3u);
 }
 
 TEST_F(PciBusTests, Inspect) {
@@ -360,17 +363,22 @@ TEST_F(PciBusTests, Inspect) {
 
   [[maybe_unused]] auto bus_node =
       owned_bus->hierarchy().GetByPath({BusInspect::kBus.Data().data()});
-  ASSERT_NOT_NULL(bus_node);
-  EXPECT_NOT_NULL(
-      bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kName.Data().data()));
-  EXPECT_NOT_NULL(bus_node->node().get_property<inspect::StringPropertyValue>(
-      BusInspect::kBusStart.Data().data()));
-  EXPECT_NOT_NULL(bus_node->node().get_property<inspect::StringPropertyValue>(
-      BusInspect::kBusEnd.Data().data()));
-  EXPECT_NOT_NULL(bus_node->node().get_property<inspect::StringPropertyValue>(
-      BusInspect::kSegmentGroup.Data().data()));
-  EXPECT_NOT_NULL(
-      bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kEcam.Data().data()));
+  ASSERT_NE(bus_node, nullptr);
+  EXPECT_NE(
+      bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kName.Data().data()),
+      nullptr);
+  EXPECT_NE(bus_node->node().get_property<inspect::StringPropertyValue>(
+                BusInspect::kBusStart.Data().data()),
+            nullptr);
+  EXPECT_NE(bus_node->node().get_property<inspect::StringPropertyValue>(
+                BusInspect::kBusEnd.Data().data()),
+            nullptr);
+  EXPECT_NE(bus_node->node().get_property<inspect::StringPropertyValue>(
+                BusInspect::kSegmentGroup.Data().data()),
+            nullptr);
+  EXPECT_NE(
+      bus_node->node().get_property<inspect::StringPropertyValue>(BusInspect::kEcam.Data().data()),
+      nullptr);
   [[maybe_unused]] auto* bus = owned_bus.release();
 }
 

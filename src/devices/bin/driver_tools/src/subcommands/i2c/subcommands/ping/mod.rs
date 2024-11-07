@@ -23,12 +23,8 @@ pub async fn ping(
     }
 
     const I2C_DEV_PATH: &str = "class/i2c";
-    let dir = fuchsia_fs::directory::open_directory_no_describe_deprecated(
-        dev,
-        I2C_DEV_PATH,
-        fio::OpenFlags::empty(),
-    )
-    .with_context(|| format!("Failed to open \"{}\"", I2C_DEV_PATH))?;
+    let dir = fuchsia_fs::directory::open_directory_async(dev, I2C_DEV_PATH, fio::Flags::empty())
+        .with_context(|| format!("Failed to open \"{}\"", I2C_DEV_PATH))?;
     let dirents = fuchsia_fs::directory::readdir(&dir).await.context("Failed to read directory")?;
     for dirent in dirents.iter() {
         writeln!(

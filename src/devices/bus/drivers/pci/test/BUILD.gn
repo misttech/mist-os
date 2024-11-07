@@ -26,14 +26,16 @@ test("pci-unit") {
   ]
 
   deps = [
-    "//sdk/lib/inspect/testing/cpp:zxtest",
+    "//sdk/lib/inspect/testing/cpp",
     "//src/devices/bus/drivers/pci:user_pci",
     "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-msi",
     "//src/devices/testing/mock-ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/zxtest",
   ]
 
   public_deps = [ "//src/devices/testing/fake-resource" ]
@@ -59,7 +61,7 @@ test("pci-driver") {
 
 # These drivers are not 'test' drivers because at the moment having other
 # drivers in test/ breaks ddkltl integration tests.
-fuchsia_driver("pci_fake-driver") {
+fuchsia_cc_driver("pci_fake-driver") {
   output_name = "pci_fake"
   configs += [
     "//build/config:all_source",
@@ -89,7 +91,7 @@ fuchsia_driver_component("pci_fake") {
   manifest = "meta/pci_fake.cml"
 }
 
-fuchsia_driver("pci_protocol_test_driver-driver") {
+fuchsia_cc_driver("pci_protocol_test_driver-driver") {
   output_name = "pci_protocol_test_driver"
   configs += [
     "//build/config:all_source",

@@ -17,7 +17,7 @@ namespace screenshot {
 // Serves a screenshot through a channel using |fuchsia.io.File|
 // Updates an unordered_map of current screenshots being served.
 bool ServeScreenshot(
-    zx::channel channel, zx::vmo response_vmo, size_t screenshot_index,
+    fidl::ServerEnd<fuchsia_io::File> file_server, zx::vmo response_vmo, size_t screenshot_index,
     std::unordered_map<size_t,
                        std::pair<std::unique_ptr<vfs::VmoFile>, std::unique_ptr<async::WaitOnce>>>*
         served_screenshots_);

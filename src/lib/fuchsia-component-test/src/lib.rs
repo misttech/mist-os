@@ -11,7 +11,7 @@ use cm_rust::{
     SourceName, UseDecl, UseProtocolDecl, UseSource,
 };
 use cm_types::Path;
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
+#[cfg(fuchsia_api_level_at_least = "25")]
 use cm_types::RelativePath;
 use component_events::events::Started;
 use component_events::matcher::EventMatcher;
@@ -168,6 +168,12 @@ impl From<&ChildRef> for Ref {
     }
 }
 
+impl From<&CollectionRef> for Ref {
+    fn from(input: &CollectionRef) -> Ref {
+        Ref { value: RefInner::Collection(input.name.clone()), scope: input.scope.clone() }
+    }
+}
+
 impl Display for Ref {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self.value {
@@ -254,6 +260,49 @@ impl From<&SubRealmBuilder> for ChildRef {
 
 impl From<&ChildRef> for ChildRef {
     fn from(input: &ChildRef) -> ChildRef {
+        input.clone()
+    }
+}
+
+/// A reference to a collection in a realm. This struct will be returned when a collection is added to a
+/// realm, and may be used in subsequent calls to `RealmBuilder` or `SubRealmBuilder` to reference
+/// the collection that was added.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CollectionRef {
+    name: String,
+    scope: Option<Vec<String>>,
+}
+
+impl CollectionRef {
+    fn new(name: String, scope: Vec<String>) -> Self {
+        CollectionRef { name, scope: Some(scope) }
+    }
+}
+
+impl From<String> for CollectionRef {
+    fn from(input: String) -> CollectionRef {
+        CollectionRef { name: input, scope: None }
+    }
+}
+
+impl From<&str> for CollectionRef {
+    fn from(input: &str) -> CollectionRef {
+        CollectionRef { name: input.to_string(), scope: None }
+    }
+}
+
+impl From<&SubRealmBuilder> for CollectionRef {
+    fn from(input: &SubRealmBuilder) -> CollectionRef {
+        // It should not be possible for library users to access the top-level SubRealmBuilder,
+        // which means that this realm_path.last() will always return Some
+        let mut scope = input.realm_path.clone();
+        let collection_name = scope.pop().expect("this should be impossible");
+        CollectionRef { name: collection_name, scope: Some(scope) }
+    }
+}
+
+impl From<&CollectionRef> for CollectionRef {
+    fn from(input: &CollectionRef) -> CollectionRef {
         input.clone()
     }
 }
@@ -406,6 +455,20 @@ impl ConfigurationCapability {
     /// Renames a configuration capability
     pub fn as_(mut self, name: impl Into<String>) -> Self {
         self.as_ = Some(name.into());
+        self
+    }
+
+    /// Marks the availability of this configuration as "optional", which allows either this or a
+    /// parent offer to have a source of `void`.
+    pub fn optional(mut self) -> Self {
+        self.availability = Some(fdecl::Availability::Optional);
+        self
+    }
+
+    /// Marks the availability of this configuration to be the same as the availability expectations
+    /// set in the target.
+    pub fn availability_same_as_target(mut self) -> Self {
+        self.availability = Some(fdecl::Availability::SameAsTarget);
         self
     }
 }
@@ -643,7 +706,7 @@ impl DictionaryCapability {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
+#[cfg(fuchsia_api_level_at_least = "25")]
 impl Into<ftest::Capability> for DictionaryCapability {
     fn into(self) -> ftest::Capability {
         ftest::Capability::Dictionary(ftest::Dictionary {
@@ -1180,7 +1243,7 @@ impl RealmBuilder {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
                 }
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 d @ ExposeDecl::Dictionary(_) => {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
@@ -1193,7 +1256,7 @@ impl RealmBuilder {
                     let expose = ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: decl.target_name.clone(),
-                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                        #[cfg(fuchsia_api_level_at_least = "25")]
                         source_dictionary: Default::default(),
                         target: ExposeTarget::Parent,
                         target_name: decl.target_name.clone(),
@@ -1205,7 +1268,7 @@ impl RealmBuilder {
                     let expose = ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: decl.target_name.clone(),
-                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                        #[cfg(fuchsia_api_level_at_least = "25")]
                         source_dictionary: Default::default(),
                         target: ExposeTarget::Parent,
                         target_name: decl.target_name.clone(),
@@ -1222,7 +1285,7 @@ impl RealmBuilder {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
                 }
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 d @ ExposeDecl::Dictionary(_) => {
                     warn!("capability type not supported for nested component manager passthrough: {:?}", d);
                     None
@@ -1240,7 +1303,7 @@ impl RealmBuilder {
                 .expect("unable to create path from capability name"),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::default(),
-                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                #[cfg(fuchsia_api_level_at_least = "25")]
                 source_dictionary: RelativePath::dot(),
             })
             .map(|d| UseDecl::Protocol(d))
@@ -1555,6 +1618,24 @@ impl RealmBuilder {
     pub async fn add_capability(&self, capability: cm_rust::CapabilityDecl) -> Result<(), Error> {
         self.root_realm.add_capability(capability).await
     }
+
+    #[cfg(fuchsia_api_level_at_least = "25")]
+    /// Adds a Collection to the root realm.
+    pub async fn add_collection(
+        &self,
+        collection: cm_rust::CollectionDecl,
+    ) -> Result<CollectionRef, Error> {
+        self.root_realm.add_collection(collection).await
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "25")]
+    /// Adds a Environment to the root realm.
+    pub async fn add_environment(
+        &self,
+        environment: cm_rust::EnvironmentDecl,
+    ) -> Result<(), Error> {
+        self.root_realm.add_environment(environment).await
+    }
 }
 
 #[derive(Debug)]
@@ -1714,7 +1795,7 @@ impl SubRealmBuilder {
 
     /// Adds a route between components within the realm
     pub async fn add_route(&self, route: Route) -> Result<(), Error> {
-        #[allow(unused_mut)] // Mutable not needed if not at API level HEAD
+        #[allow(unused_mut)] // Mutable not needed if not at API level NEXT
         let mut capabilities = route.capabilities;
         if let Some(source) = &route.from {
             source.check_scope(&self.realm_path)?;
@@ -1722,7 +1803,7 @@ impl SubRealmBuilder {
         for target in &route.to {
             target.check_scope(&self.realm_path)?;
         }
-        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        #[cfg(fuchsia_api_level_at_least = "25")]
         if let Some(from_dictionary) = route.from_dictionary {
             for c in &mut capabilities {
                 match c {
@@ -1796,6 +1877,27 @@ impl SubRealmBuilder {
     /// Adds a Configuration Capability to the root realm and routes it to the given targets.
     pub async fn add_capability(&self, capability: cm_rust::CapabilityDecl) -> Result<(), Error> {
         self.realm_proxy.add_capability(&capability.native_into_fidl()).await??;
+        Ok(())
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "25")]
+    /// Adds a Collection to the root realm.
+    pub async fn add_collection(
+        &self,
+        collection: cm_rust::CollectionDecl,
+    ) -> Result<CollectionRef, Error> {
+        let name = collection.name.clone().into();
+        self.realm_proxy.add_collection(&collection.native_into_fidl()).await??;
+        Ok(CollectionRef::new(name, self.realm_path.clone()))
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "25")]
+    /// Adds a Environment to the root realm.
+    pub async fn add_environment(
+        &self,
+        environment: cm_rust::EnvironmentDecl,
+    ) -> Result<(), Error> {
+        self.realm_proxy.add_environment(&environment.native_into_fidl()).await??;
         Ok(())
     }
 }
@@ -2862,6 +2964,12 @@ mod tests {
         AddCapability {
             capability: fdecl::Capability,
         },
+        AddCollection {
+            collection: fdecl::Collection,
+        },
+        AddEnvironment {
+            environment: fdecl::Environment,
+        },
         SetConfigValue {
             name: String,
             key: String,
@@ -2978,6 +3086,20 @@ mod tests {
                     ftest::RealmRequest::AddCapability { capability, responder } => {
                         report_requests
                             .send(ServerRequest::AddCapability { capability })
+                            .await
+                            .unwrap();
+                        responder.send(Ok(())).unwrap();
+                    }
+                    ftest::RealmRequest::AddCollection { collection, responder } => {
+                        report_requests
+                            .send(ServerRequest::AddCollection { collection })
+                            .await
+                            .unwrap();
+                        responder.send(Ok(())).unwrap();
+                    }
+                    ftest::RealmRequest::AddEnvironment { environment, responder } => {
+                        report_requests
+                            .send(ServerRequest::AddEnvironment { environment })
                             .await
                             .unwrap();
                         responder.send(Ok(())).unwrap();
@@ -3746,6 +3868,53 @@ mod tests {
                     configuration.value,
                     Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true)))
                 );
+            }
+            req => panic!("match failed, received unexpected server request: {:?}", req),
+        };
+    }
+
+    #[fuchsia::test]
+    async fn add_environment_and_collection() {
+        let (builder, _server_task, mut receive_server_requests) =
+            new_realm_builder_and_server_task();
+        _ = builder.add_child("a", "test://a", ChildOptions::new()).await.unwrap();
+        _ = receive_server_requests.next().now_or_never();
+
+        builder
+            .add_environment(cm_rust::EnvironmentDecl {
+                name: "driver-host-env".parse().unwrap(),
+                extends: fdecl::EnvironmentExtends::Realm,
+                runners: vec![],
+                resolvers: vec![cm_rust::ResolverRegistration {
+                    resolver: "boot-resolver".parse().unwrap(),
+                    source: cm_rust::RegistrationSource::Child("fake-resolver".to_string()),
+                    scheme: "fuchsia-boot".to_string(),
+                }],
+                debug_capabilities: vec![],
+                stop_timeout_ms: Some(20000),
+            })
+            .await
+            .unwrap();
+        match receive_server_requests.next().now_or_never() {
+            Some(Some(ServerRequest::AddEnvironment { environment, .. })) => {
+                assert_eq!(environment.name, Some("driver-host-env".to_string()));
+            }
+            req => panic!("match failed, received unexpected server request: {:?}", req),
+        };
+        builder
+            .add_collection(cm_rust::CollectionDecl {
+                name: "driver-hosts".parse().unwrap(),
+                durability: fdecl::Durability::SingleRun,
+                environment: Some("driver-host-env".parse().unwrap()),
+                allowed_offers: Default::default(),
+                allow_long_names: Default::default(),
+                persistent_storage: None,
+            })
+            .await
+            .unwrap();
+        match receive_server_requests.next().now_or_never() {
+            Some(Some(ServerRequest::AddCollection { collection, .. })) => {
+                assert_eq!(collection.name, Some("driver-hosts".to_string()));
             }
             req => panic!("match failed, received unexpected server request: {:?}", req),
         };

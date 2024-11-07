@@ -2,11 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/cpp/sdk_source_set.gni")
 import("//build/testing/cc_test_executable.gni")
 
-sdk_source_set("common") {
-  category = "internal"
+source_set("common") {
   visibility = [
     ":*",
     "//src/lib/files:*",
@@ -23,8 +21,7 @@ sdk_source_set("common") {
   ]
 }
 
-sdk_source_set("memory") {
-  category = "internal"
+source_set("memory") {
   visibility = [
     ":*",
     "//src/lib/files:*",
@@ -49,12 +46,8 @@ sdk_source_set("memory") {
   ]
 }
 
-sdk_source_set("third_party") {
-  category = "internal"
-  visibility = [
-    ":*",
-    ":strings",
-  ]
+source_set("third_party") {
+  visibility = [ ":strings" ]
 
   sources = [
     "third_party/icu/icu_utf.cc",
@@ -63,8 +56,7 @@ sdk_source_set("third_party") {
   configs += [ "//build/config:Wno-implicit-fallthrough" ]
 }
 
-sdk_source_set("string_printf") {
-  category = "internal"
+source_set("string_printf") {
   visibility = [
     ":*",
     "//src/lib/files:*",
@@ -79,8 +71,7 @@ sdk_source_set("string_printf") {
   public_deps = [ ":common" ]
 }
 
-sdk_source_set("strings") {
-  category = "internal"
+source_set("strings") {
   visibility = [
     ":*",
     "//src/lib/files:*",
@@ -112,8 +103,7 @@ sdk_source_set("strings") {
   ]
 }
 
-sdk_source_set("functional") {
-  category = "internal"
+source_set("functional") {
   visibility = [ ":*" ]
 
   sources = [
@@ -130,9 +120,7 @@ sdk_source_set("functional") {
 # Transitional target for things depending on the CLI
 # parts of fxl. Eventually CLI-specific functionality
 # will be removed from the main "fxl" target, and moved to this one.
-sdk_source_set("cli") {
-  category = "internal"
-
+source_set("cli") {
   sources = [
     "command_line.cc",
     "command_line.h",
@@ -151,8 +139,7 @@ group("fxl_cli") {
   public_deps = [ ":cli" ]
 }
 
-sdk_source_set("fxl") {
-  category = "internal"
+source_set("fxl") {
   sources = [ "observer_list.h" ]
 
   public_deps = [

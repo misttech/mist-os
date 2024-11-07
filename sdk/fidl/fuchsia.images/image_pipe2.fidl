@@ -82,7 +82,7 @@ closed protocol ImagePipe2 {
     ///
     /// The following errors will cause the connection to be closed:
     /// - `buffer_collection_id` is already registered
-    @available(added=NEXT, deprecated=NEXT)
+    @available(added=25, deprecated=25)
     strict AddBufferCollection2(resource struct {
         buffer_collection_id uint32;
         buffer_collection_token client_end:fuchsia.sysmem2.BufferCollectionToken;

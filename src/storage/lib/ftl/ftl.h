@@ -302,23 +302,15 @@ typedef struct XfsVol {
 
 // FTL Wear Data Structure.
 typedef struct {
-  double lag_sd;              // Standard deviation of block wear lag.
-  double used_sd;             // Standard deviation of used pages per block.
-  uint32_t recycle_cnt;       // Total number of recycles performed.
-  uint32_t max_consec_rec;    // Maximum number of consecutive recycles.
-  uint32_t avg_consec_rec;    // Average number of consecutive recycles.
-  uint32_t wc_sum_recycles;   // # recycles when average lag exceeds limit.
-  uint32_t wc_lim1_recycles;  // # recycles when a lag exceeds WC_LAG_LIM1.
-  uint32_t wc_lim2_recycles;  // # recycles when a lag exceeds WC_LAG_LIM2.
-  uint32_t write_amp_max;     // Max fl pgs per vol pgs in FtlnWrPages().
-  uint32_t write_amp_avg;     // 10 x flash wr pgs per FtlnWrPages() pgs.
-  uint32_t avg_wc_lag;        // Average wear count lag.
-  uint32_t lag_ge_lim0;       // # of blks w/wear count lag >= lag limit 0.
-  uint32_t lag_ge_lim1;       // # of blks w/wear count lag >= lag limit 1.
-  uint32_t max_ge_lim2;       // Max blks w/wear lag concurrently >= lim2.
-  uint32_t max_wc_over;       // # of times max delta (0xFF) was exceeded.
-  uint8_t lft_max_lag;        // Lifetime max wear lag below hi wear count.
-  uint8_t cur_max_lag;        // Current max wear lag.
+  double lag_sd;            // Standard deviation of block wear lag.
+  double used_sd;           // Standard deviation of used pages per block.
+  uint32_t recycle_cnt;     // Total number of recycles performed.
+  uint32_t max_consec_rec;  // Maximum number of consecutive recycles.
+  uint32_t avg_consec_rec;  // Average number of consecutive recycles.
+  uint32_t write_amp_max;   // Max fl pgs per vol pgs in FtlnWrPages().
+  uint32_t write_amp_avg;   // 10 x flash wr pgs per FtlnWrPages() pgs.
+  uint32_t avg_wc_lag;      // Average wear count lag.
+  uint32_t max_lag;         // Max wear lag.
 } FtlWearData;
 
 __BEGIN_CDECLS

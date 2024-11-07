@@ -540,3 +540,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0261_fast_and_efficient_user_space_kernel_emulation.md
   - title: "RFC-0262: Expand KMEM_STATS"
     path: /docs/contribute/governance/rfcs/0262_expand_kmem_stats.md
+  - title: "RFC-0263: Migrate driver communication to services"
+    path: /docs/contribute/governance/rfcs/0263_migrate_driver_communication_to_services.md

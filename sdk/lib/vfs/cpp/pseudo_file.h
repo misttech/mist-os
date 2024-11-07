@@ -5,6 +5,7 @@
 #ifndef LIB_VFS_CPP_PSEUDO_FILE_H_
 #define LIB_VFS_CPP_PSEUDO_FILE_H_
 
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fit/function.h>
 #include <lib/vfs/cpp/node.h>
 
@@ -47,6 +48,22 @@ class PseudoFile final : public Node {
                       WriteHandler write_handler = nullptr)
       : Node(MakePseudoFile(max_file_size, std::move(read_handler), std::move(write_handler))) {}
 
+  // Serve a new connection to this pseudo-file on `server_end` using specified `flags`.
+  //
+  // This method must only be used with a single-threaded asynchronous dispatcher. If `dispatcher`
+  // is `nullptr`, the current thread's default dispatcher will be used via
+  // `async_get_default_dispatcher`. The same `dispatcher` must be used if multiple connections are
+  // served for the same node, otherwise `ZX_ERR_INVALID_ARGS` will be returned.
+  zx_status_t Serve(fuchsia_io::Flags flags, fidl::ServerEnd<fuchsia_io::File> server_end,
+                    async_dispatcher_t* dispatcher = nullptr) {
+    if (flags & (fuchsia_io::wire::kMaskKnownProtocols ^ fuchsia_io::Flags::kProtocolFile)) {
+      return ZX_ERR_INVALID_ARGS;  // Only the file protocol is allowed with this signature.
+    }
+    return ServeInternal(flags | fuchsia_io::Flags::kProtocolFile, server_end.TakeChannel(),
+                         dispatcher);
+  }
+
+  // TODO(https://fxbug.dev/336617685): This version of `Serve` is deprecated and should be removed.
   using Node::Serve;
 
  private:

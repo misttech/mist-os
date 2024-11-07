@@ -12,7 +12,7 @@ driver_bind_rules("parent_driver_bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "fidl-bindlib-generation-parent"
   sources = [ "parent_driver.cc" ]

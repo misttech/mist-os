@@ -7,76 +7,9 @@
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
-#include <lib/driver/power/cpp/element-description-builder.h>
-#include <lib/driver/power/cpp/power-support.h>
 #include <zircon/syscalls-next.h>
 
 namespace hrtimer {
-
-zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
-    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) {
-  auto power_broker = incoming()->Connect<fuchsia_power_broker::Topology>();
-  if (power_broker.is_error() || !power_broker->is_valid()) {
-    FDF_LOG(WARNING, "Failed to connect to power broker: %s", power_broker.status_string());
-    return power_broker.take_error();
-  }
-
-  // TODO(b/358361345): Use //sdk/lib/driver/platform-device/cpp to retrieve power configuration
-  // once it supports it.
-  const auto result_power_config = pdev->GetPowerConfiguration();
-  if (!result_power_config.ok()) {
-    FDF_LOG(ERROR, "Call to get power config failed: %s", result_power_config.status_string());
-    return zx::error(result_power_config.status());
-  }
-  if (result_power_config->is_error()) {
-    FDF_LOG(INFO, "GetPowerConfiguration failed: %s",
-            zx_status_get_string(result_power_config->error_value()));
-    return zx::error(result_power_config->error_value());
-  }
-  if (result_power_config->value()->config.count() != 1) {
-    FDF_LOG(ERROR, "Unexpected number of power configurations: %zu",
-            result_power_config->value()->config.count());
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  const auto& wire_config = result_power_config->value()->config[0];
-  if (wire_config.element().name().get() != "aml-hrtimer-wake") {
-    FDF_LOG(ERROR, "Unexpected power element: %s",
-            std::string(wire_config.element().name().get()).c_str());
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-
-  fuchsia_hardware_power::PowerElementConfiguration natural_config = fidl::ToNatural(wire_config);
-  zx::result config = fdf_power::PowerElementConfiguration::FromFidl(natural_config);
-  if (config.is_error()) {
-    FDF_SLOG(ERROR, "Failed to convert power element configuration from fidl.",
-             KV("status", config.status_string()));
-    return config.take_error();
-  }
-
-  auto tokens = fdf_power::GetDependencyTokens(*incoming(), config.value());
-  if (tokens.is_error()) {
-    FDF_LOG(ERROR, "Failed to get power dependency tokens: %u",
-            static_cast<uint8_t>(tokens.error_value()));
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  fdf_power::ElementDesc description =
-      fdf_power::ElementDescBuilder(config.value(), std::move(tokens.value())).Build();
-  auto result_add_element = fdf_power::AddElement(power_broker.value(), description);
-  if (result_add_element.is_error()) {
-    FDF_LOG(ERROR, "Failed to add power element: %u",
-            static_cast<uint8_t>(result_add_element.error_value()));
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  PowerConfiguration response;
-  response.element_control_client = std::move(description.element_control_client.value());
-  response.lessor_client = std::move(description.lessor_client.value());
-  response.current_level_client = std::move(*description.current_level_client);
-  response.required_level_client = std::move(*description.required_level_client);
-  return zx::ok(std::move(response));
-}
 
 zx::result<> AmlHrtimer::Start() {
   zx::result pdev_result = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
@@ -128,32 +61,23 @@ zx::result<> AmlHrtimer::Start() {
     irq = std::move(result_irq->value()->irq);
   }
 
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control;
-  fidl::SyncClient<fuchsia_power_broker::Lessor> lessor;
-  fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level;
-  fidl::Client<fuchsia_power_broker::RequiredLevel> required_level;
-  fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag;
+  std::optional<fidl::SyncClient<fuchsia_power_system::ActivityGovernor>> sag;
 
-  zx::result<PowerConfiguration> power_configuration = GetPowerConfiguration(pdev);
   auto sag_connect = incoming()->Connect<fuchsia_power_system::ActivityGovernor>();
-  if (power_configuration.is_error()) {
-    FDF_LOG(INFO, "Could not get power configuration: %s, continue without power support",
-            zx_status_get_string(power_configuration.error_value()));
+  if (!config_.enable_suspend()) {
+    FDF_LOG(WARNING,
+            "fuchsia.power.SuspendEnabled config disabled, continue without power support");
   } else if (sag_connect.is_error() || !sag_connect->is_valid()) {
     FDF_LOG(WARNING, "Failed to connect to SAG: %s continue without power support",
             sag_connect.status_string());
   } else {
-    element_control.emplace(std::move(power_configuration->element_control_client));
-    lessor.Bind(std::move(std::move(power_configuration->lessor_client)));
-    current_level.Bind(std::move(power_configuration->current_level_client));
-    required_level.Bind(std::move(power_configuration->required_level_client), dispatcher());
-    sag.Bind(std::move(*sag_connect));
+    fidl::SyncClient<fuchsia_power_system::ActivityGovernor> local_sag(std::move(*sag_connect));
+    sag.emplace(std::move(local_sag));
   }
   server_ = std::make_unique<hrtimer::AmlHrtimerServer>(
-      dispatcher(), std::move(*mmio_buffer), std::move(element_control), std::move(lessor),
-      std::move(current_level), std::move(required_level), std::move(sag), std::move(irqs[0]),
-      std::move(irqs[1]), std::move(irqs[2]), std::move(irqs[3]), std::move(irqs[4]),
-      std::move(irqs[5]), std::move(irqs[6]), std::move(irqs[7]), inspector());
+      dispatcher(), std::move(*mmio_buffer), std::move(sag), std::move(irqs[0]), std::move(irqs[1]),
+      std::move(irqs[2]), std::move(irqs[3]), std::move(irqs[4]), std::move(irqs[5]),
+      std::move(irqs[6]), std::move(irqs[7]), inspector());
 
   auto result_dev = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_hrtimer::Device>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),

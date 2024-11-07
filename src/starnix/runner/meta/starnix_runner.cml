@@ -10,7 +10,6 @@
     program: {
         runner: "elf",
         binary: "bin/starnix_runner",
-        memory_attribution: "true",
     },
     collections: [
         {
@@ -31,7 +30,6 @@
         {
             protocol: [
                 "fuchsia.component.runner.ComponentRunner",
-                "fuchsia.memory.attribution.Provider",
                 "fuchsia.starnix.runner.Manager",
             ],
         },
@@ -74,6 +72,8 @@
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
                 "fuchsia.net.routes.admin.RouteTableV4",
                 "fuchsia.net.routes.admin.RouteTableV6",
+                "fuchsia.net.routes.admin.RuleTableV4",
+                "fuchsia.net.routes.admin.RuleTableV6",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.net.tun.Control",
@@ -85,7 +85,6 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
-                "fuchsia.tracing.provider.Registry",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
@@ -93,11 +92,13 @@
         },
         {
             protocol: [
+                "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.display.singleton.Info",
@@ -115,12 +116,6 @@
             protocol: [ "fuchsia.starnix.runner.Manager" ],
             from: "self",
             to: [ "#kernels" ],
-        },
-        {
-            service: "fuchsia.hardware.sockettunnel.Service",
-            from: "parent",
-            to: [ "#kernels" ],
-            availability: "optional",
         },
         {
             directory: "boot-kernel",
@@ -149,10 +144,7 @@
             from: "self",
         },
         {
-            protocol: [
-                "fuchsia.memory.attribution.Provider",
-                "fuchsia.starnix.runner.Manager",
-            ],
+            protocol: [ "fuchsia.starnix.runner.Manager" ],
             from: "self",
         },
     ],

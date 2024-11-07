@@ -13,9 +13,6 @@ import (
 	"runtime/trace"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
-	buildcmd "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/build"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/publish"
-	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/cmd/pm/serve"
 )
 
 const usage = `Usage: %s [-k key] [-m manifest] [-o output dir] [-t tempdir] <command> [-help]
@@ -23,15 +20,6 @@ const usage = `Usage: %s [-k key] [-m manifest] [-o output dir] [-t tempdir] <co
 IMPORTANT: Please note that pm is being sunset and will be removed.
            Building packages and serving repositories is supported
            through ffx. Please adapt workflows accordingly.
-
-Package Commands:
-    build    - perform update and seal in order
-
-Repository Commands:
-    publish  - publish a package to a local repository
-    serve    - serve a local repository
-
-For help with individual commands run "pm <command> --help"
 `
 
 var tracePath = flag.String("trace", "", "write runtime trace to `file`")
@@ -74,7 +62,8 @@ func doMain() int {
 		err = nil
 
 	case "build":
-		err = buildcmd.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "please use 'ffx package build' instead")
+		err = nil
 
 	case "delta":
 		fmt.Fprintf(os.Stderr, "delta is deprecated without replacement")
@@ -94,7 +83,8 @@ func doMain() int {
 		err = nil
 
 	case "publish":
-		err = publish.Run(cfg, flag.Args()[1:])
+		fmt.Fprintf(os.Stderr, "please use 'ffx repository publish' instead")
+		err = nil
 
 	case "seal":
 		fmt.Fprintf(os.Stderr, "please use 'ffx package far create' instead")
@@ -105,7 +95,8 @@ func doMain() int {
 		err = nil
 
 	case "serve":
-		err = serve.Run(cfg, flag.Args()[1:], nil)
+		fmt.Fprintf(os.Stderr, "please use 'ffx repository serve' instead")
+		err = nil
 
 	case "snapshot":
 		fmt.Fprintf(os.Stderr, "snapshot is deprecated without replacement")

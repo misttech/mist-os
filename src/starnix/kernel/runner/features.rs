@@ -329,10 +329,6 @@ pub fn run_component_features(
                     .start_server(kernel, incoming_dir.take())
                     .expect("Failed to start framebuffer server");
             }
-            "container" | "selinux" => {
-                // TODO(https://fxbug.dev/371368307): Remove once tests no longer share cml files with test
-                // containers.
-            }
             feature => {
                 return error!(ENOSYS, format!("Unsupported feature: {}", feature));
             }

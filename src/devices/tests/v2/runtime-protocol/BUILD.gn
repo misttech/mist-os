@@ -28,7 +28,7 @@ driver_bind_rules("root_bind") {
   bind_output = "root.bindbc"
 }
 
-fuchsia_driver("root-driver") {
+fuchsia_cc_driver("root-driver") {
   testonly = true
   output_name = "runtime-protocol-root"
   sources = [ "root-driver.cc" ]
@@ -62,7 +62,7 @@ driver_bind_rules("runtime-protocol-leaf-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("leaf-driver") {
+fuchsia_cc_driver("leaf-driver") {
   testonly = true
   output_name = "runtime-protocol-leaf"
   sources = [ "leaf-driver.cc" ]

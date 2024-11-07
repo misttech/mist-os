@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
@@ -172,6 +173,11 @@ foreach(test, fidl_compatibility_tests_categories) {
     testonly = true
     package_name = "${harness_package_name}"
     deps = [ ":${harness_component_label}" ]
+  }
+
+  export_fuchsia_package_to_bazel("${harness_package_label}.bazel_input") {
+    testonly = true
+    package = ":${harness_package_label}"
   }
 
   test_harness_labels += [ ":${harness_package_label}" ]

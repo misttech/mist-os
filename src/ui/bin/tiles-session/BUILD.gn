@@ -67,6 +67,6 @@ fuchsia_package("tiles-session") {
 }
 
 # Make `tiles_session` available to products assembled with Bazel.
-export_fuchsia_package_to_bazel("tiles_session_bazel_inputs") {
+export_fuchsia_package_to_bazel("tiles-session.bazel_input") {
   package = ":tiles-session"
 }

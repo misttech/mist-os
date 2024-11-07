@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl::endpoints::{Proxy, ServerEnd};
+use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_pkg::{
     self as fpkg, PackageResolverMarker, PackageResolverProxy, PackageResolverRequestStream,
     PackageResolverResolveResponder,
@@ -41,12 +41,12 @@ impl TestPackage {
         // Connect to the backing directory which we'll proxy _most_ requests to.
         let (backing_dir_proxy, server_end) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        fdio::open(
+        fuchsia_fs::directory::open_channel_in_namespace(
             self.root.to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE,
-            server_end.into_channel(),
+            fio::PERM_READABLE,
+            server_end,
         )
-        .unwrap();
+        .expect("open channel in namespace failed");
 
         // Open the package directory using the directory request given by the client
         // asking to resolve the package, but proxy it through our handler so that we can
@@ -78,20 +78,15 @@ pub async fn handle_package_directory_stream(
     backing_dir_proxy: fio::DirectoryProxy,
 ) {
     async move {
-        let (package_contents_node_proxy, package_contents_dir_server_end) =
-            fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let (package_contents_dir_proxy, package_contents_dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         backing_dir_proxy
-            .open(
-                fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
+            .open3(
                 PACKAGE_CONTENTS_PATH,
-                package_contents_dir_server_end,
+                fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE,
+                &fio::Options::default(),
+                package_contents_dir_server_end.into_channel(),
             )
             .unwrap();
-
-        // Effectively cast our package_contents_node_proxy to a directory, as it must be in order for these tests to work.
-        let package_contents_dir_proxy =
-            fio::DirectoryProxy::new(package_contents_node_proxy.into_channel().unwrap());
 
         while let Some(req) = stream.next().await {
             match req.unwrap() {
@@ -110,6 +105,25 @@ pub async fn handle_package_directory_stream(
                         backing_dir_proxy.open(flags, mode, &path, object).unwrap();
                     } else {
                         package_contents_dir_proxy.open(flags, mode, &path, object).unwrap();
+                    }
+                }
+                fio::DirectoryRequest::Open3 { path, flags, options, object, control_handle: _ } => {
+                    // If the client is trying to read the meta directory as a file, redirect them
+                    // to the file which actually holds the merkle for the purposes of these tests.
+                    // Otherwise, redirect to the real package contents.
+                    if path == "." {
+                        panic!(
+                            "Client would escape mock resolver directory redirects by opening '.', which might break further requests to /meta as a file"
+                        )
+                    }
+
+                    let open_meta_as_file = flags.intersects(fio::Flags::PROTOCOL_FILE) || !flags.intersects(fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PROTOCOL_NODE);
+
+                    if path == "meta" && open_meta_as_file {
+                        // Should redirect request to merkle file
+                        backing_dir_proxy.open3(&path, flags, &options, object).expect("open3 wire call failed.");
+                    } else {
+                        package_contents_dir_proxy.open3(&path, flags, &options, object).expect("open3 wire call failed.");
                     }
                 }
                 fio::DirectoryRequest::ReadDirents { max_bytes, responder } => {
@@ -410,13 +424,8 @@ mod tests {
     use fidl_fuchsia_pkg::ResolveError;
 
     async fn read_file(dir_proxy: &fio::DirectoryProxy, path: &str) -> String {
-        let file_proxy = fuchsia_fs::directory::open_file_deprecated(
-            dir_proxy,
-            path,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
+        let file_proxy =
+            fuchsia_fs::directory::open_file(dir_proxy, path, fio::PERM_READABLE).await.unwrap();
 
         fuchsia_fs::file::read_to_string(&file_proxy).await.unwrap()
     }

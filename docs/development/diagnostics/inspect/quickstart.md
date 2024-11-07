@@ -512,10 +512,10 @@ single component (for example, `my_component.cm`) as input to
 `ffx inspect show`:
 
 ```posix-terminal
-ffx inspect show --manifest my_component.cm
+ffx inspect show --component my_component.cm
 ```
 
-Specifying `--manifest` above will return data for all instances
+Specifying `--component` above will return data for all instances
 of your component running on the system. If you know a specific
 moniker of your component (for example, `core/my_component`) you
 may pass that instead:
@@ -546,11 +546,12 @@ ffx inspect show core/my_component:root
 ```
 
 If you don't know the moniker for your component, you may use
-`--manifest` with a selector that applies to all matched component
-monikers (using `*`):
+`--component` with a selector that applies to a matched component. Note that if
+there are multiple matches, you will be asked to disambiguate (all the monikers will
+be listed).
 
 ```posix-terminal
-ffx inspect show --manifest my_component.cm *:root
+ffx inspect show --component my_component.cm
 ```
 
 This will print out the following if you followed the suggested

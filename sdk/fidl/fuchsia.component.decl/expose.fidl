@@ -14,7 +14,7 @@ type Expose = flexible union {
     3: directory ExposeDirectory;
     4: runner ExposeRunner;
     5: resolver ExposeResolver;
-    @available(added=HEAD)
+    @available(added=25)
     7: dictionary ExposeDictionary;
     @available(added=20)
     8: config ExposeConfiguration;
@@ -40,7 +40,7 @@ type ExposeService = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     6: source_dictionary string:MAX_PATH_LENGTH;
 
     /// (Required) The destination to which the service is exposed: either the
@@ -80,7 +80,7 @@ type ExposeProtocol = table {
     /// dictionary capability with this name. The rest of the path (possibly empty)
     /// represents the path to a dictionary nested in the top-level dictionary which
     /// is expected to contain `source_name`.
-    @available(added=HEAD)
+    @available(added=25)
     6: source_dictionary string:MAX_PATH_LENGTH;
 
     /// (Required) The destination to which the protocol is exposed: either the
@@ -117,7 +117,7 @@ type ExposeDirectory = table {
     /// dictionary capability with this name. The rest of the path (possibly empty)
     /// represents the path to a dictionary nested in the top-level dictionary which
     /// is expected to contain `source_name`.
-    @available(added=HEAD)
+    @available(added=25)
     8: source_dictionary string:MAX_PATH_LENGTH;
 
     /// (Required) The destination to which the directory is exposed: either the
@@ -160,7 +160,7 @@ type ExposeRunner = table {
     /// dictionary capability with this name. The rest of the path (possibly empty)
     /// represents the path to a dictionary nested in the top-level dictionary which
     /// is expected to contain `source_name`.
-    @available(added=HEAD)
+    @available(added=25)
     6: source_dictionary string:MAX_PATH_LENGTH;
 
     /// (Required) The destination to which the runner is exposed: either the
@@ -190,7 +190,7 @@ type ExposeResolver = table {
     /// dictionary capability with this name. The rest of the path (possibly empty)
     /// represents the path to a dictionary nested in the top-level dictionary which
     /// is expected to contain `source_name`.
-    @available(added=HEAD)
+    @available(added=25)
     6: source_dictionary string:MAX_PATH_LENGTH;
 
     /// (Required) The destination to which the resolver is exposed
@@ -205,7 +205,7 @@ type ExposeResolver = table {
 ///
 /// To learn more about dictionarys, see:
 /// https://fuchsia.dev/fuchsia-src/glossary#dictionary
-@available(added=HEAD)
+@available(added=25)
 type ExposeDictionary = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `self` or `child`, or `void`. If set to `void`, then the
@@ -225,7 +225,7 @@ type ExposeDictionary = table {
     /// dictionary capability with this name. The rest of the path (possibly empty)
     /// represents the path to a dictionary nested in the top-level dictionary which
     /// is expected to contain `source_name`.
-    @available(added=HEAD)
+    @available(added=25)
     6: source_dictionary string:MAX_PATH_LENGTH;
 
     /// (Required) The destination to which the dictionary is exposed: either the
@@ -268,6 +268,6 @@ type ExposeConfiguration = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     6: source_dictionary string:MAX_PATH_LENGTH;
 };

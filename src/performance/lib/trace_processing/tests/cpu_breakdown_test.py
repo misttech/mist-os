@@ -2,7 +2,7 @@
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for cpu_breakdown.py."""
+"""Unit tests for cpu.py."""
 
 import unittest
 from typing import cast
@@ -261,8 +261,8 @@ class CpuBreakdownTest(unittest.TestCase):
         self.assertEqual(len(model.processes[1].threads), 1)
 
         processor = cpu.CpuMetricsProcessor()
-        breakdown = processor.process_freeform_metrics(model)
-        assert isinstance(breakdown, list)
+        name, breakdown = processor.process_freeform_metrics(model)
+        self.assertEqual(name, processor.FREEFORM_METRICS_FILENAME)
 
         self.assertEqual(len(breakdown), 5)
 
@@ -324,8 +324,8 @@ class CpuBreakdownTest(unittest.TestCase):
         model = self.construct_trace_model()
 
         processor = cpu.CpuMetricsProcessor()
-        breakdown = processor.process_freeform_metrics(model)
-        assert isinstance(breakdown, list)
+        name, breakdown = processor.process_freeform_metrics(model)
+        self.assertEqual(name, processor.FREEFORM_METRICS_FILENAME)
         consolidated_breakdown = cpu.group_by_process_name(breakdown)
         self.assertEqual(len(consolidated_breakdown), 4)
 
@@ -374,7 +374,8 @@ class CpuBreakdownTest(unittest.TestCase):
         # Keep logs for skipped records logging.
         with self.assertLogs(cpu._LOGGER, level="WARNING") as context_manager:
             processor = cpu.CpuMetricsProcessor()
-            breakdown = processor.process_freeform_metrics(model)
+            name, breakdown = processor.process_freeform_metrics(model)
+            self.assertEqual(name, processor.FREEFORM_METRICS_FILENAME)
 
         self.assertEqual(len(breakdown), 2)
 

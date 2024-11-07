@@ -309,7 +309,7 @@ group("tests") {
 if (is_host) {
   group("host_tests") {
     testonly = true
-    deps = []
+    deps = [ "frontends/ffx:host_tests($host_toolchain)" ]
 
     # ffx e2e host tests have a few constraints:
     #
@@ -331,7 +331,6 @@ if (is_fuchsia) {
   group("package_deps_for_host_tests") {
     testonly = true
     deps = [
-      "lib:package_deps_for_host_tests",
       "plugins:package_deps_for_host_tests",
       "tools/target-package/tests:package_deps_for_host_tests",
     ]
@@ -343,7 +342,6 @@ group("e2e_tests") {
   testonly = true
   deps = [
     "frontends/ffx:e2e_tests($host_toolchain)",
-    "lib/fuchsia-controller:e2e_tests($host_toolchain)",
     "plugins/emulator:e2e_tests",
     "tests:e2e_tests($host_toolchain)",
   ]

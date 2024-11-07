@@ -45,11 +45,6 @@
             path: "/specific-base-packages/root_ssl_certificates/data",
         },
         {
-            directory: "shell-commands-bin",
-            rights: [ "rx*" ],
-            path: "/specific-base-packages/shell-commands/bin",
-        },
-        {
             directory: "system",
             rights: [ "rx*" ],
             path: "/specific-base-packages/system_image",
@@ -152,7 +147,6 @@
                 "config-data",
                 "pkgfs",
                 "root-ssl-certificates",
-                "shell-commands-bin",
                 "system",
             ],
             from: "self",

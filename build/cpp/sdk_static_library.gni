@@ -77,33 +77,32 @@ template("sdk_static_library") {
   valid_categories = [
     # "excluded" is deprecated.
     # "experimental" is deprecated.
-    "internal",  # TODO(https://fxbug.dev/333907192): Disable once allowlisted
-                 # uses below are removed.
-
+    # "internal" is deprecated; only specific legacy cases below are allowed.
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.
     "partner",
-
     # "public" is not yet implemented.
   ]
 
-  # Remove categories that should not be used in new targets.
-  valid_categories_for_error_message = valid_categories - [ "internal" ]
+  # TODO(https://fxbug.dev/333907192): Remove "internal" support once the
+  # TODOs in the assert below have been addressed.
+  is_internal = invoker.category == "internal"
 
   assert(
       valid_categories + [ invoker.category ] - [ invoker.category ] !=
-          valid_categories,
-      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories_for_error_message}.")
+          valid_categories ||
+          # TODO(https://fxbug.dev/333907192): Remove "internal" per above.
+          is_internal,
+      "'${target_name}' has unsupported SDK category '${invoker.category}'. Must be one of ${valid_categories}.")
 
-  is_internal = invoker.category == "internal"
-
-  # TODO(https://fxbug.dev/333907192): Remove "internal" support once these
-  # libraries are moved to the core IDK or @internal_sdk is eliminated.
-  # TODO(https://fxbug.dev/366517646): Remove fake-* once the existing deps are
-  # switched to the new targets in //sdk and the ones on //src are deleted.
-  assert(!is_internal || target_name == "devicetree" ||
-             target_name == "fake-bti" || target_name == "fake-object",
-         "Do not add more internal static libraries.")
+  assert(
+      !is_internal ||
+          # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
+          target_name == "devicetree" ||
+          # TODO(https://fxbug.dev/366517646): Remove these once all uses of
+          # `fake-bti` are migrated to the //sdk target.
+          target_name == "fake-bti" || target_name == "fake-object",
+      "Do not add more internal static libraries.")
 
   output_name = target_name
   if (defined(invoker.output_name)) {
@@ -339,9 +338,6 @@ template("sdk_static_library") {
                                "source_dir",
                                "testonly",
                              ])
-      if (!defined(all_headers)) {
-        all_headers = []
-      }
       all_deps = build_deps
       file_base = sdk_root_path
       if (!defined(all_headers)) {

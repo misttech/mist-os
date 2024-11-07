@@ -2,10 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/assembled_system.gni")
+import("//build/assembly/generated_partitions_config.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/sdk/product_bundle.gni")
 import("//build/testing/symbols_dir_test_data.gni")
 import("//src/developer/ffx/lib/e2e_emu/ffx_e2e_test.gni")
+
+assert(
+    has_board,
+    "This file must only be included in build configurations that have a board.")
 
 if (is_host) {
   ffx_e2e_test("ffx_symbolize_lib_e2e_test") {
@@ -23,6 +31,11 @@ if (is_host) {
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tracing",
     ]
+    product_bundle = ":product_bundle($default_toolchain)"
+
+    # Get the symbolizer to log as much as it can about symbol resolution to help debug
+    # infra-only failures.
+    env = [ "FUCHSIA_HOST_LOG_MIN_SEVERITY=TRACE" ]
   }
 
   group("host_tests") {
@@ -59,8 +72,59 @@ if (is_host) {
     deps = [ ":print_fn_ptr" ]
   }
 
-  group("package_deps_for_host_tests") {
-    testonly = true
-    deps = [ ":package" ]
+  # Don't let the assembly templates expand except on the default toolchain. Weirndess ensures if
+  # they're expanded on variant toolchains like for asan.
+  if (current_toolchain == default_toolchain) {
+    files = {
+      partitions_config = "$target_out_dir/partitions/partitions_config.json"
+      outdir = target_out_dir + "/fuchsia"
+      images_json = "${outdir}/images.json"
+    }
+
+    product_bundle("product_bundle") {
+      testonly = true
+      name = "ffx-symbolize-test"
+
+      partitions = files.partitions_config
+      system_a = files.images_json
+
+      deps = [
+        ":assembly",
+        ":partitions_config",
+      ]
+    }
+
+    assembled_system("assembly") {
+      testonly = true
+      image_name = "fuchsia"
+
+      generate_fxfs = true
+      generate_vbmeta = true
+      board_config_label = board_configuration_label
+      product_assembly_config_label = ":product_assembly_config"
+    }
+
+    generated_partitions_config("partitions_config") {
+      testonly = true
+      output_path = get_path_info(files.partitions_config, "dir")
+      hw_revision = board_name
+    }
+
+    product_assembly_configuration("product_assembly_config") {
+      testonly = true
+      platform = {
+        build_type = "eng"
+        connectivity = {
+          network = {
+            netstack_version = "netstack3"
+          }
+        }
+      }
+      base_packages = [
+        {
+          package_target = ":package"
+        },
+      ]
+    }
   }
 }

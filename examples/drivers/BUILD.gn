@@ -24,6 +24,7 @@ group("hermetic_tests") {
     "driver_test_realm:hermetic_tests",
     "metadata:hermetic_tests",
     "simple/dfv2:simple-driver-test",
+    "simple/rust:hermetic_tests",
     "template:template-test",
     "transport:hermetic_tests",
   ]

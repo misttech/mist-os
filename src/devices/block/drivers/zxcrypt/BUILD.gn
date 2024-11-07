@@ -7,7 +7,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-fuchsia_driver("zxcrypt-driver") {
+fuchsia_cc_driver("zxcrypt-driver") {
   output_name = "zxcrypt"
   configs += [
     "//build/config:all_source",

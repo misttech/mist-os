@@ -5,6 +5,7 @@
 
 import json
 import logging
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -31,6 +32,7 @@ def send_http_request(
     attempts: int = _DEFAULTS["ATTEMPTS"],
     interval: int = _DEFAULTS["INTERVAL"],
     exceptions_to_skip: Iterable[type[Exception]] | None = None,
+    verify_ssl: bool = True,
 ) -> dict[str, Any]:
     """Send HTTP request and returns the string response.
 
@@ -47,6 +49,7 @@ def send_http_request(
         interval: wait time in sec before each retry in case of a failure.
         exceptions_to_skip: Any non fatal HTTP exceptions for which retry will
             not be attempted.
+        verify_ssl: Whether to verify the SSL certificate of the server.
     Returns:
         Returns the HTTP response received after converting into a dict.
 
@@ -57,14 +60,20 @@ def send_http_request(
     if exceptions_to_skip is None:
         exceptions_to_skip = []
 
-    if data is None:
-        data = {}
-    data_bytes: bytes = json.dumps(data).encode("utf-8")
-
     if headers is None:
-        headers = {}
-    headers["Content-Type"] = "application/json; charset=utf-8"
-    headers["Content-Length"] = len(data_bytes)
+        headers = {
+            "Content-Type": "application/json; charset=utf-8",
+        }
+
+    data_bytes: bytes | None = None
+    if data is not None:
+        data_bytes = json.dumps(data).encode("utf-8")
+        headers["Content-Length"] = len(data_bytes)
+
+    context: ssl.SSLContext | None = None
+    if not verify_ssl:
+        # pylint: disable-next=protected-access
+        context = ssl._create_unverified_context()
 
     for attempt in range(1, attempts + 1):
         # if this is not first attempt wait for sometime before next retry.
@@ -79,7 +88,9 @@ def send_http_request(
                 headers,
             )
             req = urllib.request.Request(url, data=data_bytes, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout) as response:
+            with urllib.request.urlopen(
+                req, timeout=timeout, context=context
+            ) as response:
                 response_body: str = response.read().decode("utf-8")
             _LOGGER.debug(
                 "HTTP response received from url=%s is '%s'", url, response_body

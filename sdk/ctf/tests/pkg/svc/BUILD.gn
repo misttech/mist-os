@@ -9,7 +9,7 @@ cc_test_executable("svc-unittests") {
   sources = [ "dir_unittest.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/svc",

@@ -356,6 +356,12 @@ class VmObjectPaged final : public VmObject {
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmObjectPaged);
 
+  // Helper for the destructor as by default destructors do not require locks to be held under the
+  // assumption the destructor runs when no other entities can see the object. This is not true here
+  // and locking is still relevant, so having the cleanup logic in a separate method allows for full
+  // static analysis to happen.
+  void DestructorHelper();
+
   // Unified function that implements both CommitRange and CommitRangePinned
   zx_status_t CommitRangeInternal(uint64_t offset, uint64_t len, bool pin, bool write);
 

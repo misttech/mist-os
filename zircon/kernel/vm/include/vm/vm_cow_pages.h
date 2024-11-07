@@ -1180,8 +1180,14 @@ class VmCowPages final : public VmHierarchyBase,
   // not accessible by the sibling vmo.
   void ReleaseCowParentPagesLocked(uint64_t start, uint64_t end, BatchPQRemove* page_remover)
       TA_REQ(lock());
-  void ReleaseCowParentPagesUsingSplitsLocked(uint64_t start, uint64_t end,
-                                              BatchPQRemove* page_remover) TA_REQ(lock());
+
+  // Release any pages this VMO can reference from the provided start offset till the end of the
+  // VMO. This releases both directly owned pages, as well as pages in hidden parents that may be
+  // considered owned by this VMO.
+  // If applicable this method will update the parent_limit_ to reflect that it has removed any
+  // reference to its parent range.
+  void ReleaseOwnedPagesLocked(uint64_t start) TA_REQ(lock());
+  void ReleaseOwnedPagesUsingSplitsLocked(uint64_t start) TA_REQ(lock());
 
   // Helper function for ReleaseCowParentPagesLocked that processes pages which are visible
   // to at least this VMO, and possibly its sibling, as well as updates parent_(offset_)limit_.

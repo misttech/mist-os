@@ -29,12 +29,20 @@ readonly python="$PREBUILT_PYTHON3"
 # remote_action.py exercises rewrapper
 readonly remote_action="$FUCHSIA_DIR/build/rbe/remote_action.py"
 
+reproxy_wrap_cmd=( "$reproxy_wrap" )
+# Propagate tracing option from `fx -x rbe ...` to the wrapper script.
+# This is less invasive than re-exporting SHELLOPTS.
+if [[ -o xtrace ]]; then
+  reproxy_wrap_cmd=( "$SHELL" -x "${reproxy_wrap_cmd[@]}" )
+fi
+
 # A single command that tests RBE end-to-end through reclient.
 reclient_auth_test_cmd=(
   env
   --unset=FX_BUILD_RBE_STATS
   FX_REMOTE_BUILD_METRICS=0
-  "$reproxy_wrap" --
+  # Let the wrapper use a default --logdir and --tmpdir.
+  "${reproxy_wrap_cmd[@]}" --
   "$python" -S "$remote_action" --
   echo "greetings from a remote RBE worker"
 )
@@ -95,6 +103,12 @@ function gcloud_auth() {
 
 function reclient_auth() {
   echo  # blank line
+  # Coerce the working directory to match the exec-root ($FUCHSIA_DIR), so the
+  # remote environment does not try to run in a nonexistent subdir.
+  # Normally subdirs are created automatically based on remote inputs and
+  # outputs, but this test command (echo) has neither inputs nor outputs.
+  # b/376105913 is an example of failing to execute remotely for this reason.
+  cd "$FUCHSIA_DIR"
   until "${reclient_auth_test_cmd[@]}"
   do
     # gcert only works in environments that get unrestricted LOAS credentials
@@ -119,9 +133,19 @@ function setup_bazel_workspace() {
 
 function test_bazel_rbe() {
   setup_bazel_workspace
+  # Test authentication to RBE and BES (both share the same gcloud auth).
+  # Shutdown any bazel server each time to prevent it from caching
+  # stale credentials, and force it to refresh.
+  # Limit the number of upload retries to make this operation fail-fast.
   (
     cd "$BAZEL_TEST_DIR/workspace" &&
-      ../bazel --nohome_rc test --config=remote --config=resultstore :all
+      ../bazel shutdown && \
+      ../bazel --nohome_rc \
+          test \
+          --config=remote \
+          --config=resultstore \
+          --experimental_build_event_upload_max_retries=1 \
+          :all
   )
 }
 
@@ -160,9 +184,9 @@ function auth_subcommand() {
 }
 
 # LINT.IfChange(reproxy_log_dirs)
-# build/rbe/fuchsia-reproxy-wrap.sh writes to logs here:
+# vars.sh:fx-run-ninja writes RBE logs here:
 readonly rbe_logs_dir="${FUCHSIA_DIR}/out/.reproxy_logs"
-# LINT.ThenChange(/build/rbe/fuchsia-reproxy-wrap.sh:reproxy_log_dirs)
+# LINT.ThenChange(/tools/devshell/lib/vars.sh:reproxy_log_dirs)
 function cleanlogs_subcommand() {
   echo "Removing $rbe_logs_dir"
   rm -rf "$rbe_logs_dir"

@@ -60,12 +60,6 @@ bool Vim3Partitioner::SupportsPartition(const PartitionSpec& spec) const {
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }
 
-zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::AddPartition(
-    const PartitionSpec& spec) const {
-  ERROR("Cannot add partitions to a vim3 device\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
 zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::GetEmmcBootPartitionClient() const {
   auto boot0_part =
       OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
@@ -135,28 +129,20 @@ zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::FindPartition(
       return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  const auto filter_by_name = [part_name](const gpt_partition_t& part) {
-    char cstring_name[GPT_NAME_LEN] = {};
-    utf16_to_cstring(cstring_name, part.name, GPT_NAME_LEN);
-    return part_name == std::string_view(cstring_name);
-  };
   LOG("Looking for part %s\n", std::string(part_name).c_str());
 
-  auto status = gpt_->FindPartition(std::move(filter_by_name));
+  auto status = gpt_->FindPartition(
+      [part_name](const GptPartitionMetadata& part) { return FilterByName(part, part_name); });
   if (status.is_error()) {
     return status.take_error();
   }
-  return zx::ok(std::move(status->partition));
+  return zx::ok(std::move(*status));
 }
 
 zx::result<> Vim3Partitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
-zx::result<> Vim3Partitioner::InitPartitionTables() const {
+zx::result<> Vim3Partitioner::ResetPartitionTables() const {
   ERROR("Initializing gpt partitions from paver is not supported on vim3\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
-zx::result<> Vim3Partitioner::WipePartitionTables() const {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 

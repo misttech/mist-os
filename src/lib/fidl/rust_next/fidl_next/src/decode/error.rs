@@ -52,6 +52,10 @@ pub enum DecodeError {
     )]
     InlineValueTooBig(usize),
 
+    /// An envelope should always be inline, but it contained out-of-line data
+    #[error("envelope should always be inline, but it contained {0} out-of-line bytes")]
+    ExpectedInline(usize),
+
     /// An envelope consumed a different number of handles than it indicated in its metadata
     #[error(
         "envelope consumed a different number of handles than it claimed that it would; expected \

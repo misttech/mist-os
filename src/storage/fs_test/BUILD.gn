@@ -55,7 +55,10 @@ static_library("fs_test") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
-  friend = [ ":*" ]
+  friend = [
+    ":*",
+    "src/storage/lib/ftl/test:wear-simulator-test",
+  ]
 }
 
 test("access_tests") {
@@ -172,7 +175,6 @@ test("full_tests") {
     "//zircon/system/ulib/fbl",
   ]
 }
-
 test("inspect_tests") {
   sources = [ "inspect.cc" ]
   deps = [

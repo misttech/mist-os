@@ -104,6 +104,11 @@ pub struct AssemblyInputBundle {
     /// Map of the names of packages that contain shell commands to the list of
     /// commands within each.
     #[serde(default)]
+    pub bootfs_shell_commands: ShellCommands,
+
+    /// Map of the names of packages that contain shell commands to the list of
+    /// commands within each.
+    #[serde(default)]
     pub shell_commands: ShellCommands,
 
     /// Packages to create dynamically as part of the Assembly process.

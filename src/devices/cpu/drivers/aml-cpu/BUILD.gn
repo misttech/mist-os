@@ -24,7 +24,7 @@ driver_bind_rules("aml-cpu-bind") {
   ]
 }
 
-fuchsia_driver("aml-cpu-driver") {
+fuchsia_cc_driver("aml-cpu-driver") {
   output_name = "aml-cpu"
   configs += [
     "//build/config:all_source",

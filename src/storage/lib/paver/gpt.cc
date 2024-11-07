@@ -6,9 +6,14 @@
 
 #include <dirent.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <fidl/fuchsia.storagehost/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/wire/status.h>
 #include <lib/fit/defer.h>
+#include <lib/zx/result.h>
 
+#include <algorithm>
 #include <string_view>
 
 #include <fbl/algorithm.h>
@@ -19,6 +24,7 @@
 #include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/pave-logging.h"
 #include "src/storage/lib/paver/utils.h"
+#include "zircon/status.h"
 
 namespace paver {
 
@@ -27,7 +33,6 @@ namespace {
 using uuid::Uuid;
 
 namespace block = fuchsia_hardware_block;
-namespace device = fuchsia_device;
 
 constexpr size_t ReservedHeaderBlocks(size_t blk_size) {
   constexpr size_t kReservedEntryBlocks{static_cast<size_t>(16) * 1024};
@@ -39,32 +44,63 @@ zx::result<> RebindGptDriver(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_r
   return device.Rebind("gpt.cm");
 }
 
+zx::result<GptPartitionMetadata> QueryGptPartitionMetadata(
+    fidl::UnownedClientEnd<fuchsia_hardware_block_partition::Partition> volume) {
+  using fuchsia_hardware_block_partition::Partition;
+  GptPartitionMetadata metadata;
+
+  fidl::WireResult result = fidl::WireCall<Partition>(volume)->GetMetadata();
+  if (!result.ok() || result->is_error()) {
+    return zx::error(result.status());
+  }
+  if (!result.value()->has_name() || !result.value()->has_type_guid() ||
+      !result.value()->has_instance_guid()) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  return zx::ok(GptPartitionMetadata{
+      .name = std::string(result.value()->name().cbegin(), result.value()->name().cend()),
+      .type_guid = Uuid(result.value()->type_guid().value.data()),
+      .instance_guid = Uuid(result.value()->instance_guid().value.data()),
+  });
+}
+
 }  // namespace
 
-bool FilterByName(const gpt_partition_t& part, std::string_view name) {
-  char cstring_name[GPT_NAME_LEN / 2 + 1];
-  ::utf16_to_cstring(cstring_name, reinterpret_cast<const uint16_t*>(part.name),
-                     sizeof(cstring_name));
+using PartitionInitSpec = GptDevicePartitioner::PartitionInitSpec;
 
-  if (name.length() != strnlen(cstring_name, sizeof(cstring_name))) {
+PartitionInitSpec PartitionInitSpec::ForKnownPartition(Partition partition, PartitionScheme scheme,
+                                                       size_t size_bytes) {
+  const char* name = PartitionName(partition, scheme);
+  std::optional<Uuid> type = PartitionTypeGuid(partition, scheme);
+  ZX_ASSERT(name && type);
+  return PartitionInitSpec{
+      .name = name,
+      .type = *type,
+      .start_block = 0,
+      .size_bytes = size_bytes,
+  };
+}
+
+bool FilterByName(const GptPartitionMetadata& part, std::string_view name) {
+  if (name.length() != part.name.length()) {
     return false;
   }
-
   // We use a case-insensitive comparison to be compatible with the previous naming scheme.
   // On a ChromeOS device, all of the kernel partitions share a common GUID type, so we
   // distinguish Zircon kernel partitions based on name.
-  return strncasecmp(cstring_name, name.data(), name.length()) == 0;
+  return strncasecmp(part.name.data(), name.data(), name.length()) == 0;
 }
 
-bool FilterByTypeAndName(const gpt_partition_t& part, const Uuid& type, std::string_view name) {
-  return type == Uuid(part.type) && FilterByName(part, name);
+bool FilterByTypeAndName(const GptPartitionMetadata& part, const Uuid& type,
+                         std::string_view name) {
+  return type == part.type_guid && FilterByName(part, name);
 }
 
 zx::result<std::vector<GptDevicePartitioner::GptClients>> GptDevicePartitioner::FindGptDevices(
     const fbl::unique_fd& devfs_root) {
   fbl::unique_fd block_fd;
   if (zx_status_t status =
-          fdio_open_fd_at(devfs_root.get(), "class/block", 0, block_fd.reset_and_get_address());
+          fdio_open3_fd_at(devfs_root.get(), "class/block", 0, block_fd.reset_and_get_address());
       status != ZX_OK) {
     ERROR("Cannot inspect block devices: %s\n", zx_status_get_string(status));
     return zx::error(status);
@@ -244,11 +280,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::ClientEnd<fuchsia_device::Controller> block_controller) {
   if (block_controller) {
-    zx::result status = InitializeProvidedGptDevice(devices, svc_root, block_controller);
-    if (status.is_error()) {
-      return status.take_error();
-    }
-    return zx::ok(InitializeGptResult{std::move(status.value()), false});
+    return InitializeProvidedGptDevice(devices, svc_root, block_controller);
   }
 
   zx::result gpt_devices = FindGptDevices(devices.devfs_root());
@@ -349,141 +381,82 @@ struct PartitionPosition {
   size_t length;  // In Blocks
 };
 
-zx::result<GptDevicePartitioner::FindFirstFitResult> GptDevicePartitioner::FindFirstFit(
-    size_t bytes_requested) const {
-  LOG("Looking for space\n");
-  // Gather GPT-related information.
-  size_t blocks_requested = (bytes_requested + block_info_.block_size - 1) / block_info_.block_size;
-
-  // Sort all partitions by starting block.
-  // For simplicity, include the 'start' and 'end' reserved spots as
-  // partitions.
-  size_t partition_count = 0;
-  PartitionPosition partitions[gpt::kPartitionCount + 2];
-  const size_t reserved_blocks = ReservedHeaderBlocks(block_info_.block_size);
-  partitions[partition_count].start = 0;
-  partitions[partition_count++].length = reserved_blocks;
-  partitions[partition_count].start = block_info_.block_count - reserved_blocks;
-  partitions[partition_count++].length = reserved_blocks;
-
-  for (uint32_t i = 0; i < gpt::kPartitionCount; i++) {
-    zx::result<const gpt_partition_t*> p = gpt_->GetPartition(i);
-    if (p.is_error()) {
-      continue;
-    }
-    partitions[partition_count].start = (*p)->first;
-    partitions[partition_count].length = (*p)->last - (*p)->first + 1;
-    LOG("Partition seen with start %zu, end %zu (length %zu)\n", (*p)->first, (*p)->last,
-        partitions[partition_count].length);
-    partition_count++;
-  }
-  LOG("Sorting\n");
-  qsort(partitions, partition_count, sizeof(PartitionPosition), [](const void* p1, const void* p2) {
-    ssize_t s1 = static_cast<ssize_t>(static_cast<const PartitionPosition*>(p1)->start);
-    ssize_t s2 = static_cast<ssize_t>(static_cast<const PartitionPosition*>(p2)->start);
-    return s1 == s2 ? 0 : (s1 > s2 ? +1 : -1);
-  });
-
-  // Look for space between the partitions. Since the reserved spots of the
-  // GPT were included in |partitions|, all available space will be located
-  // "between" partitions.
-  for (size_t i = 0; i < partition_count - 1; i++) {
-    const size_t next = partitions[i].start + partitions[i].length;
-    LOG("Partition[%zu] From Block [%zu, %zu) ... (next partition starts at block %zu)\n", i,
-        partitions[i].start, next, partitions[i + 1].start);
-
-    if (next > partitions[i + 1].start) {
-      ERROR("Corrupted GPT\n");
-      return zx::error(ZX_ERR_IO);
-    }
-    const size_t free_blocks = partitions[i + 1].start - next;
-    LOG("    There are %zu free blocks (%zu requested)\n", free_blocks, blocks_requested);
-    if (free_blocks >= blocks_requested) {
-      return zx::ok(FindFirstFitResult{next, free_blocks});
-    }
-  }
-  ERROR("No GPT space found\n");
-  return zx::error(ZX_ERR_NO_RESOURCES);
-}
-
-zx::result<Uuid> GptDevicePartitioner::CreateGptPartition(const char* name, const Uuid& type,
-                                                          uint64_t offset, uint64_t blocks) const {
-  Uuid guid = Uuid::Generate();
-
-  if (zx_status_t status =
-          gpt_->AddPartition(name, type.bytes(), guid.bytes(), offset, blocks, 0).status_value();
-      status != ZX_OK) {
-    ERROR("Failed to add partition: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-  if (zx_status_t status = gpt_->Sync(); status != ZX_OK) {
-    ERROR("Failed to sync GPT: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-  if (auto status = zx::make_result(gpt_->ClearPartition(offset, 1)); status.is_error()) {
-    ERROR("Failed to clear first block of new partition: %s", status.status_string());
-    return status.take_error();
-  }
-  if (zx::result status = RebindGptDriver(svc_root_, gpt_->device()); status.is_error()) {
-    ERROR("Failed to rebind GPT: %s", status.status_string());
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-
-  return zx::ok(guid);
-}
-
-zx::result<std::unique_ptr<PartitionClient>> GptDevicePartitioner::AddPartition(
-    const char* name, const Uuid& type, size_t minimum_size_bytes,
-    size_t optional_reserve_bytes) const {
-  auto status = FindFirstFit(minimum_size_bytes);
-  if (status.is_error()) {
-    ERROR("Couldn't find fit\n");
-    return status.take_error();
-  }
-  const size_t start = status->start;
-  size_t length = status->length;
-  LOG("Found space in GPT - OK %zu @ %zu\n", length, start);
-
-  if (optional_reserve_bytes) {
-    // If we can fulfill the requested size, and we still have space for the
-    // optional reserve section, then we should shorten the amount of blocks
-    // we're asking for.
-    //
-    // This isn't necessary, but it allows growing the GPT later, if necessary.
-    const size_t optional_reserve_blocks = optional_reserve_bytes / block_info_.block_size;
-    if (length - optional_reserve_bytes > (minimum_size_bytes / block_info_.block_size)) {
-      LOG("Space for reserve - OK\n");
-      length -= optional_reserve_blocks;
-    }
-  } else {
-    length = fbl::round_up(minimum_size_bytes, block_info_.block_size) / block_info_.block_size;
-  }
-  LOG("Final space in GPT - OK %zu @ %zu\n", length, start);
-
-  auto status_or_guid = CreateGptPartition(name, type, start, length);
-  if (status_or_guid.is_error()) {
-    return status_or_guid.take_error();
-  }
-  LOG("Added partition, waiting for bind\n");
-
-  auto status_or_part = OpenBlockPartition(devices_, status_or_guid.value(), type, ZX_SEC(15));
-  if (status_or_part.is_error()) {
-    ERROR("Added partition, waiting for bind - NOT FOUND\n");
-    return status_or_part.take_error();
-  }
-
-  LOG("Added partition, waiting for bind - OK\n");
-  return BlockPartitionClient::Create(std::move(status_or_part.value()));
-}
-
-zx::result<GptDevicePartitioner::FindPartitionResult> GptDevicePartitioner::FindPartition(
+zx::result<std::unique_ptr<BlockPartitionClient>> GptDevicePartitioner::FindPartition(
     FilterCallback filter) const {
+  if (!StorageHostDetected()) {
+    zx::result result = FindPartitionLegacy(std::move(filter));
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return zx::ok(std::move(result->partition));
+  }
+  zx::result result = devices_.OpenPartition([&](const zx::channel& chan) -> bool {
+    auto client =
+        fidl::UnownedClientEnd<fuchsia_hardware_block_partition::Partition>(chan.borrow());
+    zx::result metadata = QueryGptPartitionMetadata(client);
+    if (metadata.is_error()) {
+      ERROR("Failed to query GPT partition metadata: %s\n", metadata.status_string());
+      return false;
+    }
+    return filter(*metadata);
+  });
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  return BlockPartitionClient::Create(std::move(*result));
+}
+
+zx::result<std::vector<std::unique_ptr<BlockPartitionClient>>>
+GptDevicePartitioner::FindAllPartitions(GptDevicePartitioner::FilterCallback filter) const {
+  zx::result result = devices_.OpenAllPartitions([&](const zx::channel& chan) -> bool {
+    auto client =
+        fidl::UnownedClientEnd<fuchsia_hardware_block_partition::Partition>((chan.borrow()));
+    zx::result metadata = QueryGptPartitionMetadata(client);
+    if (metadata.is_error()) {
+      if (metadata.status_value() != ZX_ERR_NOT_SUPPORTED) {
+        ERROR("Failed to query GPT partition metadata: %s\n", metadata.status_string());
+      }
+      return false;
+    }
+    return filter(*metadata);
+  });
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  std::vector<std::unique_ptr<BlockPartitionClient>> clients;
+  for (auto& connector : *result) {
+    zx::result result = BlockPartitionClient::Create(std::move((connector)));
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    clients.push_back(std::move(*result));
+  }
+  return zx::ok(std::move(clients));
+}
+
+zx::result<GptDevicePartitioner::FindPartitionDetailsResult>
+GptDevicePartitioner::FindPartitionDetails(FilterCallback filter) const {
+  if (StorageHostDetected()) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  return FindPartitionLegacy(std::move(filter));
+}
+
+zx::result<GptDevicePartitioner::FindPartitionDetailsResult>
+GptDevicePartitioner::FindPartitionLegacy(FilterCallback filter) const {
   for (uint32_t i = 0; i < gpt::kPartitionCount; i++) {
     zx::result<gpt_partition_t*> p = gpt_->GetPartition(i);
     if (p.is_error()) {
       continue;
     }
-    if (filter(**p)) {
+    GptPartitionMetadata metadata{};
+    char name[(GPT_NAME_LEN / 2) + 1] = {'\0'};
+    paver::utf16_to_cstring(name, p->name, GPT_NAME_LEN);
+    metadata.name = std::string(name, strlen(name));
+    metadata.instance_guid = Uuid((*p)->guid);
+    metadata.type_guid = Uuid((*p)->type);
+
+    if (filter(metadata)) {
       LOG("Found partition in GPT, partition %u\n", i);
       auto status = OpenBlockPartition(devices_, Uuid((*p)->guid), Uuid((*p)->type), ZX_SEC(5));
       if (status.is_error()) {
@@ -494,49 +467,149 @@ zx::result<GptDevicePartitioner::FindPartitionResult> GptDevicePartitioner::Find
       if (part.is_error()) {
         return part.take_error();
       }
-      return zx::ok(FindPartitionResult{std::move(*part), *p});
+      return zx::ok(FindPartitionDetailsResult{std::move(*part), *p});
     }
   }
   return zx::error(ZX_ERR_NOT_FOUND);
-}
-
-zx::result<> GptDevicePartitioner::WipePartitions(FilterCallback filter) const {
-  bool modify = false;
-  for (uint32_t i = 0; i < gpt::kPartitionCount; i++) {
-    zx::result<const gpt_partition_t*> p = gpt_->GetPartition(i);
-    if (p.is_error() || !filter(**p)) {
-      continue;
-    }
-
-    modify = true;
-
-    // Ignore the return status; wiping is a best-effort approach anyway.
-    static_cast<void>(WipeBlockPartition(devices_, Uuid((*p)->guid), Uuid((*p)->type)));
-
-    if (gpt_->RemovePartition((*p)->guid) != ZX_OK) {
-      ERROR("Warning: Could not remove partition\n");
-    } else {
-      // If we successfully clear the partition, then all subsequent
-      // partitions get shifted down. If we just deleted partition 'i',
-      // we now need to look at partition 'i' again, since it's now
-      // occupied by what was in 'i+1'.
-      i--;
-    }
-  }
-  if (modify) {
-    gpt_->Sync();
-    LOG("Immediate reboot strongly recommended\n");
-  }
-  static_cast<void>(RebindGptDriver(svc_root_, gpt_->device()));
-  return zx::ok();
 }
 
 zx::result<> GptDevicePartitioner::WipeFvm() const {
   return WipeBlockPartition(devices_, std::nullopt, Uuid(GUID_FVM_VALUE));
 }
 
-zx::result<> GptDevicePartitioner::WipePartitionTables() const {
-  return WipePartitions([](const gpt_partition_t&) { return true; });
+zx::result<> GptDevicePartitioner::ResetPartitionTables(
+    std::vector<GptDevicePartitioner::PartitionInitSpec> partitions) const {
+  // Assign offsets and instance GUIDs as needed.
+  uint64_t metadata_blocks = ReservedHeaderBlocks(block_info_.block_size);
+  uint64_t last_available_block = block_info_.block_count - metadata_blocks;
+  struct Range {
+    uint64_t start;
+    uint64_t end;
+  };
+  std::vector<Range> allocations = {
+      Range{.start = 0, .end = metadata_blocks},
+      Range{.start = last_available_block, .end = block_info_.block_count},
+  };
+
+  // Returns the position to insert at, and the block offset to use.
+  auto find_first_fit = [&](uint64_t num_blocks) -> zx::result<std::tuple<size_t, uint64_t>> {
+    for (size_t i = 1; i < allocations.size(); ++i) {
+      const auto& prev = allocations[i - 1];
+      const auto& next = allocations[i];
+      if (next.start - prev.end >= num_blocks) {
+        return zx::ok(std::make_tuple(i, prev.end));
+      }
+    }
+    return zx::error(ZX_ERR_NO_SPACE);
+  };
+
+  for (auto& partition : partitions) {
+    if (partition.size_bytes == 0) {
+      continue;
+    }
+    if (partition.size_bytes % block_info_.block_size > 0) {
+      ERROR("Misaligned partition\n");
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    uint64_t num_blocks = partition.size_bytes / block_info_.block_size;
+    constexpr const Uuid kNilGuid;
+    if (partition.instance == kNilGuid) {
+      partition.instance = Uuid::Generate();
+    }
+    auto pos = allocations.end();
+    if (partition.start_block == 0) {
+      zx::result result = find_first_fit(num_blocks);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+      auto [index, off] = *result;
+      partition.start_block = off;
+      pos = std::next(allocations.begin(), static_cast<int64_t>(index));
+      LOG("Allocated partition %s @ %" PRIu64 "\n", partition.name.c_str(), off);
+    } else {
+      pos = std::lower_bound(
+          allocations.begin(), allocations.end(), partition.start_block,
+          [](const Range& range, uint64_t offset) -> bool { return range.start < offset; });
+      if (pos == allocations.end()) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+    }
+    allocations.insert(pos, Range{
+                                .start = partition.start_block,
+                                .end = partition.start_block + num_blocks,
+                            });
+  }
+
+  // Check to see if we're using storage-host.  If not, we'll fall back to writing the GPT
+  // manually.
+  // TODO(https://fxbug.dev/339491886): Remove fallback once products are using storage-host.
+  if (!StorageHostDetected()) {
+    LOG("Legacy mode; manually overwriting the GPT...\n");
+    return ResetPartitionTablesLegacy(std::move(partitions));
+  }
+
+  std::vector<fuchsia_storagehost::wire::PartitionInfo> infos{
+      partitions.size(), fuchsia_storagehost::wire::PartitionInfo{}};
+  for (size_t i = 0; i < partitions.size(); ++i) {
+    const auto& partition = partitions[i];
+    if (partition.size_bytes == 0) {
+      continue;
+    }
+    fuchsia_storagehost::wire::PartitionInfo info{
+        .name = fidl::StringView::FromExternal(partition.name),
+        .start_block = partition.start_block,
+        .num_blocks = partition.size_bytes / block_info_.block_size,
+        .flags = partition.flags,
+    };
+    std::copy(partition.type.cbegin(), partition.type.cend(), info.type_guid.value.data());
+    std::copy(partition.instance.cbegin(), partition.instance.cend(),
+              info.instance_guid.value.data());
+    infos[i] = info;
+  }
+
+  zx::result client =
+      component::ConnectAt<fuchsia_storagehost::PartitionsAdmin>(svc_root_.borrow());
+  if (client.is_error()) {
+    return client.take_error();
+  }
+  fidl::WireResult result = fidl::WireCall(*client)->ResetPartitionTable(
+      fidl::VectorView<fuchsia_storagehost::wire::PartitionInfo>::FromExternal(infos));
+  if (result.status() != ZX_OK) {
+    ERROR("Failed to reset partitions table: %s\n", result.status_string());
+    return zx::error(result.status());
+  }
+  return zx::ok();
 }
+
+zx::result<> GptDevicePartitioner::ResetPartitionTablesLegacy(
+    std::span<const PartitionInitSpec> partitions) const {
+  if (zx_status_t status = gpt_->RemoveAllPartitions(); status != ZX_OK) {
+    ERROR("Failed to remove GPT partitions: %s\n", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  for (const auto& partition : partitions) {
+    if (partition.size_bytes == 0) {
+      continue;
+    }
+    zx::result result = gpt_->AddPartition(
+        partition.name.c_str(), partition.type.bytes(), partition.instance.bytes(),
+        partition.start_block, partition.size_bytes / block_info_.block_size, partition.flags);
+    if (result.is_error()) {
+      ERROR("Failed to add partition %s at off %" PRIu64 ":  %s\n", partition.name.c_str(),
+            partition.start_block, result.status_string());
+      return result.take_error();
+    }
+  }
+  if (zx_status_t status = gpt_->Sync(); status != ZX_OK) {
+    return zx::error(status);
+  }
+  zx::result result = RebindGptDriver(svc_root_, gpt_->device());
+  if (result.is_error()) {
+    ERROR("Failed to rebind GPT driver: %s\n", result.status_string());
+  }
+  return result;
+}
+
+bool GptDevicePartitioner::StorageHostDetected() const { return devices_.HasPartitionsDirectory(); }
 
 }  // namespace paver

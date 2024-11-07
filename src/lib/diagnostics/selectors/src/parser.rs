@@ -10,11 +10,18 @@ use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while};
 use nom::character::complete::{alphanumeric1, multispace0, none_of, one_of};
 use nom::combinator::{all_consuming, complete, cond, map, opt, peek, recognize, verify};
 use nom::error::{ErrorKind, ParseError as NomParseError};
-use nom::multi::separated_list1;
+use nom::multi::{many1_count, separated_list1};
 use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
 use nom::IResult;
 
 const ALL_TREE_NAMES_SELECTED_SYMBOL: &str = "...";
+
+#[derive(Default)]
+pub enum RequireEscapedColons {
+    #[default]
+    Yes,
+    No,
+}
 
 /// Recognizes 0 or more spaces or tabs.
 fn whitespace0<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
@@ -27,7 +34,7 @@ where
 /// Parses an input containing any number and type of whitespace at the front.
 fn spaced<'a, E, F, O>(parser: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
-    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
+    F: nom::Parser<&'a str, O, E>,
     E: NomParseError<&'a str>,
 {
     preceded(whitespace0, parser)
@@ -100,22 +107,65 @@ where
     ))
 }
 
-/// Parses a component selector.
-fn component_selector<'a, E>(input: &'a str) -> IResult<&'a str, ComponentSelector<'a>, E>
+/// Returns the parser for a component selector. The parser accepts unescaped depending on the
+/// the argument `escape_colons`.
+fn component_selector<'a, E>(
+    require_escape_colons: RequireEscapedColons,
+) -> impl FnMut(&'a str) -> IResult<&'a str, ComponentSelector<'a>, E>
 where
     E: NomParseError<&'a str>,
 {
-    let accepted_characters = escaped(
-        alt((alphanumeric1, tag("*"), tag("."), tag("-"), tag("_"), tag(">"), tag("<"))),
-        '\\',
-        tag(":"),
-    );
-    // Monikers (the first part of a selector) can optionally be preceded by "/" or "./".
-    let (rest, segments) = preceded(
-        opt(alt((tag("./"), tag("/")))),
-        separated_list1(tag("/"), recognize(accepted_characters)),
-    )(input)?;
-    Ok((rest, ComponentSelector { segments: segments.into_iter().map(|s| s.into()).collect() }))
+    fn inner_component_selector<'a, F, E>(
+        segment: F,
+        input: &'a str,
+    ) -> IResult<&'a str, ComponentSelector<'a>, E>
+    where
+        F: nom::Parser<&'a str, &'a str, E>,
+        E: NomParseError<&'a str>,
+    {
+        // Monikers (the first part of a selector) can optionally be preceded by "/" or "./".
+        let (rest, segments) =
+            preceded(opt(alt((tag("./"), tag("/")))), separated_list1(tag("/"), segment))(input)?;
+        Ok((
+            rest,
+            ComponentSelector { segments: segments.into_iter().map(Segment::from).collect() },
+        ))
+    }
+
+    move |input| {
+        if matches!(require_escape_colons, RequireEscapedColons::Yes) {
+            inner_component_selector(
+                recognize(escaped(
+                    alt((
+                        alphanumeric1,
+                        tag("*"),
+                        tag("."),
+                        tag("-"),
+                        tag("_"),
+                        tag(">"),
+                        tag("<"),
+                    )),
+                    '\\',
+                    tag(":"),
+                )),
+                input,
+            )
+        } else {
+            inner_component_selector(
+                recognize(many1_count(alt((
+                    alphanumeric1,
+                    tag("*"),
+                    tag("."),
+                    tag("-"),
+                    tag("_"),
+                    tag(">"),
+                    tag("<"),
+                    tag(":"),
+                )))),
+                input,
+            )
+        }
+    }
 }
 
 /// A comment allowed in selector files.
@@ -140,7 +190,8 @@ fn core_selector<'a, E>(
 where
     E: NomParseError<&'a str>,
 {
-    let (rest, (component, _, tree)) = tuple((component_selector, tag(":"), tree_selector))(input)?;
+    let (rest, (component, _, tree)) =
+        tuple((component_selector(RequireEscapedColons::Yes), tag(":"), tree_selector))(input)?;
     Ok((rest, (component, tree)))
 }
 
@@ -236,12 +287,13 @@ where
 /// selector.
 pub fn consuming_component_selector<'a, E>(
     input: &'a str,
+    require_escape_colons: RequireEscapedColons,
 ) -> Result<ComponentSelector<'a>, ParseError>
 where
     E: ParsingError<'a>,
 {
     let result = nom::combinator::all_consuming::<_, _, <E as ParsingError<'_>>::Internal, _>(
-        pair(spaced(component_selector), multispace0),
+        pair(spaced(component_selector(require_escape_colons)), multispace0),
     )(input);
     match result {
         Ok((_, (component_selector, _))) => {
@@ -299,7 +351,7 @@ mod tests {
                 "a/*/c",
                 vec![
                     Segment::ExactMatch("a".into()),
-                    Segment::Pattern("*"),
+                    Segment::Pattern("*".into()),
                     Segment::ExactMatch("c".into()),
                 ],
             ),
@@ -307,7 +359,7 @@ mod tests {
                 "a/b*/c",
                 vec![
                     Segment::ExactMatch("a".into()),
-                    Segment::Pattern("b*"),
+                    Segment::Pattern("b*".into()),
                     Segment::ExactMatch("c".into()),
                 ],
             ),
@@ -316,7 +368,7 @@ mod tests {
                 vec![
                     Segment::ExactMatch("a".into()),
                     Segment::ExactMatch("b".into()),
-                    Segment::Pattern("**"),
+                    Segment::Pattern("**".into()),
                 ],
             ),
             (
@@ -333,16 +385,18 @@ mod tests {
                 r#"a/*/b/**"#,
                 vec![
                     Segment::ExactMatch("a".into()),
-                    Segment::Pattern("*"),
+                    Segment::Pattern("*".into()),
                     Segment::ExactMatch("b".into()),
-                    Segment::Pattern("**"),
+                    Segment::Pattern("**".into()),
                 ],
             ),
         ];
 
         for (test_string, expected_segments) in test_vector {
-            let (_, selector) =
-                component_selector::<nom::error::VerboseError<&str>>(test_string).unwrap();
+            let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
+                RequireEscapedColons::Yes,
+            )(test_string)
+            .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
                 "For '{}', got: {:?}",
@@ -351,8 +405,10 @@ mod tests {
 
             // Component selectors can start with `/`
             let test_moniker_string = format!("/{test_string}");
-            let (_, selector) =
-                component_selector::<nom::error::VerboseError<&str>>(&test_moniker_string).unwrap();
+            let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
+                RequireEscapedColons::Yes,
+            )(&test_moniker_string)
+            .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
                 "For '{}', got: {:?}",
@@ -361,8 +417,22 @@ mod tests {
 
             // Component selectors can start with `./`
             let test_moniker_string = format!("./{test_string}");
-            let (_, selector) =
-                component_selector::<nom::error::VerboseError<&str>>(&test_moniker_string).unwrap();
+            let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
+                RequireEscapedColons::Yes,
+            )(&test_moniker_string)
+            .unwrap();
+            assert_eq!(
+                expected_segments, selector.segments,
+                "For '{}', got: {:?}",
+                test_moniker_string, selector,
+            );
+
+            // We can also accept component selectors without escaping
+            let test_moniker_string = test_string.replace("\\:", ":");
+            let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
+                RequireEscapedColons::No,
+            )(&test_moniker_string)
+            .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
                 "For '{}', got: {:?}",
@@ -374,9 +444,10 @@ mod tests {
     #[fuchsia::test]
     fn missing_path_component_selector_test() {
         let component_selector_string = "c";
-        let (_, component_selector) =
-            component_selector::<nom::error::VerboseError<&str>>(component_selector_string)
-                .unwrap();
+        let (_, component_selector) = component_selector::<nom::error::VerboseError<&str>>(
+            RequireEscapedColons::Yes,
+        )(component_selector_string)
+        .unwrap();
         let mut path_vec = component_selector.segments;
         assert_eq!(path_vec.pop(), Some(Segment::ExactMatch("c".into())));
         assert!(path_vec.is_empty());
@@ -401,8 +472,10 @@ mod tests {
             "a$c/d",
         ];
         for test_string in test_vector {
-            let component_selector_result =
-                consuming_component_selector::<VerboseError>(test_string);
+            let component_selector_result = consuming_component_selector::<VerboseError>(
+                test_string,
+                RequireEscapedColons::Yes,
+            );
             assert!(component_selector_result.is_err(), "expected '{}' to fail", test_string);
         }
     }
@@ -454,14 +527,14 @@ mod tests {
             ),
             (
                 "a/*:c",
-                vec![Segment::ExactMatch("a".into()), Segment::Pattern("*")],
+                vec![Segment::ExactMatch("a".into()), Segment::Pattern("*".into())],
                 Some(Segment::ExactMatch("c".into())),
                 None,
             ),
             (
                 "a/b:*",
                 vec![Segment::ExactMatch("a".into()), Segment::ExactMatch("b".into())],
-                Some(Segment::Pattern("*")),
+                Some(Segment::Pattern("*".into())),
                 None,
             ),
             (
@@ -536,7 +609,11 @@ mod tests {
                 vec![Segment::ExactMatch("ab".into()), Segment::ExactMatch(" d".into())],
                 Some(Segment::ExactMatch("c ".into())),
             ),
-            ("a\\\t*b:c", vec![Segment::Pattern("a\\\t*b")], Some(Segment::ExactMatch("c".into()))),
+            (
+                "a\\\t*b:c",
+                vec![Segment::Pattern("a\t*b".into())],
+                Some(Segment::ExactMatch("c".into())),
+            ),
             (
                 r#"a\ "x":c"#,
                 vec![Segment::ExactMatch(r#"a "x""#.into())],
@@ -565,10 +642,16 @@ mod tests {
             selector::<VerboseError>("core/**:some-node/he*re:prop").unwrap(),
             Selector {
                 component: ComponentSelector {
-                    segments: vec![Segment::ExactMatch("core".into()), Segment::Pattern("**"),],
+                    segments: vec![
+                        Segment::ExactMatch("core".into()),
+                        Segment::Pattern("**".into()),
+                    ],
                 },
                 tree: TreeSelector {
-                    node: vec![Segment::ExactMatch("some-node".into()), Segment::Pattern("he*re"),],
+                    node: vec![
+                        Segment::ExactMatch("some-node".into()),
+                        Segment::Pattern("he*re".into()),
+                    ],
                     property: Some(Segment::ExactMatch("prop".into())),
                     tree_names: None,
                 },
@@ -594,10 +677,16 @@ mod tests {
                 .unwrap(),
             Selector {
                 component: ComponentSelector {
-                    segments: vec![Segment::ExactMatch("core".into()), Segment::Pattern("**"),],
+                    segments: vec![
+                        Segment::ExactMatch("core".into()),
+                        Segment::Pattern("**".into()),
+                    ],
                 },
                 tree: TreeSelector {
-                    node: vec![Segment::ExactMatch("some-node".into()), Segment::Pattern("he*re"),],
+                    node: vec![
+                        Segment::ExactMatch("some-node".into()),
+                        Segment::Pattern("he*re".into()),
+                    ],
                     property: Some(Segment::ExactMatch("prop".into())),
                     tree_names: Some(vec!["foo", r"bar*"].into()),
                 },
@@ -625,7 +714,10 @@ mod tests {
                     ],
                 },
                 tree: TreeSelector {
-                    node: vec![Segment::ExactMatch("some node".into()), Segment::Pattern("*"),],
+                    node: vec![
+                        Segment::ExactMatch("some node".into()),
+                        Segment::Pattern("*".into()),
+                    ],
                     property: Some(Segment::ExactMatch("prop".into())),
                     tree_names: None,
                 },

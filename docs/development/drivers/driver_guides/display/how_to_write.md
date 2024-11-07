@@ -85,7 +85,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("fancy-display") {
+fuchsia_cc_driver("fancy-display") {
   sources = []
   deps = [
     ":common",

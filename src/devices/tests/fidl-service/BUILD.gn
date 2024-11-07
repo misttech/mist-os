@@ -52,7 +52,7 @@ driver_bind_rules("parent-driver-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("parent-driver") {
+fuchsia_cc_driver("parent-driver") {
   testonly = true
   output_name = "fidl-service-parent"
   sources = [ "parent-driver.cc" ]
@@ -84,7 +84,7 @@ driver_bind_rules("child-driver-bind") {
   deps = [ ":echo_bindlib" ]
 }
 
-fuchsia_driver("child-driver") {
+fuchsia_cc_driver("child-driver") {
   testonly = true
   output_name = "fidl-service-child"
   sources = [ "child-driver.cc" ]

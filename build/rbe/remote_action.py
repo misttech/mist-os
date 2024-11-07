@@ -118,6 +118,8 @@ def _detail_diff(
     command = [
         _path_or_default(project_root_rel, PROJECT_ROOT_REL)
         / _DETAIL_DIFF_SCRIPT,
+        "-l=local",
+        "-r=remote",
         file1,
         file2,
     ]

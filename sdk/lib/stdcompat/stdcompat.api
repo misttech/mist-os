@@ -30,5 +30,5 @@
   "pkg/stdcompat/include/lib/stdcompat/utility.h": "ceccb40e5a990ab6828bf6c1d162bc9f",
   "pkg/stdcompat/include/lib/stdcompat/variant.h": "922ba4b88cd3c77275a266a35402f2e7",
   "pkg/stdcompat/include/lib/stdcompat/vector.h": "2ace65e1ee55c60e0dbfa7e19cf38e6e",
-  "pkg/stdcompat/include/lib/stdcompat/version.h": "53f54f365c9273424ad4dfb9fc38b88b"
+  "pkg/stdcompat/include/lib/stdcompat/version.h": "716bfe5d303ca68f292c16596b658db4"
 }

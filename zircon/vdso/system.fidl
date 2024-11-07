@@ -995,11 +995,15 @@ closed protocol System {
     /// ```c
     /// #include <zircon/syscalls-next.h>
     ///
-    /// zx_status_t zx_system_set_processor_power_level_domain(
+    /// zx_status_t zx_system_set_processor_power_domain(
     ///     zx_handle_t resource,
     ///     uint64_t options,
     ///     const zx_power_domain_t* power_domain,
-    ///     zx_handle_t port);
+    ///     zx_handle_t port,
+    ///     const zx_processor_power_level_t* power_levels,
+    ///     size_t num_power_levels,
+    ///     const zx_processor_power_level_transition_t* transitions,
+    ///     size_t num_transitions);
     /// ```
     ///
     /// ## Description

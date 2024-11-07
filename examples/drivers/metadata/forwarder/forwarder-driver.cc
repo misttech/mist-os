@@ -4,7 +4,7 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 #include <bind/fuchsia_examples_metadata_bind_library/cpp/bind.h>
 
@@ -27,13 +27,13 @@ class ForwarderDriver final : public fdf::DriverBase,
     // Serve the metadata to the driver's child nodes.
     zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
     if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
+      fdf::error("Failed to serve metadata: {}", zx::make_result(status));
       return zx::error(status);
     }
 
     status = AddRetrieverChild();
     if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to add retriever child.", KV("status", zx_status_get_string(status)));
+      fdf::error("Failed to add retriever child: {}", zx::make_result(status));
       return zx::error(status);
     }
 
@@ -44,7 +44,7 @@ class ForwarderDriver final : public fdf::DriverBase,
   void ForwardMetadata(ForwardMetadataCompleter::Sync& completer) override {
     zx_status_t status = metadata_server_.ForwardMetadata(incoming());
     if (status != ZX_OK) {
-      FDF_SLOG(ERROR, "Failed to forward metadata.", KV("status", zx_status_get_string(status)));
+      fdf::error("Failed to forward metadata: {}", zx::make_result(status));
       completer.Reply(fit::error(status));
       return;
     }
@@ -63,7 +63,7 @@ class ForwarderDriver final : public fdf::DriverBase,
 
     zx::result connector = devfs_connector_.Bind(dispatcher());
     if (connector.is_error()) {
-      FDF_SLOG(ERROR, "Failed to bind devfs connector.", KV("status", connector.status_string()));
+      fdf::error("Failed to bind devfs connector: {}", connector);
       return connector.error_value();
     }
 
@@ -78,7 +78,7 @@ class ForwarderDriver final : public fdf::DriverBase,
 
     zx::result controller = AddChild("forwarder", devfs_args, kProperties, offers);
     if (controller.is_error()) {
-      FDF_SLOG(ERROR, "Failed to add child.", KV("status", controller.status_string()));
+      fdf::error("Failed to add child: {}", controller);
       return controller.error_value();
     }
 

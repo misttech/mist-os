@@ -17,10 +17,10 @@ the `fuchsia_audio` crate in a Rust project.
 ## Testing
 
 Unit tests for `fuchsia-audio` are available in the
-`fuchsia-audio-tests` package:
+`fuchsia_audio_tests` package:
 
 ```
-$ fx test fuchsia-audio-tests
+$ fx test fuchsia_audio_tests
 ```
 
 You'll need to include `//src/media/audio/lib/rust:tests` in your

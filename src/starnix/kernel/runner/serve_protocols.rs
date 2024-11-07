@@ -3,6 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::Container;
 use anyhow::Error;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl::AsHandleRef;
@@ -20,7 +21,7 @@ use starnix_core::vfs::file_server::serve_file_at;
 use starnix_core::vfs::socket::VsockSocket;
 use starnix_core::vfs::{FdFlags, FileHandle};
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::uapi;
@@ -42,16 +43,11 @@ use {
 
 use super::start_component;
 
-pub fn expose_root<L>(
-    locked: &mut Locked<'_, L>,
+pub fn expose_root(
+    locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
     server_end: ServerEnd<fio::DirectoryMarker>,
-) -> Result<(), Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<(), Error> {
     let root_file = system_task.open_file(locked, "/".into(), OpenFlags::RDONLY)?;
     serve_file_at(server_end.into_channel().into(), system_task, &root_file)?;
     Ok(())
@@ -359,11 +355,12 @@ pub async fn serve_graphical_presenter(
         .map_err(Error::from)
 }
 
-pub fn serve_memory_attribution_provider(
+/// Serves the memory attribution provider for the Kernel ELF component.
+pub fn serve_memory_attribution_provider_elfkernel(
     mut request_stream: fattribution::ProviderRequestStream,
-    kernel: &Kernel,
+    container: &Container,
 ) -> impl Future<Output = Result<(), Error>> {
-    let observer = kernel.new_memory_attribution_observer(request_stream.control_handle());
+    let observer = container.new_memory_attribution_observer(request_stream.control_handle());
     async move {
         while let Some(event) = request_stream.try_next().await? {
             match event {
@@ -379,5 +376,36 @@ pub fn serve_memory_attribution_provider(
             }
         }
         Ok(())
+    }
+}
+
+/// Serves the memory attribution provider for the Container component.
+pub fn serve_memory_attribution_provider_container(
+    mut request_stream: fattribution::ProviderRequestStream,
+    kernel: &Kernel,
+) -> impl Future<Output = ()> {
+    let observer = kernel.new_memory_attribution_observer(request_stream.control_handle());
+    async move {
+        while let Some(event) = request_stream
+            .try_next()
+            .await
+            .inspect_err(|err| {
+                tracing::warn!("Error while serving container memory attribution: {:?}", err)
+            })
+            .ok()
+            .flatten()
+        {
+            match event {
+                fattribution::ProviderRequest::Get { responder } => {
+                    observer.next(responder);
+                }
+                fattribution::ProviderRequest::_UnknownMethod {
+                    ordinal, control_handle, ..
+                } => {
+                    tracing::error!("Invalid request to AttributionProvider: {ordinal}");
+                    control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                }
+            }
+        }
     }
 }

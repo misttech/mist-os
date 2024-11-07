@@ -92,14 +92,14 @@ std::atomic<trace_counter_id_t> next_counter_id;
 }  // namespace
 
 ContiguousPooledMemoryAllocator::ContiguousPooledMemoryAllocator(
-    Owner* parent_device, const char* allocation_name, inspect::Node* parent_node,
+    Owner* parent_device, const char* heap_name, inspect::Node* parent_node,
     std::optional<fuchsia_sysmem2::Heap> heap, uint64_t size, bool is_always_cpu_accessible,
     bool is_ever_cpu_accessible, bool is_ever_zircon_accessible, bool is_ready,
     bool can_be_torn_down, async_dispatcher_t* dispatcher)
     : MemoryAllocator(BuildHeapProperties(is_always_cpu_accessible, is_ever_zircon_accessible)),
       parent_device_(parent_device),
       dispatcher_(dispatcher),
-      allocation_name_(allocation_name),
+      heap_name_(heap_name),
       heap_(std::move(heap)),
       counter_id_(next_counter_id.fetch_add(1, std::memory_order_relaxed)),
       region_allocator_(RegionAllocator::RegionPool::Create(std::numeric_limits<size_t>::max())),
@@ -109,10 +109,10 @@ ContiguousPooledMemoryAllocator::ContiguousPooledMemoryAllocator(
       is_ready_(is_ready),
       can_be_torn_down_(can_be_torn_down),
       metrics_(parent_device->metrics()) {
-  snprintf(child_name_, sizeof(child_name_), "%s-child", allocation_name_);
+  snprintf(child_name_, sizeof(child_name_), "%s-child", heap_name_);
   // Ensure NUL-terminated.
   child_name_[sizeof(child_name_) - 1] = 0;
-  node_ = parent_node->CreateChild(allocation_name);
+  node_ = parent_node->CreateChild(heap_name);
   node_.CreateUint("size", size, &properties_);
   node_.CreateUint("id", id(), &properties_);
   high_water_mark_property_ = node_.CreateUint("high_water_mark", 0);
@@ -270,8 +270,8 @@ zx_status_t ContiguousPooledMemoryAllocator::Init(uint32_t alignment_log2) {
   zx_status_t status = zx::vmo::create_contiguous(parent_device_->bti(), size_, alignment_log2,
                                                   &local_contiguous_vmo);
   if (status != ZX_OK) {
-    LOG(ERROR, "Could not allocate contiguous memory, status %d allocation_name_: %s", status,
-        allocation_name_);
+    LOG(ERROR, "Could not allocate contiguous memory, status %d heap_name_: %s", status,
+        heap_name_);
     return status;
   }
 
@@ -281,8 +281,8 @@ zx_status_t ContiguousPooledMemoryAllocator::Init(uint32_t alignment_log2) {
 zx_status_t ContiguousPooledMemoryAllocator::InitPhysical(zx_paddr_t paddr) {
   zx::result<zx::vmo> physical_vmo_result = parent_device_->CreatePhysicalVmo(paddr, size_);
   if (!physical_vmo_result.is_ok()) {
-    LOG(ERROR, "Failed to create physical VMO: %s allocation_name_: %s",
-        physical_vmo_result.status_string(), allocation_name_);
+    LOG(ERROR, "Failed to create physical VMO: %s heap_name_: %s",
+        physical_vmo_result.status_string(), heap_name_);
     return physical_vmo_result.status_value();
   }
   zx::vmo& local_contiguous_vmo = physical_vmo_result.value();
@@ -291,7 +291,7 @@ zx_status_t ContiguousPooledMemoryAllocator::InitPhysical(zx_paddr_t paddr) {
 
 zx_status_t ContiguousPooledMemoryAllocator::InitCommon(zx::vmo local_contiguous_vmo) {
   zx_status_t status =
-      local_contiguous_vmo.set_property(ZX_PROP_NAME, allocation_name_, strlen(allocation_name_));
+      local_contiguous_vmo.set_property(ZX_PROP_NAME, heap_name_, strlen(heap_name_));
   if (status != ZX_OK) {
     LOG(ERROR, "Failed vmo.set_property(ZX_PROP_NAME, ...): %d", status);
     return status;
@@ -418,12 +418,14 @@ zx_status_t ContiguousPooledMemoryAllocator::Allocate(
     uint64_t size, const fuchsia_sysmem2::SingleBufferSettings& settings,
     std::optional<std::string> name, uint64_t buffer_collection_id, uint32_t buffer_index,
     zx::vmo* parent_vmo) {
+  TRACE_DURATION("gfx", "ContiguousPooledMemoryAllocator::Allocate", "size_bytes",
+                 *settings.buffer_settings()->size_bytes());
   ZX_DEBUG_ASSERT_MSG(size % zx_system_get_page_size() == 0, "size: 0x%" PRIx64, size);
   ZX_DEBUG_ASSERT_MSG(
       fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
       "size_bytes: %" PRIu64 " size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
   if (!is_ready_) {
-    LOG(ERROR, "allocation_name_: %s is not ready_, failing", allocation_name_);
+    LOG(ERROR, "heap_name_: %s is not ready_, failing", heap_name_);
     return ZX_ERR_BAD_STATE;
   }
   RegionAllocator::Region::UPtr region;
@@ -741,6 +743,9 @@ void ContiguousPooledMemoryAllocator::TraceObserverCallback(async_dispatcher_t* 
   trace_observer_event_.signal(ZX_EVENT_SIGNALED, 0);
   // We don't care if tracing was enabled or disabled - if the category is now disabled, the trace
   // will just be ignored anyway.
+  //
+  // If the category is now enabled, this ensures the trace interval has a contiguous pool size
+  // datapoint at/near the start.
   TracePoolSize(true);
 
   trace_notify_observer_updated(trace_observer_event_.get());
@@ -1212,7 +1217,7 @@ void ContiguousPooledMemoryAllocator::DumpPoolStats() {
   LOG(INFO,
       "%s unused total: %ld bytes, max free size %ld bytes "
       "AllocatedRegionCount(): %zu AvailableRegionCount(): %zu, largest 10 regions %zu",
-      allocation_name_, unused_size, max_free_size, region_allocator_.AllocatedRegionCount(),
+      heap_name_, unused_size, max_free_size, region_allocator_.AllocatedRegionCount(),
       region_allocator_.AvailableRegionCount(), top_region_sum);
   for (auto& [vmo, region] : regions_) {
     LOG(INFO, "Region koid %ld name %s size %zu", region.koid, region.name.c_str(),
@@ -1222,7 +1227,7 @@ void ContiguousPooledMemoryAllocator::DumpPoolStats() {
 
 void ContiguousPooledMemoryAllocator::DumpPoolHighWaterMark() {
   LOG(INFO, "%s high_water_mark_used_size_: %ld bytes, max_free_size_at_high_water_mark_ %ld bytes",
-      allocation_name_, high_water_mark_used_size_, max_free_size_at_high_water_mark_);
+      heap_name_, high_water_mark_used_size_, max_free_size_at_high_water_mark_);
 }
 
 void ContiguousPooledMemoryAllocator::TracePoolSize(bool initial_trace) {
@@ -1233,7 +1238,8 @@ void ContiguousPooledMemoryAllocator::TracePoolSize(bool initial_trace) {
   });
   used_size_property_.Set(used_size);
   large_contiguous_region_sum_property_.Set(CalculateLargeContiguousRegionSize());
-  TRACE_COUNTER("gfx", "Contiguous pool size", counter_id_, "size", used_size);
+  // heap_name_ points at a string literal, as required by TRACE_COUNTER
+  TRACE_COUNTER("gfx", heap_name_, counter_id_, "size", used_size);
   bool trace_high_water_mark = initial_trace;
   if (used_size > high_water_mark_used_size_) {
     high_water_mark_used_size_ = used_size;
@@ -1251,8 +1257,8 @@ void ContiguousPooledMemoryAllocator::TracePoolSize(bool initial_trace) {
     DumpPoolHighWaterMark();
   }
   if (trace_high_water_mark) {
-    TRACE_INSTANT("gfx", "Increased high water mark", TRACE_SCOPE_THREAD, "allocation_name",
-                  allocation_name_, "size", high_water_mark_used_size_);
+    TRACE_INSTANT("gfx", "Increased high water mark", TRACE_SCOPE_THREAD, "heap_name", heap_name_,
+                  "size", high_water_mark_used_size_);
   }
 }
 
@@ -1420,6 +1426,7 @@ void ContiguousPooledMemoryAllocator::OnRegionUnused(const ralloc_region_t& regi
 }
 
 zx_status_t ContiguousPooledMemoryAllocator::CommitRegion(const ralloc_region_t& region) {
+  TRACE_DURATION("gfx", "ContiguousPooledMemoryAllocator::CommitRegion");
   if (!can_decommit_) {
     return ZX_OK;
   }

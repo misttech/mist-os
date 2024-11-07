@@ -6,6 +6,7 @@
 
 use crate::file::ReadError;
 use crate::node::{self, CloneError, CloseError, OpenError, RenameError};
+use crate::PERM_READABLE;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fuchsia_async::{DurationExt, MonotonicDuration, TimeoutExt};
 use futures::future::BoxFuture;
@@ -89,7 +90,7 @@ mod fuchsia {
     ) -> Result<(), OpenError> {
         let flags = flags | fio::OpenFlags::DIRECTORY;
         let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+        namespace.open_deprecated(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
     /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
@@ -108,15 +109,13 @@ mod fuchsia {
     ) -> Result<(), OpenError> {
         let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
         let namespace = fdio::Namespace::installed().map_err(OpenError::Namespace)?;
-        namespace.open3(path, flags, request.into_channel()).map_err(OpenError::Namespace)
+        namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
     /// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.
     pub async fn read_file(parent: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, ReadError> {
-        let flags = fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE;
-        // TODO(https://fxbug.dev/361450366): Use [`open_file_async`].
-        let file =
-            open_file_no_describe_deprecated(parent, path, flags).map_err(ReadError::Open)?;
+        let flags = fio::Flags::FLAG_SEND_REPRESENTATION | PERM_READABLE;
+        let file = open_file_async(parent, path, flags).map_err(ReadError::Open)?;
         crate::file::read_file_with_on_open_event(file).await
     }
 }
@@ -127,8 +126,7 @@ mod host {
 
     /// Opens `path` from the `parent` directory as a file and reads the file contents into a Vec.
     pub async fn read_file(parent: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, ReadError> {
-        // TODO(https://fxbug.dev/361450366): Use [`open_file_async`].
-        let file = open_file_no_describe_deprecated(parent, path, fio::OpenFlags::RIGHT_READABLE)?;
+        let file = open_file_async(parent, path, PERM_READABLE)?;
         crate::file::read(&file).await
     }
 }
@@ -712,12 +710,7 @@ where
                 let dir_ref = if dir_entry.is_root() {
                     dir
                 } else {
-                    // TODO(https://fxbug.dev/361450366): Use [`open_directory_async`].
-                    match open_directory_no_describe_deprecated(
-                        dir,
-                        &dir_entry.name,
-                        fio::OpenFlags::empty(),
-                    ) {
+                    match open_directory_async(dir, &dir_entry.name, fio::Flags::empty()) {
                         Ok(dir) => {
                             sub_dir = dir;
                             &sub_dir
@@ -913,10 +906,10 @@ pub fn parse_dir_entries(mut buf: &[u8]) -> Vec<Result<DirEntry, DecodeDirentErr
     entries
 }
 
-const DIR_FLAGS: fio::OpenFlags = fio::OpenFlags::empty()
-    .union(fio::OpenFlags::DIRECTORY)
-    .union(fio::OpenFlags::RIGHT_READABLE)
-    .union(fio::OpenFlags::RIGHT_WRITABLE);
+const DIR_FLAGS: fio::Flags = fio::Flags::empty()
+    .union(fio::Flags::PROTOCOL_DIRECTORY)
+    .union(PERM_READABLE)
+    .union(fio::Flags::PERM_INHERIT_WRITE);
 
 /// Removes a directory and all of its children. `name` must be a subdirectory of `root_dir`.
 ///
@@ -927,9 +920,8 @@ pub async fn remove_dir_recursive(
 ) -> Result<(), EnumerateError> {
     let (dir, dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
-    // TODO(https://fxbug.dev/361450366): use open3 instead.
     root_dir
-        .open(DIR_FLAGS, fio::ModeType::empty(), name, ServerEnd::new(dir_server.into_channel()))
+        .open3(name, DIR_FLAGS, &fio::Options::default(), dir_server.into_channel())
         .map_err(|e| EnumerateError::Fidl("open", e))?;
     remove_dir_contents(dir).await?;
     root_dir
@@ -954,12 +946,11 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
                     let (subdir, subdir_server) =
                         fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                             .expect("failed to create proxy");
-                    // TODO(https://fxbug.dev/361450366): use open3 instead.
-                    dir.open(
-                        DIR_FLAGS,
-                        fio::ModeType::empty(),
+                    dir.open3(
                         &dirent.name,
-                        ServerEnd::new(subdir_server.into_channel()),
+                        DIR_FLAGS,
+                        &fio::Options::default(),
+                        subdir_server.into_channel(),
                     )
                     .map_err(|e| EnumerateError::Fidl("open", e))?;
                     remove_dir_contents(subdir).await?;
@@ -1374,7 +1365,9 @@ mod tests {
         let scope = ExecutionScope::new();
         example_dir.open(
             scope,
-            DIR_FLAGS,
+            fio::OpenFlags::DIRECTORY
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
             vfs::path::Path::dot(),
             ServerEnd::new(example_dir_service.into_channel()),
         );

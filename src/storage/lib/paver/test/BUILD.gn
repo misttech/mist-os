@@ -58,6 +58,7 @@ test("test") {
     "//src/storage/fvm",
     "//src/storage/gpt",
     "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/block_client/cpp:fake_device",
     "//src/storage/lib/block_server:block_server_cc",
     "//src/storage/lib/block_server:fake_block_server_cc",
     "//src/storage/lib/fs_management",

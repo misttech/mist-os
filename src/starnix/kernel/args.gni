@@ -36,4 +36,11 @@ declare_args() {
 
   # Whether or not the kernel manages wake locks internally.
   starnix_enable_wake_locks = true
+
+  # Whether or not the kernel allows 32-bit tasks
+  if (current_cpu == "arm64") {
+    starnix_enable_arch32 = true
+  } else {
+    starnix_enable_arch32 = false
+  }
 }

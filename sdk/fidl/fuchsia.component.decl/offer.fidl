@@ -16,7 +16,7 @@ type Offer = flexible union {
     5: runner OfferRunner;
     6: resolver OfferResolver;
     8: event_stream OfferEventStream;
-    @available(added=HEAD)
+    @available(added=25)
     9: dictionary OfferDictionary;
     @available(added=20)
     10: config OfferConfiguration;
@@ -101,7 +101,7 @@ type OfferService = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     8: source_dictionary dictionary_path;
 
     /// (Required) Reference to the target. Must be `child`, `collection`, or
@@ -165,7 +165,7 @@ type OfferProtocol = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     7: source_dictionary dictionary_path;
 
     /// (Required) Reference to the target. Must be `child`, `collection`, or
@@ -206,7 +206,7 @@ type OfferDirectory = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     9: source_dictionary dictionary_path;
 
     /// (Required) Reference to the target. Must be `child`, `collection`, or
@@ -284,7 +284,7 @@ type OfferRunner = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     5: source_dictionary dictionary_path;
 
     /// (Required) Reference to the target. Must be `child`, `collection`, or
@@ -312,7 +312,7 @@ type OfferResolver = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     5: source_dictionary dictionary_path;
 
     /// (Required) Reference to the target. Must be `child`, `collection`, or
@@ -362,7 +362,7 @@ type OfferEventStream = table {
 ///
 /// To learn more about dictionaries, see:
 /// https://fuchsia.dev/fuchsia-src/glossary#dictionary
-@available(added=HEAD)
+@available(added=25)
 type OfferDictionary = table {
     /// (Required) The provider of the capability relative to the component
     /// itself. Must be `parent`, `self`, `child`, or `void`.
@@ -377,7 +377,7 @@ type OfferDictionary = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     7: source_dictionary dictionary_path;
 
     /// (Required) Reference to the target. Must be `child`, `collection`, or
@@ -433,6 +433,6 @@ type OfferConfiguration = table {
     /// If this field is absent, `source_name` identifies a capability directly routed
     /// by `source`. If set, `source_name` identifies a capability nested inside this
     /// dictionary.
-    @available(added=HEAD)
+    @available(added=25)
     6: source_dictionary dictionary_path;
 };

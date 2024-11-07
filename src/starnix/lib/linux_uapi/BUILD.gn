@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
+import("//src/starnix/kernel/args.gni")
 
 rustc_library("linux_uapi") {
   edition = "2021"
@@ -15,11 +16,19 @@ rustc_library("linux_uapi") {
   if (current_cpu == "x64") {
     sources += [ "src/x86_64.rs" ]
   } else if (current_cpu == "arm64") {
-    sources += [ "src/arm64.rs" ]
+    sources += [
+      "src/arm.rs",
+      "src/arm64.rs",
+    ]
   } else if (current_cpu == "riscv64") {
     sources += [ "src/riscv64.rs" ]
   } else {
     assert(false, "Need uapi definition for the '$current_cpu` architecture")
+  }
+
+  features = []
+  if (starnix_enable_arch32) {
+    features += [ "arch32" ]
   }
 
   deps = [ "//third_party/rust_crates:zerocopy" ]

@@ -585,6 +585,10 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
   LTRACEF("va %#" PRIxPTR ", flags %#x\n", va, flags);
   DEBUG_ASSERT((flags & VMM_PF_FLAG_ACCESS) == 0);
 
+  // With the original va logged in the traces can now convert to a page aligned address suitable
+  // for passing to PageFaultLocked.
+  va = ROUNDDOWN(va, PAGE_SIZE);
+
   if (type_ == Type::GuestPhysical) {
     flags &= ~VMM_PF_FLAG_USER;
     flags |= VMM_PF_FLAG_GUEST;

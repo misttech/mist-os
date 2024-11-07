@@ -87,6 +87,7 @@ bootstrap_userdebug_platform_aib_names = [
   "kernel_args_userdebug",
 
   # Developer
+  "bootstrap_realm_development_access",
   "bootstrap_realm_vsock_development_access",
   "kernel_debug_broker_userdebug",
   "netsvc",
@@ -126,6 +127,7 @@ bootstrap_eng_platform_aib_names = [
 
   # Storage
   "fshost_storage_host",
+  "fshost_storage_host_fvm_minfs",
   "partitioning_tools",
 ]
 
@@ -318,6 +320,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "standard_userdebug",
                          "standard_userdebug_and_eng",
                          "mdns_fuchsia_device_wired_service",
+                         "nanohub_support",
                          "omaha_client_empty_eager_config",
                          "radar_proxy_with_injector",
                          "sl4f",
@@ -422,6 +425,8 @@ experimental_aib_names = [
   "adb_support",
   "bootstrap_realm_vsock_development_access",
   "fshost_storage_host",
+  "fshost_storage_host_fshost_minfs",
+  "nanohub_support",
   "paravirtualization_support_bootstrap",
   "power_framework",
   "power_framework_sag",

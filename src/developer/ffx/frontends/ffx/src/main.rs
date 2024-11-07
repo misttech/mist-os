@@ -304,7 +304,7 @@ async fn run_legacy_subcommand(
     let injector = Injection::initialize_overnet(context, None, daemon_version_string).await?;
     tracing::debug!("Overnet initialized, creating injector");
     let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
-    ffx_lib_suite::ffx_plugin_impl(&injector, subcommand).await
+    ffx_lib_suite::ffx_plugin_impl(&Some(injector), subcommand).await
 }
 
 #[fuchsia_async::run_singlethreaded]

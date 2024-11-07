@@ -30,17 +30,15 @@ namespace provider = fuchsia::tracing::provider;
 // forward decl, here to break mutual header dependency
 class TraceManagerApp;
 class TraceManager;
-class OldTraceManager;
 
 class TraceController : public controller::Session {
   friend TraceManager;
-  friend OldTraceManager;
 
  public:
   TraceController(TraceManagerApp* app, std::unique_ptr<TraceSession> session);
   ~TraceController() override;
 
-  void TerminateTracing(controller::TerminateOptions options, fit::closure cb);
+  void TerminateTracing(fit::closure cb);
 
   void OnAlert(const std::string& alert_name);
 
@@ -59,6 +57,9 @@ class TraceController : public controller::Session {
 
   TraceManagerApp* const app_;
 
+  // We only set this to false when aborting.
+  bool write_results_on_terminate_ = true;
+
   std::unique_ptr<TraceSession> session_;
   std::queue<std::string> alerts_;
   std::queue<WatchAlertCallback> watch_alert_callbacks_;
@@ -66,7 +67,6 @@ class TraceController : public controller::Session {
 
 class TraceManager : public controller::Provisioner, public provider::Registry {
   friend TraceController;
-  friend OldTraceManager;
 
  public:
   TraceManager(TraceManagerApp* app, Config config, async::Executor& executor);
@@ -74,10 +74,6 @@ class TraceManager : public controller::Provisioner, public provider::Registry {
 
   // For testing.
   TraceSession* session() const;
-
-  // Allow terminate tracing with callback for testing
-  void TerminateTracing(controller::TerminateOptions options,
-                        fit::function<void(controller::Controller_TerminateTracing_Result)> cb);
 
   void OnEmptyControllerSet();
 
@@ -113,43 +109,6 @@ class TraceManager : public controller::Provisioner, public provider::Registry {
   TraceManager(TraceManager&&) = delete;
   TraceManager& operator=(const TraceManager&) = delete;
   TraceManager& operator=(TraceManager&&) = delete;
-};
-
-// TODO(b/42083286): Remove after the old trace Controller protocol is removed
-// This is an implementations of the old trace controller FIDL protocol. It is a
-// temporary internal implementation which will be removed once all tracing
-// clients are migrated to use the new protocols.
-class OldTraceManager : public controller::Controller {
- public:
-  OldTraceManager(TraceManagerApp* app, TraceManager* trace_manager, async::Executor& executor);
-  ~OldTraceManager() override;
-
-  // For testing.
-  TraceSession* session() const;
-
-  void OnEmptyControllerSet();
-
- private:
-  // |Controller| implementation.
-  void InitializeTracing(controller::TraceConfig config, zx::socket output) override;
-  void TerminateTracing(controller::TerminateOptions options, TerminateTracingCallback cb) override;
-  void StartTracing(controller::StartOptions options, StartTracingCallback cb) override;
-  void StopTracing(controller::StopOptions options, StopTracingCallback cb) override;
-  void GetProviders(GetProvidersCallback cb) override;
-  void GetKnownCategories(GetKnownCategoriesCallback callback) override;
-  void WatchAlert(WatchAlertCallback cb) override;
-  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
-
-  void SendSessionStateEvent(controller::SessionState state);
-  controller::SessionState TranslateSessionState(TraceSession::State state);
-
-  void OnAlert(const std::string& alert_name);
-
-  controller::TerminateResult terminate_result_;
-  TraceManagerApp* const app_;
-  TraceManager* const trace_manager_;
-  fidl::InterfacePtr<controller::Session> trace_controller_;
-  async::Executor& executor_;
 };
 
 }  // namespace tracing

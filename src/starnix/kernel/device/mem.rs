@@ -105,7 +105,7 @@ impl FileOps for DevZero {
     fn mmap(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
         memory_offset: u64,
@@ -133,6 +133,7 @@ impl FileOps for DevZero {
             memory_offset,
             length,
             prot_flags,
+            file.max_access_for_memory_mapping(),
             options,
             // We set the filename here, even though we are creating what is
             // functionally equivalent to an anonymous mapping. Doing so affects
@@ -280,6 +281,7 @@ impl FileOps for DevKmsg {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &crate::vfs::FileObject,
         current_task: &crate::task::CurrentTask,
         _current_offset: starnix_uapi::off_t,

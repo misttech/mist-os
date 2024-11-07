@@ -86,13 +86,13 @@ type Peer = table {
     /// Value of the Advertising SID.
     ///
     /// Range: 0x00 to 0x0F
-    @available(added=NEXT)
+    @available(added=25)
     9: advertising_sid uint8;
 
     /// Interval of the periodic advertising.
     ///
     /// Range: 0x0006 to 0xFFFF
-    @available(added=NEXT)
+    @available(added=25)
     10: periodic_advertising_interval uint16;
 };
 

@@ -1069,7 +1069,7 @@ int InternalHandleTypeInit() {
   return mod::GenericTypeInit(&InternalHandleType, &InternalHandleType_Spec);
 }
 
-PyMODINIT_FUNC __attribute__((visibility("default"))) PyInit_fuchsia_controller_internal() {
+PyMODINIT_FUNC PyInit_libfuchsia_controller_internal() {
   if (InternalHandleTypeInit() < 0) {
     return nullptr;
   }

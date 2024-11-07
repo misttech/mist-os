@@ -4,12 +4,14 @@
 #ifndef SRC_STORAGE_LIB_PAVER_GPT_H_
 #define SRC_STORAGE_LIB_PAVER_GPT_H_
 
+#include <fidl/fuchsia.storagehost/cpp/wire.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
 
+#include <span>
 #include <string_view>
 
 #include <gpt/gpt.h>
@@ -26,11 +28,18 @@ using gpt::GptDevice;
 // Paver would use it's presence to detect system that has Android configuration.
 constexpr std::string_view kGptSuperName = "super";
 
+// Used as a search key for `GptDevicePartitioner.FindPartition`.
+struct GptPartitionMetadata {
+  std::string name;
+  uuid::Uuid type_guid;
+  uuid::Uuid instance_guid;
+};
+
 // Useful for when a GPT table is available (e.g. x86 devices). Provides common
 // utility functions.
 class GptDevicePartitioner {
  public:
-  using FilterCallback = fit::function<bool(const gpt_partition_t&)>;
+  using FilterCallback = fit::function<bool(const GptPartitionMetadata&)>;
 
   struct InitializeGptResult {
     std::unique_ptr<GptDevicePartitioner> gpt;
@@ -52,43 +61,49 @@ class GptDevicePartitioner {
 
   GptDevice* GetGpt() const { return gpt_.get(); }
 
-  struct FindFirstFitResult {
-    size_t start;
-    size_t length;
-  };
+  // Returns a connection to the first matching partition.
+  zx::result<std::unique_ptr<BlockPartitionClient>> FindPartition(FilterCallback filter) const;
 
-  // Find the first spot that has at least |bytes_requested| of space.
-  //
-  // Returns the |start_out| block and |length_out| blocks, indicating
-  // how much space was found, on success. This may be larger than
-  // the number of bytes requested.
-  zx::result<FindFirstFitResult> FindFirstFit(size_t bytes_requested) const;
+  // Returns a connection to all matching partitions.
+  zx::result<std::vector<std::unique_ptr<BlockPartitionClient>>> FindAllPartitions(
+      FilterCallback filter) const;
 
-  // Creates a partition, adds an entry to the GPT, and returns a file descriptor to it.
-  // Assumes that the partition does not already exist.
-  zx::result<std::unique_ptr<PartitionClient>> AddPartition(const char* name,
-                                                            const uuid::Uuid& type,
-                                                            size_t minimum_size_bytes,
-                                                            size_t optional_reserve_bytes) const;
-
-  struct FindPartitionResult {
+  struct FindPartitionDetailsResult {
     std::unique_ptr<BlockPartitionClient> partition;
     gpt_partition_t* gpt_partition;
   };
 
-  // Returns a file descriptor to a partition which can be paved,
-  // if one exists.
-  zx::result<FindPartitionResult> FindPartition(FilterCallback filter) const;
+  // Returns a connection to the first matching partition, as well as its GPT metadata.
+  // TODO(https://fxbug.dev/339491886): Remove once all products use storage-host.
+  zx::result<FindPartitionDetailsResult> FindPartitionDetails(FilterCallback filter) const;
 
   // Wipes a specified partition from the GPT, and overwrites first 8KiB with
   // nonsense.
   zx::result<> WipeFvm() const;
 
-  // Removes all partitions from GPT.
-  zx::result<> WipePartitionTables() const;
+  struct PartitionInitSpec {
+   public:
+    std::string name;
+    uuid::Uuid type;
+    // If zero, a random GUID will be assigned
+    uuid::Uuid instance;
+    // If nonzero, the partition will be allocated at the specific offset (and initialization will
+    // fail if this overlaps with other partitions or the GPT itself).  If the value is zero, the
+    // partition is dynamically allocated.  Dynamically allocated partitions must precede all
+    // fixed-offset partitions in the list passed to ResetPartitionTables, otherwise they might be
+    // allocated over the desired range.
+    uint64_t start_block = 0;
+    // Zero indicates an empty partition table entry; other fields are ignored.
+    uint64_t size_bytes = 0;
+    uint64_t flags = 0;
 
-  // Wipes all partitions meeting given criteria.
-  zx::result<> WipePartitions(FilterCallback filter) const;
+    static PartitionInitSpec ForKnownPartition(Partition partition, PartitionScheme scheme,
+                                               size_t size_bytes);
+  };
+
+  // Wipes the partition table and resets it to `partitions`.
+  // See fuchsia.storagehost.PartitionsManager/ResetPartitionTables.
+  zx::result<> ResetPartitionTables(std::vector<PartitionInitSpec> partitions) const;
 
   const paver::BlockDevices& devices() { return devices_; }
 
@@ -121,8 +136,17 @@ class GptDevicePartitioner {
         gpt_(std::move(gpt)),
         block_info_(block_info) {}
 
-  zx::result<uuid::Uuid> CreateGptPartition(const char* name, const uuid::Uuid& type,
-                                            uint64_t offset, uint64_t blocks) const;
+  // Detects if the system has storage-host.
+  // If not, the below Legacy methods will substitute their matching method.
+  bool StorageHostDetected() const;
+
+  // Returns a file descriptor to a partition which can be paved, if one exists.
+  // TODO(https://fxbug.dev/339491886): Remove once products are using storage-host.
+  zx::result<FindPartitionDetailsResult> FindPartitionLegacy(FilterCallback filter) const;
+
+  // Reset the partition table by directly overwriting the GPT.
+  // TODO(https://fxbug.dev/339491886): Remove once products are using storage-host.
+  zx::result<> ResetPartitionTablesLegacy(std::span<const PartitionInitSpec> partitions) const;
 
   const paver::BlockDevices devices_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_root_;
@@ -139,26 +163,26 @@ inline void utf16_to_cstring(char* dst, const uint8_t* src, size_t charcount) {
   }
 }
 
-inline bool FilterByType(const gpt_partition_t& part, const uuid::Uuid& type) {
-  return type == uuid::Uuid(part.type);
+inline bool FilterByType(const GptPartitionMetadata& part, const uuid::Uuid& type) {
+  return type == part.type_guid;
 }
 
-bool FilterByName(const gpt_partition_t& part, std::string_view name);
+bool FilterByName(const GptPartitionMetadata& part, std::string_view name);
 
-bool FilterByTypeAndName(const gpt_partition_t& part, const uuid::Uuid& type,
+bool FilterByTypeAndName(const GptPartitionMetadata& part, const uuid::Uuid& type,
                          std::string_view name);
 
-inline bool IsFvmPartition(const gpt_partition_t& part) {
+inline bool IsFvmPartition(const GptPartitionMetadata& part) {
   return FilterByType(part, GUID_FVM_VALUE) ||
          FilterByTypeAndName(part, GPT_FVM_TYPE_GUID, GPT_FVM_NAME);
 }
 
-inline bool IsAndroidPartition(const gpt_partition_t& part) {
+inline bool IsAndroidPartition(const GptPartitionMetadata& part) {
   // Check for Android specific partition 'super'.
   return FilterByName(part, kGptSuperName);
 }
 
-inline bool IsFvmOrAndroidPartition(const gpt_partition_t& part) {
+inline bool IsFvmOrAndroidPartition(const GptPartitionMetadata& part) {
   return IsFvmPartition(part) || IsAndroidPartition(part);
 }
 

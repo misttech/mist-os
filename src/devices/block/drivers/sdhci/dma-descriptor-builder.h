@@ -6,7 +6,6 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_SDHCI_DMA_DESCRIPTOR_BUILDER_H_
 
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/sdmmc/hw.h>
 #include <lib/zx/bti.h>
@@ -22,6 +21,7 @@
 
 #include <fbl/algorithm.h>
 #include <hwreg/bitfields.h>
+#include <sdk/lib/driver/logging/cpp/logger.h>
 
 #include "src/lib/vmo_store/vmo_store.h"
 
@@ -115,8 +115,8 @@ template <typename DescriptorType>
 zx_status_t DmaDescriptorBuilder<VmoInfoType>::BuildDmaDescriptors(
     cpp20::span<DescriptorType> out_descriptors) {
   if (total_size_ % request_.blocksize != 0) {
-    zxlogf(ERROR, "Total buffer size (%lu) is not a multiple of the request block size (%u)",
-           total_size_, request_.blocksize);
+    FDF_LOG(ERROR, "Total buffer size (%lu) is not a multiple of the request block size (%u)",
+            total_size_, request_.blocksize);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -124,13 +124,13 @@ zx_status_t DmaDescriptorBuilder<VmoInfoType>::BuildDmaDescriptors(
   auto desc_it = out_descriptors.begin();
   for (const fzl::PinnedVmo::Region region : regions) {
     if (desc_it == out_descriptors.end()) {
-      zxlogf(ERROR, "Not enough DMA descriptors to handle request");
+      FDF_LOG(ERROR, "Not enough DMA descriptors to handle request");
       return ZX_ERR_OUT_OF_RANGE;
     }
 
     if constexpr (sizeof(desc_it->address) == sizeof(uint32_t)) {
       if (Hi32(region.phys_addr) != 0) {
-        zxlogf(ERROR, "64-bit physical address supplied for 32-bit DMA");
+        FDF_LOG(ERROR, "64-bit physical address supplied for 32-bit DMA");
         return ZX_ERR_NOT_SUPPORTED;
       }
       desc_it->address = static_cast<uint32_t>(region.phys_addr);
@@ -151,7 +151,7 @@ zx_status_t DmaDescriptorBuilder<VmoInfoType>::BuildDmaDescriptors(
   }
 
   if (desc_it == out_descriptors.begin()) {
-    zxlogf(ERROR, "No buffers were provided for the transfer");
+    FDF_LOG(ERROR, "No buffers were provided for the transfer");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -193,7 +193,7 @@ zx::result<size_t> DmaDescriptorBuilder<VmoInfoType>::GetPinnedRegions(
   vmo_store::StoredVmo<VmoInfoType>* const stored_vmo =
       registered_vmos_.GetVmo(buffer.buffer.vmo_id);
   if (stored_vmo == nullptr) {
-    zxlogf(ERROR, "No VMO %u for client %u", buffer.buffer.vmo_id, request_.client_id);
+    FDF_LOG(ERROR, "No VMO %u for client %u", buffer.buffer.vmo_id, request_.client_id);
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -202,13 +202,13 @@ zx::result<size_t> DmaDescriptorBuilder<VmoInfoType>::GetPinnedRegions(
   if (!(request_.cmd_flags & SDMMC_CMD_READ) &&
       !(stored_vmo->meta().rights & SDMMC_VMO_RIGHT_READ)) {
     // Write request, controller reads from this VMO and writes to the card.
-    zxlogf(ERROR, "Request would cause controller to read from write-only VMO");
+    FDF_LOG(ERROR, "Request would cause controller to read from write-only VMO");
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
   if ((request_.cmd_flags & SDMMC_CMD_READ) &&
       !(stored_vmo->meta().rights & SDMMC_VMO_RIGHT_WRITE)) {
     // Read request, controller reads from the card and writes to this VMO.
-    zxlogf(ERROR, "Request would cause controller to write to read-only VMO");
+    FDF_LOG(ERROR, "Request would cause controller to write to read-only VMO");
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
 
@@ -217,7 +217,7 @@ zx::result<size_t> DmaDescriptorBuilder<VmoInfoType>::GetPinnedRegions(
       stored_vmo->GetPinnedRegions(buffer.offset + stored_vmo->meta().offset, buffer.size,
                                    out_regions.data(), out_regions.size(), &region_count);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get pinned regions: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to get pinned regions: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -232,7 +232,7 @@ zx::result<size_t> DmaDescriptorBuilder<VmoInfoType>::GetPinnedRegions(
   const uint64_t kPageMask = kPageSize - 1;
 
   if (pmt_count_ >= pmts_.size()) {
-    zxlogf(ERROR, "Too many unowned VMOs specified, maximum is %zu", pmts_.size());
+    FDF_LOG(ERROR, "Too many unowned VMOs specified, maximum is %zu", pmts_.size());
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
@@ -245,18 +245,18 @@ zx::result<size_t> DmaDescriptorBuilder<VmoInfoType>::GetPinnedRegions(
   zx_paddr_t phys[SDMMC_PAGES_COUNT];
 
   if (page_count == 0) {
-    zxlogf(ERROR, "Buffer has no pages");
+    FDF_LOG(ERROR, "Buffer has no pages");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (page_count > std::size(phys)) {
-    zxlogf(ERROR, "Buffer has too many pages, maximum is %zu", std::size(phys));
+    FDF_LOG(ERROR, "Buffer has too many pages, maximum is %zu", std::size(phys));
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
   zx_status_t status = bti_->pin(options, *vmo, buffer.offset - page_offset, page_count * kPageSize,
                                  phys, page_count, &pmts_[pmt_count_]);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to pin unowned VMO: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to pin unowned VMO: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -274,7 +274,7 @@ zx::result<size_t> DmaDescriptorBuilder<VmoInfoType>::GetPinnedRegions(
   }
 
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Cache op on unowned VMO failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Cache op on unowned VMO failed: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -298,7 +298,7 @@ zx::result<size_t> DmaDescriptorBuilder<VmoInfoType>::GetPinnedRegions(
       out_regions[last_region].size = kPageSize;
     } else {
       // Ran out of regions.
-      zxlogf(ERROR, "Buffer has too many regions, maximum is %zu", out_regions.size());
+      FDF_LOG(ERROR, "Buffer has too many regions, maximum is %zu", out_regions.size());
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
   }

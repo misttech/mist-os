@@ -111,6 +111,9 @@ def detail_diff(left: Path, right: Path):
     subprocess.call(
         [
             _PROJECT_ROOT_REL / _DETAIL_DIFF_SCRIPT,
+            # denote first/second for checking repeatability
+            "-l=first",
+            "-r=second",
             str(left),
             str(right),
         ]

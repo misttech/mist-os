@@ -15,7 +15,7 @@ _types_supporting_unstable_atoms = [
   "cc_source_library",
 ]
 _categories_supporting_unstable_atoms = [
-  "internal",
+  "internal",  # TODO(https://fxbug.dev/372986936): Remove when no more uses.
   "partner_internal",  # TODO(https://fxbug.dev/364727245): Remove when fixed.
   "partner",
 ]
@@ -180,8 +180,7 @@ template("sdk_atom") {
   _allowed_categories = [
     # "excluded" is deprecated.
     # "experimental" is deprecated.
-    "internal",  # TODO(https://fxbug.dev/333907192): Disable once @internal_sdk
-                 # is removed.
+    # "internal" is deprecated; only specific legacy cases below are allowed.
     "cts",
     "partner_internal",
     "partner",
@@ -189,7 +188,11 @@ template("sdk_atom") {
   ]
 
   assert(
-      _allowed_categories + [ category ] - [ category ] != _allowed_categories,
+      _allowed_categories + [ category ] - [ category ] !=
+          _allowed_categories ||
+          # TODO(https://fxbug.dev/372986936): Remove once all exceptions in the
+          # assert below have been removed.
+          category == "internal",
       "'${target_name}' has unsupported SDK category '${category}'. Must be one of ${_allowed_categories}.")
 
   # "cts" is not properly implemented and should not be used. See
@@ -198,6 +201,33 @@ template("sdk_atom") {
   assert(
       category != "cts" && category != "public",
       "'${target_name}' has SDK category '${category}', which is not yet supported.")
+
+  if (category == "internal" &&
+      # `sdk_source_set()` enforces an allowlist.
+      type != "cc_source_library") {
+    # Handle individual exceptions for types with only one "internal" instance.
+    target_label = get_label_info(target_name, "label_no_toolchain")
+    assert(
+        (type == "cc_prebuilt_library" &&
+             # TODO(https://fxbug.dev/366517646): Remove these once all uses of
+             # `fake-bti` are migrated to the //sdk target.
+             (target_label == "//src/devices/testing/fake-bti/fake-bti_sdk_manifest:fake-bti_sdk_manifest" || target_label == "//src/devices/testing/fake-object/fake-object_sdk_manifest:fake-object_sdk_manifest" ||
+                  # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
+                  target_label == "//zircon/kernel/lib/devicetree/devicetree_sdk_manifest:devicetree_sdk_manifest")) ||
+            # TODO(https://fxbug.dev/42070500): Remove once shard is in "partner".
+            (type == "data" && target_label == "//sdk/lib/sys/component/realm_builder_shard:realm_builder_shard") ||
+            # TODO(https://fxbug.dev/331991540): Remove once a different
+            # solution for the Firmware SDK is implemented.
+            (type == "documentation" &&
+                 target_label == "//sdk/docs/firmware:firmware") ||
+            # TODO(https://fxbug.dev/333907192): Remove once in "partner".
+            (type == "fidl_library" && target_label == "//sdk/fidl/fuchsia.boot/fuchsia.boot_sdk:fuchsia.boot_sdk") ||
+            # TODO(https://fxbug.dev/343059325): Remove once devicetree is in "partner".
+            (type == "loadable_module" &&
+                 target_label !=
+                     string_replace(target_label, "devicetree", "", 1)),
+        "`${target_label}` of type `${type}` is not allowed to use the \"internal\" SDK category. No new uses are allowed.")
+  }
 
   # Ensure that we only want write `stable` in the manifest for types that
   # support unstable atoms. For those types, ensure that `meta.stable`is always

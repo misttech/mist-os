@@ -58,6 +58,14 @@ constexpr const char* ToString(IdlePowerThread::State state) {
 
 void IdlePowerThread::UpdateMonotonicClock(cpu_num_t current_cpu,
                                            const StateMachine& current_state) {
+  // Currently, UpdatePlatformTimer, called below, requires interrupts to be
+  // disabled as an optimization. Since this method, UpdateMonotonicClock,
+  // happens to be called with interrupts disabled in the main Run loop, nothing
+  // else needs to be done here. Simply assert that interrupts are disabled to
+  // ensure that any change to the interrupt disable behavior of the run loop is
+  // handled appropriately.
+  DEBUG_ASSERT(arch_ints_disabled());
+
   if constexpr (kEnablePausingMonotonicClock) {
     if (current_cpu == BOOT_CPU_ID) {
       if (current_state == kActiveToSuspend) {
@@ -69,13 +77,11 @@ void IdlePowerThread::UpdateMonotonicClock(cpu_num_t current_cpu,
         // are present.
         timer_unpause_monotonic();
         VDso::SetMonotonicTicksOffset(timer_get_mono_ticks_offset());
-        InterruptDisableGuard interrupt_disable;
         percpu::Get(current_cpu).timer_queue.UpdatePlatformTimer();
       }
     } else if (current_state == kSuspendToActive) {
       // If we are resuming the system, the secondary CPUs have to reset their platform
       // timers to account for any monotonic timers that are present.
-      InterruptDisableGuard interrupt_disable;
       percpu::Get(current_cpu).timer_queue.UpdatePlatformTimer();
     }
   }
@@ -95,6 +101,14 @@ int IdlePowerThread::Run(void* arg) {
   const cpu_num_t cpu_num = arch_curr_cpu_num();
   IdlePowerThread& this_idle_power_thread = percpu::GetCurrent().idle_power_thread;
   for (;;) {
+    // Disable preemption and interrupts to avoid races between idle power thread requests, handling
+    // interrupts, and entering the processor idle state. All pending preemtions are handled at the
+    // end of this loop iteration. Pending interrupts may be handled either at the end of this loop
+    // iteration or within ArchIdlePowerThread::EnterIdleState on architectures that re-enable
+    // interrupts there (e.g. x64).
+    AutoPreemptDisabler preempt_disabled;
+    InterruptDisableGuard interrupt_disable;
+
     const StateMachine state = this_idle_power_thread.state_.load(ktl::memory_order_acquire);
     if (state.target != state.current) {
       ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE_ENABLE(
@@ -104,8 +118,6 @@ int IdlePowerThread::Run(void* arg) {
 
       switch (state.target) {
         case State::Offline: {
-          InterruptDisableGuard interrupt_disable;
-
           // Emit the complete event early, since mp_unplug_current_cpu() will not return.
           trace.End();
 
@@ -138,28 +150,26 @@ int IdlePowerThread::Run(void* arg) {
         Thread::Current::Reschedule();
       }
     } else {
-      // Disable preemption and interrupts, then make one last check to be sure
-      // that we don't have any pending preemptions, or pending power state
-      // transitions, before falling into our idle state.
-      //
-      // Preemption is guaranteed to stay disabled for the duration of the idle
-      // state, but interrupt *may* be re-enabled while the CPU waits in its idle
-      // state.  So, while it is guaranteed that no other threads can run on
-      // this CPU while we are in our idle state, it is possible that we may
-      // have processed any number of interrupts before the method returns.
-      AutoPreemptDisabler preempt_disabled;
-      InterruptDisableGuard interrupt_disable;
-      const StateMachine ipt_state = this_idle_power_thread.state_.load(ktl::memory_order_acquire);
-      const bool preempts_pending =
-          Thread::Current::Get()->preemption_state().preempts_pending() != 0;
+      ktrace::Scope trace =
+          KTRACE_CPU_BEGIN_SCOPE_ENABLE(kEnableRunloopTracing, "kernel:sched", "idle");
 
-      if (!preempts_pending && (ipt_state.target == ipt_state.current)) {
-        ktrace::Scope trace =
-            KTRACE_CPU_BEGIN_SCOPE_ENABLE(kEnableRunloopTracing, "kernel:sched", "idle");
-        //  TODO(eieio): Use scheduler and timer states to determine latency requirements.
-        const zx_duration_t max_latency = 0;
-        ArchIdlePowerThread::EnterIdleState(max_latency);
+      DEBUG_ASSERT(arch_ints_disabled());
+      DEBUG_ASSERT(!Thread::Current::Get()->preemption_state().PreemptIsEnabled());
+
+      // A preempt could become pending between disabling preemption and disabling interrupts above.
+      // Handle the preemption instead of attempting to enter the processor idle state.
+      if (Thread::Current::Get()->preemption_state().preempts_pending() != 0) {
+        continue;
       }
+
+      // WARNING: Be careful not to do anything that could pend a preemption after the check above,
+      // with the exception of the internal implementation of ArchIdlePowerThread::EnterIdleState.
+
+      // TODO(eieio): Use scheduler and timer states to determine latency requirements.
+      const zx_duration_t max_latency = 0;
+      ArchIdlePowerThread::EnterIdleState(max_latency);
+
+      // END WARNING: Pending preemptions is safe again.
     }
   }
 }

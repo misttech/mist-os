@@ -288,6 +288,14 @@ class BootManager : public fidl::WireServer<fuchsia_paver::BootManager> {
   std::unique_ptr<abr::Client> abr_client_;
   BlockDevices devices_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_root_;
+
+  // Returns true if we are currently executing the final boot attempt on the given slot.
+  bool IsFinalBootAttempt(const AbrSlotInfo& slot_info,
+                          fuchsia_paver::wire::Configuration configuration);
+
+  // Returns the status for the given `configuration`.
+  zx::result<std::pair<fuchsia_paver::wire::ConfigurationStatus, std::optional<uint8_t>>>
+  GetConfigurationStatus(fuchsia_paver::wire::Configuration configuration);
 };
 
 }  // namespace paver

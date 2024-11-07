@@ -5,7 +5,7 @@
 use std::io::{Error, Write};
 
 use super::Compiler;
-use crate::ir::{CompIdent, DeclType, IntType, PrimSubtype};
+use crate::ir::{CompIdent, IntType, PrimSubtype};
 
 pub fn emit_prefixed_comp_ident<W: Write>(
     compiler: &mut Compiler<'_>,
@@ -37,12 +37,7 @@ pub fn emit_wire_comp_ident<W: Write>(
     out: &mut W,
     ident: &CompIdent,
 ) -> Result<(), Error> {
-    match compiler.schema.declarations[ident] {
-        DeclType::Enum | DeclType::Struct | DeclType::Table | DeclType::Union => {
-            emit_prefixed_comp_ident(compiler, out, ident, "Wire")
-        }
-        _ => todo!(),
-    }
+    emit_prefixed_comp_ident(compiler, out, ident, "Wire")
 }
 
 pub fn emit_doc_string<W: Write>(out: &mut W, doc: Option<&str>) -> Result<(), Error> {

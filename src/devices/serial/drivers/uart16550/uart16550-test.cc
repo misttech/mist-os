@@ -84,7 +84,7 @@ class Uart16550Harness : public zxtest::Test {
 
   fdf_testing::DriverRuntime& Runtime() { return runtime_; }
 
-  void InterruptDriver() { ASSERT_OK(Device().InterruptHandle()->trigger(0, zx::time())); }
+  void InterruptDriver() { ASSERT_OK(Device().InterruptHandle()->trigger(0, zx::time_boot())); }
 
   fdf::WireClient<fuchsia_hardware_serialimpl::Device> CreateDriverClient() {
     return fdf::WireClient<fuchsia_hardware_serialimpl::Device>(

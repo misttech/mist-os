@@ -1172,9 +1172,6 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
     }
 }
 
-// TODO(https://fxbug.dev/42058712): Run this against netstack3 when it
-// hides IPv6 addresses on offline interfaces from clients of
-// fuchsia.net.interfaces/Watcher.
 #[netstack_test]
 #[variant(N, Netstack)]
 #[test_case(fidl_subnet!("abcd::1/64"))]

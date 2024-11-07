@@ -56,6 +56,7 @@ forensics
 ?mediasession
 ?memory_monitor
 ?memory_monitor2
+?memory_pressure_signaler
 ?memory_sampler
 ?metrics-logger-standalone
 ?nc
@@ -72,6 +73,7 @@ forensics
 ?omaha-client
 ?overnet-usb
 pkg-resolver
+?pkg-shell-commands
 ?pkgctl
 ?process-resolver
 ?radar-proxy-with-injector
@@ -87,7 +89,6 @@ pkg-resolver
 ?sensors
 ?session_manager
 ?setui_service
-?shell-commands
 ?sl4f
 ?snapshot
 ?sockscripter

@@ -23,6 +23,7 @@ rustc_library("selinux") {
     "src/policy/security_context.rs",
     "src/policy/symbols.rs",
     "src/security_server.rs",
+    "src/sid_table.rs",
     "src/sync.rs",
   ]
   inputs = [
@@ -74,6 +75,9 @@ rustc_library("selinux") {
   } else {
     # Fuchsia/starnix builds identified by feature `selinux_starnix`.
     features = [ "selinux_starnix" ]
+
+    # Fuchsia/starnix builds use `fuchsia-inspect-contrib` for self-profiling.
+    deps += [ "//src/lib/diagnostics/inspect/contrib/rust" ]
 
     # Fuchsia/starnix builds use `starnix-sync` for lock primitives.
     deps += [ "//src/starnix/lib/starnix-sync" ]

@@ -157,7 +157,7 @@ but it may contain nonsensical data if trace providers deliberately emit garbage
 Figure 1 shows the components of the Fuchsia tracing system and the way how the
 components communicate with one another.
 
-Note: `fx traceutil` is being deprecated. Replace `fx traceutil` with `ffx
+Note: `fx traceutil` is deprecated. Replace `fx traceutil` with `ffx
 trace` in the diagram below.
 
 ![This figure shows the Fuchsia tracing system.](images/fuchsia-tracing.png "Figure 1: Fuchsia tracing system")

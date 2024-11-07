@@ -2,9 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(https://fxbug.dev/374190056) - This file will be deleted after updating antlion to point to
-# new honeydew wlan affordances folder structure
-
 """Data types used by wlan affordance."""
 
 from __future__ import annotations

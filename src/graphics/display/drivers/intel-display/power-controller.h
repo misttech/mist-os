@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
+#include "src/graphics/display/lib/driver-utils/scoped-value-change.h"
 
 namespace intel_display {
 
@@ -242,20 +242,23 @@ class PowerController {
   // stemming from scheduling variability. Tests that simulate timeouts should
   // use the overrides below to get the PowerController to issue a deterministic
   // MMIO access pattern.
-  static ScopedValueChange<int> OverridePreviousCommandTimeoutUsForTesting(int timeout_us);
-  static ScopedValueChange<int> OverrideVoltageLevelRequestReplyTimeoutUsForTesting(int timeout_us);
-  static ScopedValueChange<int> OverrideVoltageLevelRequestTotalTimeoutUsForTesting(int timeout_us);
-  static ScopedValueChange<int> OverrideTypeCColdBlockingChangeReplyTimeoutUsForTesting(
+  static display::ScopedValueChange<int> OverridePreviousCommandTimeoutUsForTesting(int timeout_us);
+  static display::ScopedValueChange<int> OverrideVoltageLevelRequestReplyTimeoutUsForTesting(
       int timeout_us);
-  static ScopedValueChange<int> OverrideTypeCColdBlockingChangeTotalTimeoutUsForTesting(
+  static display::ScopedValueChange<int> OverrideVoltageLevelRequestTotalTimeoutUsForTesting(
       int timeout_us);
-  static ScopedValueChange<int> OverrideSystemAgentEnablementChangeReplyTimeoutUsForTesting(
+  static display::ScopedValueChange<int> OverrideTypeCColdBlockingChangeReplyTimeoutUsForTesting(
       int timeout_us);
-  static ScopedValueChange<int> OverrideSystemAgentEnablementChangeTotalTimeoutUsForTesting(
+  static display::ScopedValueChange<int> OverrideTypeCColdBlockingChangeTotalTimeoutUsForTesting(
       int timeout_us);
-  static ScopedValueChange<int> OverrideGetMemorySubsystemInfoReplyTimeoutUsForTesting(
+  static display::ScopedValueChange<int>
+  OverrideSystemAgentEnablementChangeReplyTimeoutUsForTesting(int timeout_us);
+  static display::ScopedValueChange<int>
+  OverrideSystemAgentEnablementChangeTotalTimeoutUsForTesting(int timeout_us);
+  static display::ScopedValueChange<int> OverrideGetMemorySubsystemInfoReplyTimeoutUsForTesting(
       int timeout_us);
-  static ScopedValueChange<int> OverrideGetMemoryLatencyReplyTimeoutUsForTesting(int timeout_us);
+  static display::ScopedValueChange<int> OverrideGetMemoryLatencyReplyTimeoutUsForTesting(
+      int timeout_us);
 
  private:
   fdf::MmioBuffer* mmio_buffer_;

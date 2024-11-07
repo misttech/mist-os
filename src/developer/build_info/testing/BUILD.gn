@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/testing/cc_test_executable.gni")
 
@@ -38,6 +39,11 @@ fuchsia_component("fake-build-info-component") {
 fuchsia_package("fake-build-info") {
   testonly = true
   deps = [ ":fake-build-info-component" ]
+}
+
+export_fuchsia_package_to_bazel("fake-build-info.bazel_input") {
+  testonly = true
+  package = ":fake-build-info"
 }
 
 cc_test_executable("test-bin") {

@@ -21,7 +21,7 @@ driver_bind_rules("root_bind") {
   bind_output = "root.bindbc"
 }
 
-fuchsia_driver("root_driver") {
+fuchsia_cc_driver("root_driver") {
   testonly = true
   output_name = "services_root"
   sources = [ "root_driver.cc" ]

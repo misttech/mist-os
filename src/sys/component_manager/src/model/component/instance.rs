@@ -406,8 +406,8 @@ impl ResolvedInstanceState {
         }
 
         let program_escrow = if decl.get_runner().is_some() {
-            let (escrow, escrow_task) = escrow::Actor::new(component.as_weak());
-            component.nonblocking_task_group().spawn(escrow_task);
+            let escrow =
+                escrow::Actor::new(&component.nonblocking_task_group(), component.as_weak());
             Some(escrow)
         } else {
             None

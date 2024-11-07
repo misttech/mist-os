@@ -6,9 +6,7 @@ use crate::util::cobalt_logger::log_cobalt_1dot1_batch;
 use derivative::Derivative;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use fuchsia_inspect::Node as InspectNode;
-use fuchsia_inspect_contrib::auto_persist::{
-    AutoPersist, {self},
-};
+use fuchsia_inspect_auto_persist::{self as auto_persist, AutoPersist};
 use fuchsia_inspect_contrib::id_enum::{inspect_record_id_enum, IdEnum};
 use fuchsia_inspect_contrib::nodes::{BoundedListNode, LruCacheNode};
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log};

@@ -16,7 +16,7 @@ type PacketSignal = struct {
     trigger Signals;
     observed Signals;
     count uint64;
-    reserved0 uint64;
+    timestamp Time;
     reserved1 uint64;
 };
 
@@ -91,7 +91,7 @@ type PacketGuestVcpu = struct {
 };
 
 type PacketInterrupt = struct {
-    timestamp InstantMono;
+    timestamp InstantBoot;
     reserved0 uint64;
     reserved1 uint64;
     reserved2 uint64;

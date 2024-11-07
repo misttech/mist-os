@@ -12,7 +12,7 @@ driver_bind_rules("fake_ot_radio_bind") {
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
-fuchsia_driver("fake-ot-radio-driver-driver") {
+fuchsia_cc_driver("fake-ot-radio-driver-driver") {
   output_name = "fake-ot-radio"
   testonly = true
 

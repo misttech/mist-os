@@ -60,6 +60,7 @@ impl FileOps for MemoryDirectoryFile {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,

@@ -36,7 +36,6 @@ source_set("dwc3-common") {
     "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/logging/cpp",
-    "//sdk/lib/driver/platform-device/cpp",
     "//sdk/lib/fit",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
@@ -47,19 +46,18 @@ source_set("dwc3-common") {
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server-dfv2-compat-logging",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
 }
 
-fuchsia_driver("dwc3-driver") {
+fuchsia_cc_driver("dwc3-driver") {
   output_name = "dwc3"
   configs += [
     "//build/config:all_source",

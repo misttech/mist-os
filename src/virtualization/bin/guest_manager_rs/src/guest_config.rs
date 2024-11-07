@@ -10,7 +10,7 @@ use fidl::endpoints::{ClientEnd, ProtocolMarker, ServerEnd};
 use fidl_fuchsia_virtualization::{
     BlockFormat, BlockMode, BlockSpec, GuestConfig, KernelType, MAX_BLOCK_DEVICE_ID,
 };
-use fuchsia_fs::{file, Flags};
+use fuchsia_fs::{file, PERM_READABLE};
 use serde::{de, Deserialize};
 use std::path::Path;
 use {fidl_fuchsia_io as fio, static_assertions as sa};
@@ -85,7 +85,7 @@ fn open_as_client_end<M: ProtocolMarker>(path: &str) -> Result<ClientEnd<M>, Err
     let (client_end, server_end) = fidl::Channel::create();
     file::open_channel_in_namespace(
         path,
-        Flags::PERM_READ,
+        PERM_READABLE,
         ServerEnd::<fio::FileMarker>::new(server_end),
     )?;
     Ok(ClientEnd::<M>::new(client_end))
@@ -246,6 +246,7 @@ pub fn merge_configs(mut base: GuestConfig, overrides: GuestConfig) -> GuestConf
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fuchsia_fs::Flags;
     use std::path::PathBuf;
     use tempfile::tempdir;
 

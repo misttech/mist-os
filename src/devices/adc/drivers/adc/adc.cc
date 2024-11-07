@@ -18,7 +18,7 @@
 namespace adc {
 
 AdcDevice::AdcDevice(fdf::ClientEnd<fuchsia_hardware_adcimpl::Device> adc_impl, uint32_t channel,
-                     std::string_view name, uint8_t resolution, Adc* adc)
+                     std::string_view name, std::optional<uint8_t> resolution, Adc* adc)
     : adc_impl_(std::move(adc_impl)),
       channel_(channel),
       name_(name),
@@ -26,7 +26,11 @@ AdcDevice::AdcDevice(fdf::ClientEnd<fuchsia_hardware_adcimpl::Device> adc_impl, 
       devfs_connector_(fit::bind_member<&AdcDevice::Serve>(this)) {}
 
 void AdcDevice::GetResolution(GetResolutionCompleter::Sync& completer) {
-  completer.Reply(fit::ok(resolution_));
+  if (!resolution_) {
+    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+  completer.Reply(fit::ok(*resolution_));
 }
 
 void AdcDevice::GetSample(GetSampleCompleter::Sync& completer) {
@@ -44,6 +48,11 @@ void AdcDevice::GetSample(GetSampleCompleter::Sync& completer) {
 }
 
 void AdcDevice::GetNormalizedSample(GetNormalizedSampleCompleter::Sync& completer) {
+  if (!resolution_) {
+    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
   fdf::Arena arena('ADC_');
   float sample;
   {
@@ -59,13 +68,13 @@ void AdcDevice::GetNormalizedSample(GetNormalizedSampleCompleter::Sync& complete
     sample = static_cast<float>(result->value()->value);
   }
 
-  completer.Reply(fit::ok(sample / static_cast<float>(((1 << resolution_) - 1))));
+  completer.Reply(fit::ok(sample / static_cast<float>(((1 << *resolution_) - 1))));
 }
 
 zx::result<std::unique_ptr<AdcDevice>> AdcDevice::Create(
     fdf::ClientEnd<fuchsia_hardware_adcimpl::Device> adc_impl,
     fuchsia_hardware_adcimpl::AdcChannel channel, Adc* adc) {
-  uint8_t resolution;
+  std::optional<uint8_t> resolution = std::nullopt;
   {
     fdf::Arena arena('ADC_');
     const auto result = fdf::WireCall(adc_impl).buffer(arena)->GetResolution();
@@ -74,10 +83,10 @@ zx::result<std::unique_ptr<AdcDevice>> AdcDevice::Create(
       return zx::error(ZX_ERR_INTERNAL);
     }
     if (result->is_error()) {
-      FDF_LOG(ERROR, "Failed to GetResolution %d", result->error_value());
-      return zx::error(result->error_value());
+      FDF_LOG(WARNING, "Failed to GetResolution %d", result->error_value());
+    } else {
+      resolution = result->value()->resolution;
     }
-    resolution = result->value()->resolution;
   }
 
   auto dev = std::make_unique<AdcDevice>(std::move(adc_impl), *channel.idx(),

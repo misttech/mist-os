@@ -17,9 +17,22 @@ const indentPrefix = "  "
 
 // knownRules assigns true to known rules that can be converted from Bazel to GN.
 var knownRules = map[string]bool{
-	"go_library": true,
-	"go_binary":  true,
-	"go_test":    true,
+	"go_binary":          true,
+	"go_library":         true,
+	"go_test":            true,
+	"install_host_tools": true,
+	"sdk_host_tool":      true,
+}
+
+// attrsToOmitByRules stores a mapping from known rules to attributes to omit when
+// converting them to GN.
+var attrsToOmitByRules = map[string]map[string]bool{
+	"go_library": {
+		// In GN we default cgo to true when compiling Go code, and explicitly disable
+		// it in very few places. However, in Bazel, cgo defaults to false, and
+		// require users to explicitly set when C sources are included.
+		"cgo": true,
+	},
 }
 
 // These identifiers with the same meanings are represented differently in Bazel
@@ -37,11 +50,8 @@ var specialTokens = map[syntax.Token]string{
 	syntax.OR:  "||",
 }
 
-// TODO(jayzhuang): Empty this list.
-//
-// bazelAttrsToSkip contains Bazel rule attributes that are skipped during conversion.
-var bazelAttrsToSkip = map[string]bool{
-	"target_compatible_with": true,
+var bazelConstraintsToGNConditions = map[string]string{
+	"HOST_CONSTRAINTS": "is_host",
 }
 
 // indent indents input lines by input levels.
@@ -119,6 +129,19 @@ func identToGN(ident *syntax.Ident) ([]string, error) {
 	return []string{val}, nil
 }
 
+func targetCompatibleWithToGNConditions(expr syntax.Expr) ([]string, error) {
+	switch v := expr.(type) {
+	case *syntax.Ident:
+		gnCondition, ok := bazelConstraintsToGNConditions[v.Name]
+		if !ok {
+			return nil, fmt.Errorf("unsupported target_compatible_with variable: %v", v.Name)
+		}
+		return []string{gnCondition}, nil
+	default:
+		return nil, fmt.Errorf("unsupported type %T as value to target_compatible_with in Bazel, node details: %#v", expr, expr)
+	}
+}
+
 // bazelVisibilityToGN converts Bazel visibility values [0] to GN [1].
 //
 // NOTE: Bazel visibility is based on package groups [2], while GN visibility is
@@ -159,10 +182,12 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 		return nil, fmt.Errorf("%s is not a known Bazel rule to convert to GN", fn.Name)
 	}
 
-	// Loops through all args to first determine the name of this target, because
-	// GN target name is not a regular field like others.
+	attrsToOmit := attrsToOmitByRules[fn.Name]
+
+	// Loops through all arguments to handle special ones first.
 	var name string
 	var remainingArgs []*syntax.BinaryExpr
+	var wrappingConditions []string
 	for _, arg := range expr.Args {
 		binaryExpr, ok := arg.(*syntax.BinaryExpr)
 		if !ok || binaryExpr.Op != syntax.EQ {
@@ -172,6 +197,9 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("unexpected node type on the left hand side of binary expression in target definition, want syntax.Ident, got %T", binaryExpr.X)
 		}
+		if attrsToOmit[ident.Name] {
+			continue
+		}
 		if ident.Name == "name" {
 			lines, err := exprToGN(binaryExpr.Y, nil)
 			if err != nil {
@@ -180,7 +208,12 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 			name = strings.Join(lines, "\n")
 			continue
 		}
-		if bazelAttrsToSkip[ident.Name] {
+		if ident.Name == "target_compatible_with" {
+			var err error
+			wrappingConditions, err = targetCompatibleWithToGNConditions(binaryExpr.Y)
+			if err != nil {
+				return nil, fmt.Errorf("converting Bazel target_compatible_with to GN conditions: %v", err)
+			}
 			continue
 		}
 		remainingArgs = append(remainingArgs, binaryExpr)
@@ -201,6 +234,12 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 	}
 
 	ret = append(ret, "}")
+	if len(wrappingConditions) > 0 {
+		ret = append([]string{
+			fmt.Sprintf("if (%s) {", strings.Join(wrappingConditions, " && ")),
+		}, indent(ret, 1)...)
+		ret = append(ret, "}")
+	}
 	return ret, nil
 }
 

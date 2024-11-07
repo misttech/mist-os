@@ -13,7 +13,6 @@ use fidl_fuchsia_wlan_device_service::DeviceMonitorMarker;
 use fuchsia_async::DurationExt;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
-use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::{mpsc, oneshot};
 use futures::future::OptionFuture;
 use futures::lock::Mutex;
@@ -21,6 +20,7 @@ use futures::prelude::*;
 use futures::{select, TryFutureExt};
 use std::convert::Infallible;
 use std::pin::pin;
+use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use wlancfg_lib::access_point::AccessPoint;
@@ -47,7 +47,8 @@ use wlancfg_lib::telemetry::{
 use wlancfg_lib::util;
 use {
     fidl_fuchsia_wlan_policy as fidl_policy, fuchsia_async as fasync,
-    fuchsia_trace_provider as ftrace_provider, wlan_trace as wtrace,
+    fuchsia_inspect_auto_persist as auto_persist, fuchsia_trace_provider as ftrace_provider,
+    wlan_trace as wtrace,
 };
 
 const REGULATORY_LISTENER_TIMEOUT_SEC: i64 = 30;
@@ -58,7 +59,7 @@ const PERSISTENCE_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.persist.DataPer
 async fn serve_fidl(
     ap: AccessPoint,
     configurator: legacy::deprecated_configuration::DeprecatedConfigurator,
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     legacy_client_ref: IfaceRef,
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
     scan_requester: Arc<dyn scan::ScanRequestApi>,
@@ -94,7 +95,7 @@ async fn serve_fidl(
     }
     info!("Proceeding to serve policy API.");
 
-    let mut fs = ServiceFs::new();
+    let mut fs = ServiceFs::new_local();
 
     let _inspect_server_task = inspect_runtime::publish(
         component::inspector(),
@@ -120,7 +121,7 @@ async fn serve_fidl(
     let _ = fs
         .dir("svc")
         .add_fidl_service(move |reqs| {
-            fasync::Task::spawn(client::serve_provider_requests(
+            fasync::Task::local(client::serve_provider_requests(
                 iface_manager.clone(),
                 client_sender1.clone(),
                 Arc::clone(&saved_networks_clone),
@@ -132,23 +133,23 @@ async fn serve_fidl(
             .detach()
         })
         .add_fidl_service(move |reqs| {
-            fasync::Task::spawn(client::serve_listener_requests(client_sender2.clone(), reqs))
+            fasync::Task::local(client::serve_listener_requests(client_sender2.clone(), reqs))
                 .detach()
         })
         .add_fidl_service(move |reqs| {
-            fasync::Task::spawn(ap.clone().serve_provider_requests(reqs)).detach()
+            fasync::Task::local(ap.clone().serve_provider_requests(reqs)).detach()
         })
         .add_fidl_service(move |reqs| {
-            fasync::Task::spawn(second_ap.clone().serve_listener_requests(reqs)).detach()
+            fasync::Task::local(second_ap.clone().serve_listener_requests(reqs)).detach()
         })
         .add_fidl_service(move |reqs| {
-            fasync::Task::spawn(configurator.clone().serve_deprecated_configuration(reqs)).detach()
+            fasync::Task::local(configurator.clone().serve_deprecated_configuration(reqs)).detach()
         })
         .add_fidl_service(|reqs| {
             let fut =
                 legacy::deprecated_client::serve_deprecated_client(reqs, legacy_client_ref.clone())
                     .unwrap_or_else(|e| error!("error serving deprecated client API: {}", e));
-            fasync::Task::spawn(fut).detach()
+            fasync::Task::local(fut).detach()
         });
     let service_fut = fs.take_and_serve_directory_handle()?.collect::<()>().fuse();
     let mut service_fut = pin!(service_fut);
@@ -191,7 +192,7 @@ async fn saved_networks_manager_metrics_loop(saved_networks: Arc<dyn SavedNetwor
 // service to wlancfg.  If the RegulatoryRegionWatcher is not available for either of these
 // allowed reasons, wlancfg will continue serving the WLAN policy API in WW mode.
 async fn run_regulatory_manager(
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     regulatory_sender: oneshot::Sender<()>,
 ) -> Result<(), Error> {
     // This initial connection will always succeed due to the presence of the protocol in the
@@ -297,7 +298,7 @@ async fn run_all_futures() -> Result<(), Error> {
     let scan_requester = Arc::new(scan::ScanRequester { sender: scan_request_sender });
     let saved_networks = Arc::new(SavedNetworksManager::new(telemetry_sender.clone()).await);
 
-    let connection_selector = Arc::new(ConnectionSelector::new(
+    let connection_selector = Rc::new(ConnectionSelector::new(
         saved_networks.clone(),
         scan_requester.clone(),
         component::inspector().root().create_child("connection_selector"),

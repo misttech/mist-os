@@ -10,11 +10,10 @@ use compat_info::CompatibilityInfo;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_core::events;
 use ffx_daemon_events::TargetEvent;
-use ffx_ssh::config::SshConfig;
 use ffx_ssh::parse::{
     parse_ssh_output, read_ssh_line, write_ssh_log, HostAddr, ParseSshConnectionError, PipeError,
 };
-use ffx_ssh::ssh::{build_ssh_command_with_ssh_config, SshError};
+use ffx_ssh::ssh::{build_ssh_command_with_env, SshError};
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
 use nix::errno::Errno;
 use nix::sys::signal::kill;
@@ -33,7 +32,6 @@ use tokio::io::{copy_buf, BufReader};
 use tokio::process::Child;
 
 const BUFFER_SIZE: usize = 65536;
-const KEEPALIVE_TIMEOUT_CONFIG: &str = "daemon.ssh_keepalive_timeout";
 
 #[derive(Debug)]
 pub struct LogBuffer {
@@ -274,7 +272,11 @@ impl HostPipeChild {
             args.insert(0, "-vv");
         }
 
-        let mut ssh = get_ssh_command(&ctx, ssh_path, addr, args).await?;
+        let mut ssh = tokio::process::Command::from(
+            build_ssh_command_with_env(ssh_path, addr, &ctx, args)
+                .await
+                .map_err(|e| PipeError::Error(e.to_string()))?,
+        );
 
         tracing::debug!("Spawning new ssh instance: {:?}", ssh);
 
@@ -415,31 +417,6 @@ impl HostPipeChild {
             },
         ))
     }
-}
-
-async fn get_ssh_command(
-    ctx: &EnvironmentContext,
-    ssh_path: &str,
-    addr: SocketAddr,
-    args: Vec<&str>,
-) -> Result<tokio::process::Command, PipeError> {
-    let mut ssh_config = SshConfig::new()
-        .map_err(|e| PipeError::Error(format!("Could not get default SshConfig: {e}")))?;
-    if let Some(keepalive_timeout) =
-        ctx.query(KEEPALIVE_TIMEOUT_CONFIG).get::<Option<u64>>().map_err(|e| {
-            PipeError::Error(format!("Could not get query {}: {e}", KEEPALIVE_TIMEOUT_CONFIG))
-        })?
-    {
-        ssh_config
-            .set_server_alive_count_max(keepalive_timeout as u16)
-            .map_err(|e| PipeError::Error(format!("Could not set ssh keepalive timeout: {e}")))?;
-    }
-    let ssh = tokio::process::Command::from(
-        build_ssh_command_with_ssh_config(ssh_path, addr, &ssh_config, args)
-            .await
-            .map_err(|e| PipeError::Error(e.to_string()))?,
-    );
-    Ok(ssh)
 }
 
 impl Drop for HostPipeChild {
@@ -1005,14 +982,16 @@ mod test {
         write_test_ssh_keys(&env).await;
 
         env.context
-            .query(KEEPALIVE_TIMEOUT_CONFIG)
+            .query(ffx_ssh::ssh::KEEPALIVE_TIMEOUT_CONFIG)
             .level(Some(ConfigLevel::User))
             .set(json!(30))
             .await
             .expect("setting keepalive timeout key");
 
         let addr = SocketAddr::new(Ipv4Addr::new(192, 0, 2, 0).into(), 2345);
-        let cmd = get_ssh_command(&env.context, "path-to-ssh", addr, vec![]).await.unwrap();
+        let cmd = tokio::process::Command::from(
+            build_ssh_command_with_env("path-to-ssh", addr, &env.context, vec![]).await.unwrap(),
+        );
         // Kind of a hack, but there's no non-debug method that returns a string corresponding to the command.
         assert!(format!("{cmd:?}").contains("ServerAliveCountMax=30"));
     }

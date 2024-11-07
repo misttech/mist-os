@@ -222,7 +222,7 @@ def _flatten_comma_list(items: Iterable[str]) -> Iterable[str]:
         yield from item.split(",")
 
 
-def build_metadata_flags() -> Sequence[str]:
+def build_metadata_flags(siblings_link_template: str) -> Sequence[str]:
     """Convert environment variables into build metadata flags."""
     result_flags = []
 
@@ -241,7 +241,7 @@ def build_metadata_flags() -> Sequence[str]:
     # Provide click-able/paste-able link for convenience.
     if bb_id:
         result_flags.append(
-            f"--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=BUILDBUCKET_ID:{bb_id}"
+            f"--build_metadata=SIBLING_BUILDS_LINK={siblings_link_template}?q=BUILDBUCKET_ID:{bb_id}"
         )
         if "/led/" in bb_id:
             result_flags.append(
@@ -260,7 +260,7 @@ def build_metadata_flags() -> Sequence[str]:
 
     if fx_build_id:
         result_flags.append(
-            f"--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=FX_BUILD_UUID:{fx_build_id}"
+            f"--build_metadata=SIBLING_BUILDS_LINK={siblings_link_template}?q=FX_BUILD_UUID:{fx_build_id}"
         )
 
     return result_flags
@@ -850,6 +850,13 @@ def main() -> int:
             if env_value:
                 bazel_config_args += [f"{bazel_flag}=unix://{env_value}"]
 
+    siblings_link_template: str = ""
+    for config_arg in bazel_config_args:
+        if "sponge" in config_arg:
+            siblings_link_template = "http://sponge/invocations/"
+        elif "resultstore" in config_arg:
+            siblings_link_template = "http://go/fxbtx/"
+
     jobs = None
     if "--config=remote" in bazel_config_args:
         cpus = os.cpu_count()
@@ -869,7 +876,7 @@ def main() -> int:
     if job_count:
         jobs = int(job_count)
 
-    bazel_config_args += build_metadata_flags()
+    bazel_config_args += build_metadata_flags(siblings_link_template)
 
     if args.bazel_build_events_log_json:
         args.bazel_build_events_log_json.parent.mkdir(

@@ -167,18 +167,9 @@ pub async fn parse_provided_realm(
 
     let offers = validate_and_get_offers(manifest, test_collection)?;
 
-    let (exposed_dir, server_end) =
-        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let server_end = ServerEnd::new(server_end.into_channel());
+    let (exposed_dir, server_end) = fidl::endpoints::create_proxy().unwrap();
     realm_query
-        .open(
-            &moniker.to_string(),
-            fsys::OpenDirType::ExposedDir,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory(&moniker.to_string(), fsys::OpenDirType::ExposedDir, server_end)
         .await?
         .map_err(RealmError::ConnectExposedDir)?;
 

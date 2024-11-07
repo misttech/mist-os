@@ -194,8 +194,12 @@ typedef __kernel_off_t off_t;
 
 C(TUNSETIFF);
 
+#ifndef __arm__
+
 C(FUSE_DEV_IOC_PASSTHROUGH_OPEN_V0);
 C(FUSE_DEV_IOC_PASSTHROUGH_OPEN_V1);
 C(FUSE_DEV_IOC_PASSTHROUGH_OPEN_V2);
+
+#endif  // #ifndef __arm__
 
 #endif  // SRC_STARNIX_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_

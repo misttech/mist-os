@@ -18,9 +18,11 @@ static void abr_data_init(AbrData* data) {
   data->slot_data[0].priority = kAbrMaxPriority;
   data->slot_data[0].tries_remaining = kAbrMaxTriesRemaining;
   data->slot_data[0].successful_boot = 0;
+  data->slot_data[0].unbootable_reason = kAbrUnbootableReasonNone;
   data->slot_data[1].priority = kAbrMaxPriority - 1;
   data->slot_data[1].tries_remaining = kAbrMaxTriesRemaining;
   data->slot_data[1].successful_boot = 0;
+  data->slot_data[1].unbootable_reason = kAbrUnbootableReasonNone;
 }
 
 /* Deserializes and validates |size| bytes from |buffer|. On success, |dest| is populated with the
@@ -68,9 +70,10 @@ static bool is_slot_bootable(const AbrSlotData* slot) {
   return (slot->priority > 0) && (slot->successful_boot || (slot->tries_remaining > 0));
 }
 
-static void set_slot_unbootable(AbrSlotData* slot) {
+static void set_slot_unbootable(AbrSlotData* slot, uint8_t reason) {
   slot->tries_remaining = 0;
   slot->successful_boot = 0;
+  slot->unbootable_reason = reason;
 }
 
 static uint8_t get_normalized_priority(const AbrSlotData* slot) {
@@ -98,10 +101,6 @@ static bool is_slot_active(const AbrData* abr_data, AbrSlotIndex slot_index) {
  */
 static void slot_normalize(AbrSlotData* slot) {
   if (slot->priority > 0) {
-    if ((slot->tries_remaining == 0) && !slot->successful_boot) {
-      /* We've exhausted all tries -> unbootable. */
-      set_slot_unbootable(slot);
-    }
     if ((slot->tries_remaining > 0) && slot->successful_boot) {
       /* Illegal state - AbrMarkSlotSuccessful() will clear tries_remaining when setting
        * successful_boot. Reset to not successful state.
@@ -116,7 +115,8 @@ static void slot_normalize(AbrSlotData* slot) {
       slot->tries_remaining = kAbrMaxTriesRemaining;
     }
   } else {
-    set_slot_unbootable(slot);
+    /* We're probably already in this state, but snap to the standard state just to be sure. */
+    set_slot_unbootable(slot, slot->unbootable_reason);
   }
 }
 
@@ -273,6 +273,9 @@ AbrSlotIndex AbrGetBootSlot(const AbrOps* abr_ops, bool update_metadata,
      */
     if ((slot_to_boot != kAbrSlotIndexR) && !abr_data.slot_data[slot_to_boot].successful_boot) {
       abr_data.slot_data[slot_to_boot].tries_remaining--;
+      if (abr_data.slot_data[slot_to_boot].tries_remaining == 0) {
+        abr_data.slot_data[slot_to_boot].unbootable_reason = kAbrUnbootableReasonNoMoreTries;
+      }
     }
     /* Second is to clear the successful_boot bit from any successfully-marked slots that aren't the
      * slot we're booting. It's possible that booting from one slot will render the other slot
@@ -330,6 +333,7 @@ AbrResult AbrMarkSlotActive(const AbrOps* abr_ops, AbrSlotIndex slot_index) {
   abr_data.slot_data[slot_index].priority = kAbrMaxPriority;
   abr_data.slot_data[slot_index].tries_remaining = kAbrMaxTriesRemaining;
   abr_data.slot_data[slot_index].successful_boot = 0;
+  abr_data.slot_data[slot_index].unbootable_reason = kAbrUnbootableReasonNone;
 
   /* Ensure other slot doesn't have as high a priority. */
   other_slot_index = 1 - slot_index;
@@ -358,12 +362,13 @@ AbrResult AbrMarkSlotUnbootable(const AbrOps* abr_ops, AbrSlotIndex slot_index) 
     return result;
   }
 
-  set_slot_unbootable(&abr_data.slot_data[slot_index]);
+  set_slot_unbootable(&abr_data.slot_data[slot_index], kAbrUnbootableReasonUserRequested);
 
   return save_metadata_if_changed(abr_ops, &abr_data, &abr_data_orig);
 }
 
-AbrResult AbrMarkSlotSuccessful(const AbrOps* abr_ops, AbrSlotIndex slot_index) {
+AbrResult AbrMarkSlotSuccessful(const AbrOps* abr_ops, AbrSlotIndex slot_index,
+                                bool from_unbootable_ok) {
   AbrData abr_data, abr_data_orig;
   AbrSlotIndex other_slot_index;
   AbrResult result;
@@ -382,17 +387,19 @@ AbrResult AbrMarkSlotSuccessful(const AbrOps* abr_ops, AbrSlotIndex slot_index) 
     return result;
   }
 
-  if (!is_slot_bootable(&abr_data.slot_data[slot_index])) {
+  if (!(is_slot_bootable(&abr_data.slot_data[slot_index]) || from_unbootable_ok)) {
     ABR_ERROR("Invalid argument: Cannot mark unbootable slot as successful.\n");
     return kAbrResultErrorInvalidData;
   }
 
   abr_data.slot_data[slot_index].tries_remaining = 0;
   abr_data.slot_data[slot_index].successful_boot = 1;
+  abr_data.slot_data[slot_index].unbootable_reason = kAbrUnbootableReasonNone;
 
   /* Remove any success mark on the other slot.
    *
-   * TODO(https://fxbug.dev/42142842): Remove this logic once the fix for https://fxbug.dev/42142627 has rolled out.
+   * TODO(https://fxbug.dev/42142842): Remove this logic once the fix for https://fxbug.dev/42142627
+   * has rolled out.
    */
   other_slot_index = 1 - slot_index;
   if (is_slot_bootable(&abr_data.slot_data[other_slot_index])) {
@@ -428,6 +435,7 @@ AbrResult AbrGetSlotInfo(const AbrOps* abr_ops, AbrSlotIndex slot_index, AbrSlot
     info->is_active = is_slot_active(&abr_data, kAbrSlotIndexR);
     info->is_marked_successful = true;
     info->num_tries_remaining = 0;
+    info->unbootable_reason = kAbrUnbootableReasonNone;
     return kAbrResultOk;
   }
 
@@ -435,6 +443,7 @@ AbrResult AbrGetSlotInfo(const AbrOps* abr_ops, AbrSlotIndex slot_index, AbrSlot
   info->is_active = is_slot_active(&abr_data, slot_index);
   info->is_marked_successful = abr_data.slot_data[slot_index].successful_boot;
   info->num_tries_remaining = abr_data.slot_data[slot_index].tries_remaining;
+  info->unbootable_reason = abr_data.slot_data[slot_index].unbootable_reason;
 
   return kAbrResultOk;
 }

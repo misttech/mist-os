@@ -19,8 +19,7 @@ use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex,
-    RwLock, Unlocked,
+    BeforeFsNodeAppend, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, RwLock, Unlocked,
 };
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
@@ -1023,17 +1022,13 @@ impl NamespaceNode {
     /// This function is the primary way of instantiating FileObjects. Each
     /// FileObject records the NamespaceNode that created it in order to
     /// remember its path in the Namespace.
-    pub fn open<L>(
+    pub fn open(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         flags: OpenFlags,
         access_check: AccessCheck,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         FileObject::new(
             current_task,
             self.entry.node.open(locked, current_task, &self.mount, flags, access_check)?,
@@ -1138,15 +1133,20 @@ impl NamespaceNode {
     /// The FileMode::IFMT of the FileMode is always FileMode::IFREG.
     ///
     /// Used by O_TMPFILE.
-    pub fn create_tmpfile(
+    pub fn create_tmpfile<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mode: FileMode,
         flags: OpenFlags,
-    ) -> Result<NamespaceNode, Errno> {
+    ) -> Result<NamespaceNode, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
         Ok(self.with_new_entry(self.entry.create_tmpfile(
+            locked,
             current_task,
             &self.mount,
             mode,
@@ -1302,7 +1302,7 @@ impl NamespaceNode {
                             return error!(ELOOP);
                         }
                         context.remaining_follows -= 1;
-                        child = match child.readlink(current_task)? {
+                        child = match child.readlink(locked, current_task)? {
                             SymlinkTarget::Path(link_target) => {
                                 let link_directory = if link_target[0] == b'/' {
                                     match &context.resolve_base {
@@ -1540,9 +1540,16 @@ impl NamespaceNode {
         }
     }
 
-    pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+    pub fn readlink<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<SymlinkTarget, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.update_atime();
-        self.entry.node.readlink(current_task)
+        self.entry.node.readlink(locked, current_task)
     }
 
     pub fn notify(&self, event_mask: InotifyMask) {
@@ -1554,13 +1561,17 @@ impl NamespaceNode {
     /// Check whether the node can be accessed in the current context with the specified access
     /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
     /// owner or is in the file's group.
-    pub fn check_access(
+    pub fn check_access<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         access: Access,
         reason: CheckAccessReason,
-    ) -> Result<(), Errno> {
-        self.entry.node.check_access(current_task, &self.mount, access, reason)
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.entry.node.check_access(locked, current_task, &self.mount, access, reason)
     }
 
     /// Checks if O_NOATIME is allowed,

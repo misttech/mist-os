@@ -1365,6 +1365,13 @@ mod test {
     async fn test_start_register() {
         async fn run_test_start_register(refresh_metadata: bool) {
             let test_env = get_test_env().await;
+            test_env
+                .context
+                .query("repository.process_dir")
+                .level(Some(ConfigLevel::User))
+                .set(test_env.isolate_root.path().to_string_lossy().into())
+                .await
+                .expect("Setting process dir");
 
             test_env
                 .context
@@ -1661,6 +1668,13 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_no_device() {
         let test_env = get_test_env().await;
+        test_env
+            .context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(test_env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("Setting process dir");
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
         let tmp_port_file_path = tmp_port_file.path().to_owned();
@@ -1921,6 +1935,13 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_trusted_root_file() {
         let test_env = get_test_env().await;
+        test_env
+            .context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(test_env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("Setting process dir");
 
         let tmp_port_file = tempfile::NamedTempFile::new().unwrap();
 

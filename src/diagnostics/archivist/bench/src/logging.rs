@@ -5,33 +5,51 @@
 use fuchsia_criterion::criterion::{self, Criterion};
 use fuchsia_criterion::FuchsiaCriterion;
 
-use archivist_lib::logs::buffer::{ArcList, LazyItem};
+use archivist_lib::identity::ComponentIdentity;
+use archivist_lib::logs::shared_buffer::{LazyItem, SharedBuffer};
+use archivist_lib::logs::stored_message::StoredMessage;
+use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
+use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
 use fidl_fuchsia_diagnostics::StreamMode;
 use fuchsia_async as fasync;
 use futures::StreamExt;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
+use std::io::Cursor;
 use std::mem;
+use std::pin::pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 
-fn bench_fill(b: &mut criterion::Bencher, size: usize) {
-    b.iter(|| {
-        let list = ArcList::<usize>::default();
-        for _ in 0..size {
-            list.push_back(100);
-        }
-    });
+fn make_message(msg: &str, timestamp: zx::BootInstant) -> StoredMessage {
+    let record = Record {
+        timestamp,
+        severity: StreamSeverity::Debug.into_primitive(),
+        arguments: vec![
+            Argument::pid(zx::Koid::from_raw(1)),
+            Argument::tid(zx::Koid::from_raw(2)),
+            Argument::message(msg),
+        ],
+    };
+    let mut buffer = Cursor::new(vec![0u8; msg.len() + 128]);
+    let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
+    encoder.write_record(record).unwrap();
+    let encoded = &buffer.get_ref()[..buffer.position() as usize];
+    StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
 }
 
-fn bench_fill_drain(b: &mut criterion::Bencher, size: usize) {
+fn get_component_identity() -> Arc<ComponentIdentity> {
+    Arc::new(ComponentIdentity::new(moniker::Moniker::try_from(vec!["a"]).unwrap().into(), ""))
+}
+
+fn bench_fill(b: &mut criterion::Bencher, size: usize) {
+    let buffer = Arc::new(SharedBuffer::new(65536, Box::new(|_| {})));
+    let msg =
+        make_message(std::str::from_utf8(&[65; 100]).unwrap(), zx::BootInstant::from_nanos(1));
+    let container = Arc::new(buffer.new_container_buffer(get_component_identity(), Arc::default()));
     b.iter(|| {
-        let list = ArcList::<usize>::default();
         for _ in 0..size {
-            list.push_back(100);
-        }
-        while !list.is_empty() {
-            criterion::black_box(list.pop_front());
+            container.push_back(msg.bytes());
         }
     });
 }
@@ -44,11 +62,18 @@ struct IterateArgs {
 }
 
 fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
-    let list = ArcList::<usize>::default();
     let done = Arc::new(AtomicBool::new(false));
+    // Messages take up a a little less than 200 bytes in the buffer.
+    let buffer = Arc::new(SharedBuffer::new(200 * args.size, Box::new(|_| {})));
+    let msg = Arc::new(make_message(
+        std::str::from_utf8(&[65; 100]).unwrap(),
+        zx::BootInstant::from_nanos(1),
+    ));
+    let container = Arc::new(buffer.new_container_buffer(get_component_identity(), Arc::default()));
+
     for _ in 0..args.size {
         // fill the list
-        list.push_back(100);
+        container.push_back(msg.bytes());
     }
 
     // create writer threads that constantly pop and push values
@@ -56,11 +81,11 @@ fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
     let mut threads = vec![];
     for _ in 0..args.write_threads {
         let done = done.clone();
-        let list = list.clone();
+        let container = Arc::clone(&container);
+        let msg = Arc::clone(&msg);
         threads.push(std::thread::spawn(move || {
             while !done.load(std::sync::atomic::Ordering::Relaxed) {
-                list.pop_front();
-                list.push_back(200);
+                container.push_back(msg.bytes());
                 std::thread::sleep(Duration::from_micros(
                     (1_000_000 / args.writes_per_second).try_into().unwrap(),
                 ));
@@ -71,10 +96,10 @@ fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
     // measure how long it takes to read |size| entries from the list
     let mut executor = fasync::LocalExecutor::new();
     b.iter(|| {
-        let list = list.clone();
+        let container = Arc::clone(&container);
         executor.run_singlethreaded(async move {
             let mut items_read = 0;
-            let mut cursor = list.cursor(StreamMode::SnapshotThenSubscribe);
+            let mut cursor = pin!(container.cursor(StreamMode::SnapshotThenSubscribe).unwrap());
             while items_read < args.size {
                 match cursor.next().await.expect("must have some value") {
                     LazyItem::Next(_) => {
@@ -101,24 +126,19 @@ fn main() {
         .measurement_time(Duration::from_secs(2))
         .sample_size(20);
 
-    let mut bench = criterion::Benchmark::new("Logging/ArcList/CheckEmpty", move |b| {
-        let list = ArcList::<usize>::default();
-        b.iter(|| criterion::black_box(list.is_empty()));
-    });
-
-    // The following benchmarks measure the performance of ArcList, the fundamental data
+    // The following benchmarks measure the performance of SharedBuffer, the fundamental data
     // structured used to store components' logs.
 
-    // Benchmark the time needed to fill an ArcList with 16K entries.
-    // This measures the performance of the underlying data structure for storing logs.
-    bench = bench.with_function("Logging/ArcList/Fill/16K", move |b| {
-        bench_fill(b, 16 * 1024);
+    // Benchmark the time needed to fill the buffer with just 100 entries.  This won't cause
+    // wrapping.
+    let mut bench = criterion::Benchmark::new("Logging/SharedBuffer/Fill/100", move |b| {
+        bench_fill(b, 100);
     });
 
-    // Benchmark the time needed to fill and then drain an ArcList for 16K entries.
+    // Benchmark the time needed to add 16K entries.
     // This measures the performance of rotating log buffers.
-    bench = bench.with_function("Logging/ArcList/FillDrain/16K", move |b| {
-        bench_fill_drain(b, 16 * 1024);
+    bench = bench.with_function("Logging/SharedBuffer/Fill/16K", move |b| {
+        bench_fill(b, 16 * 1024);
     });
 
     // Benchmark the time needed to read 16K entries from an ArcList starting with 16K entries
@@ -128,27 +148,31 @@ fn main() {
 
     // This benchmark has no concurrent writers, so it measures the baseline to read all 16K logs
     // out of the buffer.
-    bench =
-        bench.with_function("Logging/ArcList/Iterate/size=16K/writers=0/per_second=1", move |b| {
+    bench = bench.with_function(
+        "Logging/SharedBuffer/Iterate/size=16K/writers=0/per_second=1",
+        move |b| {
             bench_iterate_concurrent(
                 b,
                 IterateArgs { size: 16 * 1024, write_threads: 0, writes_per_second: 1 },
             );
-        });
+        },
+    );
 
     // This benchmark has one concurrent writer pushing 50 logs per second.
     // It measures the overhead of concurrent write locking on the reader.
-    bench =
-        bench.with_function("Logging/ArcList/Iterate/size=16K/writers=1/per_second=50", move |b| {
+    bench = bench.with_function(
+        "Logging/SharedBuffer/Iterate/size=16K/writers=1/per_second=50",
+        move |b| {
             bench_iterate_concurrent(
                 b,
                 IterateArgs { size: 16 * 1024, write_threads: 1, writes_per_second: 50 },
             );
-        });
+        },
+    );
 
     // Same as above, but with 500 logs per second being written.
     bench = bench.with_function(
-        "Logging/ArcList/Iterate/size=16K/writers=1/per_second=500",
+        "Logging/SharedBuffer/Iterate/size=16K/writers=1/per_second=500",
         move |b| {
             bench_iterate_concurrent(
                 b,
@@ -159,7 +183,7 @@ fn main() {
 
     // Same as above, but with 3 threads each writing 500 logs per second.
     bench = bench.with_function(
-        "Logging/ArcList/Iterate/size=16K/writers=3/per_second=500",
+        "Logging/SharedBuffer/Iterate/size=16K/writers=3/per_second=500",
         move |b| {
             bench_iterate_concurrent(
                 b,

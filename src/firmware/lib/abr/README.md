@@ -17,6 +17,20 @@ values which correspond with these slots:
  - Slot B: 1
  - Slot R: 2
 
+## Versions
+
+The libabr on-disk metadata contains a major and minor version number. Major
+versions are not backwards-compatible, minor versions are. Generally devices
+in the field cannot undergo major revision changes, since it's difficult to
+guarantee that every possible combination of bootloader and kernel A/B/R images
+are able to move to a new major version.
+
+### v2.3
+* Added `unbootable_reason` metadata to each slot, to provide information why
+  the slot was marked unbootable. This was necessary for the OS to be able to
+  distinguish between the last boot into a slot vs a truly unbootable slot,
+  but may also be useful for RMAs and debugging going forward.
+
 ## Choose Early
 
 It is best to use an A/B update scheme for both firmware and OS images.

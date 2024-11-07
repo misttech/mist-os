@@ -211,7 +211,7 @@ class AmlUsbPhyTest : public testing::Test {
     dut_->usbctrl_mmio().reg_values_[USB_R5_OFFSET >> 2] = (mode == UsbMode::Peripheral) << 6;
     // Wake up the irq thread.
     incoming_.SyncCall([](IncomingNamespace* incoming) {
-      incoming->pdev_server.irq().trigger(0, zx::clock::get_monotonic());
+      incoming->pdev_server.irq().trigger(0, zx::clock::get_boot());
     });
     runtime_.RunUntilIdle();
 

@@ -9,7 +9,7 @@ use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_factory::MiscFactoryStoreProviderProxy;
-use fidl_fuchsia_io::{DirectoryMarker, DirectoryProxy, Flags};
+use fidl_fuchsia_io::{DirectoryMarker, DirectoryProxy};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -154,10 +154,13 @@ impl FactoryFileLoader {
 #[async_trait(?Send)]
 impl FileLoader for FactoryFileLoader {
     async fn load_file(&self, file_path: &str) -> Result<String, Error> {
-        let file_proxy =
-            fuchsia_fs::directory::open_file(&self.directory_proxy, file_path, Flags::PERM_READ)
-                .await
-                .with_context(|| format!("Failed to open configuration at {:?}", file_path))?;
+        let file_proxy = fuchsia_fs::directory::open_file(
+            &self.directory_proxy,
+            file_path,
+            fuchsia_fs::PERM_READABLE,
+        )
+        .await
+        .with_context(|| format!("Failed to open configuration at {:?}", file_path))?;
         fuchsia_fs::file::read_to_string(&file_proxy)
             .await
             .map_err(|e| format_err!("{:?}", e))

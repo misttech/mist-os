@@ -215,6 +215,7 @@ fn format_text(infos: Vec<PkgServerData>, full: bool) -> String {
 mod tests {
     use super::*;
     use camino::Utf8PathBuf;
+    use ffx_config::ConfigLevel;
     use fho::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
     use fidl_fuchsia_pkg_ext::{RepositoryConfigBuilder, RepositoryStorageType};
@@ -225,14 +226,22 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_empty() {
-        let env = ffx_config::test_init().await.expect("test env");
+        let test_env = ffx_config::test_init().await.expect("test env");
+        test_env
+            .context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(test_env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("Setting process dir");
+
         let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
 
         let repos = Deferred::from_output(Ok(fake_proxy));
 
         let tool = RepoListTool {
             cmd: ListCommand { full: false, names: vec![] },
-            context: env.context.clone(),
+            context: test_env.context.clone(),
             repos,
         };
         let buffers = TestBuffers::default();
@@ -247,8 +256,16 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_text() {
-        let env = ffx_config::test_init().await.expect("test env");
-        let dir = env.context.get("repository.process_dir").expect("process_dir");
+        let test_env = ffx_config::test_init().await.expect("test env");
+        test_env
+            .context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(test_env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("Setting process dir");
+
+        let dir = test_env.context.get("repository.process_dir").expect("process_dir");
         let mgr = PkgServerInstances::new(dir);
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
         let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
@@ -277,7 +294,7 @@ mod tests {
 
         let tool = RepoListTool {
             cmd: ListCommand { full: false, names: vec![] },
-            context: env.context.clone(),
+            context: test_env.context.clone(),
             repos,
         };
         let buffers = TestBuffers::default();
@@ -292,8 +309,15 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_text_full() {
-        let env = ffx_config::test_init().await.expect("test env");
-        let dir = env.context.get("repository.process_dir").expect("process_dir");
+        let test_env = ffx_config::test_init().await.expect("test env");
+        test_env
+            .context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(test_env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("Setting process dir");
+        let dir = test_env.context.get("repository.process_dir").expect("process_dir");
         let mgr = PkgServerInstances::new(dir);
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
         let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
@@ -322,7 +346,7 @@ mod tests {
 
         let tool = RepoListTool {
             cmd: ListCommand { full: true, names: vec![] },
-            context: env.context.clone(),
+            context: test_env.context.clone(),
             repos,
         };
         let buffers = TestBuffers::default();
@@ -417,8 +441,16 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_machine_and_schema() {
-        let env = ffx_config::test_init().await.expect("test env");
-        let dir = env.context.get("repository.process_dir").expect("process_dir");
+        let test_env = ffx_config::test_init().await.expect("test env");
+        test_env
+            .context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(test_env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("Setting process dir");
+
+        let dir = test_env.context.get("repository.process_dir").expect("process_dir");
         let mgr = PkgServerInstances::new(dir);
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
         let fake_proxy = fho::testing::fake_proxy(move |req| panic!("Unexpected request: {req:?}"));
@@ -447,7 +479,7 @@ mod tests {
 
         let tool = RepoListTool {
             cmd: ListCommand { full: true, names: vec![] },
-            context: env.context.clone(),
+            context: test_env.context.clone(),
             repos,
         };
         let buffers = TestBuffers::default();

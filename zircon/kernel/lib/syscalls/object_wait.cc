@@ -178,7 +178,13 @@ zx_status_t sys_object_wait_async(zx_handle_t handle_value, zx_handle_t port_han
                                   uint64_t key, zx_signals_t signals, uint32_t options) {
   LTRACEF("handle %x\n", handle_value);
 
-  if ((options & ~(ZX_WAIT_ASYNC_TIMESTAMP | ZX_WAIT_ASYNC_EDGE)) != 0u) {
+  if ((options & ~(ZX_WAIT_ASYNC_TIMESTAMP | ZX_WAIT_ASYNC_BOOT_TIMESTAMP | ZX_WAIT_ASYNC_EDGE)) !=
+      0u) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // It is invalid to request both a monotonic and boot timestamp.
+  if ((options & ZX_WAIT_ASYNC_TIMESTAMP) != 0 && (options & ZX_WAIT_ASYNC_BOOT_TIMESTAMP) != 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 

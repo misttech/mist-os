@@ -688,7 +688,6 @@ type EncoderSettings = flexible union {
 
 /// A list of permitted codec profiles. This list should be flexible since codecs can and will be added
 /// in the future. This can contain both video and audio profiles if needed.
-@available(added=11)
 type CodecProfile = flexible enum : uint32 {
     H264PROFILE_BASELINE = 0;
     H264PROFILE_MAIN = 1;
@@ -863,6 +862,5 @@ type FormatDetails = table {
     /// their elementary bitstream so it is possible for those decoders to figure out the profile
     /// the stream is encoded in. Regardless, clients should provide the encoded profile if
     /// possible.
-    @available(added=11)
     8: profile CodecProfile;
 };

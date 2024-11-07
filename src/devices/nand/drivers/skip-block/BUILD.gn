@@ -7,7 +7,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-fuchsia_driver("skip-block-driver") {
+fuchsia_cc_driver("skip-block-driver") {
   output_name = "skip-block"
   deps = [
     ":common",

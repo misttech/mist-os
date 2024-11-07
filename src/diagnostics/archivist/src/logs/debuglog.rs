@@ -6,7 +6,6 @@
 
 use crate::identity::ComponentIdentity;
 use crate::logs::error::LogsError;
-use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
 use fidl::prelude::*;
 use fidl_fuchsia_boot::ReadOnlyLogMarker;
@@ -61,19 +60,18 @@ impl KernelDebugLog {
 pub struct DebugLogBridge<K: DebugLog> {
     debug_log: K,
     next_sequence_id: u64,
-    stats: Arc<LogStreamStats>,
 }
 
 impl<K: DebugLog> DebugLogBridge<K> {
-    pub fn create(debug_log: K, stats: Arc<LogStreamStats>) -> Self {
-        DebugLogBridge { debug_log, stats, next_sequence_id: 0 }
+    pub fn create(debug_log: K) -> Self {
+        DebugLogBridge { debug_log, next_sequence_id: 0 }
     }
 
     fn read_log(&mut self) -> Result<StoredMessage, zx::Status> {
         let record = self.debug_log.read()?;
         let dropped = record.sequence - self.next_sequence_id;
         self.next_sequence_id = record.sequence + 1;
-        Ok(StoredMessage::from_debuglog(record, dropped, Arc::clone(&self.stats)))
+        Ok(StoredMessage::from_debuglog(record, dropped))
     }
 
     pub fn existing_logs(&mut self) -> Result<Vec<StoredMessage>, zx::Status> {
@@ -122,7 +120,7 @@ mod tests {
         let klog = TestDebugEntry::new("test log".as_bytes());
         debug_log.enqueue_read_entry(&klog);
         debug_log.enqueue_read_fail(zx::Status::SHOULD_WAIT);
-        let mut log_bridge = DebugLogBridge::create(debug_log, Default::default());
+        let mut log_bridge = DebugLogBridge::create(debug_log);
 
         assert_eq!(
             log_bridge
@@ -151,7 +149,7 @@ mod tests {
         debug_log.enqueue_read_entry(&malformed_klog);
 
         debug_log.enqueue_read_fail(zx::Status::SHOULD_WAIT);
-        let mut log_bridge = DebugLogBridge::create(debug_log, Default::default());
+        let mut log_bridge = DebugLogBridge::create(debug_log);
         assert!(!log_bridge.existing_logs().unwrap().is_empty());
     }
 
@@ -161,7 +159,7 @@ mod tests {
         debug_log.enqueue_read_entry(&TestDebugEntry::new("test log".as_bytes()));
         debug_log.enqueue_read_fail(zx::Status::SHOULD_WAIT);
         debug_log.enqueue_read_entry(&TestDebugEntry::new("second test log".as_bytes()));
-        let log_bridge = DebugLogBridge::create(debug_log, Default::default());
+        let log_bridge = DebugLogBridge::create(debug_log);
         let mut log_stream =
             Box::pin(log_bridge.listen()).map(|r| r.unwrap().parse(&KERNEL_IDENTITY));
         let log_message = log_stream.try_next().await.unwrap().unwrap();
@@ -176,7 +174,7 @@ mod tests {
         debug_log.enqueue_read_entry(&malformed_klog);
 
         debug_log.enqueue_read_entry(&TestDebugEntry::new("test log".as_bytes()));
-        let log_bridge = DebugLogBridge::create(debug_log, Default::default());
+        let log_bridge = DebugLogBridge::create(debug_log);
         let mut log_stream = Box::pin(log_bridge.listen());
         let log_message =
             log_stream.try_next().await.unwrap().unwrap().parse(&KERNEL_IDENTITY).unwrap();
@@ -206,7 +204,7 @@ mod tests {
         let long_log = format!("{long_padding}ERROR: fifth log");
         debug_log.enqueue_read_entry(&TestDebugEntry::new(long_log.as_bytes()));
 
-        let log_bridge = DebugLogBridge::create(debug_log, Default::default());
+        let log_bridge = DebugLogBridge::create(debug_log);
         let mut log_stream =
             Box::pin(log_bridge.listen()).map(|r| r.unwrap().parse(&KERNEL_IDENTITY));
 

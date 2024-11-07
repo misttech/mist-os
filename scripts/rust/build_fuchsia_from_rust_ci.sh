@@ -9,6 +9,11 @@
 # and how to customize it. More documentation can be found in the Rustc
 # Developer Guide.
 
+# To test this script locally, run it from inside a Fuchsia checkout with
+# RUST_INSTALL_DIR pointing to the "install" directory of a Rust toolchain.
+# Be warned that the script MODIFIES the toolchain (requires write permissions)
+# and reconfigures the current Fuchsia build.
+
 set -eu -o pipefail
 
 print_banner() {
@@ -54,54 +59,65 @@ cat
 END
 chmod +x $rust_prefix/bin/rustfmt
 
-# Stub out runtime.json. This will cause the build to produce invalid packages
-# missing libstd, but that's okay because we don't run an emulator anyway, and
-# we disable the ELF manifest checker in the build.
-cat <<END >$rust_prefix/lib/runtime.json
-[
-  {
-    "runtime": [],
-    "rustflags": [],
-    "target": [
-      "aarch64-unknown-fuchsia"
-    ]
-  },
-  {
-    "runtime": [],
-    "rustflags": [],
-    "target": [
-      "x86_64-unknown-fuchsia"
-    ]
-  },
-  {
-    "runtime": [
-    ],
-    "rustflags": [
-      "-Cprefer-dynamic"
-    ],
-    "target": [
-      "aarch64-unknown-fuchsia"
-    ]
-  },
-  {
-    "runtime": [
-    ],
-    "rustflags": [
-      "-Cprefer-dynamic"
-    ],
-    "target": [
-      "x86_64-unknown-fuchsia"
-    ]
-  }
-]
+# Generate a minimal runtime.json.
+(
+  # This assumes that libtest is not dynamically linked, which is true as of
+  # this writing, but slightly brittle. We keep `disable_elf_checks` below to
+  # disarm any failures that would occur if it were dynamically linked again.
+  cd $rust_prefix/lib
+  x64_libstd_path=$(ls rustlib/x86_64-unknown-fuchsia/lib/libstd-*.so)
+  x64_libstd_soname=$(basename $x64_libstd_path)
+  cat <<END >runtime.json
+  [
+    {
+      "runtime": [],
+      "rustflags": [],
+      "target": [
+        "aarch64-unknown-fuchsia"
+      ]
+    },
+    {
+      "runtime": [],
+      "rustflags": [],
+      "target": [
+        "x86_64-unknown-fuchsia"
+      ]
+    },
+    {
+      "runtime": [
+      ],
+      "rustflags": [
+        "-Cprefer-dynamic"
+      ],
+      "target": [
+        "aarch64-unknown-fuchsia"
+      ]
+    },
+    {
+      "runtime": [
+        {
+          "name": "libstd",
+          "dist": "$x64_libstd_path",
+          "soname": "$x64_libstd_soname"
+        }
+      ],
+      "rustflags": [
+        "-Cprefer-dynamic"
+      ],
+      "target": [
+        "x86_64-unknown-fuchsia"
+      ]
+    }
+  ]
 END
+)
 
-$fx metrics disable
+$fx metrics disable || echo "Warning: Failed to disable metrics"
 
 print_banner
 
 # Detect Rust toolchain changes by hashing the entire toolchain.
-version_string="$(find prebuilt/third_party/rust/linux-x64 -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum)"
+version_string="$(find $rust_prefix -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum | awk '{print $1}')"
 
 set -x
 

@@ -15,7 +15,6 @@
 #include <system_error>
 
 #include "src/developer/memory/metrics/capture.h"
-#include "src/developer/memory/metrics/capture_strategy.h"
 #include "src/developer/memory/monitor/monitor.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
@@ -40,11 +39,6 @@ void SetRamDevice(monitor::Monitor* app) {
     }
   }
   FX_LOGS(INFO) << "CANNOT collect memory bandwidth measurements. error_code: " << ec;
-}
-const char kNotfiyCrashReporterPath[] = "/config/data/send_critical_pressure_crash_reports";
-bool SendCriticalMemoryPressureCrashReports() {
-  std::error_code _ignore;
-  return std::filesystem::exists(kNotfiyCrashReporterPath, _ignore);
 }
 }  // namespace
 
@@ -71,10 +65,10 @@ int main(int argc, const char** argv) {
     exit(EXIT_FAILURE);
   }
 
-  monitor::Monitor app(
-      std::move(startup_context), command_line, loop.dispatcher(), true /* send_metrics */,
-      true /* watch_memory_pressure */, SendCriticalMemoryPressureCrashReports(),
-      memory_monitor_config::Config::TakeFromStartupHandle(), std::move(maker_result.value()));
+  monitor::Monitor app(std::move(startup_context), command_line, loop.dispatcher(),
+                       true /* send_metrics */, true /* watch_memory_pressure */,
+                       memory_monitor_config::Config::TakeFromStartupHandle(),
+                       std::move(maker_result.value()));
   SetRamDevice(&app);
   loop.Run();
 

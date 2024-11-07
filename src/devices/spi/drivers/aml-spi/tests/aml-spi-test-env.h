@@ -182,7 +182,7 @@ class BaseTestEnvironment : public fdf_testing::Environment,
     zx::interrupt dut_interrupt;
     ASSERT_OK(interrupt_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dut_interrupt));
     pdev_server_.set_interrupt(std::move(dut_interrupt));
-    interrupt_.trigger(0, zx::clock::get_monotonic());
+    interrupt_.trigger(0, zx::clock::get_boot());
   }
 
   virtual void SetUpBti() {}

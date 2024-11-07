@@ -273,7 +273,7 @@ class Device : public fbl::WAVLTreeContainable<fbl::RefPtr<pci::Device>>,
   zx_status_t DisableMsix() __TA_REQUIRES(dev_lock_);
   // Signals the device's zx::interrupt, effectively triggering an interrupt for the device
   // driver.
-  zx_status_t SignalLegacyIrq(zx_time_t timestamp) __TA_REQUIRES(dev_lock_);
+  zx_status_t SignalLegacyIrq(zx_instant_boot_t timestamp) __TA_REQUIRES(dev_lock_);
   zx_status_t AckLegacyIrq() __TA_REQUIRES(dev_lock_);
   void EnableLegacyIrq() __TA_REQUIRES(dev_lock_);
   void DisableLegacyIrq() __TA_REQUIRES(dev_lock_);

@@ -68,7 +68,7 @@ zx::result<fuchsia_hardware_power::ComponentPowerConfiguration> GetAllPowerConfi
 
 zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> SdmmcBlockDevice::AcquireInitLease(
     const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client) {
-  const fidl::WireResult result = lessor_client->Lease(SdmmcBlockDevice::kPowerLevelOn);
+  const fidl::WireResult result = lessor_client->Lease(SdmmcBlockDevice::kPowerLevelBoot);
   if (!result.ok()) {
     FDF_LOGL(ERROR, logger(), "Call to Lease failed: %s", result.status_string());
     return zx::error(result.status());
@@ -380,6 +380,16 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
     }
   }
 
+  // The lease request on the hardware power element remains until we register
+  // our power element token with the CpuElementManager protocol
+  zx::result lease_control_client_end = AcquireInitLease(hardware_power_lessor_client_);
+  if (!lease_control_client_end.is_ok()) {
+    FDF_LOGL(ERROR, logger(), "Failed to acquire lease on hardware power: %s",
+             zx_status_get_string(lease_control_client_end.status_value()));
+    return lease_control_client_end.take_error();
+  }
+  hardware_power_lease_control_client_end_ = std::move(lease_control_client_end.value());
+
   // Start continuous monitoring of the required level and adjusting of the hardware's power level.
   WatchHardwareRequiredLevel();
 
@@ -429,7 +439,8 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
 
         const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
         switch (required_level) {
-          case kPowerLevelOn: {
+          case kPowerLevelOn:
+          case kPowerLevelBoot: {
             const zx::time start = zx::clock::get_monotonic();
 
             fbl::AutoLock lock(&worker_lock_);
@@ -442,8 +453,16 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
               return;
             }
 
+            // If we're rising above the boot power level, it must because an
+            // external lease raised our power level. This means we can drop
+            // our self-lease and allow the external entity to drive our power
+            // state.
+            if (kPowerLevelOn && hardware_power_lease_control_client_end_.is_valid()) {
+              hardware_power_lease_control_client_end_.reset();
+            }
+
             // Communicate to Power Broker that the hardware power level has been raised.
-            UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOn);
+            UpdatePowerLevel(hardware_power_current_level_client_, required_level);
 
             worker_condition_.Broadcast();
             break;
@@ -1219,7 +1238,7 @@ const inspect::Inspector& SdmmcBlockDevice::inspect() const {
   return parent_->driver_inspector().inspector();
 }
 
-fdf::Logger& SdmmcBlockDevice::logger() { return parent_->logger(); }
+fdf::Logger& SdmmcBlockDevice::logger() const { return parent_->logger(); }
 
 void SdmmcBlockDevice::StartThread(block_server::Thread thread) {
   if (auto server_dispatcher = fdf::SynchronizedDispatcher::Create(
@@ -1248,8 +1267,8 @@ void SdmmcBlockDevice::OnNewSession(block_server::Session session) {
 }
 
 // For now this only handles requests for the user partition.
-void SdmmcBlockDevice::OnRequests(block_server::Session& session,
-                                  cpp20::span<const block_server::Request> requests) {
+void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
+                                  cpp20::span<block_server::Request> requests) {
   fbl::AutoLock lock(&worker_lock_);
   while (power_suspended_ && !shutdown_)
     worker_condition_.Wait(&worker_lock_);
@@ -1258,7 +1277,7 @@ void SdmmcBlockDevice::OnRequests(block_server::Session& session,
 
   class Packer {
    public:
-    Packer(SdmmcBlockDevice* device, block_server::Session* session, size_t max_requests,
+    Packer(SdmmcBlockDevice* device, const block_server::Session* session, size_t max_requests,
            int max_bytes, uint32_t block_size)
         : device_(*device),
           session_(*session),
@@ -1266,38 +1285,68 @@ void SdmmcBlockDevice::OnRequests(block_server::Session& session,
           max_bytes_(max_bytes),
           block_size_(block_size) {}
 
-    void Push(const block_server::Request& request) {
+    void Push(block_server::Request& request) {
       uint64_t bytes = request.operation.read.block_count * block_size_;
+
+      if (bytes == 0)
+        return;
+
       // We need extra when we go from 1 to 2 requests.
       uint64_t extra = requests_.size() == 1 ? zx_system_get_page_size() : 0;
-      if (total_bytes_ + bytes + extra > max_bytes_) {
-        Flush();
-        extra = 0;
+
+      if (max_bytes_ > 0) {
+        for (;;) {
+          const uint64_t space = max_bytes_ - total_bytes_;
+          if (bytes + extra <= space) {
+            break;
+          }
+
+          if (space > extra) {
+            uint64_t amount = space - extra;
+            requests_.push_back(block_server::SplitRequest(
+                request, static_cast<uint32_t>(amount / block_size_), block_size_));
+            bytes -= amount;
+          }
+
+          if (auto result = Flush(/*split_last=*/true); result.is_error()) {
+            // The partial request failed which means we ignore the rest of the request.
+            return;
+          }
+
+          extra = 0;
+        }
       }
+
       requests_.push_back(request);
       total_bytes_ += bytes + extra;
-      if (requests_.size() >= max_requests_) {
-        Flush();
+      if (requests_.size() >= max_requests_ || total_bytes_ == max_bytes_) {
+        [[maybe_unused]] auto result = Flush();
       }
     }
 
     // Unfortunately, there's no way for us to tell the compiler that we hold `worker_lock_` here,
-    // so we have to skip thread safety analysis.
-    void Flush() TA_NO_THREAD_SAFETY_ANALYSIS {
+    // so we have to skip thread safety analysis.  If `split_last` is true, the last request is a
+    // partial request and so the response is not sent if successful since the caller will want to
+    // finish the request in the next batch.  If there is a failure, the response is sent and the
+    // caller is expected to discard the remaining request.
+    zx::result<> Flush(bool split_last = false) TA_NO_THREAD_SAFETY_ANALYSIS {
       if (requests_.empty())
-        return;
+        return zx::ok();
       zx::result<> result = zx::make_result(
           device_.ReadWriteWithRetries(requests_, EmmcPartition::USER_DATA_PARTITION));
+      if (split_last && result.is_ok())
+        requests_.pop_back();
       for (const block_server::Request& request : requests_) {
         session_.SendReply(request.request_id, result);
       }
       requests_.clear();
       total_bytes_ = 0;
+      return result;
     }
 
    private:
     SdmmcBlockDevice& device_;
-    block_server::Session& session_;
+    const block_server::Session& session_;
     const size_t max_requests_;
     const uint64_t max_bytes_;
     uint32_t block_size_;
@@ -1311,7 +1360,9 @@ void SdmmcBlockDevice::OnRequests(block_server::Session& session,
   Packer write_packer(this, &session, max_packed_writes_effective_, block_info_.max_transfer_size,
                       block_info_.block_size);
 
-  for (const block_server::Request& request : requests) {
+  [[maybe_unused]] zx::result<> unused_result;
+
+  for (block_server::Request& request : requests) {
     switch (request.operation.tag) {
       case block_server::Operation::Tag::Read:
         read_packer.Push(request);
@@ -1326,10 +1377,11 @@ void SdmmcBlockDevice::OnRequests(block_server::Session& session,
         // Technically, we might not need to do this, because there's no guarantee regarding the
         // ordering of requests, but it's arguably safer for us to flush preceding write requests
         // before issuing the flush command.
-        write_packer.Flush();
+        unused_result = write_packer.Flush();
 
         status = Flush();
-        session.SendReply(request.request_id, zx::error(status));
+
+        session.SendReply(request.request_id, zx::make_result(status));
 
         TRACE_DURATION_END("sdmmc", "flush", "opcode",
                            TA_INT32(static_cast<int32_t>(request.operation.tag)), "txn_status",
@@ -1345,7 +1397,7 @@ void SdmmcBlockDevice::OnRequests(block_server::Session& session,
                 .offset_dev = request.operation.trim.device_block_offset,
             },
             USER_DATA_PARTITION);
-        session.SendReply(request.request_id, zx::error(status));
+        session.SendReply(request.request_id, zx::make_result(status));
 
         TRACE_DURATION_END(
             "sdmmc", "trim", "opcode", TA_INT32(static_cast<int32_t>(request.operation.tag)),
@@ -1354,12 +1406,12 @@ void SdmmcBlockDevice::OnRequests(block_server::Session& session,
         break;
 
       case block_server::Operation::Tag::CloseVmo:
-        ZX_PANIC("unreachable");
+        __UNREACHABLE;
     }
   }
 
-  read_packer.Flush();
-  write_packer.Flush();
+  unused_result = read_packer.Flush();
+  unused_result = write_packer.Flush();
 }
 
 }  // namespace sdmmc

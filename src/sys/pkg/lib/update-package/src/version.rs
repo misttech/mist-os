@@ -124,13 +124,9 @@ impl fmt::Display for SystemVersion {
 pub(crate) async fn read_version(
     proxy: &fio::DirectoryProxy,
 ) -> Result<SystemVersion, ReadVersionError> {
-    let file = fuchsia_fs::directory::open_file_deprecated(
-        proxy,
-        "version",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .map_err(ReadVersionError::OpenFile)?;
+    let file = fuchsia_fs::directory::open_file(proxy, "version", fio::PERM_READABLE)
+        .await
+        .map_err(ReadVersionError::OpenFile)?;
     let version_str =
         fuchsia_fs::file::read_to_string(&file).await.map_err(ReadVersionError::ReadFile)?;
 

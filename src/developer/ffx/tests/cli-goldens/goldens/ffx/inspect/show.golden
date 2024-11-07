@@ -1,6 +1,6 @@
 {
   "name": "show",
-  "description": "Prints the inspect hierarchies that match the given selectors.",
+  "description": "Prints the inspect hierarchies that match the given selectors. See https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect#userspace_tools for more.",
   "examples": [],
   "flags": [
     {
@@ -20,7 +20,19 @@
       "optionality": "optional",
       "long": "--manifest",
       "short": null,
-      "description": "the name of the manifest file that we are interested in. If this is provided, the output will only contain monikers for components whose url contains the provided name.",
+      "description": "DEPRECATED: use `--component` instead.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "component"
+        }
+      },
+      "optionality": "optional",
+      "long": "--component",
+      "short": null,
+      "description": "a fuzzy-search query. May include URL, moniker, or manifest fragments. No selector-escaping for moniker is needed in this query. Selectors following --component should omit the component selector, as they will be spliced together by the tool with the correct escaping.",
       "hidden": false
     },
     {
@@ -32,7 +44,7 @@
       "optionality": "optional",
       "long": "--accessor",
       "short": null,
-      "description": "A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to. The selector will be in the form of: <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName Typically this is the output of `iquery list-accessors`. For example: `bootstrap/archivist:expose:fuchsia.diagnostics.FeedbackArchiveAccessor` means that the command will connect to the `FeedbackArchiveAccecssor` exposed by `bootstrap/archivist`.",
+      "description": "A string specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to. This can be copied from the output of `ffx inspect list-accessors`. The selector will be in the form of: <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName",
       "hidden": false
     },
     {
@@ -53,7 +65,7 @@
   "positionals": [
     {
       "name": "selectors",
-      "description": "selectors representing the Inspect data that should be queried. If no selectors are provided, Inspect data for the whole system will be returned. This command accepts the following as a selector: - A component moniker, for example, `core/network/netstack`. Doesn't work if   `--manifest` is passed. - A component selector, for example, `core/network/*`. Doesn't work if `--manifest`   is passed. - A tree selector, for example, `core/network/netstack:root/path/to/*:property` To learn more about selectors see https://fuchsia.dev/fuchsia-src/reference/diagnostics/selectors. The following characters in a selector must be escaped with `\\`: `*`, `:`, `\\`, `/` and whitespace. When `*` or other characters cause ambiguity with your shell, make sure to wrap the selector in single or double quotes. For example: `ffx inspect show \"bootstrap/boot-drivers:*:root/path/to\\:some:prop\"`",
+      "description": "queries for accessing Inspect data. If no selectors are provided, Inspect data for the whole system will be returned.",
       "optionality": "repeating",
       "hidden": false
     }

@@ -18,6 +18,12 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
         ui_config: &PlatformUiConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        let visual_debugging_level: u8 = ui_config.visual_debugging_level.clone().into();
+        builder.set_config_capability(
+            "fuchsia.ui.VisualDebuggingLevel",
+            Config::new(ConfigValueType::Uint8, visual_debugging_level.into()),
+        )?;
+
         if !ui_config.enabled {
             return Ok(());
         }
@@ -207,12 +213,6 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
         builder.set_config_capability(
             "fuchsia.ui.PowerOffDelayMillis",
             Config::new(ConfigValueType::Uint16, power_off_display_millis.into()),
-        )?;
-
-        let visual_debugging_level: u8 = ui_config.visual_debugging_level.clone().into();
-        builder.set_config_capability(
-            "fuchsia.ui.VisualDebuggingLevel",
-            Config::new(ConfigValueType::Uint8, visual_debugging_level.into()),
         )?;
 
         Ok(())

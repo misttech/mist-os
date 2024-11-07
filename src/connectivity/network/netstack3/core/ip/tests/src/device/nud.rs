@@ -19,7 +19,7 @@ use packet_formats::icmp::ndp::{
     NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder, RouterAdvertisement,
 };
 use packet_formats::icmp::{IcmpDestUnreachable, IcmpPacketBuilder, IcmpUnusedCode};
-use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
+use packet_formats::ip::{FragmentOffset, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::Ipv4PacketBuilder;
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::testutil::{
@@ -736,7 +736,7 @@ fn icmp_error_fragment_offset(fragment_offset: u16) {
     let to = Ipv4::get_other_ip_address(254);
     let mut ipv4_packet_builder =
         Ipv4PacketBuilder::new(FROM_ADDR, to, 255 /* ttl */, Ipv4Proto::Proto(IpProto::Udp));
-    ipv4_packet_builder.fragment_offset(fragment_offset);
+    ipv4_packet_builder.fragment_offset(FragmentOffset::new(fragment_offset).unwrap());
     let non_initial_fragment_packet_buf = packet::Buf::new(&mut [], ..)
         .encapsulate(UdpPacketBuilder::new(
             FROM_ADDR.get(),

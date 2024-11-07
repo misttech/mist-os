@@ -79,7 +79,7 @@ pub mod task {
         ///
         /// `local` may panic if not called in the context of a local executor
         /// (e.g. within a call to `run` or `run_singlethreaded`).
-        pub fn local<'a>(fut: impl Future<Output = T> + 'static) -> Self {
+        pub fn local(fut: impl Future<Output = T> + 'static) -> Self {
             let task = LOCAL_EXECUTOR.with(|e| {
                 e.borrow().as_ref().expect("Executor must be created first").spawn_local(fut)
             });

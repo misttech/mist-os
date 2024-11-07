@@ -13,7 +13,7 @@ driver_bind_rules("driver_bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("testcontroller_driver-driver") {
+fuchsia_cc_driver("testcontroller_driver-driver") {
   output_name = "testcontroller_driver"
   sources = [ "driver.cc" ]
   deps = [

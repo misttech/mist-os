@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::Incoming;
+use crate::{Incoming, Node};
 use namespace::Namespace;
 use zx::Status;
 
@@ -24,6 +24,21 @@ pub struct DriverContext {
 }
 
 impl DriverContext {
+    /// Binds the node proxy client end from the start args into a [`NodeProxy`] that can be used
+    /// to add child nodes. Dropping this proxy will result in the node being removed and the
+    /// driver starting shutdown, so it should be bound and stored in your driver object in its
+    /// [`crate::Driver::start`] method.
+    ///
+    /// After calling this, [`DriverStartArgs::node`] in [`Self::start_args`] will be `None`.
+    ///
+    /// Returns [`Status::INVALID_ARGS`] if the node client end is not present in the start
+    /// arguments.
+    pub fn take_node(&mut self) -> Result<Node, Status> {
+        let node_client = self.start_args.node.take().ok_or(Status::INVALID_ARGS)?;
+        // TODO(https://fxbug.dev/319159026): when this is infallible the expect can be removed.
+        Ok(Node::from(node_client.into_proxy().expect("into_proxy failed")))
+    }
+
     pub(crate) fn new(
         root_dispatcher: DispatcherRef<'static>,
         mut start_args: DriverStartArgs,

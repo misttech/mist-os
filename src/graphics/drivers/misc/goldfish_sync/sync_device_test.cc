@@ -514,7 +514,7 @@ TEST_F(SyncDeviceTest, IrqHandler) {
     cmd_buffers->batch_hostcmd.hostcmd_handle = 1u;
     cmd_buffers->batch_hostcmd.handle = 0u;
   }
-  irq_.trigger(0u, zx::time());
+  irq_.trigger(0u, zx::time_boot());
 
   // Irq handler thread handles the interrupt, copying command into staging
   // buffer and post a task on async dispatcher to handle the commands.
@@ -590,7 +590,7 @@ TEST_F(SyncDeviceTest, TriggerHostWaitAndSignalFence) {
     cmd_buffers->batch_hostcmd.handle = reinterpret_cast<uint64_t>(timeline_ptr.get());
     cmd_buffers->batch_hostcmd.time_arg = 1u;
   }
-  irq_.trigger(0u, zx::time());
+  irq_.trigger(0u, zx::time_boot());
   while (true) {
     test_loop_.RunUntilIdle();
     // Event should be signalled once the host command is executed.

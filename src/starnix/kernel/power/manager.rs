@@ -692,7 +692,7 @@ pub trait WakeLeaseInterlockOps {
 }
 
 pub trait OnWakeOps: Send + Sync {
-    fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Channel);
+    fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Handle);
 }
 
 /// The signal that the runner raises when handing over an event to the kernel.
@@ -711,6 +711,15 @@ pub fn clear_wake_proxy_signal(event: &zx::EventPair) {
     match event.signal_peer(clear_mask, set_mask) {
         Ok(_) => (),
         Err(e) => log_warn!("Failed to reset wake event state {:?}", e),
+    }
+}
+
+/// Raise the `RUNNER_PROXY_EVENT_SIGNAL`, which will prevent the container from being suspended.
+pub fn set_wake_proxy_signal(event: &zx::EventPair) {
+    let (clear_mask, set_mask) = (zx::Signals::empty(), RUNNER_PROXY_EVENT_SIGNAL);
+    match event.signal_peer(clear_mask, set_mask) {
+        Ok(_) => (),
+        Err(e) => log_warn!("Failed to signal wake event {:?}", e),
     }
 }
 

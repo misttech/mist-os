@@ -16,9 +16,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
 };
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked,
-};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
@@ -82,16 +80,11 @@ fn ensure_devpts(
 /// This function assumes that `/dev/ptmx` is the `DevPtmxFile` and that devpts
 /// is mounted at `/dev/pts`. These assumptions are necessary so that the
 /// `FileHandle` objects returned have appropriate `NamespaceNode` objects.
-pub fn create_main_and_replica<L>(
-    locked: &mut Locked<'_, L>,
+pub fn create_main_and_replica(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     window_size: uapi::winsize,
-) -> Result<(FileHandle, FileHandle), Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<(FileHandle, FileHandle), Errno> {
     let pty_file = current_task.open_file(locked, "/dev/ptmx".into(), OpenFlags::RDWR)?;
     let pty = pty_file.downcast_file::<DevPtmxFile>().ok_or_else(|| errno!(ENOTTY))?;
     {
@@ -181,7 +174,12 @@ struct DevPtsFs {
 }
 
 impl FileSystemOps for DevPtsFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(DEVPTS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
@@ -376,7 +374,12 @@ impl FileOps for DevPtmxFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, _file: &FileObject, current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) {
         self.terminal.main_close();
         let id = FsString::from(self.terminal.id.to_string());
         self.dev_pts_root.remove_child(id.as_ref(), &current_task.kernel().mounts);
@@ -487,7 +490,12 @@ impl FileOps for DevPtsFile {
     fileops_impl_nonseekable!();
     fileops_impl_noop_sync!();
 
-    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
+    fn close(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) {
         self.terminal.replica_close();
     }
 
@@ -987,31 +995,23 @@ mod tests {
         root.lookup_child(locked, task, &mut Default::default(), name)
     }
 
-    fn open_file_with_flags<L>(
-        locked: &mut Locked<'_, L>,
+    fn open_file_with_flags(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
         flags: OpenFlags,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         let node = lookup_node(locked, current_task, fs, name)?;
         node.open(locked, current_task, flags, AccessCheck::default())
     }
 
-    fn open_file<L>(
-        locked: &mut Locked<'_, L>,
+    fn open_file(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         open_file_with_flags(locked, current_task, fs, name, OpenFlags::RDWR | OpenFlags::NOCTTY)
     }
 
@@ -1047,7 +1047,7 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         let _pts = open_file(&mut locked, &task, &fs, "0".into()).expect("open file");
         std::mem::drop(ptmx);
-        task.trigger_delayed_releaser();
+        task.trigger_delayed_releaser(&mut locked);
         lookup_node(&mut locked, &task, &fs, "0".into()).unwrap_err();
     }
 
@@ -1066,7 +1066,7 @@ mod tests {
         lookup_node(&mut locked, &task, &fs, "2".into()).expect("component_lookup");
 
         std::mem::drop(_ptmx1);
-        task.trigger_delayed_releaser();
+        task.trigger_delayed_releaser(&mut locked);
 
         lookup_node(&mut locked, &task, &fs, "1".into()).unwrap_err();
 
@@ -1209,10 +1209,10 @@ mod tests {
         task.set_creds(Credentials::with_ids(22, 22));
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
-        let ptmx_stat = ptmx.node().stat(&task).expect("stat");
+        let ptmx_stat = ptmx.node().stat(&mut locked, &task).expect("stat");
         assert_eq!(ptmx_stat.st_blksize as usize, BLOCK_SIZE);
         let pts = open_file(&mut locked, &task, &fs, "0".into()).expect("open file");
-        let pts_stats = pts.node().stat(&task).expect("stat");
+        let pts_stats = pts.node().stat(&mut locked, &task).expect("stat");
         assert_eq!(pts_stats.st_mode & FileMode::PERMISSIONS.bits(), 0o620);
         assert_eq!(pts_stats.st_uid, 22);
         // TODO(qsr): Check that gid is tty.

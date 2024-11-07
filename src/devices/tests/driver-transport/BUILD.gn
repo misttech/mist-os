@@ -46,7 +46,7 @@ driver_bind_rules("parent-driver-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("parent-drv") {
+fuchsia_cc_driver("parent-drv") {
   sources = [ "parent-driver.cc" ]
   deps = [
     ":fuchsia.driver.transport.test_cpp",
@@ -75,7 +75,7 @@ driver_bind_rules("child-driver-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("child-drv") {
+fuchsia_cc_driver("child-drv") {
   sources = [ "child-driver.cc" ]
   deps = [
     ":child-driver-bind",

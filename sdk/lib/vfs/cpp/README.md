@@ -7,13 +7,6 @@ for exposing items in a component's outgoing namespace (including services).
 This allows creation of pseudo-directories that can be modified at runtime,
 pseudo/VMO-backed files, service connectors, and remote nodes.
 
-Unlike the in-tree VFS (//src/storage/lib/vfs/cpp), this library is not intended
-for filesystems development.
-
-**WARNING**: This library is currently undergoing an API overhaul. Please avoid
-new uses and prefer using the in-tree VFS at //src/storage/lib/vfs/cpp where
-possible. See https://fxbug.dev/311176363 for details.
-
 ## Thread Safety
 
 The node types this library implements are thread safe, however they must only

@@ -31,7 +31,7 @@ driver_bind_rules("bind") {
   bind_output = "my_driver_cpp.bindbc"
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "my-driver-cpp"
   sources = [ "my_driver_cpp.cc" ]
   deps = [

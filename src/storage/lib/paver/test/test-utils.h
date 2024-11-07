@@ -54,6 +54,9 @@ class BlockDevice {
   static void Create(const fbl::unique_fd& devfs_root, const uint8_t* guid, uint64_t block_count,
                      uint32_t block_size, std::unique_ptr<BlockDevice>* device);
 
+  static void CreateFromVmo(const fbl::unique_fd& devfs_root, const uint8_t* guid, zx::vmo vmo,
+                            uint32_t block_size, std::unique_ptr<BlockDevice>* device);
+
   ~BlockDevice() { ramdisk_destroy(client_); }
 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_interface() const {
@@ -136,16 +139,9 @@ class FakeDevicePartitioner : public paver::DevicePartitioner {
     return zx::ok();
   }
 
-  zx::result<std::unique_ptr<paver::PartitionClient>> AddPartition(
-      const paver::PartitionSpec& spec) const override {
-    return zx::ok(nullptr);
-  }
-
   zx::result<> WipeFvm() const override { return zx::ok(); }
 
-  zx::result<> InitPartitionTables() const override { return zx::ok(); }
-
-  zx::result<> WipePartitionTables() const override { return zx::ok(); }
+  zx::result<> ResetPartitionTables() const override { return zx::ok(); }
 
   zx::result<> ValidatePayload(const paver::PartitionSpec& spec,
                                std::span<const uint8_t> data) const override {

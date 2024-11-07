@@ -13,7 +13,6 @@ source_set("lib") {
     "kernel_sampler.cc",
     "process_watcher.cc",
     "sampler.cc",
-    "symbolization_context.cc",
     "symbolizer_markup.cc",
     "targets.cc",
     "taskfinder.cc",

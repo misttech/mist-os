@@ -123,10 +123,11 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
 }
 
 async fn wipe_storage(
+    environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
     launcher: &FilesystemLauncher,
-    ignored_paths: &mut HashSet<String>,
+    matcher_lock: &Arc<Mutex<HashSet<String>>>,
     blobfs_root: Option<ServerEnd<DirectoryMarker>>,
     blob_creator: Option<ServerEnd<fidl_fuchsia_fxfs::BlobCreatorMarker>>,
 ) -> Result<(), Error> {
@@ -136,39 +137,36 @@ async fn wipe_storage(
         // need access (that will probably change eventually, at which point those will need to be
         // threaded through). For ignored_paths, fxblob launching doesn't generate any new block
         // devices that we need to mark as accounted for for the block watcher.
-        wipe_storage_fxblob(ramdisk_prefix, blobfs_root, blob_creator).await
+        wipe_storage_fxblob(environment, blobfs_root, blob_creator).await
     } else {
-        wipe_storage_fvm(config, ramdisk_prefix, launcher, ignored_paths, blobfs_root).await
+        wipe_storage_fvm(config, ramdisk_prefix, launcher, matcher_lock, blobfs_root).await
     }
 }
 
 async fn wipe_storage_fxblob(
-    ramdisk_prefix: Option<String>,
+    environment: &Arc<Mutex<dyn Environment>>,
     blobfs_root: Option<ServerEnd<DirectoryMarker>>,
     blob_creator: Option<ServerEnd<fidl_fuchsia_fxfs::BlobCreatorMarker>>,
 ) -> Result<(), Error> {
     tracing::info!("Searching for fxfs block device");
 
-    let fxfs_matcher = PartitionMatcher {
-        type_guids: Some(vec![constants::FVM_TYPE_GUID, constants::FVM_LEGACY_TYPE_GUID]),
-        ignore_prefix: ramdisk_prefix,
-        ..Default::default()
-    };
+    let registered_devices = environment.lock().await.registered_devices().clone();
+    let block_connector = registered_devices
+        .get_block_connector(DeviceTag::FxblobOnRecovery)
+        .map_err(|error| {
+            tracing::error!(?error, "shred_data_volume: unable to get block connector");
+            zx::Status::NOT_FOUND
+        })
+        .on_timeout(FIND_PARTITION_DURATION, || {
+            tracing::error!("Failed to find fxfs within timeout");
+            Err(zx::Status::NOT_FOUND)
+        })
+        .await?;
 
-    let fxfs_controller = find_partition(fxfs_matcher, FIND_PARTITION_DURATION)
-        .await
-        .context("Failed to find FVM")?;
-    let fxfs_path = fxfs_controller
-        .get_topological_path()
-        .await
-        .context("fvm get_topo_path transport error")?
-        .map_err(zx::Status::from_raw)
-        .context("fvm get_topo_path returned error")?;
-
-    tracing::info!(device_path = ?fxfs_path, "Wiping storage");
     tracing::info!("Reformatting Fxfs.");
 
-    let mut fxfs = filesystem::Filesystem::new(fxfs_controller, Fxfs::default());
+    let mut fxfs =
+        filesystem::Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
     fxfs.format().await.context("Failed to format fxfs")?;
 
     let blobfs_root = match blobfs_root {
@@ -225,10 +223,11 @@ async fn wipe_storage_fvm(
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
     launcher: &FilesystemLauncher,
-    ignored_paths: &mut HashSet<String>,
+    matcher_lock: &Arc<Mutex<HashSet<String>>>,
     blobfs_root: Option<ServerEnd<DirectoryMarker>>,
 ) -> Result<(), Error> {
     tracing::info!("Searching for block device with FVM");
+    let mut ignored_paths = matcher_lock.lock().await;
 
     let fvm_matcher = PartitionMatcher {
         type_guids: Some(vec![constants::FVM_TYPE_GUID, constants::FVM_LEGACY_TYPE_GUID]),
@@ -667,7 +666,6 @@ pub fn fshost_admin(
                         blob_creator,
                     }) => {
                         tracing::info!("admin wipe storage called");
-                        let mut ignored_paths = matcher_lock.lock().await;
                         let res = if !config.ramdisk_image {
                             tracing::error!(
                                 "Can't WipeStorage from a non-recovery build; \
@@ -676,10 +674,11 @@ pub fn fshost_admin(
                             Err(zx::Status::NOT_SUPPORTED.into_raw())
                         } else {
                             match wipe_storage(
+                                &env,
                                 &config,
                                 ramdisk_prefix.clone(),
                                 &launcher,
-                                &mut *ignored_paths,
+                                &matcher_lock,
                                 blobfs_root,
                                 blob_creator,
                             )

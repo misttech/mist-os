@@ -254,8 +254,13 @@ void DebugAgentServer::OnNotification(const debug_ipc::NotifyProcessStarting& no
     return;
   }
 
-  // We only get process starting notifications (as a debug_ipc client) when a filter matches.
-  AttachToFilterMatches({{notify.filter_id, {notify.koid}}});
+  // We only get process starting notifications (as a debug_ipc client) when a filter matches. We
+  // also only get this notification for processes specifically, so the koid is always a process.
+  // When we matched a job_only filter, we create a DebuggedProcess object for it internally, and
+  // don't need an explicit attach.
+  if (!debug_agent_->GetDebuggedProcess(notify.koid)) {
+    AttachToFilterMatches({{notify.filter_id, {notify.koid}}});
+  }
 }
 
 void DebugAgentServer::OnNotification(const debug_ipc::NotifyException& notify) {
@@ -289,23 +294,31 @@ void DebugAgentServer::OnNotification(const debug_ipc::NotifyException& notify) 
   //
   // |this| is owned by the async dispatcher associated with this message loop, so it's safe to
   // capture. Similarly, DebugAgent is allocated in main, so our reference should also always be
-  // valid here.
-  debug::MessageLoop::Current()->PostTask(FROM_HERE, [=]() {
-    FX_DCHECK(this);
-    FX_DCHECK(debug_agent_);
+  // valid here. The thread and process might exit independently before the message loop runs this
+  // callback, so we capture the process's koid by value first.
+  debug::MessageLoop::Current()->PostTask(
+      FROM_HERE, [=, process_koid = thread->process()->koid()]() {
+        FX_DCHECK(this);
+        FX_DCHECK(debug_agent_);
 
-    if (!debug_agent_->is_connected()) {
-      debug_ipc::DetachRequest request;
-      request.koid = thread->process()->koid();
-      debug_ipc::DetachReply reply;
-      debug_agent_->OnDetach(request, &reply);
+        // The check for the DebuggedProcess isn't strictly necessary, but prevents some log spam
+        // in the case that the process has already gone away after the exception was released. We
+        // want the log to be forwarded to debug_ipc clients so we'll check here to avoid the error
+        // case when this is more likely to happen.
+        //
+        // TODO(https://fxbug.dev/377671670): Write better tests for this.
+        if (!debug_agent_->is_connected() && debug_agent_->GetDebuggedProcess(process_koid)) {
+          debug_ipc::DetachRequest request;
+          request.koid = process_koid;
+          debug_ipc::DetachReply reply;
+          debug_agent_->OnDetach(request, &reply);
 
-      if (reply.status.has_error()) {
-        FX_LOGS(WARNING) << "Failed to detach from process " << std::hex
-                         << thread->process()->koid() << ": " << reply.status.message();
-      }
-    }
-  });
+          if (reply.status.has_error()) {
+            FX_LOGS(WARNING) << "Failed to detach from process " << process_koid << ": "
+                             << reply.status.message();
+          }
+        }
+      });
 }
 
 DebugAgentServer::GetMatchingProcessesResult DebugAgentServer::GetMatchingProcesses(

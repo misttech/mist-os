@@ -96,7 +96,7 @@ impl ModularFacade {
     ///
     /// If a session is already running, it will be stopped first.
     ///
-    /// One of `session_url` or `session.url` is required.
+    /// `session_url` is required.
     ///
     /// # Arguments
     /// * `args`: A serde_json Value parsed into [`StartBasemgrRequest`]
@@ -108,8 +108,7 @@ impl ModularFacade {
             self.stop_session().await?;
         }
 
-        let url = &req.session_url.unwrap_or_else(|| req.session.unwrap().url);
-        self.launch_session(url).await?;
+        self.launch_session(&req.session_url).await?;
 
         Ok(BasemgrResult::Success)
     }
@@ -296,29 +295,6 @@ mod tests {
     async fn test_start_session_without_config() -> Result<(), Error> {
         async fn start_session_v2_steps(facade: ModularFacade) -> Result<(), Error> {
             let start_session_args = json!({
-                "session": { "url": TEST_SESSION_URL, },
-            });
-            assert_matches!(
-                facade.start_session(start_session_args).await,
-                Ok(BasemgrResult::Success)
-            );
-            Ok(())
-        }
-
-        test_facade(
-            &start_session_v2_steps,
-            false, // is_session_running
-            1,     // SESSION_LAUNCH_CALL_COUNT
-            0,     // DESTROY_CHILD_CALL_COUNT
-            0,     // SESSION_RESTART_CALL_COUNT
-        )
-        .await
-    }
-
-    #[fuchsia_async::run(2, test)]
-    async fn test_start_session_with_legacy_session_url() -> Result<(), Error> {
-        async fn start_session_v2_steps(facade: ModularFacade) -> Result<(), Error> {
-            let start_session_args = json!({
                 "session_url": TEST_SESSION_URL,
             });
             assert_matches!(
@@ -342,7 +318,7 @@ mod tests {
     async fn test_start_session_shutdown_existing() -> Result<(), Error> {
         async fn start_existing_steps(facade: ModularFacade) -> Result<(), Error> {
             let start_session_args = json!({
-                "session": { "url": TEST_SESSION_URL, },
+                "session_url": TEST_SESSION_URL,
             });
 
             assert_matches!(facade.is_session_running().await, Ok(true));

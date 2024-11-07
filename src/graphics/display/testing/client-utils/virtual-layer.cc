@@ -18,6 +18,7 @@
 
 #include <fbl/algorithm.h>
 
+#include "fidl/fuchsia.hardware.display.types/cpp/wire_types.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
@@ -391,16 +392,16 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
 
     constexpr fuchsia_images2::wire::PixelFormat kColorLayerFormat =
         fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
-    constexpr uint32_t kColorLayerBytesPerPixel = 4;
-    uint32_t kColorLayerColor = get_fg_color();
+    uint32_t color = get_fg_color();
 
-    uint8_t data[kColorLayerBytesPerPixel];
-    *reinterpret_cast<uint32_t*>(data) = kColorLayerColor;
-
+    fidl::Array<uint8_t, 8> bytes;
+    std::memcpy(bytes.data(), &color, sizeof(color));
     const fhd::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer->id);
-    auto result = dc->SetLayerColorConfig(
-        fidl_layer_id, kColorLayerFormat,
-        ::fidl::VectorView<uint8_t>::FromExternal(data, kColorLayerBytesPerPixel));
+    auto result =
+        dc->SetLayerColorConfig(fidl_layer_id, fuchsia_hardware_display_types::wire::Color{
+                                                   .format = kColorLayerFormat,
+                                                   .bytes = bytes,
+                                               });
 
     if (!result.ok()) {
       printf("Setting layer config failed\n");

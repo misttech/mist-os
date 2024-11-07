@@ -17,7 +17,7 @@ driver_bind_rules("hidctl_bind") {
   ]
 }
 
-fuchsia_driver("hidctl-driver") {
+fuchsia_cc_driver("hidctl-driver") {
   output_name = "hidctl"
   configs += [
     "//build/config:all_source",

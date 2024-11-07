@@ -20,7 +20,7 @@ driver_bind_rules("dwc2_bind") {
   ]
 }
 
-fuchsia_driver("dwc2-driver") {
+fuchsia_cc_driver("dwc2-driver") {
   output_name = "dwc2"
   configs += [
     "//build/config:all_source",

@@ -46,7 +46,7 @@ common_deps = [
   "//zircon/system/ulib/zircon-internal",
 ]
 
-fuchsia_driver("nvme-driver") {
+fuchsia_cc_driver("nvme-driver") {
   output_name = "nvme"
   configs += [ "//build/config:all_source" ]
   sources = [

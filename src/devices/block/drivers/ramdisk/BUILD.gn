@@ -12,7 +12,7 @@ driver_bind_rules("ramdisk_bind") {
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
 
-fuchsia_driver("ramdisk-driver") {
+fuchsia_cc_driver("ramdisk-driver") {
   output_name = "ramdisk"
   configs += [
     "//build/config:all_source",
@@ -51,7 +51,6 @@ fuchsia_driver_component("ramdisk-v1") {
 }
 
 bind_library("fuchsia.hardware.ramdisk") {
-  sdk_category = "internal"
   source = "ramdisk-lib.bind"
 }
 
@@ -62,7 +61,7 @@ driver_bind_rules("ramdisk_v2_bind") {
   deps = [ ":fuchsia.hardware.ramdisk" ]
 }
 
-fuchsia_driver("ramdisk-driver-v2") {
+fuchsia_cc_driver("ramdisk-driver-v2") {
   output_name = "ramdisk-v2"
   configs += [
     "//build/config:all_source",

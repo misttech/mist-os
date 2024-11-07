@@ -79,7 +79,7 @@ source_set("shared") {
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
-fuchsia_driver("usb-audio-driver") {
+fuchsia_cc_driver("usb-audio-driver") {
   output_name = "usb-audio"
   deps = [ ":shared" ]
 }

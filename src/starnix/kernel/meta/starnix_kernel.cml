@@ -21,13 +21,9 @@
         job_with_available_exception_channel: "true",
 
         // The starnix kernel reports memory attribution information
-        // for the Linux programs it runs, but note that we do not add
-        // memory_attribution: "true",
-        // here, because the starnix kernel is an implementation detail used
-        // by starnix runner, and starnix runner will connect to this protocol
-        // internally. If we had memory_attribution: "true", then that will
-        // cause the ELF runner to also attempt to connect to this protocol,
-        // resulting in duplicate reporting.
+        // for the Starnix containers it runs, which in turn will report
+        // memory attribution information for their Linux processes.
+        memory_attribution: "true",
     },
     capabilities: [
         {
@@ -84,6 +80,7 @@
             protocol: [
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.feedback.CrashReporter",
+                "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.kernel.Stats",
                 "fuchsia.net.filter.Control",
                 "fuchsia.net.interfaces.admin.Installer",
@@ -93,6 +90,8 @@
                 "fuchsia.net.routes.admin.RouteTableProviderV6",
                 "fuchsia.net.routes.admin.RouteTableV4",
                 "fuchsia.net.routes.admin.RouteTableV6",
+                "fuchsia.net.routes.admin.RuleTableV4",
+                "fuchsia.net.routes.admin.RuleTableV6",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",
                 "fuchsia.net.tun.Control",
@@ -118,11 +117,6 @@
                 "fuchsia.vulkan.loader.Loader",
                 "fuchsia.wlan.wlanix.Wlanix",
             ],
-            from: "parent",
-            availability: "optional",
-        },
-        {
-            service: "fuchsia.hardware.sockettunnel.Service",
             from: "parent",
             availability: "optional",
         },

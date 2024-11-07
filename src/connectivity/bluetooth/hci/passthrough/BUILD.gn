@@ -33,7 +33,7 @@ source_set("passthrough_sources") {
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 }
 
-fuchsia_driver("fuchsia_driver") {
+fuchsia_cc_driver("fuchsia_driver") {
   output_name = "bt-hci-passthrough"
   deps = [ ":passthrough_sources" ]
 }

@@ -16,7 +16,6 @@ driver_deps = [
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia",
   "//src/lib/fuchsia-component-test",
-  "//src/lib/fuchsia-fs",
   "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
   "//src/storage/lib/vfs/rust:vfs",
   "//src/sys/lib/cm_rust",

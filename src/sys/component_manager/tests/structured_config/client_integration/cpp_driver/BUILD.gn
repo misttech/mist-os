@@ -18,7 +18,7 @@ driver_bind_rules("receiver_bind") {
   bind_output = "receiver.bindbc"
 }
 
-fuchsia_driver("receiver_driver") {
+fuchsia_cc_driver("receiver_driver") {
   testonly = true
   output_name = "structured_config_receiver"
   sources = [ "receiver.cc" ]

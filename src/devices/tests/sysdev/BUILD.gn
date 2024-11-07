@@ -9,7 +9,7 @@ driver_bind_rules("sysdev-bind") {
   disable_autobind = true
 }
 
-fuchsia_driver("sysdev-driver") {
+fuchsia_cc_driver("sysdev-driver") {
   output_name = "sysdev"
   sources = [ "sysdev.cc" ]
   deps = [

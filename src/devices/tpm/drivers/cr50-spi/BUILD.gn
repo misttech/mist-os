@@ -30,7 +30,7 @@ common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
-fuchsia_driver("fuchsia_driver") {
+fuchsia_cc_driver("fuchsia_driver") {
   output_name = "cr50-spi-driver"
   sources = [ "cr50-spi.cc" ]
   deps = common_deps

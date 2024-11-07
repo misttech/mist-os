@@ -18,7 +18,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
-#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/lib/driver-utils/poll-until.h"
 
 namespace intel_display {
 
@@ -217,7 +217,7 @@ bool DpllSkylake::DoEnable(const DdiPllConfig& pll_config) {
 
   auto dpll_enable = registers::PllEnable::GetForSkylakeDpll(pll_id()).ReadFrom(mmio_space_);
   dpll_enable.set_pll_enabled(true).WriteTo(mmio_space_);
-  if (!PollUntil(
+  if (!display::PollUntil(
           [&] {
             return registers::DisplayPllStatus::Get().ReadFrom(mmio_space_).pll_locked(pll_id());
           },
@@ -487,8 +487,8 @@ bool DisplayPllTigerLake::DoEnable(const DdiPllConfig& pll_config) {
   auto dpll_enable = registers::PllEnable::GetForTigerLakeDpll(pll_id()).ReadFrom(mmio_space_);
   dpll_enable.set_power_on_request_tiger_lake(true);
   dpll_enable.WriteTo(mmio_space_);
-  if (!PollUntil([&] { return dpll_enable.ReadFrom(mmio_space_).powered_on_tiger_lake(); },
-                 zx::msec(1), g_display_pll_tiger_lake_power_on_wait_timeout_ms)) {
+  if (!display::PollUntil([&] { return dpll_enable.ReadFrom(mmio_space_).powered_on_tiger_lake(); },
+                          zx::msec(1), g_display_pll_tiger_lake_power_on_wait_timeout_ms)) {
     FDF_LOG(ERROR, "DPLL %d power up failure!", pll_id());
     return false;
   }
@@ -514,7 +514,7 @@ bool DisplayPllTigerLake::DoEnable(const DdiPllConfig& pll_config) {
 
   dpll_enable.set_pll_enabled(true);
   dpll_enable.WriteTo(mmio_space_);
-  if (!PollUntil(
+  if (!display::PollUntil(
           [&] { return dpll_enable.ReadFrom(mmio_space_).pll_locked_tiger_lake_and_lcpll1(); },
           zx::usec(1), g_display_pll_tiger_lake_lock_wait_timeout_us)) {
     FDF_LOG(ERROR, "DPLL %d lock failure! Failed to lock after 500us", pll_id());
@@ -532,13 +532,15 @@ bool DisplayPllTigerLake::DoDisable() {
 }
 
 // static
-ScopedValueChange<int> DisplayPllTigerLake::OverrideLockWaitTimeoutUsForTesting(int timeout_us) {
-  return ScopedValueChange(g_display_pll_tiger_lake_lock_wait_timeout_us, timeout_us);
+display::ScopedValueChange<int> DisplayPllTigerLake::OverrideLockWaitTimeoutUsForTesting(
+    int timeout_us) {
+  return display::ScopedValueChange(g_display_pll_tiger_lake_lock_wait_timeout_us, timeout_us);
 }
 
 // static
-ScopedValueChange<int> DisplayPllTigerLake::OverridePowerOnWaitTimeoutMsForTesting(int timeout_ms) {
-  return ScopedValueChange(g_display_pll_tiger_lake_power_on_wait_timeout_ms, timeout_ms);
+display::ScopedValueChange<int> DisplayPllTigerLake::OverridePowerOnWaitTimeoutMsForTesting(
+    int timeout_ms) {
+  return display::ScopedValueChange(g_display_pll_tiger_lake_power_on_wait_timeout_ms, timeout_ms);
 }
 
 namespace {
@@ -624,7 +626,7 @@ bool DekelPllTigerLake::DoDisable() {
 
   // Step 4. Wait for PLL not locked status in MGPLL_ENABLE.
   // Should complete within 50us.
-  if (!PollUntil(
+  if (!display::PollUntil(
           [&] { return !pll_enable.ReadFrom(mmio_space_).pll_locked_tiger_lake_and_lcpll1(); },
           zx::usec(1), 50)) {
     FDF_LOG(ERROR, "Dekel PLL %s: Cannot disable PLL", name().c_str());
@@ -643,8 +645,8 @@ bool DekelPllTigerLake::DoDisable() {
 
   // 7. Wait for PLL power state disabled in MGPLL_ENABLE.
   // - Should complete immediately.
-  if (!PollUntil([&] { return !pll_enable.ReadFrom(mmio_space_).powered_on_tiger_lake(); },
-                 zx::usec(1), 10)) {
+  if (!display::PollUntil([&] { return !pll_enable.ReadFrom(mmio_space_).powered_on_tiger_lake(); },
+                          zx::usec(1), 10)) {
     FDF_LOG(ERROR, "Dekel PLL %s: Cannot disable PLL power", name().c_str());
   }
 
@@ -665,8 +667,8 @@ bool DekelPllTigerLake::EnableDp(const DdiPllConfig& pll_config) {
 
   auto pll_enable = registers::PllEnable::GetForTigerLakeDpll(pll_id()).ReadFrom(mmio_space_);
   pll_enable.set_power_on_request_tiger_lake(true).WriteTo(mmio_space_);
-  if (!PollUntil([&] { return pll_enable.ReadFrom(mmio_space_).powered_on_tiger_lake(); },
-                 zx::usec(1), 10)) {
+  if (!display::PollUntil([&] { return pll_enable.ReadFrom(mmio_space_).powered_on_tiger_lake(); },
+                          zx::usec(1), 10)) {
     FDF_LOG(ERROR, "Dekel PLL %s: Cannot enable PLL power", name().c_str());
     return false;
   }
@@ -776,7 +778,7 @@ bool DekelPllTigerLake::EnableDp(const DdiPllConfig& pll_config) {
 
   // Step 7. Wait for PLL lock status in MGPLL_ENABLE.
   // - Timeout and fail after 900us.
-  if (!PollUntil(
+  if (!display::PollUntil(
           [&] { return pll_enable.ReadFrom(mmio_space_).pll_locked_tiger_lake_and_lcpll1(); },
           zx::usec(1), 900)) {
     FDF_LOG(ERROR, "Dekel PLL (%s): Cannot enable PLL", name().c_str());

@@ -37,7 +37,7 @@ common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
-fuchsia_driver("sensor_fuchsia_driver") {
+fuchsia_cc_driver("sensor_fuchsia_driver") {
   output_name = "goldfish_sensor"
 
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]

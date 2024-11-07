@@ -16,8 +16,8 @@ use tracing::{error, info};
 pub struct Listener {
     proxy: DeviceMonitorProxy,
     legacy_shim: IfaceRef,
-    phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
-    iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+    phy_manager: Arc<Mutex<dyn PhyManagerApi>>,
+    iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
 }
 
 pub async fn handle_event(listener: &Listener, evt: DeviceWatcherEvent) {
@@ -132,8 +132,8 @@ impl Listener {
     pub fn new(
         proxy: DeviceMonitorProxy,
         legacy_shim: IfaceRef,
-        phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
-        iface_manager: Arc<Mutex<dyn IfaceManagerApi + Send>>,
+        phy_manager: Arc<Mutex<dyn PhyManagerApi>>,
+        iface_manager: Arc<Mutex<dyn IfaceManagerApi>>,
     ) -> Self {
         Listener { proxy, legacy_shim, phy_manager, iface_manager }
     }
@@ -766,7 +766,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl PhyManagerApi for FakePhyManager {
         async fn add_phy(&mut self, phy_id: u16) -> Result<(), PhyManagerError> {
             if self.add_phy_succeeds {
@@ -872,7 +872,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl IfaceManagerApi for FakeIfaceManager {
         async fn disconnect(
             &mut self,

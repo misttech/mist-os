@@ -27,7 +27,7 @@ aead = { version = "0.4.2", features = ["std"] }
 aes = "0.8.4"
 aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
-ahash = "0.8.6"
+ahash = "0.8.11"
 ansi_term = "0.12.0"
 anyhow = "1.0.86"
 arbitrary = { version = "1.0.3", features = ["derive"] }
@@ -155,7 +155,7 @@ num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.4.2"
 num-traits = "0.2.18"
 omaha_client = "0.2"
-once_cell = "1.17.1"
+once_cell = "1.20.2"
 nu-ansi-term = "0.46.0"
 overload = "0.1.1"
 p256 = { version = "0.11.1", features = ["pem", "serde"] }
@@ -452,7 +452,7 @@ require_feature_reviews = [
 [gn.package.aes."0.8.4"]
 rustflags = [ "--cfg=aes_armv8" ]
 
-[gn.package.ahash."0.8.6".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
+[gn.package.ahash."0.8.11".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
 rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
 
 [gn.package.anyhow."1.0.86"]
@@ -689,7 +689,7 @@ rustflags = [
   "--cfg=has_total_cmp",
 ]
 
-[gn.package.once_cell."1.17.1"]
+[gn.package.once_cell."1.20.2"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "once_cell_visibility" }
 
 [gn.package.parking_lot."0.12.0"]
@@ -976,6 +976,7 @@ rustflags = [
   "--cfg=feature=\\\"socket2\\\"",
   "--cfg=feature=\\\"sync\\\"",
   "--cfg=feature=\\\"time\\\"",
+  "--cfg=tokio_unstable",
 ]
 
 # TODO(https://fxbug.dev/106164) This manual configuration enables the "log" so that

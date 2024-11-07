@@ -61,7 +61,6 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
-#include "src/graphics/display/drivers/coordinator/util/post-task.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
@@ -76,6 +75,7 @@
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
+#include "src/graphics/display/lib/driver-utils/post-task.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
@@ -584,15 +584,15 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
   }
 
   uint32_t bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(
-      request->pixel_format,
+      request->color.format,
       /*pixel_format_modifier_param=*/fuchsia_images2::wire::PixelFormatModifier::kLinear));
-  if (request->color_bytes.count() != bytes_per_pixel) {
-    FDF_LOG(ERROR, "SetLayerColorConfig with invalid color bytes");
+  if (request->color.bytes.size() < bytes_per_pixel) {
+    FDF_LOG(ERROR, "SetLayerColorConfig with invalid pixel format");
     TearDown();
     return;
   }
 
-  layer->SetColorConfig(request->pixel_format, request->color_bytes);
+  layer->SetColorConfig(request->color);
   pending_config_valid_ = false;
   // no Reply defined
 }

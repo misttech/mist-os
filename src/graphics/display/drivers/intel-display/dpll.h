@@ -14,7 +14,7 @@
 #include <variant>
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
-#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
+#include "src/graphics/display/lib/driver-utils/scoped-value-change.h"
 
 namespace intel_display {
 
@@ -283,8 +283,8 @@ class DisplayPllTigerLake : public DisplayPll {
   // stemming from scheduling variability. Tests that simulate timeouts should
   // use the overrides below to get the DisplayPllTigerLake to issue a
   // deterministic MMIO access pattern.
-  static ScopedValueChange<int> OverrideLockWaitTimeoutUsForTesting(int timeout_us);
-  static ScopedValueChange<int> OverridePowerOnWaitTimeoutMsForTesting(int timeout_ms);
+  static display::ScopedValueChange<int> OverrideLockWaitTimeoutUsForTesting(int timeout_us);
+  static display::ScopedValueChange<int> OverridePowerOnWaitTimeoutMsForTesting(int timeout_ms);
 
  protected:
   // DisplayPll overrides:

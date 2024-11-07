@@ -13,7 +13,7 @@ driver_bind_rules("bind") {
   deps = [ "//sdk/lib/driver/metadata/cpp/tests:fuchsia_driver_metadata_test_bind_library" ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "metadata_forwarder_sdk_test_driver"
   sources = [

@@ -9,7 +9,7 @@
 namespace screenshot {
 
 bool ServeScreenshot(
-    zx::channel channel, zx::vmo response_vmo, size_t screenshot_index,
+    fidl::ServerEnd<fuchsia_io::File> file_server, zx::vmo response_vmo, size_t screenshot_index,
     std::unordered_map<size_t,
                        std::pair<std::unique_ptr<vfs::VmoFile>, std::unique_ptr<async::WaitOnce>>>*
         served_screenshots) {
@@ -46,7 +46,7 @@ bool ServeScreenshot(
 
   auto served_screenshot = std::make_unique<vfs::VmoFile>(std::move(response_vmo), vmo_size);
   std::unique_ptr<async::WaitOnce> channel_closed_observer =
-      std::make_unique<async::WaitOnce>(channel.get(), ZX_CHANNEL_PEER_CLOSED);
+      std::make_unique<async::WaitOnce>(file_server.channel().get(), ZX_CHANNEL_PEER_CLOSED);
 
   served_screenshots->emplace(screenshot_index, std::make_pair(std::move(served_screenshot),
                                                                std::move(channel_closed_observer)));
@@ -66,7 +66,7 @@ bool ServeScreenshot(
 
   if (const auto status =
           served_screenshots->at(screenshot_index)
-              .first->Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(channel));
+              .first->Serve(fuchsia_io::wire::kPermReadable, std::move(file_server));
       status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Cannot serve screenshot";
     return false;

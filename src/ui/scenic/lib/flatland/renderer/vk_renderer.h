@@ -68,7 +68,7 @@ class VkRenderer final : public Renderer {
 
   // |Renderer|.
   // Only called from the main thread.
-  fuchsia_images2::PixelFormat ChoosePreferredPixelFormat(
+  fuchsia_images2::PixelFormat ChoosePreferredRenderTargetFormat(
       const std::vector<fuchsia_images2::PixelFormat>& available_formats) const override;
 
   // |Renderer|.

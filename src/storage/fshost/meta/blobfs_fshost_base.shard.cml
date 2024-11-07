@@ -56,6 +56,10 @@
             from: "#blobfs",
         },
         {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
+            from: "#blobfs",
+        },
+        {
             protocol: "fuchsia.fxfs.BlobCreator",
             from: "#blobfs",
         },

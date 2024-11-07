@@ -25,7 +25,7 @@ InterruptDispatcher::InterruptDispatcher(Flags flags)
                (flags & INTERRUPT_UNMASK_PREWAIT_UNLOCKED) == 0);
 }
 
-zx_status_t InterruptDispatcher::WaitForInterrupt(zx_time_t* out_timestamp) {
+zx_status_t InterruptDispatcher::WaitForInterrupt(zx_instant_boot_t* out_timestamp) {
   bool defer_unmask = false;
   while (true) {
     {
@@ -80,7 +80,7 @@ zx_status_t InterruptDispatcher::WaitForInterrupt(zx_time_t* out_timestamp) {
   }
 }
 
-bool InterruptDispatcher::SendPacketLocked(zx_time_t timestamp) {
+bool InterruptDispatcher::SendPacketLocked(zx_instant_boot_t timestamp) {
   bool status = port_dispatcher_->QueueInterruptPacket(&port_packet_, timestamp);
   if (flags_ & INTERRUPT_MASK_POSTWAIT) {
     MaskInterrupt();
@@ -89,7 +89,7 @@ bool InterruptDispatcher::SendPacketLocked(zx_time_t timestamp) {
   return status;
 }
 
-zx_status_t InterruptDispatcher::Trigger(zx_time_t timestamp) {
+zx_status_t InterruptDispatcher::Trigger(zx_instant_boot_t timestamp) {
   if (!(flags_ & INTERRUPT_VIRTUAL))
     return ZX_ERR_BAD_STATE;
 
@@ -130,7 +130,7 @@ void InterruptDispatcher::InterruptHandler() {
 
   // only record timestamp if this is the first IRQ since we started waiting
   if (!timestamp_) {
-    timestamp_ = current_time();
+    timestamp_ = current_boot_time();
   }
   if (state_ == InterruptState::NEEDACK && port_dispatcher_) {
     return;

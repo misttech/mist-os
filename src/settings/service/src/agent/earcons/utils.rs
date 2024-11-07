@@ -16,7 +16,7 @@ use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 /// Creates a file-based sound from a resource file.
 fn resource_file(name: &str) -> Result<fidl::endpoints::ClientEnd<fio::FileMarker>, Error> {
     let path = format!("/config/data/{name}");
-    fuchsia_fs::file::open_in_namespace_deprecated(&path, fio::OpenFlags::RIGHT_READABLE)
+    fuchsia_fs::file::open_in_namespace(&path, fio::PERM_READABLE)
         .with_context(|| format!("opening resource file: {path}"))?
         .into_client_end()
         .map_err(|_: fio::FileProxy| {

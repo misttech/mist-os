@@ -50,8 +50,8 @@ fidl_testdata_info = [
   {
     name = "aliases"
     target = "//tools/fidl/fidlc/testdata/aliases:test.aliases"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -66,7 +66,7 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
     ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
       "fidlgen_rust_next",
     ]
   },
@@ -85,10 +85,18 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "bits"
     target = "//tools/fidl/fidlc/testdata:test.bits"
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "byte_and_bytes"
@@ -104,6 +112,10 @@ fidl_testdata_info = [
       "fidlgen_cpp",
       "fidlgen_go",
     ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "constants"
@@ -115,13 +127,17 @@ fidl_testdata_info = [
       "fidlgen_cpp",
       "fidlgen_go",
 
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
       "fidlgen_rust_next",
     ]
   },
   {
     name = "bits_constants"
     target = "//tools/fidl/fidlc/testdata:test.bitsconstants"
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "doc_comments"
@@ -135,6 +151,10 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
     ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "driver_handle"
@@ -144,7 +164,7 @@ fidl_testdata_info = [
       "fidlgen_go",
     ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -154,6 +174,10 @@ fidl_testdata_info = [
     build_denylist = [
       # TODO(https://fxbug.dev/42052603): Fix.
       "fidlgen_libfuzzer",
+    ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -167,6 +191,10 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
       "fidlgen_syzkaller",
     ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "driver_two_way"
@@ -174,6 +202,10 @@ fidl_testdata_info = [
     build_denylist = [
       # TODO(https://fxbug.dev/42052603): Fix.
       "fidlgen_libfuzzer",
+    ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -232,8 +264,9 @@ fidl_testdata_info = [
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
-
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+    ]
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -257,14 +290,14 @@ fidl_testdata_info = [
     target = "//tools/fidl/fidlc/testdata:test.handles"
     build_denylist = [ "fidlgen_libfuzzer" ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
   {
     name = "handles_in_types"
     target = "//tools/fidl/fidlc/testdata:test.handlesintypes"
-    host_build_denylist = [
+    denylist = [
       # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
@@ -272,6 +305,10 @@ fidl_testdata_info = [
   {
     name = "imported_const_values"
     target = "//tools/fidl/fidlc/testdata/imported_const_values:test.importedconstvalues"
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support dependencies yet.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "inheritance"
@@ -295,7 +332,7 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
     ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -312,6 +349,9 @@ fidl_testdata_info = [
       "fidlgen_cpp",
       "fidlgen_rust",
       "fidlgen_syzkaller",
+
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bits yet.
+      "fidlgen_rust_next",
     ]
   },
   {
@@ -320,9 +360,12 @@ fidl_testdata_info = [
     host_build_denylist = [
       # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
+
+      # Host-side FIDL doesn't support handles
+      "fidlgen_rust_next",
     ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -341,7 +384,7 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
     ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -356,7 +399,7 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42068207): Re-enable when fixed.
       "fidlgen_go",
 
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -374,7 +417,7 @@ fidl_testdata_info = [
     target =
         "//tools/fidl/fidlc/testdata/protocol_payloads:test.protocolpayloads"
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -396,7 +439,7 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
     ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -415,7 +458,7 @@ fidl_testdata_info = [
       "fidlgen_libfuzzer",
     ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -437,6 +480,10 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support services yet.
+      "fidlgen_rust_next",
+    ]
   },
   {
     name = "struct"
@@ -450,7 +497,7 @@ fidl_testdata_info = [
       # in struct defaults.
       "fidlgen_syzkaller",
 
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support dependencies yet.
       "fidlgen_rust_next",
     ]
   },
@@ -461,17 +508,13 @@ fidl_testdata_info = [
   {
     name = "time"
     target = "//tools/fidl/fidlc/testdata:test.time"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
-      "fidlgen_rust_next",
-      "fidlgen_libfuzzer",
-    ]
+    denylist = [ "fidlgen_libfuzzer" ]
   },
   {
     name = "transitive_dependencies"
     target = "//tools/fidl/fidlc/testdata/transitive_dependencies:test.transitivedependencies"
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support dependencies yet.
       "fidlgen_rust_next",
     ]
   },
@@ -490,7 +533,7 @@ fidl_testdata_info = [
     name = "types_in_protocols"
     target = "//tools/fidl/fidlc/testdata:test.typesinprotocols"
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -514,7 +557,7 @@ fidl_testdata_info = [
     name = "unknown_interactions"
     target = "//tools/fidl/fidlc/testdata:test.unknowninteractions"
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
       "fidlgen_rust_next",
     ]
   },
@@ -528,6 +571,10 @@ fidl_testdata_info = [
     host_build_denylist = [
       # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
+    ]
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support type aliases yet.
+      "fidlgen_rust_next",
     ]
   },
   {

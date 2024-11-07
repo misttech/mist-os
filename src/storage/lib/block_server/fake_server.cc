@@ -30,7 +30,7 @@ class FakeServer::FakeInterface : public Interface {
   void OnNewSession(Session session) override {
     std::thread([session = std::move(session)]() mutable { session.Run(); }).detach();
   }
-  void OnRequests(Session& session, std::span<const Request> requests) override {
+  void OnRequests(const Session& session, std::span<Request> requests) override {
     std::vector<uint8_t> buf;
     size_t len;
     for (const Request& request : requests) {

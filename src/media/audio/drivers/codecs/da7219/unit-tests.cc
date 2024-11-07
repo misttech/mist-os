@@ -274,7 +274,7 @@ TEST_F(Da7219Test, PlugDetectInitiallyUnplugged) {
   ASSERT_GT(initial_plugged_state.value().plug_state.plug_state_time(), 0);
 
   // Trigger IRQ and Watch for plugging the headset.
-  ASSERT_OK(irq().trigger(0, zx::clock::get_monotonic()));
+  ASSERT_OK(irq().trigger(0, zx::clock::get_boot()));
   auto plugged_state = codec_->WatchPlugState();
   ASSERT_TRUE(plugged_state.ok());
   ASSERT_TRUE(plugged_state.value().plug_state.plugged());
@@ -290,7 +290,7 @@ TEST_F(Da7219Test, PlugDetectInitiallyUnplugged) {
   // Delay not required for the test to pass, it can trigger a failure if the tested code does not
   // handle clearing its callbacks correctly.
   zx::nanosleep(zx::deadline_after(zx::msec(1)));
-  ASSERT_OK(irq().trigger(0, zx::clock::get_monotonic()));
+  ASSERT_OK(irq().trigger(0, zx::clock::get_boot()));
   thread.join();
 
   // To make sure the IRQ processing is completed in the server, make a 2-way call synchronously.
@@ -373,7 +373,7 @@ TEST_F(Da7219Test, PlugDetectInitiallyPlugged) {
   ASSERT_GT(initial_plugged_state.value().plug_state.plug_state_time(), 0);
 
   // Trigger IRQ for a still plugged headset so we can't Watch (there would be no reply).
-  ASSERT_OK(irq().trigger(0, zx::clock::get_monotonic()));
+  ASSERT_OK(irq().trigger(0, zx::clock::get_boot()));
 
   // Trigger Watch and IRQ for unplugging the headset.
   auto thread = std::thread([&] {
@@ -385,7 +385,7 @@ TEST_F(Da7219Test, PlugDetectInitiallyPlugged) {
   // Delay not required for the test to pass, it can trigger a failure if the tested code does not
   // handle clearing its callbacks correctly.
   zx::nanosleep(zx::deadline_after(zx::msec(1)));
-  ASSERT_OK(irq().trigger(0, zx::clock::get_monotonic()));
+  ASSERT_OK(irq().trigger(0, zx::clock::get_boot()));
   thread.join();
 
   // Trigger IRQ for plugging the headset again.
@@ -398,7 +398,7 @@ TEST_F(Da7219Test, PlugDetectInitiallyPlugged) {
   // Delay not required for the test to pass, it can trigger a failure if the tested code does not
   // handle clearing its callbacks correctly.
   zx::nanosleep(zx::deadline_after(zx::msec(1)));
-  ASSERT_OK(irq().trigger(0, zx::clock::get_monotonic()));
+  ASSERT_OK(irq().trigger(0, zx::clock::get_boot()));
   thread2.join();
 
   // To make sure the IRQ processing is completed in the server, make a 2-way call synchronously.
@@ -460,10 +460,10 @@ TEST_F(Da7219Test, PlugDetectNoMicrophoneWatchBeforeReset) {
 
   // Trigger IRQ for unplugging the headset.
   // No additional watch reply triggered since it is the same the initial plugged state.
-  ASSERT_OK(irq().trigger(0, zx::clock::get_monotonic()));
+  ASSERT_OK(irq().trigger(0, zx::clock::get_boot()));
 
   // Trigger IRQ and Watch for plugging the headset.
-  ASSERT_OK(irq().trigger(0, zx::clock::get_monotonic()));
+  ASSERT_OK(irq().trigger(0, zx::clock::get_boot()));
 
   auto output_state = codec_->WatchPlugState();
   ASSERT_TRUE(output_state.ok());
@@ -527,10 +527,10 @@ TEST_F(Da7219Test, PlugDetectWithMicrophoneWatchBeforeReset) {
 
   // Trigger IRQ for unplugging the headset.
   // No additional watch reply triggered since it is the same the initial plugged state.
-  ASSERT_OK(irq().trigger(0, zx::clock::get_monotonic()));
+  ASSERT_OK(irq().trigger(0, zx::clock::get_boot()));
 
   // Trigger IRQ and Watch for plugging the headset.
-  ASSERT_OK(irq().trigger(0, zx::clock::get_monotonic()));
+  ASSERT_OK(irq().trigger(0, zx::clock::get_boot()));
 
   auto output_state = codec_->WatchPlugState();
   ASSERT_TRUE(output_state.ok());

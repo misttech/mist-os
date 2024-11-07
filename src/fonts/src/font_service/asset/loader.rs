@@ -113,13 +113,10 @@ impl AssetLoader for AssetLoaderImpl {
             cause,
         };
 
-        let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
-            &directory_proxy,
-            &file_name,
-            io::OpenFlags::RIGHT_READABLE,
-        )
-        .map_err(Into::into)
-        .map_err(|e| packaged_file_error(e))?;
+        let file_proxy =
+            fuchsia_fs::directory::open_file_async(&directory_proxy, &file_name, io::PERM_READABLE)
+                .map_err(Into::into)
+                .map_err(|e| packaged_file_error(e))?;
 
         let vmo = file_proxy
             .get_backing_memory(io::VmoFlags::READ)

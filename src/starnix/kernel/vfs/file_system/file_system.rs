@@ -18,7 +18,7 @@ use once_cell::sync::OnceCell;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_sync::Mutex;
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::arc_key::ArcKey;
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::device_type::DeviceType;
@@ -324,8 +324,9 @@ impl FileSystem {
     /// replacing |replaced|.
     /// If |replaced| exists and is a directory, this function must check that |renamed| is n
     /// directory and that |replaced| is empty.
-    pub fn rename(
+    pub fn rename<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
         old_name: &FsStr,
@@ -333,8 +334,13 @@ impl FileSystem {
         new_name: &FsStr,
         renamed: &FsNodeHandle,
         replaced: Option<&FsNodeHandle>,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops.rename(
+            &mut locked,
             self,
             current_task,
             old_parent,
@@ -367,8 +373,16 @@ impl FileSystem {
     /// the filesystem.
     ///
     /// Returns `ENOSYS` if the `FileSystemOps` don't implement `stat`.
-    pub fn statfs(&self, current_task: &CurrentTask) -> Result<statfs, Errno> {
-        let mut stat = self.ops.statfs(self, current_task)?;
+    pub fn statfs<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<statfs, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let mut stat = self.ops.statfs(&mut locked, self, current_task)?;
         if stat.f_frsize == 0 {
             stat.f_frsize = stat.f_bsize as i64;
         }
@@ -449,7 +463,12 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     ///     ..statfs::default(FILE_SYSTEM_MAGIC)
     /// })
     /// ```
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno>;
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno>;
 
     fn name(&self) -> &'static FsStr;
 
@@ -474,6 +493,7 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     /// not in the DirEntry cache).
     fn rename(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,

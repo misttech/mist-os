@@ -19,7 +19,7 @@ driver_bind_rules("ti_tas5720-bind") {
   ]
 }
 
-fuchsia_driver("tas5720-driver") {
+fuchsia_cc_driver("tas5720-driver") {
   output_name = "tas5720"
   defines = [ "_ALL_SOURCE" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]

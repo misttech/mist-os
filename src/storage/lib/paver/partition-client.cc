@@ -21,6 +21,7 @@
 #include <storage/buffer/owned_vmoid.h>
 
 #include "lib/fidl/cpp/wire/channel.h"
+#include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/paver/pave-logging.h"
 
 namespace paver {
@@ -33,8 +34,9 @@ zx::result<std::unique_ptr<BlockPartitionClient>> BlockPartitionClient::Create(
   if (partition_client_end.is_error()) {
     return partition_client_end.take_error();
   }
-  fidl::WireSyncClient<fuchsia_hardware_block::Block> partition(
-      fidl::ClientEnd<fuchsia_hardware_block::Block>(partition_client_end->TakeChannel()));
+  fidl::WireSyncClient<fuchsia_hardware_block_partition::Partition> partition(
+      fidl::ClientEnd<fuchsia_hardware_block_partition::Partition>(
+          partition_client_end->TakeChannel()));
   return zx::ok(std::unique_ptr<BlockPartitionClient>(
       new BlockPartitionClient(std::move(connector), std::move(partition))));
 }
@@ -73,6 +75,27 @@ zx::result<size_t> BlockPartitionClient::GetPartitionSize() {
   }
   const fuchsia_hardware_block::wire::BlockInfo& block_info = block_info_result.value().get();
   return zx::ok(block_info.block_size * block_info.block_count);
+}
+
+zx::result<PartitionMetadata> BlockPartitionClient::GetMetadata() const {
+  const fidl::WireResult result = partition_->GetMetadata();
+  if (!result.ok() || result->is_error()) {
+    ERROR("Failed to get partition metadata with status: %s\n", result.FormatDescription().c_str());
+    return zx::error(result.status());
+  }
+  const auto& value = result.value();
+  if (!value->has_name() || !value->has_type_guid() || !value->has_instance_guid()) {
+    ERROR("Called GetMetadata on a partition that doesn't support required fields.\n");
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  return zx::ok(PartitionMetadata{
+      .name = std::string(value->name().cbegin(), value->name().cend()),
+      .type_guid = uuid::Uuid(value->type_guid().value.data()),
+      .instance_guid = uuid::Uuid(value->instance_guid().value.data()),
+      .start_block_offset = value->start_block_offset(),
+      .num_blocks = value->num_blocks(),
+      .flags = value->flags(),
+  });
 }
 
 zx::result<> BlockPartitionClient::RegisterFastBlockIo() {
@@ -241,8 +264,9 @@ FixedOffsetBlockPartitionClient::Create(std::unique_ptr<VolumeConnector> connect
   if (partition_client_end.is_error()) {
     return partition_client_end.take_error();
   }
-  fidl::WireSyncClient<fuchsia_hardware_block::Block> block(
-      fidl::ClientEnd<fuchsia_hardware_block::Block>(partition_client_end->TakeChannel()));
+  fidl::WireSyncClient<fuchsia_hardware_block_partition::Partition> block(
+      fidl::ClientEnd<fuchsia_hardware_block_partition::Partition>(
+          partition_client_end->TakeChannel()));
   return zx::ok(std::make_unique<FixedOffsetBlockPartitionClient>(
       BlockPartitionClient(std::move(connector), std::move(block)), offset_partition_in_blocks,
       offset_buffer_in_blocks));

@@ -103,6 +103,10 @@ impl RealmQuery {
                     let result = construct_namespace(&model, &scope_moniker, &moniker).await;
                     responder.send(result)
                 }
+                #[cfg(any(
+                    fuchsia_api_level_less_than = "25",
+                    fuchsia_api_level_at_least = "PLATFORM"
+                ))]
                 fsys::RealmQueryRequest::Open {
                     moniker,
                     dir_type,
@@ -112,7 +116,7 @@ impl RealmQuery {
                     object,
                     responder,
                 } => {
-                    let result = open(
+                    let result = open_deprecated(
                         &model,
                         &scope_moniker,
                         &moniker,
@@ -123,6 +127,12 @@ impl RealmQuery {
                         object,
                     )
                     .await;
+                    responder.send(result)
+                }
+                #[cfg(fuchsia_api_level_at_least = "25")]
+                fsys::RealmQueryRequest::OpenDirectory { moniker, dir_type, object, responder } => {
+                    let result =
+                        open_directory(&model, &scope_moniker, &moniker, dir_type, object).await;
                     responder.send(result)
                 }
                 fsys::RealmQueryRequest::ConnectToStorageAdmin {
@@ -409,7 +419,8 @@ async fn construct_namespace(
     Ok(ns.into())
 }
 
-async fn open(
+#[cfg(any(fuchsia_api_level_less_than = "25", fuchsia_api_level_at_least = "PLATFORM"))]
+async fn open_deprecated(
     model: &Arc<Model>,
     scope_moniker: &Moniker,
     moniker_str: &str,
@@ -503,6 +514,82 @@ async fn open(
             );
 
             Ok(())
+        }
+        _ => Err(fsys::OpenError::BadDirType),
+    }
+}
+
+#[cfg(fuchsia_api_level_at_least = "25")]
+async fn open_directory(
+    model: &Arc<Model>,
+    scope_moniker: &Moniker,
+    moniker_str: &str,
+    dir_type: fsys::OpenDirType,
+    object: ServerEnd<fio::DirectoryMarker>,
+) -> Result<(), fsys::OpenError> {
+    // Construct the complete moniker using the scope moniker and the moniker string.
+    let moniker = Moniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
+    let moniker = scope_moniker.concat(&moniker);
+
+    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
+    let instance = model.root().find(&moniker).await.ok_or(fsys::OpenError::InstanceNotFound)?;
+
+    // The intention is that this is only used for component introspection, so we only request
+    // readable/executable rights when creating a connection to the desired directory.
+    const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::Flags::PERM_INHERIT_EXECUTE);
+    let mut request = FLAGS.to_object_request(object);
+    let path = vfs::path::Path::dot();
+
+    match dir_type {
+        fsys::OpenDirType::OutgoingDir => {
+            let scope: package_directory::ExecutionScope = instance.execution_scope.clone();
+            instance
+                .open_outgoing(OpenRequest::new(scope, FLAGS, path, &mut request))
+                .await
+                .map_err(|e| {
+                    request.shutdown(e.as_zx_status());
+                    e.into()
+                })
+        }
+        fsys::OpenDirType::RuntimeDir => {
+            let state = instance.lock_state().await;
+            let runtime_dir = state
+                .get_started_state()
+                .ok_or(fsys::OpenError::InstanceNotRunning)?
+                .runtime_dir()
+                .ok_or(fsys::OpenError::NoSuchDir)?;
+            runtime_dir
+                .open3(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
+                .map_err(|_| fsys::OpenError::FidlError)
+        }
+        fsys::OpenDirType::PackageDir => {
+            let state = instance.lock_state().await;
+            let resolved =
+                state.get_resolved_state().ok_or(fsys::OpenError::InstanceNotResolved)?;
+            let package_dir = &resolved.package().ok_or(fsys::OpenError::NoSuchDir)?.package_dir;
+            package_dir
+                .open3(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
+                .map_err(|_| fsys::OpenError::FidlError)
+        }
+        fsys::OpenDirType::ExposedDir => {
+            let scope: package_directory::ExecutionScope = instance.execution_scope.clone();
+            instance.open_exposed(OpenRequest::new(scope, FLAGS, path, &mut request)).await.map_err(
+                |e| {
+                    request.shutdown(e.as_zx_status());
+                    e.into()
+                },
+            )
+        }
+        fsys::OpenDirType::NamespaceDir => {
+            let state = instance.lock_state().await;
+            let resolved =
+                state.get_resolved_state().ok_or(fsys::OpenError::InstanceNotResolved)?;
+            let namespace_dir =
+                resolved.namespace_dir().await.map_err(|_| fsys::OpenError::NoSuchDir)?;
+            let scope: package_directory::ExecutionScope = instance.execution_scope.clone();
+            namespace_dir
+                .open3(scope, path, FLAGS, &mut request)
+                .map_err(|_| fsys::OpenError::FidlError)
         }
         _ => Err(fsys::OpenError::BadDirType),
     }
@@ -704,7 +791,10 @@ mod tests {
     use super::*;
     use crate::capability;
     use crate::model::component::StartReason;
-    use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
+    use crate::model::start::Start;
+    use crate::model::testing::test_helpers::{
+        config_override, new_config_decl, TestEnvironmentBuilder, TestModelResult,
+    };
     use assert_matches::assert_matches;
     use cm_rust::*;
     use cm_rust_testing::*;
@@ -830,28 +920,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn structured_config_test() {
-        let checksum = ConfigChecksum::Sha256([
-            0x07, 0xA8, 0xE6, 0x85, 0xC8, 0x79, 0xA9, 0x79, 0xC3, 0x26, 0x17, 0xDC, 0x4E, 0x74,
-            0x65, 0x7F, 0xF1, 0xF7, 0x73, 0xE7, 0x12, 0xEE, 0x51, 0xFD, 0xF6, 0x57, 0x43, 0x07,
-            0xA7, 0xAF, 0x2E, 0x64,
-        ]);
-
-        let config = ConfigDecl {
-            fields: vec![ConfigField {
-                key: "my_field".to_string(),
-                type_: ConfigValueType::Bool,
-                mutability: Default::default(),
-            }],
-            checksum: checksum.clone(),
-            value_source: ConfigValueSource::PackagePath("meta/root.cvf".into()),
-        };
-
-        let config_values = ConfigValuesData {
-            values: vec![ConfigValueSpec {
-                value: ConfigValue::Single(ConfigSingleValue::Bool(true)),
-            }],
-            checksum: checksum.clone(),
-        };
+        let (config, config_values, checksum) = new_config_decl();
 
         let components = vec![("root", ComponentDeclBuilder::new().config(config).build())];
 
@@ -873,6 +942,65 @@ mod tests {
         assert_matches!(
             field.value,
             fcdecl::ConfigValue::Single(fcdecl::ConfigSingleValue::Bool(true))
+        );
+        assert_eq!(config.checksum, checksum.native_into_fidl());
+    }
+
+    #[fuchsia::test]
+    async fn override_structured_config_test() {
+        let (config, config_values, checksum) = new_config_decl();
+
+        let components = vec![("root", ComponentDeclBuilder::new().config(config).build())];
+
+        let test = TestEnvironmentBuilder::new()
+            .set_components(components)
+            .set_config_values(vec![("meta/root.cvf", config_values)])
+            .build()
+            .await;
+        let (query, _host) = realm_query(&test).await;
+        let config_override_proxy = config_override(&test).await;
+
+        test.model.start().await;
+
+        let config = query.get_structured_config("./").await.unwrap().unwrap();
+
+        // Component should have one config field with right value
+        assert_eq!(config.fields.len(), 1);
+        let field = &config.fields[0];
+        assert_eq!(field.key, "my_field");
+        assert_matches!(
+            field.value,
+            fcdecl::ConfigValue::Single(fcdecl::ConfigSingleValue::Bool(true))
+        );
+        assert_eq!(config.checksum, checksum.clone().native_into_fidl());
+
+        // Override the config field value
+        config_override_proxy
+            .set_structured_config(
+                "./",
+                &[fcdecl::ConfigOverride {
+                    key: Some("my_field".to_string()),
+                    value: Some(fcdecl::ConfigValue::Single(fcdecl::ConfigSingleValue::Bool(
+                        false,
+                    ))),
+                    ..Default::default()
+                }],
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        // Unresolve and restart the component so that the configuration override will take effect.
+        test.model.root().unresolve().await.unwrap();
+        test.model.root().ensure_started(&StartReason::Root).await.unwrap();
+        let config = query.get_structured_config("./").await.unwrap().unwrap();
+
+        // Component should have one config field with the override value
+        assert_eq!(config.fields.len(), 1);
+        let field = &config.fields[0];
+        assert_eq!(field.key, "my_field");
+        assert_matches!(
+            field.value,
+            fcdecl::ConfigValue::Single(fcdecl::ConfigSingleValue::Bool(false))
         );
         assert_eq!(config.checksum, checksum.native_into_fidl());
     }

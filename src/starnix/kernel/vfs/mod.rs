@@ -75,53 +75,105 @@ pub use xattr::*;
 use crate::device::binder::BinderDriver;
 use crate::task::CurrentTask;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::ownership::{Releasable, ReleaseGuard};
 use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
+/// Register the container to be deferred released.
+// This could be done through a blanket implementation, but doesn't compile because of the lifetime
+// dependency.
+//
+// Can be replaced when https://github.com/rust-lang/rust/issues/100013 is fixed by:
+//
+// fn register<T: for<'a, 'b> Releasable<Context<'a, 'b> = CurrentTaskAndLocked<'a, 'b>> + 'static>(
+//     to_release: T,
+// ) {
+//     RELEASERS.with(|cell| {
+//         cell.borrow_mut()
+//             .as_mut()
+//             .expect("not finalized")
+//             .releasables
+//             .push(Box::new(Some(to_release)));
+//     });
+// }
+macro_rules! register {
+    ($arg:expr) => {
+        RELEASERS.with(|cell| {
+            cell.borrow_mut()
+                .as_mut()
+                .expect("not finalized")
+                .releasables
+                .push(Box::new(Some($arg)));
+        });
+    };
+}
+
+/// Macro impl for Option since we can't take `self` by value and remain object-safe/dyn-compat.
+///
+// This could be done through a blanket implementation, but doesn't compile because of the lifetime
+// dependency.
+//
+// Can be replaced when https://github.com/rust-lang/rust/issues/100013 is fixed by:
+//
+// impl<T> CurrentTaskAndLockedReleasable for Option<T>
+// where
+//    for<'b, 'a> T: Releasable<Context<'a, 'b> = CurrentTaskAndLocked<'a, 'b>>,
+// {
+//     fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>) {
+//         if let Some(this) = self.take() {
+//             <T as Releasable>::release(this, context);
+//         }
+//     }
+// }
+macro_rules! impl_ctr_for_option {
+    ($arg:ty) => {
+        impl CurrentTaskAndLockedReleasable for Option<$arg> {
+            fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>) {
+                if let Some(this) = self.take() {
+                    <$arg as Releasable>::release(this, context);
+                }
+            }
+        }
+    };
+}
+
 pub enum FileObjectReleaserAction {}
 impl ReleaserAction<FileObject> for FileObjectReleaserAction {
     fn release(file_object: ReleaseGuard<FileObject>) {
-        LocalReleasers::register(file_object);
+        register!(file_object);
     }
 }
 pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
+impl_ctr_for_option!(ReleaseGuard<FileObject>);
 
 pub enum FsNodeReleaserAction {}
 impl ReleaserAction<FsNode> for FsNodeReleaserAction {
     fn release(fs_node: ReleaseGuard<FsNode>) {
-        LocalReleasers::register(fs_node);
+        register!(fs_node);
     }
 }
 pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;
+impl_ctr_for_option!(ReleaseGuard<FsNode>);
 
 #[cfg(not(feature = "starnix_lite"))]
 pub enum BinderDriverReleaserAction {}
 #[cfg(not(feature = "starnix_lite"))]
 impl ReleaserAction<BinderDriver> for BinderDriverReleaserAction {
     fn release(driver: ReleaseGuard<BinderDriver>) {
-        LocalReleasers::register(driver);
+        register!(driver);
     }
 }
 #[cfg(not(feature = "starnix_lite"))]
 pub type BinderDriverReleaser = ObjectReleaser<BinderDriver, BinderDriverReleaserAction>;
+impl_ctr_for_option!(ReleaseGuard<BinderDriver>);
+
+pub type CurrentTaskAndLocked<'a, 'b> = (&'b mut Locked<'a, FileOpsCore>, &'b CurrentTask);
 
 /// An object-safe/dyn-compatible trait to wrap `Releasable` types.
-trait CurrentTaskReleasable {
-    fn release_with_task(&mut self, context: &CurrentTask);
-}
-
-// Blanket impl for Option since we can't take `self` by value and remain object-safe/dyn-compat.
-impl<T> CurrentTaskReleasable for Option<T>
-where
-    for<'a> T: Releasable<Context<'a> = &'a CurrentTask>,
-{
-    fn release_with_task(&mut self, context: &CurrentTask) {
-        if let Some(this) = self.take() {
-            <T as Releasable>::release(this, context);
-        }
-    }
+trait CurrentTaskAndLockedReleasable {
+    fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>);
 }
 
 thread_local! {
@@ -132,32 +184,22 @@ thread_local! {
 #[derive(Default)]
 struct LocalReleasers {
     /// The list of entities to be deferred released.
-    releasables: Vec<Box<dyn CurrentTaskReleasable>>,
+    releasables: Vec<Box<dyn CurrentTaskAndLockedReleasable>>,
 }
 
 impl LocalReleasers {
-    /// Register the container to be deferred released.
-    fn register<T: for<'a> Releasable<Context<'a> = &'a CurrentTask> + 'static>(to_release: T) {
-        RELEASERS.with(|cell| {
-            cell.borrow_mut()
-                .as_mut()
-                .expect("not finalized")
-                .releasables
-                .push(Box::new(Some(to_release)));
-        });
-    }
-
     fn is_empty(&self) -> bool {
         self.releasables.is_empty()
     }
 }
 
 impl Releasable for LocalReleasers {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
 
-    fn release(self, context: Self::Context<'_>) {
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+        let (locked, current_task) = context;
         for mut releasable in self.releasables {
-            releasable.release_with_task(context);
+            releasable.release_with_context((locked, current_task));
         }
     }
 }
@@ -171,11 +213,15 @@ pub struct DelayedReleaser {}
 
 impl DelayedReleaser {
     pub fn flush_file(&self, file: &FileHandle, id: FdTableId) {
-        LocalReleasers::register(FlushedFile(Arc::clone(file), id));
+        register!(FlushedFile(Arc::clone(file), id));
     }
 
     /// Run all current delayed releases for the current thread.
-    pub fn apply(&self, current_task: &CurrentTask) {
+    pub fn apply<'a>(
+        &self,
+        locked: &'a mut Locked<'a, FileOpsCore>,
+        current_task: &'a CurrentTask,
+    ) {
         loop {
             let releasers = RELEASERS.with(|cell| {
                 std::mem::take(cell.borrow_mut().as_mut().expect("not finalized").deref_mut())
@@ -183,7 +229,7 @@ impl DelayedReleaser {
             if releasers.is_empty() {
                 return;
             }
-            releasers.release(current_task);
+            releasers.release((locked, current_task));
         }
     }
 
@@ -203,8 +249,10 @@ impl DelayedReleaser {
 struct FlushedFile(FileHandle, FdTableId);
 
 impl Releasable for FlushedFile {
-    type Context<'a> = &'a CurrentTask;
-    fn release(self, context: &CurrentTask) {
-        self.0.flush(context, self.1);
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
+    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+        let (locked, current_task) = context;
+        self.0.flush(locked, current_task, self.1);
     }
 }
+impl_ctr_for_option!(FlushedFile);

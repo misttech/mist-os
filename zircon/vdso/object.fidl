@@ -271,10 +271,15 @@ closed protocol Object {
     ///
     /// The *options* argument can be 0 or it can be one or more of
     ///
-    ///   * ZX_WAIT_ASYNC_TIMESTAMP which causes the system to capture a timestamp when
+    ///   * ZX_WAIT_ASYNC_TIMESTAMP which causes the system to capture a monotonic timestamp when
+    ///     the wait triggered.
+    ///   * ZX_WAIT_ASYNC_BOOT_TIMESTAMP which causes the system to capture a boot timestamp when
     ///     the wait triggered.
     ///   * ZX_WAIT_ASYNC_EDGE causes the port to not enqueue a packet for signals active
     ///     at the time of the `zx_object_wait_async()` call.
+    ///
+    /// Note that passing in both ZX_WAIT_ASYNC_TIMESTAMP and ZX_WAIT_ASYNC_BOOT_TIMESTAMP is
+    /// invalid and will return ZX_ERR_INVALID_ARGS.
     ///
     /// The *signals* argument is a bitmask indicating which [signals] on the object
     /// specified by *handle* will cause a packet to be enqueued.
@@ -346,8 +351,10 @@ closed protocol Object {
     ///
     /// ## Errors
     ///
-    /// `ZX_ERR_INVALID_ARGS`  *options* has bits other than `ZX_WAIT_ASYNC_TIMESTAMP`
-    /// and `ZX_WAIT_ASYNC_EDGE` set.
+    /// `ZX_ERR_INVALID_ARGS` This is returned in two cases. The first is if *options* has bits
+    /// other than `ZX_WAIT_ASYNC_TIMESTAMP`, `ZX_WAIT_ASYNC_BOOT_TIMESTAMP`, and
+    /// `ZX_WAIT_ASYNC_EDGE` set. The seconds is if both `ZX_WAIT_ASYNC_TIMESTAMP` and
+    /// `ZX_WAIT_ASYNC_BOOT_TIMESTAMP` are set.
     ///
     /// `ZX_ERR_BAD_HANDLE`  *handle* is not a valid handle or *port* is not a valid handle.
     ///

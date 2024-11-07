@@ -1279,6 +1279,56 @@ TEST_P(BlobfsIntegrationTest, HealthCheckDuringBlobWrite) {
   }
 }
 
+TEST_P(BlobfsIntegrationTest, ComponentOtaHealthCheckDuringBlobWrite) {
+  std::unique_ptr<BlobInfo> info = GenerateRandomBlob(fs().mount_path(), 1 << 5);
+  fbl::unique_fd fd;
+
+  fidl::UnownedClientEnd export_dir = fs().ServiceDirectory();
+  zx::result client_end =
+      component::ConnectAt<fuchsia_update_verify::ComponentOtaHealthCheck>(export_dir);
+  ASSERT_TRUE(client_end.is_ok()) << "Opening verify service failed with "
+                                  << client_end.status_string();
+
+  {
+    fidl::WireResult result = fidl::WireCall(client_end.value())->GetHealthStatus();
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    EXPECT_EQ(result->health_status, fuchsia_update_verify::HealthStatus::kHealthy);
+  }
+
+  fd.reset(open(info->path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
+  ASSERT_TRUE(fd) << "Open failed: " << strerror(errno);
+
+  {
+    fidl::WireResult result = fidl::WireCall(client_end.value())->GetHealthStatus();
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    EXPECT_EQ(result->health_status, fuchsia_update_verify::HealthStatus::kHealthy);
+  }
+
+  ASSERT_EQ(ftruncate(fd.get(), info->size_data), 0);
+
+  {
+    fidl::WireResult result = fidl::WireCall(client_end.value())->GetHealthStatus();
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    EXPECT_EQ(result->health_status, fuchsia_update_verify::HealthStatus::kHealthy);
+  }
+
+  ASSERT_EQ(StreamAll(write, fd.get(), info->data.get(), info->size_data), 0);
+
+  {
+    fidl::WireResult result = fidl::WireCall(client_end.value())->GetHealthStatus();
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    EXPECT_EQ(result->health_status, fuchsia_update_verify::HealthStatus::kHealthy);
+  }
+
+  VerifyContents(fd.get(), info->data.get(), info->size_data);
+
+  {
+    fidl::WireResult result = fidl::WireCall(client_end.value())->GetHealthStatus();
+    ASSERT_TRUE(result.ok()) << result.status_string();
+    EXPECT_EQ(result->health_status, fuchsia_update_verify::HealthStatus::kHealthy);
+  }
+}
+
 class BlobfsMetricIntegrationTest : public FdioTest {
  protected:
   void GetReadBytes(uint64_t* total_read_bytes) {

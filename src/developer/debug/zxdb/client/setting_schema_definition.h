@@ -48,6 +48,7 @@ struct ClientSettings {
 
     // Symbol lookup.
     static const char* kSymbolIndexFiles;
+    static const char* kSymbolIndexInclude;
     static const char* kSymbolPaths;
     static const char* kBuildIdDirs;
     static const char* kIdsTxts;

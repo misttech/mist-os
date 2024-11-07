@@ -63,10 +63,12 @@ source_set("lib") {
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/syslog/cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/storage/lib/vfs/cpp",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
+
+  deps = [ "//src/storage/lib/vfs/cpp:cpp" ]
 }
 
 fidl("fuchsia.driverhost.test") {
@@ -78,7 +80,7 @@ driver_bind_rules("bind") {
   disable_autobind = true
 }
 
-fuchsia_driver("test_driver_driver") {
+fuchsia_cc_driver("test_driver_driver") {
   output_name = "test_driver"
   testonly = true
   sources = [ "driver_host_test_driver.cc" ]
@@ -99,7 +101,7 @@ fuchsia_driver_component("test_driver") {
   manifest = "meta/test_driver.cml"
 }
 
-fuchsia_driver("test_not_driver_driver") {
+fuchsia_cc_driver("test_not_driver_driver") {
   testonly = true
   deps = [ ":bind" ]
 
@@ -131,6 +133,7 @@ cc_test_executable("unittests") {
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/fxl/test:gtest_main",
+    "//src/storage/lib/vfs/cpp:cpp",
   ]
 
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,

@@ -2,6 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
+import("//build/config.gni")
+
+_common_deps = [
+  "//sdk/lib/async-default",
+  "//sdk/lib/async-loop:async-loop-cpp",
+  "//sdk/lib/async-loop:async-loop-default",
+  "//sdk/lib/sys/cpp",
+]
+
 source_set("lib") {
   sources = [
     "debugger.cc",
@@ -17,16 +27,38 @@ source_set("lib") {
     "pressure_observer.h",
   ]
   deps = [
-    "//sdk/lib/async-default",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/component/incoming/cpp:cpp",
-    "//sdk/lib/sys/cpp:cpp",
-    "//sdk/lib/syslog/cpp",
-  ]
+           "//sdk/lib/component/incoming/cpp:cpp",
+           "//sdk/lib/sys/cpp:cpp",
+           "//sdk/lib/syslog/cpp",
+         ] + _common_deps
   public_deps = [
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug_hlcpp",
+    "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_cpp",
   ]
+}
+
+executable("bin") {
+  output_name = "memory_pressure_signaler"
+  sources = [ "main.cc" ]
+  deps = [
+           ":lib",
+           "//sdk/lib/syslog/cpp",
+         ] + _common_deps
+}
+
+fuchsia_component_manifest("memory_pressure_signaler_manifest") {
+  component_name = "memory_pressure_signaler"
+  manifest = "meta/memory_pressure_signaler.cml"
+}
+
+fuchsia_component("component") {
+  cm_label = ":memory_pressure_signaler_manifest"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("pressure_signaler") {
+  package_name = "memory_pressure_signaler"
+  deps = [ ":component" ]
 }

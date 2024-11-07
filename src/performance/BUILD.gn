@@ -15,6 +15,5 @@ group("tests") {
     "trace2json:trace2json_tests($host_toolchain)",
     "trace_bench:tests",
     "trace_manager/tests",
-    "traceutil:zedmon_test($host_toolchain)",
   ]
 }

@@ -179,12 +179,12 @@ static_library("symbols") {
     # no_rtti config from llvm_library targets.
     "//src/lib/llvm:LLVMDebugInfoDWARF",
     "//third_party/googletest:gtest_prod",
+    "//third_party/rapidjson",
   ]
 
   deps = [
     "//src/lib/elflib",
     "//src/lib/files",
-    "//third_party/rapidjson",
   ]
 
   # zxdb will be 500% slower in loading symbols if compiled with no optimization,

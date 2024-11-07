@@ -37,7 +37,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("aml-saradc-driver") {
+fuchsia_cc_driver("aml-saradc-driver") {
   output_name = "aml-saradc"
   deps = [
     ":common",

@@ -24,7 +24,7 @@ group("tests") {
   deps = [ ":qmi_usb_bind_test" ]
 }
 
-fuchsia_driver("qmi_driver-driver") {
+fuchsia_cc_driver("qmi_driver-driver") {
   output_name = "qmi-transport"
 
   deps = [ ":qmi_driver_src" ]

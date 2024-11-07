@@ -102,6 +102,7 @@
                 "fuchsia.sysmem.FixedProtectedMemorySize",
                 "fuchsia.sysmem.PercentContiguousMemorySize",
                 "fuchsia.sysmem.PercentProtectedMemorySize",
+                "fuchsia.ui.VisualDebuggingLevel",
                 "fuchsia.virtcon.BootAnimation",
                 "fuchsia.virtcon.BufferCount",
                 "fuchsia.virtcon.ColorScheme",
@@ -200,6 +201,7 @@
                 "fuchsia.kernel.SmcResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
+                "fuchsia.pkg.PackageResolver-boot",
                 "fuchsia.process.Launcher",
                 "fuchsia.sys2.CrashIntrospect",
             ],
@@ -249,7 +251,6 @@
                 "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.RepositoryManager",
                 "fuchsia.pkg.rewrite.Engine",
-                "fuchsia.process.Resolver",
                 "fuchsia.settings.Input",
                 "fuchsia.ui.activity.Provider",
                 "fuchsia.update.CommitStatusProvider",
@@ -305,18 +306,6 @@
             availability: "optional",
             source_availability: "unknown",
         },
-
-        // The source of this protocol, debug-dash-launcher,
-        // may not be available on all products.
-        // Used by console-launcher.
-        {
-            protocol: "fuchsia.dash.Launcher",
-            from: "#core",
-            to: "#bootstrap",
-            dependency: "weak",
-            availability: "optional",
-            source_availability: "unknown",
-        },
         {
             protocol: "fuchsia.sys2.RealmExplorer",
             from: "framework",
@@ -346,6 +335,18 @@
             from: "framework",
             as: "fuchsia.sys2.RouteValidator.root",
             to: "#bootstrap",
+        },
+        {
+            protocol: "fuchsia.sys2.ConfigOverride",
+            from: "framework",
+            as: "fuchsia.sys2.ConfigOverride.root",
+            to: "#bootstrap",
+        },
+        {
+            protocol: "fuchsia.sys2.ConfigOverride",
+            from: "framework",
+            as: "fuchsia.sys2.ConfigOverride.root",
+            to: "#toolbox",
         },
         {
             protocol: "fuchsia.sys2.RealmQuery",

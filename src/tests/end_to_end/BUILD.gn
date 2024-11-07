@@ -130,12 +130,12 @@ group("minimal_vim3_staging_tests") {
 # instead of internal `<PRODUCT>` name.
 group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
   testonly = true
-  public_deps = [ "//src/storage/blackout/host:blackout_starnix_vim3_stable" ]
+  public_deps = []
 }
 
 group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
   testonly = true
-  public_deps = [ "//src/storage/blackout/host:blackout_starnix_vim3_unstable" ]
+  public_deps = []
 }
 
 group("starnix_vim3_staging_tests") {
@@ -151,13 +151,12 @@ group("starnix_vim3_staging_tests") {
 # instead of internal `<PRODUCT>` name.
 group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
   testonly = true
-  public_deps = [ "//src/storage/blackout/host:blackout_starnix_arm64_stable" ]
+  public_deps = []
 }
 
 group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
-  public_deps =
-      [ "//src/storage/blackout/host:blackout_starnix_arm64_unstable" ]
+  public_deps = []
 }
 
 group("starnix_arm64_staging_tests") {

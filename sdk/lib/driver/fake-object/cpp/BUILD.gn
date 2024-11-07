@@ -16,7 +16,6 @@ sdk_source_set("cpp") {
   stable = false
   sdk_name = "driver_fake_object_cpp"
   include_base = "//sdk"
-  testonly = true
 
   sources = [
     "fake-handle.cc",
@@ -28,7 +27,6 @@ sdk_source_set("cpp") {
 
   public_deps = [
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
 

@@ -16,8 +16,9 @@ use crate::model::testing::test_hook::TestHook;
 use camino::Utf8PathBuf;
 use cm_config::RuntimeConfig;
 use cm_rust::{
-    Availability, CapabilityDecl, ComponentDecl, ConfigValuesData, EventStreamDecl, NativeIntoFidl,
-    RunnerDecl, UseEventStreamDecl, UseSource,
+    Availability, CapabilityDecl, ComponentDecl, ConfigChecksum, ConfigDecl, ConfigField,
+    ConfigSingleValue, ConfigValue, ConfigValueSource, ConfigValueSpec, ConfigValueType,
+    ConfigValuesData, EventStreamDecl, NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,
 };
 use cm_rust_testing::*;
 use cm_types::{Name, Url};
@@ -34,7 +35,7 @@ use vfs::service;
 use zx::{self as zx, Koid};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
 };
 
 pub const TEST_RUNNER_NAME: &str = cm_rust_testing::TEST_RUNNER_NAME;
@@ -484,4 +485,47 @@ pub async fn new_event_stream(
         .await
         .expect("subscribe to event stream");
     (event_source, event_stream)
+}
+
+/// Create a test ConfigDecl and an associated ConfigValuesData and ConfigChecksum.
+pub fn new_config_decl() -> (ConfigDecl, ConfigValuesData, ConfigChecksum) {
+    let checksum = ConfigChecksum::Sha256([
+        0x07, 0xA8, 0xE6, 0x85, 0xC8, 0x79, 0xA9, 0x79, 0xC3, 0x26, 0x17, 0xDC, 0x4E, 0x74, 0x65,
+        0x7F, 0xF1, 0xF7, 0x73, 0xE7, 0x12, 0xEE, 0x51, 0xFD, 0xF6, 0x57, 0x43, 0x07, 0xA7, 0xAF,
+        0x2E, 0x64,
+    ]);
+    let config = ConfigDecl {
+        fields: vec![ConfigField {
+            key: "my_field".to_string(),
+            type_: ConfigValueType::Bool,
+            mutability: Default::default(),
+        }],
+        checksum: checksum.clone(),
+        value_source: ConfigValueSource::PackagePath("meta/root.cvf".into()),
+    };
+    let config_values = ConfigValuesData {
+        values: vec![ConfigValueSpec { value: ConfigValue::Single(ConfigSingleValue::Bool(true)) }],
+        checksum: checksum.clone(),
+    };
+    (config, config_values, checksum)
+}
+
+pub async fn lifecycle_controller(test: &TestModelResult) -> fsys::LifecycleControllerProxy {
+    let host = {
+        let env = test.builtin_environment.lock().await;
+        env.lifecycle_controller.clone().unwrap()
+    };
+    let (proxy, server) = endpoints::create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
+    capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
+    proxy
+}
+
+pub async fn config_override(test: &TestModelResult) -> fsys::ConfigOverrideProxy {
+    let host = {
+        let env = test.builtin_environment.lock().await;
+        env.config_override.clone().unwrap()
+    };
+    let (proxy, server) = fidl::endpoints::create_proxy::<fsys::ConfigOverrideMarker>().unwrap();
+    capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
+    proxy
 }

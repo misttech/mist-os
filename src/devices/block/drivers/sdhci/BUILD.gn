@@ -12,8 +12,8 @@ source_set("dma-descriptor-builder") {
   public = [ "dma-descriptor-builder.h" ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/lib/driver/logging/cpp",
     "//src/devices/block/lib/sdmmc",
-    "//src/lib/ddk",
     "//src/lib/vmo_store",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
@@ -44,14 +44,15 @@ source_set("sdhci-driver-source") {
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
     "//zircon/system/ulib/fbl",
   ]
   public_deps = [
     ":dma-descriptor-builder",
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/lib/driver/compat/cpp",
     "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
@@ -63,8 +64,9 @@ source_set("sdhci-driver-source") {
   ]
 }
 
-fuchsia_driver("sdhci-driver") {
+fuchsia_cc_driver("sdhci-driver") {
   output_name = "sdhci"
+  sources = [ "export.cc" ]
   deps = [ ":sdhci-driver-source" ]
 }
 
@@ -88,15 +90,14 @@ test("sdhci-test-bin") {
   sources = [ "sdhci-test.cc" ]
   deps = [
     ":sdhci-driver-source",
-    "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp_mock",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
-    "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 

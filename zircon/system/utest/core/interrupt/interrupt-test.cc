@@ -25,8 +25,8 @@
 
 namespace {
 
-constexpr zx::time kSignaledTimeStamp1(12345);
-constexpr zx::time kSignaledTimeStamp2(67890);
+constexpr zx::time_boot kSignaledTimeStamp1(12345);
+constexpr zx::time_boot kSignaledTimeStamp2(67890);
 constexpr uint32_t kKey = 789;
 
 // Use an alias so we use a different test case name.
@@ -209,7 +209,7 @@ TEST_F(InterruptTest, UnBindPort) {
 TEST_F(InterruptTest, VirtualInterrupts) {
   zx::interrupt interrupt;
   zx::interrupt interrupt_cancelled;
-  zx::time timestamp;
+  zx::time_boot timestamp;
 
   ASSERT_EQ(zx::interrupt::create(*irq_resource(), 0, ZX_INTERRUPT_SLOT_USER, &interrupt),
             ZX_ERR_INVALID_ARGS);
@@ -270,7 +270,7 @@ TEST_F(InterruptTest, WaitThreadFunctionsAfterSuspendResume) {
   ASSERT_TRUE(WaitThread(thread, ZX_THREAD_STATE_BLOCKED_INTERRUPT));
 
   // Signal the interrupt and wait for the thread to exit.
-  interrupt.trigger(0, zx::time());
+  interrupt.trigger(0, zx::time_boot());
   zx_signals_t observed;
   ASSERT_OK(thread.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), &observed));
 }

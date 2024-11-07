@@ -14,7 +14,7 @@ use crate::telemetry::{self, TelemetryEvent, TelemetrySender};
 use anyhow::format_err;
 use async_trait::async_trait;
 use fuchsia_inspect::{Node as InspectNode, StringReference};
-use fuchsia_inspect_contrib::auto_persist::{self, AutoPersist};
+use fuchsia_inspect_auto_persist::{self as auto_persist, AutoPersist};
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use fuchsia_inspect_contrib::nodes::BoundedListNode as InspectBoundedListNode;
@@ -23,6 +23,7 @@ use futures::lock::Mutex;
 use futures::select;
 use futures::stream::StreamExt;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use wlan_common::security::SecurityAuthenticator;
@@ -99,8 +100,8 @@ pub enum ConnectionSelectionRequest {
 }
 
 // Primary functionality in a trait, so it can be stubbed for tests.
-#[async_trait]
-pub trait ConnectionSelectorApi: Send + Sync {
+#[async_trait(?Send)]
+pub trait ConnectionSelectorApi {
     // Find best connection candidate to initialize a connection.
     async fn find_and_select_connection_candidate(
         &self,
@@ -117,7 +118,7 @@ pub trait ConnectionSelectorApi: Send + Sync {
 
 // Main loop to handle incoming requests.
 pub async fn serve_connection_selection_request_loop(
-    connection_selector: Arc<dyn ConnectionSelectorApi>,
+    connection_selector: Rc<dyn ConnectionSelectorApi>,
     mut request_channel: mpsc::Receiver<ConnectionSelectionRequest>,
 ) {
     loop {
@@ -331,7 +332,7 @@ impl ConnectionSelector {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl ConnectionSelectorApi for ConnectionSelector {
     /// Full connection selection. Scans to find available candidates, uses network selection (or
     /// optional provided network) to filter out networks, and then bss selection to select the best
@@ -749,6 +750,7 @@ mod tests {
     use lazy_static::lazy_static;
     use rand::Rng;
     use std::pin::pin;
+    use std::rc::Rc;
     use test_case::test_case;
     use wlan_common::scan::Compatibility;
     use wlan_common::security::SecurityDescriptor;
@@ -763,7 +765,7 @@ mod tests {
     }
 
     struct TestValues {
-        connection_selector: Arc<ConnectionSelector>,
+        connection_selector: Rc<ConnectionSelector>,
         real_saved_network_manager: Arc<dyn SavedNetworksManagerApi>,
         saved_network_manager: Arc<FakeSavedNetworksManager>,
         scan_requester: Arc<FakeScanRequester>,
@@ -780,7 +782,7 @@ mod tests {
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
 
-        let connection_selector = Arc::new(ConnectionSelector::new(
+        let connection_selector = Rc::new(ConnectionSelector::new(
             if use_real_save_network_manager {
                 real_saved_network_manager.clone()
             } else {
@@ -990,6 +992,8 @@ mod tests {
 
         // validate the function works
         let results = merge_saved_networks_and_scan_data(
+            // We're not yet ready to change all our Arc to Rc
+            #[allow(clippy::arc_with_non_send_sync)]
             &Arc::new(test_values.real_saved_network_manager),
             mock_scan_results,
         )
@@ -1798,7 +1802,7 @@ mod tests {
         pub response_to_find_and_select_connection_candidate: Option<types::ScannedCandidate>,
         pub response_to_find_and_select_roam_candidate: Option<types::ScannedCandidate>,
     }
-    #[async_trait]
+    #[async_trait(?Send)]
     impl ConnectionSelectorApi for FakeConnectionSelector {
         async fn find_and_select_connection_candidate(
             &self,
@@ -1821,7 +1825,7 @@ mod tests {
 
         // Create a fake selector, since we're just testing the service loop.
         let candidate = generate_random_scanned_candidate();
-        let connection_selector = Arc::new(FakeConnectionSelector {
+        let connection_selector = Rc::new(FakeConnectionSelector {
             response_to_find_and_select_connection_candidate: Some(candidate.clone()),
             response_to_find_and_select_roam_candidate: None,
         });
@@ -1856,7 +1860,7 @@ mod tests {
 
         // Create a fake selector, since we're just testing the service loop.
         let candidate = generate_random_scanned_candidate();
-        let connection_selector = Arc::new(FakeConnectionSelector {
+        let connection_selector = Rc::new(FakeConnectionSelector {
             response_to_find_and_select_connection_candidate: None,
             response_to_find_and_select_roam_candidate: Some(candidate.clone()),
         });

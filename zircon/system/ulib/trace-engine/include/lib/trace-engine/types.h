@@ -22,8 +22,8 @@
 
 __BEGIN_CDECLS
 
-// Timebase recorded into trace files, as returned by zx_ticks_get().
-typedef uint64_t trace_ticks_t;
+// Timebase recorded into trace files, as returned by zx_ticks_get_boot().
+typedef zx_instant_boot_ticks_t trace_ticks_t;
 
 // The ids used to correlate related counters, asynchronous operations, flows, and virtual threads.
 typedef uint64_t trace_counter_id_t;

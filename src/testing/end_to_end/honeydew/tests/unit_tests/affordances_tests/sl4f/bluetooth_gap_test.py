@@ -10,6 +10,7 @@ from unittest import mock
 
 from parameterized import param, parameterized
 
+from honeydew import errors
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_gap as sl4f_bluetooth_gap,
 )
@@ -85,17 +86,19 @@ class BluetoothGapSL4FTests(unittest.TestCase):
 
     def test_sys_init(self) -> None:
         """Test for Bluetooth.sys_init() method."""
-        self.bluetooth_obj.sys_init()
-
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            self.bluetooth_obj.sys_init()
         self.sl4f_obj.run.assert_called()
 
     def test_accept_pairing(self) -> None:
         """Test for Bluetooth.accept_pairing() method."""
-        self.bluetooth_obj.accept_pairing(
-            BluetoothAcceptPairing.DEFAULT_INPUT_MODE,
-            BluetoothAcceptPairing.DEFAULT_OUTPUT_MODE,
-        )
-
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            self.bluetooth_obj.accept_pairing(
+                BluetoothAcceptPairing.DEFAULT_INPUT_MODE,
+                BluetoothAcceptPairing.DEFAULT_OUTPUT_MODE,
+            )
         self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
@@ -117,41 +120,74 @@ class BluetoothGapSL4FTests(unittest.TestCase):
     )
     def test_connect_device(self, parameterized_dict: dict[str, Any]) -> None:
         """Test for Bluetooth.connect_device() method."""
-        dummy_identifier = "0"
-        self.bluetooth_obj.connect_device(
-            identifier=dummy_identifier,
-            connection_type=parameterized_dict["transport"],
-        )
-
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            dummy_identifier = "0"
+            self.bluetooth_obj.connect_device(
+                identifier=dummy_identifier,
+                connection_type=parameterized_dict["transport"],
+            )
         self.sl4f_obj.run.assert_called()
 
     def test_forget_device(self) -> None:
         """Test for Bluetooth.forget_device() method."""
-        dummy_identifier = "0"
-        self.bluetooth_obj.forget_device(dummy_identifier)
-
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            dummy_identifier = "0"
+            self.bluetooth_obj.forget_device(dummy_identifier)
         self.sl4f_obj.run.assert_called()
 
-    def test_get_active_adapter_address(self) -> None:
+    def test_get_active_adapter_address_success(self) -> None:
         """Test for Bluetooth.get_active_adapter_address() method."""
         self.sl4f_obj.run.return_value = _SAMPLE_ADDRESS_OUTPUT
         res = self.bluetooth_obj.get_active_adapter_address()
         self.sl4f_obj.run.assert_called()
-        assert res == "20:1F:3B:62:E9:D2"
+        self.assertEqual(res, "20:1F:3B:62:E9:D2")
 
-    def test_get_connected_devices(self) -> None:
+    def test_get_active_adapter_address_fail(self) -> None:
+        """Test for Bluetooth.get_active_adapter_address() method."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            _ = self.bluetooth_obj.get_active_adapter_address()
+        self.sl4f_obj.run.assert_called()
+
+    def test_get_connected_devices_pass(self) -> None:
         """Test for Bluetooth.get_connected_devices() method."""
         self.sl4f_obj.run.return_value = _SAMPLE_KNOWN_DEVICES_OUTPUT
         res = self.bluetooth_obj.get_connected_devices()
         self.sl4f_obj.run.assert_called()
-        assert "16085008211800713200" in res
+        self.assertEqual(
+            res[0],
+            _SAMPLE_KNOWN_DEVICES_OUTPUT["result"]["16085008211800713200"][
+                "id"
+            ],
+        )
 
-    def test_get_known_remote_devices(self) -> None:
+    def test_get_connected_devices_fail(self) -> None:
+        """Test for Bluetooth.get_connected_devices() method."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            _ = self.bluetooth_obj.get_connected_devices()
+        self.sl4f_obj.run.assert_called()
+
+    def test_get_known_remote_devices_pass(self) -> None:
         """Test for Bluetooth.get_known_remote_devices() method."""
         self.sl4f_obj.run.return_value = _SAMPLE_KNOWN_DEVICES_OUTPUT
         res = self.bluetooth_obj.get_known_remote_devices()
         self.sl4f_obj.run.assert_called()
-        assert res["16085008211800713200"]["id"] == "16085008211800713200"
+        self.assertEqual(
+            res["16085008211800713200"]["id"],
+            _SAMPLE_KNOWN_DEVICES_OUTPUT["result"]["16085008211800713200"][
+                "id"
+            ],
+        )
+
+    def test_get_known_remote_devices_fail(self) -> None:
+        """Test for Bluetooth.get_known_remote_devices() method."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            _ = self.bluetooth_obj.get_known_remote_devices()
+        self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
         [
@@ -172,12 +208,13 @@ class BluetoothGapSL4FTests(unittest.TestCase):
     )
     def test_pair_device(self, parameterized_dict: dict[str, Any]) -> None:
         """Test for Bluetooth.pair_device() method."""
-        dummy_identifier = "0"
-        self.bluetooth_obj.pair_device(
-            identifier=dummy_identifier,
-            connection_type=parameterized_dict["transport"],
-        )
-
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            dummy_identifier = "0"
+            self.bluetooth_obj.pair_device(
+                identifier=dummy_identifier,
+                connection_type=parameterized_dict["transport"],
+            )
         self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
@@ -191,10 +228,11 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         self, parameterized_dict: dict[str, Any]
     ) -> None:
         """Test for Bluetooth.request_discovery() method."""
-        self.bluetooth_obj.request_discovery(
-            discovery=parameterized_dict["discovery"]
-        )
-
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            self.bluetooth_obj.request_discovery(
+                discovery=parameterized_dict["discovery"]
+            )
         self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
@@ -206,9 +244,11 @@ class BluetoothGapSL4FTests(unittest.TestCase):
     )
     def test_set_discoverable(self, parameterized_dict: dict[str, Any]) -> None:
         """Test for Bluetooth.set_discoverable() method."""
-        self.bluetooth_obj.set_discoverable(
-            discoverable=parameterized_dict["discoverable"]
-        )
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.BluetoothError):
+            self.bluetooth_obj.set_discoverable(
+                discoverable=parameterized_dict["discoverable"]
+            )
         self.sl4f_obj.run.assert_called()
 
 

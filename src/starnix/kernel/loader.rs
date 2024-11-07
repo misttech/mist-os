@@ -21,7 +21,7 @@ use crate::vdso::vdso_loader::ZX_TIME_VALUES_MEMORY;
 use crate::vfs::{FdNumber, FileHandle, FileWriteGuardMode, FileWriteGuardRef};
 use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::time::SCHEDULER_CLOCK_HZ;
 use starnix_uapi::errors::Errno;
@@ -178,6 +178,20 @@ fn elf_load_error_to_errno(err: elf_load::ElfLoadError) -> Errno {
     errno!(EINVAL)
 }
 
+fn access_from_vmar_flags(vmar_flags: zx::VmarFlags) -> Access {
+    let mut access = Access::empty();
+    if vmar_flags.contains(zx::VmarFlags::PERM_READ) {
+        access |= Access::READ;
+    }
+    if vmar_flags.contains(zx::VmarFlags::PERM_WRITE) {
+        access |= Access::WRITE;
+    }
+    if vmar_flags.contains(zx::VmarFlags::PERM_EXECUTE) {
+        access |= Access::EXEC;
+    }
+    access
+}
+
 struct Mapper<'a> {
     file: &'a FileHandle,
     mm: &'a Arc<MemoryManager>,
@@ -209,6 +223,7 @@ impl elf_load::Mapper for Mapper<'_> {
                 vmo_offset,
                 length,
                 ProtectionFlags::from_vmar_flags(vmar_flags),
+                access_from_vmar_flags(vmar_flags),
                 MappingOptions::ELF_BINARY,
                 MappingName::File(self.file.name.clone()),
                 self.file_write_guard.clone(),
@@ -299,27 +314,22 @@ const MAX_RECURSION_DEPTH: usize = 5;
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
 /// recursion depth. `argv` may change due to script interpreter logic.
-pub fn resolve_executable<L>(
-    locked: &mut Locked<'_, L>,
+pub fn resolve_executable(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     file: FileHandle,
     path: CString,
     argv: Vec<CString>,
     environ: Vec<CString>,
     security_state: security::ResolvedElfState,
-) -> Result<ResolvedElf, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ResolvedElf, Errno> {
     resolve_executable_impl(locked, current_task, file, path, argv, environ, 0, security_state)
 }
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
 /// recursion depth.
-fn resolve_executable_impl<L>(
-    locked: &mut Locked<'_, L>,
+fn resolve_executable_impl(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     file: FileHandle,
     path: CString,
@@ -327,12 +337,7 @@ fn resolve_executable_impl<L>(
     environ: Vec<CString>,
     recursion_depth: usize,
     security_state: security::ResolvedElfState,
-) -> Result<ResolvedElf, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ResolvedElf, Errno> {
     if recursion_depth > MAX_RECURSION_DEPTH {
         return error!(ELOOP);
     }
@@ -363,8 +368,8 @@ where
 }
 
 /// Resolves a #! script file into a validated executable ELF.
-fn resolve_script<L>(
-    locked: &mut Locked<'_, L>,
+fn resolve_script(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     memory: Arc<MemoryObject>,
     path: CString,
@@ -372,12 +377,7 @@ fn resolve_script<L>(
     environ: Vec<CString>,
     recursion_depth: usize,
     security_state: security::ResolvedElfState,
-) -> Result<ResolvedElf, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ResolvedElf, Errno> {
     // All VMOs have sizes in multiple of the system page size, so as long as we only read a page or
     // less, we should never read past the end of the VMO.
     // Since Linux 5.1, the max length of the interpreter following the #! is 255.
@@ -456,20 +456,15 @@ fn parse_interpreter_line(line: &[u8]) -> Result<Vec<CString>, Errno> {
 }
 
 /// Resolves a file handle into a validated executable ELF.
-fn resolve_elf<L>(
-    locked: &mut Locked<'_, L>,
+fn resolve_elf(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     file: FileHandle,
     memory: Arc<MemoryObject>,
     argv: Vec<CString>,
     environ: Vec<CString>,
     security_state: security::ResolvedElfState,
-) -> Result<ResolvedElf, Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<ResolvedElf, Errno> {
     let vmo = memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
     let elf_headers = elf_parse::Elf64Headers::from_vmo(vmo).map_err(elf_parse_error_to_errno)?;
     let interp = if let Some(interp_hdr) = elf_headers
@@ -548,25 +543,28 @@ pub fn load_executable(
         let vdso_memory = &current_task.kernel().vdso.memory;
         let vvar_memory = current_task.kernel().vdso.vvar_readonly.clone();
 
-        let vdso_size = vdso_memory.get_size();
-        const VDSO_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ.union(ProtectionFlags::EXEC);
+    let vdso_size = vdso_memory.get_size();
+    const VDSO_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ.union(ProtectionFlags::EXEC);
+    const VDSO_MAX_ACCESS: Access = Access::READ.union(Access::EXEC);
 
-        let vvar_size = vvar_memory.get_size();
-        const VVAR_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ;
+    let vvar_size = vvar_memory.get_size();
+    const VVAR_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ;
+    const VVAR_MAX_ACCESS: Access = Access::READ;
 
-        // Map the time values VMO used by libfasttime. We map this right behind the vvar so that
-        // userspace sees this as one big vvar block in memory.
-        let time_values_size = ZX_TIME_VALUES_MEMORY.get_size();
-        let time_values_map_result = current_task.mm().map_memory(
-            DesiredAddress::Any,
-            ZX_TIME_VALUES_MEMORY.clone(),
-            0,
-            (time_values_size as usize) + (vvar_size as usize) + (vdso_size as usize),
-            VVAR_PROT_FLAGS,
-            MappingOptions::empty(),
-            MappingName::Vvar,
-            FileWriteGuardRef(None),
-        )?;
+    // Map the time values VMO used by libfasttime. We map this right behind the vvar so that
+    // userspace sees this as one big vvar block in memory.
+    let time_values_size = ZX_TIME_VALUES_MEMORY.get_size();
+    let time_values_map_result = current_task.mm().map_memory(
+        DesiredAddress::Any,
+        ZX_TIME_VALUES_MEMORY.clone(),
+        0,
+        (time_values_size as usize) + (vvar_size as usize) + (vdso_size as usize),
+        VVAR_PROT_FLAGS,
+        VVAR_MAX_ACCESS,
+        MappingOptions::empty(),
+        MappingName::Vvar,
+        FileWriteGuardRef(None),
+    )?;
 
         // Create a private clone of the starnix kernel vDSO.
         let vdso_clone = vdso_memory
@@ -579,30 +577,31 @@ pub fn load_executable(
                 .map_err(|status| from_status_like_fdio!(status))?,
         );
 
-        // Overwrite the second part of the vvar mapping with starnix's vvar.
-        let vvar_map_result = current_task.mm().map_memory(
-            DesiredAddress::FixedOverwrite(time_values_map_result + time_values_size),
-            vvar_memory,
-            0,
-            vvar_size as usize,
-            VVAR_PROT_FLAGS,
-            MappingOptions::empty(),
-            MappingName::Vvar,
-            FileWriteGuardRef(None),
-        )?;
+    // Overwrite the second part of the vvar mapping with starnix's vvar.
+    let vvar_map_result = current_task.mm().map_memory(
+        DesiredAddress::FixedOverwrite(time_values_map_result + time_values_size),
+        vvar_memory,
+        0,
+        vvar_size as usize,
+        VVAR_PROT_FLAGS,
+        VVAR_MAX_ACCESS,
+        MappingOptions::empty(),
+        MappingName::Vvar,
+        FileWriteGuardRef(None),
+    )?;
 
-        // Overwrite the third part of the vvar mapping to contain the vDSO clone.
-        vdso_base = current_task.mm().map_memory(
-            DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
-            vdso_executable,
-            0,
-            vdso_size as usize,
-            VDSO_PROT_FLAGS,
-            MappingOptions::DONT_SPLIT,
-            MappingName::Vdso,
-            FileWriteGuardRef(None),
-        )?;
-    }
+    // Overwrite the third part of the vvar mapping to contain the vDSO clone.
+    let vdso_base = current_task.mm().map_memory(
+        DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
+        vdso_executable,
+        0,
+        vdso_size as usize,
+        VDSO_PROT_FLAGS,
+        VDSO_MAX_ACCESS,
+        MappingOptions::DONT_SPLIT,
+        MappingName::Vdso,
+        FileWriteGuardRef(None),
+    )?;
 
     let auxv = {
         let creds = current_task.creds();
@@ -670,7 +669,6 @@ mod tests {
     use super::*;
     use crate::testing::*;
     use assert_matches::assert_matches;
-    use starnix_sync::MmDumpable;
     use std::mem::MaybeUninit;
 
     const TEST_STACK_ADDR: UserAddress = UserAddress::const_from(0x3000_0000);
@@ -764,16 +762,10 @@ mod tests {
         assert_eq!(stack_start_addr, original_stack_start_addr - payload_size);
     }
 
-    fn exec_hello_starnix<L>(
-        locked: &mut Locked<'_, L>,
+    fn exec_hello_starnix(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &mut CurrentTask,
-    ) -> Result<(), Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-        L: LockBefore<MmDumpable>,
-    {
+    ) -> Result<(), Errno> {
         let argv = vec![CString::new("data/tests/hello_starnix").unwrap()];
         let executable =
             current_task.open_file(locked, argv[0].as_bytes().into(), OpenFlags::RDONLY)?;

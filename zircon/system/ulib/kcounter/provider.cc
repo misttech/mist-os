@@ -78,6 +78,11 @@ class Counter : public fidl::WireServer<fuchsia_kernel::Counter>,
         dispatcher_, std::move(request->tree_iterator), std::vector<std::string>{});
   }
 
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_inspect::Tree> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    completer.Close(ZX_ERR_UNAVAILABLE);
+  }
+
   async_dispatcher_t* dispatcher_;
   kcounter::VmoToInspectMapper mapper_;
 };

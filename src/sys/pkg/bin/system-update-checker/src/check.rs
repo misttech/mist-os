@@ -474,7 +474,7 @@ pub mod test_check_for_system_update_impl {
             dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
         ) -> Self::ResolveResponseFut {
             assert_eq!(package_url, self.expected_package_url);
-            fdio::open(
+            fdio::open_deprecated(
                 self.temp_dir.path().to_str().expect("path is utf8"),
                 fio::OpenFlags::RIGHT_READABLE,
                 dir.into_channel(),
@@ -678,7 +678,7 @@ pub mod test_check_for_system_update_impl {
                 }
 
                 assert_eq!(package_url, TEST_UPDATE_PACKAGE_URL);
-                fdio::open(
+                fdio::open_deprecated(
                     self.temp_dir.path().to_str().expect("path is utf8"),
                     fio::OpenFlags::RIGHT_READABLE,
                     dir.into_channel(),

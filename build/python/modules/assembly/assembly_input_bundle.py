@@ -249,6 +249,10 @@ class AssemblyInputBundle:
             },
             "qemu_kernel": "kernel/multiboot.bin",
             "boot_args": [ "arg1", "arg2", ... ],
+            "bootfs_shell_commands": {
+                "package1":
+                    ["path/to/binary1", "path/to/binary2"]
+            },
             "shell_commands": {
                 "package1":
                     ["path/to/binary1", "path/to/binary2"]
@@ -298,6 +302,9 @@ class AssemblyInputBundle:
     blobs: Set[FilePath] = field(default_factory=set)
     base_drivers: List[DriverDetails] = field(default_factory=list)
     boot_drivers: List[DriverDetails] = field(default_factory=list)
+    bootfs_shell_commands: Dict[str, List[str]] = field(
+        default_factory=functools.partial(defaultdict, list)
+    )
     shell_commands: Dict[str, List[str]] = field(
         default_factory=functools.partial(defaultdict, list)
     )
@@ -413,6 +420,7 @@ class AIBCreator:
 
         # The shell command configurations
         self.shell_commands: Dict[str, List[str]] = defaultdict(list)
+        self.bootfs_shell_commands: Dict[str, List[str]] = defaultdict(list)
 
         # The kernel info
         self.kernel = KernelInfo()
@@ -523,6 +531,7 @@ class AIBCreator:
         result.memory_buckets.update(memory_buckets)
 
         # Add shell_commands field to assembly_config.json field in AIBCreator
+        result.bootfs_shell_commands = self.bootfs_shell_commands
         result.shell_commands = self.shell_commands
 
         # Copy all the blobs to their dir in the out-of-tree layout
@@ -638,6 +647,9 @@ class AIBCreator:
         result.config_data = config_data
 
         # Sort the shell commands alphabetically
+        result.bootfs_shell_commands = dict(
+            sorted(result.bootfs_shell_commands.items())
+        )
         result.shell_commands = dict(sorted(result.shell_commands.items()))
 
         # Write the AIB manifest

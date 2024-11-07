@@ -111,6 +111,7 @@ impl FileOps for Ashmem {
 
     fn seek(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -165,7 +166,7 @@ impl FileOps for Ashmem {
     fn mmap(
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
         memory_offset: u64,
@@ -205,6 +206,7 @@ impl FileOps for Ashmem {
             memory_offset,
             length,
             prot_flags,
+            file.max_access_for_memory_mapping(),
             mapping_options,
             MappingName::Ashmem(state.name.clone()),
             FileWriteGuardRef(None),

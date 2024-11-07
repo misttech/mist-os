@@ -8,7 +8,7 @@ import subprocess
 
 import fidl.fuchsia_tracing as tracing
 import fidl.fuchsia_tracing_controller as tracing_controller
-from fuchsia_controller_py import Socket
+from fuchsia_controller_py import Channel, Socket
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import asserts, base_test, test_runner
 from mobly_controller import fuchsia_device
@@ -32,9 +32,9 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         if self.device.ctx is None:
             raise ValueError(f"Device: {self.device.target} has no context")
         ch = self.device.ctx.connect_device_proxy(
-            "core/trace_manager", tracing_controller.Controller.MARKER
+            "core/trace_manager", tracing_controller.Provisioner.MARKER
         )
-        controller = tracing_controller.Controller.Client(ch)
+        controller = tracing_controller.Provisioner.Client(ch)
         res = await controller.get_known_categories()
         asserts.assert_true(
             res.response,
@@ -57,9 +57,9 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         if self.device.ctx is None:
             raise ValueError(f"Device: {self.device.target} has no context")
         ch = self.device.ctx.connect_device_proxy(
-            "core/trace_manager", tracing_controller.Controller.MARKER
+            "core/trace_manager", tracing_controller.Provisioner.MARKER
         )
-        controller = tracing_controller.Controller.Client(ch)
+        provisioner = tracing_controller.Provisioner.Client(ch)
         categories = [
             "blobfs",
             "gfx",
@@ -73,7 +73,13 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         _client, server = Socket.create()
         client = AsyncSocket(_client)
 
-        controller.initialize_tracing(config=config, output=server.take())
+        client_end, server_end = Channel.create()
+
+        provisioner.initialize_tracing(
+            controller=server_end.take(), config=config, output=server.take()
+        )
+        controller = tracing_controller.Session.Client(client_end)
+
         await controller.start_tracing(
             options=tracing_controller.StartOptions()
         )
@@ -84,22 +90,18 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         )
         asserts.assert_true(
             stop_res.response,
-            msg="Error retrieving known categories",
+            msg="Error stopping tracing",
         )
 
-        terminate_res = await controller.terminate_tracing(
-            options=tracing_controller.TerminateOptions(write_results=True)
-        )
+        stop_result = stop_res.response.result
         asserts.assert_true(
-            terminate_res.response,
-            msg="Error retrieving known categories",
+            len(stop_result.provider_stats) > 0,
+            msg="Stop result provider stats should not be empty.",
         )
 
-        terminate_result = terminate_res.response.result
-        asserts.assert_true(
-            len(terminate_result.provider_stats) > 0,
-            msg="Terminate result provider stats should not be empty.",
-        )
+        # Closing the channel will terminate tracing
+        controller.channel.close()
+
         raw_trace = await socket_task
         asserts.assert_equal(type(raw_trace), bytearray)
         asserts.assert_true(

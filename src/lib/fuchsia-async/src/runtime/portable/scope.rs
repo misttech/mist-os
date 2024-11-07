@@ -5,9 +5,6 @@
 // This implements a *very* limited version of the fuchsia Scope API.  More can be added
 // as needed.
 
-// Refer to the documentation for the fuchsia implementation.
-#![doc(hidden)]
-
 use crate::condition::Condition;
 use std::collections::HashMap;
 use std::future::{poll_fn, Future};
@@ -18,9 +15,14 @@ use std::task::{Poll, Waker};
 use std::{fmt, hash};
 use tokio::task::AbortHandle;
 
-/// A unique handle to a scope.
+/// A unique handle to a scope. When this handle is dropped, the scope is
+/// cancelled.
 ///
-/// When this handle is dropped, the scope is cancelled.
+/// See the [Fuchsia target documentation on this type][docs] for more
+/// information about scopes. This version of the Scope API is a limited subset
+/// of that API.
+///
+/// [docs]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Scope.html
 pub struct Scope {
     inner: ScopeRef,
 }
@@ -73,12 +75,45 @@ impl ScopeRef {
         self.compute(future).detach_on_drop()
     }
 
-    /// Spawns a task on the scope, but unlink `spawn` returns a handle that will drop the future
+    /// Spawns a task on the scope.
+    pub fn spawn_local(&self, future: impl Future<Output = ()> + 'static) -> crate::JoinHandle<()> {
+        self.compute_local(future).detach_on_drop()
+    }
+
+    /// Spawns a task on the scope, but unlike `spawn` returns a handle that will drop the future
     /// when dropped.
     pub fn compute<T: Send + 'static>(
         &self,
         future: impl Future<Output = T> + Send + 'static,
     ) -> crate::Task<T> {
+        let (task_id, fut) = self.mk_task_fut(future);
+        // Take the lock first so that the insert below happens before the task tries to take the
+        // lock to set the waker.
+        let mut state = self.inner.state.lock();
+        let task = crate::Task::spawn(fut);
+        state.all_tasks.insert(task_id, (task.abort_handle(), None));
+        task
+    }
+
+    /// Spawns a task on the scope, but unlike `spawn` returns a handle that will drop the future
+    /// when dropped.
+    pub fn compute_local<T: 'static>(
+        &self,
+        future: impl Future<Output = T> + 'static,
+    ) -> crate::Task<T> {
+        let (task_id, fut) = self.mk_task_fut(future);
+        // Take the lock first so that the insert below happens before the task tries to take the
+        // lock to set the waker.
+        let mut state = self.inner.state.lock();
+        let task = crate::Task::local(fut);
+        state.all_tasks.insert(task_id, (task.abort_handle(), None));
+        task
+    }
+
+    fn mk_task_fut<T: 'static, F: Future<Output = T> + 'static>(
+        &self,
+        future: F,
+    ) -> (u64, impl Future<Output = T>) {
         static TASK_ID: AtomicU64 = AtomicU64::new(0);
 
         let task_id = TASK_ID.fetch_add(1, Ordering::Relaxed);
@@ -110,32 +145,27 @@ impl ScopeRef {
 
         let on_drop = OnDrop { scope: self.downgrade(), task_id };
 
-        // Take the lock first so that the insert below happens before the task tries to take the
-        // lock to set the waker.
-        let mut state = self.inner.state.lock();
-
         let weak = self.downgrade();
-        let task = crate::Task::spawn(async move {
+        let fut = async move {
             let _on_drop = on_drop;
             let mut future = std::pin::pin!(future);
             // Every time we poll, we must set the waker so that `wake_all` works.
             poll_fn(|cx| {
                 if let Some(scope) = weak.upgrade() {
-                    scope.inner.state.lock().all_tasks.get_mut(&task_id).unwrap().1 =
-                        Some(cx.waker().clone());
+                    if let Some(task) = scope.inner.state.lock().all_tasks.get_mut(&task_id) {
+                        task.1 = Some(cx.waker().clone());
+                    }
                 }
                 future.as_mut().poll(cx)
             })
             .await
-        });
+        };
 
-        state.all_tasks.insert(task_id, (task.abort_handle(), None));
-
-        task
+        (task_id, fut)
     }
 
     /// Creates a [`WeakScopeRef`] for this scope.
-    pub fn downgrade(&self) -> WeakScopeRef {
+    fn downgrade(&self) -> WeakScopeRef {
         WeakScopeRef { inner: Arc::downgrade(&self.inner) }
     }
 
@@ -171,7 +201,7 @@ impl fmt::Debug for ScopeRef {
 
 /// A weak reference to a scope.
 #[derive(Clone)]
-pub struct WeakScopeRef {
+struct WeakScopeRef {
     inner: Weak<ScopeInner>,
 }
 

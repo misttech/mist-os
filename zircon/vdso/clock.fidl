@@ -131,6 +131,8 @@ closed protocol Clockfuncs {
     ///
     /// The following options are defined for clock objects:
     ///
+    /// + `ZX_CLOCK_OPT_BOOT`: When set, creates a clock object whose reference is the
+    ///    boot timeline.
     /// + `ZX_CLOCK_OPT_MONOTONIC` : When set, creates a clock object that is
     ///   guaranteed to never run backwards. Monotonic clocks must always move forward.
     /// + `ZX_CLOCK_OPT_CONTINUOUS` : When set, creates a clock that is guaranteed to

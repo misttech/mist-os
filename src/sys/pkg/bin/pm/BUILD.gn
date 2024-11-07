@@ -23,7 +23,7 @@ if (is_host) {
 
   group("host_tests") {
     testonly = true
-    public_deps = [ "cmd/pm:host_tests" ]
+    public_deps = []
     foreach(label, test_labels) {
       public_deps += [ label ]
     }

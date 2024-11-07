@@ -34,8 +34,16 @@ class IsolatedDevmgr {
     // If this is true then tell fshost not to create a block watcher.
     bool disable_block_watcher = true;
 
+    // Enable storage-host in fshost.  GPT and FVM drivers won't be bound by the driver framework.
+    // `disable_block_watcher` is ignored when this is set.
+    bool enable_storage_host = false;
+
+    // Enable the fuchsia.fshost.Netboot flag, which prevents fshost from binding to the GPT.
+    bool netboot = false;
+
     // A board name to appear.
     fbl::String board_name;
+    fbl::String boot_arg;
     std::vector<std::string> driver_disable;
     std::vector<std::string> driver_bind_eager;
   };
@@ -54,7 +62,7 @@ class IsolatedDevmgr {
     return realm_->component().Connect(interface_name, std::move(channel));
   }
 
-  fidl::ClientEnd<fuchsia_io::Directory> fshost_svc_dir() const {
+  fidl::ClientEnd<fuchsia_io::Directory> RealmExposedDir() const {
     auto root = realm_->component().CloneExposedDir();
     return fidl::ClientEnd<fuchsia_io::Directory>(root.TakeChannel());
   }

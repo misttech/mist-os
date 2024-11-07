@@ -34,7 +34,7 @@ source_set("src") {
   ]
 }
 
-fuchsia_driver("network-device-driver") {
+fuchsia_cc_driver("network-device-driver") {
   output_name = "network-device"
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   if (is_mistos) {

@@ -27,6 +27,7 @@ use crate::builtin::time::{create_utc_clock, UtcInstantMaintainer};
 use crate::capability::{self, BuiltinCapability, FrameworkCapability};
 use crate::framework::binder::BinderFrameworkCapability;
 use crate::framework::capability_store::CapabilityStore;
+use crate::framework::config_override::ConfigOverride;
 use crate::framework::introspector::IntrospectorFrameworkCapability;
 use crate::framework::lifecycle_controller::LifecycleController;
 use crate::framework::namespace::Namespace;
@@ -691,6 +692,7 @@ impl RootComponentInputBuilder {
 pub struct BuiltinEnvironment {
     pub model: Arc<Model>,
 
+    pub config_override: Option<ConfigOverride>,
     pub realm_query: Option<RealmQuery>,
     pub lifecycle_controller: Option<LifecycleController>,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
@@ -1426,6 +1428,14 @@ impl BuiltinEnvironment {
             None
         };
 
+        let config_override = if runtime_config.enable_introspection {
+            let cap = ConfigOverride::new(Arc::downgrade(&model));
+            framework_capabilities.push(Box::new(cap.clone()));
+            Some(cap)
+        } else {
+            None
+        };
+
         if runtime_config.enable_introspection {
             framework_capabilities
                 .push(Box::new(RouteValidatorFrameworkCapability::new(Arc::downgrade(&model))));
@@ -1458,6 +1468,7 @@ impl BuiltinEnvironment {
 
         Ok(BuiltinEnvironment {
             model,
+            config_override,
             realm_query,
             lifecycle_controller,
             event_registry,
@@ -1483,6 +1494,10 @@ impl BuiltinEnvironment {
         // Create the ServiceFs
         let mut service_fs = ServiceFs::new();
 
+        self.add_exposed_framework_protocol::<_, fsys::ConfigOverrideMarker>(
+            &mut service_fs,
+            self.config_override.as_ref(),
+        );
         self.add_exposed_framework_protocol::<_, fsys::LifecycleControllerMarker>(
             &mut service_fs,
             self.lifecycle_controller.as_ref(),

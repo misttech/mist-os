@@ -38,10 +38,16 @@ using Vector = elfldltl::AllocCheckerContainer<fbl::Vector>::Container<T>;
 using ModuleRefList = Vector<const RuntimeModule*>;
 
 // These are helpers to allow specific ways to access an element.
-constexpr auto DerefElement = [](auto&& ptr) -> decltype(auto) { return *ptr; };
-constexpr auto AsConstElement = [](const auto& elt) -> decltype(auto) { return elt; };
-constexpr auto DerefElementsView = std::views::transform(DerefElement);
-constexpr auto AsConstElementsView = std::views::transform(AsConstElement);
+struct DerefElement {
+  constexpr decltype(auto) operator()(auto&& ptr) const { return *ptr; }
+};
+
+struct AsConstElement {
+  constexpr decltype(auto) operator()(const auto& elt) const { return elt; }
+};
+
+constexpr auto DerefElementsView = std::views::transform(DerefElement());
+constexpr auto AsConstElementsView = std::views::transform(AsConstElement());
 
 // TODO(https://fxbug.dev/324136831): comment on how RuntimeModule relates to
 // startup modules when the latter is supported.
@@ -116,7 +122,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // Return a view of `list` with all of its elements dereferenced and made
   // constant (i.e. Vector<const RuntimeModule*> -> View<const RuntimeModule&>).
   static constexpr auto const_derefed_element_view(const ModuleRefList& list) {
-    return std::views::transform(std::views::transform(list, DerefElement), AsConstElement);
+    return AsConstElementsView(DerefElementsView(list));
   }
 
   // This is a list of module pointers to this module's DT_NEEDEDs, i.e. the
@@ -143,6 +149,12 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // Constructs this module's `module_tree` if it has not been set yet.
   bool ReifyModuleTree(Diagnostics& diag);
 
+  // Whether this module is a global module: either the module was loaded at
+  // startup or loaded by dlopen() with the RTLD_GLOBAL flag.
+  constexpr bool is_global() const { return abi_module_.symbols_visible; }
+  constexpr void set_global() { abi_module_.symbols_visible = true; }
+  constexpr bool is_local() const { return !is_global(); }
+
  private:
   // A RuntimeModule can only be created with Module::Create...).
   RuntimeModule() = default;
@@ -155,6 +167,9 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   ModuleRefList direct_deps_;
   ModuleRefList module_tree_;
 };
+
+// This is the module tree view type returned by RuntimeModule::module_tree.
+using ModuleTree = decltype(std::declval<RuntimeModule>().module_tree());
 
 }  // namespace dl
 

@@ -113,15 +113,15 @@ void DataProvider::GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
                                    ? zx::duration(params.collection_timeout_per_data())
                                    : kDefaultDataTimeout;
 
-  std::optional<zx::channel> channel;
+  fidl::ServerEnd<fuchsia_io::File> file_server;
   if (params.has_response_channel()) {
-    channel = std::move(*params.mutable_response_channel());
+    file_server = fidl::ServerEnd<fuchsia_io::File>(std::move(*params.mutable_response_channel()));
   }
 
   FX_LOGS(INFO) << "Generating snapshot";
   GetSnapshotInternal(
       timeout, uuid::Generate(),
-      [this, callback = std::move(callback), channel = std::move(channel)](
+      [this, callback = std::move(callback), file_server = std::move(file_server)](
           const feedback::Annotations& annotations, fsl::SizedVmo archive) mutable {
         FX_LOGS(INFO) << "Generated snapshot";
         Snapshot snapshot;
@@ -137,8 +137,8 @@ void DataProvider::GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
         }
 
         if (archive.vmo().is_valid()) {
-          if (channel) {
-            ServeArchive(std::move(archive), std::move(channel.value()));
+          if (file_server.is_valid()) {
+            ServeArchive(std::move(archive), std::move(file_server));
           } else {
             snapshot.set_archive(
                 {.key = kSnapshotFilename, .value = std::move(archive).ToTransport()});
@@ -209,11 +209,12 @@ void DataProvider::GetSnapshotInternal(
   executor_.schedule_task(std::move(promise));
 }
 
-bool DataProvider::ServeArchive(fsl::SizedVmo archive, zx::channel server_end) {
+bool DataProvider::ServeArchive(fsl::SizedVmo archive,
+                                fidl::ServerEnd<fuchsia_io::File> file_server) {
   const size_t archive_index = next_served_archive_index_++;
   auto served_archive = std::make_unique<ServedArchive>(std::move(archive));
 
-  if (!served_archive->Serve(std::move(server_end), dispatcher_, [this, archive_index]() mutable {
+  if (!served_archive->Serve(std::move(file_server), dispatcher_, [this, archive_index]() mutable {
         served_archives_.erase(archive_index);
       })) {
     return false;
@@ -226,12 +227,11 @@ bool DataProvider::ServeArchive(fsl::SizedVmo archive, zx::channel server_end) {
 ServedArchive::ServedArchive(fsl::SizedVmo archive)
     : file_(std::move(archive.vmo()), archive.size()) {}
 
-bool ServedArchive::Serve(zx::channel server_end, async_dispatcher_t* dispatcher,
-                          std::function<void()> completed) {
+bool ServedArchive::Serve(fidl::ServerEnd<fuchsia_io::File> file_server,
+                          async_dispatcher_t* dispatcher, std::function<void()> completed) {
   channel_closed_observer_ =
-      std::make_unique<async::WaitOnce>(server_end.get(), ZX_CHANNEL_PEER_CLOSED);
-  if (const auto status =
-          file_.Serve(fuchsia::io::OpenFlags::RIGHT_READABLE, std::move(server_end));
+      std::make_unique<async::WaitOnce>(file_server.channel().get(), ZX_CHANNEL_PEER_CLOSED);
+  if (const auto status = file_.Serve(fuchsia_io::wire::kPermReadable, std::move(file_server));
       status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Cannot serve archive";
     return false;

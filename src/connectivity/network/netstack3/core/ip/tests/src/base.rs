@@ -28,7 +28,7 @@ use packet_formats::icmp::{
     MessageBody,
 };
 use packet_formats::ip::{
-    IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto,
+    FragmentOffset, IpPacket as _, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto,
 };
 use packet_formats::ipv4::Ipv4PacketBuilder;
 use packet_formats::ipv6::ext_hdrs::ExtensionHeaderOptionAction;
@@ -196,7 +196,7 @@ fn process_ipv4_fragment(
 
     let mut builder = get_ipv4_builder();
     builder.id(fragment_id);
-    builder.fragment_offset(fragment_offset as u16);
+    builder.fragment_offset(FragmentOffset::new(fragment_offset.into()).unwrap());
     builder.mf_flag(m_flag);
     let mut body: Vec<u8> = Vec::new();
     body.extend(fragment_offset * 8..fragment_offset * 8 + 8);

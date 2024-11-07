@@ -130,7 +130,7 @@ TEST(MsdArmDFv2, LoadDriver) {
         auto irq_status = registers::GpuIrqFlags::GetStatus().FromValue(0);
         irq_status.set_reset_completed(1);
         irq_status.WriteTo(mmio_buffer_);
-        gpu_interrupt_->trigger(0, zx::time());
+        gpu_interrupt_->trigger(0, zx::time_boot());
       }
     }
 

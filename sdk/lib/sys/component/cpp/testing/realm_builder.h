@@ -178,6 +178,11 @@ class Realm final {
   Realm& AddCapability(fuchsia::component::decl::Capability capability);
 #endif
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
+  Realm& AddCollection(fuchsia::component::decl::Collection collection);
+  Realm& AddEnvironment(fuchsia::component::decl::Environment environment);
+#endif
+
   // Fetches the Component decl of the given child. This operation is only
   // supported for:
   //

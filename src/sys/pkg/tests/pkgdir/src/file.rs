@@ -12,7 +12,7 @@ use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
-use fuchsia_fs::directory::open_file_deprecated;
+use fuchsia_fs::directory::open_file;
 use futures::StreamExt;
 use std::cmp;
 use std::convert::TryFrom as _;
@@ -45,7 +45,7 @@ async fn assert_read_max_buffer_success(
     path: &str,
     expected_contents: &str,
 ) {
-    let file = open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
     let bytes = file.read(fio::MAX_BUF).await.unwrap().map_err(zx::Status::from_raw).unwrap();
     assert_eq!(std::str::from_utf8(&bytes).unwrap(), expected_contents);
 }
@@ -58,8 +58,7 @@ async fn assert_read_buffer_success(
     for buffer_size in 0..expected_contents.len() {
         let expected_contents = &expected_contents[0..buffer_size];
 
-        let file =
-            open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+        let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
         let bytes = file
             .read(buffer_size.try_into().unwrap())
             .await
@@ -75,7 +74,7 @@ async fn assert_read_buffer_success(
 }
 
 async fn assert_read_past_end(root_dir: &fio::DirectoryProxy, path: &str, expected_contents: &str) {
-    let file = open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
     let bytes = file.read(fio::MAX_BUF).await.unwrap().map_err(zx::Status::from_raw).unwrap();
     assert_eq!(std::str::from_utf8(&bytes).unwrap(), expected_contents);
 
@@ -84,7 +83,7 @@ async fn assert_read_past_end(root_dir: &fio::DirectoryProxy, path: &str, expect
 }
 
 async fn assert_read_exceeds_buffer_success(root_dir: &fio::DirectoryProxy, path: &str) {
-    let file = open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
 
     // Read the first MAX_BUF contents.
     let bytes = file.read(fio::MAX_BUF).await.unwrap().map_err(zx::Status::from_raw).unwrap();
@@ -125,7 +124,7 @@ async fn assert_read_at_max_buffer_success(
     path: &str,
     expected_contents: &str,
 ) {
-    let file = open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
     let bytes = file.read_at(fio::MAX_BUF, 0).await.unwrap().map_err(zx::Status::from_raw).unwrap();
     assert_eq!(std::str::from_utf8(&bytes).unwrap(), expected_contents);
 }
@@ -140,8 +139,7 @@ async fn assert_read_at_success(
             let end = cmp::min(count + offset, full_expected_contents.len());
             let expected_contents = &full_expected_contents[offset..end];
 
-            let file =
-                open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+            let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
             let bytes = file
                 .read_at(count.try_into().unwrap(), offset.try_into().unwrap())
                 .await
@@ -159,8 +157,7 @@ async fn assert_read_at_success(
 
 async fn assert_read_at_does_not_affect_seek_offset(root_dir: &fio::DirectoryProxy, path: &str) {
     for seek_offset in 0..path.len() as i64 {
-        let file =
-            open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+        let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
 
         let position = file
             .seek(fio::SeekOrigin::Start, seek_offset)
@@ -190,8 +187,7 @@ async fn assert_read_at_does_not_affect_seek_offset(root_dir: &fio::DirectoryPro
 
 async fn assert_read_at_is_unaffected_by_seek(root_dir: &fio::DirectoryProxy, path: &str) {
     for seek_offset in 0..path.len() as i64 {
-        let file =
-            open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+        let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
 
         let first_read_bytes = file
             .read_at(fio::MAX_BUF, 0)
@@ -250,8 +246,7 @@ async fn assert_seek_success(
     seek_origin: fio::SeekOrigin,
 ) {
     for expected_position in 0..expected.len() {
-        let file =
-            open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+        let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
         let position = file
             .seek(seek_origin, expected_position.try_into().unwrap())
             .await
@@ -268,8 +263,7 @@ async fn assert_seek_success(
 
 async fn assert_seek_affects_read(root_dir: &fio::DirectoryProxy, path: &str, expected: &str) {
     for seek_offset in 0..expected.len() {
-        let file =
-            open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+        let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
         let bytes = file
             .read(fio::MAX_BUF)
             .await
@@ -312,7 +306,7 @@ async fn assert_seek_past_end(
     expected: &str,
     seek_origin: fio::SeekOrigin,
 ) {
-    let file = open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
     let position = file
         .seek(seek_origin, expected.len() as i64 + 1)
         .await
@@ -332,7 +326,7 @@ async fn assert_seek_past_end_end_origin(
     path: &str,
     expected: &str,
 ) {
-    let file = open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
     let position =
         file.seek(fio::SeekOrigin::End, 1).await.unwrap().map_err(zx::Status::from_raw).unwrap();
     assert_eq!(expected.len() as u64 + 1, position);
@@ -354,9 +348,7 @@ async fn get_backing_memory_per_package_source(source: PackageSource) {
     // calls with supported flags should succeed for files that are not meta-as-file.
     for size in [0, 1, 4095, 4096, 4097] {
         for path in [format!("file_{size}"), format!("meta/file_{size}")] {
-            let file = open_file_deprecated(root_dir, &path, fio::OpenFlags::RIGHT_READABLE)
-                .await
-                .unwrap();
+            let file = open_file(root_dir, &path, fuchsia_fs::PERM_READABLE).await.unwrap();
 
             let _: zx::Vmo =
                 test_get_backing_memory_success(&file, fio::VmoFlags::READ, size).await;
@@ -382,16 +374,14 @@ async fn get_backing_memory_per_package_source(source: PackageSource) {
         }
     }
 
-    let file =
-        open_file_deprecated(root_dir, "meta", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let file = open_file(root_dir, "meta", fuchsia_fs::PERM_READABLE).await.unwrap();
     let result =
         file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().map_err(zx::Status::from_raw);
     assert_matches!(result, Ok(_));
 
     // For files NOT under meta, calls with unsupported flags should successfully return the FIDL
     // call with a failure status.
-    let file =
-        open_file_deprecated(root_dir, "file", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let file = open_file(root_dir, "file", fuchsia_fs::PERM_READABLE).await.unwrap();
     let result = file
         .get_backing_memory(fio::VmoFlags::EXECUTE)
         .await
@@ -408,8 +398,7 @@ async fn get_backing_memory_per_package_source(source: PackageSource) {
         file.get_backing_memory(fio::VmoFlags::WRITE).await.unwrap().map_err(zx::Status::from_raw);
     assert_eq!(result, Err(zx::Status::ACCESS_DENIED));
 
-    let file =
-        open_file_deprecated(root_dir, "meta/file", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+    let file = open_file(root_dir, "meta/file", fuchsia_fs::PERM_READABLE).await.unwrap();
     let result = file
         .get_backing_memory(fio::VmoFlags::EXECUTE)
         .await
@@ -483,7 +472,7 @@ async fn assert_clone_success(
     path: &str,
     expected_contents: &str,
 ) {
-    let parent = open_file_deprecated(package_root, path, fio::OpenFlags::RIGHT_READABLE)
+    let parent = open_file(package_root, path, fuchsia_fs::PERM_READABLE)
         .await
         .expect("open parent directory");
     let (clone, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy");
@@ -503,13 +492,14 @@ async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, pa
                     _ => Err(anyhow!("wrong fio::NodeInfoDeprecated returned")),
                 }
             }
+            Some(Ok(fio::FileEvent::OnRepresentation { payload: _ })) => Ok(()),
             Some(Ok(other)) => Err(anyhow!("wrong node type returned: {:?}", other)),
             Some(Err(e)) => Err(e).context("failed to call onopen"),
             None => Err(anyhow!("no events!")),
         }
     }
 
-    let parent = open_file_deprecated(package_root, path, fio::OpenFlags::RIGHT_READABLE)
+    let parent = open_file(package_root, path, fuchsia_fs::PERM_READABLE)
         .await
         .expect("open parent directory");
     let (file_proxy, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy");
@@ -535,8 +525,7 @@ async fn unsupported_per_package_source(source: PackageSource) {
         path: &str,
         expected_status: zx::Status,
     ) {
-        let file =
-            open_file_deprecated(root_dir, path, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
+        let file = open_file(root_dir, path, fuchsia_fs::PERM_READABLE).await.unwrap();
 
         // Verify write() fails.
         let result = file.write(b"potato").await.unwrap().map_err(zx::Status::from_raw);

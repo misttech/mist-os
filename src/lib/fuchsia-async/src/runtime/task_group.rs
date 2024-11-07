@@ -5,7 +5,9 @@
 use crate::Task;
 
 use futures::channel::mpsc;
-use futures::{Future, StreamExt};
+use futures::Future;
+
+use super::Scope;
 
 /// Errors that can be returned by this crate.
 #[derive(Debug, thiserror::Error)]
@@ -19,13 +21,10 @@ enum Error {
 ///
 /// Tasks can be added to this group using [`TaskGroup::add`].
 /// All pending tasks in the group can be awaited using [`TaskGroup::join`].
+///
+/// New code should prefer to use [`Scope`] instead.
 pub struct TaskGroup {
-    sink: TaskSink,
-    // A Task that waits for all tasks sent on `sink` to complete.
-    // `sink` writes tasks to a channel and this Task drains tasks from the channel
-    // using an unbounded loop. Therefore, `sink` must be dropped to close the channel and
-    // allow this future to complete.
-    done: Task<()>,
+    scope: Scope,
 }
 
 impl Default for TaskGroup {
@@ -40,21 +39,7 @@ impl TaskGroup {
     /// The TaskGroup can be used to await an arbitrary number of Tasks and may
     /// consume an arbitrary amount of memory.
     pub fn new() -> Self {
-        let (tx, rx) = mpsc::unbounded::<Task<()>>();
-        let sink = TaskSink::new(tx);
-        let done = Task::spawn(async move {
-            rx.for_each_concurrent(None, |task| task).await;
-        });
-        Self { sink, done }
-    }
-
-    /// Adds a Task to this TaskGroup.
-    pub fn add(&mut self, task: Task<()>) {
-        // This only panics if the receiver is closed. TaskSink is private, so the only
-        // way to close the receiver is with TaskGroup::join() which consumes this TaskGroup.
-        // Therefore this method can't be called after the receiver is closed and should
-        // never panic.
-        self.sink.try_add(task).unwrap();
+        Self { scope: Scope::new() }
     }
 
     /// Spawns a new task in this TaskGroup.
@@ -66,7 +51,7 @@ impl TaskGroup {
     /// `spawn` may panic if not called in the context of an executor (e.g.
     /// within a call to `run` or `run_singlethreaded`).
     pub fn spawn(&mut self, future: impl Future<Output = ()> + Send + 'static) {
-        self.add(Task::spawn(future));
+        self.scope.spawn(future);
     }
 
     /// Spawns a new task in this TaskGroup.
@@ -76,35 +61,14 @@ impl TaskGroup {
     /// `spawn` may panic if not called in the context of a single threaded executor
     /// (e.g. within a call to `run_singlethreaded`).
     pub fn local(&mut self, future: impl Future<Output = ()> + 'static) {
-        self.add(Task::local(future));
+        self.scope.spawn_local(future);
     }
 
     /// Waits for all Tasks in this TaskGroup to finish.
     ///
     /// Call this only after all Tasks have been added.
     pub async fn join(self) {
-        // Close the sink to ensure the receiving end of the channel terminates.
-        drop(self.sink);
-        self.done.await;
-    }
-}
-
-/// Adds tasks to a remote [`TaskGroup`].
-///
-/// This sink must be dropped before the corresponding done future on the original
-/// [`TaskGroup`] can complete.
-struct TaskSink {
-    sender: mpsc::UnboundedSender<Task<()>>,
-}
-
-impl TaskSink {
-    fn new(sender: mpsc::UnboundedSender<Task<()>>) -> Self {
-        Self { sender }
-    }
-
-    /// Adds a task to this sink.
-    pub fn try_add(&mut self, task: Task<()>) -> Result<(), Error> {
-        self.sender.unbounded_send(task).map_err(Error::GroupDropped)
+        self.scope.on_no_tasks().await;
     }
 }
 
@@ -112,6 +76,7 @@ impl TaskSink {
 mod tests {
     use super::*;
     use crate::SendExecutor;
+    use futures::StreamExt;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 
@@ -161,10 +126,9 @@ mod tests {
 
             for _ in 0..task_count {
                 let value = value.clone();
-                let task = Task::spawn(async move {
+                task_group.spawn(async move {
                     value.fetch_add(1, Ordering::Relaxed);
                 });
-                task_group.add(task);
             }
 
             task_group.join().await;
@@ -190,13 +154,11 @@ mod tests {
                 let done_signaler = wait_group.add_one();
 
                 // Never completes but drops `done_signaler` when cancelled.
-                let task = Task::spawn(async move {
+                task_group.spawn(async move {
                     // Take ownership of done_signaler.
                     let _done_signaler = done_signaler;
                     std::future::pending::<()>().await;
                 });
-
-                task_group.add(task);
             }
 
             drop(task_group);

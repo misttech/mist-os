@@ -125,21 +125,13 @@ pub struct BootInstant(zx::BootInstant);
 impl BootInstant {
     /// Return the current time according to the system boot clock. Advances while the system
     /// is suspended.
-    ///
-    /// This function does not support fake time from a `TestExecutor`.
-    // TODO(https://fxbug.dev/375631801): FakeTime in the TestExecutor does not support boot
-    // time yet.
     pub fn now() -> Self {
-        BootInstant::from_zx(zx::BootInstant::get())
+        EHandle::local().inner().boot_now()
     }
 
     /// Compute a deadline for the time in the future that is the
     /// given `Duration` away. Similar to `zx::BootInstant::after`,
     /// saturates on overflow instead of wrapping around.
-    ///
-    /// This function does not support fake time from a `TestExecutor`.
-    // TODO(https://fxbug.dev/375631801): FakeTime in the TestExecutor does not support boot
-    // time yet.
     pub fn after(duration: zx::BootDuration) -> Self {
         Self::now() + duration
     }

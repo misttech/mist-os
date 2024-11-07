@@ -532,7 +532,7 @@ TEST(Loop, Irq) {
     EXPECT_EQ(ZX_OK, zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &irq));
     TestWaitIrq wait(irq.get());
     EXPECT_EQ(ZX_OK, wait.Begin(loop.dispatcher()));
-    irq.trigger(0, zx::time());
+    irq.trigger(0, zx::time_boot());
     EXPECT_EQ(ZX_OK, loop.RunUntilIdle());
     EXPECT_EQ(1, wait.run_count);
     EXPECT_EQ(ZX_OK, irq.ack());
@@ -556,7 +556,7 @@ TEST(Loop, Irq) {
     EXPECT_EQ(ZX_OK, zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &irq));
     TestWaitIrq wait(irq.get());
     EXPECT_EQ(ZX_OK, wait.Begin(loop.dispatcher()));
-    irq.trigger(0, zx::time());
+    irq.trigger(0, zx::time_boot());
     EXPECT_EQ(ZX_OK, wait.Cancel(loop.dispatcher()));
     EXPECT_EQ(ZX_OK, loop.RunUntilIdle());
     EXPECT_EQ(0, wait.run_count);
@@ -569,7 +569,7 @@ TEST(Loop, Irq) {
     TestWaitIrq wait(irq.get());
     EXPECT_EQ(ZX_OK, wait.Begin(loop.dispatcher()));
     EXPECT_EQ(ZX_OK, wait.Cancel(loop.dispatcher()));
-    irq.trigger(0, zx::time());
+    irq.trigger(0, zx::time_boot());
     EXPECT_EQ(ZX_OK, loop.RunUntilIdle());
     EXPECT_EQ(0, wait.run_count);
   }

@@ -20,18 +20,18 @@ use crate::state::{Action, FilterIpMetadata, Hook, Routine, Rule, TransparentPro
 
 /// The final result of packet processing at a given filtering hook.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Verdict {
+pub enum Verdict<R = ()> {
     /// The packet should continue traversing the stack.
-    Accept,
+    Accept(R),
     /// The packet should be dropped immediately.
     Drop,
 }
 
 /// The final result of packet processing at the INGRESS hook.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum IngressVerdict<I: IpExt> {
+pub enum IngressVerdict<I: IpExt, R = ()> {
     /// A verdict that is valid at any hook.
-    Verdict(Verdict),
+    Verdict(Verdict<R>),
     /// The packet should be immediately redirected to a local socket without its
     /// header being changed in any way.
     TransparentLocalDelivery {
@@ -42,8 +42,8 @@ pub enum IngressVerdict<I: IpExt> {
     },
 }
 
-impl<I: IpExt> From<Verdict> for IngressVerdict<I> {
-    fn from(verdict: Verdict) -> Self {
+impl<I: IpExt, R> From<Verdict<R>> for IngressVerdict<I, R> {
+    fn from(verdict: Verdict<R>) -> Self {
         IngressVerdict::Verdict(verdict)
     }
 }
@@ -207,7 +207,7 @@ where
             }
         }
     }
-    Verdict::Accept
+    Verdict::Accept(())
 }
 
 fn check_routines_for_ingress<I, P, D, DeviceClass>(
@@ -233,7 +233,7 @@ where
             }
         }
     }
-    Verdict::Accept.into()
+    Verdict::Accept(()).into()
 }
 
 /// An implementation of packet filtering logic, providing entry points at
@@ -359,7 +359,7 @@ where
                 Interfaces { ingress: Some(interface), egress: None },
             ) {
                 v @ IngressVerdict::Verdict(Verdict::Drop) => return v,
-                v @ IngressVerdict::Verdict(Verdict::Accept)
+                v @ IngressVerdict::Verdict(Verdict::Accept(()))
                 | v @ IngressVerdict::TransparentLocalDelivery { .. } => v,
             };
 
@@ -370,6 +370,7 @@ where
                 match nat::perform_nat::<nat::IngressHook, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
+                    state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
                     &state.installed_routines.get().nat.ingress,
@@ -380,7 +381,7 @@ where
                     // `TransparentLocalDelivery`; in case of an `Accept` verdict from the NAT
                     // routines, we do not change the existing verdict.
                     v @ IngressVerdict::Verdict(Verdict::Drop) => return v,
-                    IngressVerdict::Verdict(Verdict::Accept) => {}
+                    IngressVerdict::Verdict(Verdict::Accept(())) => {}
                     v @ IngressVerdict::TransparentLocalDelivery { .. } => {
                         verdict = v;
                     }
@@ -429,7 +430,7 @@ where
                 Interfaces { ingress: Some(interface), egress: None },
             ) {
                 Verdict::Drop => return Verdict::Drop,
-                Verdict::Accept => Verdict::Accept,
+                Verdict::Accept(()) => Verdict::Accept(()),
             };
 
             if let Some(mut conn) = conn {
@@ -439,6 +440,7 @@ where
                 match nat::perform_nat::<nat::LocalIngressHook, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
+                    state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
                     &state.installed_routines.get().nat.local_ingress,
@@ -446,7 +448,7 @@ where
                     Interfaces { ingress: Some(interface), egress: None },
                 ) {
                     Verdict::Drop => return Verdict::Drop,
-                    Verdict::Accept => {}
+                    Verdict::Accept(()) => {}
                 }
 
                 match state.conntrack.finalize_connection(bindings_ctx, conn) {
@@ -513,7 +515,7 @@ where
                 Interfaces { ingress: None, egress: Some(interface) },
             ) {
                 Verdict::Drop => return Verdict::Drop,
-                Verdict::Accept => Verdict::Accept,
+                Verdict::Accept(()) => Verdict::Accept(()),
             };
 
             if let Some(mut conn) = conn {
@@ -523,6 +525,7 @@ where
                 match nat::perform_nat::<nat::LocalEgressHook, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
+                    state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
                     &state.installed_routines.get().nat.local_egress,
@@ -530,7 +533,7 @@ where
                     Interfaces { ingress: None, egress: Some(interface) },
                 ) {
                     Verdict::Drop => return Verdict::Drop,
-                    Verdict::Accept => {}
+                    Verdict::Accept(()) => {}
                 }
 
                 let res = metadata.replace_conntrack_connection(conn);
@@ -576,7 +579,7 @@ where
                 Interfaces { ingress: None, egress: Some(interface) },
             ) {
                 Verdict::Drop => return Verdict::Drop,
-                Verdict::Accept => Verdict::Accept,
+                Verdict::Accept(()) => Verdict::Accept(()),
             };
 
             if let Some(mut conn) = conn {
@@ -586,6 +589,7 @@ where
                 match nat::perform_nat::<nat::EgressHook, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
+                    state.nat_installed.get(),
                     &state.conntrack,
                     &mut conn,
                     &state.installed_routines.get().nat.egress,
@@ -593,7 +597,7 @@ where
                     Interfaces { ingress: None, egress: Some(interface) },
                 ) {
                     Verdict::Drop => return Verdict::Drop,
-                    Verdict::Accept => {}
+                    Verdict::Accept(()) => {}
                 }
 
                 match state.conntrack.finalize_connection(bindings_ctx, conn) {
@@ -685,7 +689,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            Verdict::Accept.into()
+            Verdict::Accept(()).into()
         }
 
         fn local_ingress_hook<P, M>(
@@ -699,7 +703,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            Verdict::Accept
+            Verdict::Accept(())
         }
 
         fn forwarding_hook<P, M>(
@@ -713,7 +717,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            Verdict::Accept
+            Verdict::Accept(())
         }
 
         fn local_egress_hook<P, M>(
@@ -727,7 +731,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            Verdict::Accept
+            Verdict::Accept(())
         }
 
         fn egress_hook<P, M>(
@@ -741,7 +745,7 @@ pub mod testutil {
             P: IpPacket<I>,
             M: FilterIpMetadata<I, BC>,
         {
-            (Verdict::Accept, ProofOfEgressCheck::forge_proof_for_test())
+            (Verdict::Accept(()), ProofOfEgressCheck::forge_proof_for_test())
         }
     }
 
@@ -865,7 +869,7 @@ mod tests {
                 &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
-            Verdict::Accept
+            Verdict::Accept(())
         );
     }
 
@@ -883,7 +887,7 @@ mod tests {
                 &FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value(),
                 Interfaces { ingress: None, egress: None },
             ),
-            Verdict::Accept
+            Verdict::Accept(())
         );
     }
 
@@ -1230,10 +1234,10 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(22 => Verdict::Accept; "port 22 allowed for SSH")]
-    #[test_case(80 => Verdict::Accept; "port 80 allowed for HTTP")]
-    #[test_case(1024 => Verdict::Accept; "ephemeral port 1024 allowed")]
-    #[test_case(65535 => Verdict::Accept; "ephemeral port 65535 allowed")]
+    #[test_case(22 => Verdict::Accept(()); "port 22 allowed for SSH")]
+    #[test_case(80 => Verdict::Accept(()); "port 80 allowed for HTTP")]
+    #[test_case(1024 => Verdict::Accept(()); "ephemeral port 1024 allowed")]
+    #[test_case(65535 => Verdict::Accept(()); "ephemeral port 65535 allowed")]
     #[test_case(1023 => Verdict::Drop; "privileged port 1023 blocked")]
     #[test_case(53 => Verdict::Drop; "privileged port 53 blocked")]
     fn block_privileged_ports_except_ssh_http<I: TestIpExt>(port: u16) -> Verdict {
@@ -1314,7 +1318,7 @@ mod tests {
 
     #[ip_test(I)]
     #[test_case(
-        ethernet_interface() => Verdict::Accept;
+        ethernet_interface() => Verdict::Accept(());
         "allow incoming traffic on ethernet interface"
     )]
     #[test_case(wlan_interface() => Verdict::Drop; "drop incoming traffic on wlan interface")]
@@ -1364,7 +1368,7 @@ mod tests {
             &ethernet_interface(),
             &mut metadata,
         );
-        assert_eq!(verdict, Verdict::Accept);
+        assert_eq!(verdict, Verdict::Accept(()));
 
         // The stashed reference should point to the connection that is in the table.
         let stashed =
@@ -1389,7 +1393,7 @@ mod tests {
             &ethernet_interface(),
             &mut metadata,
         );
-        assert_eq!(verdict, Verdict::Accept.into());
+        assert_eq!(verdict, Verdict::Accept(()).into());
 
         // As a result, rather than there being a new connection in the packet metadata,
         // it should contain the same connection that is still in the table.
@@ -1426,7 +1430,7 @@ mod tests {
                 &ethernet_interface(),
                 &mut NullMetadata {},
             );
-            assert_eq!(verdict, Verdict::Accept);
+            assert_eq!(verdict, Verdict::Accept(()));
         }
 
         // Finalizing the connection should fail when the conntrack table is at maximum
@@ -1479,7 +1483,7 @@ mod tests {
             &ethernet_interface(),
             &mut NullMetadata {},
         );
-        assert_eq!(verdict, Verdict::Accept);
+        assert_eq!(verdict, Verdict::Accept(()));
         assert_eq!(packet.src_ip, I::SRC_IP);
 
         // Now simulate a locally-generated packet that conflicts with this flow; it is
@@ -1496,7 +1500,64 @@ mod tests {
             &ethernet_interface(),
             &mut NullMetadata {},
         );
-        assert_eq!(verdict, Verdict::Accept);
+        assert_eq!(verdict, Verdict::Accept(()));
         assert_ne!(packet.body.src_port, src_port);
+    }
+
+    #[ip_test(I)]
+    fn packet_adopts_tracked_connection_in_table_if_identical<I: TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        let mut core_ctx = FakeCtx::new(&mut bindings_ctx);
+
+        // Simulate a race where two packets in the same flow both end up
+        // creating identical exclusive connections.
+        let mut first_packet = FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value();
+        let mut first_metadata = PacketMetadata::default();
+        let verdict = FilterImpl(&mut core_ctx).local_egress_hook(
+            &mut bindings_ctx,
+            &mut first_packet,
+            &ethernet_interface(),
+            &mut first_metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+
+        let mut second_packet = FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value();
+        let mut second_metadata = PacketMetadata::default();
+        let verdict = FilterImpl(&mut core_ctx).local_egress_hook(
+            &mut bindings_ctx,
+            &mut second_packet,
+            &ethernet_interface(),
+            &mut second_metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+
+        // Finalize the first connection; it should get inserted in the table.
+        let (verdict, _proof) = FilterImpl(&mut core_ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut first_packet,
+            &ethernet_interface(),
+            &mut first_metadata,
+        );
+        assert_eq!(verdict, Verdict::Accept(()));
+
+        // The second packet conflicts with the connection that's in the table, but it's
+        // identical to the first one, so it should adopt the finalized connection.
+        let (verdict, _proof) = FilterImpl(&mut core_ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut second_packet,
+            &ethernet_interface(),
+            &mut second_metadata,
+        );
+        assert_eq!(second_packet.body.src_port, first_packet.body.src_port);
+        assert_eq!(verdict, Verdict::Accept(()));
+
+        let first_conn = first_metadata.take_conntrack_connection().unwrap();
+        let second_conn = second_metadata.take_conntrack_connection().unwrap();
+        assert_matches!(
+            (first_conn, second_conn),
+            (Connection::Shared(first), Connection::Shared(second)) => {
+                assert!(Arc::ptr_eq(&first, &second));
+            }
+        );
     }
 }

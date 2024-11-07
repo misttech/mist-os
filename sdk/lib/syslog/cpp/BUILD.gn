@@ -8,18 +8,21 @@ import("//build/cpp/sdk_source_set.gni")
 import("//build/cpp/sdk_static_library.gni")
 import("//build/test.gni")
 
-sdk_source_set("cpp") {
+if (is_fuchsia) {
+  target_type = "sdk_source_set"
+} else {
+  # Don't ship the host logging library in the SDK.
+  target_type = "source_set"
+
   # TODO(https://fxbug.dev/42138060): Remove when Mac links OK against this.
   if ((current_toolchain == "//build/toolchain:host_x64" && host_os == "mac") ||
       (current_toolchain == "//build/toolchain:host_arm64" &&
        host_os == "mac")) {
-    build_as_static = true
+    target_type = "static_library"
   }
+}
 
-  sdk_name = "syslog_cpp"
-
-  include_base = "//sdk"
-
+target(target_type, "cpp") {
   public_deps = [
     "//sdk/lib/fit-promise",
     "//sdk/lib/stdcompat",
@@ -35,8 +38,10 @@ sdk_source_set("cpp") {
 
   if (is_fuchsia || is_mistos) {
     category = "partner"
-
     stable = true
+    sdk_name = "syslog_cpp"
+
+    include_base = "//sdk"
 
     sources += [
       "logging_backend_fuchsia.cc",
@@ -61,9 +66,6 @@ sdk_source_set("cpp") {
       "//zircon/system/ulib/zx",
     ]
   } else {
-    # Don't ship the host logging library in the SDK.
-    category = "internal"
-
     sources += [
       "host/encoder.h",
       "host/logging_backend.cc",

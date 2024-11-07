@@ -33,14 +33,17 @@ pub enum Error {
     #[error("Error while communicating with {0}: {1}")]
     CommunicatingWith(String, #[source] anyhow::Error),
 
-    #[error("Failed to connect to archivst: {0}")]
-    ConnectToArchivist(#[source] anyhow::Error),
+    #[error("Failed to connect to {0}: {1}")]
+    ConnectToProtocol(String, #[source] anyhow::Error),
 
     #[error("IO error. Failed to {0}: {1}")]
     IOError(String, #[source] anyhow::Error),
 
     #[error("No running component was found whose URL contains the given string: {0}")]
     ManifestNotFound(String),
+
+    #[error("No running components were found matching {0}")]
+    SearchParameterNotFound(String),
 
     #[error("Invalid selector: {0}")]
     InvalidSelector(String),
@@ -71,6 +74,36 @@ pub enum Error {
 
     #[error("Must be exact protocol (protocol cannot contain wildcards)")]
     MustBeExactProtocol,
+
+    #[error(transparent)]
+    FuzzyMatchRealmQuery(anyhow::Error),
+
+    #[error("Fuzzy matching failed due to too many matches, please re-try with one of these:\n{0}")]
+    FuzzyMatchTooManyMatches(FuzzyMatchErrorWrapper),
+
+    #[error(
+        "hint: selectors paired with --component must not include component selector segment: {0}"
+    )]
+    PartialSelectorHint(#[source] selectors::Error),
+}
+
+#[derive(Debug)]
+pub struct FuzzyMatchErrorWrapper(Vec<String>);
+
+impl std::iter::FromIterator<String> for FuzzyMatchErrorWrapper {
+    fn from_iter<I: IntoIterator<Item = String>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+impl std::fmt::Display for FuzzyMatchErrorWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        for component in &self.0 {
+            writeln!(f, "{component}")?;
+        }
+
+        Ok(())
+    }
 }
 
 impl From<ConnectCapabilityError> for Error {

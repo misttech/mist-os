@@ -12,7 +12,7 @@ driver_bind_rules("ddk-fidl-bind") {
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
-fuchsia_driver("fidl-llcpp-driver-driver") {
+fuchsia_cc_driver("fidl-llcpp-driver-driver") {
   output_name = "fidl-llcpp-driver"
   configs += [
     "//build/config:all_source",
@@ -44,7 +44,7 @@ driver_bind_rules("ddk-fidl-async-bind") {
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
-fuchsia_driver("fidl-async-llcpp-driver-driver") {
+fuchsia_cc_driver("fidl-async-llcpp-driver-driver") {
   output_name = "fidl-async-llcpp-driver"
   configs += [
     "//build/config:all_source",

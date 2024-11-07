@@ -878,7 +878,7 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
         context: &mut Self::Context<'a>,
         dst_reg: Register,
         src_reg: Register,
-        offset: i16,
+        offset: i32,
         register_offset: Option<Register>,
         width: DataWidth,
     ) -> Result<(), String> {

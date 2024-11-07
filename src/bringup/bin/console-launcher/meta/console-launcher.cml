@@ -20,9 +20,9 @@
             default: false,
         },
         {
-            directory: "bin",
+            directory: "boot-bin",
             rights: [ "rx*" ],
-            path: "/bin",
+            path: "/boot-bin",
         },
         {
             directory: "boot",
@@ -53,6 +53,11 @@
             directory: "pkgfs",
             rights: [ "rx*" ],
             path: "/pkgfs",
+        },
+        {
+            directory: "base-bin",
+            rights: [ "rx*" ],
+            path: "/bin",
         },
         {
             directory: "system",
@@ -106,6 +111,7 @@
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
+                "fuchsia.sys2.ConfigOverride.root",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",

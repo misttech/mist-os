@@ -587,9 +587,14 @@ template("assembly_input_bundle") {
           defined(shell_command.components),
           "shell_command components must be a list of strings pointing to binaries that are components in the package that make up the package: ${shell_command}")
       _package_name = get_label_info(shell_command.package, "name")
+      _bootfs_package = false
+      if (defined(shell_command.bootfs_package)) {
+        _bootfs_package = shell_command.bootfs_package
+      }
       shell_commands_json_contents += [
         {
           package = _package_name
+          bootfs_package = _bootfs_package
           components = shell_command.components
         },
       ]

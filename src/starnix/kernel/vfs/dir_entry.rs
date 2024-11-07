@@ -9,7 +9,7 @@ use crate::vfs::{
     FsString, MountInfo, Mounts, NamespaceNode, UnlinkKind,
 };
 use bitflags::bitflags;
-use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, RwLock, RwLockWriteGuard};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, RwLock, RwLockWriteGuard};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::{Errno, ENOENT};
 use starnix_uapi::file_mode::{Access, FileMode};
@@ -85,7 +85,12 @@ pub trait DirEntryOps: Send + Sync + 'static {
     ///
     /// Returns `Ok(valid)` where `valid` indicates if the `DirEntry` is still valid,
     /// or an error.
-    fn revalidate(&self, _: &CurrentTask, _: &DirEntry) -> Result<bool, Errno> {
+    fn revalidate(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _: &CurrentTask,
+        _: &DirEntry,
+    ) -> Result<bool, Errno> {
         Ok(true)
     }
 }
@@ -362,7 +367,7 @@ impl DirEntry {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno>
     where
-        L: starnix_sync::LockBefore<starnix_sync::FileOpsCore>,
+        L: LockBefore<FileOpsCore>,
     {
         self.create_dir_for_testing(locked, current_task, name)
     }
@@ -371,12 +376,12 @@ impl DirEntry {
     // user to save a bit of typing in tests, but this shouldn't happen silently in production.
     pub fn create_dir_for_testing<L>(
         self: &DirEntryHandle,
-        locked: &mut starnix_sync::Locked<'_, L>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno>
     where
-        L: starnix_sync::LockBefore<starnix_sync::FileOpsCore>,
+        L: LockBefore<FileOpsCore>,
     {
         // TODO: apply_umask
         self.create_entry(
@@ -403,14 +408,18 @@ impl DirEntry {
     /// The FileMode::IFMT of the FileMode is always FileMode::IFREG.
     ///
     /// Used by O_TMPFILE.
-    pub fn create_tmpfile(
+    pub fn create_tmpfile<L>(
         self: &DirEntryHandle,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         mode: FileMode,
         owner: FsCred,
         flags: OpenFlags,
-    ) -> Result<DirEntryHandle, Errno> {
+    ) -> Result<DirEntryHandle, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         // Only directories can have children.
         if !self.node.is_dir() {
             return error!(ENOTDIR);
@@ -430,7 +439,8 @@ impl DirEntry {
             FsNodeLinkBehavior::Allowed
         };
 
-        let node = self.node.create_tmpfile(current_task, mount, mode, owner, link_behavior)?;
+        let node =
+            self.node.create_tmpfile(locked, current_task, mount, mode, owner, link_behavior)?;
         Ok(DirEntry::new_unrooted(node))
     }
 
@@ -576,12 +586,14 @@ impl DirEntry {
 
         // This task must have write access to the old and new parent nodes.
         old_parent.node.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,
         )?;
         new_parent.node.check_access(
+            locked,
             current_task,
             mount,
             Access::WRITE,
@@ -714,6 +726,7 @@ impl DirEntry {
                 )?;
             } else {
                 fs.rename(
+                    locked,
                     current_task,
                     &old_parent.node,
                     old_basename,
@@ -815,6 +828,7 @@ impl DirEntry {
         }
         // The user must be able to search the directory (requires the EXEC permission)
         self.node.check_access(
+            locked,
             current_task,
             mount,
             Access::EXEC,
@@ -842,7 +856,11 @@ impl DirEntry {
         let (child, exists) = match create_result {
             CreationResult::Created => (child, false),
             CreationResult::Existed { create_fn } => {
-                if child.ops.revalidate(current_task, &child)? {
+                if child.ops.revalidate(
+                    &mut locked.cast_locked::<FileOpsCore>(),
+                    current_task,
+                    &child,
+                )? {
                     (child, true)
                 } else {
                     self.internal_remove_child(&child);
@@ -1076,7 +1094,7 @@ impl<'a> DirEntryLockedChildren<'a> {
             }
         };
 
-        security::fs_node_init_with_dentry(current_task, &child)?;
+        security::fs_node_init_with_dentry(locked, current_task, &child)?;
 
         child.node.fs().did_create_dir_entry(&child);
         Ok((child, create_result))

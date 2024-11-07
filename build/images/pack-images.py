@@ -7,7 +7,7 @@
 This program takes as input one or more JSON files that
 describe "image files" according to the //:images schema.
 
-Use --pave, --pave_zedboot, --netboot or --fastboot_boot
+Use --pave, --pave_zedboot, --netboot
 to generate a paving/flashing script, which will reference
 input image file paths extracted from the input manifest(s).
 
@@ -264,11 +264,6 @@ def main():
         help="Write netboot bootserver script to FILE",
     )
     group.add_argument(
-        "--fastboot_boot",
-        metavar="FILE",
-        help="Write fastboot boot script to FILE",
-    )
-    group.add_argument(
         "--archive", metavar="FILE", help="Write archive to FILE"
     )
     parser.add_argument(
@@ -308,8 +303,6 @@ def main():
             os.open(outfile, os.O_CREAT | os.O_TRUNC | os.O_WRONLY, 0o777), "w"
         ) as script_file:
             additional_args = ""
-            if mode != "fastboot_boot":
-                additional_args = "".join(args.additional_bootserver_arguments)
             script_file.write(
                 generate_script(
                     binary_name, images, args.board_name, mode, additional_args
@@ -326,12 +319,6 @@ def main():
     elif args.netboot:
         outfile = args.netboot
         write_script_for(args.netboot, "bootserver_netboot")
-    elif args.fastboot_boot:
-        outfile = args.fastboot_boot
-        write_script_for(
-            args.fastboot_boot, "fastboot_boot", binary_name="fastboot"
-        )
-
     elif args.archive:
         outfile = args.archive
         archive_images = [

@@ -875,7 +875,16 @@ impl ServiceProxy {
         Ok(proxy)
     }
 
+    /// Like `connect_to_p`, but returns a sync proxy.
+    /// See [`Self::connect_to_p`] for more details.
+    pub fn connect_to_p_sync(&self) -> Result<ProtocolSynchronousProxy, fidl::Error> {
+        let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<ProtocolMarker>();
+        self.connect_channel_to_p(server_end)?;
+        Ok(proxy)
+    }
+
     /// Like `connect_to_p`, but accepts a server end.
+    /// See [`Self::connect_to_p`] for more details.
     pub fn connect_channel_to_p(
         &self,
         server_end: fidl::endpoints::ServerEnd<ProtocolMarker>,

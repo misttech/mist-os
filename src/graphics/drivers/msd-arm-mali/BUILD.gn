@@ -90,7 +90,7 @@ source_set("msd_arm_test_entry") {
          ]
 }
 
-fuchsia_driver("msd_arm-driver") {
+fuchsia_cc_driver("msd_arm-driver") {
   output_name = "msd_arm"
   deps = [
     ":msd_arm_entry",
@@ -110,7 +110,7 @@ fuchsia_driver_component("msd_arm") {
   manifest = "meta/msd_arm.cml"
 }
 
-fuchsia_driver("msd_arm_test-driver") {
+fuchsia_cc_driver("msd_arm_test-driver") {
   testonly = true
   output_name = "msd_arm_test"
   deps = [

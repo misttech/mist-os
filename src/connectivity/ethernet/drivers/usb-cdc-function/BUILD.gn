@@ -15,7 +15,7 @@ driver_bind_rules("usb_cdc_bind") {
   ]
 }
 
-fuchsia_driver("usb-cdc-function-driver") {
+fuchsia_cc_driver("usb-cdc-function-driver") {
   output_name = "usb-cdc-function"
   configs += [
     "//build/config:all_source",

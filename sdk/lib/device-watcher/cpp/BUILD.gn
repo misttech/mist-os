@@ -7,6 +7,7 @@ import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
 sdk_source_set("cpp") {
+  # TODO(https://fxbug.dev/343059325): Promote to "partner" with devicetree.
   category = "internal"
   sdk_name = "device-watcher"
   include_base = "//sdk"

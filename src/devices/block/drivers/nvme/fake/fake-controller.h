@@ -118,7 +118,7 @@ class FakeController {
     // Trigger the interrupt, or mark it as pending if it is disabled.
     void Trigger() {
       if (enabled_) {
-        irq_.trigger(0, zx::clock::get_monotonic());
+        irq_.trigger(0, zx::clock::get_boot());
       } else {
         pending_ = true;
       }

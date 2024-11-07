@@ -123,10 +123,15 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
         // Set up the platform's common AIBs by feature_set_level and build_type.
         for bundle_name in match (context.feature_set_level, context.build_type) {
             (FeatureSupportLevel::Embeddable, BuildType::Eng) => {
-                vec!["embeddable", "embeddable_userdebug", "embeddable_eng"]
+                vec![
+                    "embeddable",
+                    "embeddable_userdebug",
+                    "embeddable_eng",
+                    "bootstrap_realm_development_access",
+                ]
             }
             (FeatureSupportLevel::Embeddable, BuildType::UserDebug) => {
-                vec!["embeddable", "embeddable_userdebug"]
+                vec!["embeddable", "embeddable_userdebug", "bootstrap_realm_development_access"]
             }
             (FeatureSupportLevel::Embeddable, BuildType::User) => {
                 vec!["embeddable"]
@@ -139,6 +144,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap",
                     "bootstrap_userdebug",
                     "bootstrap_eng",
+                    "bootstrap_realm_development_access",
                 ]
             }
             (FeatureSupportLevel::Utility, BuildType::Eng) => {

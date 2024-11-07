@@ -10,7 +10,7 @@ group("test") {
   if (!is_debug) {
     deps += [
       "hardware:audio_core_hardware_tests",
-      "stress:audio-core-stress-tests",
+      "stress:audio_core_stress_tests",
     ]
   }
 }

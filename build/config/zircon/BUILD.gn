@@ -171,10 +171,14 @@ config("nolibc") {
   # Don't use -nostdlib, because the builtins (or libgcc) are what we want
   # and are otherwise annoying to find and specify.  It's just the -lc that
   # we really want to defeat, and that's handled by giving a -L that will
-  # find exactly nothing but a dummy libc.so.  Clang has -nolibc to kill
+  # find exactly nothing but a stub libc.so.  Clang has -nolibc to kill
   # the -lc, but for C++ it still uses -lm under -nolibc.  So this is still
   # needed to make -lm into a stub.
-  lib_dirs = [ "libc-dummy" ]
+  # This doesn't use lib_dirs because that propagates across linking targets to
+  # e.g. affect an executable() linked with a shared_library() that uses this
+  # config. Since ldflags does not propagate that way, this uses explicitly the
+  # -L switch that lib_dirs would expand to.
+  ldflags += [ "-L" + rebase_path("libc-stub", root_build_dir) ]
 }
 
 config("data_sections") {

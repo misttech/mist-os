@@ -31,7 +31,7 @@ ComponentControllerImpl::Bind(
   auto remote = fbl::MakeRefCounted<fs::RemoteDir>(std::move(pkg_directory));
   root->AddEntry("pkg", remote);
   zx_status_t status =
-      server->vfs_.ServeDirectory(root, std::move(outgoing_dir), fs::Rights::ReadExec());
+      server->vfs_.ServeDirectory(root, std::move(outgoing_dir), fuchsia_io::kRxStarDir);
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to serve package directory!";
     return zx::error(status);

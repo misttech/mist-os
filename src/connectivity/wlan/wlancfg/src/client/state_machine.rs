@@ -403,7 +403,7 @@ async fn handle_connecting_error_and_retry(
 /// - duplicate connect requests are deduped
 /// - different connect requests are serviced by passing a next_network to the DISCONNECTING state
 /// - disconnect requests cause a transition to DISCONNECTING state
-async fn connecting_state<'a>(
+async fn connecting_state(
     mut common_options: CommonStateOptions,
     options: ConnectingOptions,
 ) -> Result<State, ExitReason> {
@@ -1178,9 +1178,7 @@ mod tests {
         }
     }
 
-    async fn run_state_machine(
-        fut: impl Future<Output = Result<State, ExitReason>> + Send + 'static,
-    ) {
+    async fn run_state_machine(fut: impl Future<Output = Result<State, ExitReason>> + 'static) {
         let state_machine = fut.into_state_machine();
         select! {
             _state_machine = state_machine.fuse() => return,

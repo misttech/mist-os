@@ -165,9 +165,8 @@ void Ramdisk::OnNewSession(block_server::Session session) {
   }
 }
 
-void Ramdisk::OnRequests(block_server::Session& session,
-                         cpp20::span<const block_server::Request> requests)
-    TA_NO_THREAD_SAFETY_ANALYSIS {
+void Ramdisk::OnRequests(const block_server::Session& session,
+                         cpp20::span<block_server::Request> requests) TA_NO_THREAD_SAFETY_ANALYSIS {
   for (const auto& request : requests) {
     zx_status_t status = ZX_OK;
 

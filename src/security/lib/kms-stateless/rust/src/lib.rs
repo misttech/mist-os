@@ -125,10 +125,7 @@ fn rotate_key_from_tee_device(device: Option<&CStr>, info: KeyInfo) -> Result<()
 pub async fn get_hardware_derived_key(info: KeyInfo) -> Result<Vec<u8>, Error> {
     const DEV_CLASS_TEE: &str = "/dev/class/tee";
 
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        DEV_CLASS_TEE,
-        fuchsia_fs::OpenFlags::empty(),
-    )?;
+    let dir = fuchsia_fs::directory::open_in_namespace(DEV_CLASS_TEE, fuchsia_fs::Flags::empty())?;
     let mut stream = device_watcher::watch_for_files(&dir).await?;
     let first = stream
         .try_next()
@@ -158,10 +155,7 @@ pub async fn get_hardware_derived_key_from_service(info: KeyInfo) -> Result<Vec<
 pub async fn rotate_hardware_derived_key(info: KeyInfo) -> Result<(), Error> {
     const DEV_CLASS_TEE: &str = "/dev/class/tee";
 
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        DEV_CLASS_TEE,
-        fuchsia_fs::OpenFlags::empty(),
-    )?;
+    let dir = fuchsia_fs::directory::open_in_namespace(DEV_CLASS_TEE, fuchsia_fs::Flags::empty())?;
     let mut stream = device_watcher::watch_for_files(&dir).await?;
     let first = stream
         .try_next()

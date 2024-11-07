@@ -31,6 +31,21 @@ typedef enum {
   kAbrSlotIndexR,
 } AbrSlotIndex;
 
+/* If a slot is unbootable, this provides the reason why it became unbootable.
+ *
+ * Note: this value is only guaranteed accurate if both the bootloader and OS support it (v2.3+).
+ * Otherwise, you can rely on values you set, but the other side will always have
+ * |kAbrUnbootableReasonNone|.
+ */
+typedef enum {
+  /* Slot is not unbootable, or unbootable reason is unknown. */
+  kAbrUnbootableReasonNone,
+  /* Slot ran out of attempts before being marked successful. */
+  kAbrUnbootableReasonNoMoreTries,
+  /* Slot was explicitly marked unbootable by AbrMarkSlotUnbootable(). */
+  kAbrUnbootableReasonUserRequested,
+} AbrUnbootableReason;
+
 /* This structure describes the current state of an A/B slot.
  *
  * Note that slot R does not have associated metadata and is always considered bootable and
@@ -50,12 +65,16 @@ typedef enum {
  *                          reaches zero and a slot has not been marked successful, the slot is
  *                          considered unbootable. This value is only meaningful if |is_bootable| is
  *                          true and |is_marked_successful| is false.
+ *    unbootable_reason - If the slot is not bootable, this indicates the reason why. This value
+ *                        may not be a known |AbrUnbootableReason| variant, e.g. if the creator of
+ *                        this metadata blob was running a newer version of libabr.
  */
 typedef struct {
   bool is_bootable;
   bool is_active;
   bool is_marked_successful;
   uint8_t num_tries_remaining;
+  uint8_t unbootable_reason;
 } AbrSlotInfo;
 
 /* This function implements the core A/B/R logic. It selects a slot to boot based on the current
@@ -135,10 +154,13 @@ AbrResult AbrMarkSlotUnbootable(const AbrOps* abr_ops, AbrSlotIndex slot_index);
 
 /* Marks the given |slot_index| as successful. Returns kAbrResultOk on success.
  *
- * Calling this on an unbootable slot is an error and kAbrResultErrorInvalidData will be
- * returned.
- *
  * Calling this on kAbrSlotIndexR is an error and kAbrResultErrorInvalidData will be returned.
+ *
+ * Calling this on an unbootable slot is only allowed if |from_unbootable_ok| is true, otherwise
+ * kAbrResultErrorInvalidData will be returned. The caller must be careful here; setting a slot
+ * directly from unbootable to successful can be dangeous as it could easily result in a bootloop.
+ * Generally this should only be used by the OS on its final boot attempt for this slot, since in
+ * this case even though the metadata shows unbootable, the slot is still being attempted.
  *
  * This function is typically used by the OS update system after having confirmed that the slot
  * works as intended. It is not normally used by a bootloader except in response to an explicit
@@ -148,7 +170,8 @@ AbrResult AbrMarkSlotUnbootable(const AbrOps* abr_ops, AbrSlotIndex slot_index);
  * slot was successful at one point, it may no longer be. This function adds a success mark to the
  * given slot but also removes any success mark on the other slot.
  */
-AbrResult AbrMarkSlotSuccessful(const AbrOps* abr_ops, AbrSlotIndex slot_index);
+AbrResult AbrMarkSlotSuccessful(const AbrOps* abr_ops, AbrSlotIndex slot_index,
+                                bool from_unbootable_ok);
 
 /* Gets the current |info| for |slot_index|. On success populates |info| and returns kAbrResultOk.
  */

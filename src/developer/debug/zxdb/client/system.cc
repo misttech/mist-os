@@ -113,7 +113,15 @@ static const char* kSkipUnsymbolizedDescription =
 const char* ClientSettings::System::kSymbolIndexFiles = "symbol-index-files";
 static const char* kSymbolIndexFilesDescription =
     R"(  List of symbol-index files for symbol lookup. The content will be used
-  to populate the "ids-txts" and "build-id-dirs" settings. Check the
+  to populate the "ids-txts", "build-id-dirs", "public-symbol-servers", and
+  "private-symbol-servers" settings. Check the "symbol-index" host tool for more
+  information.)";
+
+const char* ClientSettings::System::kSymbolIndexInclude = "symbol-index-include";
+static const char* kSymbolIndexIncludeDescription =
+    R"(  Strings containing additional symbol index content, encoded as JSON.
+  The content will be used to populate the "ids-txts", "build-id-dirs",
+  "public-symbol-servers", and "private-symbol-servers" settings. Check the
   "symbol-index" host tool for more information.)";
 
 const char* ClientSettings::System::kSymbolPaths = "symbol-paths";
@@ -214,6 +222,7 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
 
   // Symbol lookup.
   schema->AddList(ClientSettings::System::kSymbolIndexFiles, kSymbolIndexFilesDescription, {});
+  schema->AddList(ClientSettings::System::kSymbolIndexInclude, kSymbolIndexIncludeDescription, {});
   schema->AddList(ClientSettings::System::kSymbolPaths, kSymbolPathsDescription, {});
   schema->AddList(ClientSettings::System::kBuildIdDirs, kBuildIdDirsDescription, {});
   schema->AddList(ClientSettings::System::kIdsTxts, kIdsTxtsDescription, {});
@@ -635,6 +644,12 @@ void System::OnSettingChanged(const SettingStore& store, const std::string& sett
 
     // Add symbol-index files first. Because they might encode extra information, e.g., build_dir
     // and require_authentication.
+    for (const std::string& contents : store.GetList(ClientSettings::System::kSymbolIndexInclude)) {
+      // In practice, symbol indices from raw strings that have relative paths will be
+      // rather brittle and probably should not be used. Treat them as root-relative to force
+      // use of absolute paths.
+      build_id_index.AddSymbolIndex(contents, "/");
+    }
     for (const std::string& path : store.GetList(ClientSettings::System::kSymbolIndexFiles)) {
       build_id_index.AddSymbolIndexFile(path);
     }

@@ -3,11 +3,16 @@
 # found in the LICENSE file.
 """Mobly test for Session affordance."""
 
+import logging
+import time
+
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
 from honeydew import errors
 from honeydew.interfaces.device_classes import fuchsia_device
+
+_LOGGER = logging.getLogger(__name__)
 
 TILE_URL = (
     "fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-rainbow.cm"
@@ -33,9 +38,8 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device.session.stop()
 
     def teardown_test(self) -> None:
-        super().teardown_test()
-
         self.device.session.stop()
+        super().teardown_test()
 
     def test_add_component(self) -> None:
         """Test case for session.add_component()"""
@@ -66,6 +70,13 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_add_component_twice(self) -> None:
         """Test case for session.add_component() called twice."""
 
+        _LOGGER.info("Waiting for Starnix kernel to shut down")
+        while True:
+            components: str = self.device.ffx.run(["component", "list"])
+            if components.find("starnix_runner/kernels") == -1:
+                _LOGGER.info("Starnix kernel has shut down")
+                break
+
         self.device.session.start()
         self.device.session.add_component(TILE_URL)
         self.device.session.add_component(TILE_URL)
@@ -74,6 +85,12 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for session.start() called multiple times."""
 
         self.device.session.start()
+
+        # Give the system a chance to fully start the session before starting
+        # the second session.
+        _LOGGER.info("Waiting for session to fully start up...")
+        time.sleep(10)
+
         self.device.session.start()
         self.device.session.add_component(TILE_URL)
 

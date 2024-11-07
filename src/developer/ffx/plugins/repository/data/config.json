@@ -1,6 +1,6 @@
 {
     "repository": {
-        "process_dir": "$DATA/repos/server_info",
+        "process_dir": "$SHARED_DATA/repos/server_info",
         "server": {
             "enabled": false,
             "listen": "[::]:8083",

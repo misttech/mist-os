@@ -192,6 +192,7 @@
                 target_monikers: [
                     // process is used in userdebug builds to launch
                     // shell binaries. It uses PackageResolver to resolve tools from packages.
+                    "/bootstrap/process_resolver",
                     "/core/process_resolver",
                 ],
             },

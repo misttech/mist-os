@@ -62,12 +62,6 @@ bool NelsonPartitioner::SupportsPartition(const PartitionSpec& spec) const {
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }
 
-zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::AddPartition(
-    const PartitionSpec& spec) const {
-  ERROR("Cannot add partitions to a nelson device\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
 zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::GetEmmcBootPartitionClient() const {
   auto boot0_part =
       OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
@@ -194,12 +188,6 @@ zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::FindPartition(
       return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  const auto filter_by_name = [&part_info](const gpt_partition_t& part) {
-    char cstring_name[GPT_NAME_LEN] = {};
-    utf16_to_cstring(cstring_name, part.name, GPT_NAME_LEN);
-    return std::get<std::string_view>(part_info) == std::string_view(cstring_name);
-  };
-
   if (std::holds_alternative<Uuid>(part_info)) {
     auto partition =
         OpenBlockPartition(gpt_->devices(), std::nullopt, std::get<Uuid>(part_info), ZX_SEC(5));
@@ -208,21 +196,21 @@ zx::result<std::unique_ptr<PartitionClient>> NelsonPartitioner::FindPartition(
     }
     return BlockPartitionClient::Create(std::move(*partition));
   }
-  auto status = gpt_->FindPartition(std::move(filter_by_name));
+  auto status = gpt_->FindPartition([&part_info](const GptPartitionMetadata& part) {
+    return FilterByName(part, std::get<std::string_view>(part_info));
+  }
+
+  );
   if (status.is_error()) {
     return status.take_error();
   }
-  return zx::ok(std::move(status->partition));
+  return zx::ok(std::move(*status));
 }
 
 zx::result<> NelsonPartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
-zx::result<> NelsonPartitioner::InitPartitionTables() const {
+zx::result<> NelsonPartitioner::ResetPartitionTables() const {
   ERROR("Initializing gpt partitions from paver is not supported on nelson\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
-zx::result<> NelsonPartitioner::WipePartitionTables() const {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 

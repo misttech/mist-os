@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 const SSH_PRIV: &str = "ssh.priv";
+pub const KEEPALIVE_TIMEOUT_CONFIG: &str = "ssh.keepalive_timeout";
 
 #[derive(thiserror::Error, Debug, Hash, Clone, PartialEq, Eq)]
 pub enum SshError {
@@ -108,13 +109,13 @@ async fn apply_auth_sock(cmd: &mut Command) {
     }
 }
 
-pub async fn build_ssh_command_with_ssh_path(
+async fn build_ssh_command_with_ssh_path(
     ssh_path: &str,
     addr: SocketAddr,
     command: Vec<&str>,
 ) -> Result<Command> {
-    let config = SshConfig::new()?;
-    build_ssh_command_with_ssh_config(ssh_path, addr, &config, command).await
+    let mut config = SshConfig::new()?;
+    build_ssh_command_with_ssh_config(ssh_path, addr, &mut config, command).await
 }
 
 pub async fn build_ssh_command_with_env(
@@ -123,24 +124,25 @@ pub async fn build_ssh_command_with_env(
     env: &EnvironmentContext,
     command: Vec<&str>,
 ) -> Result<Command> {
-    let config = SshConfig::new()?;
-    build_ssh_command_with_ssh_config_and_env(ssh_path, addr, &config, command, Some(env)).await
+    let mut ssh_config = SshConfig::new()?;
+    build_ssh_command_with_ssh_config_and_env(ssh_path, addr, &mut ssh_config, command, Some(env))
+        .await
 }
 
 pub async fn build_ssh_command_with_ssh_config(
     ssh_path: &str,
     addr: SocketAddr,
-    config: &SshConfig,
+    config: &mut SshConfig,
     command: Vec<&str>,
 ) -> Result<Command> {
     build_ssh_command_with_ssh_config_and_env(ssh_path, addr, config, command, None).await
 }
 
 /// Builds the ssh command using the specified ssh configuration and path to the ssh command.
-pub async fn build_ssh_command_with_ssh_config_and_env(
+async fn build_ssh_command_with_ssh_config_and_env(
     ssh_path: &str,
     addr: SocketAddr,
-    config: &SshConfig,
+    config: &mut SshConfig,
     command: Vec<&str>,
     env: Option<&EnvironmentContext>,
 ) -> Result<Command> {
@@ -153,6 +155,12 @@ pub async fn build_ssh_command_with_ssh_config_and_env(
     } else {
         get_ssh_key_paths().await?
     };
+
+    if let Some(env) = env {
+        if let Some(keepalive_timeout) = env.query(KEEPALIVE_TIMEOUT_CONFIG).get::<Option<u64>>()? {
+            config.set_server_alive_count_max(keepalive_timeout as u16)?
+        }
+    }
 
     let mut c = Command::new(ssh_path);
     apply_auth_sock(&mut c).await;
@@ -308,7 +316,7 @@ mod test {
         config.set("LogLevel", "DEBUG3").expect("setting loglevel");
 
         let result =
-            build_ssh_command_with_ssh_config("ssh", addr, &config, vec!["ls"]).await.unwrap();
+            build_ssh_command_with_ssh_config("ssh", addr, &mut config, vec!["ls"]).await.unwrap();
         let actual_args: Vec<_> =
             result.get_args().map(|a| a.to_string_lossy().to_string()).collect();
 

@@ -36,7 +36,7 @@ static constexpr bool HasOverlappingCpu(const uint64_t (&a)[N], const uint64_t (
 
 }  // namespace
 
-zx::result<PowerModel> PowerModel::Create(
+zx::result<EnergyModel> EnergyModel::Create(
     cpp20::span<const zx_processor_power_level_t> levels,
     cpp20::span<const zx_processor_power_level_transition_t> transitions) {
   // Allocations below would be UB.
@@ -156,8 +156,8 @@ zx::result<PowerModel> PowerModel::Create(
                      cpp23::to_underlying(power_levels[b].control());
             });
 
-  return zx::ok(PowerModel{std::move(power_levels), std::move(power_level_transitions),
-                           std::move(power_levels_lookup), idle_levels});
+  return zx::ok(EnergyModel{std::move(power_levels), std::move(power_level_transitions),
+                            std::move(power_levels_lookup), idle_levels});
 }
 
 zx::result<> PowerDomainRegistry::UpdateRegistry(
@@ -254,8 +254,8 @@ zx::result<> PowerDomainRegistry::RemoveFromRegistry(
   return zx::ok();
 }
 
-std::optional<uint8_t> PowerModel::FindPowerLevel(ControlInterface interface_id,
-                                                  uint64_t control_argument) const {
+std::optional<uint8_t> EnergyModel::FindPowerLevel(ControlInterface interface_id,
+                                                   uint64_t control_argument) const {
   auto it = std::lower_bound(control_lookup_.begin(), control_lookup_.end(),
                              zx_processor_power_level_t{
                                  .control_interface = cpp23::to_underlying(interface_id),

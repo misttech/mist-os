@@ -73,7 +73,7 @@ device.
 
 Unit tests are controlled by direct invocations of code within the body of the
 test. For instance,
-[`audio_effects_example_tests.cc`][audio-effects-example-tests] exercises code
+[`audio_effects_example_test.cc`][audio-effects-example-test] exercises code
 in a loadable module that implements audio effects and validates that the code
 works.
 
@@ -327,7 +327,7 @@ See also:
 
 [best-practices]: /docs/contribute/testing/best-practices.md
 [testing-principles]: /docs/contribute/testing/principles.md
-[audio-effects-example-tests]: /src/media/audio/examples/effects/test/audio_effects_example_tests.cc
+[audio-effects-example-test]: /src/media/audio/examples/effects/test/audio_effects_example_test.cc
 [build-bringup]: /docs/development/build/build_system/bringup.md
 [capabilities-protocol]: /docs/concepts/components/v2/capabilities/protocol.md
 [cf]: /docs/concepts/components/v2/README.md

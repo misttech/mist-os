@@ -13,16 +13,9 @@
 #include <lib/async-loop/default.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <memory>
-#include <sstream>
-#include <string>
-
-#include "lib/fidl/cpp/binding.h"
-#include "lib/fidl/cpp/synchronous_interface_ptr.h"
 #include "src/cobalt/bin/testapp/cobalt_testapp.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
-#include "src/lib/fxl/macros.h"
 
 // Command-line flags
 

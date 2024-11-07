@@ -23,7 +23,7 @@ use packet::records::{
 use packet::{BufferView, BufferViewMut};
 use zerocopy::byteorder::network_endian::U16;
 
-use crate::ip::{IpProto, Ipv6ExtHdrType, Ipv6Proto};
+use crate::ip::{FragmentOffset, IpProto, Ipv6ExtHdrType, Ipv6Proto};
 
 /// The length of an IPv6 Fragment Extension Header.
 pub(crate) const IPV6_FRAGMENT_EXT_HDR_LEN: usize = 8;
@@ -41,6 +41,11 @@ impl<'a> Ipv6ExtensionHeader<'a> {
     /// Returns the extension header-specific data.
     pub fn data(&self) -> &Ipv6ExtensionHeaderData<'a> {
         &self.data
+    }
+
+    /// Consumes `self` returning only the containing data.
+    pub fn into_data(self) -> Ipv6ExtensionHeaderData<'a> {
+        self.data
     }
 }
 
@@ -368,13 +373,13 @@ impl RecordsImplLayout for Ipv6ExtensionHeaderImpl {
     type Error = Ipv6ExtensionHeaderParsingError;
 }
 
-impl<'a> RecordsImpl<'a> for Ipv6ExtensionHeaderImpl {
-    type Record = Ipv6ExtensionHeader<'a>;
+impl RecordsImpl for Ipv6ExtensionHeaderImpl {
+    type Record<'a> = Ipv6ExtensionHeader<'a>;
 
-    fn parse_with_context<BV: BufferView<&'a [u8]>>(
+    fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
         data: &mut BV,
         context: &mut Self::Context,
-    ) -> RecordParseResult<Self::Record, Self::Error> {
+    ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
         let expected_hdr = context.next_header;
 
         match Ipv6ExtHdrType::from(expected_hdr) {
@@ -539,15 +544,15 @@ impl ExtensionHeaderOptionDataImplLayout for HopByHopOptionDataImpl {
     type Context = ();
 }
 
-impl<'a> ExtensionHeaderOptionDataImpl<'a> for HopByHopOptionDataImpl {
-    type OptionData = HopByHopOptionData<'a>;
+impl ExtensionHeaderOptionDataImpl for HopByHopOptionDataImpl {
+    type OptionData<'a> = HopByHopOptionData<'a>;
 
-    fn parse_option(
+    fn parse_option<'a>(
         kind: u8,
         data: &'a [u8],
         _context: &mut Self::Context,
         allow_unrecognized: bool,
-    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData> {
+    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData<'a>> {
         match kind {
             HBH_OPTION_KIND_RTRALRT => {
                 if data.len() == HBH_OPTION_RTRALRT_LEN {
@@ -682,9 +687,9 @@ pub struct FragmentData<'a> {
 
 impl<'a> FragmentData<'a> {
     /// Returns the fragment offset.
-    pub fn fragment_offset(&self) -> u16 {
+    pub fn fragment_offset(&self) -> FragmentOffset {
         debug_assert!(self.bytes.len() == 6);
-        (u16::from(self.bytes[0]) << 5) | (u16::from(self.bytes[1]) >> 3)
+        FragmentOffset::new_with_msb(U16::from_bytes([self.bytes[0], self.bytes[1]]).get())
     }
 
     /// Returns the more fragments flags.
@@ -745,15 +750,15 @@ impl ExtensionHeaderOptionDataImplLayout for DestinationOptionDataImpl {
     type Context = ();
 }
 
-impl<'a> ExtensionHeaderOptionDataImpl<'a> for DestinationOptionDataImpl {
-    type OptionData = DestinationOptionData<'a>;
+impl ExtensionHeaderOptionDataImpl for DestinationOptionDataImpl {
+    type OptionData<'a> = DestinationOptionData<'a>;
 
-    fn parse_option(
+    fn parse_option<'a>(
         kind: u8,
         data: &'a [u8],
         _context: &mut Self::Context,
         allow_unrecognized: bool,
-    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData> {
+    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData<'a>> {
         if allow_unrecognized {
             ExtensionHeaderOptionDataParseResult::Ok(DestinationOptionData::Unrecognized {
                 kind,
@@ -826,15 +831,13 @@ pub enum ExtensionHeaderOptionDataParseResult<D> {
 }
 
 /// An implementation of an extension header specific option data parser.
-pub(super) trait ExtensionHeaderOptionDataImpl<'a>:
-    ExtensionHeaderOptionDataImplLayout
-{
+pub(super) trait ExtensionHeaderOptionDataImpl: ExtensionHeaderOptionDataImplLayout {
     /// Extension header specific option data.
     ///
     /// Note, `OptionData` does not need to hold general option data as defined by
     /// RFC 8200 section 4.2. It should only hold extension header specific option
     /// data.
-    type OptionData: Sized;
+    type OptionData<'a>: Sized;
 
     /// Parse an option of a given `kind` from `data`.
     ///
@@ -846,12 +849,12 @@ pub(super) trait ExtensionHeaderOptionDataImpl<'a>:
     /// that was passed to `parse_option`). A recognized option `kind` with incorrect
     /// `data` must return `ErrorAt(offset)`, where the offset indicates where the
     /// erroneous field is within the option data buffer.
-    fn parse_option(
+    fn parse_option<'a>(
         kind: u8,
         data: &'a [u8],
         context: &mut Self::Context,
         allow_unrecognized: bool,
-    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData>;
+    ) -> ExtensionHeaderOptionDataParseResult<Self::OptionData<'a>>;
 }
 
 /// Generic implementation of extension header options parsing.
@@ -876,16 +879,16 @@ where
     type Context = ExtensionHeaderOptionContext<O::Context>;
 }
 
-impl<'a, O> RecordsImpl<'a> for ExtensionHeaderOptionImpl<O>
+impl<O> RecordsImpl for ExtensionHeaderOptionImpl<O>
 where
-    O: ExtensionHeaderOptionDataImpl<'a>,
+    O: ExtensionHeaderOptionDataImpl,
 {
-    type Record = ExtensionHeaderOption<O::OptionData>;
+    type Record<'a> = ExtensionHeaderOption<O::OptionData<'a>>;
 
-    fn parse_with_context<BV: BufferView<&'a [u8]>>(
+    fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
         data: &mut BV,
         context: &mut Self::Context,
-    ) -> RecordParseResult<Self::Record, Self::Error> {
+    ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
         // If we have no more bytes left, we are done.
         let kind = match data.take_byte_front() {
             None => return Ok(ParsedRecord::Done),
@@ -1775,7 +1778,7 @@ mod tests {
         assert_eq!(ext_hdrs[0].next_header, IpProto::Tcp.into());
 
         if let Ipv6ExtensionHeaderData::Fragment { fragment_data } = ext_hdrs[0].data() {
-            assert_eq!(fragment_data.fragment_offset(), 5063);
+            assert_eq!(fragment_data.fragment_offset().into_raw(), 5063);
             assert_eq!(fragment_data.m_flag(), true);
             assert_eq!(fragment_data.identification(), 3266246449);
         } else {

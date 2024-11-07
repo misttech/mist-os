@@ -11,7 +11,8 @@ use crate::config_management::SavedNetworksManagerApi;
 use crate::telemetry::TelemetrySender;
 use anyhow::Error;
 use futures::channel::mpsc;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
+use futures::lock::Mutex;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt};
 use std::convert::Infallible;
@@ -26,6 +27,7 @@ fn create_roam_monitor(
     credential: Credential,
     telemetry_sender: TelemetrySender,
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
+    past_roams: Arc<Mutex<PastRoamList>>,
 ) -> Box<dyn roam_monitor::RoamMonitorApi> {
     match roaming_policy {
         RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, .. } => {
@@ -35,6 +37,7 @@ fn create_roam_monitor(
                 credential,
                 telemetry_sender.clone(),
                 saved_networks,
+                past_roams.clone(),
             ))
         }
         RoamingPolicy::Disabled => {
@@ -100,8 +103,9 @@ pub async fn serve_local_roam_manager_requests(
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
 ) -> Result<Infallible, Error> {
     // Queue of created monitor futures.
-    let mut monitor_futs: FuturesUnordered<BoxFuture<'static, Result<(), anyhow::Error>>> =
+    let mut monitor_futs: FuturesUnordered<LocalBoxFuture<'static, Result<(), anyhow::Error>>> =
         FuturesUnordered::new();
+    let past_roams = Arc::new(Mutex::new(PastRoamList::new(NUM_PLATFORM_MAX_ROAMS_PER_DAY)));
 
     loop {
         select! {
@@ -111,8 +115,8 @@ pub async fn serve_local_roam_manager_requests(
                     // Create and start a roam monitor future, passing in handles from caller. This
                     // ensures that new data is initialized for every new caller (e.g. connected_state).
                     RoamServiceRequest::InitializeRoamMonitor { ap_state, network_identifier, credential, roam_sender, roam_trigger_data_receiver }=> {
-                        let monitor = create_roam_monitor(roaming_policy, ap_state, network_identifier, credential, telemetry_sender.clone(), saved_networks.clone());
-                        let monitor_fut = roam_monitor::serve_roam_monitor(monitor, roam_trigger_data_receiver, connection_selection_requester.clone(), roam_sender.clone(), telemetry_sender.clone());
+                        let monitor = create_roam_monitor(roaming_policy, ap_state, network_identifier, credential, telemetry_sender.clone(), saved_networks.clone(), past_roams.clone());
+                        let monitor_fut = roam_monitor::serve_roam_monitor(monitor, roam_trigger_data_receiver, connection_selection_requester.clone(), roam_sender.clone(), telemetry_sender.clone(), past_roams.clone());
                         monitor_futs.push(Box::pin(monitor_fut));
                     }
                 }
@@ -174,6 +178,7 @@ mod tests {
         let (telemetry_sender, _) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let saved_networks = Arc::new(FakeSavedNetworksManager::new());
+        let past_roams = Arc::new(Mutex::new(PastRoamList::new(NUM_PLATFORM_MAX_ROAMS_PER_DAY)));
         let monitor = create_roam_monitor(
             roaming_policy,
             generate_random_ap_state(),
@@ -181,6 +186,7 @@ mod tests {
             generate_random_password(),
             telemetry_sender.clone(),
             saved_networks.clone(),
+            past_roams.clone(),
         );
         match roaming_policy {
             RoamingPolicy::Disabled => {
@@ -196,6 +202,7 @@ mod tests {
                         generate_random_password(),
                         telemetry_sender.clone(),
                         saved_networks,
+                        past_roams.clone(),
                     ));
 
                 assert_eq!(stationary_monitor.type_id(), monitor.type_id());

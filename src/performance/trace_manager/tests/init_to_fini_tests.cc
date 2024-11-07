@@ -14,7 +14,7 @@ namespace tracing {
 namespace test {
 
 TEST_F(TraceManagerTest, InitToFini) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   FakeProvider* provider;
   ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider));
@@ -39,7 +39,7 @@ TEST_F(TraceManagerTest, InitToFini) {
 }
 
 TEST_F(TraceManagerTest, InitToFiniWithNoProviders) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   ASSERT_TRUE(InitializeSession());
 
@@ -60,7 +60,7 @@ TEST_F(TraceManagerTest, InitToFiniWithNoProviders) {
 }
 
 TEST_F(TraceManagerTest, InitToFiniWithProviderAddedAfterSessionStarts) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   FakeProvider* provider1;
   ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider1));
@@ -119,7 +119,7 @@ TEST_F(TraceManagerTest, InitToFiniWithProviderAddedAfterSessionStarts) {
 }
 
 TEST_F(TraceManagerTest, InitToFiniWithNoStop) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   FakeProvider* provider;
   ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider));
@@ -131,8 +131,7 @@ TEST_F(TraceManagerTest, InitToFiniWithNoStop) {
   VerifyCounts(1, 0);
 
   ASSERT_TRUE(TerminateSession());
-  // Stop is immplicitly called first before terminating.
-  VerifyCounts(1, 1);
+  VerifyCounts(1, 0);
 }
 
 static constexpr char kAlertName[] = "alert-name";
@@ -143,7 +142,7 @@ static constexpr char kAlertNameMax[] = "alert-name-max";
 
 // Tests alerts with names of various lengths.
 TEST_F(TraceManagerTest, Alerted) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   FakeProvider* provider;
   ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider));
@@ -157,7 +156,7 @@ TEST_F(TraceManagerTest, Alerted) {
   // Intermediate-length alert name (10 characters).
   provider->SendAlert(kAlertName);
   std::string received_alert_name;
-  controller()->WatchAlert([&received_alert_name](controller::Controller_WatchAlert_Result result) {
+  controller()->WatchAlert([&received_alert_name](controller::Session_WatchAlert_Result result) {
     ASSERT_TRUE(result.is_response());
     received_alert_name = result.response().alert_name;
   });
@@ -167,7 +166,7 @@ TEST_F(TraceManagerTest, Alerted) {
   // Minimum-length alert name (1 character).
   provider->SendAlert(kAlertNameMin);
   received_alert_name.clear();
-  controller()->WatchAlert([&received_alert_name](controller::Controller_WatchAlert_Result result) {
+  controller()->WatchAlert([&received_alert_name](controller::Session_WatchAlert_Result result) {
     ASSERT_TRUE(result.is_response());
     received_alert_name = result.response().alert_name;
   });
@@ -177,7 +176,7 @@ TEST_F(TraceManagerTest, Alerted) {
   // Maximum-length alert name (14 characters).
   provider->SendAlert(kAlertNameMax);
   received_alert_name.clear();
-  controller()->WatchAlert([&received_alert_name](controller::Controller_WatchAlert_Result result) {
+  controller()->WatchAlert([&received_alert_name](controller::Session_WatchAlert_Result result) {
     ASSERT_TRUE(result.is_response());
     received_alert_name = result.response().alert_name;
   });
@@ -195,7 +194,7 @@ static constexpr size_t kMaxAlertQueueDepth = 16;
 
 // Tests alerts with a variety of sequences WRT |WatchAlert|.
 TEST_F(TraceManagerTest, AlertSequence) {
-  ConnectToControllerService();
+  ConnectToProvisionerService();
 
   FakeProvider* provider;
   ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider));
@@ -208,7 +207,7 @@ TEST_F(TraceManagerTest, AlertSequence) {
 
   // Calling |WatchAlert| before sending alert.
   std::string received_alert_name;
-  controller()->WatchAlert([&received_alert_name](controller::Controller_WatchAlert_Result result) {
+  controller()->WatchAlert([&received_alert_name](controller::Session_WatchAlert_Result result) {
     ASSERT_TRUE(result.is_response());
     received_alert_name = result.response().alert_name;
   });
@@ -227,11 +226,10 @@ TEST_F(TraceManagerTest, AlertSequence) {
 
   for (uint8_t i = 0; i < 4; ++i) {
     received_alert_name.clear();
-    controller()->WatchAlert(
-        [&received_alert_name](controller::Controller_WatchAlert_Result result) {
-          ASSERT_TRUE(result.is_response());
-          received_alert_name = result.response().alert_name;
-        });
+    controller()->WatchAlert([&received_alert_name](controller::Session_WatchAlert_Result result) {
+      ASSERT_TRUE(result.is_response());
+      received_alert_name = result.response().alert_name;
+    });
     RunLoopUntilIdle();
     std::string alert_name = kAlertName;
     alert_name.append(1, 'A' + i);
@@ -248,11 +246,10 @@ TEST_F(TraceManagerTest, AlertSequence) {
 
   for (uint8_t i = 2; i < kMaxAlertQueueDepth + 2; ++i) {
     received_alert_name.clear();
-    controller()->WatchAlert(
-        [&received_alert_name](controller::Controller_WatchAlert_Result result) {
-          ASSERT_TRUE(result.is_response());
-          received_alert_name = result.response().alert_name;
-        });
+    controller()->WatchAlert([&received_alert_name](controller::Session_WatchAlert_Result result) {
+      ASSERT_TRUE(result.is_response());
+      received_alert_name = result.response().alert_name;
+    });
     RunLoopUntilIdle();
     std::string alert_name = kAlertName;
     alert_name.append(1, 'A' + i);

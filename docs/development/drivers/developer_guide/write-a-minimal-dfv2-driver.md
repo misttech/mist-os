@@ -149,7 +149,7 @@ To create a build file for the driver, do the following:
 1. Add a target for the driver, for example:
 
    ```gn
-   fuchsia_driver("driver") {
+   fuchsia_cc_driver("driver") {
      output_name = "skeleton_driver"
      sources = [ "skeleton_driver.cc" ]
      deps = [

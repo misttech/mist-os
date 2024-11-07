@@ -809,7 +809,7 @@ TEST(BootTests, RollbackIndexUpdatedOnSuccessfulSlot) {
   // Mark slot A successful.
   constexpr AbrSlotIndex active_slot = kAbrSlotIndexA;
   AbrOps abr_ops = dev->GetAbrOps();
-  ASSERT_EQ(AbrMarkSlotSuccessful(&abr_ops, kAbrSlotIndexA), kAbrResultOk);
+  ASSERT_EQ(AbrMarkSlotSuccessful(&abr_ops, kAbrSlotIndexA, false), kAbrResultOk);
   ASSERT_EQ(AbrMarkSlotUnbootable(&abr_ops, kAbrSlotIndexB), kAbrResultOk);
 
   ASSERT_EQ(LoadAndBoot(&ops, kZirconBootFlagsNone), kBootResultBootReturn);

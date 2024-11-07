@@ -218,7 +218,7 @@ driver_bind_rules("brcmfmac_sdio_bind") {
 }
 
 # Driver module for the brcmfmac driver.
-fuchsia_driver("fuchsia_driver-driver") {
+fuchsia_cc_driver("fuchsia_driver-driver") {
   output_name = "brcmfmac"
   sources = []
   deps = [
@@ -244,7 +244,7 @@ fuchsia_driver_component("fuchsia_driver") {
 
 # Driver module for the test version of the brcmfmac driver, which includes run_unit_tests() DDK
 # tests.
-fuchsia_driver("test_fuchsia_driver-driver") {
+fuchsia_cc_driver("test_fuchsia_driver-driver") {
   output_name = "brcmfmac-test"
 
   sources = []

@@ -10,7 +10,7 @@ driver_bind_rules("bind") {
   bind_output = "composite.bindbc"
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "reload_test_composite_driver"
   sources = [ "composite_driver.cc" ]

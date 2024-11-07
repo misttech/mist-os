@@ -13,14 +13,10 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
-#include <sstream>
 #include <string>
-#include <thread>
 
 #include "lib/sys/component/cpp/testing/scoped_child.h"
 #include "src/cobalt/bin/testapp/cobalt_testapp_logger.h"
-#include "src/lib/fxl/command_line.h"
-#include "src/lib/fxl/log_settings_command_line.h"
 #include "src/lib/fxl/macros.h"
 #include "third_party/cobalt/src/public/lib/clock_interfaces.h"
 
@@ -68,7 +64,6 @@ class CobaltTestApp {
   // Counter used to generate unique ScopedChild names.
   std::size_t scoped_children_ = 0;
 
- private:
   FXL_DISALLOW_COPY_AND_ASSIGN(CobaltTestApp);
 };
 

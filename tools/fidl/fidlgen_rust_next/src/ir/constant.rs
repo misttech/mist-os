@@ -4,15 +4,34 @@
 
 use serde::Deserialize;
 
-use super::{CompIdent, Literal};
+use crate::de::Index;
+
+use super::{CompIdent, Literal, Type};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub struct Const {
+    pub name: CompIdent,
+    #[serde(rename = "type")]
+    pub ty: Type,
+    pub value: Constant,
+}
+
+impl Index for Const {
+    type Key = CompIdent;
+
+    fn key(&self) -> &Self::Key {
+        &self.name
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct Constant {
+    pub expression: String,
+    pub value: String,
     #[expect(dead_code)]
     #[serde(flatten)]
     pub kind: ConstantKind,
-    pub value: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]

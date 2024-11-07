@@ -206,12 +206,14 @@ class X86PageTableBase {
     test_page_alloc_func_ = test_paf;
 
     /* allocate a top level page table for the new address space */
-    virt_ = AllocatePageTable();
-    if (!virt_) {
-      return ZX_ERR_NO_MEMORY;
+    auto result = AllocatePageTable(true);
+    if (result.is_error()) {
+      return result.status_value();
     }
 
-    phys_ = physmap_to_paddr(virt_);
+    page_ = *result;
+    phys_ = page_->paddr();
+    virt_ = reinterpret_cast<pt_entry_t*>(X86_PHYS_TO_VIRT(phys_));
     DEBUG_ASSERT(phys_ != 0);
 
     ctx_ = ctx;
@@ -219,29 +221,29 @@ class X86PageTableBase {
     return ZX_OK;
   }
 
-  pt_entry_t* AllocatePageTable() {
-    paddr_t pa;
-    vm_page* p;
-    zx_status_t status;
-
+  zx::result<vm_page_t*> AllocatePageTable(bool zero) {
+    auto test_alloc = [&]() -> zx::result<vm_page_t*> {
+      vm_page_t* page;
+      paddr_t paddr;
+      zx_status_t status = test_page_alloc_func_(0, &page, &paddr);
+      if (status == ZX_OK) {
+        return zx::ok(page);
+      }
+      return zx::error(status);
+    };
     // The default allocation routine is pmm_alloc_page so test and explicitly call it
     // to avoid any unnecessary virtual function calls.
-    if (likely(!test_page_alloc_func_)) {
-      status = pmm_alloc_page(0, &p, &pa);
-    } else {
-      status = test_page_alloc_func_(0, &p, &pa);
+    auto result = likely(!test_page_alloc_func_) ? Pmm::Node().AllocPage(0) : test_alloc();
+    if (likely(result.is_ok())) {
+      vm_page_t* p = *result;
+      p->set_state(vm_page_state::MMU);
+      p->mmu.num_mappings = 0;
+
+      if (zero) {
+        arch_zero_page(paddr_to_physmap(p->paddr()));
+      }
     }
-    if (status != ZX_OK) {
-      return nullptr;
-    }
-    p->set_state(vm_page_state::MMU);
-
-    pt_entry_t* page_ptr = static_cast<pt_entry_t*>(paddr_to_physmap(pa));
-    DEBUG_ASSERT(page_ptr);
-
-    arch_zero_page(page_ptr);
-
-    return page_ptr;
+    return result;
   }
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(X86PageTableBase);
@@ -263,6 +265,7 @@ class X86PageTableBase {
   // Pointer to the translation table.
   paddr_t phys_ = 0;
   pt_entry_t* virt_ = nullptr;
+  vm_page_t* page_ = nullptr;
 
   // Counter of pages allocated to back the translation table.
   size_t pages_ TA_GUARDED(lock_) = 0;
@@ -353,8 +356,19 @@ class X86PageTableImpl : public X86PageTableBase {
 
       MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
                            /*vaddr=*/vaddr);
-      zx_status_t status = AddMapping(virt_, mmu_flags, static_cast<T*>(this)->top_level(),
-                                      existing_action, cursor, &cm);
+      auto [status, lower_mapped] = AddMapping(virt_, mmu_flags, static_cast<T*>(this)->top_level(),
+                                               existing_action, cursor, &cm);
+      page_->mmu.num_mappings += lower_mapped;
+      if (status != ZX_OK) {
+        VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
+        if (unmap_cursor.size() > 0) {
+          auto [unmap_status, unmapped] =
+              RemoveMapping(virt_, static_cast<T*>(this)->top_level(), EnlargeOperation::No,
+                            CheckForEmptyPt::Yes, unmap_cursor, &cm);
+          DEBUG_ASSERT(unmap_status == ZX_OK);
+          page_->mmu.num_mappings -= unmapped;
+        }
+      }
       cm.Finish();
       if (status != ZX_OK) {
         dprintf(SPEW, "Add mapping failed with err=%d\n", status);
@@ -388,8 +402,19 @@ class X86PageTableImpl : public X86PageTableBase {
     {
       Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
       DEBUG_ASSERT(virt_);
-      zx_status_t status = AddMapping(virt_, mmu_flags, static_cast<T*>(this)->top_level(),
-                                      ExistingEntryAction::Error, cursor, &cm);
+      auto [status, lower_mapped] = AddMapping(virt_, mmu_flags, static_cast<T*>(this)->top_level(),
+                                               ExistingEntryAction::Error, cursor, &cm);
+      page_->mmu.num_mappings += lower_mapped;
+      if (status != ZX_OK) {
+        VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
+        if (unmap_cursor.size() > 0) {
+          auto [unmap_status, unmapped] =
+              RemoveMapping(virt_, static_cast<T*>(this)->top_level(), EnlargeOperation::No,
+                            CheckForEmptyPt::Yes, unmap_cursor, &cm);
+          DEBUG_ASSERT(unmap_status == ZX_OK);
+          page_->mmu.num_mappings -= unmapped;
+        }
+      }
       cm.Finish();
       if (status != ZX_OK) {
         dprintf(SPEW, "Add mapping failed with err=%d\n", status);
@@ -415,23 +440,20 @@ class X86PageTableImpl : public X86PageTableBase {
     VirtualAddressCursor cursor(/*vaddr=*/vaddr, /*size=*/count * PAGE_SIZE);
 
     __UNINITIALIZED ConsistencyManager cm(this);
-    // This needs to be initialized to some value as gcc cannot work out that it can elide the
-    // default constructor.
-    zx::result<bool> status = zx::ok(true);
-    {
-      Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
-      DEBUG_ASSERT(virt_);
-      status = RemoveMapping(virt_, static_cast<T*>(this)->top_level(), enlarge,
-                             CheckForEmptyPt::No, cursor, &cm);
-      cm.Finish();
-    }
-    DEBUG_ASSERT(cursor.size() == 0 || status.is_error());
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
+    DEBUG_ASSERT(virt_);
+    auto [status, lower_unmapped] = RemoveMapping(virt_, static_cast<T*>(this)->top_level(),
+                                                  enlarge, CheckForEmptyPt::No, cursor, &cm);
+    page_->mmu.num_mappings -= lower_unmapped;
+    cm.Finish();
+    DEBUG_ASSERT(cursor.size() == 0 || status != ZX_OK);
 
     if (unmapped)
       *unmapped = count;
 
-    return status.status_value();
+    return status;
   }
+
   zx_status_t ProtectPages(vaddr_t vaddr, size_t count, uint mmu_flags) override final {
     canary_.Assert();
 
@@ -524,6 +546,16 @@ class X86PageTableImpl : public X86PageTableBase {
     return ZX_OK;
   }
 
+  static uint CountPresentEntries(const volatile pt_entry_t* page_table) {
+    uint count = 0;
+    for (uint i = 0; i < NO_OF_PT_ENTRIES; i++) {
+      if (IS_PAGE_PRESENT(page_table[i])) {
+        count++;
+      }
+    }
+    return count;
+  }
+
  protected:
   // We disable analysis due to the write to |pages_| tripping it up.  It is safe
   // to write to |pages_| since this is part of object construction.
@@ -554,12 +586,13 @@ class X86PageTableImpl : public X86PageTableBase {
     IntermediatePtFlags flags = static_cast<T*>(this)->intermediate_flags();
 
     for (uint i = start; i < end; i++) {
-      pt_entry_t* pdp = AllocatePageTable();
-      if (pdp == nullptr) {
-        return ZX_ERR_NO_MEMORY;
+      auto result = AllocatePageTable(true);
+      if (result.is_error()) {
+        return result.status_value();
       }
       pages_ += 1;
-      virt_[i] = X86_VIRT_TO_PHYS(pdp) | flags | X86_MMU_PG_P;
+      virt_[i] = (*result)->paddr() | flags | X86_MMU_PG_P;
+      page_->mmu.num_mappings++;
     }
     return ZX_OK;
   }
@@ -686,6 +719,7 @@ class X86PageTableImpl : public X86PageTableBase {
       vm_page_t* p;
       list_for_every_entry (&to_free_, p, vm_page_t, queue_node) {
         DEBUG_ASSERT(p->state() == vm_page_state::MMU);
+        DEBUG_ASSERT(p->mmu.num_mappings == 0);
       }
       if (!list_is_empty(&to_free_)) {
         pmm_free(&to_free_);
@@ -695,6 +729,7 @@ class X86PageTableImpl : public X86PageTableBase {
     void queue_free(vm_page_t* page) {
       AssertHeld(pt_->lock_);
       DEBUG_ASSERT(page->state() == vm_page_state::MMU);
+      DEBUG_ASSERT(page->mmu.num_mappings == 0);
       list_add_tail(&to_free_, &page->queue_node);
       DEBUG_ASSERT(pt_->pages_ > 0);
       pt_->pages_--;
@@ -823,16 +858,6 @@ class X86PageTableImpl : public X86PageTableBase {
     return static_cast<PageTableLevel>(static_cast<int>(level) - 1);
   }
 
-  static bool page_table_is_clear(const volatile pt_entry_t* page_table) {
-    uint lower_idx;
-    for (lower_idx = 0; lower_idx < NO_OF_PT_ENTRIES; ++lower_idx) {
-      if (IS_PAGE_PRESENT(page_table[lower_idx])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   // Used by callers of RemoveMapping to indicate whether there might be empty page tables in the
   // tree that need to be checked for. Empty page tables are normally not allowed, but might be
   // there due to cleaning up a failed attempt at mapping.
@@ -850,14 +875,14 @@ class X86PageTableImpl : public X86PageTableBase {
    * @param cursor A cursor describing the range of address space to act on.
    * @param cm Object to manage consistency of page table entries and cache+TLB.
    *
-   * @return ZX_OK if successful
-   * @return ZX_ERR_ALREADY_EXISTS if the range overlaps an existing mapping and
-   *         `existing_action` is set to `Error`
-   * @return ZX_ERR_NO_MEMORY if intermediate page tables could not be allocated
+   * @return both a status, as well as how many new mappings were installed in |table|. If the new
+   * mapping count is non-zero, regardless of the error value, the num_mappings field in the page
+   * must be updated by the caller.
    */
-  zx_status_t AddMapping(volatile pt_entry_t* table, uint mmu_flags, PageTableLevel level,
-                         ExistingEntryAction existing_action, MappingCursor& cursor,
-                         ConsistencyManager* cm) TA_REQ(lock_) {
+  ktl::pair<zx_status_t, uint> AddMapping(volatile pt_entry_t* table, uint mmu_flags,
+                                          PageTableLevel level, ExistingEntryAction existing_action,
+                                          MappingCursor& cursor, ConsistencyManager* cm)
+      TA_REQ(lock_) {
     DEBUG_ASSERT(table);
     DEBUG_ASSERT(static_cast<T*>(this)->check_vaddr(cursor.vaddr()));
     DEBUG_ASSERT(static_cast<T*>(this)->check_paddr(cursor.paddr()));
@@ -865,26 +890,10 @@ class X86PageTableImpl : public X86PageTableBase {
     // tables should be mapping entries on their behalf.
     DEBUG_ASSERT(!IsUnified());
 
-    zx_status_t ret = ZX_OK;
-
     if (level == PageTableLevel::PT_L) {
       return AddMappingL0(table, mmu_flags, existing_action, cursor, cm);
     }
-
-    auto abort = fit::defer([&]() {
-      AssertHeld(lock_);
-      if (level == static_cast<T*>(this)->top_level()) {
-        // Build an unmap cursor of what was already mapped.
-        VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
-        if (unmap_cursor.size() > 0) {
-          auto status = RemoveMapping(table, level, EnlargeOperation::No, CheckForEmptyPt::Yes,
-                                      unmap_cursor, cm);
-          // Removing the exact mappings we just added should never be able to fail.
-          ASSERT(status.is_ok());
-          DEBUG_ASSERT(unmap_cursor.size() == 0);
-        }
-      }
-    });
+    uint mapped = 0;
 
     IntermediatePtFlags interm_flags = static_cast<T*>(this)->intermediate_flags();
     PtFlags term_flags = static_cast<T*>(this)->terminal_flags(level, mmu_flags);
@@ -899,7 +908,7 @@ class X86PageTableImpl : public X86PageTableBase {
       // See if there's a large page in our way
       if (IS_PAGE_PRESENT(pt_val) && IS_LARGE_PAGE(pt_val)) {
         if (existing_action == ExistingEntryAction::Error) {
-          return ZX_ERR_ALREADY_EXISTS;
+          return {ZX_ERR_ALREADY_EXISTS, mapped};
         }
         cursor.Consume(ps);
         continue;
@@ -912,6 +921,7 @@ class X86PageTableImpl : public X86PageTableBase {
           level_paligned && cursor.PageRemaining() >= ps) {
         UpdateEntry(cm, level, cursor.vaddr(), table + index, cursor.paddr(),
                     term_flags | X86_MMU_PG_PS, /*was_terminal=*/false);
+        mapped++;
         cursor.Consume(ps);
       } else {
         // See if we need to create a new table.
@@ -920,15 +930,16 @@ class X86PageTableImpl : public X86PageTableBase {
           if (level == PageTableLevel::PML4_L) {
             DEBUG_ASSERT(!IsShared());
           }
-          volatile pt_entry_t* m = AllocatePageTable();
-          if (m == nullptr) {
+          auto result = AllocatePageTable(true);
+          if (result.is_error()) {
             // The mapping wasn't fully updated, but there is work here that might need to be undone
             // as we may have allocated various levels of page tables. By consuming a single page we
             // make the cleanup operation think we have added a mapping here, causing it to check
             // the page table for potential cleanup.
             cursor.Consume(PAGE_SIZE);
-            return ZX_ERR_NO_MEMORY;
+            return {result.status_value(), mapped};
           }
+          paddr_t table_paddr = (*result)->paddr();
 
           if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
             Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
@@ -937,39 +948,48 @@ class X86PageTableImpl : public X86PageTableBase {
 
             ConsistencyManager cm_referenced(referenced_pt_);
             referenced_pt_->UpdateEntry(&cm_referenced, level, cursor.vaddr(), referenced_entry,
-                                        X86_VIRT_TO_PHYS(m), interm_flags,
+                                        table_paddr, interm_flags,
                                         /*was_terminal=*/false);
+            referenced_pt_->page_->mmu.num_mappings++;
             cm_referenced.Finish();
           }
 
-          UpdateEntry(cm, level, cursor.vaddr(), e, X86_VIRT_TO_PHYS(m), interm_flags,
+          UpdateEntry(cm, level, cursor.vaddr(), e, table_paddr, interm_flags,
                       /*was_terminal=*/false);
-
+          mapped++;
           pt_val = *e;
           pages_++;
         }
 
-        ret = AddMapping(get_next_table_from_entry(pt_val), mmu_flags, lower_level(level),
-                         existing_action, cursor, cm);
-
+        volatile pt_entry_t* next_table = get_next_table_from_entry(pt_val);
+        auto [ret, lower_mapped] =
+            AddMapping(next_table, mmu_flags, lower_level(level), existing_action, cursor, cm);
+        // Regardless of success or failure we must update the mapping counts.
+        if (lower_mapped > 0) {
+          vm_page_t* lower_page = Pmm::Node().PaddrToPage(X86_VIRT_TO_PHYS(next_table));
+          DEBUG_ASSERT(lower_page);
+          lower_page->mmu.num_mappings += lower_mapped;
+        }
         if (ret != ZX_OK) {
-          return ret;
+          return {ret, mapped};
         }
       }
     }
-    abort.cancel();
-    return ZX_OK;
+    return {ZX_OK, mapped};
   }
 
-  // Base case of AddMapping for smallest page size.
-  zx_status_t AddMappingL0(volatile pt_entry_t* table, uint mmu_flags,
-                           ExistingEntryAction existing_action, MappingCursor& cursor,
-                           ConsistencyManager* cm) TA_REQ(lock_) {
+  // Base case of AddMapping for smallest page size. Returns the number of mappings installed in
+  // |table|, it is the callers responsibility to update the num_mappings field in the page.
+  ktl::pair<zx_status_t, uint> AddMappingL0(volatile pt_entry_t* table, uint mmu_flags,
+                                            ExistingEntryAction existing_action,
+                                            MappingCursor& cursor, ConsistencyManager* cm)
+      TA_REQ(lock_) {
     DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
 
     const bool ro = (mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK) == ARCH_MMU_FLAG_PERM_READ;
     const PtFlags term_flags =
         static_cast<T*>(this)->terminal_flags(PageTableLevel::PT_L, mmu_flags);
+    uint mapped = 0;
 
     uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
@@ -980,7 +1000,7 @@ class X86PageTableImpl : public X86PageTableBase {
       // Do not consume addresses yet - the caller's error handling logic expects
       // them to be unconsumed in this case.
       if (valid && existing_action == ExistingEntryAction::Error) {
-        return ZX_ERR_ALREADY_EXISTS;
+        return {ZX_ERR_ALREADY_EXISTS, mapped};
       }
 
       const bool paddr_changing = (*existing_entry & X86_PG_FRAME) != cursor.paddr();
@@ -999,6 +1019,11 @@ class X86PageTableImpl : public X86PageTableBase {
                       term_flags, /*was_terminal=*/true);
         }
       } else {
+        if (!valid) {
+          // As we are going to transition an entry form INVALID->VALID we must count this as an
+          // additional mapping. All other cases are changing an etry from VALID->VALID.
+          mapped++;
+        }
         // Either
         //  1. no existing entry.
         //  2. upgrading an existing entry where the physical address is changing.
@@ -1023,14 +1048,13 @@ class X86PageTableImpl : public X86PageTableBase {
       cursor.Consume(PAGE_SIZE);
     }
 
-    return ZX_OK;
+    return {ZX_OK, mapped};
   }
 
   /**
    * @brief Unmaps the range specified by start_cursor.
    *
-   * Level must be top_level() when invoked.  The caller must, even on
-   * failure, free all pages in the |to_free| list and adjust the |pages_| count.
+   * Level must be top_level() when invoked.
    *
    * @param table The top-level paging structure's virtual address.
    * @param enlarge Whether the caller can tolerate more being unmapped than was requested.
@@ -1039,12 +1063,13 @@ class X86PageTableImpl : public X86PageTableBase {
    * @param cursor A cursor describing the range of address space to unmap within table.
    * @param cm Reference to a consistency manager to handle invalidations.
    *
-   * @return true if the caller (i.e. the next level up page table) might need to
-   * free this page table.
+   * @return both a status, as well as how many mappings were removed in |table|. If the removed
+   * mapping count is non-zero, regardless of the error value, the num_mappings field in the page
+   * must be updated by the caller.
    */
-  zx::result<bool> RemoveMapping(volatile pt_entry_t* table, PageTableLevel level,
-                                 EnlargeOperation enlarge, CheckForEmptyPt pt_check,
-                                 VirtualAddressCursor& cursor, ConsistencyManager* cm)
+  ktl::pair<zx_status_t, uint> RemoveMapping(volatile pt_entry_t* table, PageTableLevel level,
+                                             EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+                                             VirtualAddressCursor& cursor, ConsistencyManager* cm)
       TA_REQ(lock_) {
     DEBUG_ASSERT(table);
     DEBUG_ASSERT(static_cast<T*>(this)->check_vaddr(cursor.vaddr()));
@@ -1053,14 +1078,11 @@ class X86PageTableImpl : public X86PageTableBase {
     DEBUG_ASSERT(!IsUnified());
 
     if (level == PageTableLevel::PT_L) {
-      return zx::ok(RemoveMappingL0(table, cursor, cm));
+      return {ZX_OK, RemoveMappingL0(table, cursor, cm)};
     }
 
-    bool unmapped = false;
-    // Track if there are any entries at all. This is necessary to properly rollback if an
-    // attempt to map a page fails to allocate a page table, as that case can result in an
-    // empty non-last-level page table.
-    bool any_pages = false;
+    uint unmapped = 0;
+
     size_t ps = page_size(level);
     uint index = vaddr_to_index(level, cursor.vaddr());
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
@@ -1071,14 +1093,13 @@ class X86PageTableImpl : public X86PageTableBase {
         cursor.SkipEntry(ps);
         continue;
       }
-      any_pages = true;
 
       if (IS_LARGE_PAGE(pt_val)) {
         bool vaddr_level_aligned = page_aligned(level, cursor.vaddr());
         // If the request covers the entire large page, just unmap it
         if (vaddr_level_aligned && cursor.size() >= ps) {
           UnmapEntry(cm, level, cursor.vaddr(), e, /*was_terminal=*/true);
-          unmapped = true;
+          unmapped++;
 
           cursor.Consume(ps);
           continue;
@@ -1091,82 +1112,81 @@ class X86PageTableImpl : public X86PageTableBase {
           // subsequent page fault clean it up.
           if (enlarge == EnlargeOperation::Yes) {
             UnmapEntry(cm, level, cursor.vaddr(), e, /*was_terminal=*/true);
-            unmapped = true;
+            unmapped++;
 
             cursor.SkipEntry(ps);
             continue;
           } else {
-            return zx::error(status);
+            return {status, unmapped};
           }
         }
         pt_val = *e;
       }
 
       volatile pt_entry_t* next_table = get_next_table_from_entry(pt_val);
+
       // Remember where we are unmapping from in case we need to do a second pass to remove a PT.
       const vaddr_t unmap_vaddr = cursor.vaddr();
-      auto status = RemoveMapping(next_table, lower_level(level), enlarge, pt_check, cursor, cm);
-      if (status.is_error()) {
-        return status;
+      auto [status, lower_unmapped] =
+          RemoveMapping(next_table, lower_level(level), enlarge, pt_check, cursor, cm);
+      // Regardless of success or failure we must update the mapping count. Since this involves
+      // looking up the vm_page_t we take this opportunity to check if it's empty and needs
+      // unmapping.
+      bool unmap_lower = false;
+      vm_page_t* lower_page = nullptr;
+      if (lower_unmapped > 0 || pt_check == CheckForEmptyPt::Yes) {
+        lower_page = Pmm::Node().PaddrToPage(X86_VIRT_TO_PHYS(next_table));
+        DEBUG_ASSERT(lower_page->mmu.num_mappings >= lower_unmapped);
+        lower_page->mmu.num_mappings -= lower_unmapped;
+        unmap_lower = lower_page->mmu.num_mappings == 0;
       }
-      const size_t unmap_size = cursor.vaddr() - unmap_vaddr;
-      bool lower_unmapped = status.value();
+      if (unlikely(status != ZX_OK)) {
+        return {status, unmapped};
+      }
 
-      // If we were requesting to unmap everything in the lower page table,
-      // we know we can unmap the lower level page table.  Otherwise, if
-      // we unmapped anything in the lower level, check to see if that
-      // level is now empty.
-      bool unmap_page_table = page_aligned(level, unmap_vaddr) && unmap_size >= ps;
       // If the top level page is shared, we cannot unmap it here as other page tables may be
       // referencing its entries.
-      if (IsShared() && level == PageTableLevel::PML4_L) {
-        unmap_page_table = false;
-      } else if (!unmap_page_table && lower_unmapped) {
-        unmap_page_table = page_table_is_clear(next_table);
-      }
-      if (unmap_page_table) {
-        paddr_t ptable_phys = X86_VIRT_TO_PHYS(next_table);
-
-        vm_page_t* page = paddr_to_vm_page(ptable_phys);
-        DEBUG_ASSERT_MSG(page, "phys address %#" PRIxPTR " from PTE %#" PRIxPTR " was invalid",
-                         ptable_phys, pt_val);
+      if (unmap_lower && !(IsShared() && level == PageTableLevel::PML4_L)) {
+        DEBUG_ASSERT(lower_page);
         if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
           Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
           pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
           DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
 
+          vm_page_t* referenced_table_page = referenced_pt_->page_;
           ConsistencyManager cm_referenced(referenced_pt_);
           referenced_pt_->UnmapEntry(&cm_referenced, level, unmap_vaddr, referenced_entry, false);
+          referenced_table_page->mmu.num_mappings--;
           cm_referenced.Finish();
         }
         UnmapEntry(cm, level, unmap_vaddr, e, /*was_terminal=*/false);
+        unmapped++;
 
-        DEBUG_ASSERT_MSG(page->state() == vm_page_state::MMU,
-                         "page %p state %u, paddr %#" PRIxPTR "\n", page,
-                         static_cast<uint32_t>(page->state()), X86_VIRT_TO_PHYS(next_table));
-        DEBUG_ASSERT(!list_in_list(&page->queue_node));
+        DEBUG_ASSERT_MSG(lower_page->state() == vm_page_state::MMU,
+                         "page %p state %u, paddr %#" PRIxPTR "\n", lower_page,
+                         static_cast<uint32_t>(lower_page->state()), X86_VIRT_TO_PHYS(next_table));
+        DEBUG_ASSERT(!list_in_list(&lower_page->queue_node));
 
-        cm->queue_free(page);
-        unmapped = true;
+        cm->queue_free(lower_page);
       }
 
       DEBUG_ASSERT(cursor.size() == 0 || page_aligned(level, cursor.vaddr()));
     }
 
-    return zx::ok(unmapped || (!any_pages && pt_check == CheckForEmptyPt::Yes));
+    return {ZX_OK, unmapped};
   }
   // Base case of RemoveMapping for smallest page size.
-  bool RemoveMappingL0(volatile pt_entry_t* table, VirtualAddressCursor& cursor,
+  uint RemoveMappingL0(volatile pt_entry_t* table, VirtualAddressCursor& cursor,
                        ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
 
-    bool unmapped = false;
     uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
+    uint unmapped = 0;
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
       volatile pt_entry_t* e = table + index;
       if (IS_PAGE_PRESENT(*e)) {
         UnmapEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), e, /*was_terminal=*/true);
-        unmapped = true;
+        unmapped++;
       }
 
       cursor.Consume(PAGE_SIZE);
@@ -1279,7 +1299,7 @@ class X86PageTableImpl : public X86PageTableBase {
    * @return true if the caller (i.e. the next level up page table) might need to
    * free this page table.
    */
-  bool HarvestMapping(volatile pt_entry_t* table, NonTerminalAction non_terminal_action,
+  void HarvestMapping(volatile pt_entry_t* table, NonTerminalAction non_terminal_action,
                       TerminalAction terminal_action, PageTableLevel level,
                       VirtualAddressCursor& cursor, ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(table);
@@ -1287,16 +1307,14 @@ class X86PageTableImpl : public X86PageTableBase {
 
     if (level == PageTableLevel::PT_L) {
       HarvestMappingL0(table, terminal_action, cursor, cm);
-      // HarvestMappingL0 never actually unmaps any entries, so this is always false.
-      return false;
+      return;
     }
 
-    // Track if we perform any unmappings. We propagate this up to our caller, since if we performed
-    // any unmappings then we could now be empty, and if so our caller needs to free us.
-    bool unmapped = false;
     size_t ps = page_size(level);
     uint index = vaddr_to_index(level, cursor.vaddr());
     bool always_recurse = level == PageTableLevel::PML4_L && (IsShared() || IsRestricted());
+    vm_page_t* table_page = Pmm::Node().PaddrToPage(physmap_to_paddr((void*)table));
+    DEBUG_ASSERT(table_page);
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
       volatile pt_entry_t* e = table + index;
       pt_entry_t pt_val = *e;
@@ -1322,8 +1340,6 @@ class X86PageTableImpl : public X86PageTableBase {
 
       volatile pt_entry_t* next_table = get_next_table_from_entry(pt_val);
       paddr_t ptable_phys = X86_VIRT_TO_PHYS(next_table);
-      bool lower_unmapped;
-      bool unmap_page_table = false;
       // Remember where we are unmapping from in case we need to do a second pass to remove a PT.
       const vaddr_t unmap_vaddr = cursor.vaddr();
       // We should recurse and HarvestMappings at the next level if:
@@ -1334,31 +1350,26 @@ class X86PageTableImpl : public X86PageTableBase {
       // 2. The page table entry has been accessed. We unset the AF later should we end up not
       //    unmapping the page table.
       bool should_recurse = always_recurse || (pt_val & X86_MMU_PG_A);
+      vm_page_t* lower_page = Pmm::Node().PaddrToPage(physmap_to_paddr((void*)next_table));
+      DEBUG_ASSERT(lower_page);
       if (should_recurse) {
-        lower_unmapped = HarvestMapping(next_table, non_terminal_action, terminal_action,
-                                        lower_level(level), cursor, cm);
+        HarvestMapping(next_table, non_terminal_action, terminal_action, lower_level(level), cursor,
+                       cm);
       } else if (non_terminal_action == NonTerminalAction::FreeUnaccessed) {
-        auto status = RemoveMapping(next_table, lower_level(level), EnlargeOperation::No,
-                                    CheckForEmptyPt::No, cursor, cm);
+        auto [result, unmapped] = RemoveMapping(
+            next_table, lower_level(level), EnlargeOperation::No, CheckForEmptyPt::No, cursor, cm);
         // Although we pass in EnlargeOperation::No, the unmap should never fail since we are
         // unmapping an entire block and never a sub part of a page.
-        ASSERT(status.is_ok());
-        lower_unmapped = status.value();
-        const vaddr_t unmap_size = cursor.vaddr() - unmap_vaddr;
-        // If we processed the entire next level then we can ignore lower_unmapped and just directly
-        // assume that the whole page table is empty/unaccessed and that we can unmap it.
-        unmap_page_table = page_aligned(level, unmap_vaddr) && unmap_size >= ps;
+        ASSERT(result == ZX_OK);
+        lower_page->mmu.num_mappings -= unmapped;
       } else {
         // No accessed flag and no request to unmap means we are done with this entry.
         cursor.SkipEntry(ps);
         continue;
       }
 
-      // If the lower page table was accessed and there is uncertainty around whether it might now
-      // be empty, then we have to just scan it and see.
-      if (!unmap_page_table && lower_unmapped) {
-        unmap_page_table = page_table_is_clear(next_table);
-      }
+      bool unmap_page_table = lower_page->mmu.num_mappings == 0;
+
       // If the top level page is shared, we cannot unmap it here as other page tables may be
       // referencing its entries.
       if (IsShared() && level == PageTableLevel::PML4_L) {
@@ -1366,16 +1377,20 @@ class X86PageTableImpl : public X86PageTableBase {
       }
       if (unmap_page_table) {
         vm_page_t* page = paddr_to_vm_page(ptable_phys);
+        DEBUG_ASSERT(page);
         if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
           Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
           pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
           DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
 
+          vm_page_t* referenced_table_page = referenced_pt_->page_;
           ConsistencyManager cm_referenced(referenced_pt_);
           referenced_pt_->UnmapEntry(&cm_referenced, level, unmap_vaddr, referenced_entry, false);
+          referenced_table_page->mmu.num_mappings--;
           cm_referenced.Finish();
         }
         UnmapEntry(cm, level, unmap_vaddr, e, /*was_terminal=*/false);
+        table_page->mmu.num_mappings--;
 
         DEBUG_ASSERT(page);
         DEBUG_ASSERT_MSG(page->state() == vm_page_state::MMU,
@@ -1384,11 +1399,11 @@ class X86PageTableImpl : public X86PageTableBase {
         DEBUG_ASSERT(!list_in_list(&page->queue_node));
 
         cm->queue_free(page);
-        unmapped = true;
       } else if ((pt_val & X86_MMU_PG_A) && non_terminal_action != NonTerminalAction::Retain) {
         // Since we didn't unmap, we need to unset the accessed flag.
         const IntermediatePtFlags flags = static_cast<T*>(this)->intermediate_flags();
-        UpdateEntry(cm, level, unmap_vaddr, e, ptable_phys, flags, /*was_terminal=*/false,
+        UpdateEntry(cm, level, unmap_vaddr, e, ptable_phys, flags,
+                    /*was_terminal=*/false,
                     /*exact_flags=*/true);
         // For the accessed flag to reliably reset we need to ensure that any leaf pages from here
         // are not in the TLB so that a re-walk occurs. To avoid having to find every leaf page,
@@ -1398,7 +1413,6 @@ class X86PageTableImpl : public X86PageTableBase {
       }
       DEBUG_ASSERT(cursor.size() == 0 || page_aligned(level, cursor.vaddr()));
     }
-    return unmapped;
   }
   // Base case of HarvestMapping for smallest page size.
   void HarvestMappingL0(volatile pt_entry_t* table, TerminalAction terminal_action,
@@ -1493,10 +1507,12 @@ class X86PageTableImpl : public X86PageTableBase {
     DEBUG_ASSERT_MSG(level != PageTableLevel::PT_L, "tried splitting PT_L");
 
     DEBUG_ASSERT(IS_PAGE_PRESENT(*pte) && IS_LARGE_PAGE(*pte));
-    volatile pt_entry_t* m = AllocatePageTable();
-    if (m == nullptr) {
-      return ZX_ERR_NO_MEMORY;
+    auto result = AllocatePageTable(false);
+    if (result.is_error()) {
+      return result.status_value();
     }
+    vm_page_t* page = *result;
+    volatile pt_entry_t* m = reinterpret_cast<pt_entry_t*>(X86_PHYS_TO_VIRT(page->paddr()));
 
     paddr_t paddr_base = paddr_from_pte(level, *pte);
     PtFlags flags = static_cast<T*>(this)->split_flags(level, *pte & X86_LARGE_FLAGS_MASK);
@@ -1509,14 +1525,16 @@ class X86PageTableImpl : public X86PageTableBase {
       volatile pt_entry_t* e = m + i;
       // If this is a PDP_L (i.e. huge page), flags will include the
       // PS bit still, so the new PD entries will be large pages.
-      UpdateEntry(cm, lower_level(level), new_vaddr, e, new_paddr, flags, /*was_terminal=*/false);
+      UpdateEntry(cm, lower_level(level), new_vaddr, e, new_paddr, flags,
+                  /*was_terminal=*/false);
       new_vaddr += ps;
       new_paddr += ps;
     }
     DEBUG_ASSERT(new_vaddr == vaddr + page_size(level));
+    page->mmu.num_mappings = NO_OF_PT_ENTRIES;
 
     flags = static_cast<T*>(this)->intermediate_flags();
-    UpdateEntry(cm, level, vaddr, pte, X86_VIRT_TO_PHYS(m), flags, /*was_terminal=*/true);
+    UpdateEntry(cm, level, vaddr, pte, page->paddr(), flags, /*was_terminal=*/true);
     pages_++;
     return ZX_OK;
   }
@@ -1564,10 +1582,8 @@ class X86PageTableImpl : public X86PageTableBase {
     cm->cache_line_flusher()->FlushPtEntry(pte);
 
     /* attempt to invalidate the page */
-    if (IS_PAGE_PRESENT(olde)) {
-      cm->pending_tlb()->enqueue(vaddr, level, /*is_global_page=*/olde & X86_MMU_PG_G,
-                                 was_terminal);
-    }
+    DEBUG_ASSERT(IS_PAGE_PRESENT(olde));
+    cm->pending_tlb()->enqueue(vaddr, level, /*is_global_page=*/olde & X86_MMU_PG_G, was_terminal);
   }
 
   // Allocating a new page table
@@ -1600,9 +1616,14 @@ class X86PageTableImpl : public X86PageTableBase {
         if (IS_PAGE_PRESENT(table[i])) {
           volatile pt_entry_t* next_table = get_next_table_from_entry(table[i]);
           paddr_t ptable_phys = X86_VIRT_TO_PHYS(next_table);
-          vm_page_t* page = paddr_to_vm_page(ptable_phys);
+          vm_page_t* page = Pmm::Node().PaddrToPage(ptable_phys);
+          DEBUG_ASSERT(page);
+          DEBUG_ASSERT(page->state() == vm_page_state::MMU);
+          DEBUG_ASSERT(page->mmu.num_mappings == 0);
           pmm_free_page(page);
           table[i] = 0;
+          DEBUG_ASSERT(page_->mmu.num_mappings > 0);
+          page_->mmu.num_mappings--;
         }
       }
     }
@@ -1675,8 +1696,12 @@ class X86PageTableImpl : public X86PageTableBase {
   // Frees the top level page in this page table.
   void FreeTopLevelPage() TA_REQ(lock_) {
     if (phys_) {
-      pmm_free_page(paddr_to_vm_page(phys_));
+      DEBUG_ASSERT(page_);
+      DEBUG_ASSERT(page_->state() == vm_page_state::MMU);
+      DEBUG_ASSERT(page_->mmu.num_mappings == 0);
+      pmm_free_page(page_);
       phys_ = 0;
+      page_ = nullptr;
     }
 
     // Clear virt_ to indicate we are now destroyed, and prevent any misuses of the ArchVmAspace API

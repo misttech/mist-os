@@ -31,7 +31,7 @@ source_set("fake_battery_driver_lib") {
   ]
 }
 
-fuchsia_driver("fake_battery_driver") {
+fuchsia_cc_driver("fake_battery_driver") {
   output_name = "fake_battery"
 
   deps = [

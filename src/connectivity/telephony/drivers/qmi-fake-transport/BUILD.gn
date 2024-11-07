@@ -17,7 +17,7 @@ group("tests") {
   deps = [ ":qmi_fake_bind_test" ]
 }
 
-fuchsia_driver("fake_qmi_driver-driver") {
+fuchsia_cc_driver("fake_qmi_driver-driver") {
   output_name = "qmi-fake-transport"
   testonly = true
 

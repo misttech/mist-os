@@ -4,17 +4,21 @@
 
 use crate::client::config_management::Credential;
 use crate::client::connection_selection::ConnectionSelectionRequester;
-use crate::client::roaming::lib::{RoamTriggerData, RoamTriggerDataOutcome};
+use crate::client::roaming::lib::{
+    PastRoamList, RoamEvent, RoamTriggerData, RoamTriggerDataOutcome,
+};
 use crate::client::types;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_wlan_internal as fidl_internal;
 use futures::channel::mpsc;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
+use futures::lock::Mutex;
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{select, FutureExt};
 use std::any::Any;
+use std::sync::Arc;
 use tracing::{error, info, warn};
 
 pub mod default_monitor;
@@ -36,8 +40,8 @@ impl RoamDataSender {
     }
 }
 /// Trait for creating different roam monitors based on roaming profiles.
-#[async_trait]
-pub trait RoamMonitorApi: Send + Sync + Any {
+#[async_trait(?Send)]
+pub trait RoamMonitorApi: Any {
     // Handles trigger data and evaluates current state. Returns an outcome to be taken (e.g. if
     // roam search is warranted). All roam monitors MUST handle all trigger data types, even if
     // they always take no action.
@@ -61,10 +65,11 @@ pub async fn serve_roam_monitor(
     connection_selection_requester: ConnectionSelectionRequester,
     mut roam_sender: mpsc::Sender<types::ScannedCandidate>,
     telemetry_sender: TelemetrySender,
+    past_roams: Arc<Mutex<PastRoamList>>,
 ) -> Result<(), anyhow::Error> {
     // Queue of initialized roam searches.
     let mut roam_search_result_futs: FuturesUnordered<
-        BoxFuture<'static, Result<types::ScannedCandidate, Error>>,
+        LocalBoxFuture<'static, Result<types::ScannedCandidate, Error>>,
     > = FuturesUnordered::new();
 
     loop {
@@ -98,6 +103,13 @@ pub async fn serve_roam_monitor(
                             if roam_sender.try_send(candidate).is_err() {
                                 warn!("Failed to send roam request, exiting monitor service loop.");
                                 break
+                            } else {
+                                // Record that a roam attempt is made.
+                                if let Some(mut past_roams) = past_roams.try_lock() {
+                                    past_roams.add(RoamEvent::new_roam_now());
+                                } else {
+                                    error!("Unexpectedly failed to acquire lock on past roam list; will not record roam");
+                                }
                             }
 
                     }
@@ -132,6 +144,7 @@ async fn get_roaming_connection_selection_future(
 mod test {
     use super::*;
     use crate::client::connection_selection::ConnectionSelectionRequest;
+    use crate::client::roaming::lib::NUM_PLATFORM_MAX_ROAMS_PER_DAY;
     use crate::telemetry::TelemetryEvent;
     use crate::util::testing::fakes::FakeRoamMonitor;
     use crate::util::testing::{
@@ -139,9 +152,10 @@ mod test {
         generate_random_scanned_candidate,
     };
     use fidl_fuchsia_wlan_internal as fidl_internal;
-    use fuchsia_async::TestExecutor;
-    use futures::pin_mut;
+    use fuchsia_async::{self as fasync, TestExecutor};
     use futures::task::Poll;
+    use futures::{pin_mut, Future};
+    use std::pin::Pin;
     use test_case::test_case;
     use wlan_common::assert_variant;
 
@@ -154,6 +168,7 @@ mod test {
         connection_selection_request_receiver: mpsc::Receiver<ConnectionSelectionRequest>,
         telemetry_sender: TelemetrySender,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
+        past_roams: Arc<Mutex<PastRoamList>>,
     }
 
     fn setup_test() -> TestValues {
@@ -165,6 +180,7 @@ mod test {
             ConnectionSelectionRequester::new(connection_selection_request_sender);
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let past_roams = Arc::new(Mutex::new(PastRoamList::new(NUM_PLATFORM_MAX_ROAMS_PER_DAY)));
         TestValues {
             trigger_data_sender,
             trigger_data_receiver,
@@ -174,6 +190,7 @@ mod test {
             connection_selection_request_receiver,
             telemetry_sender,
             telemetry_receiver,
+            past_roams,
         }
     }
 
@@ -212,6 +229,7 @@ mod test {
             // test_values.roam_search_sender,
             test_values.roam_sender,
             test_values.telemetry_sender,
+            test_values.past_roams,
         );
         pin_mut!(serve_fut);
 
@@ -278,6 +296,7 @@ mod test {
             test_values.connection_selection_requester,
             test_values.roam_sender,
             test_values.telemetry_sender,
+            test_values.past_roams,
         );
         pin_mut!(serve_fut);
 
@@ -323,5 +342,104 @@ mod test {
             // false.
             assert_variant!(test_values.roam_receiver.try_next(), Err(_));
         }
+    }
+
+    #[fuchsia::test]
+    fn test_roam_attempts_are_recorded_in_past_roams() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = setup_test();
+
+        // Create a fake roam monitor. Set should_roam_scan to true to ensure roam searches get
+        // queued. Conditionally set the should_send_roam_request response.
+        let mut roam_monitor = FakeRoamMonitor::new();
+        roam_monitor.response_to_should_roam_scan = RoamTriggerDataOutcome::RoamSearch(
+            generate_random_network_identifier(),
+            generate_random_password(),
+        );
+        roam_monitor.response_to_should_send_roam_request = true;
+
+        // Start a serve loop with the fake roam monitor
+        let serve_fut = serve_roam_monitor(
+            Box::new(roam_monitor),
+            test_values.trigger_data_receiver,
+            // test_values.roam_search_sender,
+            test_values.connection_selection_requester,
+            test_values.roam_sender,
+            test_values.telemetry_sender,
+            test_values.past_roams.clone(),
+        );
+        pin_mut!(serve_fut);
+
+        trigger_scan_and_roam(
+            &mut exec,
+            &mut serve_fut,
+            &mut test_values.trigger_data_sender,
+            &mut test_values.connection_selection_request_receiver,
+            &mut test_values.roam_receiver,
+        );
+
+        // A roam request should have been sent, verify that it is recorded in the past roams list.
+        let past_roams = test_values
+            .past_roams
+            .clone()
+            .try_lock()
+            .unwrap()
+            .get_recent(fasync::MonotonicInstant::INFINITE_PAST);
+        assert_eq!(past_roams.len(), 1);
+
+        trigger_scan_and_roam(
+            &mut exec,
+            &mut serve_fut,
+            &mut test_values.trigger_data_sender,
+            &mut test_values.connection_selection_request_receiver,
+            &mut test_values.roam_receiver,
+        );
+
+        // A roam request should have been sent, verify that it is recorded in the past roams list.
+        let past_roams = test_values
+            .past_roams
+            .clone()
+            .try_lock()
+            .unwrap()
+            .get_recent(fasync::MonotonicInstant::INFINITE_PAST);
+        assert_eq!(past_roams.len(), 2);
+    }
+
+    // This sends a signal report to the roam monitor, responds to roam searches with a random
+    // candidate network, progresses the serve loop forward, and verifies that the roam monitor
+    // sends out a roam request.
+    fn trigger_scan_and_roam(
+        exec: &mut TestExecutor,
+        serve_fut: &mut Pin<&mut impl Future<Output = std::result::Result<(), anyhow::Error>>>,
+        trigger_data_sender: &mut mpsc::Sender<RoamTriggerData>,
+        connection_selection_request_receiver: &mut mpsc::Receiver<ConnectionSelectionRequest>,
+        roam_receiver: &mut mpsc::Receiver<types::ScannedCandidate>,
+    ) {
+        // Run the serve loop forward
+        assert_variant!(exec.run_until_stalled(serve_fut), Poll::Pending);
+
+        // Send some trigger data to kick off the handling sequence. The actual values here are
+        // irrelevant.
+        trigger_data_sender
+            .try_send(RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
+                rssi_dbm: -40,
+                snr_db: 40,
+            }))
+            .expect("failed to send");
+
+        // Run loop forward
+        assert_variant!(exec.run_until_stalled(serve_fut), Poll::Pending);
+
+        // Respond via the connection selection requester
+        let candidate = generate_random_scanned_candidate();
+        assert_variant!(connection_selection_request_receiver.try_next(), Ok(Some(ConnectionSelectionRequest::RoamSelection { responder, .. })) => {
+            // Respond with a roam candidate
+            responder.send(Some(candidate.clone())).expect("failed to send");
+        });
+
+        assert_variant!(exec.run_until_stalled(serve_fut), Poll::Pending);
+        assert_variant!(roam_receiver.try_next(), Ok(Some(roam_request)) => {
+            assert_eq!(roam_request, candidate);
+        });
     }
 }

@@ -67,6 +67,19 @@ pub async fn show_cmd_serialized(
     Ok(instance)
 }
 
+pub(crate) async fn config_table_print<W: std::io::Write>(
+    query: String,
+    realm_query: fsys::RealmQueryProxy,
+    mut writer: W,
+) -> Result<()> {
+    let instance = get_instance_by_query(query, realm_query).await?;
+    let table = create_config_table(instance);
+    table.print(&mut writer)?;
+    writeln!(&mut writer, "")?;
+
+    Ok(())
+}
+
 async fn get_instance_by_query(
     query: String,
     realm_query: fsys::RealmQueryProxy,
@@ -144,6 +157,15 @@ fn create_table(instance: ShowCmdInstance, with_style: bool) -> Table {
     table
 }
 
+fn create_config_table(instance: ShowCmdInstance) -> Table {
+    let mut table = Table::new();
+    table.set_format(FormatBuilder::new().padding(2, 0).build());
+    if let Some(resolved) = instance.resolved {
+        add_config_info_to_table(&mut table, &resolved);
+    }
+    table
+}
+
 fn colorized(string: &str, color: Colour, with_style: bool) -> String {
     if with_style {
         color.paint(string).to_string()
@@ -174,19 +196,7 @@ fn add_resolved_info_to_table(
             table.add_row(row!(r->"Merkle root:", "Unknown"));
         }
 
-        if let Some(config) = &resolved.config {
-            if !config.is_empty() {
-                let mut config_table = Table::new();
-                let format = FormatBuilder::new().padding(0, 0).build();
-                config_table.set_format(format);
-
-                for field in config {
-                    config_table.add_row(row!(field.key, " -> ", field.value));
-                }
-
-                table.add_row(row!(r->"Configuration:", config_table));
-            }
-        }
+        add_config_info_to_table(table, &resolved);
 
         if !resolved.collections.is_empty() {
             table.add_row(row!(r->"Collections:", resolved.collections.join("\n")));
@@ -196,6 +206,22 @@ fn add_resolved_info_to_table(
     } else {
         table
             .add_row(row!(r->"Component State:", colorized("Unresolved", Colour::Red, with_style)));
+    }
+}
+
+fn add_config_info_to_table(table: &mut Table, resolved: &ShowCmdResolvedInfo) {
+    if let Some(config) = &resolved.config {
+        if !config.is_empty() {
+            let mut config_table = Table::new();
+            let format = FormatBuilder::new().padding(0, 0).build();
+            config_table.set_format(format);
+
+            for field in config {
+                config_table.add_row(row!(field.key, " -> ", field.value));
+            }
+
+            table.add_row(row!(r->"Configuration:", config_table));
+        }
     }
 }
 

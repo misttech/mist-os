@@ -9,6 +9,7 @@ pub mod security_server;
 pub use security_server::SecurityServer;
 
 mod access_vector_cache;
+mod sid_table;
 mod sync;
 
 use policy::arrays::FsUseType;
@@ -517,7 +518,7 @@ class_permission_enum! {
 #[repr(u64)]
 enum ReferenceInitialSid {
     Kernel = 1,
-    _Security = 2,
+    Security = 2,
     Unlabeled = 3,
     _Fs = 4,
     File = 5,
@@ -569,6 +570,7 @@ initial_sid_enum! {
         // keep-sorted start
         File("file"),
         Kernel("kernel"),
+        Security("security"),
         Unlabeled("unlabeled"),
         // keep-sorted end
     }

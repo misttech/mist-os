@@ -30,7 +30,7 @@ group("tools") {
     "//tools/loglistener:host($host_toolchain)",
     "//tools/make-fuchsia-vol:host",
     "//tools/mdlint:host",
-    "//tools/net/device-finder:host",
+    "//tools/net/device-finder:host($host_toolchain)",
     "//tools/netprotocol($host_toolchain)",
     "//tools/orchestrate($host_toolchain)",
     "//tools/pbtool($host_toolchain)",

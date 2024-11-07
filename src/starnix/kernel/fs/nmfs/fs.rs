@@ -66,7 +66,12 @@ const NMFS_NAME: &[u8; 4] = b"nmfs";
 const NMFS_MAGIC: u32 = u32::from_be_bytes(*NMFS_NAME);
 
 impl FileSystemOps for Nmfs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(NMFS_MAGIC))
     }
 

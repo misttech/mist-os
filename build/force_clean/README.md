@@ -13,6 +13,13 @@ caches, both on builders and on developer machines. As a result of the
 widespread impact, new fences must be approved by the build team after
 investigating other options for making a change.**
 
-Add a new `print("...")` statement to the `print_fences` function in
-`get_fences.py`, including a bug number and short explanation as to why
-it's needed.
+Append a new line to the `build_fences.txt` file in this directory, or one under
+`//vendor/*/build/force_clean/build_fences.txt`. Empty lines and comment lines
+(starting with "#") are ignored. Each valid line should include a bug number and
+a short explanation as to why it is needed.
+
+For complex cases (e.g. when the fence depends on some conditions like the host
+operating system), it is possible to use `get_fences.py` script instead of a file.
+The script will be launched and should print to stdout the content of its build
+fences. However, this case is discouraged (its use case originates from Chromium
+but has never been implemented for Fuchsia).

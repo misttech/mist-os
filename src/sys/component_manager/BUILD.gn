@@ -13,6 +13,7 @@ import("//build/images/filesystem_limits.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 import("//tools/fidl/measure-tape/measure_tape.gni")
 
 rustc_binary("bin") {
@@ -38,6 +39,12 @@ rustc_binary("bin") {
     configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
     configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
   }
+
+  # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
+  # enabled, shift it to the large RBE worker pool)
+  _concurrent_jobs = concurrent_jobs.link_highmem
+  configs += _concurrent_jobs.configs
+  forward_variables_from(_concurrent_jobs.vars, "*")
 
   deps = [
     ":measure_tape_for_events",
@@ -179,6 +186,7 @@ rustc_binary("bin") {
     "src/constants.rs",
     "src/framework/binder.rs",
     "src/framework/capability_store.rs",
+    "src/framework/config_override.rs",
     "src/framework/controller.rs",
     "src/framework/introspector.rs",
     "src/framework/lifecycle_controller.rs",

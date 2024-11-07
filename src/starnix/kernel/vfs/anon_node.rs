@@ -63,7 +63,12 @@ impl Anon {
 
 struct AnonFs;
 impl FileSystemOps for AnonFs {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(default_statfs(ANON_INODE_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {

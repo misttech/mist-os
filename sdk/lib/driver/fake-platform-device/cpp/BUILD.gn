@@ -10,7 +10,6 @@ sdk_source_set("cpp") {
   stable = false
   sdk_name = "driver_fake_platform_device_cpp"
   include_base = "//sdk"
-  testonly = true
 
   sources = [
     "fake-pdev.cc",
@@ -21,12 +20,9 @@ sdk_source_set("cpp") {
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/lib/async-default",
-    "//sdk/lib/driver/platform-device/cpp",
-    "//src/devices/lib/mmio",
-  ]
-
-  deps = [
     "//sdk/lib/driver/fake-bti/cpp",
     "//sdk/lib/driver/fake-resource/cpp",
+    "//sdk/lib/driver/platform-device/cpp",
+    "//src/devices/lib/mmio",
   ]
 }

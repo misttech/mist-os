@@ -34,9 +34,7 @@ pub async fn disable(
     let restart_result = driver_development_proxy
         .restart_driver_hosts(
             cmd.url.as_str(),
-            fdd::RestartRematchFlags::REQUESTED
-                | fdd::RestartRematchFlags::LEGACY_COMPOSITE
-                | fdd::RestartRematchFlags::COMPOSITE_SPEC,
+            fdd::RestartRematchFlags::REQUESTED | fdd::RestartRematchFlags::COMPOSITE_SPEC,
         )
         .await?;
 

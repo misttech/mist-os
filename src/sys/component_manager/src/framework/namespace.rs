@@ -235,14 +235,14 @@ mod tests {
             let (receiver, sender) = Connector::new();
 
             // Serve an Echo request handler on the Receiver.
-            tasks.add(fasync::Task::spawn(async move {
+            tasks.spawn(async move {
                 loop {
                     let msg = receiver.receive().await.unwrap();
                     let stream: fecho::EchoRequestStream =
                         ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream().unwrap();
                     handle_echo_request_stream(response, stream).await;
                 }
-            }));
+            });
 
             // Create a dictionary and add the Sender to it.
             let dict = Dict::new();
@@ -303,13 +303,13 @@ mod tests {
             let (receiver, sender) = Connector::new();
 
             // Serve an Echo request handler on the Receiver.
-            tasks.add(fasync::Task::spawn(async move {
+            tasks.spawn(async move {
                 while let Some(msg) = receiver.receive().await {
                     let stream: fecho::EchoRequestStream =
                         ServerEnd::<fecho::EchoMarker>::from(msg.channel).into_stream().unwrap();
                     handle_echo_request_stream("hello", stream).await;
                 }
-            }));
+            });
 
             // Create a dictionary and add the Sender to it.
             let dict = Dict::new();

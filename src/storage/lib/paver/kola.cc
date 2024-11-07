@@ -54,15 +54,9 @@ bool KolaPartitioner::SupportsPartition(const PartitionSpec& spec) const {
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }
 
-zx::result<std::unique_ptr<PartitionClient>> KolaPartitioner::AddPartition(
-    const PartitionSpec& spec) const {
-  ERROR("Cannot add partitions to a Kola device\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
 zx::result<std::unique_ptr<PartitionClient>> KolaPartitioner::FindPartition(
     const PartitionSpec& spec) const {
-  zx::result<FindPartitionResult> result = FindPartitionDetails(spec);
+  zx::result<FindPartitionDetailsResult> result = FindPartitionDetails(spec);
   if (result.is_error()) {
     return result.take_error();
   }
@@ -70,7 +64,12 @@ zx::result<std::unique_ptr<PartitionClient>> KolaPartitioner::FindPartition(
   return zx::ok(std::move(result.value().partition));
 }
 
-zx::result<FindPartitionResult> KolaPartitioner::FindPartitionDetails(
+zx::result<std::vector<std::unique_ptr<BlockPartitionClient>>> KolaPartitioner::FindAllPartitions(
+    FilterCallback filter) const {
+  return gpt_->FindAllPartitions(std::move(filter));
+}
+
+zx::result<FindPartitionDetailsResult> KolaPartitioner::FindPartitionDetails(
     const PartitionSpec& spec) const {
   if (!SupportsPartition(spec)) {
     ERROR("Unsupported partition %s\n", spec.ToString().c_str());
@@ -93,8 +92,10 @@ zx::result<FindPartitionResult> KolaPartitioner::FindPartitionDetails(
       return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  const auto filter = [&](const gpt_partition_t& part) { return FilterByName(part, part_name); };
-  auto status = gpt_->FindPartition(filter);
+  const auto filter = [&](const GptPartitionMetadata& part) {
+    return FilterByName(part, part_name);
+  };
+  auto status = gpt_->FindPartitionDetails(filter);
   if (status.is_error()) {
     return status.take_error();
   }
@@ -113,13 +114,8 @@ zx::result<> KolaPartitioner::FinalizePartition(const PartitionSpec& spec) const
 
 zx::result<> KolaPartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
-zx::result<> KolaPartitioner::InitPartitionTables() const {
+zx::result<> KolaPartitioner::ResetPartitionTables() const {
   ERROR("Initialising partition tables is not supported for a Kola device\n");
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
-}
-
-zx::result<> KolaPartitioner::WipePartitionTables() const {
-  ERROR("Wiping partition tables is not supported for a Kola device\n");
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -171,14 +167,14 @@ class KolaAbrClient : public abr::Client {
  public:
   static zx::result<std::unique_ptr<abr::Client>> Create(
       std::unique_ptr<KolaPartitioner> partitioner) {
-    zx::result<FindPartitionResult> zircon_a =
+    zx::result<FindPartitionDetailsResult> zircon_a =
         partitioner->FindPartitionDetails(PartitionSpec(Partition::kZirconA));
     if (zircon_a.is_error()) {
       ERROR("Failed to find Zircon A partition\n");
       return zircon_a.take_error();
     }
 
-    zx::result<FindPartitionResult> zircon_b =
+    zx::result<FindPartitionDetailsResult> zircon_b =
         partitioner->FindPartitionDetails(PartitionSpec(Partition::kZirconB));
     if (zircon_b.is_error()) {
       ERROR("Failed to find Zircon B partition\n");
@@ -190,21 +186,8 @@ class KolaAbrClient : public abr::Client {
   }
 
  private:
-  struct GptEntryAttributes {
-    static constexpr uint8_t kKolaMaxPriority = 3;
-
-    GptEntryAttributes(uint64_t flags) : flags(flags) {}
-
-    uint64_t flags;
-    DEF_SUBFIELD(flags, 49, 48, priority);
-    DEF_SUBBIT(flags, 50, active);
-    DEF_SUBFIELD(flags, 53, 51, retry_count);
-    DEF_SUBBIT(flags, 54, boot_success);
-    DEF_SUBBIT(flags, 55, unbootable);
-  };
-
-  KolaAbrClient(std::unique_ptr<KolaPartitioner> partitioner, FindPartitionResult zircon_a,
-                FindPartitionResult zircon_b)
+  KolaAbrClient(std::unique_ptr<KolaPartitioner> partitioner, FindPartitionDetailsResult zircon_a,
+                FindPartitionDetailsResult zircon_b)
       : Client(/*custom=*/true),
         partitioner_(std::move(partitioner)),
         zircon_a_(std::move(zircon_a)),
@@ -223,10 +206,10 @@ class KolaAbrClient : public abr::Client {
     // The priority field in Kola is only 2 bits wide (max value 3). Normalize AbrSlotData::priority
     // while maintaining the slots' relative priority.
     const uint8_t kola_priority = current.priority >= alternative.priority
-                                      ? GptEntryAttributes::kKolaMaxPriority
-                                      : GptEntryAttributes::kKolaMaxPriority - 1;
+                                      ? KolaGptEntryAttributes::kKolaMaxPriority
+                                      : KolaGptEntryAttributes::kKolaMaxPriority - 1;
 
-    GptEntryAttributes attributes(gpt_entry_flags);
+    KolaGptEntryAttributes attributes(gpt_entry_flags);
     attributes.set_priority(kola_priority)
         .set_retry_count(current.tries_remaining)  // Both fields are 3 bits wide.
         .set_boot_success(current.successful_boot);
@@ -243,13 +226,13 @@ class KolaAbrClient : public abr::Client {
       return slot_info.take_error();
     }
 
-    GptEntryAttributes attributes(gpt_entry_flags);
+    KolaGptEntryAttributes attributes(gpt_entry_flags);
     attributes.set_active(slot_info->is_active).set_unbootable(!slot_info->is_bootable);
     return zx::ok(attributes.flags);
   }
 
   AbrSlotData ToFuchsia(uint64_t gpt_entry_flags) {
-    const GptEntryAttributes attributes(gpt_entry_flags);
+    const KolaGptEntryAttributes attributes(gpt_entry_flags);
 
     AbrSlotData abr_slot_data = {};
     abr_slot_data.priority = static_cast<uint8_t>(attributes.priority());
@@ -403,17 +386,17 @@ class KolaAbrClient : public abr::Client {
     return zx::ok(std::move(commit_guid_swap));
   }
 
-  zx::result<> Flush() const override { return zx::make_result(partitioner_->GetGpt()->Sync()); }
+  zx::result<> Flush() override { return zx::make_result(partitioner_->GetGpt()->Sync()); }
 
   std::unique_ptr<KolaPartitioner> partitioner_;
-  FindPartitionResult zircon_a_;
-  FindPartitionResult zircon_b_;
+  FindPartitionDetailsResult zircon_a_;
+  FindPartitionDetailsResult zircon_b_;
 };
 
 zx::result<std::unique_ptr<abr::Client>> KolaAbrClientFactory::New(
     const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  auto partitioner = KolaPartitioner::Initialize(devices, std::move(svc_root), {});
+  auto partitioner = KolaPartitioner::Initialize(devices, svc_root, {});
 
   if (partitioner.is_error()) {
     ERROR("Failed to initialize Kola partitioner: %s\n", partitioner.status_string());

@@ -61,16 +61,16 @@ constexpr DiskImage kExtrasImage = DiskImage{
 // Opens the given disk image.
 zx::result<fuchsia::io::FileHandle> GetPartition(const DiskImage& image) {
   TRACE_DURATION("termina_guest_manager", "GetPartition");
-  fuchsia::io::OpenFlags flags = fuchsia::io::OpenFlags::RIGHT_READABLE;
+  fuchsia::io::Flags flags = fuchsia::io::PERM_READABLE;
   if (!image.read_only) {
-    flags |= fuchsia::io::OpenFlags::RIGHT_WRITABLE;
+    flags |= fuchsia::io::PERM_WRITABLE;
   }
   if (image.create_file) {
-    flags |= fuchsia::io::OpenFlags::CREATE;
+    flags |= fuchsia::io::Flags::FLAG_MUST_CREATE;
   }
   fuchsia::io::FileHandle file;
-  zx_status_t status = fdio_open(image.path, static_cast<uint32_t>(flags),
-                                 file.NewRequest().TakeChannel().release());
+  zx_status_t status = fdio_open3(image.path, static_cast<uint64_t>(flags),
+                                  file.NewRequest().TakeChannel().release());
   if (status) {
     return zx::error(status);
   }
@@ -116,12 +116,12 @@ zx::result<fidl::InterfaceHandle<fuchsia::hardware::block::Block>> GetFxfsPartit
   }
   auto [dir_client, dir_server] = *std::move(dir_endpoints);
   std::filesystem::path image_path(image.path);
-  uint32_t dir_flags = static_cast<uint32_t>(
-      fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable | fio::OpenFlags::kDirectory);
+  uint64_t dir_flags = static_cast<uint64_t>(fio::wire::kPermReadable | fio::wire::kPermWritable |
+                                             fio::Flags::kProtocolDirectory);
   zx_status_t dir_open_status =
-      fdio_open(image_path.parent_path().c_str(), dir_flags, dir_server.TakeChannel().release());
+      fdio_open3(image_path.parent_path().c_str(), dir_flags, dir_server.TakeChannel().release());
   if (dir_open_status != ZX_OK) {
-    FX_PLOGS(ERROR, dir_open_status) << "fdio_open(Fxfs image.path.parent) failed";
+    FX_PLOGS(ERROR, dir_open_status) << "fdio_open3(Fxfs image.path.parent) failed";
     return zx::error(dir_open_status);
   }
 

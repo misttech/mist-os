@@ -6,7 +6,7 @@
 // //src/storage/lib/vfs/cpp and //src/storage/conformance.
 
 #include <fcntl.h>
-#include <fuchsia/io/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/io.h>
@@ -43,22 +43,23 @@ class VmoFileTest : public ::gtest::RealLoopFixture {
     zx::vmo vmo;
     ASSERT_EQ(zx::vmo::create(kFileContents.size(), 0, &vmo), ZX_OK);
     ASSERT_EQ(vmo.write(kFileContents.data(), 0, kFileContents.size()), ZX_OK);
-    auto writable_file = std::make_unique<vfs::VmoFile>(std::move(vmo), kFileContents.size(),
+    auto writable_file = std::make_shared<vfs::VmoFile>(std::move(vmo), kFileContents.size(),
                                                         vfs::VmoFile::WriteMode::kWritable);
-    ASSERT_EQ(root_->AddEntry("writable_file", std::move(writable_file)), ZX_OK);
+    ASSERT_EQ(root_->AddSharedEntry("writable_file", writable_file), ZX_OK);
+    writable_file_ = std::move(writable_file);
 
     ASSERT_EQ(zx::vmo::create(kFileContents.size(), 0, &vmo), ZX_OK);
     ASSERT_EQ(vmo.write(kFileContents.data(), 0, kFileContents.size()), ZX_OK);
-    auto read_only_file = std::make_unique<vfs::VmoFile>(std::move(vmo), kFileContents.size(),
+    auto read_only_file = std::make_shared<vfs::VmoFile>(std::move(vmo), kFileContents.size(),
                                                          vfs::VmoFile::WriteMode::kReadOnly);
-    ASSERT_EQ(root_->AddEntry("read_only_file", std::move(read_only_file)), ZX_OK);
+    ASSERT_EQ(root_->AddSharedEntry("read_only_file", read_only_file), ZX_OK);
+    read_only_file_ = std::move(read_only_file);
 
-    zx::channel root_server;
-    ASSERT_EQ(zx::channel::create(0, &root_client_, &root_server), ZX_OK);
-    ASSERT_EQ(root_->Serve(
-                  fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
-                  std::move(root_server)),
-              ZX_OK);
+    auto [root_client, root_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_EQ(
+        root_->Serve(fuchsia_io::kPermReadable | fuchsia_io::kPermWritable, std::move(root_server)),
+        ZX_OK);
+    root_client_ = std::move(root_client);
   }
 
   // Consumes and opens the root connection as a file descriptor. This must be called from a
@@ -66,15 +67,71 @@ class VmoFileTest : public ::gtest::RealLoopFixture {
   fbl::unique_fd open_root_fd() {
     ZX_ASSERT_MSG(root_client_.is_valid(), "open_root_fd() can only be called once per test!");
     fbl::unique_fd fd;
-    zx_status_t status = fdio_fd_create(root_client_.release(), fd.reset_and_get_address());
+    zx_status_t status =
+        fdio_fd_create(root_client_.TakeHandle().release(), fd.reset_and_get_address());
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to create fd: %s", zx_status_get_string(status));
     return fd;
   }
 
+  vfs::VmoFile* read_only_file() { return read_only_file_.get(); }
+
+  vfs::VmoFile* writable_file() { return writable_file_.get(); }
+
  private:
   std::unique_ptr<vfs::PseudoDir> root_;
-  zx::channel root_client_;
+  std::shared_ptr<vfs::VmoFile> read_only_file_;
+  std::shared_ptr<vfs::VmoFile> writable_file_;
+  fidl::ClientEnd<fuchsia_io::Directory> root_client_;
 };
+
+TEST_F(VmoFileTest, ServeReadOnly) {
+  // Read-only connections should be allowed.
+  {
+    auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+    ASSERT_EQ(read_only_file()->Serve(fuchsia_io::kPermReadable, std::move(server)), ZX_OK);
+  }
+  // Write and execute access should be disallowed.
+  {
+    auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+    ASSERT_EQ(read_only_file()->Serve(fuchsia_io::kPermWritable, std::move(server)),
+              ZX_ERR_ACCESS_DENIED);
+  }
+  {
+    auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+    ASSERT_EQ(read_only_file()->Serve(fuchsia_io::Flags::kPermExecute, std::move(server)),
+              ZX_ERR_ACCESS_DENIED);
+  }
+  // Non-file protocols should be disallowed.
+  {
+    auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+    ASSERT_EQ(read_only_file()->Serve(fuchsia_io::Flags::kProtocolDirectory, std::move(server)),
+              ZX_ERR_INVALID_ARGS);
+  }
+}
+
+TEST_F(VmoFileTest, ServeWritable) {
+  // Read-only and write access should be allowed.
+  {
+    auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+    ASSERT_EQ(writable_file()->Serve(fuchsia_io::kPermReadable, std::move(server)), ZX_OK);
+  }
+  {
+    auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+    ASSERT_EQ(writable_file()->Serve(fuchsia_io::kPermWritable, std::move(server)), ZX_OK);
+  }
+  // Execute access should be disallowed.
+  {
+    auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+    ASSERT_EQ(writable_file()->Serve(fuchsia_io::Flags::kPermExecute, std::move(server)),
+              ZX_ERR_ACCESS_DENIED);
+  }
+  // Non-file protocols should be disallowed.
+  {
+    auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+    ASSERT_EQ(writable_file()->Serve(fuchsia_io::Flags::kProtocolDirectory, std::move(server)),
+              ZX_ERR_INVALID_ARGS);
+  }
+}
 
 TEST_F(VmoFileTest, ReadOnlyIsNotWritable) {
   PerformBlockingWork([this] {

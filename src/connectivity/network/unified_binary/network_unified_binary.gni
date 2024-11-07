@@ -22,6 +22,7 @@ import("//build/rust/rustc_library.gni")
 #   binary target.
 # - add_configs: applies `configs += add_configs` on the generated
 #   binary and library targets.
+# - bin_build_job_vars: vars to set on the bin for build job configuration.
 template("network_unified_binary") {
   _bin_remove_configs = []
   if (defined(invoker.bin_remove_configs)) {
@@ -39,11 +40,20 @@ template("network_unified_binary") {
   # Always emit a rust binary with the incoming arguments. Because this is used
   # for networking binaries, always remove allow unused results.
   rustc_binary(target_name) {
-    forward_variables_from(invoker, "*", [ "bin_remove_configs" ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "bin_remove_configs",
+                             "bin_build_job_vars",
+                           ])
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]
     configs -= _bin_remove_configs
     configs += _bin_add_configs
     configs += _add_configs
+
+    if (defined(invoker.bin_build_job_vars)) {
+      forward_variables_from(invoker.bin_build_job_vars, "*")
+    }
   }
 
   output_name = target_name

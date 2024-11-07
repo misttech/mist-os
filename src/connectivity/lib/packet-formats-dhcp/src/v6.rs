@@ -695,18 +695,18 @@ impl RecordsImplLayout for ParsedDhcpOptionImpl {
     type Error = ParseError;
 }
 
-impl<'a> RecordsImpl<'a> for ParsedDhcpOptionImpl {
-    type Record = ParsedDhcpOption<'a>;
+impl RecordsImpl for ParsedDhcpOptionImpl {
+    type Record<'a> = ParsedDhcpOption<'a>;
 
     /// Tries to parse an option from the beginning of the input buffer. Returns the parsed
     /// `ParsedDhcpOption` and the remaining buffer. If the buffer is malformed, returns a
     /// `ParseError`. Option format as defined in [RFC 8415, Section 21.1]:
     ///
     /// [RFC 8415, Section 21.1]: https://tools.ietf.org/html/rfc8415#section-21.1
-    fn parse_with_context<BV: BufferView<&'a [u8]>>(
+    fn parse_with_context<'a, BV: BufferView<&'a [u8]>>(
         data: &mut BV,
         _context: &mut Self::Context,
-    ) -> RecordParseResult<Self::Record, Self::Error> {
+    ) -> RecordParseResult<Self::Record<'a>, Self::Error> {
         if data.len() == 0 {
             return Ok(ParsedRecord::Done);
         }

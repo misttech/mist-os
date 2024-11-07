@@ -81,7 +81,6 @@ mod tests {
     use super::*;
     use crate::storage_migrations::tests::open_tempdir;
     use assert_matches::assert_matches;
-    use fidl_fuchsia_io::OpenFlags;
     use fidl_fuchsia_settings::{LightGroup, LightState, LightType, LightValue};
     use fidl_fuchsia_stash::{StoreAccessorRequest, StoreMarker, StoreRequest};
     use fidl_fuchsia_ui_types::ColorRgb;
@@ -265,10 +264,10 @@ mod tests {
         let file_generator = FileGenerator::new(0, migration.id(), Clone::clone(&directory));
         assert_matches!(migration.migrate(file_generator).await, Ok(()));
 
-        let file = fuchsia_fs::directory::open_file_deprecated(
+        let file = fuchsia_fs::directory::open_file(
             &directory,
             "light_info_1653667208.pfidl",
-            OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::PERM_READABLE,
         )
         .await
         .expect("file should exist");

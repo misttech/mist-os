@@ -23,6 +23,10 @@ void* thread_function(void* arg);
 int main(void) {
   main_tid = (pid_t)syscall(SYS_gettid);
 
+  // Sleep needed to address a flake in
+  // //src/lib/fuchsia-component-test/src/lib.rs:ScopedInstanceFactory::new_named_instance.
+  sleep(10);
+
   pthread_t thread;
   if (pthread_create(&thread, NULL, thread_function, NULL)) {
     fprintf(stderr, "Error creating second thread\n");

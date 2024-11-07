@@ -47,6 +47,7 @@ template("_cuckoo_product_bundle") {
       }
       isolated = true
       product_bundle = main_target
+      is_boot_test = true
 
       bootup_timeout_secs = default_boot_test_timeout_secs
       if (defined(invoker.timeout)) {

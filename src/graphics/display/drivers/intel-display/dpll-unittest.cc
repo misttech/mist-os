@@ -12,7 +12,7 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
+#include "src/graphics/display/lib/driver-utils/scoped-value-change.h"
 
 namespace intel_display {
 
@@ -46,8 +46,8 @@ class DisplayPllTigerLakeTest : public ::testing::Test {
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 
-  ScopedValueChange<int> lock_wait_timeout_change_;
-  ScopedValueChange<int> power_on_wait_timeout_change_;
+  display::ScopedValueChange<int> lock_wait_timeout_change_;
+  display::ScopedValueChange<int> power_on_wait_timeout_change_;
 };
 
 TEST_F(DisplayPllTigerLakeTest, EnableHdmi) {

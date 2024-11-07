@@ -7,6 +7,8 @@
 
 #include <zircon/types.h>
 
+#include <soc/aml-s905d2/s905d2-hiu.h>
+
 // MMIO ranges that can contain clock gates.
 enum meson_register_sets {
   // HIU is the default set of registers.

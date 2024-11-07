@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::prelude::*;
 use futures::task::Poll;
 
@@ -10,7 +10,7 @@ use futures::task::Poll;
 /// the future is pending. When the future finishes, it will resolve with
 /// a tuple: (inner_fut::Output, metadata).
 pub struct FutureWithMetadata<F, M> {
-    inner_fut: BoxFuture<'static, F>,
+    inner_fut: LocalBoxFuture<'static, F>,
     pub metadata: M,
 }
 
@@ -18,7 +18,7 @@ impl<F, M> FutureWithMetadata<F, M>
 where
     M: Unpin + Clone,
 {
-    pub fn new(metadata: M, future: BoxFuture<'static, F>) -> Self {
+    pub fn new(metadata: M, future: LocalBoxFuture<'static, F>) -> Self {
         Self { metadata, inner_fut: future }
     }
 }

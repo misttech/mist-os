@@ -22,25 +22,39 @@ driver_bind_rules("aml-hrtimer-bind") {
   ]
 }
 
-fuchsia_driver("aml-hrtimer-driver") {
+fuchsia_cc_driver("aml-hrtimer-driver") {
   output_name = "aml-hrtimer"
   deps = [
     ":aml-hrtimer-bind",
     ":common",
   ]
 }
+fuchsia_component_manifest("aml-hrtimer-manifest") {
+  component_name = "aml-hrtimer"
+  manifest = "meta/aml-hrtimer.cml"
+}
 
 fuchsia_driver_component("aml-hrtimer") {
-  visibility = [ ":*" ]
-  component_name = "aml-hrtimer"
+  cm_label = ":aml-hrtimer-manifest"
   deps = [ ":aml-hrtimer-driver" ]
   info = "meta/aml-hrtimer-info.json"
-  manifest = "meta/aml-hrtimer.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("aml-hrtimer-config") {
+  cm_label = ":aml-hrtimer-manifest"
+}
+
+fuchsia_structured_config_values("sc-values") {
+  cm_label = ":aml-hrtimer-manifest"
+  values = {
+    enable_suspend = true
+  }
 }
 
 fuchsia_driver_package("package") {
   package_name = "aml-hrtimer"
   driver_components = [ ":aml-hrtimer" ]
+  deps = [ ":sc-values" ]
 }
 
 source_set("common") {
@@ -51,6 +65,7 @@ source_set("common") {
   ]
 
   public_deps = [
+    ":aml-hrtimer-config",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_cpp",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
@@ -58,7 +73,6 @@ source_set("common") {
     "//sdk/lib/driver/compat/cpp:cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
-    "//sdk/lib/driver/power/cpp",
     "//sdk/lib/fit",
     "//sdk/lib/inspect",
     "//src/devices/bin/driver_runtime",

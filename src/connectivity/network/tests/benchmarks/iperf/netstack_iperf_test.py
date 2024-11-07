@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import asyncio
-import concurrent.futures
 import ipaddress
 import json
 import logging
@@ -15,7 +14,7 @@ import subprocess
 import time
 from enum import Enum
 from importlib.resources import as_file, files
-from typing import Any
+from typing import Any, Callable
 
 import honeydew
 import test_data
@@ -26,8 +25,8 @@ from perf_publish import publish
 from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import cpu
 
-# The first TCP/UDP port number that the Fuchsia side will listen on.
-FIRST_LISTEN_PORT: int = 9001
+# The TCP/UDP port number that the Fuchsia side will listen on.
+LISTEN_PORT: int = 9001
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -217,9 +216,9 @@ def generate_result(
 
 
 class IperfServer:
-    def __init__(self, port: int, ffx: honeydew.transports.ffx.FFX) -> None:
+    def __init__(self, ffx: honeydew.transports.ffx.FFX) -> None:
         self._process: subprocess.Popen[bytes] = ffx.popen(
-            ["target", "ssh", f"iperf3 --server --port {port} --json"],
+            ["target", "ssh", f"iperf3 --server --port {LISTEN_PORT} --json"],
             text=False,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -249,12 +248,8 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             self._label += ".netstack3"
 
     def test_iperf(self) -> None:
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=5)
         self._wait_system_metrics_daemon_start()
-        try:
-            self._run_iperf_client_tests(executor)
-        finally:
-            self._cleanup_iperf_tasks()
+        self._run_iperf_client_tests()
 
     def _wait_system_metrics_daemon_start(self) -> None:
         for i in range(10):
@@ -264,8 +259,9 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                 directory=self.test_case_path,
                 trace_file="trace.fxt",
             ):
-                # Do nothing for sometime to let system_metrics to be logged.
-                time.sleep(10)
+                # Record a 1-second trace session to give the system metrics daemon a chance to
+                # emit CPU usage trace event(s), which it typically does every second.
+                time.sleep(1)
             cpu_results = self._get_cpu_results(
                 os.path.join(self.test_case_path, "trace.fxt")
             )
@@ -275,94 +271,27 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             "Failed to retrieve CPU stats from system_metrics daemon"
         )
 
-    def _run_iperf_client_tests(
-        self,
-        executor: concurrent.futures.ThreadPoolExecutor,
-    ) -> None:
+    def _run_iperf_client_tests(self) -> None:
         results: list[dict[str, Any]] = []
-        for message_size in [64, 1024, 1400]:
-            for flows in [1, 2, 4]:
-                # Disable the ethernet_udp_recv 64-byte multi-flow test cases because (as of
-                # writing) they are very flaky, most likely due to the netstack or network driver
-                # dropping packets under high load (see https://fxbug.dev/42085351).
-                if (
-                    self._protocol == Protocol.UDP
-                    and self._direction == Direction.HOST_TO_DEVICE
-                    and message_size == 64
-                    and flows > 1
-                ):
-                    continue
-
-                dir = pathlib.Path(self.test_case_path) / (
-                    f"{message_size}bytes_{flows}flow"
-                    + ("s" if flows > 1 else "")
-                )
-                os.makedirs(dir)
-                try:
-                    with self._device.tracing.trace_session(
-                        categories=["system_metrics"],
-                        download=True,
-                        directory=dir,
-                        trace_file="trace.fxt",
-                    ):
-                        if self._direction == Direction.LOOPBACK:
-                            test_component_args = [
-                                "--protocol",
-                                f"{self._protocol}",
-                                "--message-size",
-                                f"{message_size}",
-                                "--flows",
-                                f"{flows}",
-                            ]
-                            if self._netstack3:
-                                test_component_args.append("--netstack3")
-                            self._device.ffx.run_test_component(
-                                "fuchsia-pkg://fuchsia.com/iperf-benchmark#meta/iperf-benchmark-component.cm",
-                                ffx_test_args=[
-                                    "--output-directory",
-                                    dir,
-                                ],
-                                test_component_args=test_component_args,
-                                capture_output=False,
-                            )
-                            result_files = [
-                                str(path)
-                                for path in dir.rglob(f"iperf_client_*.json")
-                            ]
-                            asserts.assert_equal(len(result_files), flows)
-                        else:
-                            servers = asyncio.run(
-                                self._start_iperf3_servers(executor, flows)
-                            )
-                            result_files = asyncio.run(
-                                self._execute_iperf3_commands(
-                                    executor,
-                                    flows,
-                                    # TODO(https://fxbug.dev/42124566): Currently, we are using
-                                    # the link used for ssh to also inject data traffic. This is
-                                    # prone to interference to ssh and to the tests.  On NUC7, we
-                                    # can use a separate usb-ethernet interface for the test
-                                    # traffic.
-                                    self._device.ffx.get_target_ssh_address().ip,
-                                    message_size,
-                                    dir,
-                                )
-                            )
-                    cpu_results = self._get_cpu_results(dir / "trace.fxt")
-                    asserts.assert_equal(len(cpu_results), 1)
-                    cpu_percentages = list(cpu_results[0].values)
-                    results += self._iperf_results_to_fuchsiaperf(
-                        result_files,
-                        cpu_percentages,
-                        message_size,
+        MESSAGE_SIZES = [64, 1024, 1400]
+        if self._direction != Direction.LOOPBACK:
+            server = asyncio.run(self._start_iperf3_server())
+            try:
+                for message_size in MESSAGE_SIZES:
+                    results += self._run_iperf_client_test_case(
+                        self._run_ethernet_tests, message_size, 1
                     )
-                finally:
-                    if self._direction != Direction.LOOPBACK:
-                        self._cleanup_iperf_tasks()
-                        for i, server in enumerate(servers):
-                            server.dump_output_to_file(
-                                dir / f"iperf_server_{i}.json"
-                            )
+            finally:
+                dir = pathlib.Path(self.test_case_path)
+                self._cleanup_iperf_tasks()
+                server.dump_output_to_file(dir / f"iperf_server.json")
+        else:
+            for message_size in MESSAGE_SIZES:
+                for flows in [1, 2, 4]:
+                    results += self._run_iperf_client_test_case(
+                        self._run_loopback_tests, message_size, flows
+                    )
+
         path = os.path.join(
             self.test_case_path, "netstack_iperf_results.fuchsiaperf.json"
         )
@@ -373,6 +302,78 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             f"fuchsia.netstack.iperf_benchmarks.{self._label}.txt",
             test_data_module=test_data,
         )
+
+    def _run_iperf_client_test_case(
+        self,
+        test: Callable[[pathlib.Path, int, int], list[str]],
+        message_size: int,
+        flows: int,
+    ) -> list[dict[str, Any]]:
+        dir = pathlib.Path(self.test_case_path) / (
+            f"{message_size}bytes_{flows}flow" + ("s" if flows > 1 else "")
+        )
+        os.makedirs(dir)
+
+        with self._device.tracing.trace_session(
+            categories=["system_metrics"],
+            download=True,
+            directory=dir,
+            trace_file="trace.fxt",
+        ):
+            result_files = test(dir, message_size, flows)
+
+        cpu_results = self._get_cpu_results(dir / "trace.fxt")
+        asserts.assert_equal(len(cpu_results), 1)
+        cpu_percentages = list(cpu_results[0].values)
+        return self._iperf_results_to_fuchsiaperf(
+            result_files,
+            cpu_percentages,
+            message_size,
+        )
+
+    def _run_loopback_tests(
+        self, dir: pathlib.Path, message_size: int, flows: int
+    ) -> list[str]:
+        test_component_args = [
+            "--protocol",
+            f"{self._protocol}",
+            "--message-size",
+            f"{message_size}",
+            "--flows",
+            f"{flows}",
+        ]
+        if self._netstack3:
+            test_component_args.append("--netstack3")
+        self._device.ffx.run_test_component(
+            "fuchsia-pkg://fuchsia.com/iperf-benchmark#meta/iperf-benchmark-component.cm",
+            ffx_test_args=[
+                "--output-directory",
+                dir,
+            ],
+            test_component_args=test_component_args,
+            capture_output=False,
+        )
+        result_files = [str(path) for path in dir.rglob(f"iperf_client_*.json")]
+        asserts.assert_equal(len(result_files), flows)
+        return result_files
+
+    def _run_ethernet_tests(
+        self, dir: pathlib.Path, message_size: int, flows: int
+    ) -> list[str]:
+        asserts.assert_equal(flows, 1)
+        return [
+            asyncio.run(
+                self._execute_iperf3_commands(
+                    # NOTE(https://fxbug.dev/42124566): Currently, we are using the link used for
+                    # ssh to also inject data traffic. This is prone to interference to ssh and to
+                    # the tests. Ideally we would use a separate usb-ethernet interface for the test
+                    # traffic.
+                    self._device.ffx.get_target_ssh_address().ip,
+                    message_size,
+                    dir,
+                )
+            )
+        ]
 
     def _get_cpu_results(
         self, path: str | os.PathLike[str]
@@ -387,33 +388,12 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             )
         )
 
-    async def _start_iperf3_servers(
-        self, executor: concurrent.futures.ThreadPoolExecutor, flows: int
-    ) -> list[IperfServer]:
-        loop = asyncio.get_running_loop()
-        client_futures = []
-        for i in range(flows):
-            client_futures.append(
-                loop.run_in_executor(
-                    executor,
-                    self._start_iperf3_server,
-                    i,
-                )
-            )
-        results, pending = await asyncio.wait(
-            client_futures, return_when=asyncio.ALL_COMPLETED
-        )
-        asserts.assert_equal(len(pending), 0)
-        asserts.assert_equal(len(results), flows)
-        return [result.result() for result in results]
-
-    def _start_iperf3_server(self, index: int) -> IperfServer:
-        port: int = FIRST_LISTEN_PORT + index
-        server = IperfServer(port, self._device.ffx)
+    async def _start_iperf3_server(self) -> IperfServer:
+        server = IperfServer(self._device.ffx)
         while True:
             try:
                 output = self._device.ffx.run_ssh_cmd(
-                    cmd=f"iperf3 -n 1 -c 127.0.0.1 -p {port}",
+                    cmd=f"iperf3 -n 1 -c 127.0.0.1 -p {LISTEN_PORT}",
                 )
                 asserts.assert_not_in(
                     "iperf3: error - unable to connect to server: Connection refused",
@@ -422,26 +402,26 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                 output = output.strip()
                 asserts.assert_true(
                     output.startswith(
-                        f"Connecting to host 127.0.0.1, port {port}"
+                        f"Connecting to host 127.0.0.1, port {LISTEN_PORT}"
                     ),
                     "output has expected beginning",
                 )
-                asserts.assert_in(f"connected to 127.0.0.1 port {port}", output)
+                asserts.assert_in(
+                    f"connected to 127.0.0.1 port {LISTEN_PORT}", output
+                )
                 asserts.assert_true(
                     output.endswith("iperf Done."), "output has expected end"
                 )
                 return server
             except Exception:  # pylint: disable=broad-except
-                time.sleep(1)
+                time.sleep(0.1)
 
     async def _execute_iperf3_commands(
         self,
-        executor: concurrent.futures.ThreadPoolExecutor,
-        flows: int,
         server_ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
         message_size: int,
         output_dir: str | os.PathLike[str],
-    ) -> list[str]:
+    ) -> str:
         protocol_option: str = "--udp" if self._protocol == Protocol.UDP else ""
         dir_option: str = (
             "--reverse" if self._direction == Direction.DEVICE_TO_HOST else ""
@@ -454,31 +434,20 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             "--json",
             protocol_option,
             "--bitrate",
-            # TODO(https://fxbug.dev/42124566): Until we define separate link for ssh and data,
-            # enforce a < 1Gbps rate on NUC7. After the bug is resolved, this can
-            # be changed to '0' which means as much as the system and link can
-            # transmit.
-            f"{100 // flows}M",
+            # NOTE(https://fxbug.dev/42124566): Until we define separate link for ssh and
+            # data, enforce a < 1Gbps rate. If/when the linked bug is resolved, this can be
+            # changed to '0' which means as much as the system and link can transmit.
+            "100M",
             dir_option,
             "--get-server-output",
+            "--time",
+            "5",
         ]
-        tasks = []
-        result_files = []
-        for i in range(flows):
-            cmd_args = command_args + ["--port", f"{FIRST_LISTEN_PORT + i}"]
-            result_path = os.path.join(output_dir, f"iperf_client_{i}.json")
-            result_files.append(result_path)
-            tasks.append(
-                asyncio.create_task(
-                    self._run_host_iperf3_command(cmd_args, result_path)
-                )
-            )
-        (done, pending) = await asyncio.wait(
-            tasks, return_when=asyncio.ALL_COMPLETED
-        )
-        asserts.assert_equal(len(pending), 0)
-        asserts.assert_equal(len(done), flows)
-        return result_files
+
+        cmd_args = command_args + ["--port", str(LISTEN_PORT)]
+        result_path = os.path.join(output_dir, f"iperf_client.json")
+        await self._run_host_iperf3_command(cmd_args, result_path)
+        return result_path
 
     async def _run_host_iperf3_command(
         self,

@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::marker::PhantomData;
+use core::mem::{ManuallyDrop, MaybeUninit};
 use core::ptr::addr_of_mut;
 
 use munge::munge;
 
+use crate::decoder::InternalHandleDecoder;
 use crate::{
-    decode, encode, u16_le, u32_le, Chunk, Decode, Decoder, DecoderExt as _, Encode, Encoder,
+    decode, encode, u16_le, u32_le, Decode, Decoder, DecoderExt as _, Encode, Encoder,
     EncoderExt as _, Slot, CHUNK_SIZE,
 };
 
@@ -20,23 +21,16 @@ struct Encoded {
     flags: u16_le,
 }
 
-#[derive(Clone, Copy)]
-#[repr(C)]
-struct DecodedOutOfLine<'buf> {
-    ptr: *mut (),
-    _phantom: PhantomData<&'buf mut [Chunk]>,
-}
-
 /// A FIDL envelope
 #[repr(C, align(8))]
-pub union WireEnvelope<'buf> {
+pub union WireEnvelope {
     zero: [u8; 8],
     encoded: Encoded,
-    decoded_inline: [u8; 4],
-    decoded_out_of_line: DecodedOutOfLine<'buf>,
+    decoded_inline: [MaybeUninit<u8>; 4],
+    decoded_out_of_line: *mut (),
 }
 
-impl<'buf> WireEnvelope<'buf> {
+impl WireEnvelope {
     const IS_INLINE_BIT: u16 = 1;
 
     /// Encodes a zero envelope into a slot.
@@ -118,8 +112,32 @@ impl<'buf> WireEnvelope<'buf> {
         }
     }
 
+    /// Decodes and discards a static type in an envelope.
+    pub fn decode_unknown_static<D: InternalHandleDecoder + ?Sized>(
+        slot: Slot<'_, Self>,
+        decoder: &mut D,
+    ) -> Result<(), decode::DecodeError> {
+        munge! {
+            let Self {
+                encoded: Encoded {
+                    maybe_num_bytes,
+                    num_handles,
+                    flags,
+                },
+            } = slot;
+        }
+
+        if let Some(count) = Self::out_of_line_chunks(maybe_num_bytes, flags)? {
+            return Err(decode::DecodeError::ExpectedInline(count * CHUNK_SIZE));
+        }
+
+        decoder.__internal_take_handles(num_handles.to_native() as usize)?;
+
+        Ok(())
+    }
+
     /// Decodes and discards an unknown value in an envelope.
-    pub fn decode_unknown<D: Decoder<'buf> + ?Sized>(
+    pub fn decode_unknown<'buf, D: Decoder<'buf> + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
     ) -> Result<(), decode::DecodeError> {
@@ -143,7 +161,48 @@ impl<'buf> WireEnvelope<'buf> {
     }
 
     /// Decodes a value of a known type from an envelope.
-    pub fn decode_as<D: Decoder<'buf> + ?Sized, T: Decode<D>>(
+    pub fn decode_as_static<D: InternalHandleDecoder + ?Sized, T: Decode<D>>(
+        mut slot: Slot<'_, Self>,
+        decoder: &mut D,
+    ) -> Result<(), decode::DecodeError> {
+        munge! {
+            let Self {
+                encoded: Encoded {
+                    maybe_num_bytes,
+                    num_handles,
+                    flags,
+                },
+             } = slot.as_mut();
+        }
+
+        let handles_before = decoder.__internal_handles_remaining();
+        let num_handles = num_handles.to_native() as usize;
+
+        if let Some(count) = Self::out_of_line_chunks(maybe_num_bytes, flags)? {
+            return Err(decode::DecodeError::ExpectedInline(count * CHUNK_SIZE));
+        }
+
+        // Decode inline value
+        if size_of::<T>() > 4 {
+            return Err(decode::DecodeError::InlineValueTooBig(size_of::<T>()));
+        }
+        munge!(let Self { mut decoded_inline } = slot);
+        let mut slot = unsafe { Slot::<T>::new_unchecked(decoded_inline.as_mut_ptr().cast()) };
+        T::decode(slot.as_mut(), decoder)?;
+
+        let handles_consumed = handles_before - decoder.__internal_handles_remaining();
+        if handles_consumed != num_handles {
+            return Err(decode::DecodeError::IncorrectNumberOfHandlesConsumed {
+                expected: num_handles,
+                actual: handles_consumed,
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Decodes a value of a known type from an envelope.
+    pub fn decode_as<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>>(
         mut slot: Slot<'_, Self>,
         decoder: &mut D,
     ) -> Result<(), decode::DecodeError> {
@@ -169,17 +228,10 @@ impl<'buf> WireEnvelope<'buf> {
             let value_ptr = value_slot.as_mut_ptr();
             T::decode(value_slot, decoder)?;
 
-            munge! {
-                let Self {
-                    decoded_out_of_line: DecodedOutOfLine {
-                        mut ptr,
-                        _phantom,
-                    },
-                } = slot;
-            }
+            munge!(let Self { mut decoded_out_of_line } = slot);
             // SAFETY: Identical to `ptr.write(value_ptr.cast())`, but raw
             // pointers don't currently implement `IntoBytes`.
-            unsafe { ptr.as_mut_ptr().write(value_ptr.cast()) };
+            unsafe { decoded_out_of_line.as_mut_ptr().write(value_ptr.cast()) };
         } else {
             // Decode inline value
             if size_of::<T>() > 4 {
@@ -206,7 +258,7 @@ impl<'buf> WireEnvelope<'buf> {
             let inline = unsafe { addr_of_mut!((*this).decoded_inline) };
             inline.cast()
         } else {
-            unsafe { (*this).decoded_out_of_line.ptr.cast() }
+            unsafe { (*this).decoded_out_of_line.cast() }
         }
     }
 
@@ -240,5 +292,27 @@ impl<'buf> WireEnvelope<'buf> {
         let result = unsafe { ptr.read() };
         *self = Self { zero: [0; 8] };
         result
+    }
+
+    /// Clones the envelope, assuming that it contains an inline `T`.
+    ///
+    /// # Safety
+    ///
+    /// The envelope must have been successfully decoded as a `T`.
+    pub unsafe fn clone_unchecked<T: Clone>(&self) -> Self {
+        debug_assert_eq!(size_of::<T>(), 4);
+
+        union ClonedToDecodedInline<T> {
+            cloned: ManuallyDrop<T>,
+            decoded_inline: [MaybeUninit<u8>; 4],
+        }
+
+        let cloned = unsafe { self.deref_unchecked::<T>().clone() };
+        unsafe {
+            Self {
+                decoded_inline: ClonedToDecodedInline { cloned: ManuallyDrop::new(cloned) }
+                    .decoded_inline,
+            }
+        }
     }
 }

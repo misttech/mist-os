@@ -37,28 +37,6 @@ namespace fs {
 
 class Vnode;
 
-namespace Rights {
-
-// Alias for commonly used read-only directory rights.
-constexpr fuchsia_io::Rights ReadOnly() { return fuchsia_io::kRStarDir; }
-
-// Alias for commonly used write-only directory rights.
-constexpr fuchsia_io::Rights WriteOnly() {
-  // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
-  return fuchsia_io::Rights::kGetAttributes | fuchsia_io::kWStarDir;
-}
-
-// Alias for commonly used read-write directory rights.
-constexpr fuchsia_io::Rights ReadWrite() { return fuchsia_io::kRwStarDir; }
-
-// Alias for commonly used read-execute directory rights.
-constexpr fuchsia_io::Rights ReadExec() { return fuchsia_io::kRxStarDir; }
-
-// Alias for all possible rights.
-constexpr fuchsia_io::Rights All() { return fuchsia_io::Rights::kMask; }
-
-}  // namespace Rights
-
 // All io1 OpenFlags that correspond to connection rights.
 constexpr fuchsia_io::OpenFlags kAllIo1Rights = fuchsia_io::OpenFlags::kRightReadable |
                                                 fuchsia_io::OpenFlags::kRightWritable |
@@ -92,57 +70,6 @@ enum class VnodeProtocol : uint8_t {
 struct VnodeConnectionOptions {
   fuchsia_io::OpenFlags flags;
   fuchsia_io::Rights rights;
-
-  // TODO(https://fxbug.dev/324112857): Remove the following setters, as some aren't compatible with
-  // io2 directly (e.g. not_directory has no equivalent, and set_truncate only applies if the file
-  // protocol was selected). These setters are only used in tests anyways - same with the factory
-  // functions below.
-
-  constexpr VnodeConnectionOptions set_directory() {
-    flags |= fuchsia_io::OpenFlags::kDirectory;
-    return *this;
-  }
-
-  constexpr VnodeConnectionOptions set_not_directory() {
-    flags |= fuchsia_io::OpenFlags::kNotDirectory;
-    return *this;
-  }
-
-  constexpr VnodeConnectionOptions set_node_reference() {
-    flags |= fuchsia_io::OpenFlags::kNodeReference;
-    return *this;
-  }
-
-  constexpr VnodeConnectionOptions set_truncate() {
-    flags |= fuchsia_io::OpenFlags::kTruncate;
-    return *this;
-  }
-
-  // Convenience factory functions for commonly used option combinations.
-
-  constexpr static VnodeConnectionOptions ReadOnly() {
-    VnodeConnectionOptions options;
-    options.rights = Rights::ReadOnly();
-    return options;
-  }
-
-  constexpr static VnodeConnectionOptions WriteOnly() {
-    VnodeConnectionOptions options;
-    options.rights = Rights::WriteOnly();
-    return options;
-  }
-
-  constexpr static VnodeConnectionOptions ReadWrite() {
-    VnodeConnectionOptions options;
-    options.rights = Rights::ReadWrite();
-    return options;
-  }
-
-  constexpr static VnodeConnectionOptions ReadExec() {
-    VnodeConnectionOptions options;
-    options.rights = Rights::ReadExec();
-    return options;
-  }
 
   // Translates the io1 flags passed by the client into an equivalent set of io2 protocols.
   constexpr fuchsia_io::NodeProtocolKinds protocols() const {

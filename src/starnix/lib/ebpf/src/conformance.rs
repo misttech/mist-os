@@ -170,7 +170,7 @@ pub mod test {
                                 is_ind = true;
                             }
                             Rule::OFFSET => {
-                                instruction.off = Self::parse_value(inner).as_i16();
+                                instruction.imm = Self::parse_value(inner).as_i32();
                             }
                             r @ _ => unreachable!("unexpected rule {r:?}"),
                         }

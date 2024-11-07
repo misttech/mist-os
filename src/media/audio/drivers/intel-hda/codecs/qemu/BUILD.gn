@@ -15,7 +15,7 @@ group("qemu") {
   deps = [ ":qemu-audio-codec" ]
 }
 
-fuchsia_driver("qemu-audio-codec-driver") {
+fuchsia_cc_driver("qemu-audio-codec-driver") {
   output_name = "qemu-audio-codec"
   configs += [
     "//build/config:all_source",

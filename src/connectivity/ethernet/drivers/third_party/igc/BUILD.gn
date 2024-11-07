@@ -51,7 +51,7 @@ source_set("igc_core") {
   ]
 }
 
-fuchsia_driver("igc-driver") {
+fuchsia_cc_driver("igc-driver") {
   output_name = "igc"
   deps = [ ":igc_core" ]
 }

@@ -36,6 +36,8 @@
 
 // Command-line flags
 
+namespace {
+
 // Used to override kScheduleIntervalDefault;
 constexpr std::string_view kScheduleIntervalSecondsFlagName = "schedule_interval_seconds";
 
@@ -82,7 +84,7 @@ const std::chrono::minutes kInitialIntervalDefault(1);
 const std::chrono::seconds kMinIntervalDefault(10);
 
 // Offset uploads by at most 20% of current interval.
-float kUploadJitterDefault(.2);
+constexpr float kUploadJitterDefault(.2);
 
 // The EventAggregator looks back 2 days, in addition to the previous day, to
 // make sure that all locally aggregated observations have been generated.
@@ -140,6 +142,8 @@ void ReplaceRuntimeClock() {
 
   zx_utc_reference_swap(replacement.release(), current_clock.reset_and_get_address());
 }
+
+}  // namespace
 
 int main(int argc, const char** argv) {
   // Parse the flags.

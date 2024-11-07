@@ -82,6 +82,7 @@ rustc_library("component_debug") {
     "src/capability.rs",
     "src/cli/capability.rs",
     "src/cli/collection.rs",
+    "src/cli/config.rs",
     "src/cli/create.rs",
     "src/cli/destroy.rs",
     "src/cli/doctor.rs",

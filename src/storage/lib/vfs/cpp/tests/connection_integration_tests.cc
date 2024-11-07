@@ -176,17 +176,17 @@ TEST_F(ConnectionTest, NodeGetSetFlagsOnFile) {
   // Connect to File
   zx::result fc = fidl::CreateEndpoints<fio::File>();
   ASSERT_EQ(fc.status_value(), ZX_OK);
-  ASSERT_EQ(fdio_open_at(root.client.channel().get(), "file",
-                         static_cast<uint32_t>(fio::OpenFlags::kRightReadable),
-                         fc->server.TakeChannel().release()),
-            ZX_OK);
+  ASSERT_EQ(
+      fdio_open3_at(root.client.channel().get(), "file", static_cast<uint64_t>(fio::kPermReadable),
+                    fc->server.TakeChannel().release()),
+      ZX_OK);
 
   // Use GetFlags to get current flags and rights
   auto file_get_result = fidl::WireCall(fc->client)->GetFlags();
   EXPECT_EQ(file_get_result.status(), ZX_OK);
   EXPECT_EQ(fio::OpenFlags::kRightReadable, file_get_result->flags);
   {
-    // Make modifications to flags with SetFlags: Note this only works for kOpenFlagAppend
+    // Make modifications to flags with SetFlags: Note this only works for fio::OpenFlags::kAppend
     // based on posix standard
     auto file_set_result = fidl::WireCall(fc->client)->SetFlags(fio::OpenFlags::kAppend);
     EXPECT_EQ(file_set_result->s, ZX_OK);
@@ -207,10 +207,9 @@ TEST_F(ConnectionTest, NodeGetSetFlagsOnDirectory) {
   // Connect to Directory
   zx::result dc = fidl::CreateEndpoints<fio::Directory>();
   ASSERT_EQ(dc.status_value(), ZX_OK);
-  ASSERT_EQ(fdio_open_at(root.client.channel().get(), "dir",
-                         static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
-                                               fio::OpenFlags::kRightWritable),
-                         dc->server.TakeChannel().release()),
+  ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "dir",
+                          static_cast<uint64_t>(fio::kPermReadable | fio::kPermWritable),
+                          dc->server.TakeChannel().release()),
             ZX_OK);
 
   // Directories don't have settable flags, only report RIGHT_* flags.
@@ -223,23 +222,23 @@ TEST_F(ConnectionTest, NodeGetSetFlagsOnDirectory) {
   EXPECT_EQ(dir_set_result->s, ZX_ERR_NOT_SUPPORTED);
 }
 
-TEST_F(ConnectionTest, PosixFlagDirectoryRightExpansion) {
+TEST_F(ConnectionTest, InheritPermissionFlagDirectoryRightExpansion) {
   // Create connection to VFS with all rights.
   auto root = fidl::Endpoints<fio::Directory>::Create();
   ASSERT_EQ(ConnectClient(std::move(root.server)), ZX_OK);
 
-  // Combinations of POSIX flags to be tested.
-  const fio::OpenFlags OPEN_FLAG_COMBINATIONS[]{
-      fio::OpenFlags::kPosixWritable, fio::OpenFlags::kPosixExecutable,
-      fio::OpenFlags::kPosixWritable | fio::OpenFlags::kPosixExecutable};
+  // Combinations of permission inherit flags to be tested.
+  const fio::Flags kFlagCombinations[]{
+      fio::Flags::kPermInheritWrite, fio::Flags::kPermInheritExecute,
+      fio::Flags::kPermInheritWrite | fio::Flags::kPermInheritExecute};
 
-  for (const fio::OpenFlags OPEN_FLAGS : OPEN_FLAG_COMBINATIONS) {
+  for (const fio::Flags kOpenFlags : kFlagCombinations) {
     // Connect to drectory specifying the flag combination we want to test.
     zx::result dc = fidl::CreateEndpoints<fio::Directory>();
     ASSERT_EQ(dc.status_value(), ZX_OK);
-    ASSERT_EQ(fdio_open_at(root.client.channel().get(), "dir",
-                           static_cast<uint32_t>(fio::OpenFlags::kRightReadable | OPEN_FLAGS),
-                           dc->server.TakeChannel().release()),
+    ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "dir",
+                            static_cast<uint64_t>(fio::kPermReadable | kOpenFlags),
+                            dc->server.TakeChannel().release()),
               ZX_OK);
 
     // Ensure flags match those which we expect.
@@ -247,17 +246,17 @@ TEST_F(ConnectionTest, PosixFlagDirectoryRightExpansion) {
     EXPECT_EQ(dir_get_result->s, ZX_OK);
     auto dir_flags = dir_get_result->flags;
     EXPECT_TRUE(fio::OpenFlags::kRightReadable & dir_flags);
-    // Each POSIX flag should be expanded to its respective right(s).
-    if (OPEN_FLAGS & fio::OpenFlags::kPosixWritable)
+    // Each permission inherit flag should be expanded to its respective right(s).
+    if (kOpenFlags & fio::Flags::kPermInheritWrite)
       EXPECT_TRUE(fio::OpenFlags::kRightWritable & dir_flags);
-    if (OPEN_FLAGS & fio::OpenFlags::kPosixExecutable)
+    if (kOpenFlags & fio::Flags::kPermInheritExecute)
       EXPECT_TRUE(fio::OpenFlags::kRightExecutable & dir_flags);
 
     // Repeat test, but for file, which should not have any expanded rights.
     auto fc = fidl::Endpoints<fio::File>::Create();
-    ASSERT_EQ(fdio_open_at(root.client.channel().get(), "file",
-                           static_cast<uint32_t>(fio::OpenFlags::kRightReadable | OPEN_FLAGS),
-                           fc.server.TakeChannel().release()),
+    ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "file",
+                            static_cast<uint64_t>(fio::kPermReadable | kOpenFlags),
+                            fc.server.TakeChannel().release()),
               ZX_OK);
     auto file_get_result = fidl::WireCall(fc.client)->GetFlags();
     EXPECT_EQ(file_get_result.status(), ZX_OK);
@@ -273,10 +272,10 @@ TEST_F(ConnectionTest, FileGetSetFlagsOnFile) {
   // Connect to File
   zx::result fc = fidl::CreateEndpoints<fio::File>();
   ASSERT_EQ(fc.status_value(), ZX_OK);
-  ASSERT_EQ(fdio_open_at(root.client.channel().get(), "file",
-                         static_cast<uint32_t>(fio::OpenFlags::kRightReadable),
-                         fc->server.TakeChannel().release()),
-            ZX_OK);
+  ASSERT_EQ(
+      fdio_open3_at(root.client.channel().get(), "file", static_cast<uint64_t>(fio::kPermReadable),
+                    fc->server.TakeChannel().release()),
+      ZX_OK);
 
   {
     // Use GetFlags to get current flags and rights
@@ -306,10 +305,9 @@ TEST_F(ConnectionTest, GetSetIo1Attrs) {
   // Connect to File
   zx::result fc = fidl::CreateEndpoints<fio::File>();
   ASSERT_EQ(fc.status_value(), ZX_OK);
-  ASSERT_EQ(fdio_open_at(root.client.channel().get(), "file_or_dir",
-                         static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
-                                               fio::OpenFlags::kRightWritable),
-                         fc->server.TakeChannel().release()),
+  ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "file_or_dir",
+                          static_cast<uint64_t>(fio::kPermReadable | fio::kPermWritable),
+                          fc->server.TakeChannel().release()),
             ZX_OK);
   {
     auto io1_attrs = fidl::WireCall(fc->client)->GetAttr();
@@ -351,10 +349,9 @@ TEST_F(ConnectionTest, GetUpdateIo2Attrs) {
   // Connect to File
   zx::result fc = fidl::CreateEndpoints<fio::File>();
   ASSERT_EQ(fc.status_value(), ZX_OK);
-  ASSERT_EQ(fdio_open_at(root.client.channel().get(), "file_or_dir",
-                         static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
-                                               fio::OpenFlags::kRightWritable),
-                         fc->server.TakeChannel().release()),
+  ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "file_or_dir",
+                          static_cast<uint64_t>(fio::kPermReadable | fio::kPermWritable),
+                          fc->server.TakeChannel().release()),
             ZX_OK);
   auto client = fidl::SyncClient(std::move(fc->client));
   // Our test Vnode only reports a hard-coded ID in addition to protocols/abilities.
@@ -406,10 +403,9 @@ TEST_F(ConnectionTest, FileSeekDirectory) {
   {
     zx::result dc = fidl::CreateEndpoints<fio::Directory>();
     ASSERT_EQ(dc.status_value(), ZX_OK);
-    ASSERT_EQ(fdio_open_at(root.client.channel().get(), "dir",
-                           static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
-                                                 fio::OpenFlags::kRightWritable),
-                           dc->server.TakeChannel().release()),
+    ASSERT_EQ(fdio_open3_at(root.client.channel().get(), "dir",
+                            static_cast<uint64_t>(fio::kPermReadable | fio::kPermWritable),
+                            dc->server.TakeChannel().release()),
               ZX_OK);
 
     // Borrowing directory channel as file channel.

@@ -561,6 +561,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
     "//src/lib/ui/fuchsia-scenic",
+    "//src/performance/memory/attribution/server",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-types",
     "//src/starnix/lib/starnix-uapi",

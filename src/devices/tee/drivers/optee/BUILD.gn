@@ -66,7 +66,7 @@ source_set("optee_lib") {
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
-fuchsia_driver("optee-driver") {
+fuchsia_cc_driver("optee-driver") {
   output_name = "optee"
   configs += [
     "//build/config:all_source",

@@ -24,13 +24,10 @@ use crate::vfs::{
 };
 use extended_pstate::ExtendedPstateState;
 use fuchsia_inspect_contrib::profile_duration;
-use starnix_sync::LockEqualOrBefore;
-use zx::sys::zx_thread_state_general_regs_t;
-
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable,
-    ProcessGroupState, RwLockWriteGuard, TaskRelease, WakeReason,
+    EventWaitGuard, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, MmDumpable,
+    ProcessGroupState, RwLockWriteGuard, TaskRelease, Unlocked, WakeReason,
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
@@ -60,6 +57,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
+use zx::sys::zx_thread_state_general_regs_t;
 
 pub struct TaskBuilder {
     /// The underlying task object.
@@ -90,9 +88,9 @@ impl From<TaskBuilder> for CurrentTask {
 }
 
 impl Releasable for TaskBuilder {
-    type Context<'a> = &'a mut Locked<'a, TaskRelease>;
+    type Context<'a: 'b, 'b> = &'b mut Locked<'a, TaskRelease>;
 
-    fn release<'a>(self, locked: &'a mut Locked<'a, TaskRelease>) {
+    fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
         let context = (self.thread_state, locked);
         self.task.release(context);
     }
@@ -183,9 +181,9 @@ type SyscallRestartFunc =
     dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send + Sync;
 
 impl Releasable for CurrentTask {
-    type Context<'a> = &'a mut Locked<'a, TaskRelease>;
+    type Context<'a: 'b, 'b> = &'b mut Locked<'a, TaskRelease>;
 
-    fn release<'a>(self, locked: &'a mut Locked<'a, TaskRelease>) {
+    fn release<'a: 'b, 'b>(self, locked: Self::Context<'a, 'b>) {
         self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
 
@@ -217,8 +215,12 @@ impl CurrentTask {
         Self { task, thread_state, _local_marker: Default::default() }
     }
 
-    pub fn trigger_delayed_releaser(&self) {
-        self.kernel().delayed_releaser.apply(self);
+    pub fn trigger_delayed_releaser<L>(&self, locked: &mut Locked<'_, L>)
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        self.kernel().delayed_releaser.apply(&mut locked, self);
     }
 
     pub fn weak_task(&self) -> WeakRef<Task> {
@@ -260,20 +262,22 @@ impl CurrentTask {
     /// signal machinery in the syscall dispatch loop.
     ///
     /// The returned result is the result returned from the wait function.
-    pub fn wait_with_temporary_mask<F, T>(
+    pub fn wait_with_temporary_mask<F, T, L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         signal_mask: SigSet,
         wait_function: F,
     ) -> Result<T, Errno>
     where
-        F: FnOnce(&CurrentTask) -> Result<T, Errno>,
+        L: LockEqualOrBefore<FileOpsCore>,
+        F: FnOnce(&mut Locked<'_, L>, &CurrentTask) -> Result<T, Errno>,
     {
         {
             let mut state = self.write();
             state.set_flags(TaskFlags::TEMPORARY_SIGNAL_MASK, true);
             state.set_temporary_signal_mask(signal_mask);
         }
-        wait_function(self)
+        wait_function(locked, self)
     }
 
     /// If waking, promotes from waking to awake.  If not waking, make waiter async
@@ -394,12 +398,16 @@ impl CurrentTask {
     /// Determine namespace node indicated by the dir_fd.
     ///
     /// Returns the namespace node and the path to use relative to that node.
-    pub fn resolve_dir_fd<'a>(
+    pub fn resolve_dir_fd<'a, L>(
         &self,
+        locked: &mut Locked<'_, L>,
         dir_fd: FdNumber,
         mut path: &'a FsStr,
         flags: ResolveFlags,
-    ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
+    ) -> Result<(NamespaceNode, &'a FsStr), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let path_is_absolute = path.starts_with(b"/");
         if path_is_absolute {
             if flags.contains(ResolveFlags::BENEATH) {
@@ -430,7 +438,12 @@ impl CurrentTask {
             if !dir.entry.node.is_dir() {
                 return error!(ENOTDIR);
             }
-            dir.check_access(self, Access::EXEC, CheckAccessReason::InternalPermissionChecks)?;
+            dir.check_access(
+                locked,
+                self,
+                Access::EXEC,
+                CheckAccessReason::InternalPermissionChecks,
+            )?;
         }
         Ok((dir, path.into()))
     }
@@ -439,17 +452,12 @@ impl CurrentTask {
     ///
     /// Returns a FileHandle but does not install the FileHandle in the FdTable
     /// for this task.
-    pub fn open_file<L>(
+    pub fn open_file(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         path: &FsStr,
         flags: OpenFlags,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-    {
+    ) -> Result<FileHandle, Errno> {
         if flags.contains(OpenFlags::CREAT) {
             // In order to support OpenFlags::CREAT we would need to take a
             // FileMode argument.
@@ -538,7 +546,7 @@ impl CurrentTask {
                     }
 
                     context.remaining_follows -= 1;
-                    match name.readlink(self)? {
+                    match name.readlink(locked, self)? {
                         SymlinkTarget::Path(path) => {
                             let dir = if path[0] == b'/' { self.fs().root() } else { parent };
                             self.resolve_open_path(
@@ -596,44 +604,34 @@ impl CurrentTask {
     ///
     /// Returns a FileHandle but does not install the FileHandle in the FdTable
     /// for this task.
-    pub fn open_file_at<L>(
+    pub fn open_file_at(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         dir_fd: FdNumber,
         path: &FsStr,
         flags: OpenFlags,
         mode: FileMode,
         resolve_flags: ResolveFlags,
         access_check: AccessCheck,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<BeforeFsNodeAppend>,
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         if path.is_empty() {
             return error!(ENOENT);
         }
 
-        let (dir, path) = self.resolve_dir_fd(dir_fd, path, resolve_flags)?;
+        let (dir, path) = self.resolve_dir_fd(locked, dir_fd, path, resolve_flags)?;
         self.open_namespace_node_at(locked, dir, path, flags, mode, resolve_flags, access_check)
     }
 
-    pub fn open_namespace_node_at<L>(
+    pub fn open_namespace_node_at(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         dir: NamespaceNode,
         path: &FsStr,
         flags: OpenFlags,
         mode: FileMode,
         mut resolve_flags: ResolveFlags,
         access_check: AccessCheck,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<BeforeFsNodeAppend>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<FileHandle, Errno> {
         // 64-bit kernels force the O_LARGEFILE flag to be on.
         let mut flags = flags | OpenFlags::LARGEFILE;
         let opath = flags.contains(OpenFlags::PATH);
@@ -695,7 +693,7 @@ impl CurrentTask {
             };
 
         let name = if flags.contains(OpenFlags::TMPFILE) {
-            name.create_tmpfile(self, mode.with_type(FileMode::IFREG), flags)?
+            name.create_tmpfile(locked, self, mode.with_type(FileMode::IFREG), flags)?
         } else {
             let mode = name.entry.node.info().mode;
 
@@ -768,7 +766,7 @@ impl CurrentTask {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let (dir, path) = self.resolve_dir_fd(dir_fd, path, ResolveFlags::empty())?;
+        let (dir, path) = self.resolve_dir_fd(locked, dir_fd, path, ResolveFlags::empty())?;
         self.lookup_parent(locked, context, &dir, path)
     }
 
@@ -844,20 +842,14 @@ impl CurrentTask {
         self.lookup_path(locked, &mut context, self.fs().root(), path)
     }
 
-    pub fn exec<L>(
+    pub fn exec(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         executable: FileHandle,
         path: CString,
         argv: Vec<CString>,
         environ: Vec<CString>,
-    ) -> Result<(), Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-        L: LockBefore<MmDumpable>,
-    {
+    ) -> Result<(), Errno> {
         // Executable must be a regular file
         if !executable.name.entry.node.is_reg() {
             return error!(EACCES);
@@ -867,6 +859,7 @@ impl CurrentTask {
         // Note that the ability to execute a file is unrelated to the flags
         // used in the `open` call.
         executable.name.check_access(
+            locked,
             self,
             Access::EXEC,
             CheckAccessReason::InternalPermissionChecks,
@@ -905,7 +898,7 @@ impl CurrentTask {
             return Err(err);
         }
 
-        self.ptrace_event(PtraceOptions::TRACEEXEC, self.task.id as u64);
+        self.ptrace_event(locked, PtraceOptions::TRACEEXEC, self.task.id as u64);
         self.signal_vfork();
 
         Ok(())
@@ -1107,6 +1100,7 @@ impl CurrentTask {
 
     pub fn run_seccomp_filters(
         &mut self,
+        locked: &mut Locked<'_, Unlocked>,
         syscall: &Syscall,
     ) -> Option<Result<SyscallResult, Errno>> {
         profile_duration!("RunSeccompFilters");
@@ -1119,7 +1113,7 @@ impl CurrentTask {
         // Run user-defined seccomp filters
         let result = self.task.read().seccomp_filters.run_all(self, syscall);
 
-        SeccompState::do_user_defined(result, self, syscall)
+        SeccompState::do_user_defined(locked, result, self, syscall)
     }
 
     fn seccomp_tsync_error(id: i32, flags: u32) -> Result<SyscallResult, Errno> {
@@ -1935,7 +1929,7 @@ impl CurrentTask {
 
     /// Block the execution of `current_task` as long as the task is stopped and
     /// not terminated.
-    pub fn block_while_stopped(&mut self) {
+    pub fn block_while_stopped(&mut self, locked: &mut Locked<'_, Unlocked>) {
         // Upgrade the state from stopping to stopped if needed. Return if the task
         // should not be stopped.
         if !self.finalize_stop_state() {
@@ -1957,7 +1951,7 @@ impl CurrentTask {
             }
 
             // Do the wait. Result is not needed, as this is not in a syscall.
-            let _: Result<(), Errno> = waiter.wait(self);
+            let _: Result<(), Errno> = waiter.wait(locked, self);
 
             // Maybe go from stopping to stopped, if we are currently stopping
             // again.
@@ -1986,7 +1980,12 @@ impl CurrentTask {
     /// Note that the Linux kernel has a documented bug where, if TRACEEXIT is
     /// enabled, SIGKILL will trigger an event.  We do not exhibit this
     /// behavior.
-    pub fn ptrace_event(&mut self, trace_kind: PtraceOptions, msg: u64) {
+    pub fn ptrace_event(
+        &mut self,
+        locked: &mut Locked<'_, Unlocked>,
+        trace_kind: PtraceOptions,
+        msg: u64,
+    ) {
         if !trace_kind.is_empty() {
             {
                 let mut state = self.write();
@@ -2014,15 +2013,23 @@ impl CurrentTask {
                     return;
                 }
             }
-            self.block_while_stopped();
+            self.block_while_stopped(locked);
         }
     }
 
     /// Causes the current thread's thread group to exit, notifying any ptracer
     /// of this task first.
-    pub fn thread_group_exit(&mut self, exit_status: ExitStatus) {
-        self.ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
-        self.thread_group.exit(exit_status, None);
+    pub fn thread_group_exit(
+        &mut self,
+        locked: &mut Locked<'_, Unlocked>,
+        exit_status: ExitStatus,
+    ) {
+        self.ptrace_event(
+            locked,
+            PtraceOptions::TRACEEXIT,
+            exit_status.signal_info_status() as u64,
+        );
+        self.thread_group.exit(locked, exit_status, None);
     }
 
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the

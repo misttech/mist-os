@@ -312,8 +312,14 @@ const ProcessSymbols::ModuleInfo* ProcessSymbols::InfoForAddress(uint64_t addres
 
   if (found->second.symbols->module_symbols()) {
     if (uint64_t mapped_length = found->second.symbols->module_symbols()->GetMappedLength()) {
-      if (found->first + mapped_length < address)
+      if (found->first + mapped_length < address) {
+        // Also check for negative loads which can happen on zircon on x64.
+        // When this happens, the module will have a base address of 0.
+        if (modules_.contains(0)) {
+          return &modules_.at(0);
+        }
         return nullptr;  // Address is beyond the end of the module.
+      }
     }
   }
 

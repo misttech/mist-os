@@ -1,7 +1,9 @@
 # vkproto/example
+
 See the parent vkproto/README.md for general information about vkproto.
 
 ## AGI Instrumentation
+
 The layer overrides for vkproto is configured to request the
 `VK_LAYER_GOOGLE_gpu_inspector`.  Providing this layer service and
 capability is done using the gapii.far package as built within the
@@ -17,18 +19,20 @@ The output of this gapii.far build is created in the AGI build as:
   - `bazel-bin/gapii/fuchsia/gapii.far`
 
 ### Gapii Package Serving
+
 gapii.far is served to a running Fuchsia instance using the following example
 3 step process:
 
-  1. Publish the gapii repository
-    - `pm publish -a -C -f bazel-bin/gapii/fuchsia/gapii.far -repo ~/gapii-repo`
-  2. Add the published repository
-    - `ffx repository add-from-pm -r gapii-repo ~/gapii-repo`
+  1. Publish the gapii package to a package repository
+    - `ffx repository create ~/gapii-repo`
+    - `ffx repository publish --package-archive bazel-bin/gapii/fuchsia/gapii.far ~/gapii-repo`
+  2. Start the repository
+    - `ffx repository server start --background -r gapii-repo --repo-path ~/gapii-repo`
   3. Register the repository
     - `ffx target repository register -r gapii-repo`
 
-
 ### Component Management
+
 vkproto/example as defined must run in the `/core/agis:vulkan-trace`
 collection that was specifically designed with the capability routing
 needed for Vulkan tracable components that use AGI.

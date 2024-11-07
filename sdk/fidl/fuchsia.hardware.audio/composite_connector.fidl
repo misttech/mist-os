@@ -5,7 +5,6 @@ library fuchsia.hardware.audio;
 
 /// For an overview see
 /// [Audio Composite Devices](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite.md).
-@available(added=12)
 closed protocol CompositeConnector {
     /// Connect to a `Device` protocol.
     /// This method allows a component to serve FIDL outside the devhost's control.
@@ -14,7 +13,6 @@ closed protocol CompositeConnector {
     });
 };
 
-@available(added=12)
 service CompositeConnectorService {
     composite_connector client_end:CompositeConnector;
 };

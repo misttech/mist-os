@@ -14,7 +14,7 @@ driver_bind_rules("acpi-arm64-bind") {
   ]
 }
 
-fuchsia_driver("acpi-arm64-driver") {
+fuchsia_cc_driver("acpi-arm64-driver") {
   output_name = "acpi-arm64"
   sources = [ "acpi-arm64.cc" ]
   deps = [

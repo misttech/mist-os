@@ -65,8 +65,6 @@ std::unique_ptr<CurrentChannelProvider> CreateCurrentChannelProvider(
                                                   std::move(system_data_node), current_channel);
 }
 
-}  // namespace
-
 std::unique_ptr<CobaltRegistry> ReadRegistry(const std::string& global_metrics_registry_path) {
   std::ifstream registry_file_stream;
   registry_file_stream.open(global_metrics_registry_path);
@@ -84,6 +82,8 @@ std::unique_ptr<CobaltRegistry> ReadRegistry(const std::string& global_metrics_r
 
   return cobalt_registry;
 }
+
+}  // namespace
 
 CobaltConfig CobaltApp::CreateCobaltConfig(
     async_dispatcher_t* dispatcher, const std::string& global_metrics_registry_path,

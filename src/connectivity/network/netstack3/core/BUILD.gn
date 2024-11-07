@@ -66,13 +66,9 @@ rustc_library_with_features("netstack3-core") {
     "no_lock_order",
   ]
 
-  # Disable lock ordering in release builds to speed-up compilation.
-  #
-  # We also always disable it for host builds to make it easier to spot
-  # conditional compilation problems when building a debug image.
-  if (!is_debug || is_host) {
-    configs += [ ":no_lock_order" ]
-  }
+  # Disable lock ordering to speed-up compilation. It's manually re-enabled for
+  # the main instrumented build to keep coverage.
+  configs += [ ":no_lock_order" ]
 
   sources = [
     "src/api.rs",
@@ -162,6 +158,14 @@ rustc_library_with_features("netstack3-core") {
 
       # Guard against bad crate variants.
       assert_no_deps = _all_core_crates - non_test_deps
+
+      # Only re-enabled lock order checks for debug non-host configurations.
+      #
+      # Keeping it disabled for host builds makes it easier to spot
+      # conditional compilation problems when building a debug image.
+      if (is_debug && !is_host) {
+        configs -= [ ":no_lock_order" ]
+      }
     },
 
     # A variant of the netstack3-core library that exposes test utilities.

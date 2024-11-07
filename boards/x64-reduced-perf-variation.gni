@@ -35,3 +35,4 @@
 import("x64.gni")
 
 board_configuration_label = "//boards/x64:reduced_perf_variation"
+bazel_product_bundle_board = "x64_reduced_perf_variation"

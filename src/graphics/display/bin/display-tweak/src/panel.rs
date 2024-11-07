@@ -12,11 +12,8 @@ use {fidl_fuchsia_hardware_display as display, fidl_fuchsia_io as fio, fuchsia_f
 
 async fn get_display_coordinator_path() -> anyhow::Result<String> {
     const DEVICE_CLASS_PATH: &'static str = "/dev/class/display-coordinator";
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        DEVICE_CLASS_PATH,
-        fio::OpenFlags::empty(),
-    )
-    .context("open directory")?;
+    let dir = fuchsia_fs::directory::open_in_namespace(DEVICE_CLASS_PATH, fio::Flags::empty())
+        .context("open directory")?;
     let entries = fuchsia_fs::directory::readdir(&dir).await.context("read directory")?;
     let first_entry = entries.first().context("no valid display-coordinator")?;
     Ok(String::from(DEVICE_CLASS_PATH) + "/" + &first_entry.name)

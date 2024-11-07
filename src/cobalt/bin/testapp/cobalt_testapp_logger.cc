@@ -10,6 +10,7 @@
 
 #include <map>
 #include <string>
+#include <utility>
 
 #include <rapidjson/document.h>
 #include <src/lib/fsl/vmo/strings.h>
@@ -30,7 +31,7 @@ bool CobaltTestAppLogger::LogOccurrence(uint32_t metric_id, std::vector<uint32_t
     default:
       metric_event_logger = &metric_event_logger_;
   };
-  (*metric_event_logger)->LogOccurrence(metric_id, count, indices, &result);
+  (*metric_event_logger)->LogOccurrence(metric_id, count, std::move(indices), &result);
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogOccurrence() => " << ResultToString(std::move(result));
     return false;
@@ -40,9 +41,9 @@ bool CobaltTestAppLogger::LogOccurrence(uint32_t metric_id, std::vector<uint32_t
 }
 
 bool CobaltTestAppLogger::LogInteger(uint32_t metric_id, std::vector<uint32_t> indices,
-                                     int64_t value) {
+                                     int64_t value) const {
   fuchsia::metrics::MetricEventLogger_LogInteger_Result result;
-  metric_event_logger_->LogInteger(metric_id, value, indices, &result);
+  metric_event_logger_->LogInteger(metric_id, value, std::move(indices), &result);
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogInteger() => " << ResultToString(std::move(result));
     return false;
@@ -51,8 +52,9 @@ bool CobaltTestAppLogger::LogInteger(uint32_t metric_id, std::vector<uint32_t> i
   return true;
 }
 
-bool CobaltTestAppLogger::LogIntegerHistogram(uint32_t metric_id, std::vector<uint32_t> indices,
-                                              const std::map<uint32_t, uint64_t>& histogram_map) {
+bool CobaltTestAppLogger::LogIntegerHistogram(
+    uint32_t metric_id, std::vector<uint32_t> indices,
+    const std::map<uint32_t, uint64_t>& histogram_map) const {
   fuchsia::metrics::MetricEventLogger_LogIntegerHistogram_Result result;
   std::vector<fuchsia::metrics::HistogramBucket> histogram;
   for (auto it = histogram_map.begin(); histogram_map.end() != it; it++) {
@@ -62,7 +64,8 @@ bool CobaltTestAppLogger::LogIntegerHistogram(uint32_t metric_id, std::vector<ui
     histogram.push_back(std::move(entry));
   }
 
-  metric_event_logger_->LogIntegerHistogram(metric_id, std::move(histogram), indices, &result);
+  metric_event_logger_->LogIntegerHistogram(metric_id, std::move(histogram), std::move(indices),
+                                            &result);
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogString() => " << ResultToString(std::move(result));
     return false;
@@ -72,9 +75,9 @@ bool CobaltTestAppLogger::LogIntegerHistogram(uint32_t metric_id, std::vector<ui
 }
 
 bool CobaltTestAppLogger::LogString(uint32_t metric_id, std::vector<uint32_t> indices,
-                                    const std::string& string_value) {
+                                    const std::string& string_value) const {
   fuchsia::metrics::MetricEventLogger_LogString_Result result;
-  metric_event_logger_->LogString(metric_id, string_value, indices, &result);
+  metric_event_logger_->LogString(metric_id, string_value, std::move(indices), &result);
   if (result.is_err()) {
     FX_LOGS(ERROR) << "LogString() => " << ResultToString(std::move(result));
     return false;
@@ -84,7 +87,7 @@ bool CobaltTestAppLogger::LogString(uint32_t metric_id, std::vector<uint32_t> in
   return true;
 }
 
-bool CobaltTestAppLogger::CheckForSuccessfulSend() {
+bool CobaltTestAppLogger::CheckForSuccessfulSend() const {
   if (!use_network_) {
     FX_LOGS(INFO) << "Not using the network because --no_network_for_testing "
                      "was passed.";

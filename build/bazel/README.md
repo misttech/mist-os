@@ -331,6 +331,32 @@ contains a working target that invokes a Bazel build command (that simply
 copies an input file into a Bazel output), then verify that it worked
 properly.
 
+## Debugging build sandbox
+
+Most non-remote bazel build actions are launched in a sandbox, whose
+content disappears after the build, even in case of failure. It is
+possible to set `FUCHSIA_DEBUG_BAZEL_SANDBOX=1` in the environment
+before invoking `fx build` to tell Bazel to preserve the sandboxes.
+
+Note that setting this variable makes Bazel much more chatty, and too
+many stale sandboxes can become a problem, so this is best used when
+encountering a sandboxing-related issue, which most of the time come
+from inputs missing from the sandbox due to missing dependency.
+
+Also note that *this does not affect remote actions* (i.e. if you have
+RBE enabled). It is however possible to force a specific Bazel target
+to run in a local sandbox run by using adding the `no-remote` string
+to its `tags` attribute, as in:
+
+```
+cc_library(
+  name = "bin",
+  srcs = [ ... ],
+  deps = [ ... ],
+  tags = [ "no-remote" ],
+)
+```
+
 # CLANG TOOLCHAIN REPOSITORY
 
 The Bazel build generates an external repository named `@prebuilt_clang`

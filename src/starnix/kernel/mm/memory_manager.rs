@@ -31,6 +31,7 @@ use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::ownership::WeakRef;
 use starnix_types::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::Access;
 use starnix_uapi::range_ext::RangeExt;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::restricted_aspace::{
@@ -205,6 +206,20 @@ impl ProtectionFlags {
     pub fn access_flags(&self) -> Self {
         *self & Self::ACCESS_FLAGS
     }
+
+    pub fn to_access(&self) -> Access {
+        let mut access = Access::empty();
+        if self.contains(ProtectionFlags::READ) {
+            access |= Access::READ;
+        }
+        if self.contains(ProtectionFlags::WRITE) {
+            access |= Access::WRITE;
+        }
+        if self.contains(ProtectionFlags::EXEC) {
+            access |= Access::EXEC;
+        }
+        access
+    }
 }
 
 bitflags! {
@@ -376,6 +391,9 @@ struct Mapping {
     /// The flags used by the mapping, including protection.
     flags: MappingFlags,
 
+    /// The maximum amount of access allowed to this mapping.
+    max_access: Access,
+
     /// The name for this mapping.
     ///
     /// This may be a reference to the filesystem node backing this mapping or a userspace-assigned name.
@@ -396,9 +414,18 @@ impl Mapping {
         memory: Arc<MemoryObject>,
         memory_offset: u64,
         flags: MappingFlags,
+        max_access: Access,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
-        Self::with_name(base, memory, memory_offset, flags, MappingName::None, file_write_guard)
+        Self::with_name(
+            base,
+            memory,
+            memory_offset,
+            flags,
+            max_access,
+            MappingName::None,
+            file_write_guard,
+        )
     }
 
     fn with_name(
@@ -406,12 +433,14 @@ impl Mapping {
         memory: Arc<MemoryObject>,
         memory_offset: u64,
         flags: MappingFlags,
+        max_access: Access,
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
         Mapping {
             backing: MappingBacking::Memory(MappingBackingMemory { base, memory, memory_offset }),
             flags,
+            max_access,
             name,
             file_write_guard,
         }
@@ -468,6 +497,82 @@ impl Mapping {
             return true;
         }
         !self.flags.contains(MappingFlags::SHARED) && self.flags.contains(MappingFlags::ANONYMOUS)
+    }
+
+    fn vm_flags(&self) -> String {
+        let mut string = String::default();
+        // From <https://man7.org/linux/man-pages/man5/proc_pid_smaps.5.html>:
+        //
+        // rd   -   readable
+        if self.flags.contains(MappingFlags::READ) {
+            string.push_str("rd ");
+        }
+        // wr   -   writable
+        if self.flags.contains(MappingFlags::WRITE) {
+            string.push_str("wr ");
+        }
+        // ex   -   executable
+        if self.flags.contains(MappingFlags::EXEC) {
+            string.push_str("ex ");
+        }
+        // sh   -   shared
+        if self.flags.contains(MappingFlags::SHARED) && self.max_access.contains(Access::WRITE) {
+            string.push_str("sh ");
+        }
+        // mr   -   may read
+        if self.max_access.contains(Access::READ) {
+            string.push_str("mr ");
+        }
+        // mw   -   may write
+        if self.max_access.contains(Access::WRITE) {
+            string.push_str("mw ");
+        }
+        // me   -   may execute
+        if self.max_access.contains(Access::EXEC) {
+            string.push_str("me ");
+        }
+        // ms   -   may share
+        if self.flags.contains(MappingFlags::SHARED) {
+            string.push_str("ms ");
+        }
+        // gd   -   stack segment grows down
+        if self.flags.contains(MappingFlags::GROWSDOWN) {
+            string.push_str("gd ");
+        }
+        // pf   -   pure PFN range
+        // dw   -   disabled write to the mapped file
+        // lo   -   pages are locked in memory
+        // io   -   memory mapped I/O area
+        // sr   -   sequential read advise provided
+        // rr   -   random read advise provided
+        // dc   -   do not copy area on fork
+        if self.flags.contains(MappingFlags::DONTFORK) {
+            string.push_str("dc ");
+        }
+        // de   -   do not expand area on remapping
+        if self.flags.contains(MappingFlags::DONT_EXPAND) {
+            string.push_str("de ");
+        }
+        // ac   -   area is accountable
+        string.push_str("ac ");
+        // nr   -   swap space is not reserved for the area
+        // ht   -   area uses huge tlb pages
+        // sf   -   perform synchronous page faults (since Linux 4.15)
+        // nl   -   non-linear mapping (removed in Linux 4.0)
+        // ar   -   architecture specific flag
+        // wf   -   wipe on fork (since Linux 4.14)
+        if self.flags.contains(MappingFlags::WIPEONFORK) {
+            string.push_str("wf ");
+        }
+        // dd   -   do not include area into core dump
+        // sd   -   soft-dirty flag (since Linux 3.13)
+        // mm   -   mixed map area
+        // hg   -   huge page advise flag
+        // nh   -   no-huge page advise flag
+        // mg   -   mergeable advise flag
+        // um   -   userfaultfd missing pages tracking (since Linux 4.3)
+        // uw   -   userfaultfd wprotect pages tracking (since Linux 4.3)
+        string
     }
 }
 
@@ -910,6 +1015,7 @@ impl MemoryManagerState {
         memory_offset: u64,
         length: usize,
         flags: MappingFlags,
+        max_access: Access,
         populate: bool,
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
@@ -937,7 +1043,8 @@ impl MemoryManagerState {
             self.update_after_unmap(mm, addr, end - addr, released_mappings)?;
         }
 
-        let mut mapping = Mapping::new(mapped_addr, memory, memory_offset, flags, file_write_guard);
+        let mut mapping =
+            Mapping::new(mapped_addr, memory, memory_offset, flags, max_access, file_write_guard);
         mapping.name = name;
         self.mappings.insert(mapped_addr..end, mapping);
 
@@ -1021,6 +1128,7 @@ impl MemoryManagerState {
             0,
             length,
             flags,
+            Access::rwx(),
             options.contains(MappingOptions::POPULATE),
             name,
             FileWriteGuardRef(None),
@@ -1176,6 +1284,7 @@ impl MemoryManagerState {
                     backing.memory_offset,
                     final_length,
                     original_mapping.flags,
+                    original_mapping.max_access,
                     false,
                     original_mapping.name,
                     original_mapping.file_write_guard,
@@ -1362,6 +1471,7 @@ impl MemoryManagerState {
             dst_memory_offset,
             dst_length,
             src_mapping.flags,
+            src_mapping.max_access,
             false,
             src_mapping.name,
             src_mapping.file_write_guard,
@@ -1622,6 +1732,10 @@ impl MemoryManagerState {
         let addr = prot_range.start;
         let length = prot_range.end - prot_range.start;
 
+        // TODO: We should check the max_access flags on all the mappings in this range.
+        //       There are cases where max_access is more restrictive than the Zircon rights
+        //       we hold on the underlying VMOs.
+
         // Make one call to mprotect to update all the zircon protections.
         // SAFETY: This is safe because the vmar belongs to a different process.
         unsafe { self.user_vmar.protect(addr.ptr(), length, vmar_flags) }.map_err(|s| match s {
@@ -1708,6 +1822,7 @@ impl MemoryManagerState {
                         backing.memory.clone(),
                         backing.memory_offset + start,
                         new_flags,
+                        mapping.max_access,
                         mapping.name.clone(),
                         mapping.file_write_guard.clone(),
                     ),
@@ -1927,6 +2042,7 @@ impl MemoryManagerState {
             memory.clone(),
             0,
             mapping_to_grow.flags,
+            mapping_to_grow.max_access,
             FileWriteGuardRef(None),
         );
         let vmar_offset = self
@@ -3322,6 +3438,7 @@ impl MemoryManager {
                         memory_offset,
                         length,
                         mapping.flags,
+                        mapping.max_access,
                         false,
                         mapping.name.clone(),
                         FileWriteGuardRef(None),
@@ -3459,6 +3576,7 @@ impl MemoryManager {
         memory_offset: u64,
         length: usize,
         prot_flags: ProtectionFlags,
+        max_access: Access,
         options: MappingOptions,
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
@@ -3477,6 +3595,7 @@ impl MemoryManager {
             memory_offset,
             length,
             flags,
+            max_access,
             options.contains(MappingOptions::POPULATE),
             name,
             file_write_guard,
@@ -3540,7 +3659,7 @@ impl MemoryManager {
             DesiredAddress::Hint(addr),
             length,
             prot_flags,
-            MappingOptions::ANONYMOUS,
+            MappingOptions::ANONYMOUS | MappingOptions::GROWSDOWN,
             MappingName::Stack,
         )?;
         if stack_addr != addr {
@@ -3715,6 +3834,7 @@ impl MemoryManager {
                             backing.memory.clone(),
                             backing.memory_offset,
                             mapping.flags,
+                            mapping.max_access,
                             mapping.file_write_guard.clone(),
                         )
                     }
@@ -3759,6 +3879,7 @@ impl MemoryManager {
                         backing.memory.clone(),
                         backing.memory_offset + tail_offset as u64,
                         mapping.flags,
+                        mapping.max_access,
                         mapping.file_write_guard.clone(),
                     ),
                     #[cfg(feature = "alternate_anon_allocs")]
@@ -4193,7 +4314,7 @@ impl SequenceFileSource for ProcSmapsFile {
             write_map(&task, sink, range, map)?;
 
             let size_kb = (range.end.ptr() - range.start.ptr()) / 1024;
-            writeln!(sink, "Size:\t{size_kb} kB",)?;
+            writeln!(sink, "Size:           {size_kb:>8} kB",)?;
 
             let (committed_bytes, share_count) = match &map.backing {
                 MappingBacking::Memory(backing) => {
@@ -4208,34 +4329,32 @@ impl SequenceFileSource for ProcSmapsFile {
             };
 
             let rss_kb = committed_bytes / 1024;
-            writeln!(sink, "Rss:\t{rss_kb} kB")?;
+            writeln!(sink, "Rss:            {rss_kb:>8} kB")?;
 
-            writeln!(
-                sink,
-                "Pss:\t{} kB",
-                if map.flags.contains(MappingFlags::SHARED) {
-                    rss_kb / share_count as u64
-                } else {
-                    rss_kb
-                }
-            )?;
+            let pss_kb = if map.flags.contains(MappingFlags::SHARED) {
+                rss_kb / share_count as u64
+            } else {
+                rss_kb
+            };
+            writeln!(sink, "Pss:            {pss_kb:>8} kB")?;
 
             track_stub!(TODO("https://fxbug.dev/322874967"), "smaps dirty pages");
             let (shared_dirty_kb, private_dirty_kb) = (0, 0);
 
             let is_shared = share_count > 1;
             let shared_clean_kb = if is_shared { rss_kb } else { 0 };
-            writeln!(sink, "Shared_Clean:\t{shared_clean_kb} kB")?;
-            writeln!(sink, "Shared_Dirty:\t{shared_dirty_kb} kB")?;
+            writeln!(sink, "Shared_Clean:   {shared_clean_kb:>8} kB")?;
+            writeln!(sink, "Shared_Dirty:   {shared_dirty_kb:>8} kB")?;
 
             let private_clean_kb = if is_shared { 0 } else { rss_kb };
-            writeln!(sink, "Private_Clean:\t{} kB", private_clean_kb)?;
-            writeln!(sink, "Private_Dirty:\t{} kB", private_dirty_kb)?;
+            writeln!(sink, "Private_Clean:  {private_clean_kb:>8} kB")?;
+            writeln!(sink, "Private_Dirty:  {private_dirty_kb:>8} kB")?;
 
             let anonymous_kb = if map.private_anonymous() { rss_kb } else { 0 };
-            writeln!(sink, "Anonymous:\t{anonymous_kb} kB")?;
-            writeln!(sink, "KernelPageSize:\t{page_size_kb} kB")?;
-            writeln!(sink, "MMUPageSize:\t{page_size_kb} kB")?;
+            writeln!(sink, "Anonymous:      {anonymous_kb:>8} kB")?;
+            writeln!(sink, "KernelPageSize: {page_size_kb:>8} kB")?;
+            writeln!(sink, "MMUPageSize:    {page_size_kb:>8} kB")?;
+            writeln!(sink, "VmFlags: {}", map.vm_flags())?;
 
             track_stub!(TODO("https://fxbug.dev/297444691"), "optional smaps fields");
             return Ok(Some(range.end));
@@ -5523,6 +5642,7 @@ mod tests {
                 0,
                 VMO_SIZE as usize,
                 prot_flags,
+                Access::rwx(),
                 MappingOptions::empty(),
                 MappingName::None,
                 FileWriteGuardRef(None),

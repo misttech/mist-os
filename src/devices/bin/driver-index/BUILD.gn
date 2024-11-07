@@ -9,6 +9,7 @@ import("//build/drivers.gni")
 import("//build/drivers/driver_manifest.gni")
 import("//build/drivers/fuchsia_driver_package.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 
 group("driver-index") {
   deps = [ ":package" ]
@@ -34,6 +35,12 @@ rustc_binary("bin") {
   output_name = "driver_index"
 
   configs += [ "//build/config/rust:bootfs" ]
+
+  # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
+  # enabled, shift it to the large RBE worker pool)
+  _concurrent_jobs = concurrent_jobs.link_highmem
+  configs += _concurrent_jobs.configs
+  forward_variables_from(_concurrent_jobs.vars, "*")
 
   # Generates a GN target for unit-tests with the label `bin_test`, and
   # a binary named `driver_index_bin_test`.
@@ -109,7 +116,7 @@ fuchsia_package("package") {
   deps = [ ":component" ]
 }
 
-fuchsia_driver("fake-driver") {
+fuchsia_cc_driver("fake-driver") {
 }
 
 driver_bind_rules("test-bind") {
@@ -125,7 +132,7 @@ fuchsia_driver_component("test-bind-component") {
   manifest = "meta/test-bind-component.cml"
 }
 
-fuchsia_driver("fake-driver2") {
+fuchsia_cc_driver("fake-driver2") {
 }
 
 driver_bind_rules("test-bind2") {
@@ -141,7 +148,7 @@ fuchsia_driver_component("test-bind2-component") {
   manifest = "meta/test-bind2-component.cml"
 }
 
-fuchsia_driver("fake-fallback-driver") {
+fuchsia_cc_driver("fake-fallback-driver") {
 }
 
 driver_bind_rules("test-fallback-bind") {

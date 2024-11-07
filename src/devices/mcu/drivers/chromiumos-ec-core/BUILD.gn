@@ -93,7 +93,7 @@ source_set("power-sensor") {
   ]
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "chromiumos-ec-core"
   deps = [
     ":core",

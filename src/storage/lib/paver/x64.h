@@ -24,9 +24,6 @@ class EfiDevicePartitioner : public DevicePartitioner {
 
   bool SupportsPartition(const PartitionSpec& spec) const override;
 
-  zx::result<std::unique_ptr<PartitionClient>> AddPartition(
-      const PartitionSpec& spec) const override;
-
   zx::result<std::unique_ptr<PartitionClient>> FindPartition(
       const PartitionSpec& spec) const override;
 
@@ -34,9 +31,7 @@ class EfiDevicePartitioner : public DevicePartitioner {
 
   zx::result<> WipeFvm() const override;
 
-  zx::result<> InitPartitionTables() const override;
-
-  zx::result<> WipePartitionTables() const override;
+  zx::result<> ResetPartitionTables() const override;
 
   zx::result<> ValidatePayload(const PartitionSpec& spec,
                                std::span<const uint8_t> data) const override;

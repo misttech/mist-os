@@ -163,7 +163,7 @@ async fn main() -> Result<()> {
     let sag_factory_fn = move |cpu_manager, execution_state_dependencies| {
         let topology = topology2.clone();
         async move {
-            tracing::info!("Starting activity governor server...");
+            tracing::info!("Creating activity governor server...");
             SystemActivityGovernor::new(
                 &topology,
                 inspector.root().clone_weak(),

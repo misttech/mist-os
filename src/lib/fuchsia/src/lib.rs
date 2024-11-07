@@ -194,7 +194,7 @@ where
 #[doc(hidden)]
 pub fn test_singlethreaded<F, Fut, R>(f: F) -> R
 where
-    F: Fn(usize) -> Fut + Send + Sync + 'static,
+    F: Fn(usize) -> Fut + Sync + 'static,
     Fut: Future<Output = R> + 'static,
     R: fuchsia_async::test_support::TestResult,
 {
@@ -209,7 +209,7 @@ where
 #[doc(hidden)]
 pub fn test_multithreaded<F, Fut, R>(f: F, num_threads: usize) -> R
 where
-    F: Fn(usize) -> Fut + Send + 'static,
+    F: Fn(usize) -> Fut + Sync + 'static,
     Fut: Future<Output = R> + Send + 'static,
     R: fuchsia_async::test_support::MultithreadedTestResult,
 {
@@ -225,14 +225,11 @@ where
 #[cfg(target_os = "fuchsia")]
 pub fn test_until_stalled<F, Fut, R>(f: F) -> R
 where
-    F: 'static + Fn(usize) -> Fut,
+    F: 'static + Sync + Fn(usize) -> Fut,
     Fut: 'static + Future<Output = R>,
     R: fuchsia_async::test_support::TestResult,
 {
-    let result = fuchsia_async::test_support::run_until_stalled_test(
-        &mut fuchsia_async::TestExecutor::new_with_fake_time(),
-        f,
-    );
+    let result = fuchsia_async::test_support::run_until_stalled_test(true, f);
     if result.is_ok() {
         install_lsan_hook();
     }

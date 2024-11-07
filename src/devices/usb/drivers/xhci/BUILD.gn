@@ -52,7 +52,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("xhci-driver") {
+fuchsia_cc_driver("xhci-driver") {
   output_name = "xhci"
 
   configs += [

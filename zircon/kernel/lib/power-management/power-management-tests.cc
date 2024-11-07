@@ -36,11 +36,11 @@
 namespace {
 
 using power_management::ControlInterface;
+using power_management::EnergyModel;
 using power_management::PortPowerLevelController;
 using power_management::PowerDomain;
 using power_management::PowerLevelController;
 using power_management::PowerLevelUpdateRequest;
-using power_management::PowerModel;
 
 constexpr uint8_t kIdlePowerLevel = 0;
 constexpr uint8_t kLowPowerLevel = 1;
@@ -182,8 +182,8 @@ bool SchedulerFlushesPendingControlRequests() {
   // from a different CPU than the target CPU.
   Scheduler& scheduler = percpu::GetCurrent().scheduler;
 
-  zx::result power_model = PowerModel::Create(kPowerLevels, kTransitions);
-  ASSERT_TRUE(power_model.is_ok());
+  zx::result energy_model = EnergyModel::Create(kPowerLevels, kTransitions);
+  ASSERT_TRUE(energy_model.is_ok());
 
   fbl::AllocChecker ac;
   fbl::RefPtr controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
@@ -191,7 +191,7 @@ bool SchedulerFlushesPendingControlRequests() {
 
   fbl::RefPtr domain = fbl::MakeRefCountedChecked<PowerDomain>(
       &ac, 1, zx_cpu_set_t{.mask = {cpu_num_to_mask(scheduler.this_cpu())}},
-      ktl::move(*power_model), controller);
+      ktl::move(*energy_model), controller);
   ASSERT_TRUE(ac.check());
 
   // Set the current power domain, saving the previous domain to restore at the end of the test.
@@ -243,8 +243,8 @@ bool SchedulerElidesPendingControlRequests() {
   // from a different CPU than the target CPU.
   Scheduler& scheduler = percpu::GetCurrent().scheduler;
 
-  zx::result power_model = PowerModel::Create(kPowerLevels, kTransitions);
-  ASSERT_TRUE(power_model.is_ok());
+  zx::result energy_model = EnergyModel::Create(kPowerLevels, kTransitions);
+  ASSERT_TRUE(energy_model.is_ok());
 
   fbl::AllocChecker ac;
   fbl::RefPtr controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
@@ -252,7 +252,7 @@ bool SchedulerElidesPendingControlRequests() {
 
   fbl::RefPtr domain = fbl::MakeRefCountedChecked<PowerDomain>(
       &ac, 1, zx_cpu_set_t{.mask = {cpu_num_to_mask(scheduler.this_cpu())}},
-      ktl::move(*power_model), controller);
+      ktl::move(*energy_model), controller);
   ASSERT_TRUE(ac.check());
 
   // Set the current power domain, saving the previous domain to restore at the end of the test.
@@ -290,8 +290,8 @@ bool SchedulerCanPendControlRequestsInIrqContext() {
   // from a different CPU than the target CPU.
   Scheduler& scheduler = percpu::GetCurrent().scheduler;
 
-  zx::result power_model = PowerModel::Create(kPowerLevels, kTransitions);
-  ASSERT_TRUE(power_model.is_ok());
+  zx::result energy_model = EnergyModel::Create(kPowerLevels, kTransitions);
+  ASSERT_TRUE(energy_model.is_ok());
 
   fbl::AllocChecker ac;
   fbl::RefPtr controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
@@ -299,7 +299,7 @@ bool SchedulerCanPendControlRequestsInIrqContext() {
 
   fbl::RefPtr domain = fbl::MakeRefCountedChecked<PowerDomain>(
       &ac, 1, zx_cpu_set_t{.mask = {cpu_num_to_mask(scheduler.this_cpu())}},
-      ktl::move(*power_model), controller);
+      ktl::move(*energy_model), controller);
   ASSERT_TRUE(ac.check());
 
   // Set the current power domain, saving the previous domain to restore at the end of the test.
@@ -347,8 +347,8 @@ bool SchedulerCanPendControlRequestsAcrossCpus() {
   // from a different CPU than the target CPU.
   Scheduler& scheduler = percpu::GetCurrent().scheduler;
 
-  zx::result power_model = PowerModel::Create(kPowerLevels, kTransitions);
-  ASSERT_TRUE(power_model.is_ok());
+  zx::result energy_model = EnergyModel::Create(kPowerLevels, kTransitions);
+  ASSERT_TRUE(energy_model.is_ok());
 
   fbl::AllocChecker ac;
   fbl::RefPtr controller = fbl::MakeRefCountedChecked<FakePowerLevelController>(&ac);
@@ -356,7 +356,7 @@ bool SchedulerCanPendControlRequestsAcrossCpus() {
 
   fbl::RefPtr domain = fbl::MakeRefCountedChecked<PowerDomain>(
       &ac, 1, zx_cpu_set_t{.mask = {cpu_num_to_mask(scheduler.this_cpu())}},
-      ktl::move(*power_model), controller);
+      ktl::move(*energy_model), controller);
   ASSERT_TRUE(ac.check());
 
   // Set the current power domain, saving the previous domain to restore at the end of the test.

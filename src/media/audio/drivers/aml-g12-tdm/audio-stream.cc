@@ -42,7 +42,7 @@ AmlG12TdmStream::AmlG12TdmStream(
 
 int AmlG12TdmStream::Thread() {
   while (1) {
-    zx::time timestamp;
+    zx::time_boot timestamp;
     irq_.wait(&timestamp);
     if (!running_.load()) {
       break;

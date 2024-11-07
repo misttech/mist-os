@@ -239,12 +239,9 @@ impl Coordinator {
             )?;
             for layer in &config.layers {
                 match &layer.config {
-                    LayerConfig::Color { pixel_format, color_bytes } => {
-                        proxy.set_layer_color_config(
-                            &layer.id.into(),
-                            pixel_format.into(),
-                            &color_bytes,
-                        )?;
+                    LayerConfig::Color { color } => {
+                        let fidl_color = fidl_fuchsia_hardware_display_types::Color::from(color);
+                        proxy.set_layer_color_config(&layer.id.into(), &fidl_color)?;
                     }
                     LayerConfig::Primary {
                         image_id,
@@ -391,8 +388,7 @@ impl CoordinatorInner {
 // returned future does not resolve until either an entry is found or there is an error while
 // watching the directory.
 async fn watch_first_file(path: &str) -> Result<PathBuf> {
-    let dir =
-        fuchsia_fs::directory::open_in_namespace_deprecated(path, fio::OpenFlags::RIGHT_READABLE)?;
+    let dir = fuchsia_fs::directory::open_in_namespace(path, fio::PERM_READABLE)?;
 
     let mut watcher = Watcher::new(&dir).await?;
     while let Some(msg) = watcher.try_next().await? {

@@ -610,16 +610,20 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::LayerId&
 
   // We have to convert the image_metadata's multiply color, which is an array of normalized
   // floating point values, to an unnormalized array of uint8_ts in the range 0-255.
-  std::vector<uint8_t> col = {static_cast<uint8_t>(255 * image.multiply_color[0]),
-                              static_cast<uint8_t>(255 * image.multiply_color[1]),
-                              static_cast<uint8_t>(255 * image.multiply_color[2]),
-                              static_cast<uint8_t>(255 * image.multiply_color[3])};
+  const std::array<uint8_t, 8> color_bytes = {static_cast<uint8_t>(255 * image.multiply_color[0]),
+                                              static_cast<uint8_t>(255 * image.multiply_color[1]),
+                                              static_cast<uint8_t>(255 * image.multiply_color[2]),
+                                              static_cast<uint8_t>(255 * image.multiply_color[3]),
+                                              0,
+                                              0,
+                                              0,
+                                              0};
 
   const fit::result<fidl::OneWayStatus> set_layer_color_result =
       display_coordinator_->SetLayerColorConfig({{
           .layer_id = layer_id,
-          .pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8,
-          .color_bytes = col,
+          .color = fuchsia_hardware_display_types::Color(fuchsia_images2::PixelFormat::kB8G8R8A8,
+                                                         color_bytes),
       }});
   FX_DCHECK(set_layer_color_result.is_ok())
       << "Failed to call FIDL SetLayerColorConfig method: " << set_layer_color_result.error_value();
@@ -1058,7 +1062,7 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
   // Grab the best pixel format that the renderer prefers given the list of available formats on
   // the display.
   FX_DCHECK(!info.formats.empty());
-  const auto pixel_format = renderer_->ChoosePreferredPixelFormat(info.formats);
+  const auto pixel_format = renderer_->ChoosePreferredRenderTargetFormat(info.formats);
 
   const fuchsia::math::SizeU size = {/*width*/ info.dimensions.x, /*height*/ info.dimensions.y};
 

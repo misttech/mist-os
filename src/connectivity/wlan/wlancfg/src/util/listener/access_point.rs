@@ -6,7 +6,7 @@ use super::generic::{CurrentStateCache, Listener, Message};
 use crate::access_point::types;
 use fidl_fuchsia_wlan_policy as fidl_policy;
 use futures::channel::mpsc;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::prelude::*;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -92,7 +92,7 @@ impl Listener<Vec<fidl_policy::AccessPointState>> for fidl_policy::AccessPointSt
     fn notify_listener(
         self,
         update: Vec<fidl_policy::AccessPointState>,
-    ) -> BoxFuture<'static, Option<Box<Self>>> {
+    ) -> LocalBoxFuture<'static, Option<Box<Self>>> {
         let fut = async move {
             let fut = self.on_access_point_state_update(&update);
             fut.await.ok().map(|()| Box::new(self))

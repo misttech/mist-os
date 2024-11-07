@@ -2,96 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
-    ],
+    include: [ "//src/storage/fshost/meta/storage_host_minfs_base.shard.cml" ],
     children: [
         {
             name: "fvm",
-            url: "#meta/fvm2.cm",
-        },
-    ],
-    collections: [
-        {
-            name: "storage-host",
-            durability: "transient",
-        },
-    ],
-    capabilities: [
-        {
-            directory: "blob",
-            rights: [ "rw*" ],
-            path: "/fs/blob/root",
-        },
-        {
-            directory: "blob-exec",
-            rights: [
-                "execute",
-                "rw*",
-            ],
-            path: "/fs/blob/root",
-        },
-        {
-            protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobCreator",
-            path: "/fs/blob/svc/fuchsia.fxfs.BlobCreator",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobReader",
-            path: "/fs/blob/svc/fuchsia.fxfs.BlobReader",
-        },
-    ],
-    use: [
-        {
-            protocol: "fuchsia.component.Realm",
-            from: "framework",
-        },
-        {
-            service: [
-                "fuchsia.hardware.block.volume.Service",
-                "fuchsia.hardware.ramdisk.Service",
-            ],
+            url: "fuchsia-boot:///fvm2#meta/fvm2.cm",
         },
     ],
     offer: [
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "parent",
-            to: [ "#storage-host" ],
-            availability: "optional",
-        },
-    ],
-    expose: [
-        {
-            directory: [
-                "blob",
-                "blob-exec",
+            protocol: [
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.scheduler.RoleManager",
             ],
-            from: "self",
-        },
-        {
-            directory: "volumes",
-            from: "#fvm",
-        },
-        {
-            protocol: "fuchsia.fs.startup.Volumes",
-            from: "#fvm",
-        },
-        {
-            protocol: "fuchsia.update.verify.BlobfsVerifier",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobCreator",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobReader",
-            from: "self",
-            availability: "same_as_target",
+            from: "parent",
+            to: "#fvm",
         },
     ],
 }

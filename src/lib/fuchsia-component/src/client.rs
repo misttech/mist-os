@@ -11,14 +11,17 @@ use fidl::endpoints::{
 use fidl_fuchsia_component::{RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::ChildRef;
 use fidl_fuchsia_io as fio;
+use fuchsia_fs::directory::{WatchEvent, Watcher};
+use futures::stream::FusedStream;
+use futures::{Stream, StreamExt};
+use pin_project::pin_project;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
+use std::pin::pin;
+use std::task::Poll;
 
 use crate::directory::{open_directory_async, AsRefDirectory};
-use crate::DEFAULT_SERVICE_INSTANCE;
-
-/// Path to the service directory in an application's root namespace.
-const SVC_DIR: &'static str = "/svc";
+use crate::SVC_DIR;
 
 /// A protocol connection request that allows checking if the protocol exists.
 pub struct ProtocolConnector<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> {
@@ -230,10 +233,162 @@ impl MemberOpener for ServiceInstanceDirectory {
     }
 }
 
-/// Connect to the "default" instance of a FIDL service in the `/svc` directory of
-/// the application's root namespace.
-pub fn connect_to_service<S: ServiceMarker>() -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at::<S>(SVC_DIR, DEFAULT_SERVICE_INSTANCE)
+/// An instance of an aggregated fidl service that has been enumerated by [`ServiceWatcher::watch`]
+/// or [`ServiceWatcher::watch_for_any`].
+pub struct ServiceInstance<'a, S> {
+    /// The name of the service instance within the service directory
+    pub name: String,
+    service: &'a Service<S>,
+}
+
+// note: complicated bounds here can help the compiler deduce the service marker from a known
+// proxy type.
+impl<'a, P: ServiceProxy, S: ServiceMarker<Proxy = P>> ServiceInstance<'a, S> {
+    /// Connects to the instance named by [`Self::name`] in the service directory that enumerated
+    /// it.
+    pub async fn connect(&self) -> Result<P, Error> {
+        self.service.connect_to_instance(&self.name)
+    }
+}
+
+/// A service from an incoming namespace's `/svc` directory.
+pub struct Service<S> {
+    dir: fio::DirectoryProxy,
+    _marker: S,
+}
+
+/// Returns a new [`Service`] that waits for instances to appear in
+/// the given service directory, probably opened by [`open_service`]
+impl<S> From<fio::DirectoryProxy> for Service<S>
+where
+    S: Default,
+{
+    fn from(dir: fio::DirectoryProxy) -> Self {
+        Self { dir, _marker: S::default() }
+    }
+}
+
+impl<S: ServiceMarker> Service<S> {
+    /// Returns a new [`Service`] that waits for instances to appear in
+    /// the given service directory, probably opened by [`open_service`]
+    pub fn from_service_dir_proxy(dir: fio::DirectoryProxy, _marker: S) -> Self {
+        Self { dir, _marker }
+    }
+
+    /// Returns a new [`Service`] from the process's incoming service namespace.
+    pub fn open(marker: S) -> Result<Self, Error> {
+        Ok(Self::from_service_dir_proxy(open_service::<S>()?, marker))
+    }
+
+    /// Returns a new [`Service`] that is in the given directory.
+    pub fn open_from_dir(svc_dir: impl AsRefDirectory, marker: S) -> Result<Self, Error> {
+        let dir = open_directory_async(&svc_dir, S::SERVICE_NAME, fio::Rights::empty())?;
+        Ok(Self::from_service_dir_proxy(dir, marker))
+    }
+
+    /// Returns a new [`Service`] that is in the given directory under the given prefix
+    /// (as "{prefix}/ServiceName"). A common case would be passing [`SVC_DIR`] as the prefix.
+    pub fn open_from_dir_prefix(
+        dir: impl AsRefDirectory,
+        prefix: impl AsRef<str>,
+        marker: S,
+    ) -> Result<Self, Error> {
+        let prefix = prefix.as_ref();
+        let service_path = format!("{prefix}/{}", S::SERVICE_NAME);
+        // TODO(https://fxbug.dev/42068248): Some Directory implementations require relative paths,
+        // even though they aren't technically supposed to, so strip the leading slash until that's
+        // resolved one way or the other.
+        let service_path = service_path.strip_prefix('/').unwrap_or(service_path.as_ref());
+        let dir = open_directory_async(&dir, &service_path, fio::Rights::empty())?;
+        Ok(Self::from_service_dir_proxy(dir, marker))
+    }
+
+    /// Connects to the named instance without waiting for it to appear. You should only use this
+    /// after the instance name has been returned by the [`Self::watch`] stream, or if the
+    /// instance is statically routed so component manager will lazily load it.
+    pub fn connect_to_instance(&self, name: impl AsRef<str>) -> Result<S::Proxy, Error> {
+        connect_to_instance_in_service_dir::<S>(&self.dir, name.as_ref())
+    }
+
+    /// Returns an async stream of service instances that are enumerated within this service
+    /// directory.
+    pub async fn watch(&self) -> Result<ServiceInstanceStream<'_, S>, Error> {
+        let watcher = Watcher::new(&self.dir).await?;
+        let finished = false;
+        Ok(ServiceInstanceStream { service: self, watcher, finished })
+    }
+
+    /// Asynchronously returns the first service instance available within this service directory.
+    pub async fn watch_for_any(&self) -> Result<ServiceInstance<'_, S>, Error> {
+        self.watch()
+            .await?
+            .next()
+            .await
+            .context("No instances found before service directory was removed")?
+    }
+}
+
+/// A stream iterator for a service directory that produces one item for every service instance
+/// that is added to it as they are added. Returned from [`Service::watch`]
+///
+/// Normally, this stream will only terminate if the service directory being watched is removed, so
+/// the client must decide when it has found all the instances it's looking for.
+#[pin_project]
+pub struct ServiceInstanceStream<'a, S> {
+    service: &'a Service<S>,
+    watcher: Watcher,
+    finished: bool,
+}
+impl<'a, S> Stream for ServiceInstanceStream<'a, S> {
+    type Item = Result<ServiceInstance<'a, S>, Error>;
+
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let this = self.project();
+        use Poll::*;
+        if *this.finished {
+            return Poll::Ready(None);
+        }
+        // poll the inner watcher until we either find something worth returning or it
+        // returns Pending.
+        while let Ready(next) = this.watcher.poll_next_unpin(cx) {
+            match next {
+                Some(Ok(state)) => match state.event {
+                    WatchEvent::DELETED => {
+                        *this.finished = true;
+                        return Ready(None);
+                    }
+                    WatchEvent::ADD_FILE | WatchEvent::EXISTING => {
+                        let filename = state.filename.to_str().unwrap();
+                        if filename != "." {
+                            return Ready(Some(Ok(ServiceInstance {
+                                service: this.service,
+                                name: filename.to_owned(),
+                            })));
+                        }
+                    }
+                    _ => {}
+                },
+                Some(Err(err)) => {
+                    *this.finished = true;
+                    return Ready(Some(Err(err.into())));
+                }
+                None => {
+                    *this.finished = true;
+                    return Ready(None);
+                }
+            }
+        }
+        Pending
+    }
+}
+
+impl<'a, S> FusedStream for ServiceInstanceStream<'a, S> {
+    fn is_terminated(&self) -> bool {
+        self.finished
+    }
 }
 
 /// Connect to an instance of a FIDL service in the `/svc` directory of
@@ -262,14 +417,6 @@ pub fn connect_to_service_instance_at<S: ServiceMarker>(
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 
-/// Connect to the "default" instance of a FIDL service hosted on the directory protocol
-/// channel `directory`.
-pub fn connect_to_default_instance_in_service_dir<S: ServiceMarker>(
-    directory: &fio::DirectoryProxy,
-) -> Result<S::Proxy, Error> {
-    connect_to_instance_in_service_dir::<S>(directory, DEFAULT_SERVICE_INSTANCE)
-}
-
 /// Connect to an instance of a FIDL service hosted on the directory protocol channel `directory`.
 /// `instance` is a path of one or more components.
 pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
@@ -282,22 +429,6 @@ pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
         fio::Flags::empty(),
     )?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
-}
-
-/// Connect to the "default" instance of a FIDL service hosted in the service subdirectory under
-/// the directory protocol channel `directory`
-pub fn connect_to_service_at_dir<S: ServiceMarker>(
-    directory: &fio::DirectoryProxy,
-) -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at_dir::<S>(directory, DEFAULT_SERVICE_INSTANCE)
-}
-
-/// Connect to the "default" instance of a FIDL service hosted in the service subdirectory under
-/// the directory protocol channel `directory`, in the `svc/` subdir.
-pub fn connect_to_service_at_dir_svc<S: ServiceMarker>(
-    directory: &impl AsRefDirectory,
-) -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at_dir_svc::<S>(directory, DEFAULT_SERVICE_INSTANCE)
 }
 
 /// Connect to a named instance of a FIDL service hosted in the service subdirectory under the
@@ -326,35 +457,6 @@ pub fn connect_to_service_instance_at_dir_svc<S: ServiceMarker>(
     // resolved one way or the other.
     let service_path = service_path.strip_prefix('/').unwrap();
     let directory_proxy = open_directory_async(directory, service_path, fio::Rights::empty())?;
-    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
-}
-
-/// Connect to the "default" instance of a FIDL service hosted in `directory`.
-pub fn connect_to_service_at_channel<S: ServiceMarker>(
-    directory: &zx::Channel,
-) -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at_channel::<S>(directory, DEFAULT_SERVICE_INSTANCE)
-}
-
-/// Connect to an instance of a FIDL service hosted in `directory`.
-/// `instance` is a path of one or more components.
-// NOTE: We would like to use impl AsRef<T> to accept a wide variety of string-like
-// inputs but Rust limits specifying explicit generic parameters when `impl-traits`
-// are present.
-pub fn connect_to_service_instance_at_channel<S: ServiceMarker>(
-    directory: &zx::Channel,
-    instance: &str,
-) -> Result<S::Proxy, Error> {
-    let service_path = format!("{}/{}", S::SERVICE_NAME, instance);
-    let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    // NB: This has to use `fdio` because we are holding a channel rather than a
-    // proxy, and we can't make FIDL calls on unowned channels in Rust.
-    let () = fdio::open_at(
-        directory,
-        &service_path,
-        fio::OpenFlags::DIRECTORY,
-        server_end.into_channel(),
-    )?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 
@@ -430,30 +532,36 @@ pub mod test_util {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+    use std::sync::Arc;
+
     use super::*;
+    use fidl::endpoints::ServiceMarker as _;
     use fidl_fuchsia_component_client_test::{
-        ServiceAMarker, ServiceAProxy, ServiceBMarker, ServiceBProxy,
+        ProtocolAMarker, ProtocolAProxy, ProtocolBMarker, ProtocolBProxy, ServiceMarker,
     };
-    use fuchsia_async as fasync;
+    use fuchsia_async::{self as fasync};
+    use futures::{future, TryStreamExt};
+    use vfs::directory::simple::Simple;
     use vfs::file::vmo::read_only;
     use vfs::pseudo_directory;
 
     #[fasync::run_singlethreaded(test)]
     async fn test_svc_connector_svc_does_not_exist() -> Result<(), Error> {
-        let req = new_protocol_connector::<ServiceAMarker>().context("error probing service")?;
+        let req = new_protocol_connector::<ProtocolAMarker>().context("error probing service")?;
         assert_matches::assert_matches!(
             req.exists().await.context("error checking service"),
             Ok(false)
         );
-        let _: ServiceAProxy = req.connect().context("error connecting to service")?;
+        let _: ProtocolAProxy = req.connect().context("error connecting to service")?;
 
-        let req = new_protocol_connector_at::<ServiceAMarker>(SVC_DIR)
+        let req = new_protocol_connector_at::<ProtocolAMarker>(SVC_DIR)
             .context("error probing service at svc dir")?;
         assert_matches::assert_matches!(
             req.exists().await.context("error checking service at svc dir"),
             Ok(false)
         );
-        let _: ServiceAProxy = req.connect().context("error connecting to service at svc dir")?;
+        let _: ProtocolAProxy = req.connect().context("error connecting to service at svc dir")?;
 
         Ok(())
     }
@@ -461,22 +569,101 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_svc_connector_connect_with_dir() -> Result<(), Error> {
         let dir = pseudo_directory! {
-            ServiceBMarker::PROTOCOL_NAME => read_only("read_only"),
+            ProtocolBMarker::PROTOCOL_NAME => read_only("read_only"),
         };
         let dir_proxy = test_util::run_directory_server(dir);
-        let req = new_protocol_connector_in_dir::<ServiceAMarker>(&dir_proxy);
+        let req = new_protocol_connector_in_dir::<ProtocolAMarker>(&dir_proxy);
         assert_matches::assert_matches!(
             req.exists().await.context("error probing invalid service"),
             Ok(false)
         );
-        let _: ServiceAProxy = req.connect().context("error connecting to invalid service")?;
+        let _: ProtocolAProxy = req.connect().context("error connecting to invalid service")?;
 
-        let req = new_protocol_connector_in_dir::<ServiceBMarker>(&dir_proxy);
+        let req = new_protocol_connector_in_dir::<ProtocolBMarker>(&dir_proxy);
         assert_matches::assert_matches!(
             req.exists().await.context("error probing service"),
             Ok(true)
         );
-        let _: ServiceBProxy = req.connect().context("error connecting to service")?;
+        let _: ProtocolBProxy = req.connect().context("error connecting to service")?;
+
+        Ok(())
+    }
+
+    fn make_inner_service_instance_tree() -> Arc<Simple> {
+        pseudo_directory! {
+            ServiceMarker::SERVICE_NAME => pseudo_directory! {
+                "default" => read_only("read_only"),
+                "another_instance" => read_only("read_only"),
+            },
+        }
+    }
+
+    fn make_service_instance_tree() -> Arc<Simple> {
+        pseudo_directory! {
+            "svc" => make_inner_service_instance_tree(),
+        }
+    }
+
+    #[fasync::run_until_stalled(test)]
+    async fn test_service_instance_watcher_from_root() -> Result<(), Error> {
+        let dir_proxy = test_util::run_directory_server(make_service_instance_tree());
+        let watcher = Service::open_from_dir_prefix(&dir_proxy, SVC_DIR, ServiceMarker)?;
+        let found_names: HashSet<_> = watcher
+            .watch()
+            .await?
+            .take(2)
+            .and_then(|service| future::ready(Ok(service.name)))
+            .try_collect()
+            .await?;
+        assert_eq!(
+            found_names,
+            HashSet::from_iter(["default".to_owned(), "another_instance".to_owned()])
+        );
+
+        Ok(())
+    }
+
+    #[fasync::run_until_stalled(test)]
+    async fn test_service_instance_watcher_from_svc() -> Result<(), Error> {
+        let dir_proxy = test_util::run_directory_server(make_inner_service_instance_tree());
+        let watcher = Service::open_from_dir(&dir_proxy, ServiceMarker)?;
+        let found_names: HashSet<_> = watcher
+            .watch()
+            .await?
+            .take(2)
+            .and_then(|service| future::ready(Ok(service.name)))
+            .try_collect()
+            .await?;
+        assert_eq!(
+            found_names,
+            HashSet::from_iter(["default".to_owned(), "another_instance".to_owned()])
+        );
+
+        Ok(())
+    }
+
+    #[fasync::run_until_stalled(test)]
+    async fn test_connect_to_all_services() -> Result<(), Error> {
+        let dir_proxy = test_util::run_directory_server(make_service_instance_tree());
+        let watcher = Service::open_from_dir_prefix(&dir_proxy, SVC_DIR, ServiceMarker)?;
+        let _: Vec<_> = watcher
+            .watch()
+            .await?
+            .take(2)
+            .and_then(|service| async move { service.connect().await })
+            .try_collect()
+            .await?;
+
+        Ok(())
+    }
+
+    #[fasync::run_until_stalled(test)]
+    async fn test_connect_to_any() -> Result<(), Error> {
+        let dir_proxy = test_util::run_directory_server(make_service_instance_tree());
+        let watcher = Service::open_from_dir_prefix(&dir_proxy, SVC_DIR, ServiceMarker)?;
+        let found = watcher.watch_for_any().await?;
+        assert!(["default", "another_instance"].contains(&&*found.name));
+        found.connect().await?;
 
         Ok(())
     }

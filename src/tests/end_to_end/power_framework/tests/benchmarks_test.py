@@ -71,13 +71,13 @@ class PowerBenchmarksTest(fuchsia_base_test.FuchsiaBaseTest):
 
         fuchsiaperf_data = [
             {
-                "test_suite": "fuchsia.power.daemon",
+                "test_suite": "fuchsia.power.framework",
                 "label": "ToggleLease",
                 "values": [1.015],
                 "unit": "ms",
             },
             {
-                "test_suite": "fuchsia.power.sag",
+                "test_suite": "fuchsia.power.framework",
                 "label": "TakeWakeLease",
                 "values": [0.750],
                 "unit": "ms",

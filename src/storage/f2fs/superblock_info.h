@@ -273,7 +273,26 @@ class SuperblockInfo {
   block_t StartSumAddr() const { return LeToCpu(checkpoint_block_->cp_pack_start_sum); }
   block_t GetNumCpPayload() const { return cp_payload_; }
 
-  uint64_t GetCheckpointVer() const { return checkpoint_ver_; }
+  zx::result<uint32_t> GetCrcFromCheckpointBlock(
+      std::optional<const Checkpoint *> block = std::nullopt) {
+    const Checkpoint *cp_block = block ? *block : checkpoint_block_.get<Checkpoint>();
+    size_t offset = LeToCpu(cp_block->checksum_offset);
+    if (offset >= kBlockSize) {
+      return zx::error(ZX_ERR_BAD_STATE);
+    }
+    return zx::ok(
+        *reinterpret_cast<const uint32_t *>(reinterpret_cast<const uint8_t *>(cp_block) + offset));
+  }
+
+  uint64_t GetCheckpointVer(bool with_crc = false) {
+    uint64_t version = checkpoint_ver_;
+    if (with_crc && TestCpFlags(CpFlag::kCpCrcRecoveryFlag)) {
+      zx::result crc_or = GetCrcFromCheckpointBlock();
+      ZX_DEBUG_ASSERT(crc_or.is_ok());
+      version |= static_cast<uint64_t>(*crc_or) << 32;
+    }
+    return version;
+  }
   void UpdateCheckpointVer() { checkpoint_block_->checkpoint_ver = CpuToLe(++checkpoint_ver_); }
 
  private:

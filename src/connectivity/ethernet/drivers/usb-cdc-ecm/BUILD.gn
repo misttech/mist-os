@@ -18,7 +18,7 @@ driver_bind_rules("ethernet_usb_cdc_ecm_bind") {
   ]
 }
 
-fuchsia_driver("usb-cdc-ecm-driver") {
+fuchsia_cc_driver("usb-cdc-ecm-driver") {
   output_name = "usb-cdc-ecm"
   configs += [
     "//build/config:all_source",

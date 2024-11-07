@@ -70,9 +70,9 @@ impl TestEnvBuilder {
         }
 
         let mut fs = ServiceFs::new();
-        let config_data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let config_data_proxy = fuchsia_fs::directory::open_in_namespace(
             config_data.path().to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
         )
         .unwrap();
         fs.dir("config").add_remote("data", config_data_proxy);

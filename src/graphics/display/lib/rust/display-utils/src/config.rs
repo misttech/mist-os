@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::pixel_format::PixelFormat;
-use crate::types::{DisplayId, EventId, ImageId, LayerId};
+use crate::types::{Color, DisplayId, EventId, ImageId, LayerId};
 use fidl_fuchsia_hardware_display_types as fdisplay_types;
 
 /// LayerConfig is a variant type of the two distinct layer configuration types that are
@@ -13,11 +12,8 @@ use fidl_fuchsia_hardware_display_types as fdisplay_types;
 pub enum LayerConfig {
     /// A color layer contains a single color.
     Color {
-        /// Pixel format of the color.
-        pixel_format: PixelFormat,
-
-        /// Bytes representing the color. This must conform to the layout implied by `pixel_format`.
-        color_bytes: Vec<u8>,
+        /// The layer's color.
+        color: Color,
     },
 
     /// A primary layer is draws its pixels from a sysmem buffer backed image and supports various

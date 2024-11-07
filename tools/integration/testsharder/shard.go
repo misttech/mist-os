@@ -60,6 +60,9 @@ type Shard struct {
 	// against which the test should be run.
 	ProductBundle string `json:"product_bundle,omitempty"`
 
+	// IsBootTest specifies whether the test is a boot test.
+	IsBootTest bool `json:"is_boot_test,omitempty"`
+
 	// BootupTimeoutSecs is the timeout in seconds that the provided product
 	// bundle/environment is expected to take to boot up the target.
 	BootupTimeoutSecs int `json:"bootup_timeout_secs,omitempty"`
@@ -250,38 +253,48 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 			return specs[i].Test.Name < specs[j].Test.Name
 		})
 
-		tests := []Test{}
-		expectsSSH := false
+		shardForProductBundle := make(map[string]*Shard)
 		for _, spec := range specs {
+			shard, ok := shardForProductBundle[spec.ProductBundle]
+			if !ok {
+				name := environmentName(e)
+				if spec.ProductBundle != "" {
+					name = fmt.Sprintf("%s-%s", name, spec.ProductBundle)
+				}
+				shard = &Shard{
+					Name:              name,
+					Tests:             []Test{},
+					ProductBundle:     spec.ProductBundle,
+					BootupTimeoutSecs: spec.BootupTimeoutSecs,
+					ExpectsSSH:        spec.ExpectsSSH,
+					Env:               e,
+				}
+			}
 			test := Test{Test: spec.Test, Runs: 1}
 			testListEntry, exists := testListEntries[spec.Test.Name]
 			if exists {
 				test.updateFromTestList(testListEntry)
 			}
-			if spec.Test.Isolated {
+			if spec.Test.Isolated || spec.IsBootTest {
 				name := fmt.Sprintf("%s-%s", environmentName(e), normalizeTestName(spec.Test.Name))
 				shards = append(shards, &Shard{
 					Name:              name,
 					Tests:             []Test{test},
 					ProductBundle:     spec.ProductBundle,
+					IsBootTest:        spec.IsBootTest,
 					BootupTimeoutSecs: spec.BootupTimeoutSecs,
 					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
 				})
 			} else {
-				if spec.ExpectsSSH {
-					expectsSSH = true
-				}
-				tests = append(tests, test)
+				shard.Tests = append(shard.Tests, test)
+				shardForProductBundle[spec.ProductBundle] = shard
 			}
 		}
-		if len(tests) > 0 {
-			shards = append(shards, &Shard{
-				Name:       environmentName(e),
-				Tests:      tests,
-				ExpectsSSH: expectsSSH,
-				Env:        e,
-			})
+		for _, shard := range shardForProductBundle {
+			if len(shard.Tests) > 0 {
+				shards = append(shards, shard)
+			}
 		}
 	}
 

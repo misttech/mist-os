@@ -9,17 +9,11 @@
 
 use anyhow::{anyhow, Context as _, Error};
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
-use fdio::{SpawnAction, SpawnOptions};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
-use fuchsia_component::server::ServiceFs;
 use fuchsia_merkle::Hash;
-use zx::prelude::*;
-
-use futures::prelude::*;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
-use std::ffi::CString;
 use {fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio};
 
 const RAMDISK_BLOCK_SIZE: u64 = 512;
@@ -528,73 +522,10 @@ impl std::ops::Deref for FormattedRamdisk {
 }
 
 impl FormattedRamdisk {
-    /// Corrupt the blob given by merkle.
-    pub async fn corrupt_blob(&self, merkle: &Hash) {
-        blobfs_corrupt_blob(&self.0.client, merkle).await.unwrap();
-    }
-
     /// Shuts down this ramdisk.
     pub async fn stop(self) -> Result<(), Error> {
         self.0.stop().await
     }
-}
-
-async fn blobfs_corrupt_blob(
-    ramdisk: &ramdevice_client::RamdiskClient,
-    merkle: &Hash,
-) -> Result<(), Error> {
-    let mut fs = ServiceFs::new();
-    fs.root_dir().add_service_at("block", move |channel: zx::Channel| {
-        let _: Result<(), Error> = ramdisk.connect(channel.into());
-        None
-    });
-
-    let (devfs_client, devfs_server) = fidl::endpoints::create_endpoints();
-    fs.serve_connection(devfs_server)?;
-    let serve_fs = fs.collect::<()>();
-
-    let spawn_and_wait = async move {
-        let p = fdio::spawn_etc(
-            &fuchsia_runtime::job_default(),
-            SpawnOptions::CLONE_ALL - SpawnOptions::CLONE_NAMESPACE,
-            &CString::new("/pkg/bin/blobfs-corrupt").unwrap(),
-            &[
-                &CString::new("blobfs-corrupt").unwrap(),
-                &CString::new("--device").unwrap(),
-                &CString::new("/dev/block").unwrap(),
-                &CString::new("--merkle").unwrap(),
-                &CString::new(merkle.to_string()).unwrap(),
-            ],
-            None,
-            &mut [SpawnAction::add_namespace_entry(
-                &CString::new("/dev").unwrap(),
-                devfs_client.into(),
-            )],
-        )
-        .map_err(|(status, _)| status)
-        .context("spawning 'blobfs-corrupt'")?;
-
-        wait_for_process_async(p).await.context("'blobfs-corrupt'")?;
-        Ok(())
-    };
-
-    let ((), res) = futures::join!(serve_fs, spawn_and_wait);
-
-    res
-}
-
-async fn wait_for_process_async(proc: zx::Process) -> Result<(), Error> {
-    let signals =
-        fuchsia_async::OnSignals::new(&proc.as_handle_ref(), zx::Signals::PROCESS_TERMINATED)
-            .await
-            .context("waiting for tool to terminate")?;
-    assert_eq!(signals, zx::Signals::PROCESS_TERMINATED);
-
-    let ret = proc.info().context("getting tool process info")?.return_code;
-    if ret != 0 {
-        return Err(anyhow!("tool returned nonzero exit code {}", ret));
-    }
-    Ok(())
 }
 
 #[cfg(test)]

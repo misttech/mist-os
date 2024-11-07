@@ -888,8 +888,6 @@ template("bazel_action") {
       args += [
         "--cxxopt=-std=c++20",
         "--cxxopt=-Wno-deprecated-this-capture",
-        "--cxxopt=-Wc++20-compat",
-        "--cxxopt=-Wno-error=c++20-compat",
       ]
     }
 

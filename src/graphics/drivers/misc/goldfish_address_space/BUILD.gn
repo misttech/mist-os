@@ -38,7 +38,7 @@ common_deps = [
   "//zircon/system/ulib/zx",
 ]
 
-fuchsia_driver("address_space_driver-driver") {
+fuchsia_cc_driver("address_space_driver-driver") {
   output_name = "goldfish_address_space"
 
   sources = [ "address_space_device.cc" ]

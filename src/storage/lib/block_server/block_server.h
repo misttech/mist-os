@@ -42,7 +42,7 @@ class Session {
   // Runs the session (blocking).
   void Run();
 
-  void SendReply(RequestId, zx::result<>);
+  void SendReply(RequestId, zx::result<>) const;
 
  private:
   friend class BlockServer;
@@ -89,7 +89,10 @@ class Interface {
 
   // Called when new requests arrive.  It is OK for this method to block so as to cause push back on
   // the fifo (which is recommended for effective flow control).
-  virtual void OnRequests(Session&, std::span<const Request>) = 0;
+  virtual void OnRequests(const Session&, std::span<Request>) = 0;
+
+  // Called for log messages.
+  virtual void Log(std::string_view msg) const {}
 };
 
 class BlockServer {
@@ -136,6 +139,9 @@ class BlockServer {
   Interface* interface_ = nullptr;
   internal::BlockServer* server_ = nullptr;
 };
+
+// Splits the request at `block_offset` returning the head and leaving the tail in `request`.
+Request SplitRequest(Request& request, uint32_t block_offset, uint32_t block_size);
 
 }  // namespace block_server
 

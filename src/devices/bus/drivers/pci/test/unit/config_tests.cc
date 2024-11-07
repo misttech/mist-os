@@ -6,14 +6,15 @@
 #include <lib/zx/result.h>
 #include <zircon/limits.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_pciroot.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace pci {
 
-class PciConfigTests : public zxtest::Test {
+class PciConfigTests : public ::testing::Test {
  public:
   FakePciroot& pciroot_proto() { return *pciroot_; }
   ddk::PcirootProtocolClient& pciroot_client() { return *client_; }
@@ -54,11 +55,11 @@ void PciConfigTests::IntegrationTestImpl(Config* cfg1, Config* cfg2) {
   // overlapping somehow.
   {
     FakePciType0Config& dev = pciroot_proto().ecam().get(default_bdf2()).device;
-    EXPECT_EQ(cfg2->Read(Config::kRevisionId), 0x0);
+    EXPECT_EQ(cfg2->Read(Config::kRevisionId), 0x0u);
     EXPECT_EQ(cfg2->Read(Config::kVendorId), 0xFFFF);
     EXPECT_EQ(cfg2->Read(Config::kDeviceId), 0xFFFF);
-    EXPECT_EQ(cfg2->Read(Config::kHeaderType), 0x0);
-    EXPECT_EQ(cfg2->Read(Config::kExpansionRomAddress), 0x0);
+    EXPECT_EQ(cfg2->Read(Config::kHeaderType), 0x0u);
+    EXPECT_EQ(cfg2->Read(Config::kExpansionRomAddress), 0x0u);
 
     dev.set_vendor_id(0x8680)
         .set_device_id(0x4321)
@@ -78,49 +79,49 @@ void PciConfigTests::ConfigReadWriteImpl(Config* cfg) {
   FakePciType0Config& dev = pciroot_proto().ecam().get(default_bdf1()).device;
   ASSERT_EQ(dev.vendor_id(), 0xFFFF);
   ASSERT_EQ(dev.device_id(), 0xFFFF);
-  ASSERT_EQ(dev.command(), 0x0);
-  ASSERT_EQ(dev.status(), 0x0);
-  ASSERT_EQ(dev.revision_id(), 0x0);
-  ASSERT_EQ(dev.program_interface(), 0x0);
-  ASSERT_EQ(dev.sub_class(), 0x0);
-  ASSERT_EQ(dev.base_class(), 0x0);
-  ASSERT_EQ(dev.cache_line_size(), 0x0);
-  ASSERT_EQ(dev.latency_timer(), 0x0);
-  ASSERT_EQ(dev.header_type(), 0x0);
-  ASSERT_EQ(dev.bist(), 0x0);
-  ASSERT_EQ(dev.cardbus_cis_ptr(), 0x0);
-  ASSERT_EQ(dev.subsystem_vendor_id(), 0x0);
-  ASSERT_EQ(dev.subsystem_id(), 0x0);
-  ASSERT_EQ(dev.expansion_rom_address(), 0x0);
-  ASSERT_EQ(dev.capabilities_ptr(), 0x0);
-  ASSERT_EQ(dev.interrupt_line(), 0x0);
-  ASSERT_EQ(dev.interrupt_pin(), 0x0);
-  ASSERT_EQ(dev.min_grant(), 0x0);
-  ASSERT_EQ(dev.max_latency(), 0x0);
+  ASSERT_EQ(dev.command(), 0x0u);
+  ASSERT_EQ(dev.status(), 0x0u);
+  ASSERT_EQ(dev.revision_id(), 0x0u);
+  ASSERT_EQ(dev.program_interface(), 0x0u);
+  ASSERT_EQ(dev.sub_class(), 0x0u);
+  ASSERT_EQ(dev.base_class(), 0x0u);
+  ASSERT_EQ(dev.cache_line_size(), 0x0u);
+  ASSERT_EQ(dev.latency_timer(), 0x0u);
+  ASSERT_EQ(dev.header_type(), 0x0u);
+  ASSERT_EQ(dev.bist(), 0x0u);
+  ASSERT_EQ(dev.cardbus_cis_ptr(), 0x0u);
+  ASSERT_EQ(dev.subsystem_vendor_id(), 0x0u);
+  ASSERT_EQ(dev.subsystem_id(), 0x0u);
+  ASSERT_EQ(dev.expansion_rom_address(), 0x0u);
+  ASSERT_EQ(dev.capabilities_ptr(), 0x0u);
+  ASSERT_EQ(dev.interrupt_line(), 0x0u);
+  ASSERT_EQ(dev.interrupt_pin(), 0x0u);
+  ASSERT_EQ(dev.min_grant(), 0x0u);
+  ASSERT_EQ(dev.max_latency(), 0x0u);
 
   // Ensure the config header reads match the reset values above, this time
   // through the config interface.
   EXPECT_EQ(cfg->Read(Config::kVendorId), 0xFFFF);
   EXPECT_EQ(cfg->Read(Config::kDeviceId), 0xFFFF);
-  EXPECT_EQ(cfg->Read(Config::kCommand), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kStatus), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kRevisionId), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kProgramInterface), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kSubClass), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kBaseClass), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kCacheLineSize), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kLatencyTimer), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kHeaderType), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kBist), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kCardbusCisPtr), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kSubsystemVendorId), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kSubsystemId), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kExpansionRomAddress), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kCapabilitiesPtr), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kInterruptLine), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kInterruptPin), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kMinGrant), 0x0);
-  EXPECT_EQ(cfg->Read(Config::kMaxLatency), 0x0);
+  EXPECT_EQ(cfg->Read(Config::kCommand), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kStatus), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kRevisionId), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kProgramInterface), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kSubClass), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kBaseClass), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kCacheLineSize), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kLatencyTimer), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kHeaderType), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kBist), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kCardbusCisPtr), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kSubsystemVendorId), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kSubsystemId), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kExpansionRomAddress), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kCapabilitiesPtr), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kInterruptLine), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kInterruptPin), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kMinGrant), 0x0u);
+  EXPECT_EQ(cfg->Read(Config::kMaxLatency), 0x0u);
 
   // Write test data to the config header registers.
   cfg->Write(Config::kVendorId, 0x1111);
@@ -146,50 +147,50 @@ void PciConfigTests::ConfigReadWriteImpl(Config* cfg) {
   cfg->Write(Config::kMaxLatency, 0x66);
 
   // Verify the config header reads match through the fake ecam.
-  EXPECT_EQ(dev.vendor_id(), 0x1111);
-  EXPECT_EQ(dev.device_id(), 0x2222);
-  EXPECT_EQ(dev.command(), 0x3333);
-  EXPECT_EQ(dev.status(), 0x4444);
-  EXPECT_EQ(dev.revision_id(), 0x55);
-  EXPECT_EQ(dev.program_interface(), 0x66);
-  EXPECT_EQ(dev.sub_class(), 0x77);
-  EXPECT_EQ(dev.base_class(), 0x88);
-  EXPECT_EQ(dev.cache_line_size(), 0x99);
+  EXPECT_EQ(dev.vendor_id(), 0x1111u);
+  EXPECT_EQ(dev.device_id(), 0x2222u);
+  EXPECT_EQ(dev.command(), 0x3333u);
+  EXPECT_EQ(dev.status(), 0x4444u);
+  EXPECT_EQ(dev.revision_id(), 0x55u);
+  EXPECT_EQ(dev.program_interface(), 0x66u);
+  EXPECT_EQ(dev.sub_class(), 0x77u);
+  EXPECT_EQ(dev.base_class(), 0x88u);
+  EXPECT_EQ(dev.cache_line_size(), 0x99u);
   EXPECT_EQ(dev.latency_timer(), 0xAA);
   EXPECT_EQ(dev.header_type(), 0xBB);
   EXPECT_EQ(dev.bist(), 0xCC);
   EXPECT_EQ(dev.cardbus_cis_ptr(), 0xDDDDDDDD);
   EXPECT_EQ(dev.subsystem_vendor_id(), 0xEEEE);
   EXPECT_EQ(dev.subsystem_id(), 0xFFFF);
-  EXPECT_EQ(dev.expansion_rom_address(), 0x11111111);
-  EXPECT_EQ(dev.capabilities_ptr(), 0x22);
-  EXPECT_EQ(dev.interrupt_line(), 0x33);
-  EXPECT_EQ(dev.interrupt_pin(), 0x44);
-  EXPECT_EQ(dev.min_grant(), 0x55);
-  EXPECT_EQ(dev.max_latency(), 0x66);
+  EXPECT_EQ(dev.expansion_rom_address(), 0x11111111u);
+  EXPECT_EQ(dev.capabilities_ptr(), 0x22u);
+  EXPECT_EQ(dev.interrupt_line(), 0x33u);
+  EXPECT_EQ(dev.interrupt_pin(), 0x44u);
+  EXPECT_EQ(dev.min_grant(), 0x55u);
+  EXPECT_EQ(dev.max_latency(), 0x66u);
 
   // Verify the config header reads match through the config interface.
-  EXPECT_EQ(cfg->Read(Config::kVendorId), 0x1111);
-  EXPECT_EQ(cfg->Read(Config::kDeviceId), 0x2222);
-  EXPECT_EQ(cfg->Read(Config::kCommand), 0x3333);
-  EXPECT_EQ(cfg->Read(Config::kStatus), 0x4444);
-  EXPECT_EQ(cfg->Read(Config::kRevisionId), 0x55);
-  EXPECT_EQ(cfg->Read(Config::kProgramInterface), 0x66);
-  EXPECT_EQ(cfg->Read(Config::kSubClass), 0x77);
-  EXPECT_EQ(cfg->Read(Config::kBaseClass), 0x88);
-  EXPECT_EQ(cfg->Read(Config::kCacheLineSize), 0x99);
+  EXPECT_EQ(cfg->Read(Config::kVendorId), 0x1111u);
+  EXPECT_EQ(cfg->Read(Config::kDeviceId), 0x2222u);
+  EXPECT_EQ(cfg->Read(Config::kCommand), 0x3333u);
+  EXPECT_EQ(cfg->Read(Config::kStatus), 0x4444u);
+  EXPECT_EQ(cfg->Read(Config::kRevisionId), 0x55u);
+  EXPECT_EQ(cfg->Read(Config::kProgramInterface), 0x66u);
+  EXPECT_EQ(cfg->Read(Config::kSubClass), 0x77u);
+  EXPECT_EQ(cfg->Read(Config::kBaseClass), 0x88u);
+  EXPECT_EQ(cfg->Read(Config::kCacheLineSize), 0x99u);
   EXPECT_EQ(cfg->Read(Config::kLatencyTimer), 0xAA);
   EXPECT_EQ(cfg->Read(Config::kHeaderType), 0xBB);
   EXPECT_EQ(cfg->Read(Config::kBist), 0xCC);
   EXPECT_EQ(cfg->Read(Config::kCardbusCisPtr), 0xDDDDDDDD);
   EXPECT_EQ(cfg->Read(Config::kSubsystemVendorId), 0xEEEE);
   EXPECT_EQ(cfg->Read(Config::kSubsystemId), 0xFFFF);
-  EXPECT_EQ(cfg->Read(Config::kExpansionRomAddress), 0x11111111);
-  EXPECT_EQ(cfg->Read(Config::kCapabilitiesPtr), 0x22);
-  EXPECT_EQ(cfg->Read(Config::kInterruptLine), 0x33);
-  EXPECT_EQ(cfg->Read(Config::kInterruptPin), 0x44);
-  EXPECT_EQ(cfg->Read(Config::kMinGrant), 0x55);
-  EXPECT_EQ(cfg->Read(Config::kMaxLatency), 0x66);
+  EXPECT_EQ(cfg->Read(Config::kExpansionRomAddress), 0x11111111u);
+  EXPECT_EQ(cfg->Read(Config::kCapabilitiesPtr), 0x22u);
+  EXPECT_EQ(cfg->Read(Config::kInterruptLine), 0x33u);
+  EXPECT_EQ(cfg->Read(Config::kInterruptPin), 0x44u);
+  EXPECT_EQ(cfg->Read(Config::kMinGrant), 0x55u);
+  EXPECT_EQ(cfg->Read(Config::kMaxLatency), 0x66u);
 }
 
 TEST_F(PciConfigTests, MmioIntegration) {

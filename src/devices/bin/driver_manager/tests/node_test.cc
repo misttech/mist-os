@@ -257,11 +257,6 @@ TEST_F(Dfv2NodeTest, TestEvaluateRematchFlags) {
       fuchsia_driver_development::RestartRematchFlags::kRequested |
           fuchsia_driver_development::RestartRematchFlags::kNonRequested,
       "some-url"));
-  ASSERT_FALSE(composite->EvaluateRematchFlags(
-      fuchsia_driver_development::RestartRematchFlags::kRequested |
-          fuchsia_driver_development::RestartRematchFlags::kNonRequested |
-          fuchsia_driver_development::RestartRematchFlags::kLegacyComposite,
-      "some-url"));
 }
 
 TEST_F(Dfv2NodeTest, RemoveCompositeNodeForRebind) {

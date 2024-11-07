@@ -23,9 +23,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
-#include <sstream>
 #include <string>
-#include <thread>
 
 #include "src/cobalt/bin/testapp/cobalt_testapp_logger.h"
 #include "src/cobalt/bin/testapp/prober_metrics_registry.cb.h"

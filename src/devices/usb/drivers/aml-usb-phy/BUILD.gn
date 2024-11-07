@@ -104,7 +104,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("aml-usb-phy-driver") {
+fuchsia_cc_driver("aml-usb-phy-driver") {
   output_name = "aml-usb-phy"
   configs += [
     "//build/config:all_source",

@@ -18,7 +18,7 @@ driver_bind_rules("aml-thermistor-bind") {
   ]
 }
 
-fuchsia_driver("aml-thermistor-driver") {
+fuchsia_cc_driver("aml-thermistor-driver") {
   output_name = "aml-thermistor"
   defines = [ "_ALL_SOURCE" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]

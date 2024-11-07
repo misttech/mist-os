@@ -122,6 +122,36 @@ extern "C" {
     ) -> zx_status_t;
 }
 extern "C" {
+    pub fn fdio_open3(
+        path: *const ::std::os::raw::c_char,
+        flags: u64,
+        request: zx_handle_t,
+    ) -> zx_status_t;
+}
+extern "C" {
+    pub fn fdio_open3_at(
+        directory: zx_handle_t,
+        path: *const ::std::os::raw::c_char,
+        flags: u64,
+        request: zx_handle_t,
+    ) -> zx_status_t;
+}
+extern "C" {
+    pub fn fdio_open3_fd(
+        path: *const ::std::os::raw::c_char,
+        flags: u64,
+        out_fd: *mut ::std::os::raw::c_int,
+    ) -> zx_status_t;
+}
+extern "C" {
+    pub fn fdio_open3_fd_at(
+        dir_fd: ::std::os::raw::c_int,
+        path: *const ::std::os::raw::c_char,
+        flags: u64,
+        out_fd: *mut ::std::os::raw::c_int,
+    ) -> zx_status_t;
+}
+extern "C" {
     pub fn fdio_open(
         path: *const ::std::os::raw::c_char,
         flags: u32,

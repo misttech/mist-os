@@ -91,7 +91,7 @@ class AmlRamDeviceTest : public zxtest::Test {
     return std::move(endpoints.client);
   }
 
-  void InjectInterrupt() { irq_signaller_->trigger(0, zx::time()); }
+  void InjectInterrupt() { irq_signaller_->trigger(0, zx::time_boot()); }
 
  protected:
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};

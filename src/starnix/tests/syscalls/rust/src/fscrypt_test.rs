@@ -696,7 +696,9 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
     #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
     fn one_user_adds_the_same_encryption_key_twice() {
         let Some(root_path) = get_root_path() else { return };
         let dir_path = std::path::Path::new(&root_path).join("my_dir");

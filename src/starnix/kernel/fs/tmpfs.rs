@@ -25,7 +25,12 @@ use std::sync::Arc;
 pub struct TmpFs(());
 
 impl FileSystemOps for Arc<TmpFs> {
-    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+    fn statfs(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _fs: &FileSystem,
+        _current_task: &CurrentTask,
+    ) -> Result<statfs, Errno> {
         Ok(statfs {
             // Pretend we have a ton of free space.
             f_blocks: 0x100000000,
@@ -40,6 +45,7 @@ impl FileSystemOps for Arc<TmpFs> {
 
     fn rename(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         old_parent: &FsNodeHandle,

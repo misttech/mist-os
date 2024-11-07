@@ -4,7 +4,6 @@
 library fuchsia.hardware.display;
 
 using fuchsia.hardware.display.types;
-using fuchsia.images2;
 using fuchsia.math;
 using fuchsia.sysmem2;
 using zx;
@@ -303,18 +302,12 @@ closed protocol Coordinator {
         val float32;
     });
 
-    /// Configures the layer as a color layer with the given color in
-    /// `pixel_format`.
+    /// Configures the layer as a color layer with the given color.
     ///
-    /// `color_bytes` vector is little-endian and of the exact size of one pixel
-    /// in `pixel_format`.
-    ///
-    /// It is illegal to call this on an invalid layer or for the length of
-    /// color_bytes to mismatch the size of the supplied format.
+    /// It is illegal to call this on an invalid layer.
     strict SetLayerColorConfig(struct {
         layer_id LayerId;
-        pixel_format fuchsia.images2.PixelFormat;
-        color_bytes vector<uint8>:MAX;
+        color fuchsia.hardware.display.types.Color;
     });
 
     /// Sets the image for the layer.

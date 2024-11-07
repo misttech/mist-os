@@ -7,7 +7,7 @@ use async_lock::{Mutex, MutexGuard};
 use ffx_config::EnvironmentContext;
 use ffx_target::connection::{Connection, ConnectionError};
 use ffx_target::ssh_connector::SshConnector;
-use ffx_target::{OvernetConnector, Resolution};
+use ffx_target::{Resolution, TargetConnector};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::future::LocalBoxFuture;
 use std::fmt::Debug;
@@ -103,14 +103,14 @@ impl TryFromEnvContext for SshConnector {
 /// Encapsulates a connection to a single fuchsia device, using overnet as the FIDL communication
 /// backend.
 #[derive(Debug, Clone)]
-pub struct Overnet<T: TryFromEnvContext + OvernetConnector> {
+pub struct Overnet<T: TryFromEnvContext + TargetConnector> {
     env: EnvironmentContext,
     connection: Arc<Mutex<Option<Connection>>>,
     target_spec: Option<String>,
     _t: std::marker::PhantomData<T>,
 }
 
-async fn connect_helper<T: TryFromEnvContext + OvernetConnector + 'static>(
+async fn connect_helper<T: TryFromEnvContext + TargetConnector + 'static>(
     env: &EnvironmentContext,
     conn: &mut MutexGuard<'_, Option<Connection>>,
 ) -> Result<()> {
@@ -124,7 +124,7 @@ async fn connect_helper<T: TryFromEnvContext + OvernetConnector + 'static>(
                     tracing::info!("connector encountered start error: {cmd_info}, '{error}'");
                     Err(crate::user_error!(
                         "Unable to connect to device via {}: {error}",
-                        <T as OvernetConnector>::CONNECTION_TYPE
+                        <T as TargetConnector>::CONNECTION_TYPE
                     ))
                 }
                 Err(e) => Err(crate::bug!("{e}")),
@@ -135,7 +135,7 @@ async fn connect_helper<T: TryFromEnvContext + OvernetConnector + 'static>(
     }
 }
 
-impl<T: TryFromEnvContext + OvernetConnector + 'static> Overnet<T> {
+impl<T: TryFromEnvContext + TargetConnector + 'static> Overnet<T> {
     /// Attempts to connect. If already connected, this is a no-op.
     fn maybe_connect(&self) -> LocalBoxFuture<'_, Result<()>> {
         Box::pin(async {
@@ -145,7 +145,7 @@ impl<T: TryFromEnvContext + OvernetConnector + 'static> Overnet<T> {
     }
 }
 
-impl<T: TryFromEnvContext + OvernetConnector + 'static> DirectConnector for Overnet<T> {
+impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Overnet<T> {
     fn connect(&self) -> LocalBoxFuture<'_, Result<()>> {
         Box::pin(async {
             let mut conn = self.connection.lock().await;
@@ -202,7 +202,7 @@ impl<T: TryFromEnvContext + OvernetConnector + 'static> DirectConnector for Over
     }
 }
 
-impl<T: TryFromEnvContext + OvernetConnector> Overnet<T> {
+impl<T: TryFromEnvContext + TargetConnector> Overnet<T> {
     pub async fn new(env: &EnvironmentContext) -> Result<Self> {
         let target_spec = Option::<String>::try_from_env_context(env).await?;
         Ok(Self {
@@ -218,17 +218,17 @@ impl<T: TryFromEnvContext + OvernetConnector> Overnet<T> {
 mod tests {
     use super::*;
     use ffx_target::connection::testing::{FakeOvernet, FakeOvernetBehavior};
-    use ffx_target::{OvernetConnection, OvernetConnectionError};
+    use ffx_target::{TargetConnection, TargetConnectionError};
 
     // This is a bit of a hack, but there needs to be a way to set the behavior that also doesn't
     // require locking every test sequentially.
     #[derive(Debug)]
     struct RegularFakeOvernet(FakeOvernet);
 
-    impl OvernetConnector for RegularFakeOvernet {
+    impl TargetConnector for RegularFakeOvernet {
         const CONNECTION_TYPE: &'static str = "fake";
 
-        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
             self.0.connect().await
         }
     }
@@ -271,9 +271,9 @@ mod tests {
     #[derive(Debug)]
     struct FromContextFailer(FakeOvernet);
 
-    impl OvernetConnector for FromContextFailer {
+    impl TargetConnector for FromContextFailer {
         const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<OvernetConnection, OvernetConnectionError> {
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
             self.0.connect().await
         }
     }

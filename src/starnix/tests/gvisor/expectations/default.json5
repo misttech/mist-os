@@ -358,7 +358,6 @@
 
                 // ioctl_test
                 "IoctlTest/IoctlTestSIOCGIFCONF.ValidateNoArrayGetsLength/*",
-                "IoctlTest.FIONBIOFails",
                 "IoctlTest.FIOASYNCFails",
                 "IoctlTest.FIOASYNCSucceeds",
                 "IoctlTest.FIOASYNCNoTarget",
@@ -369,7 +368,6 @@
                 "IoctlTest.FIOASYNCUnsetTarget",
                 "IoctlTest.FIOGETOWNSucceeds",
                 "IoctlTest.SIOCGPGRPSucceeds",
-                "IoctlTest.FIONBIOSucceeds",
                 "IoctlTest/IoctlTestSIOCGIFCONF.ValidateNoPartialIfrsReturned/*",
                 "IoctlTest/IoctlTestSIOCGIFCONF.ValidateNestedPointerCheck/*",
                 "IoctlTest/IoctlTestSIOCGIFCONF.ValidateLoopbackIsPresent/*",

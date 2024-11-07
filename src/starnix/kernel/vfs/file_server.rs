@@ -15,7 +15,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_runtime::UtcInstant;
 use futures::future::BoxFuture;
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_types::convert::{FromFidl as _, IntoFidl as _};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -159,16 +159,12 @@ impl StarnixNodeConnection {
 
     /// Reopen the current `StarnixNodeConnection` with the given `OpenFlags`. The new file will not share
     /// state. It is equivalent to opening the same file, not dup'ing the file descriptor.
-    fn reopen<L>(
+    fn reopen(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         flags: &impl ProtocolsExt,
-    ) -> Result<Arc<Self>, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
+    ) -> Result<Arc<Self>, Errno> {
         let file = self.file.name.open(
             locked,
             current_task,
@@ -247,15 +243,19 @@ impl StarnixNodeConnection {
                 return Ok((directory::traversal_position::TraversalPosition::End, sink.seal()));
             }
         };
+        let kernel = self.kernel().unwrap().clone();
         if *self.file.offset.lock() != offset {
-            self.file.seek(&current_task, SeekTarget::Set(offset))?;
+            self.file.seek(
+                kernel.kthreads.unlocked_for_async().deref_mut(),
+                &current_task,
+                SeekTarget::Set(offset),
+            )?;
         }
         let mut file_offset = self.file.offset.lock();
         let mut dirent_sink = DirentSinkAdapter {
             sink: Some(directory::dirents_sink::AppendResult::Ok(sink)),
             offset: &mut file_offset,
         };
-        let kernel = self.kernel().unwrap().clone();
         self.file.readdir(
             kernel.kthreads.unlocked_for_async().deref_mut(),
             &current_task,
@@ -672,12 +672,18 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
     }
 
     async fn seek(&self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, zx::Status> {
+        let kernel = self.kernel()?;
         let target = match origin {
             fio::SeekOrigin::Start => SeekTarget::Set(offset),
             fio::SeekOrigin::Current => SeekTarget::Cur(offset),
             fio::SeekOrigin::End => SeekTarget::End(offset),
         };
-        Ok(self.file.seek(&*self.task()?, target)? as u64)
+        let seek_result = self.file.seek(
+            kernel.kthreads.unlocked_for_async().deref_mut(),
+            &*self.task()?,
+            target,
+        )?;
+        Ok(seek_result as u64)
     }
 
     fn update_flags(&self, flags: fio::OpenFlags) -> zx::Status {

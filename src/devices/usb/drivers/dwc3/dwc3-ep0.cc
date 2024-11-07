@@ -5,7 +5,7 @@
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <lib/driver/logging/cpp/logger.h>
 
-#include <fbl/auto_lock.h>
+#include <mutex>
 
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
@@ -14,7 +14,7 @@ namespace dwc3 {
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 
 zx_status_t Dwc3::Ep0Init() {
-  fbl::AutoLock lock(&ep0_.lock);
+  std::lock_guard<std::mutex> lock(ep0_.lock);
 
   if (zx_status_t status = ep0_.shared_fifo.Init(bti_); status != ZX_OK) {
     return status;
@@ -32,13 +32,13 @@ zx_status_t Dwc3::Ep0Init() {
 }
 
 void Dwc3::Ep0Reset() {
-  fbl::AutoLock lock(&ep0_.lock);
+  std::lock_guard<std::mutex> lock(ep0_.lock);
   CmdEpEndTransfer(ep0_.out);
   ep0_.state = Ep0::State::None;
 }
 
 void Dwc3::Ep0Start() {
-  fbl::AutoLock lock(&ep0_.lock);
+  std::lock_guard<std::mutex> lock(ep0_.lock);
 
   CmdStartNewConfig(ep0_.out, 0);
   EpSetConfig(ep0_.out, true);
@@ -69,7 +69,7 @@ void Dwc3::Ep0StartEndpoints() {
   CmdStartNewConfig(ep0_.out, 2);
 
   for (UserEndpoint& uep : user_endpoints_) {
-    fbl::AutoLock lock(&uep.ep.lock);
+    std::lock_guard<std::mutex> lock(uep.ep.lock);
 
     if (uep.ep.enabled) {
       EpSetConfig(uep.ep, true);
@@ -79,7 +79,7 @@ void Dwc3::Ep0StartEndpoints() {
 }
 
 void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
-  fbl::AutoLock lock(&ep0_.lock);
+  std::lock_guard<std::mutex> lock(ep0_.lock);
   ZX_DEBUG_ASSERT(is_ep0_num(ep_num));
 
   switch (ep0_.state) {
@@ -151,7 +151,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
 }
 
 void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
-  fbl::AutoLock lock(&ep0_.lock);
+  std::lock_guard<std::mutex> lock(ep0_.lock);
   ZX_DEBUG_ASSERT(is_ep0_num(ep_num));
 
   switch (ep0_.state) {
@@ -211,7 +211,7 @@ zx::result<size_t> Dwc3::HandleEp0Setup(const fdescriptor::wire::UsbSetup& setup
   auto DoControlCall = [this](const fdescriptor::wire::UsbSetup& setup, const uint8_t* in_buf,
                               size_t in_len, uint8_t* out_buf,
                               size_t out_len) -> zx::result<size_t> {
-    fbl::AutoLock lock(&dci_lock_);
+    std::lock_guard<std::mutex> lock(dci_lock_);
 
     if (!dci_intf_.is_valid()) {
       return zx::error(ZX_ERR_BAD_STATE);
@@ -228,7 +228,7 @@ zx::result<size_t> Dwc3::HandleEp0Setup(const fdescriptor::wire::UsbSetup& setup
     // handle some special setup requests in this driver
     switch (setup.b_request) {
       case USB_REQ_SET_ADDRESS: {
-        fbl::AutoLock lock{&lock_};
+        std::lock_guard<std::mutex> lock{lock_};
         SetDeviceAddress(setup.w_value);
       }
         return zx::ok(0);

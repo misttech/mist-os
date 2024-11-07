@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/fshost/admin-client.h"
+
 #include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
@@ -24,15 +26,10 @@ zx::result<fidl::ClientEnd<fuchsia_fshost::Admin>> ConnectToAdmin() {
     return query_client_end.take_error();
   }
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-
+  auto [exposed_client, exposed_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   auto res = fidl::WireCall(query_client_end.value())
-                 ->Open(kFshostMoniker, fuchsia_sys2::OpenDirType::kExposedDir,
-                        fuchsia_io::OpenFlags::kRightReadable, fuchsia_io::ModeType(), ".",
-                        std::move(endpoints->server));
+                 ->OpenDirectory(kFshostMoniker, fuchsia_sys2::OpenDirType::kExposedDir,
+                                 std::move(exposed_server));
 
   if (!res.ok()) {
     return zx::error(res.status());
@@ -41,16 +38,7 @@ zx::result<fidl::ClientEnd<fuchsia_fshost::Admin>> ConnectToAdmin() {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  auto exposed_dir = fidl::ClientEnd<fuchsia_io::Directory>(endpoints->client.TakeChannel());
-
   // Connect to Admin protocol from exposed dir of fshost
-  zx::result<fidl::ClientEnd<fuchsia_fshost::Admin>> client_end_res =
-      component::ConnectAt<fuchsia_fshost::Admin>(exposed_dir.borrow());
-
-  if (!client_end_res.is_ok()) {
-    return zx::error(std::move(client_end_res.error_value()));
-  }
-
-  return zx::ok(std::move(client_end_res.value()));
+  return component::ConnectAt<fuchsia_fshost::Admin>(exposed_client.borrow());
 }
 }  // namespace fshost

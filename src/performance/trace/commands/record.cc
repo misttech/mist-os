@@ -209,7 +209,7 @@ Command::Info RecordCommand::Describe() {
       {{"output-file=[/tmp/trace.json]",
         "Trace data is stored in this file. "
         "If the output file is \"tcp:TCP-ADDRESS\" then the output is streamed "
-        "to that address. TCP support is generally only used by traceutil."},
+        "to that address."},
        {"binary=[false]",
         "Output the binary trace rather than converting to JSON. "
         "If this is set, then the default output location will be "
@@ -381,8 +381,8 @@ void RecordCommand::LaunchSpawnedApp() {
   std::vector<std::string> all_args = {options_.app};
   all_args.insert(all_args.end(), options_.args.begin(), options_.args.end());
 
-  // Include the arguments here for when invoked by traceutil: It's useful to
-  // see how the passed command+args ended up after shell processing.
+  // Include the arguments here: It's useful to see how the passed command+args ended up after shell
+  // processing.
   FX_LOGS(INFO) << "Spawning: " << JoinArgsForLogging(all_args);
 
   zx::process subprocess;

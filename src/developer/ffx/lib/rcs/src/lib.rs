@@ -11,8 +11,8 @@ use fidl_fuchsia_developer_remotecontrol::{
 };
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fidl_fuchsia_sys2::{
-    LifecycleControllerMarker, LifecycleControllerProxy, RealmQueryMarker, RealmQueryProxy,
-    RouteValidatorMarker, RouteValidatorProxy,
+    ConfigOverrideMarker, ConfigOverrideProxy, LifecycleControllerMarker, LifecycleControllerProxy,
+    RealmQueryMarker, RealmQueryProxy, RouteValidatorMarker, RouteValidatorProxy,
 };
 use futures::{StreamExt, TryFutureExt};
 use std::hash::{Hash, Hasher};
@@ -410,6 +410,13 @@ pub async fn kernel_stats(
         proxy
     };
     Ok(proxy)
+}
+
+pub async fn root_config_override(
+    rcs_proxy: &RemoteControlProxy,
+    timeout: Duration,
+) -> Result<ConfigOverrideProxy> {
+    get_cf_root_from_namespace::<ConfigOverrideMarker>(rcs_proxy, timeout).await
 }
 
 pub async fn root_realm_query(

@@ -21,7 +21,7 @@ group("tests") {
   deps = [ ":virtual_audio_bind_test" ]
 }
 
-fuchsia_driver("virtual_audio_driver-driver") {
+fuchsia_cc_driver("virtual_audio_driver-driver") {
   output_name = "virtual_audio_driver"
 
   sources = [

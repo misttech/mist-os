@@ -11,7 +11,6 @@ use fuchsia_component::client::{
     connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
 };
 use fuchsia_component::server::ServiceFs;
-use fuchsia_fs::OpenFlags;
 use futures::{StreamExt, TryStreamExt};
 use vsock_service_config::Config;
 
@@ -32,11 +31,9 @@ async fn main() -> Result<(), Error> {
 
     let guest_vsock_device = if config.guest_to_host_supported {
         const DEV_CLASS_VSOCK: &str = "/dev/class/vsock";
-        let vsock_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-            DEV_CLASS_VSOCK,
-            OpenFlags::RIGHT_READABLE,
-        )
-        .context("Open vsock dir")?;
+        let vsock_dir =
+            fuchsia_fs::directory::open_in_namespace(DEV_CLASS_VSOCK, fuchsia_fs::PERM_READABLE)
+                .context("Open vsock dir")?;
         let path = device_watcher::watch_for_files(&vsock_dir)
             .await
             .with_context(|| format!("Watching for files in {}", DEV_CLASS_VSOCK))?

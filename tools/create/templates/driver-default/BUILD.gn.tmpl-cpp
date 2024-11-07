@@ -27,7 +27,7 @@ driver_bind_rules("bind") {
   bind_output = "{{snake_case PROJECT_NAME}}.bindbc"
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "{{PROJECT_NAME}}"
   sources = [ "{{snake_case PROJECT_NAME}}.cc" ]
   deps = [

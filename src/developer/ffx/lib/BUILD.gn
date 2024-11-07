@@ -51,14 +51,6 @@ if (is_host) {
     }
   }
 
-  group("host_tests") {
-    testonly = true
-    deps = [
-      "e2e_emu:host_tests",
-      "symbolize:host_tests",
-    ]
-  }
-
   group("lib") {
     testonly = true
 
@@ -67,9 +59,13 @@ if (is_host) {
       deps += [ lib ]
     }
   }
-} else if (is_fuchsia) {
-  group("package_deps_for_host_tests") {
-    testonly = true
-    deps = [ "symbolize:package_deps_for_host_tests" ]
-  }
+}
+
+group("host_tests") {
+  testonly = true
+  deps = [
+    "e2e_emu:host_tests($host_toolchain)",
+    "fuchsia-controller:host_tests($host_toolchain)",
+    "symbolize:host_tests($host_toolchain)",
+  ]
 }

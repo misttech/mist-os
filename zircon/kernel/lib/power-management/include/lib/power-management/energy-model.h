@@ -36,16 +36,33 @@
 namespace power_management {
 
 // forward declaration.
-class PowerModel;
+class EnergyModel;
 
 // Enum representing supported control interfaces.
 enum class ControlInterface : uint64_t {
-  kArmWfi = ZX_PROCESSOR_POWER_CONTROL_ARM_WFI,
+  kCpuDriver = ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER,
   kArmPsci = ZX_PROCESSOR_POWER_CONTROL_ARM_PSCI,
+  kArmWfi = ZX_PROCESSOR_POWER_CONTROL_ARM_WFI,
   kRiscvSbi = ZX_PROCESSOR_POWER_CONTROL_RISCV_SBI,
   kRiscvWfi = ZX_PROCESSOR_POWER_CONTROL_RISCV_WFI,
-  kCpuDriver = ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER,
 };
+
+constexpr const char* ToString(ControlInterface control_interface) {
+  switch (control_interface) {
+    case ControlInterface::kCpuDriver:
+      return "CPU_DRIVER";
+    case ControlInterface::kArmPsci:
+      return "ARM_PSCI";
+    case ControlInterface::kArmWfi:
+      return "ARM_WFI";
+    case ControlInterface::kRiscvSbi:
+      return "RISCV_SBI";
+    case ControlInterface::kRiscvWfi:
+      return "RISCV_WFI";
+    default:
+      return "[unknown]";
+  }
+}
 
 // List of support control interfaces.
 static constexpr auto kSupportedControlInterfaces = cpp20::to_array(
@@ -218,7 +235,7 @@ struct TransitionMatrix {
   }
 
  private:
-  friend PowerModel;
+  friend EnergyModel;
   TransitionMatrix(cpp20::span<const PowerLevelTransition> transitions, size_t num_rows)
       : transitions_(transitions), num_rows_(num_rows) {
     ZX_DEBUG_ASSERT(transitions_.size() != 0);
@@ -231,21 +248,25 @@ struct TransitionMatrix {
   const size_t num_rows_;
 };
 
-// A `Power Model` describes information related to, how many levels are there,
-// what interface should be used for transitioning to any particular level, etc.
+// EnergyModel describes the power consumption rates of the available active and
+// idle states a processor may enter, which interfaces to use to effect state
+// transitions, and properties of the state transitions, such as energy cost and
+// latency. This information is used to make efficient scheduling and load
+// balancing decisions that meet the power vs. performance tradeoffs specified
+// by a product.
 //
-// A `PowerModel` is constant and will never change once initialized, the update
-// model for a `PowerModel` consists on creating a new one, and increasing
-// a generation number.
-class PowerModel {
+// An energy model is constant once initialized. Updating the active energy
+// model requires replacing it with a new instance and incrementing a generation
+// count to detect stale values derived from the previous energy model.
+class EnergyModel {
  public:
-  static zx::result<PowerModel> Create(
+  static zx::result<EnergyModel> Create(
       cpp20::span<const zx_processor_power_level_t> levels,
       cpp20::span<const zx_processor_power_level_transition_t> transitions);
 
-  PowerModel() = default;
-  PowerModel(const PowerModel&) = delete;
-  PowerModel(PowerModel&&) = default;
+  EnergyModel() = default;
+  EnergyModel(const EnergyModel&) = delete;
+  EnergyModel(EnergyModel&&) = default;
 
   // All power levels described in the model, sorted by processing power and energy consumption.
   //
@@ -278,8 +299,8 @@ class PowerModel {
                                         uint64_t control_argument) const;
 
  private:
-  PowerModel(fbl::Vector<PowerLevel> levels, fbl::Vector<PowerLevelTransition> transitions,
-             fbl::Vector<size_t> control_lookup, size_t idle_levels)
+  EnergyModel(fbl::Vector<PowerLevel> levels, fbl::Vector<PowerLevelTransition> transitions,
+              fbl::Vector<size_t> control_lookup, size_t idle_levels)
       : power_levels_(std::move(levels)),
         transitions_(std::move(transitions)),
         control_lookup_(std::move(control_lookup)),
@@ -291,21 +312,19 @@ class PowerModel {
   size_t idle_power_levels_ = 0;
 };
 
-// A `PowerDomain` establishes the relationship between a CPU and a `PowerModel`.
-// A `PowerDomain` may not be modified after its initialization, except for the associated
-// `cpus_`.
-// A `PowerDomain` ID represents a link between a set of cpus and a power model.
-// A `PowerDomain` is considered active if at least once CPU is part of the domain.
+// PowerDomain establishes the relationship between a set of CPUs, the energy
+// model that describes their characteristics, and the power level controller
+// responsible for changing the active power levels for the set of CPUs.
 //
 // Instances of PowerDomain are safe for concurrent use.
 class PowerDomain : public fbl::RefCounted<PowerDomain>,
                     public fbl::SinglyLinkedListable<fbl::RefPtr<PowerDomain>> {
  public:
-  PowerDomain(uint32_t id, zx_cpu_set_t cpus, PowerModel model)
+  PowerDomain(uint32_t id, zx_cpu_set_t cpus, EnergyModel model)
       : PowerDomain(id, cpus, std::move(model), nullptr) {}
-  PowerDomain(uint32_t id, zx_cpu_set_t cpus, PowerModel model,
+  PowerDomain(uint32_t id, zx_cpu_set_t cpus, EnergyModel model,
               fbl::RefPtr<PowerLevelController> controller)
-      : cpus_(cpus), id_(id), power_model_(std::move(model)), controller_(std::move(controller)) {}
+      : cpus_(cpus), id_(id), energy_model_(std::move(model)), controller_(std::move(controller)) {}
 
   // ID representing the relationship between a set of CPUs and a power model.
   constexpr uint32_t id() const { return id_; }
@@ -314,7 +333,7 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
   constexpr const zx_cpu_set_t& cpus() const { return cpus_; }
 
   // Model describing the behavior of the power domain.
-  constexpr const PowerModel& model() const { return power_model_; }
+  constexpr const EnergyModel& model() const { return energy_model_; }
 
   // Normalized utilization accumulated from all the entities that this `PowerDomain`
   // is associated with (e.g. all the cpus in the power domain).
@@ -340,7 +359,7 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
 
   const zx_cpu_set_t cpus_;
   const uint32_t id_;
-  const PowerModel power_model_;
+  const EnergyModel energy_model_;
 
   std::atomic<uint64_t> total_normalized_utilization_{0};
   const fbl::RefPtr<PowerLevelController> controller_ = nullptr;

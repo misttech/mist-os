@@ -228,13 +228,8 @@ class ChromiumInputTest : public ChromiumInputBase {
   static constexpr auto kWebContextProviderUrl =
       "fuchsia-pkg://fuchsia.com/web_engine#meta/context_provider.cm";
 
-  static constexpr auto kMemoryPressureProvider = "memory_pressure_provider";
-  static constexpr auto kMemoryPressureProviderUrl = "#meta/memory_monitor.cm";
-  static constexpr auto kCaptureOnPressureChange = "fuchsia.memory.CaptureOnPressureChange";
-  static constexpr auto kImminentOomCaptureDelay = "fuchsia.memory.ImminentOomCaptureDelay";
-  static constexpr auto kCriticalCaptureDelay = "fuchsia.memory.CriticalCaptureDelay";
-  static constexpr auto kWarningCaptureDelay = "fuchsia.memory.WarningCaptureDelay";
-  static constexpr auto kNormalCaptureDelay = "fuchsia.memory.NormalCaptureDelay";
+  static constexpr auto kMemoryPressureSignaler = "memory_pressure_signaler";
+  static constexpr auto kMemoryPressureSignalerUrl = "#meta/memory_pressure_signaler.cm";
 
   static constexpr auto kNetstack = "netstack";
   static constexpr auto kNetstackUrl = "#meta/netstack.cm";
@@ -260,7 +255,7 @@ class ChromiumInputTest : public ChromiumInputBase {
   std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
     return {
         std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
-        std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
+        std::make_pair(kMemoryPressureSignaler, kMemoryPressureSignalerUrl),
         std::make_pair(kNetstack, kNetstackUrl),
         std::make_pair(kFakeCobalt, kFakeCobaltUrl),
         std::make_pair(kFontsProvider, kFontsProviderUrl),
@@ -285,7 +280,7 @@ class ChromiumInputTest : public ChromiumInputBase {
             .source = ParentRef(),
             .targets =
                 {
-                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
+                    target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureSignaler},
                     ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
                     ChildRef{kFakeCobalt},
                     // Not including kNetstack here, since it emits spurious
@@ -319,7 +314,7 @@ class ChromiumInputTest : public ChromiumInputBase {
                                     .rights = fidl::NaturalToHLCPP(r_star_dir),
                                     .path = "/config/data"}},
          .source = ParentRef(),
-         .targets = {ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider}}},
+         .targets = {ChildRef{kFontsProvider}, ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_intl::PropertyProvider>}},
          .source = ChildRef{kIntl},
          .targets = {target}},
@@ -332,7 +327,7 @@ class ChromiumInputTest : public ChromiumInputBase {
          .targets = {target}},
         {.capabilities = {Protocol{
              fidl::DiscoverableProtocolName<fuchsia_memorypressure::Provider>}},
-         .source = ChildRef{kMemoryPressureProvider},
+         .source = ChildRef{kMemoryPressureSignaler},
          .targets = {target}},
 
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_posix_socket::Provider>},
@@ -350,43 +345,28 @@ class ChromiumInputTest : public ChromiumInputBase {
         {.capabilities = {Protocol{
              fidl::DiscoverableProtocolName<fuchsia_metrics::MetricEventLoggerFactory>}},
          .source = ChildRef{kFakeCobalt},
-         .targets = {ChildRef{kMemoryPressureProvider}}},
+         .targets = {ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_input3::Keyboard>}},
          .source = kTestUIStackRef,
          .targets = {target}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>},
                           Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>}},
          .source = ParentRef(),
-         .targets = {target, ChildRef{kMemoryPressureProvider}}},
+         .targets = {target, ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_scheduler::RoleManager>}},
          .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
+         .targets = {ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{
              fidl::DiscoverableProtocolName<fuchsia_kernel::RootJobForInspect>}},
          .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
+         .targets = {ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_kernel::Stats>}},
          .source = ParentRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
+         .targets = {ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{
              fidl::DiscoverableProtocolName<fuchsia_tracing_provider::Registry>}},
          .source = ParentRef(),
-         .targets = {target, ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kCaptureOnPressureChange}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kImminentOomCaptureDelay}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kCriticalCaptureDelay}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kWarningCaptureDelay}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Config{kNormalCaptureDelay}},
-         .source = VoidRef(),
-         .targets = {ChildRef{kMemoryPressureProvider}}},
+         .targets = {target, ChildRef{kMemoryPressureSignaler}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_buildinfo::Provider>}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target}},

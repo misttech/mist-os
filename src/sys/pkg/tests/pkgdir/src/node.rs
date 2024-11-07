@@ -36,7 +36,7 @@ async fn get_attributes_per_package_source(source: PackageSource) {
     let root_dir = &source.dir;
     #[derive(Debug)]
     struct Args {
-        open_flags: fio::OpenFlags,
+        open_flags: fio::Flags,
         expected_protocols: fio::NodeProtocolKinds,
         expected_abilities: fio::Abilities,
         id_verifier: Option<Box<dyn U64Verifier>>,
@@ -58,9 +58,7 @@ async fn get_attributes_per_package_source(source: PackageSource) {
     }
 
     async fn verify_get_attributes(root_dir: &fio::DirectoryProxy, path: &str, args: Args) {
-        let node = fuchsia_fs::directory::open_node_deprecated(root_dir, path, args.open_flags)
-            .await
-            .unwrap();
+        let node = fuchsia_fs::directory::open_node(root_dir, path, args.open_flags).await.unwrap();
         let (_, immut_attrs) = node
             .get_attributes(fio::NodeAttributesQuery::all())
             .await
@@ -83,7 +81,7 @@ async fn get_attributes_per_package_source(source: PackageSource) {
         root_dir,
         ".",
         Args {
-            open_flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            open_flags: fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_EXECUTABLE,
             expected_protocols: fio::NodeProtocolKinds::DIRECTORY,
             expected_abilities: fio::Abilities::GET_ATTRIBUTES
                 | fio::Abilities::ENUMERATE
@@ -108,7 +106,7 @@ async fn get_attributes_per_package_source(source: PackageSource) {
         root_dir,
         "file",
         Args {
-            open_flags: fio::OpenFlags::RIGHT_READABLE,
+            open_flags: fuchsia_fs::PERM_READABLE,
             expected_protocols: fio::NodeProtocolKinds::FILE,
             expected_abilities: fio::Abilities::GET_ATTRIBUTES
                 | fio::Abilities::READ_BYTES
@@ -123,7 +121,7 @@ async fn get_attributes_per_package_source(source: PackageSource) {
         root_dir,
         "meta",
         Args {
-            open_flags: fio::OpenFlags::NOT_DIRECTORY,
+            open_flags: fio::Flags::PROTOCOL_FILE,
             expected_protocols: fio::NodeProtocolKinds::FILE,
             expected_abilities: fio::Abilities::GET_ATTRIBUTES | fio::Abilities::READ_BYTES,
             expected_content_size: Some(64),
@@ -136,7 +134,7 @@ async fn get_attributes_per_package_source(source: PackageSource) {
         root_dir,
         "meta",
         Args {
-            open_flags: fio::OpenFlags::DIRECTORY,
+            open_flags: fio::Flags::PROTOCOL_DIRECTORY,
             expected_protocols: fio::NodeProtocolKinds::DIRECTORY,
             expected_abilities: fio::Abilities::GET_ATTRIBUTES
                 | fio::Abilities::ENUMERATE
@@ -184,14 +182,11 @@ async fn close() {
 
 async fn close_per_package_source(source: PackageSource) {
     let root_dir = source.dir;
-    async fn verify_close(root_dir: &fio::DirectoryProxy, path: &str, flags: fio::OpenFlags) {
-        let node = fuchsia_fs::directory::open_node_deprecated(
-            root_dir,
-            path,
-            flags | fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
+    async fn verify_close(root_dir: &fio::DirectoryProxy, path: &str, flags: fio::Flags) {
+        let node =
+            fuchsia_fs::directory::open_node(root_dir, path, flags | fuchsia_fs::PERM_READABLE)
+                .await
+                .unwrap();
 
         let () = node.close().await.unwrap().map_err(zx::Status::from_raw).unwrap();
 
@@ -201,14 +196,14 @@ async fn close_per_package_source(source: PackageSource) {
         );
     }
 
-    verify_close(&root_dir, ".", fio::OpenFlags::DIRECTORY).await;
-    verify_close(&root_dir, "dir", fio::OpenFlags::DIRECTORY).await;
-    verify_close(&root_dir, "meta", fio::OpenFlags::DIRECTORY).await;
-    verify_close(&root_dir, "meta/dir", fio::OpenFlags::DIRECTORY).await;
+    verify_close(&root_dir, ".", fio::Flags::PROTOCOL_DIRECTORY).await;
+    verify_close(&root_dir, "dir", fio::Flags::PROTOCOL_DIRECTORY).await;
+    verify_close(&root_dir, "meta", fio::Flags::PROTOCOL_DIRECTORY).await;
+    verify_close(&root_dir, "meta/dir", fio::Flags::PROTOCOL_DIRECTORY).await;
 
-    verify_close(&root_dir, "file", fio::OpenFlags::NOT_DIRECTORY).await;
-    verify_close(&root_dir, "meta/file", fio::OpenFlags::NOT_DIRECTORY).await;
-    verify_close(&root_dir, "meta", fio::OpenFlags::NOT_DIRECTORY).await;
+    verify_close(&root_dir, "file", fio::Flags::PROTOCOL_FILE).await;
+    verify_close(&root_dir, "meta/file", fio::Flags::PROTOCOL_FILE).await;
+    verify_close(&root_dir, "meta", fio::Flags::PROTOCOL_FILE).await;
 }
 
 #[fuchsia::test]
@@ -233,11 +228,11 @@ async fn describe_per_package_source(source: PackageSource) {
 }
 
 async fn assert_query_directory(package_root: &fio::DirectoryProxy, path: &str) {
-    for flag in [fio::OpenFlags::empty(), fio::OpenFlags::NODE_REFERENCE] {
-        let node = fuchsia_fs::directory::open_node_deprecated(
+    for flag in [fio::Flags::empty(), fio::Flags::PROTOCOL_NODE] {
+        let node = fuchsia_fs::directory::open_node(
             package_root,
             path,
-            flag | fio::OpenFlags::DIRECTORY,
+            flag | fio::Flags::PROTOCOL_DIRECTORY,
         )
         .await
         .unwrap();
@@ -251,9 +246,9 @@ async fn assert_query_directory(package_root: &fio::DirectoryProxy, path: &str) 
     }
 }
 
-async fn verify_query_directory(node: fio::NodeProxy, flag: fio::OpenFlags) -> Result<(), Error> {
+async fn verify_query_directory(node: fio::NodeProxy, flag: fio::Flags) -> Result<(), Error> {
     let protocol = String::from_utf8(node.query().await.context("failed to call query")?).unwrap();
-    let expected = if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
+    let expected = if flag.intersects(fio::Flags::PROTOCOL_NODE) {
         crate::NODE_PROTOCOL_NAMES
     } else {
         crate::DIRECTORY_PROTOCOL_NAMES
@@ -266,9 +261,8 @@ async fn verify_query_directory(node: fio::NodeProxy, flag: fio::OpenFlags) -> R
 }
 
 async fn assert_describe_file(package_root: &fio::DirectoryProxy, path: &str) {
-    for flag in [fio::OpenFlags::RIGHT_READABLE, fio::OpenFlags::NODE_REFERENCE] {
-        let node =
-            fuchsia_fs::directory::open_node_deprecated(package_root, path, flag).await.unwrap();
+    for flag in [fuchsia_fs::PERM_READABLE, fio::Flags::PROTOCOL_NODE] {
+        let node = fuchsia_fs::directory::open_node(package_root, path, flag).await.unwrap();
         if let Err(e) = verify_describe_file(node, flag).await {
             panic!(
                 "failed to verify describe. path: {path:?}, flag: {flag:?}, \
@@ -278,9 +272,9 @@ async fn assert_describe_file(package_root: &fio::DirectoryProxy, path: &str) {
     }
 }
 
-async fn verify_describe_file(node: fio::NodeProxy, flag: fio::OpenFlags) -> Result<(), Error> {
+async fn verify_describe_file(node: fio::NodeProxy, flag: fio::Flags) -> Result<(), Error> {
     let protocol = String::from_utf8(node.query().await.context("failed to call query")?).unwrap();
-    if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
+    if flag.intersects(fio::Flags::PROTOCOL_NODE) {
         if crate::NODE_PROTOCOL_NAMES.contains(&protocol.as_str()) {
             Ok(())
         } else {
@@ -306,134 +300,14 @@ async fn verify_describe_file(node: fio::NodeProxy, flag: fio::OpenFlags) -> Res
 }
 
 async fn assert_describe_meta_file(package_root: &fio::DirectoryProxy, path: &str) {
-    for flag in [fio::OpenFlags::empty(), fio::OpenFlags::NODE_REFERENCE] {
-        let node =
-            fuchsia_fs::directory::open_node_deprecated(package_root, path, flag).await.unwrap();
+    for flag in [fio::Flags::empty(), fio::Flags::PROTOCOL_NODE] {
+        let node = fuchsia_fs::directory::open_node(package_root, path, flag).await.unwrap();
         if let Err(e) = verify_describe_file(node, flag).await {
             panic!(
                 "failed to verify describe. path: {path:?}, flag: {flag:?}, \
                     error: {e:#}"
             );
         }
-    }
-}
-
-#[fuchsia::test]
-async fn get_flags() {
-    for source in dirs_to_test().await {
-        get_flags_per_package_source(source).await
-    }
-}
-
-async fn get_flags_per_package_source(source: PackageSource) {
-    let root_dir = source.dir;
-    assert_get_flags_root_dir(&root_dir, ".").await;
-    assert_get_flags_content_dir(&root_dir, "dir").await;
-    assert_get_flags_content_file(&root_dir, "file").await;
-    assert_get_flags_meta(&root_dir, "meta").await;
-    assert_get_flags_meta_file(&root_dir, "meta/file").await;
-    assert_get_flags_meta_dir(&root_dir, "meta/dir").await;
-}
-
-/// Opens a file and verifies the result of GetFlags().
-async fn assert_get_flags(root_dir: &fio::DirectoryProxy, path: &str, open_flags: fio::OpenFlags) {
-    let node =
-        fuchsia_fs::directory::open_node_deprecated(root_dir, path, open_flags).await.unwrap();
-
-    // The flags returned by GetFlags() do NOT always match the flags the node is opened with
-    // because GetFlags only returns those flags that are meaningful after the Open call (instead
-    // of only during).
-    // C++ VFS https://cs.opensource.google/fuchsia/fuchsia/+/main:src/storage/lib/vfs/cpp/file_connection.cc;l=124;drc=6865fdce358ab86d9d2deae5d4693786fbe88d45
-    // Rust VFS https://cs.opensource.google/fuchsia/fuchsia/+/main:src/storage/lib/vfs/rust/src/common.rs;l=21;drc=8cea889022e03a335c73905f5b0aa80937165c03
-    let mask = fio::OpenFlags::APPEND
-        | fio::OpenFlags::NODE_REFERENCE
-        | fio::OpenFlags::RIGHT_READABLE
-        | fio::OpenFlags::RIGHT_WRITABLE
-        | fio::OpenFlags::RIGHT_EXECUTABLE;
-    let expected_flags = open_flags & (mask);
-
-    // Verify GetFlags() produces the expected result.
-    let (status, flags) = node.get_flags().await.unwrap();
-    let () = zx::Status::ok(status).unwrap();
-    assert_eq!(flags, expected_flags);
-}
-
-async fn assert_get_flags_root_dir(root_dir: &fio::DirectoryProxy, path: &str) {
-    for open_flag in [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::DIRECTORY,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-    ] {
-        assert_get_flags(root_dir, path, open_flag).await;
-    }
-}
-
-async fn assert_get_flags_content_dir(root_dir: &fio::DirectoryProxy, path: &str) {
-    for open_flag in [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::DIRECTORY,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-    ] {
-        assert_get_flags(root_dir, path, open_flag).await;
-    }
-}
-
-async fn assert_get_flags_content_file(root_dir: &fio::DirectoryProxy, path: &str) {
-    for open_flag in [
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_EXECUTABLE,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-        fio::OpenFlags::RIGHT_EXECUTABLE,
-        fio::OpenFlags::RIGHT_EXECUTABLE | fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::RIGHT_EXECUTABLE | fio::OpenFlags::POSIX_EXECUTABLE,
-        fio::OpenFlags::RIGHT_EXECUTABLE | fio::OpenFlags::NOT_DIRECTORY,
-    ] {
-        assert_get_flags(root_dir, path, open_flag).await;
-    }
-}
-
-async fn assert_get_flags_meta(root_dir: &fio::DirectoryProxy, path: &str) {
-    for open_flag in [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::DIRECTORY,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
-        fio::OpenFlags::NOT_DIRECTORY,
-    ] {
-        assert_get_flags(root_dir, path, open_flag).await;
-    }
-}
-
-async fn assert_get_flags_meta_file(root_dir: &fio::DirectoryProxy, path: &str) {
-    for open_flag in [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
-        fio::OpenFlags::NOT_DIRECTORY,
-    ] {
-        assert_get_flags(root_dir, path, open_flag).await;
-    }
-}
-
-async fn assert_get_flags_meta_dir(root_dir: &fio::DirectoryProxy, path: &str) {
-    for open_flag in [
-        fio::OpenFlags::empty(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::NODE_REFERENCE,
-        fio::OpenFlags::DESCRIBE,
-        fio::OpenFlags::POSIX_EXECUTABLE,
-        fio::OpenFlags::DIRECTORY,
-    ] {
-        assert_get_flags(root_dir, path, open_flag).await;
     }
 }
 
@@ -446,31 +320,31 @@ async fn set_flags() {
 
 async fn set_flags_per_package_source(source: PackageSource) {
     let package_root = &source.dir;
-    do_set_flags(package_root, ".", fio::OpenFlags::DIRECTORY, fio::OpenFlags::empty())
+    do_set_flags(package_root, ".", fio::Flags::PROTOCOL_DIRECTORY, fio::OpenFlags::empty())
         .await
         .assert_not_supported();
-    do_set_flags(package_root, "meta", fio::OpenFlags::DIRECTORY, fio::OpenFlags::empty())
+    do_set_flags(package_root, "meta", fio::Flags::PROTOCOL_DIRECTORY, fio::OpenFlags::empty())
         .await
         .assert_not_supported();
-    do_set_flags(package_root, "meta/dir", fio::OpenFlags::DIRECTORY, fio::OpenFlags::empty())
+    do_set_flags(package_root, "meta/dir", fio::Flags::PROTOCOL_DIRECTORY, fio::OpenFlags::empty())
         .await
         .assert_not_supported();
-    do_set_flags(package_root, "dir", fio::OpenFlags::DIRECTORY, fio::OpenFlags::empty())
+    do_set_flags(package_root, "dir", fio::Flags::PROTOCOL_DIRECTORY, fio::OpenFlags::empty())
         .await
         .assert_not_supported();
-    do_set_flags(package_root, "file", fio::OpenFlags::NOT_DIRECTORY, fio::OpenFlags::empty())
+    do_set_flags(package_root, "file", fio::Flags::PROTOCOL_FILE, fio::OpenFlags::empty())
         .await
         .assert_ok();
-    do_set_flags(package_root, "meta", fio::OpenFlags::NOT_DIRECTORY, fio::OpenFlags::empty())
+    do_set_flags(package_root, "meta", fio::Flags::PROTOCOL_FILE, fio::OpenFlags::empty())
         .await
         .assert_ok();
-    do_set_flags(package_root, "meta", fio::OpenFlags::NOT_DIRECTORY, fio::OpenFlags::APPEND)
+    do_set_flags(package_root, "meta", fio::Flags::PROTOCOL_FILE, fio::OpenFlags::APPEND)
         .await
         .assert_ok();
-    do_set_flags(package_root, "meta/file", fio::OpenFlags::NOT_DIRECTORY, fio::OpenFlags::empty())
+    do_set_flags(package_root, "meta/file", fio::Flags::PROTOCOL_FILE, fio::OpenFlags::empty())
         .await
         .assert_ok();
-    do_set_flags(package_root, "meta/file", fio::OpenFlags::NOT_DIRECTORY, fio::OpenFlags::APPEND)
+    do_set_flags(package_root, "meta/file", fio::Flags::PROTOCOL_FILE, fio::OpenFlags::APPEND)
         .await
         .assert_ok();
 }
@@ -483,16 +357,13 @@ struct SetFlagsOutcome<'a> {
 async fn do_set_flags<'a>(
     package_root: &fio::DirectoryProxy,
     path: &'a str,
-    flags: fio::OpenFlags,
+    flags: fio::Flags,
     argument: fio::OpenFlags,
 ) -> SetFlagsOutcome<'a> {
-    let node = fuchsia_fs::directory::open_node_deprecated(
-        package_root,
-        path,
-        flags | fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .unwrap();
+    let node =
+        fuchsia_fs::directory::open_node(package_root, path, flags | fuchsia_fs::PERM_READABLE)
+            .await
+            .unwrap();
 
     let result = node.set_flags(argument).await.map(zx::Status::ok);
     SetFlagsOutcome { path, result, argument }
@@ -547,17 +418,16 @@ async fn set_attr() {
 
 async fn set_attr_per_package_source(source: PackageSource) {
     let root_dir = source.dir;
-    assert_set_attr(&root_dir, ".", fio::OpenFlags::DIRECTORY).await;
-    assert_set_attr(&root_dir, "meta", fio::OpenFlags::DIRECTORY).await;
-    assert_set_attr(&root_dir, "meta/dir", fio::OpenFlags::DIRECTORY).await;
-    assert_set_attr(&root_dir, "dir", fio::OpenFlags::DIRECTORY).await;
-    assert_set_attr(&root_dir, "meta", fio::OpenFlags::NOT_DIRECTORY).await;
-    assert_set_attr(&root_dir, "meta/file", fio::OpenFlags::NOT_DIRECTORY).await;
+    assert_set_attr(&root_dir, ".", fio::Flags::PROTOCOL_DIRECTORY).await;
+    assert_set_attr(&root_dir, "meta", fio::Flags::PROTOCOL_DIRECTORY).await;
+    assert_set_attr(&root_dir, "meta/dir", fio::Flags::PROTOCOL_DIRECTORY).await;
+    assert_set_attr(&root_dir, "dir", fio::Flags::PROTOCOL_DIRECTORY).await;
+    assert_set_attr(&root_dir, "meta", fio::Flags::PROTOCOL_FILE).await;
+    assert_set_attr(&root_dir, "meta/file", fio::Flags::PROTOCOL_FILE).await;
 }
 
-async fn assert_set_attr(package_root: &fio::DirectoryProxy, path: &str, flags: fio::OpenFlags) {
-    let node =
-        fuchsia_fs::directory::open_node_deprecated(package_root, path, flags).await.unwrap();
+async fn assert_set_attr(package_root: &fio::DirectoryProxy, path: &str, flags: fio::Flags) {
+    let node = fuchsia_fs::directory::open_node(package_root, path, flags).await.unwrap();
 
     if let Err(e) = verify_set_attr(node).await {
         panic!("set_attr failed. path: {path:?}, error: {e:#}");
@@ -598,17 +468,16 @@ async fn sync() {
 
 async fn sync_per_package_source(source: PackageSource) {
     let root_dir = source.dir;
-    assert_sync(&root_dir, ".", fio::OpenFlags::DIRECTORY).await;
-    assert_sync(&root_dir, "meta", fio::OpenFlags::DIRECTORY).await;
-    assert_sync(&root_dir, "meta/dir", fio::OpenFlags::DIRECTORY).await;
-    assert_sync(&root_dir, "dir", fio::OpenFlags::DIRECTORY).await;
-    assert_sync(&root_dir, "meta", fio::OpenFlags::NOT_DIRECTORY).await;
-    assert_sync(&root_dir, "meta/file", fio::OpenFlags::NOT_DIRECTORY).await;
+    assert_sync(&root_dir, ".", fio::Flags::PROTOCOL_DIRECTORY).await;
+    assert_sync(&root_dir, "meta", fio::Flags::PROTOCOL_DIRECTORY).await;
+    assert_sync(&root_dir, "meta/dir", fio::Flags::PROTOCOL_DIRECTORY).await;
+    assert_sync(&root_dir, "dir", fio::Flags::PROTOCOL_DIRECTORY).await;
+    assert_sync(&root_dir, "meta", fio::Flags::PROTOCOL_FILE).await;
+    assert_sync(&root_dir, "meta/file", fio::Flags::PROTOCOL_FILE).await;
 }
 
-async fn assert_sync(package_root: &fio::DirectoryProxy, path: &str, flags: fio::OpenFlags) {
-    let node =
-        fuchsia_fs::directory::open_node_deprecated(package_root, path, flags).await.unwrap();
+async fn assert_sync(package_root: &fio::DirectoryProxy, path: &str, flags: fio::Flags) {
+    let node = fuchsia_fs::directory::open_node(package_root, path, flags).await.unwrap();
 
     if let Err(e) = verify_sync(node).await {
         panic!("sync failed. path: {path:?}, error: {e:#}");

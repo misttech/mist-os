@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
@@ -35,7 +34,6 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_rust",
-    "//sdk/fidl/fuchsia.driver.legacy:fuchsia.driver.legacy_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
@@ -139,8 +137,6 @@ rustc_library("lib") {
     "//third_party/pciids/pci.ids.zst",
     "tests/golden/list_composites_verbose",
     "tests/golden/list_composites_verbose_empty_fields",
-    "tests/golden/list_legacy_composites_verbose",
-    "tests/golden/list_legacy_composites_verbose_empty_fields",
   ]
 }
 
@@ -172,6 +168,7 @@ rustc_binary("driver_tools") {
   configs += [ "//build/config/rust:bootfs" ]
 }
 
-bootfs_files_for_assembly("bootfs") {
+fuchsia_package("package") {
+  package_name = "driver"
   deps = [ ":driver_tools" ]
 }

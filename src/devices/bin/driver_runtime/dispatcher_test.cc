@@ -1742,7 +1742,7 @@ TEST_F(DispatcherTest, Irq) {
   ASSERT_EQ(ZX_ERR_ALREADY_EXISTS, irq.Begin(dispatcher));
 
   for (uint32_t i = 0; i < kNumCallbacks; i++) {
-    irq_object.trigger(0, zx::time());
+    irq_object.trigger(0, zx::time_boot());
     irq_signal.Wait();
     irq_signal.Reset();
   }
@@ -1782,7 +1782,7 @@ TEST_F(DispatcherTest, UnbindIrq) {
   unbind_complete.Wait();
 
   // The irq has been unbound, so this should not call the handler.
-  irq_object.trigger(0, zx::time());
+  irq_object.trigger(0, zx::time_boot());
 }
 
 // Tests that we get cancellation callbacks for irqs that are still bound when shutting down.
@@ -1860,7 +1860,7 @@ TEST_F(DispatcherTest, IrqCancelOnShutdownCallbackOnlyOnce) {
   entered_task.Wait();
 
   // Trigger the irq to queue a callback request.
-  irq_object.trigger(0, zx::time());
+  irq_object.trigger(0, zx::time_boot());
 
   // Make sure the callback request has already been queued by the second global dispatcher thread,
   // by queueing a task after the trigger and waiting for the task's completion.
@@ -1961,8 +1961,8 @@ TEST_F(DispatcherTest, IrqSynchronized) {
   // While the order of these triggers are serialized, the order in which the triggers are observed
   // by the async_irqs is not. As a result either of the above async_irqs may trigger first. If the
   // irqs are not synchronized, both irq handlers will run and block.
-  irq_object1.trigger(0, zx::time());
-  irq_object2.trigger(0, zx::time());
+  irq_object1.trigger(0, zx::time_boot());
+  irq_object2.trigger(0, zx::time_boot());
 
   // Unblock the irq handler.
   ASSERT_OK(async::PostTask(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher2),
@@ -2007,7 +2007,7 @@ TEST_F(DispatcherTest, UnbindIrqRemovesPacketFromPort) {
   libsync::Completion task_complete;
   ASSERT_OK(async::PostTask(dispatcher, [&] {
     // The irq handler should not be called yet since the dispatcher thread is blocked.
-    irq_object.trigger(0, zx::time());
+    irq_object.trigger(0, zx::time_boot());
     // This should remove the pending irq packet from the port.
     ASSERT_OK(irq.Cancel());
     task_complete.Signal();
@@ -2052,7 +2052,7 @@ TEST_F(DispatcherTest, UnbindIrqRemovesQueuedIrqs) {
   }));
   task_started.Wait();
 
-  irq_object.trigger(0, zx::time());
+  irq_object.trigger(0, zx::time_boot());
 
   // Make sure the irq |OnSignal| has happened on the other |process_shared_dispatcher| thread.
   // Since there are only 2 threads, and 1 is blocked by the task, the other must have already
@@ -2121,7 +2121,7 @@ TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
               const zx_packet_interrupt_t* interrupt) { ASSERT_FALSE(true); });
       ASSERT_EQ(ZX_OK, irq.Begin(dispatcher));
       // This queues the irq packet on the port, which may be read by another thread.
-      irqs[i].trigger(0, zx::time());
+      irqs[i].trigger(0, zx::time_boot());
       ASSERT_OK(irq.Cancel());
       unbind_complete.Signal();
     }));

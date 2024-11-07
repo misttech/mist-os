@@ -62,9 +62,9 @@ fit::result<GuestManagerError, GuestConfig> GuestManager::GetDefaultGuestConfig(
   // [zircon|termina|debian]_guest_manager component hierarchy.
   const std::string config_path = config_pkg_dir_path_ + config_path_;
   auto open_at = [&](const std::string& path, fidl::InterfaceRequest<fuchsia::io::File> file) {
-    return fdio_open((config_pkg_dir_path_ + path).c_str(),
-                     static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),
-                     file.TakeChannel().release());
+    return fdio_open3((config_pkg_dir_path_ + path).c_str(),
+                      static_cast<uint64_t>(fuchsia::io::PERM_READABLE),
+                      file.TakeChannel().release());
   };
 
   std::string content;

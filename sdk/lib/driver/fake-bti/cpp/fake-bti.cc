@@ -4,7 +4,6 @@
 
 #include <lib/driver/fake-bti/cpp/fake-bti.h>
 #include <lib/driver/fake-object/cpp/fake-object.h>
-#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
@@ -105,7 +104,7 @@ class FakeBti final : public fdf_fake_object::FakeObject {
   };
 
   std::mutex lock_;
-  std::vector<PinnedVmoInfo> pinned_vmos_ TA_GUARDED(lock_);
+  std::vector<PinnedVmoInfo> pinned_vmos_ __TA_GUARDED(lock_);
   cpp20::span<const zx_paddr_t> paddrs_;
   size_t paddrs_index_ = 0;
   uint64_t pmo_count_ = 0;

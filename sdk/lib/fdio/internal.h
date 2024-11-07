@@ -113,10 +113,6 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
   static zx::result<fdio_ptr> create(fidl::ClientEnd<fuchsia_io::Node> node,
                                      fuchsia_io::wire::Representation representation);
 
-  // Waits for a |fuchsia.io/Node.OnOpen| event on channel.
-  static zx::result<fdio_ptr> create_with_on_open_deprecated(
-      fidl::ClientEnd<fuchsia_io::Node> node);
-
   virtual zx::result<fdio_ptr> open_deprecated(std::string_view path,
                                                fuchsia_io::wire::OpenFlags flags);
   virtual zx::result<fdio_ptr> open(std::string_view path, fuchsia_io::Flags flags);

@@ -5,7 +5,7 @@
 use crate::client::connection_selection::scoring_functions;
 use crate::client::types;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
-use fuchsia_inspect_contrib::auto_persist::AutoPersist;
+use fuchsia_inspect_auto_persist::AutoPersist;
 use fuchsia_inspect_contrib::log::InspectList;
 use fuchsia_inspect_contrib::nodes::BoundedListNode as InspectBoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log};

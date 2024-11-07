@@ -5,7 +5,7 @@
 use anyhow::{format_err, Error};
 use eui48::MacAddress;
 use fidl::endpoints::create_proxy;
-use futures::future::BoxFuture;
+use futures::future::LocalBoxFuture;
 use futures::TryStreamExt;
 use {
     fidl_fuchsia_wlan_policy as wlan_policy,
@@ -157,7 +157,9 @@ fn handle_request_status(status: wlan_policy::RequestStatus) -> Result<(), Error
 /// When a client or AP controller is created, the policy layer may close the serving end with an
 /// epitaph if another component already holds a controller.  This macro wraps proxy API calls
 /// and provides context to the caller.
-async fn run_proxy_command<'a, T>(fut: BoxFuture<'a, Result<T, fidl::Error>>) -> Result<T, Error> {
+async fn run_proxy_command<'a, T>(
+    fut: LocalBoxFuture<'a, Result<T, fidl::Error>>,
+) -> Result<T, Error> {
     fut.await.map_err(|e| {
         match e {
             fidl::Error::ClientChannelClosed{ .. } => format_err!(

@@ -6,7 +6,7 @@
 
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 namespace banjo_transport {
 
@@ -16,7 +16,7 @@ zx::result<> ChildBanjoTransportDriver::Start() {
       compat::ConnectBanjo<ddk::MiscProtocolClient>(incoming());
 
   if (client.is_error()) {
-    FDF_SLOG(ERROR, "Failed to connect client", KV("status", client.status_string()));
+    fdf::error("Failed to connect client: {}", client);
     return client.take_error();
   }
   client_ = *client;
@@ -40,13 +40,13 @@ zx_status_t ChildBanjoTransportDriver::QueryParent() {
   if (status != ZX_OK) {
     return status;
   }
-  FDF_LOG(INFO, "Transport client hardware: %X", hardware_id_);
+  fdf::info("Transport client hardware: {:X}", hardware_id_);
 
   status = client_.GetFirmwareVersion(&major_version_, &minor_version_);
   if (status != ZX_OK) {
     return status;
   }
-  FDF_LOG(INFO, "Transport client firmware: %d.%d", major_version_, minor_version_);
+  fdf::info("Transport client firmware: {}.{}", major_version_, minor_version_);
   return ZX_OK;
 }
 

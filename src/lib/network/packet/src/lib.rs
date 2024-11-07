@@ -834,31 +834,6 @@ pub trait GrowBufferMut: GrowBuffer + FragmentedBufferMut {
     where
         F: for<'a, 'b> FnOnce(&'a mut [u8], FragmentedBytesMut<'a, 'b>, &'a mut [u8]) -> O;
 
-    /// Gets a mutable view into the header of the previously parsed packet.
-    ///
-    /// Calls `f`, passing the subset of the prefix that forms the header of the
-    /// previously parsed packet, as specified by `meta`.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `meta.header_len` is greater than the size of `self`'s prefix.
-    fn with_header_mut_with_meta<O, F>(&mut self, meta: ParseMetadata, f: F) -> O
-    where
-        F: for<'a, 'b> FnOnce(&'a mut [u8]) -> O,
-    {
-        self.with_parts_mut(|prefix, _body, _suffix| {
-            assert!(
-                prefix.len() >= meta.header_len,
-                "prefix ({} bytes) too small to contain header ({} bytes)",
-                prefix.len(),
-                meta.header_len
-            );
-            let offset = prefix.len() - meta.header_len;
-            let header = &mut prefix[offset..];
-            f(header)
-        })
-    }
-
     /// Extends the front of the body towards the beginning of the buffer,
     /// zeroing the new bytes.
     ///
@@ -2523,67 +2498,5 @@ mod tests {
         assert_eq!(b.take_byte_back().unwrap(), 3);
         assert!(b.take_byte_front().is_none());
         assert!(b.take_byte_back().is_none());
-    }
-
-    #[test]
-    fn with_header_mut_with_meta() {
-        #[derive(zerocopy:: KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned)]
-        #[repr(C)]
-        struct Header {
-            two_bytes: [u8; 2],
-        }
-        struct TestParsablePacket<B> {
-            header: Ref<B, Header>,
-        }
-
-        #[derive(Debug)]
-        struct ParseError;
-
-        impl<B: SplitByteSlice> ParsablePacket<B, ()> for TestParsablePacket<B> {
-            type Error = ParseError;
-            fn parse<BV: BufferView<B>>(
-                mut buffer: BV,
-                _args: (),
-            ) -> Result<TestParsablePacket<B>, ParseError> {
-                let header = buffer.take_obj_front::<Header>().ok_or(ParseError)?;
-                Ok(TestParsablePacket { header })
-            }
-
-            fn parse_mut<BV: BufferViewMut<B>>(
-                mut buffer: BV,
-                _args: (),
-            ) -> Result<TestParsablePacket<B>, ParseError>
-            where
-                B: SplitByteSliceMut,
-            {
-                let header = buffer.take_obj_front::<Header>().ok_or(ParseError)?;
-                Ok(TestParsablePacket { header })
-            }
-
-            fn parse_metadata(&self) -> ParseMetadata {
-                let header_len = Ref::bytes(&self.header).len();
-                ParseMetadata::from_packet(header_len, 0, 0)
-            }
-        }
-
-        // Parse the packet.
-        let mut buf = Buf::new(vec![0, 1, 2, 3], ..);
-        let outer = buf.parse::<TestParsablePacket<_>>().unwrap();
-        assert_eq!(outer.header.two_bytes, [0, 1]);
-
-        // We should be able to access the header we just parsed using its
-        // ParseMetadata.
-        let meta = outer.parse_metadata();
-        buf.with_header_mut_with_meta(meta, |mut header| {
-            let TestParsablePacket { mut header } =
-                header.parse_mut::<TestParsablePacket<_>>().unwrap();
-            assert_eq!(header.two_bytes, [0, 1]);
-            header.two_bytes = [2, 3];
-        });
-
-        // If we undo the parse and extract the inner buffer, we should be able
-        // to see that the header of the outer packet was modified.
-        buf.undo_parse(meta);
-        assert_eq!(buf.into_inner(), vec![2, 3, 2, 3]);
     }
 }

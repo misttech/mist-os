@@ -21,6 +21,11 @@
             to: "#pkg_cache_integration_test",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#pkg_cache_integration_test",
+        },
+        {
             storage: "tmp",
             from: "parent",
             to: "#pkg_cache_integration_test",

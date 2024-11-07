@@ -65,7 +65,7 @@ async fn open_package_directory(
         package_directory::ExecutionScope::new(),
         blobfs.clone(),
         meta_far,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         server,
     )
     .await

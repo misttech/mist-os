@@ -11,7 +11,7 @@ driver_bind_rules("node-group-bind") {
   bind_output = "node-group.bindbc"
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   testonly = true
   output_name = "node-group"
   sources = [ "node-group.cc" ]

@@ -265,7 +265,7 @@ class DriverBase {
   void InitializeAndServe(Namespace incoming,
                           fidl::ServerEnd<fuchsia_io::Directory> outgoing_directory_request);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(25)
   // This will enable validating service instance connection requests that are made to the incoming
   // namespace |incoming()|. It will ensure that the given service + instance combination is valid
   // before attempting to make a connection. If it is not a valid combination, |Connect()| attempts
@@ -274,7 +274,7 @@ class DriverBase {
   // This can be enabled by setting `service_connect_validation: "true"` in the driver cml's
   // `program` section.
   void EnableServiceValidator();
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(25)
 
   std::string name_;
   DriverStartArgs start_args_;

@@ -351,11 +351,11 @@ void CodecFactoryApp::DiscoverMediaCodecDriversAndListenForMoreAsync() {
           return;
         }
 
+        auto [aux_svc_client, aux_svc_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
         fidl::InterfaceHandle<fuchsia::io::Directory> aux_service_directory;
         if (zx_status_t status = outgoing_codec_aux_service_directory_->Serve(
-                fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE |
-                    fuchsia::io::OpenFlags::DIRECTORY,
-                aux_service_directory.NewRequest().TakeChannel(), dispatcher_);
+                fuchsia_io::wire::kPermReadable | fuchsia_io::wire::kPermWritable,
+                std::move(aux_svc_server), dispatcher_);
             status != ZX_OK) {
           FX_PLOGS(ERROR, status) << "outgoing_codec_aux_service_directory_.Serve() failed";
           return;
@@ -371,7 +371,8 @@ void CodecFactoryApp::DiscoverMediaCodecDriversAndListenForMoreAsync() {
         //
         // TODO(dustingreen): Combine these two calls into "Connect" and use FIDL table with the
         // needed fields.
-        device_interface->SetAuxServiceDirectory(std::move(aux_service_directory));
+        device_interface->SetAuxServiceDirectory(
+            fidl::InterfaceHandle<fuchsia::io::Directory>(aux_svc_client.TakeChannel()));
         device_interface->GetCodecFactory(
             discovery_entry->codec_factory->NewRequest(dispatcher()).TakeChannel());
 

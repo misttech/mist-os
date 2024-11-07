@@ -143,6 +143,7 @@ fuchsia_package("remote-control-package") {
   package_name = "remote-control"
   deps = [
     ":remote-control-component",
+    "//src/developer/remote-control/fdomain-runner:bin",
     "//src/developer/remote-control/runner:bin",
   ]
 }

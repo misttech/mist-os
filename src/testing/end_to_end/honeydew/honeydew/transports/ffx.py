@@ -49,7 +49,7 @@ _FFX_CONFIG_CMDS: dict[str, list[str]] = {
     "SSH_KEEPALIVE_TIMEOUT": [
         "config",
         "set",
-        "daemon.ssh_keepalive_timeout",
+        "ssh.keepalive_timeout",
     ],
     "DAEMON_START": [
         "daemon",

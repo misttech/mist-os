@@ -22,8 +22,11 @@ closed protocol Timer {
     /// ## Description
     ///
     /// `zx_timer_create()` creates a timer, an object that can signal
-    /// when a specified point in time has been reached. The only valid
-    /// *clock_id* is `ZX_CLOCK_MONOTONIC`.
+    /// when a specified point in time has been reached. `clock_id` can
+    /// be either `ZX_CLOCK_MONOTONIC` or `ZX_CLOCK_BOOT`, depending on
+    /// which timeline the timer should use as its reference. Note that
+    /// timers on the boot timeline will elapse during suspend-to-idle,
+    /// but will not wake the system.
     ///
     /// The *options* value specifies the coalescing behavior, which
     /// controls whether the system can fire the time earlier or later

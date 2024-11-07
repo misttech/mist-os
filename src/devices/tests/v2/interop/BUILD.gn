@@ -25,7 +25,7 @@ driver_bind_rules("root_bind") {
   bind_output = "root.bindbc"
 }
 
-fuchsia_driver("root_driver") {
+fuchsia_cc_driver("root_driver") {
   testonly = true
   output_name = "interop_root"
   sources = [ "root_driver.cc" ]
@@ -59,7 +59,7 @@ driver_bind_rules("interop_v1_bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("v1_driver") {
+fuchsia_cc_driver("v1_driver") {
   testonly = true
   output_name = "interop_v1"
   sources = [ "v1_driver.cc" ]
@@ -88,7 +88,7 @@ driver_bind_rules("interop_leaf_bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("leaf_driver") {
+fuchsia_cc_driver("leaf_driver") {
   testonly = true
   output_name = "interop_leaf"
   sources = [ "leaf_driver.cc" ]

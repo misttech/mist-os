@@ -20,7 +20,7 @@ driver_bind_rules("ddk-topology-test-bind") {
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
-fuchsia_driver("ddk-topology-test") {
+fuchsia_cc_driver("ddk-topology-test") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",

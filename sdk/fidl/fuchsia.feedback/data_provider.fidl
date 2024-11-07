@@ -54,10 +54,10 @@ closed protocol DataProvider {
 /// Feedback is getting close to the limit defined by MAX_NUM_ANNOTATIONS_PROVIDED. Clients
 /// should migrate to using MAX_NUM_ANNOTATIONS2_PROVIDED with |annotations2|, which will include
 /// all annotations included in |annotations| but has a higher limit for future growth.
-@available(deprecated=NEXT, note="Use MAX_NUM_ANNOTATIONS2_PROVIDED with annotations2")
+@available(deprecated=25, note="Use MAX_NUM_ANNOTATIONS2_PROVIDED with annotations2")
 const MAX_NUM_ANNOTATIONS_PROVIDED uint32 = 64;
 
-@available(added=NEXT)
+@available(added=25)
 const MAX_NUM_ANNOTATIONS2_PROVIDED uint32 = 512;
 
 
@@ -104,11 +104,11 @@ type Annotations = table {
     /// Feedback is getting close to the limit defined by MAX_NUM_ANNOTATIONS_PROVIDED. Clients
     /// should migrate to |annotations2|, which will include all annotations included in
     /// |annotations| but has a higher limit for future growth.
-    @available(deprecated=NEXT, note="Use annotations2")
+    @available(deprecated=25, note="Use annotations2")
     1: annotations vector<Annotation>:MAX_NUM_ANNOTATIONS_PROVIDED;
 
     /// A vector of key-value string pairs. Keys are guaranteed to be unique.
-    @available(added=NEXT)
+    @available(added=25)
     2: annotations2 vector<Annotation>:MAX_NUM_ANNOTATIONS2_PROVIDED;
 };
 
@@ -136,14 +136,14 @@ type Snapshot = resource table {
     /// Feedback is getting close to the limit defined by MAX_NUM_ANNOTATIONS_PROVIDED. Clients
     /// should migrate to |annotations2|, which will include all annotations included in
     /// |annotations| but has a higher limit for future growth.
-    @available(deprecated=NEXT, note="Use annotations2")
+    @available(deprecated=25, note="Use annotations2")
     2: annotations vector<Annotation>:MAX_NUM_ANNOTATIONS_PROVIDED;
 
     /// A vector of key-value string pairs. Keys are guaranteed to be unique.
     ///
     /// While the annotations are included in the ZIP archive itself, some clients also want them
     /// separately to index or augment them so we provide them separately as well.
-    @available(added=NEXT)
+    @available(added=25)
     3: annotations2 vector<Annotation>:MAX_NUM_ANNOTATIONS2_PROVIDED;
 };
 

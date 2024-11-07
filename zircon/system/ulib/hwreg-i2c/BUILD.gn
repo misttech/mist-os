@@ -18,17 +18,3 @@ zx_library("hwreg-i2c") {
     "//zircon/system/ulib/hwreg:hwreg",
   ]
 }
-
-sdk_source_set("hwreg-i2c_sdk") {
-  public = [ "include/hwreg/i2c.h" ]
-  sdk_name = "hwreg-i2c"
-  category = "internal"
-
-  deps = [
-    # <hwreg/i2c.h> has #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>.
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
-
-    # <hwreg/i2c.h> has #include <hwreg/bitfields.h>
-    "//zircon/system/ulib/hwreg:hwreg_sdk",
-  ]
-}

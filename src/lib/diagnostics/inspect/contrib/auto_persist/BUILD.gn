@@ -1,0 +1,45 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("auto_persist") {
+  name = "fuchsia_inspect_auto_persist"
+  version = "0.1.0"
+  edition = "2021"
+  with_unit_tests = true
+
+  deps = [
+    "//sdk/rust/zx",
+    "//src/diagnostics/persistence/fidl:persist_rust",
+    "//src/lib/injectable-time",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  test_deps = [
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+  ]
+
+  sources = [ "src/lib.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+}
+
+fuchsia_unittest_package("fuchsia-inspect-auto-persist-tests") {
+  deps = [ ":auto_persist_test" ]
+}
+
+group("rust") {
+  public_deps = [ ":fuchsia-inspect-auto-persist" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":fuchsia-inspect-auto-persist-tests" ]
+}

@@ -4,10 +4,14 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//src/storage/testing/driver_test_realm.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":ftl-library-test" ]
+  deps = [
+    ":ftl-library-test",
+    ":ftl-wear-simulator-package",
+  ]
 }
 
 test("ftl-test") {
@@ -42,4 +46,30 @@ source_set("ftl-workload-fuzzer") {
     "//src/devices/block/drivers/ftl/tests:shared",
     "//src/storage/lib/ftl",
   ]
+}
+
+test("ftl-wear-simulator-test") {
+  sources = [ "wear_simulator.cc" ]
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//src/storage/blobfs/bin:blobfs-component",
+    "//src/storage/blobfs/test:test_utils",
+    "//src/storage/fs_test",
+    "//src/storage/fvm:fvm-component",
+    "//src/storage/minfs/bin:minfs-test-component",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+storage_driver_test_realm_v2_component("ftl-wear-simulator") {
+  deps = [ ":ftl-wear-simulator-test" ]
+}
+
+fuchsia_test_package("ftl-wear-simulator-package") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_components = [ ":ftl-wear-simulator" ]
 }

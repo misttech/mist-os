@@ -87,10 +87,9 @@ static zx_status_t AddAuxDirToSpawnAction(const char* local_path, const char* re
     return false;
   }
 
-  status = fdio_open(local_path,
-                     static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                           fuchsia::io::OpenFlags::RIGHT_WRITABLE),
-                     server.release());
+  status = fdio_open3(
+      local_path, static_cast<uint64_t>(fuchsia::io::PERM_READABLE | fuchsia::io::PERM_WRITABLE),
+      server.release());
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Could not open " << local_path;
     return false;

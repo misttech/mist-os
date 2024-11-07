@@ -13,8 +13,10 @@
 #include <iterator>
 
 #include "fidl/fuchsia.system.state/cpp/common_types.h"
+#include "gpt/gpt.h"
 #include "src/lib/uuid/uuid.h"
 #include "src/storage/lib/paver/device-partitioner.h"
+#include "src/storage/lib/paver/gpt.h"
 #include "src/storage/lib/paver/pave-logging.h"
 #include "src/storage/lib/paver/system_shutdown_state.h"
 #include "src/storage/lib/paver/utils.h"
@@ -68,7 +70,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> EfiDevicePartitioner::Initialize(
   auto partitioner =
       WrapUnique(new EfiDevicePartitioner(arch, std::move(status->gpt), std::move(context)));
   if (status->initialize_partition_tables) {
-    if (auto status = partitioner->InitPartitionTables(); status.is_error()) {
+    if (auto status = partitioner->ResetPartitionTables(); status.is_error()) {
       return status.take_error();
     }
   }
@@ -94,54 +96,6 @@ bool EfiDevicePartitioner::SupportsPartition(const PartitionSpec& spec) const {
                      [&](const PartitionSpec& supported) { return SpecMatches(spec, supported); });
 }
 
-zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::AddPartition(
-    const PartitionSpec& spec) const {
-  if (!SupportsPartition(spec)) {
-    ERROR("Unsupported partition %s\n", spec.ToString().c_str());
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  // NOTE: If you update the minimum sizes of partitions, please update the
-  // EfiDevicePartitionerTests.InitPartitionTables test.
-  size_t minimum_size_bytes = 0;
-  switch (spec.partition) {
-    case Partition::kBootloaderA:
-      minimum_size_bytes = 16 * kMebibyte;
-      break;
-    case Partition::kZirconA:
-      minimum_size_bytes = 128 * kMebibyte;
-      break;
-    case Partition::kZirconB:
-      minimum_size_bytes = 128 * kMebibyte;
-      break;
-    case Partition::kZirconR:
-      minimum_size_bytes = 192 * kMebibyte;
-      break;
-    case Partition::kVbMetaA:
-      minimum_size_bytes = 64 * kKibibyte;
-      break;
-    case Partition::kVbMetaB:
-      minimum_size_bytes = 64 * kKibibyte;
-      break;
-    case Partition::kVbMetaR:
-      minimum_size_bytes = 64 * kKibibyte;
-      break;
-    case Partition::kAbrMeta:
-      minimum_size_bytes = 4 * kKibibyte;
-      break;
-    case Partition::kFuchsiaVolumeManager:
-      minimum_size_bytes = 56 * kGibibyte;
-      break;
-    default:
-      ERROR("EFI partitioner cannot add unknown partition type\n");
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  const char* name = PartitionName(spec.partition, kPartitionScheme);
-  Uuid type = PartitionType(spec.partition);
-  return gpt_->AddPartition(name, type, minimum_size_bytes, /*optional_reserve_bytes*/ 0);
-}
-
 zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition(
     const PartitionSpec& spec) const {
   if (!SupportsPartition(spec)) {
@@ -151,7 +105,7 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition
 
   switch (spec.partition) {
     case Partition::kBootloaderA: {
-      const auto filter = [](const gpt_partition_t& part) {
+      const auto filter = [](const GptPartitionMetadata& part) {
         return FilterByTypeAndName(part, GUID_EFI_VALUE, GUID_EFI_NAME) ||
                // TODO: Remove support after July 9th 2021.
                FilterByTypeAndName(part, GUID_EFI_VALUE, kOldEfiName);
@@ -160,7 +114,7 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition
       if (status.is_error()) {
         return status.take_error();
       }
-      return zx::ok(std::move(status->partition));
+      return zx::ok(std::move(*status));
     }
     case Partition::kZirconA:
     case Partition::kZirconB:
@@ -169,21 +123,21 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition
     case Partition::kVbMetaB:
     case Partition::kVbMetaR:
     case Partition::kAbrMeta: {
-      const auto filter = [&spec](const gpt_partition_t& part) {
+      const auto filter = [&spec](const GptPartitionMetadata& part) {
         return FilterByType(part, PartitionType(spec.partition));
       };
       auto status = gpt_->FindPartition(filter);
       if (status.is_error()) {
         return status.take_error();
       }
-      return zx::ok(std::move(status->partition));
+      return zx::ok(std::move(*status));
     }
     case Partition::kFuchsiaVolumeManager: {
       auto status = gpt_->FindPartition(IsFvmPartition);
       if (status.is_error()) {
         return status.take_error();
       }
-      return zx::ok(std::move(status->partition));
+      return zx::ok(std::move(*status));
     }
     default:
       ERROR("EFI partitioner cannot find unknown partition type\n");
@@ -202,63 +156,86 @@ zx::result<> EfiDevicePartitioner::FinalizePartition(const PartitionSpec& spec) 
 
 zx::result<> EfiDevicePartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
-zx::result<> EfiDevicePartitioner::InitPartitionTables() const {
-  const std::array<Partition, 9> partitions_to_add{
-      Partition::kBootloaderA, Partition::kZirconA, Partition::kZirconB,
-      Partition::kZirconR,     Partition::kVbMetaA, Partition::kVbMetaB,
-      Partition::kVbMetaR,     Partition::kAbrMeta, Partition::kFuchsiaVolumeManager,
+zx::result<> EfiDevicePartitioner::ResetPartitionTables() const {
+  LOG("Wiping GPT, expect data loss.\n");
+  using PartitionInitSpec = GptDevicePartitioner::PartitionInitSpec;
+
+  const std::array<PartitionInitSpec, 9> fuchsia_partitions{
+      PartitionInitSpec{
+          .name = GUID_EFI_NAME,
+          .type = GUID_EFI_VALUE,
+          .size_bytes = 16 * kMebibyte,
+      },
+      PartitionInitSpec::ForKnownPartition(Partition::kZirconA, kPartitionScheme, 128 * kMebibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kZirconB, kPartitionScheme, 128 * kMebibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kZirconR, kPartitionScheme, 192 * kMebibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaA, kPartitionScheme, 64 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaB, kPartitionScheme, 64 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaR, kPartitionScheme, 64 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kAbrMeta, kPartitionScheme, 4 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kFuchsiaVolumeManager, kPartitionScheme,
+                                           56 * kGibibyte),
   };
 
-  // Wipe partitions.
-  // EfiDevicePartitioner operates on partition types.
-  auto status = gpt_->WipePartitions([&partitions_to_add](const gpt_partition_t& part) {
-    for (auto& partition : partitions_to_add) {
-      // Get the partition type GUID, and compare it.
-      if (PartitionType(partition) != Uuid(part.type)) {
-        continue;
-      }
-      // If we are wiping any non-bootloader partition, we are done.
-      if (partition != Partition::kBootloaderA) {
+  std::vector<PartitionInitSpec> partitions_to_add;
+  partitions_to_add.resize(gpt::kPartitionCount);
+  size_t index = 0;
+
+  // To support dual-booting, add back any partitions we've found which are not known to Fuchsia.
+  zx::result<std::vector<std::unique_ptr<BlockPartitionClient>>> non_fuchsia_partitions =
+      gpt_->FindAllPartitions([&](const GptPartitionMetadata& part) -> bool {
+        // There are multiple possible partitions with the ESP type GUID.  Filter those which aren't
+        // from Fuchsia.
+        if (part.type_guid == Uuid(GUID_EFI_VALUE)) {
+          return part.name != GUID_EFI_NAME;
+        }
+        // For everything else, check if it's a known (Fuchsia-specific) type GUID.
+        for (const auto& known_partition : fuchsia_partitions) {
+          if (part.type_guid == known_partition.type) {
+            return false;
+          }
+        }
         return true;
+      });
+  if (non_fuchsia_partitions.is_error()) {
+    ERROR("Failed to find non-Fuchsia partitions; dual booting may break!: %s\n",
+          non_fuchsia_partitions.status_string());
+  } else {
+    for (auto& partition : non_fuchsia_partitions.value()) {
+      zx::result metadata = partition->GetMetadata();
+      zx::result size = partition->GetPartitionSize();
+      if (metadata.is_ok() && size.is_ok()) {
+        LOG("Preserving non-Fuchsia partition %s (%s) @ %" PRIu64 "\n", metadata->name.c_str(),
+            metadata->type_guid.ToString().c_str(), metadata->start_block_offset);
+        partitions_to_add[index++] = PartitionInitSpec{
+            .name = std::move(metadata->name),
+            .type = metadata->type_guid,
+            .instance = metadata->instance_guid,
+            .start_block = metadata->start_block_offset,
+            .size_bytes = *size,
+            .flags = metadata->flags,
+        };
+      } else {
+        ERROR("Failed to query info for non-Fuchsia partition: %s. Dual booting may break!\n",
+              metadata.is_error() ? metadata.status_string() : size.status_string());
       }
-      // If we are wiping the bootloader partition, only do so if it is the
-      // Fuchsia-installed bootloader partition. This is to allow dual-booting.
-      char cstring_name[GPT_NAME_LEN] = {};
-      utf16_to_cstring(cstring_name, part.name, GPT_NAME_LEN);
-      if (strncasecmp(cstring_name, GUID_EFI_NAME, GPT_NAME_LEN) == 0) {
-        return true;
-      }
-      // Support the old name.
-      // TODO: Remove support after July 9th 2021.
-      if (strncasecmp(cstring_name, kOldEfiName, GPT_NAME_LEN) == 0) {
-        return true;
+      if (index >= partitions_to_add.size()) {
+        ERROR("Too many partitions found!\n");
+        return zx::error(ZX_ERR_BAD_STATE);
       }
     }
-    return false;
-  });
-  if (status.is_error()) {
-    ERROR("Failed to wipe partitions: %s\n", status.status_string());
-    return status.take_error();
   }
 
-  // Add partitions with default content_type.
-  for (auto type : partitions_to_add) {
-    auto status = AddPartition(PartitionSpec(type));
-    if (status.status_value() == ZX_ERR_ALREADY_BOUND) {
-      ERROR("Warning: Skipping existing partition \"%s\"\n", PartitionName(type, kPartitionScheme));
-    } else if (status.is_error()) {
-      ERROR("Failed to create partition \"%s\": %s\n", PartitionName(type, kPartitionScheme),
-            status.status_string());
-      return status.take_error();
+  // Add the known partitions at the end, so the existing partitions get allocated first.
+  for (const auto& partition : fuchsia_partitions) {
+    partitions_to_add[index++] = partition;
+    if (index >= partitions_to_add.size()) {
+      ERROR("Too many partitions found!\n");
+      return zx::error(ZX_ERR_BAD_STATE);
     }
   }
 
-  LOG("Successfully initialized GPT\n");
-  return zx::ok();
-}  // namespace paver
-
-zx::result<> EfiDevicePartitioner::WipePartitionTables() const {
-  return gpt_->WipePartitionTables();
+  return gpt_->ResetPartitionTables(std::move(partitions_to_add));
 }
 
 zx::result<> EfiDevicePartitioner::ValidatePayload(const PartitionSpec& spec,

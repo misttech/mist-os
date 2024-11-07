@@ -4,44 +4,36 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
-sdk_source_set("unwinder") {
-  category = "internal"
-  build_as_static = true
-
+static_library("unwinder") {
   public = [
     "cfi_module.h",
     "cfi_parser.h",
     "dwarf_expr.h",
     "error.h",
+    "fp_unwinder.h",  # Used by
+                      # //src/performance/experimental/profiler/sampler.cc.
     "memory.h",
     "module.h",
     "platform.h",
     "registers.h",
     "unwind.h",
   ]
-  sdk_headers_for_internal_use = [
-    "cfi_module.h",
-    "cfi_parser.h",
-    "cfi_unwinder.h",
-    "dwarf_expr.h",
-    "fp_unwinder.h",
-    "plt_unwinder.h",
-    "scs_unwinder.h",
-  ]
   sources = [
     "cfi_module.cc",
     "cfi_parser.cc",
     "cfi_unwinder.cc",
+    "cfi_unwinder.h",
     "dwarf_expr.cc",
     "error.cc",
     "fp_unwinder.cc",
     "memory.cc",
     "plt_unwinder.cc",
+    "plt_unwinder.h",
     "registers.cc",
     "scs_unwinder.cc",
+    "scs_unwinder.h",
     "unwind.cc",
   ]
   deps = []
@@ -55,7 +47,6 @@ sdk_source_set("unwinder") {
       "third_party/libunwindstack/context.h",
       "unwind_local.h",
     ]
-    sdk_headers_for_internal_use += [ "third_party/libunwindstack/context.h" ]
     sources += [ "unwind_local.cc" ]
     if (current_cpu == "x64") {
       sources += [ "third_party/libunwindstack/context_x86_64.S" ]

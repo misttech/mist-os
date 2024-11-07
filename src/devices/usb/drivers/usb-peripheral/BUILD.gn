@@ -19,7 +19,7 @@ driver_bind_rules("usb_peripheral_bind") {
   ]
 }
 
-fuchsia_driver("usb-peripheral-driver") {
+fuchsia_cc_driver("usb-peripheral-driver") {
   output_name = "usb-peripheral"
   configs += [
     "//build/config:all_source",

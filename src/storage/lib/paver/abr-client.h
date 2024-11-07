@@ -63,8 +63,9 @@ class Client {
     return AbrResultToZxStatus(AbrMarkSlotUnbootable(&abr_ops_, index));
   }
 
-  zx::result<> MarkSlotSuccessful(AbrSlotIndex index) {
-    return AbrResultToZxStatus(AbrMarkSlotSuccessful(&abr_ops_, index));
+  // Only set |from_unbootable_ok| if this is the final boot into the current slot.
+  zx::result<> MarkSlotSuccessful(AbrSlotIndex index, bool from_unbootable_ok = false) {
+    return AbrResultToZxStatus(AbrMarkSlotSuccessful(&abr_ops_, index, from_unbootable_ok));
   }
 
   zx::result<AbrSlotInfo> GetSlotInfo(AbrSlotIndex index) const {
@@ -95,7 +96,7 @@ class Client {
 
   static zx::result<> AbrResultToZxStatus(AbrResult status);
 
-  virtual zx::result<> Flush() const = 0;
+  virtual zx::result<> Flush() = 0;
 
   void InitializeAbrOps();
 
@@ -119,6 +120,8 @@ class Client {
   Client& operator=(Client&&) = delete;
 
  private:
+  friend class KolaAbrClientTest;
+
   AbrOps abr_ops_;
 
   // ReadAbrMetaData and WriteAbrMetaData will be assigned to fields in AbrOps
@@ -184,7 +187,7 @@ class AbrPartitionClient : public Client {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx::result<> Flush() const override { return partition_->Flush(); }
+  zx::result<> Flush() override { return partition_->Flush(); }
 
   std::unique_ptr<paver::PartitionClient> partition_;
   zx::vmo vmo_;

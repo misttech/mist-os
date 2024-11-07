@@ -7,6 +7,7 @@
 
 #include <lib/fit/internal/compiler.h>
 #include <lib/fit/result.h>
+#include <lib/stdcompat/version.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -253,4 +254,25 @@ const char* result<T>::status_string() const {
 
 }  // namespace zx
 
+// Support for std::format
+#if defined(__cpp_lib_format) && __cplusplus >= 202002L && defined(__Fuchsia__)
+#include <format>
+
+template <>
+struct std::formatter<zx::result<>> : std::formatter<const char*> {
+  constexpr auto parse(auto& ctx) { return ctx.begin(); }
+  auto format(const zx::result<>& result, std::format_context& ctx) const {
+    return std::formatter<const char*>::format(result.status_string(), ctx);
+  }
+};
+
+template <typename T>
+struct std::formatter<zx::result<T>> : std::formatter<const char*> {
+  constexpr auto parse(auto& ctx) { return ctx.begin(); }
+  auto format(const zx::result<T>& result, std::format_context& ctx) const {
+    return std::formatter<const char*>::format(result.status_string(), ctx);
+  }
+};
+
+#endif
 #endif  // LIB_ZX_RESULT_H_

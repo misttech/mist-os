@@ -4,6 +4,7 @@
 
 pub mod capability;
 pub mod collection;
+pub mod config;
 pub mod create;
 pub mod destroy;
 pub mod doctor;
@@ -22,6 +23,7 @@ pub mod storage;
 
 pub use capability::capability_cmd;
 pub use collection::{collection_list_cmd, collection_show_cmd};
+pub use config::{config_list_cmd, config_set_cmd, config_unset_cmd};
 pub use create::create_cmd;
 pub use destroy::destroy_cmd;
 pub use doctor::{doctor_cmd_print, doctor_cmd_serialized};

@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
+use ffx_config::FfxConfigBacked;
 use ffx_core::ffx_command;
 use ffx_fastboot::common::cmd::{Command, ManifestParams, OemFile};
 use std::default::Default;
 use std::path::PathBuf;
 
 #[ffx_command()]
-#[derive(ArgsInfo, FromArgs, Default, Debug, Eq, PartialEq)]
+#[derive(FfxConfigBacked, ArgsInfo, FromArgs, Default, Debug, Eq, PartialEq)]
 #[argh(
     subcommand,
     name = "flash",
@@ -84,6 +85,17 @@ pub struct FlashCommand {
     )]
     pub skip_verify: bool,
 
+    #[argh(option, description = "flash timeout rate in mb/second.")]
+    #[ffx_config_default(key = "fastboot.flash.min_timeout_rate", default = "2")]
+    pub timeout_rate: Option<u64>,
+
+    #[argh(
+        option,
+        description = "minimum timeout in seconds to wait while flashing per-partition"
+    )]
+    #[ffx_config_default(key = "fastboot.flash.min_timeout_secs", default = "60")]
+    pub min_timeout_secs: Option<u64>,
+
     #[argh(
         switch,
         description = "skip uploading ssh authorized keys. This is dangerous, you will be unable to communicate with the target via ffx.",
@@ -94,6 +106,8 @@ pub struct FlashCommand {
 
 impl Into<ManifestParams> for FlashCommand {
     fn into(self) -> ManifestParams {
+        let flash_min_timeout_seconds = self.min_timeout_secs().ok().unwrap();
+        let flash_timeout_rate_mb_per_second = self.timeout_rate().ok().unwrap();
         let manifest = self.manifest.or(self.manifest_path);
         ManifestParams {
             manifest,
@@ -103,6 +117,8 @@ impl Into<ManifestParams> for FlashCommand {
             skip_verify: self.skip_verify,
             no_bootloader_reboot: self.no_bootloader_reboot,
             op: Command::Flash,
+            flash_min_timeout_seconds,
+            flash_timeout_rate_mb_per_second,
         }
     }
 }
@@ -161,6 +177,8 @@ mod test {
             no_bootloader_reboot: false,
             skip_verify: false,
             oem_stage: vec![test_staged_file],
+            min_timeout_secs: Some(100),
+            timeout_rate: Some(1),
             skip_authorized_keys: false,
         };
 

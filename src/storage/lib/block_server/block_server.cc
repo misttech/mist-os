@@ -4,6 +4,8 @@
 
 #include "src/storage/lib/block_server/block_server.h"
 
+#include <zircon/assert.h>
+
 #include "src/storage/lib/block_server/block_server_c.h"
 
 namespace block_server {
@@ -24,11 +26,21 @@ BlockServer::BlockServer(const PartitionInfo& info, Interface* interface)
                         Session(session));
                   },
               .on_requests =
-                  [](void* context, const internal::Session* session, const Request* requests,
+                  [](void* context, const internal::Session* session, Request* requests,
                      uintptr_t request_count) {
+                    // Use a union so that the destructor for session does not run.
+                    union U {
+                      U(const internal::Session* session) : session(session) {}
+                      ~U() {}
+                      Session session;
+                    } u(session);
                     reinterpret_cast<BlockServer*>(context)->interface_->OnRequests(
-                        reinterpret_cast<Session&>(session),
-                        std::span<const Request>(requests, request_count));
+                        u.session, std::span<Request>(requests, request_count));
+                  },
+              .log =
+                  [](void* context, const char* msg, size_t len) {
+                    reinterpret_cast<BlockServer*>(context)->interface_->Log(
+                        std::string_view(msg, len));
                   },
           })) {}
 
@@ -50,7 +62,7 @@ Session::~Session() {
 
 void Session::Run() { block_server_session_run(session_); }
 
-void Session::SendReply(RequestId request_id, zx::result<> result) {
+void Session::SendReply(RequestId request_id, zx::result<> result) const {
   block_server_send_reply(session_, request_id, result.status_value());
 }
 
@@ -68,6 +80,25 @@ BlockServer::~BlockServer() {
 
 void BlockServer::Serve(fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> server_end) {
   block_server_serve(server_, server_end.TakeChannel().release());
+}
+
+Request SplitRequest(Request& request, uint32_t block_offset, uint32_t block_size) {
+  Request head = request;
+  switch (request.operation.tag) {
+    case Operation::Tag::Read:
+    case Operation::Tag::Write:
+      request.operation.read.vmo_offset += static_cast<uint64_t>(block_offset) * block_size;
+      break;
+    case Operation::Tag::Trim:
+      break;
+    case Operation::Tag::Flush:
+    case Operation::Tag::CloseVmo:
+      ZX_PANIC("Can't split Flush or CloseVmo operations");
+  }
+  head.operation.read.block_count = block_offset;
+  request.operation.read.device_block_offset += block_offset;
+  request.operation.read.block_count -= block_offset;
+  return head;
 }
 
 }  // namespace block_server

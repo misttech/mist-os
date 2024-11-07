@@ -96,6 +96,8 @@ zx::result<> GuestPhysicalAspace::UnmapRange(zx_gpaddr_t guest_paddr, size_t len
 zx::result<> GuestPhysicalAspace::PageFault(zx_gpaddr_t guest_paddr) {
   __UNINITIALIZED MultiPageRequest page_request;
 
+  guest_paddr = ROUNDDOWN(guest_paddr, PAGE_SIZE);
+
   zx_status_t status;
   do {
     {

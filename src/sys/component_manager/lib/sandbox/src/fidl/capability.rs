@@ -13,6 +13,7 @@ impl From<Capability> for fsandbox::Capability {
     fn from(capability: Capability) -> Self {
         match capability {
             Capability::Connector(s) => s.into(),
+            Capability::DirConnector(s) => s.into(),
             Capability::DirEntry(s) => s.into(),
             Capability::DictionaryRouter(s) => s.into(),
             Capability::ConnectorRouter(s) => s.into(),
@@ -47,6 +48,14 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 let any = try_from_handle_in_registry(connector.token.as_handle_ref())?;
                 match &any {
                     Capability::Connector(_) => (),
+                    _ => return Err(RemoteError::BadCapability),
+                };
+                Ok(any)
+            }
+            fsandbox::Capability::DirConnector(connector) => {
+                let any = try_from_handle_in_registry(connector.token.as_handle_ref())?;
+                match &any {
+                    Capability::DirConnector(_) => (),
                     _ => return Err(RemoteError::BadCapability),
                 };
                 Ok(any)
@@ -103,6 +112,7 @@ impl RemotableCapability for Capability {
     fn try_into_directory_entry(self) -> Result<Arc<dyn DirectoryEntry>, ConversionError> {
         match self {
             Self::Connector(s) => s.try_into_directory_entry(),
+            Self::DirConnector(s) => s.try_into_directory_entry(),
             Self::DirEntry(s) => s.try_into_directory_entry(),
             Self::ConnectorRouter(s) => s.try_into_directory_entry(),
             Self::DictionaryRouter(s) => s.try_into_directory_entry(),

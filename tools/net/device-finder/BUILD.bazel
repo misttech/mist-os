@@ -1,0 +1,66 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library", "go_test")
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("//build/tools/gnerator/bazel_rules:defs.bzl", "install_host_tools", "sdk_host_tool")
+
+go_library(
+    name = "lib",
+    srcs = [
+        "cmd/common.go",
+        "cmd/dnssderrors.go",
+        "cmd/dnssdfinder.go",
+        "cmd/dnssdfinder.h",
+        "cmd/dnssdfinder_c.c",
+        "cmd/finders.go",
+        "cmd/list.go",
+        "cmd/main.go",
+        "cmd/resolve.go",
+    ],
+    cgo = True,
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [
+        "//third_party/golibs:github.com/google/subcommands",
+        "//tools/lib/color",
+        "//tools/lib/logger",
+        "//tools/net/mdns",
+        "//tools/net/netboot",
+    ],
+)
+
+go_binary(
+    name = "device-finder",
+    embed = [":lib"],
+    target_compatible_with = HOST_CONSTRAINTS,
+)
+
+go_test(
+    name = "dev_finder_tests",
+    srcs = [
+        "cmd/dev_finder_test.go",
+    ],
+    embed = [
+        ":lib",
+    ],
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [
+        "//third_party/golibs:github.com/google/go-cmp/cmp",
+    ],
+)
+
+sdk_host_tool(
+    name = "device-finder_sdk",
+    category = "partner",
+    output_name = "device-finder",
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [":device-finder"],
+)
+
+install_host_tools(
+    name = "host",
+    outputs = ["device-finder"],
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [":device-finder"],
+)

@@ -151,7 +151,7 @@ std::string echo_service = R"({
           "maybe_request": [
             {
               "type": {
-                "kind": "string",
+                "kind_v2": "string",
                 "nullable": true,
                 "type_shape_v1": {
                   "inline_size": 16,
@@ -190,7 +190,7 @@ std::string echo_service = R"({
             }
           ],
           "maybe_request_payload": {
-            "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "fidl.examples.echo/EchoEchoStringRequest",
             "nullable": false,
             "type_shape_v1": {
@@ -234,7 +234,7 @@ std::string echo_service = R"({
           "maybe_response": [
             {
               "type": {
-                "kind": "string",
+                "kind_v2": "string",
                 "nullable": true,
                 "type_shape_v1": {
                   "inline_size": 16,
@@ -273,7 +273,7 @@ std::string echo_service = R"({
             }
           ],
           "maybe_response_payload": {
-            "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "fidl.examples.echo/EchoEchoStringTopResponse",
             "nullable": false,
             "type_shape_v1": {
@@ -329,7 +329,7 @@ std::string echo_service = R"({
           "maybe_request": [
             {
               "type": {
-                "kind": "handle",
+                "kind_v2": "handle",
                 "obj_type": 0,
                 "subtype": "handle",
                 "rights": 2147483648,
@@ -371,7 +371,7 @@ std::string echo_service = R"({
             }
           ],
           "maybe_request_payload": {
-            "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "fidl.examples.echo/EchoEchoHandleRequest",
             "nullable": false,
             "type_shape_v1": {
@@ -415,7 +415,7 @@ std::string echo_service = R"({
           "maybe_response": [
             {
               "type": {
-                "kind": "handle",
+                "kind_v2": "handle",
                 "obj_type": 0,
                 "subtype": "handle",
                 "rights": 2147483648,
@@ -457,7 +457,7 @@ std::string echo_service = R"({
             }
           ],
           "maybe_response_payload": {
-            "kind": "identifier",
+            "kind_v2": "identifier",
             "identifier": "fidl.examples.echo/EchoEchoHandleTopResponse",
             "nullable": false,
             "type_shape_v1": {
@@ -554,7 +554,7 @@ std::string echo_service = R"({
       "members": [
         {
           "type": {
-            "kind": "string",
+            "kind_v2": "string",
             "nullable": true,
             "type_shape_v1": {
               "inline_size": 16,
@@ -628,7 +628,7 @@ std::string echo_service = R"({
       "members": [
         {
           "type": {
-            "kind": "string",
+            "kind_v2": "string",
             "nullable": true,
             "type_shape_v1": {
               "inline_size": 16,
@@ -702,7 +702,7 @@ std::string echo_service = R"({
       "members": [
         {
           "type": {
-            "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 0,
             "subtype": "handle",
             "rights": 2147483648,
@@ -779,7 +779,7 @@ std::string echo_service = R"({
       "members": [
         {
           "type": {
-            "kind": "handle",
+            "kind_v2": "handle",
             "obj_type": 0,
             "subtype": "handle",
             "rights": 2147483648,

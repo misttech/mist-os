@@ -5,6 +5,7 @@
 #ifndef SRC_STORAGE_LIB_BLOCK_CLIENT_CPP_FAKE_BLOCK_DEVICE_H_
 #define SRC_STORAGE_LIB_BLOCK_CLIENT_CPP_FAKE_BLOCK_DEVICE_H_
 
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -49,6 +50,9 @@ class FakeBlockDevice : public BlockDevice {
   FakeBlockDevice& operator=(FakeBlockDevice&& other) = delete;
 
   ~FakeBlockDevice() override = default;
+
+  /// Returns a VMO child reference of the block device.
+  zx::result<zx::vmo> VmoChildReference() const;
 
   // Sets a callback which will be invoked for each FIFO request that is received by the block
   // device. (If the FIFO request targets a VMO, |vmo| will be set as well.)

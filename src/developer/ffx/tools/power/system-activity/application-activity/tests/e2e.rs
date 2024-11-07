@@ -9,17 +9,11 @@ use ffx_e2e_emu::IsolatedEmulator;
 async fn taking_lease_adds_lease_to_broker_inspect() {
     let emu = IsolatedEmulator::start("application-activity-test").await.unwrap();
 
-    // Start SAG. "stop" is a no-op since no application-activity lease exists at this point.
-    emu.ffx(&["power", "system-activity", "application-activity", "stop"]).await.unwrap();
-
-    std::thread::sleep(std::time::Duration::from_secs(1));
-    let lease_count = dbg!(get_active_leases(&emu).await);
-
     emu.ffx(&["power", "system-activity", "application-activity", "start"]).await.unwrap();
 
-    // Wait until the command exiting results in more leases being held.
+    // Wait until application_activity level changing to active.
     loop {
-        if dbg!(get_active_leases(&emu).await).len() > lease_count.len() {
+        if get_application_activity_level(&emu).await == 1 {
             break;
         }
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -28,24 +22,30 @@ async fn taking_lease_adds_lease_to_broker_inspect() {
     emu.stop().await;
 }
 
-async fn get_active_leases(emu: &IsolatedEmulator) -> Vec<String> {
-    let broker_inspect_json = emu
-        .ffx_output(&["--machine", "json", "inspect", "show", "/bootstrap/power-broker"])
+async fn get_application_activity_level(emu: &IsolatedEmulator) -> i64 {
+    let sag_inspect_json = emu
+        .ffx_output(&[
+            "--machine",
+            "json",
+            "inspect",
+            "show",
+            "/bootstrap/system-activity-governor",
+        ])
         .await
         .unwrap();
-    let data: Vec<InspectData> = serde_json::from_str(&broker_inspect_json).unwrap();
+    let data: Vec<InspectData> = serde_json::from_str(&sag_inspect_json).unwrap();
     assert_eq!(data.len(), 1, "only one component's inspect should be returned");
     data[0]
         .payload
         .as_ref()
         .unwrap()
-        .get_child("broker")
+        .get_child("power_elements")
         .unwrap()
-        .get_child("leases")
+        .get_child("application_activity")
+        .unwrap()
+        .get_property("power_level")
         .unwrap()
         .clone()
-        .properties
-        .iter()
-        .map(|l| l.key().to_string())
-        .collect()
+        .number_as_int()
+        .unwrap()
 }

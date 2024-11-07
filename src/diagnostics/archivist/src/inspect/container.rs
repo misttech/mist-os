@@ -133,9 +133,7 @@ impl InspectArtifactsContainer {
         let stored = StoredInspectHandle { _control: control_snd, handle: Arc::clone(&handle) };
         let koid = handle.koid();
         self.inspect_handles.insert(koid, stored);
-        let (task, rcv) = Self::on_closed_task(handle, koid, control_rcv);
-        self.on_closed_tasks.add(task);
-        Some(rcv)
+        Some(self.spawn_on_closed_task(handle, koid, control_rcv))
     }
 
     /// Generate an `UnpopulatedInspectDataContainer` from the proxies managed by `self`.
@@ -207,23 +205,22 @@ impl InspectArtifactsContainer {
         }
     }
 
-    fn on_closed_task(
+    fn spawn_on_closed_task(
+        &mut self,
         proxy: Arc<InspectHandle>,
         koid: zx::Koid,
         control_rcv: oneshot::Receiver<()>,
-    ) -> (fasync::Task<()>, oneshot::Receiver<zx::Koid>) {
+    ) -> oneshot::Receiver<zx::Koid> {
         let (snd, rcv) = oneshot::channel();
-        (
-            fasync::Task::spawn(async move {
-                if !proxy.is_closed() {
-                    let closed_fut = proxy.on_closed();
-                    futures::pin_mut!(closed_fut);
-                    let _ = futures::future::select(closed_fut, control_rcv).await;
-                }
-                let _ = snd.send(koid);
-            }),
-            rcv,
-        )
+        self.on_closed_tasks.spawn(async move {
+            if !proxy.is_closed() {
+                let closed_fut = proxy.on_closed();
+                futures::pin_mut!(closed_fut);
+                let _ = futures::future::select(closed_fut, control_rcv).await;
+            }
+            let _ = snd.send(koid);
+        });
+        rcv
     }
 }
 
@@ -598,11 +595,7 @@ mod test {
     #[fuchsia::test]
     async fn no_inspect_files_do_not_give_an_error_response() {
         let directory = Arc::new(InspectHandle::directory(
-            fuchsia_fs::directory::open_in_namespace_deprecated(
-                "/tmp",
-                fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            )
-            .unwrap(),
+            fuchsia_fs::directory::open_in_namespace("/tmp", fio::PERM_READABLE).unwrap(),
         ));
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),

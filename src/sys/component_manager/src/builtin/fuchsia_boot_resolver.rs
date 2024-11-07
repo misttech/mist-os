@@ -392,7 +392,7 @@ impl FuchsiaBootPackageResolver {
             package_directory::ExecutionScope::new(),
             blob_proxy,
             meta_hash,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            fio::PERM_READABLE | fio::PERM_EXECUTABLE,
             dir,
         )
         .await

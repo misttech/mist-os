@@ -61,6 +61,10 @@ cc_source_library://pkg/component_incoming_cpp
 cc_source_library://pkg/component_outgoing_cpp
 cc_source_library://pkg/driver_component_cpp
 cc_source_library://pkg/driver_devfs_cpp
+cc_source_library://pkg/driver_fake_bti_cpp (unstable)
+cc_source_library://pkg/driver_fake_object_cpp (unstable)
+cc_source_library://pkg/driver_fake_platform_device_cpp (unstable)
+cc_source_library://pkg/driver_fake_resource_cpp (unstable)
 cc_source_library://pkg/driver_incoming_cpp
 cc_source_library://pkg/driver_logging_cpp
 cc_source_library://pkg/driver_metadata_cpp (unstable)
@@ -235,7 +239,6 @@ fidl_library://fidl/fuchsia.diagnostics
 fidl_library://fidl/fuchsia.diagnostics.types
 fidl_library://fidl/fuchsia.driver.development
 fidl_library://fidl/fuchsia.driver.framework
-fidl_library://fidl/fuchsia.driver.legacy
 fidl_library://fidl/fuchsia.driver.metadata (unstable)
 fidl_library://fidl/fuchsia.driver.registrar
 fidl_library://fidl/fuchsia.driver.test

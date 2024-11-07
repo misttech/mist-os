@@ -9,6 +9,7 @@ use super::time::{BootInstant, MonotonicInstant};
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
+use zx::BootDuration;
 
 use std::any::Any;
 use std::cell::RefCell;
@@ -32,7 +33,17 @@ thread_local!(
 
 pub enum ExecutorTime {
     RealTime,
-    FakeTime(AtomicI64),
+    /// Fake readings used in tests.
+    FakeTime {
+        // The fake monotonic clock reading.
+        mono_reading_ns: AtomicI64,
+        // An offset to add to mono_reading_ns to get the reading of the boot
+        // clock, disregarding the difference in timelines.
+        //
+        // We disregard the fact that the reading and offset can not be
+        // read atomically, this is usually not relevant in tests.
+        mono_to_boot_offset_ns: AtomicI64,
+    },
 }
 
 enum PollReadyTasksResult {
@@ -84,15 +95,18 @@ impl Executor {
         ACTIVE_EXECUTORS.fetch_add(1, Ordering::Relaxed);
 
         let mut receivers: PacketReceiverMap<Arc<dyn PacketReceiver>> = PacketReceiverMap::new();
+
+        // Is this a fake-time executor?
+        let is_fake = matches!(
+            time,
+            ExecutorTime::FakeTime { mono_reading_ns: _, mono_to_boot_offset_ns: _ }
+        );
         let monotonic_timers = receivers.insert(|key| {
-            let timers = Arc::new(Timers::<MonotonicInstant>::new(
-                key,
-                matches!(time, ExecutorTime::FakeTime(_)),
-            ));
+            let timers = Arc::new(Timers::<MonotonicInstant>::new(key, is_fake));
             (timers.clone(), timers)
         });
         let boot_timers = receivers.insert(|key| {
-            let timers = Arc::new(Timers::<BootInstant>::new(key, false));
+            let timers = Arc::new(Timers::<BootInstant>::new(key, is_fake));
             (timers.clone(), timers)
         });
 
@@ -260,23 +274,81 @@ impl Executor {
         receiver.receive_packet(packet);
     }
 
+    /// Returns the current reading of the monotonic clock.
+    ///
+    /// For test executors running in fake time, returns the reading of the
+    /// fake monotonic clock.
     pub fn now(&self) -> MonotonicInstant {
         match &self.time {
             ExecutorTime::RealTime => MonotonicInstant::from_zx(zx::MonotonicInstant::get()),
-            ExecutorTime::FakeTime(t) => MonotonicInstant::from_nanos(t.load(Ordering::Relaxed)),
+            ExecutorTime::FakeTime { mono_reading_ns: t, .. } => {
+                MonotonicInstant::from_nanos(t.load(Ordering::Relaxed))
+            }
         }
     }
 
-    pub fn set_fake_time(&self, new: MonotonicInstant) {
+    /// Returns the current reading of the boot clock.
+    ///
+    /// For test executors running in fake time, returns the reading of the
+    /// fake boot clock.
+    pub fn boot_now(&self) -> BootInstant {
         match &self.time {
+            ExecutorTime::RealTime => BootInstant::from_zx(zx::BootInstant::get()),
+
+            ExecutorTime::FakeTime { mono_reading_ns: t, mono_to_boot_offset_ns } => {
+                // The two atomic values are loaded one after the other. This should
+                // not normally be an issue in tests.
+                let fake_mono_now = MonotonicInstant::from_nanos(t.load(Ordering::Relaxed));
+                let boot_offset_ns = mono_to_boot_offset_ns.load(Ordering::Relaxed);
+                BootInstant::from_nanos(fake_mono_now.into_nanos() + boot_offset_ns)
+            }
+        }
+    }
+
+    /// Sets the reading of the fake monotonic clock.
+    ///
+    /// # Panics
+    ///
+    /// If called on an executor that runs in real time.
+    pub fn set_fake_time(&self, new: MonotonicInstant) {
+        let boot_offset_ns = match &self.time {
             ExecutorTime::RealTime => {
                 panic!("Error: called `set_fake_time` on an executor using actual time.")
             }
-            ExecutorTime::FakeTime(t) => t.store(new.into_nanos(), Ordering::Relaxed),
-        }
+            ExecutorTime::FakeTime { mono_reading_ns: t, mono_to_boot_offset_ns } => {
+                t.store(new.into_nanos(), Ordering::Relaxed);
+                mono_to_boot_offset_ns.load(Ordering::Relaxed)
+            }
+        };
         self.monotonic_timers.maybe_notify(new);
+
+        // Changing fake time also affects boot time.  Notify boot clocks as well.
+        let new_boot_time = BootInstant::from_nanos(new.into_nanos() + boot_offset_ns);
+        self.boot_timers.maybe_notify(new_boot_time);
     }
 
+    // Sets a new offset between boot and monotonic time.
+    //
+    // Only works for executors operating in fake time.
+    // The change in the fake offset will wake expired boot timers.
+    pub fn set_fake_boot_to_mono_offset(&self, offset: BootDuration) {
+        let mono_now_ns = match &self.time {
+            ExecutorTime::RealTime => {
+                panic!("Error: called `set_fake_boot_to_mono_offset` on an executor using actual time.")
+            }
+            ExecutorTime::FakeTime { mono_reading_ns: t, mono_to_boot_offset_ns: b } => {
+                // We ignore the non-atomic update between b and t, it is likely
+                // not relevant in tests.
+                b.store(offset.into_nanos(), Ordering::Relaxed);
+                t.load(Ordering::Relaxed)
+            }
+        };
+        let new_boot_now = BootInstant::from_nanos(mono_now_ns) + offset;
+        self.boot_timers.maybe_notify(new_boot_now);
+    }
+
+    /// Returns `true` if this executor is running in real time.  Returns
+    /// `false` if this executor si running in fake time.
     pub fn is_real_time(&self) -> bool {
         matches!(self.time, ExecutorTime::RealTime)
     }
@@ -525,6 +597,11 @@ impl Executor {
     pub fn monotonic_timers(&self) -> &Timers<MonotonicInstant> {
         &self.monotonic_timers
     }
+
+    /// Returns the boot timers.
+    pub fn boot_timers(&self) -> &Timers<BootInstant> {
+        &self.boot_timers
+    }
 }
 
 #[cfg(test)]
@@ -570,6 +647,9 @@ impl EHandle {
     ///
     /// This can be used to spawn tasks that live as long as the executor, and
     /// to create shorter-lived child scopes.
+    ///
+    /// Most users should create an owned scope with
+    /// [`Scope::new`][crate::Scope::new] instead of using this method.
     pub fn root_scope(&self) -> &ScopeRef {
         &self.root_scope
     }

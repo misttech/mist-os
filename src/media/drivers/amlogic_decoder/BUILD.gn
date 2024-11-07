@@ -67,7 +67,7 @@ if (target_cpu == "arm64") {
     ]
   }
 
-  fuchsia_driver("amlogic_video_decoder-driver") {
+  fuchsia_cc_driver("amlogic_video_decoder-driver") {
     output_name = "amlogic_video_decoder"
     deps = [
       ":amlogic_video_bind",
@@ -87,7 +87,7 @@ if (target_cpu == "arm64") {
   }
 
   # This version of the driver runs tests on startup.
-  fuchsia_driver("amlogic_decoder_test-driver") {
+  fuchsia_cc_driver("amlogic_decoder_test-driver") {
     output_name = "amlogic_video_decoder_test"
 
     testonly = true

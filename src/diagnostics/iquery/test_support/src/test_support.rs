@@ -153,18 +153,9 @@ impl MockRealmQueryBuilder {
     pub fn build(self) -> MockRealmQuery {
         MockRealmQuery { mapping: self.mapping }
     }
-}
 
-/// Provides a mock `RealmQuery` interface.
-pub struct MockRealmQuery {
-    /// Mapping from Moniker -> Expose.
-    mapping: HashMap<String, Box<MockRealmQueryBuilderInner>>,
-}
-
-/// Creates the default test fixures for `MockRealmQuery`.
-impl Default for MockRealmQuery {
-    fn default() -> Self {
-        MockRealmQueryBuilder::new()
+    pub fn prefilled() -> Self {
+        Self::new()
             .when("example/component")
             .moniker("./example/component")
             .exposes(vec![Expose::Protocol(ExposeProtocol {
@@ -217,7 +208,19 @@ impl Default for MockRealmQuery {
                 ..Default::default()
             })])
             .add()
-            .build()
+    }
+}
+
+/// Provides a mock `RealmQuery` interface.
+pub struct MockRealmQuery {
+    /// Mapping from Moniker -> Expose.
+    mapping: HashMap<String, Box<MockRealmQueryBuilderInner>>,
+}
+
+/// Creates the default test fixures for `MockRealmQuery`.
+impl Default for MockRealmQuery {
+    fn default() -> Self {
+        MockRealmQueryBuilder::prefilled().build()
     }
 }
 

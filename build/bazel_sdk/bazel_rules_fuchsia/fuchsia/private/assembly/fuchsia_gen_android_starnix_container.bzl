@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/private:fuchsia_prebuilt_package.bzl", "fuchsia_prebuilt_package")
+load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 
 def _gen_android_starnix_container_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]

@@ -33,8 +33,7 @@ trace [options] command [command-specific options]
     --output-file=[/tmp/trace.json]: Trace data is stored in this file
         The output file may be "tcp:IP-ADDRESS:PORT" in which case a stream
         socket is connected to that address and trace data is streamed directly
-        to it instead of saving the output locally. Streaming via TCP is
-        generally only done when invoked by traceutil.
+        to it instead of saving the output locally.
     --compress=[false]: Compress the output stream. Compressing a network
         output stream is not supported, if both --output-file=tcp:... and
         --compress are provided, --compress is ignored.

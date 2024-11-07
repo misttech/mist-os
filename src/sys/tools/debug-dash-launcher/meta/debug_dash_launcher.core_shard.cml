@@ -9,10 +9,23 @@
         },
         {
             name: "debug-dash-launcher",
-            url: "fuchsia-pkg://fuchsia.com/debug-dash-launcher#meta/debug_dash_launcher.cm",
+            url: "fuchsia-pkg://fuchsia.com/debug-dash-launcher#meta/debug-dash-launcher.cm",
+        },
+    ],
+    capabilities: [
+        {
+            config: "fuchsia.debug.ToolsPkgUrl",
+            type: "string",
+            max_size: 100,
+            value: "fuchsia-pkg://fuchsia.com/debug-dash-launcher",
         },
     ],
     offer: [
+        {
+            config: "fuchsia.debug.ToolsPkgUrl",
+            from: "self",
+            to: "#debug-dash-launcher",
+        },
         {
             protocol: [ "fuchsia.process.Resolver" ],
             from: "#process_resolver",

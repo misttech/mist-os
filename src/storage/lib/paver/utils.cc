@@ -70,7 +70,6 @@ zx::result<std::unique_ptr<VolumeConnector>> OpenBlockPartition(const paver::Blo
         if (response.status != ZX_OK) {
           ERROR("Failed to GetInstanceGuid: %s\n", zx_status_get_string(response.status));
         }
-        LOG("Mismatch instance\n");
         return false;
       }
     }

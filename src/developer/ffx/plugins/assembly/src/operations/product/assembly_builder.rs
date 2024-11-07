@@ -78,6 +78,7 @@ pub struct ImageAssemblyConfigBuilder {
     kernel_args: BTreeSet<String>,
 
     qemu_kernel: Option<Utf8PathBuf>,
+    bootfs_shell_commands: ShellCommands,
     shell_commands: ShellCommands,
 
     /// The packages for assembly to create specified by AIBs
@@ -112,6 +113,7 @@ impl ImageAssemblyConfigBuilder {
             base_drivers: NamedMap::new("base_drivers"),
             boot_drivers: NamedMap::new("boot_drivers"),
             boot_args: BTreeSet::default(),
+            bootfs_shell_commands: ShellCommands::default(),
             shell_commands: ShellCommands::default(),
             bootfs_files: NamedFileMap::new("bootfs files"),
             package_configs: PackageConfigs::new("package configs"),
@@ -171,7 +173,7 @@ impl ImageAssemblyConfigBuilder {
 
         for (package, binaries) in shell_commands {
             for binary in binaries {
-                self.add_shell_command_entry(&package, binary)?;
+                self.add_pkg_shell_command_entry(&package, binary)?;
             }
         }
 
@@ -217,6 +219,7 @@ impl ImageAssemblyConfigBuilder {
             blobs: _,
             base_drivers,
             boot_drivers,
+            bootfs_shell_commands,
             shell_commands,
             packages_to_compile,
             bootfs_files_package,
@@ -279,9 +282,14 @@ impl ImageAssemblyConfigBuilder {
             }
         }
 
+        for (package, binaries) in bootfs_shell_commands {
+            for binary in binaries {
+                self.add_bootfs_shell_command_entry(&package, binary)?;
+            }
+        }
         for (package, binaries) in shell_commands {
             for binary in binaries {
-                self.add_shell_command_entry(&package, binary)?;
+                self.add_pkg_shell_command_entry(&package, binary)?;
             }
         }
 
@@ -634,7 +642,25 @@ impl ImageAssemblyConfigBuilder {
         })
     }
 
-    fn add_shell_command_entry(
+    fn add_bootfs_shell_command_entry(
+        &mut self,
+        package_name: impl AsRef<str>,
+        binary: PackageInternalPathBuf,
+    ) -> Result<()> {
+        self.bootfs_shell_commands
+            .entry(package_name.as_ref().into())
+            .or_default()
+            .try_insert_unique(binary)
+            .map_err(|dup| {
+                anyhow!(
+                    "duplicate shell command found in package: {} = {}",
+                    package_name.as_ref(),
+                    dup
+                )
+            })
+    }
+
+    fn add_pkg_shell_command_entry(
         &mut self,
         package_name: impl AsRef<str>,
         binary: PackageInternalPathBuf,
@@ -770,6 +796,7 @@ impl ImageAssemblyConfigBuilder {
             kernel_path,
             kernel_args,
             qemu_kernel,
+            bootfs_shell_commands,
             shell_commands,
             packages_to_compile,
             memory_buckets: _,
@@ -968,7 +995,7 @@ impl ImageAssemblyConfigBuilder {
         }
 
         if !shell_commands.is_empty() {
-            let mut shell_commands_builder = ShellCommandsBuilder::new();
+            let mut shell_commands_builder = ShellCommandsBuilder::new_pkg();
             shell_commands_builder.add_shell_commands(shell_commands, "fuchsia.com".to_string());
             let manifest_path =
                 shell_commands_builder.build(outdir).context("building shell commands package")?;
@@ -980,6 +1007,22 @@ impl ImageAssemblyConfigBuilder {
                     entry,
                 )
                 .context("Adding shell commands package to base")?;
+        }
+
+        if !bootfs_shell_commands.is_empty() {
+            let mut shell_commands_builder = ShellCommandsBuilder::new_bootfs();
+            shell_commands_builder.add_bootfs_shell_commands(bootfs_shell_commands);
+            let manifest_path = shell_commands_builder
+                .build(outdir)
+                .context("building bootfs shell commands package")?;
+            let (_, entry) =
+                PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Bootfs, manifest_path)?;
+            packages
+                .try_insert_unique(
+                    PackageSetDestination::Boot(BootfsPackageDestination::ShellCommands),
+                    entry,
+                )
+                .context("Adding shell commands package to bootfs")?;
         }
 
         let bootfs_files = bootfs_files
@@ -1291,6 +1334,7 @@ mod tests {
             boot_drivers: Vec::default(),
             config_data: BTreeMap::default(),
             blobs: Vec::default(),
+            bootfs_shell_commands: ShellCommands::default(),
             shell_commands: ShellCommands::default(),
             packages_to_compile: Vec::default(),
             bootfs_files_package: Some(test_file_path),
@@ -1341,6 +1385,7 @@ mod tests {
             boot_drivers: Vec::default(),
             config_data: BTreeMap::default(),
             blobs: Vec::default(),
+            bootfs_shell_commands: ShellCommands::default(),
             shell_commands: ShellCommands::default(),
             packages_to_compile: Vec::default(),
             bootfs_files_package: None,
@@ -1703,7 +1748,7 @@ mod tests {
 
         // config_data's manifest is in outdir
         let expected_manifest_path =
-            vars.outdir.join("shell-commands").join("package_manifest.json");
+            vars.outdir.join("pkg-shell-commands").join("package_manifest.json");
 
         // Validate that the base package set contains shell_commands.
         assert_eq!(result.base.len(), 3);
@@ -1883,7 +1928,6 @@ mod tests {
                     "args": [
                         "compile",
                         "--features=allow_long_names",
-                        "--features=dictionaries",
                         "--config-package-path",
                         "meta/component1.cvf",
                         "-o",
@@ -1906,7 +1950,6 @@ mod tests {
                     "args": [
                         "compile",
                         "--features=allow_long_names",
-                        "--features=dictionaries",
                         "--config-package-path",
                         "meta/component2.cvf",
                         "-o",

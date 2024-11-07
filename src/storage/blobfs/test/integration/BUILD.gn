@@ -266,6 +266,38 @@ wrap_with_decompressor("blobfs-superblock") {
   ]
 }
 
+test("ota_health_check_service") {
+  output_name = "ota_health_check_service_test"
+
+  # We need some extra system flags that the _ALL_SOURCE define exposes.
+  configs += [ "//build/config:all_source" ]
+
+  sources = [ "component_ota_health_check_test.cc" ]
+  deps = [
+    ":blobfs_integration_fixtures",
+    "//sdk/fidl/fuchsia.update:fuchsia.update_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fdio",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+storage_driver_test_realm_v2_component("ota-health-check-service-component") {
+  deps = [
+    ":decompressor_includes",
+    ":ota_health_check_service",
+  ]
+}
+
+wrap_with_decompressor("ota-health-check-service") {
+  test_url = "fuchsia-pkg://fuchsia.com/blobfs-integration#meta/ota-health-check-service-component.cm"
+  forwarded_protocols = [
+    "fuchsia.logger.LogSink",
+    "fuchsia.process.Launcher",
+  ]
+}
+
 test("blobfs_verifier_service") {
   output_name = "blobfs_verifier_service_test"
 
@@ -486,6 +518,7 @@ fuchsia_test_package("blobfs-integration-package") {
     ":blobfs-verifier-service",
     ":executable-mount",
     ":external-decompressor",
+    ":ota-health-check-service",
   ]
   deps = [
     ":blob-creator-test-component",
@@ -497,6 +530,7 @@ fuchsia_test_package("blobfs-integration-package") {
     ":blobfs-verifier-service-component",
     ":executable-mount-component",
     ":external-decompressor-integration",
+    ":ota-health-check-service-component",
     "//src/storage/blobfs/bin:blobfs-component",
     "//src/storage/fvm:fvm-component",
   ]

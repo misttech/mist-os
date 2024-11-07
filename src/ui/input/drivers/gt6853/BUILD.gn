@@ -77,7 +77,7 @@ driver_bind_rules("gt6853-bind") {
   ]
 }
 
-fuchsia_driver("gt6853-module-driver") {
+fuchsia_cc_driver("gt6853-module-driver") {
   output_name = "gt6853"
   sources = [
     "gt6853-nelson.cc",

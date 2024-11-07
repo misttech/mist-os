@@ -4,6 +4,7 @@
 
 import("//build/drivers/verify_shared_libraries.gni")
 import("//build/rust/rustc_cdylib.gni")
+import("//build/rust/rustc_staticlib.gni")
 import("//build/zircon/c_utils.gni")
 
 # The inner implementation for `fuchsia_driver` and `fuchsia_rust_driver`.
@@ -58,8 +59,6 @@ template("_fuchsia_driver") {
 
     # Save the target name as forward_variables_from below might override it.
     _target_name = target_name
-
-    assert_no_deps = []
 
     if (invoker.target_type == "rustc_cdylib") {
       is_loadable_module = true
@@ -133,6 +132,9 @@ template("_fuchsia_driver") {
 
     # If no syslog backend is found, ensure we have not included the syslog frontend.
     if (!has_syslog_backend) {
+      if (!defined(assert_no_deps)) {
+        assert_no_deps = []
+      }
       assert_no_deps += [ "//sdk/lib/syslog/cpp" ]
     }
 
@@ -192,29 +194,21 @@ set_defaults("fuchsia_cc_driver") {
   # Sets the default configs for fuchsia_driver, which can be modified later
   # by the invoker. This overrides the loadable_module default.
   configs = default_shared_library_configs
-
-  # Drivers cannot dynamically link against the C++ standard library. This config
-  # tells the linker to link against it statically. This is safe for drivers which
-  # don't depend on the standard library as well as the linker will not have any
-  # symbols to resolve.
-  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }
 
-# Define a fuchsia driver built as a loadable module (deprecated: b/370513425)
+# Define a fuchsia driver built as a rust cdylib.
 #
-# This target is a deprecated alias for `fuchsia_cc_driver`.
+# This target allows you to create an ELF shared library that can be used as a driver
+# that is loaded at runtime.
 #
-# Parameters
+# See `rustc_cdylib`'s parameters for more information on what can be passed in here.
 #
-# Flags: cflags, cflags_c, cflags_cc,  asmflags, defines, include_dirs,
-#        ldflags, lib_dirs, libs
-# Deps: data_deps, deps, public_deps
-# Dependent configs: all_dependent_configs, public_configs
-# General: check_includes, configs, data, inputs, output_name,
-#          output_extension, public, sources, testonly, visibility
-template("fuchsia_driver") {
+# This template will also generate an extra target called `$target_name-test-staticlib` that
+# can be used to link the driver code into separate unit tests that depend on finding
+# the driver registration.
+template("fuchsia_rust_driver") {
   _fuchsia_driver(target_name) {
-    target_type = "loadable_module"
+    target_type = "rustc_cdylib"
 
     # Explicitly forward applicable_licenses and visibility, implicitly forward everything else.
     # See comment in //build/config/BUILDCONFIG.gn for details on this pattern.
@@ -231,33 +225,10 @@ template("fuchsia_driver") {
                              "visibility",
                            ])
   }
-}
 
-set_defaults("fuchsia_driver") {
-  # Sets the default configs for fuchsia_driver, which can be modified later
-  # by the invoker. This overrides the loadable_module default.
-  configs = default_shared_library_configs
-
-  # Drivers cannot dynamically link against the C++ standard library. This config
-  # tells the linker to link against it statically. This is safe for drivers which
-  # don't depend on the standard library as well as the linker will not have any
-  # symbols to resolve.
-  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
-  if (is_mistos) {
-    configs -= [ "//build/config/fuchsia:static_cpp_standard_library" ]
-    configs += [ "//build/config/mistos:static_cpp_standard_library" ]
-  }
-}
-
-# Define a fuchsia driver built as a rust cdylib.
-#
-# This target allows you to create an ELF shared library that can be used as a driver
-# that is loaded at runtime.
-#
-# See `rustc_cdylib`'s parameters for more information on what can be passed in here.
-template("fuchsia_rust_driver") {
-  _fuchsia_driver(target_name) {
-    target_type = "rustc_cdylib"
+  rustc_staticlib("$target_name-test-staticlib") {
+    # This should only be used from unit tests.
+    testonly = true
 
     # Explicitly forward applicable_licenses and visibility, implicitly forward everything else.
     # See comment in //build/config/BUILDCONFIG.gn for details on this pattern.

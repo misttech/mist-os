@@ -343,7 +343,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPush) {
   ASSERT_TRUE(result.is_ok());
 
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 }
 
@@ -358,7 +358,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetDefaultGpioReadResponse(0, 1);
 
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -387,7 +387,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
   // Release.
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetDefaultGpioReadResponse(0, 0);
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -423,7 +423,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReportWithoutPower) {
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetDefaultGpioReadResponse(0, 1);
 
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -448,7 +448,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReportWithoutPower) {
   // Release.
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetDefaultGpioReadResponse(0, 0);
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -475,13 +475,13 @@ TEST_P(ParameterizedButtonsTest, DirectButtonPushReleasePush) {
 
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetGpioReadResponse(0, 0);
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
 
     env.SetGpioReadResponse(0, 1);
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
 
     env.SetGpioReadResponse(0, 0);
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 }
 
@@ -494,7 +494,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonFlaky) {
     env.SetGpioReadResponse(0, 0);
     env.SetDefaultGpioReadResponse(0, 1);  // Stabilizes.
 
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 
   auto reader = GetReader();
@@ -539,7 +539,7 @@ TEST_P(ParameterizedButtonsTest, MatrixButtonPush) {
     env.SetGpioReadResponse(1, 0);  // Read row. Matrix Scan for 1.
     env.SetGpioReadResponse(1, 0);  // Read row. Matrix Scan for 3.
 
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 
   auto result = reader->ReadInputReports();
@@ -622,7 +622,7 @@ TEST_P(ParameterizedButtonsTest, DuplicateReports) {
     env.SetGpioReadResponse(1, 1);
     env.SetGpioReadResponse(2, 0);
 
-    env.fake_gpio_interrupts_[2].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[2].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -652,7 +652,7 @@ TEST_P(ParameterizedButtonsTest, DuplicateReports) {
   }
 
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -676,7 +676,7 @@ TEST_P(ParameterizedButtonsTest, DuplicateReports) {
   }
 
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
-    env.fake_gpio_interrupts_[2].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[2].trigger(0, zx::clock::get_boot());
   });
 }
 
@@ -696,7 +696,7 @@ TEST_P(ParameterizedButtonsTest, CamMute) {
     env.SetGpioReadResponse(1, 0);
     env.SetGpioReadResponse(2, 1);
 
-    env.fake_gpio_interrupts_[2].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[2].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -728,7 +728,7 @@ TEST_P(ParameterizedButtonsTest, CamMute) {
     env.SetGpioReadResponse(1, 0);
     env.SetGpioReadResponse(2, 0);
 
-    env.fake_gpio_interrupts_[2].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[2].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -765,7 +765,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonWakeable) {
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetDefaultGpioReadResponse(0, 1);
 
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -790,7 +790,7 @@ TEST_P(ParameterizedButtonsTest, DirectButtonWakeable) {
   // Release.
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetDefaultGpioReadResponse(0, 0);
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -822,7 +822,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetDefaultGpioReadResponse(0, 1);
 
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
   });
   {
     auto result = reader->ReadInputReports();
@@ -846,8 +846,8 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetDefaultGpioReadResponse(1, 1);
 
-    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
-    env.fake_gpio_interrupts_[1].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_boot());
+    env.fake_gpio_interrupts_[1].trigger(0, zx::clock::get_boot());
   });
 
   {
@@ -877,7 +877,7 @@ TEST_P(ParameterizedButtonsTest, PollOneButton) {
 
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetDefaultGpioReadResponse(0, 0);
-    env.fake_gpio_interrupts_[1].trigger(0, zx::clock::get_monotonic());
+    env.fake_gpio_interrupts_[1].trigger(0, zx::clock::get_boot());
   });
 
   {

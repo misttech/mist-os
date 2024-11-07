@@ -44,7 +44,7 @@ source_set("usb-adb-common") {
   ]
 }
 
-fuchsia_driver("usb-adb-function-driver") {
+fuchsia_cc_driver("usb-adb-function-driver") {
   output_name = "usb-adb-function"
   deps = [ ":usb-adb-common" ]
 }

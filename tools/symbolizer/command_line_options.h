@@ -28,6 +28,9 @@ struct CommandLineOptions {
   std::optional<std::string> symbol_cache;
   std::optional<std::string> dumpfile_output;
 
+  // Whether to enable DEBUG level logs printed to stderr.
+  bool verbose = false;
+
   bool auth_mode = false;
   bool requested_version = false;
 
@@ -40,6 +43,9 @@ struct CommandLineOptions {
   // Analytics options
   AnalyticsOption analytics = AnalyticsOption::kUnspecified;
   bool analytics_show = false;
+
+  // Configure any additional defaults from environment variables.
+  void SetupDefaultsFromEnvironment();
 };
 
 // Parses the command line into options.

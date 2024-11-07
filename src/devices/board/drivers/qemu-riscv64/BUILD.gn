@@ -20,7 +20,7 @@ group("tests") {
   deps = [ ":qemu-riscv64_bind_test" ]
 }
 
-fuchsia_driver("qemu-riscv64-driver") {
+fuchsia_cc_driver("qemu-riscv64-driver") {
   output_name = "qemu-riscv64"
   configs += [
     "//build/config:all_source",

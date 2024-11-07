@@ -28,7 +28,7 @@ source_set("common") {
   ]
 }
 
-fuchsia_driver("shtv3-driver") {
+fuchsia_cc_driver("shtv3-driver") {
   output_name = "shtv3"
   configs += [
     "//build/config:all_source",

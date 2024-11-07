@@ -17,7 +17,7 @@ driver_bind_rules("usb_peripheral_test-bind") {
 if (is_fuchsia) {
   import("//build/drivers.gni")
 
-  fuchsia_driver("usb-peripheral-test-driver") {
+  fuchsia_cc_driver("usb-peripheral-test-driver") {
     output_name = "usb-peripheral-test"
     configs += [
       "//build/config:all_source",

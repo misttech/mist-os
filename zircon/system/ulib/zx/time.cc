@@ -15,7 +15,7 @@ basic_ticks<ZX_CLOCK_MONOTONIC> basic_ticks<ZX_CLOCK_MONOTONIC>::now() ZX_AVAILA
 
 // Constructs a tick object for the current tick counter in the system in the boot timeline.
 template <>
-basic_ticks<ZX_CLOCK_BOOT> basic_ticks<ZX_CLOCK_BOOT>::now() ZX_AVAILABLE_SINCE(NEXT) {
+basic_ticks<ZX_CLOCK_BOOT> basic_ticks<ZX_CLOCK_BOOT>::now() ZX_AVAILABLE_SINCE(25) {
   return basic_ticks(zx_ticks_get_boot());
 }
 

@@ -30,7 +30,7 @@ group("common") {
   ]
 }
 
-fuchsia_driver("fusb302-driver") {
+fuchsia_cc_driver("fusb302-driver") {
   output_name = "fusb302"
   sources = [
     "fusb302-controls.cc",

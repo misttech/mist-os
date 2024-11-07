@@ -73,7 +73,7 @@ source_set("lib") {
   }
 }
 
-fuchsia_driver("driver") {
+fuchsia_cc_driver("driver") {
   output_name = "compat"
   deps = [ ":lib" ]
   _version_script = "//src/devices/misc/drivers/compat/compat.ld"
@@ -86,7 +86,7 @@ driver_bind_rules("v1_test_bind") {
   disable_autobind = true
 }
 
-fuchsia_driver("v1_test") {
+fuchsia_cc_driver("v1_test") {
   sources = [
     "v1_test.cc",
     "v1_test.h",
@@ -108,7 +108,7 @@ fidl("fuchsia.test.echo") {
   sources = [ "test.echo.fidl" ]
 }
 
-fuchsia_driver("v1_create_test") {
+fuchsia_cc_driver("v1_create_test") {
   sources = [
     "v1_create_test.cc",
     "v1_test.h",
@@ -126,7 +126,7 @@ fuchsia_driver_component("compat_v1_create_test") {
   manifest = "meta/compat_v1_create_test.cml"
 }
 
-fuchsia_driver("v1_missing_test") {
+fuchsia_cc_driver("v1_missing_test") {
   sources = [ "v1_missing_test.cc" ]
   deps = [
     ":v1_test_bind",
@@ -141,7 +141,7 @@ fuchsia_driver_component("compat_v1_missing_test") {
   manifest = "meta/compat_v1_missing_test.cml"
 }
 
-fuchsia_driver("v1_device_add_null_test") {
+fuchsia_cc_driver("v1_device_add_null_test") {
   sources = [
     "v1_device_add_null.cc",
     "v1_test.h",

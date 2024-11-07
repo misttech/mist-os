@@ -191,26 +191,16 @@ local_repository(
     path = "build/bazel_sdk/bazel_rules_fuchsia",
 )
 
-# googletest is a dependency from @fuchsia_sdk amd requires a local
-# patch for now for Fuchsia support, which is handled by a repository rule.
-#
-# local_repository(
-#    name = "com_google_googletest",
-#    path = "third_party/googletest/src",
-# )
-# buildifier: disable=load-on-top
-load(
-    "//:build/bazel/repository_rules.bzl",
-    "boringssl_repository",
-    "fuchsia_build_info_repository",
-    "gn_targets_repository",
-    "googletest_repository",
-)
-
 # com_google_absl is a dependency of com_google_googletest
 local_repository(
     name = "com_google_absl",
     path = "third_party/abseil-cpp",
+)
+
+# buildifier: disable=load-on-top
+load(
+    "//:build/bazel/repository_rules/fuchsia_build_info_repository.bzl",
+    "fuchsia_build_info_repository",
 )
 
 fuchsia_build_info_repository(
@@ -220,6 +210,12 @@ fuchsia_build_info_repository(
     # LINT.ThenChange(scripts/update_workspace.py)
 )
 
+# googletest is a dependency from @fuchsia_sdk amd requires a local
+# patch for now for Fuchsia support, which is handled by a repository rule.
+
+# buildifier: disable=load-on-top
+load("//:build/bazel/repository_rules/googletest_repository.bzl", "googletest_repository")
+
 googletest_repository(
     name = "com_google_googletest",
     # LINT.IfChange
@@ -227,10 +223,18 @@ googletest_repository(
     # LINT.ThenChange(scripts/update_workspace.py)
 )
 
+# buildifier: disable=load-on-top
+load("//:build/bazel/repository_rules/boringssl_repository.bzl", "boringssl_repository")
+
 boringssl_repository(
     name = "boringssl",
+    # LINT.IfChange
     content_hash_file = "fuchsia_build_generated/boringssl.hash",
+    # LINT.ThenChange(scripts/update_workspace.py)
 )
+
+# buildifier: disable=load-on-top
+load("//:build/bazel/repository_rules/gn_targets_repository.bzl", "gn_targets_repository")
 
 gn_targets_repository(
     name = "gn_targets",
@@ -247,14 +251,28 @@ load(
 )
 
 # A repository that wraps //sdk:bazel_in_tree_idk in the Bazel graph.
-# This is not used at the moment, but prepares for a future CL where
-# this will become the input of @fuchsia_idk.
+# This is used to populate the @fuchsia_sdk repository as well as
+# generate the @fuchsia_in_tree_idk:final_idk target.
 fuchsia_idk_repository(
     name = "fuchsia_in_tree_idk",
     idk_export_dir = "%s/sdk/exported/bazel_in_tree_idk" % ninja_output_dir,
     ninja_build_dir = ninja_output_dir,
     python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
+    # LINT.IfChange
     content_hash_file = "//:fuchsia_build_generated/fuchsia_in_tree_idk.hash",
+    # LINT.ThenChange(scripts/update_workspace.py)
+)
+
+# A repository that wraps //sdk:bazel_internal_only_idk in the Bazel graph.
+# This is used to populate the @internal_sdk repository only.
+fuchsia_idk_repository(
+    name = "fuchsia_internal_only_idk",
+    idk_export_dir = "%s/sdk/exported/bazel_internal_only_idk" % ninja_output_dir,
+    ninja_build_dir = ninja_output_dir,
+    python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
+    # LINT.IfChange
+    content_hash_file = "//:fuchsia_build_generated/fuchsia_internal_only_idk.hash",
+    # LINT.ThenChange(scripts/update_workspace.py)
 )
 
 # buildifier: disable=load-on-top
@@ -268,7 +286,7 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
-    local_paths = ["%s/sdk/exported/bazel_in_tree_idk" % ninja_output_dir],
+    local_paths = ["@fuchsia_in_tree_idk"],
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_sdk.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
@@ -281,12 +299,12 @@ fuchsia_sdk_repository(
 # TODO(https://fxbug.dev/333907192): Remove this
 fuchsia_sdk_repository(
     name = "internal_sdk",
-    local_paths = ["%s/sdk/exported/bazel_internal_only_idk" % ninja_output_dir],
+    local_paths = ["@fuchsia_internal_only_idk"],
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/internal_sdk.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
     parent_sdk = "@fuchsia_sdk",
-    parent_sdk_local_paths = ["%s/sdk/exported/bazel_in_tree_idk" % ninja_output_dir],
+    parent_sdk_local_paths = ["@fuchsia_in_tree_idk"],
     fuchsia_api_level_override = "HEAD",
 )
 

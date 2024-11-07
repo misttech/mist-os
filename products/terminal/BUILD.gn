@@ -4,7 +4,9 @@
 
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/sshd_config.gni")
+import("//build/bazel/assembly/bazel_product_bundle.gni")
 import("//build/info/info.gni")
+import("//products/terminal/cache_packages.gni")
 
 assert(
     is_fuchsia,
@@ -77,8 +79,9 @@ terminal_base = {
   }
 
   product = {
-    session_url =
-        "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
+    session = {
+      url = "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
+    }
     build_info = default_product_build_info
   }
   deps = [ "//build/info:build_info_files" ]
@@ -90,116 +93,14 @@ terminal_base = {
     },
   ]
 
-  cache_packages = [
-    {
-      package_target = "//src/ui/bin/terminal"
-    },
-    {
-      package_target = "//src/ui/bin/tiles-session"
-    },
-
-    # Used to mock out display hardware in UI integration tests.
-    {
-      package_target =
-          "//src/graphics/display/testing/fake-coordinator-connector"
-    },
-
-    # Add validator package for use in tests.
-    # TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK.
-    {
-      package_target = "//src/diagnostics/validator/inspect:validator"
-    },
-
-    # Add test validation packages for use in tests.
-    # TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK and we want to put
-    # this in the SDK.
-    {
-      package_target = "//src/tests/fidl/dynsuite/client_suite/harness"
-    },
-    {
-      package_target = "//src/tests/fidl/dynsuite/server_suite/harness"
-    },
-
-    # Fake services needed by Chromium tests until subpackages are supported OOT
-    # and fakes are provided with the SDK. See crbug.com/1326674.
-    # TODO(crbug.com/1408597): Remove once the Chromium tests package the fakes.
-    {
-      package_target = "//src/developer/build_info/testing:fake-build-info"
-    },
-    {
-      # archivist-for-embedding is needed by
-      # WebEngineIntegrationLoggingTest.SetJavaScriptLogLevel_DEBUG.
-      # TODO(crbug.com/1451376): Move it to a peer group as appropriate.
-      package_target = "//src/diagnostics/archivist:archivist-for-embedding"
-    },
-    {
-      package_target = "//src/testing/fidl/intl_property_manager"
-    },
-    {
-      # A font provider with built-in font file assets.
-      # TODO(crbug.com/1408597): Once OOT fakes are available, this can be
-      # turned into a hermetic component, or a subpackage.
-      package_target = "//src/fonts:fonts_hermetic_for_test"
-    },
-    {
-      # A font provider without built-in font file assets.
-      package_target = "//src/fonts:fonts_configurable_for_test"
-    },
-
-    # Add Test UI Stack for use in tests.
-    # TODO(https://fxbug.dev/42056298): Remove once we migrate client usage to subpackages.
-    {
-      package_target =
-          "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack"
-    },
-    {
-      package_target = "//src/ui/testing/test_ui_stack:test-ui-stack"
-    },
-
-    # Add FIDL compatibility test harneses for SDK customers to use until these are in
-    # the SDK for subpackaging
-    #
-    # TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK and we want to put this
-    # in the SDK.
-    {
-      package_target =
-          "//src/tests/fidl/compatibility:fidl-compatibility-array-harness_pkg"
-    },
-    {
-      package_target = "//src/tests/fidl/compatibility:fidl-compatibility-minimal-harness_pkg"
-    },
-    {
-      package_target =
-          "//src/tests/fidl/compatibility:fidl-compatibility-struct-harness_pkg"
-    },
-    {
-      package_target =
-          "//src/tests/fidl/compatibility:fidl-compatibility-table-harness_pkg"
-    },
-    {
-      package_target =
-          "//src/tests/fidl/compatibility:fidl-compatibility-union-harness_pkg"
-    },
-    {
-      package_target =
-          "//src/tests/fidl/compatibility:fidl-compatibility-vector-harness_pkg"
-    },
-    {
-      package_target = "//src/tests/fidl/compatibility/cpp"
-    },
-    {
-      package_target = "//src/tests/fidl/compatibility/hlcpp"
-    },
-    {
-      package_target = "//src/tests/fidl/compatibility/llcpp"
-    },
-    {
-      package_target = "//src/tests/fidl/compatibility/go"
-    },
-    {
-      package_target = "//src/tests/fidl/compatibility/rust"
-    },
-  ]
+  cache_packages = []
+  foreach(pkg, terminal_cache_packages) {
+    cache_packages += [
+      {
+        package_target = pkg
+      },
+    ]
+  }
 }
 
 product_assembly_configuration("terminal") {
@@ -215,5 +116,132 @@ product_assembly_configuration("terminal_with_netstack2") {
     network = {
       netstack_version = "netstack2"
     }
+  }
+}
+
+bazel_inputs = terminal_cache_package_bazel_inputs + [
+                 "//src/fonts/asset_providers:open-fonts-collection-bazel",
+                 "//build/images/flash:esp.bazel_input",
+                 "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
+                 "//build/images/zedboot:zedboot.bazel_legacy_aib",
+               ]
+if (board_configuration_label != false) {
+  bazel_inputs += [ get_label_info(board_configuration_label,
+                                   "label_no_toolchain") + ".bazel_input" ]
+}
+
+if (target_cpu == "x64") {
+  bazel_product_bundle("product_bundle.x64") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.x64"
+    bazel_product_image_target = ":image.x64"
+    bazel_recovery_image_target = "//products/zedboot:x64"
+    bazel_elf_sizes_target = ":elf_sizes.x64"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle("product_bundle.x64_reduced_perf_variation") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.x64_reduced_perf_variation"
+    bazel_product_image_target = ":image.x64_reduced_perf_variation"
+    bazel_recovery_image_target =
+        "//products/zedboot:x64_reduced_perf_variation"
+    bazel_elf_sizes_target = ":elf_sizes.x64_reduced_perf_variation"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle("product_bundle_with_netstack2.x64") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.x64"
+    bazel_product_image_target = ":image_with_netstack2.x64"
+    bazel_recovery_image_target = "//products/zedboot:x64"
+    bazel_elf_sizes_target = ":elf_sizes_with_netstack2.x64"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle(
+      "product_bundle_with_netstack2.x64_reduced_perf_variation") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target =
+        ":product_bundle_with_netstack2.x64_reduced_perf_variation"
+    bazel_product_image_target =
+        ":image_with_netstack2.x64_reduced_perf_variation"
+    bazel_recovery_image_target =
+        "//products/zedboot:x64_reduced_perf_variation"
+    bazel_elf_sizes_target =
+        ":elf_sizes_with_netstack2.x64_reduced_perf_variation"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+}
+
+if (target_cpu == "arm64") {
+  bazel_product_bundle("product_bundle.arm64") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.arm64"
+    bazel_product_image_target = ":image.arm64"
+    bazel_recovery_image_target = "//products/zedboot:arm64"
+    bazel_elf_sizes_target = ":elf_sizes.arm64"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle("product_bundle.vim3") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.vim3"
+    bazel_product_image_target = ":image.vim3"
+    bazel_recovery_image_target = "//products/zedboot:vim3"
+    bazel_elf_sizes_target = ":elf_sizes.vim3"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle("product_bundle.vim3_reduced_perf_variation") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle.vim3_reduced_perf_variation"
+    bazel_product_image_target = ":image.vim3_reduced_perf_variation"
+    bazel_recovery_image_target =
+        "//products/zedboot:vim3_reduced_perf_variation"
+    bazel_elf_sizes_target = ":elf_sizes.vim3_reduced_perf_variation"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle("product_bundle_with_netstack2.arm64") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.arm64"
+    bazel_product_image_target = ":image_with_netstack2.arm64"
+    bazel_recovery_image_target = "//products/zedboot:arm64"
+    bazel_elf_sizes_target = ":elf_sizes_with_netstack2.arm64"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle("product_bundle_with_netstack2.vim3") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.vim3"
+    bazel_product_image_target = ":image_with_netstack2.vim3"
+    bazel_recovery_image_target = "//products/zedboot:vim3"
+    bazel_elf_sizes_target = ":elf_sizes_with_netstack2.vim3"
+    bazel_inputs_from_gn = bazel_inputs
+  }
+
+  bazel_product_bundle(
+      "product_bundle_with_netstack2.vim3_reduced_perf_variation") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    bazel_product_bundle_target =
+        ":product_bundle_with_netstack2.vim3_reduced_perf_variation"
+    bazel_product_image_target =
+        ":image_with_netstack2.vim3_reduced_perf_variation"
+    bazel_recovery_image_target =
+        "//products/zedboot:vim3_reduced_perf_variation"
+    bazel_elf_sizes_target =
+        ":elf_sizes_with_netstack2.vim3_reduced_perf_variation"
+    bazel_inputs_from_gn = bazel_inputs
   }
 }

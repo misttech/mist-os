@@ -17,12 +17,11 @@ use crate::task::{
     StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState,
     TimerTable, WaitQueue, ZombiePtraces,
 };
-
 use itertools::Itertools;
 use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock};
+use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock, Unlocked};
 use starnix_types::ownership::{OwnedRef, Releasable, TempRef, WeakRef};
 use starnix_types::stats::TaskTimeStats;
 use starnix_types::time::{itimerspec_from_itimerval, timeval_from_duration};
@@ -208,9 +207,9 @@ impl PartialEq for ThreadGroup {
 }
 
 impl Releasable for ThreadGroup {
-    type Context<'a> = ();
+    type Context<'a: 'b, 'b> = ();
 
-    fn release<'a>(mut self, _context: Self::Context<'a>) {
+    fn release<'a: 'b, 'b>(mut self, _context: Self::Context<'a, 'b>) {
         let mut pids = self.kernel.pids.write();
         let state = self.mutable_state.get_mut();
 
@@ -399,9 +398,9 @@ impl ZombieProcess {
 }
 
 impl Releasable for ZombieProcess {
-    type Context<'a> = &'a mut PidTable;
+    type Context<'a: 'b, 'b> = &'a mut PidTable;
 
-    fn release(self, pids: &mut PidTable) {
+    fn release<'a: 'b, 'b>(self, pids: &mut PidTable) {
         if self.is_canonical {
             pids.remove_zombie(self.pid);
         }
@@ -488,10 +487,18 @@ impl ThreadGroup {
     // that is part of the current thread group, the caller should pass
     // `current_task`.  If ownership issues prevent passing `current_task`, then
     // callers should use CurrentTask::thread_group_exit instead.
-    pub fn exit(&self, exit_status: ExitStatus, mut current_task: Option<&mut CurrentTask>) {
+    pub fn exit(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        exit_status: ExitStatus,
+        mut current_task: Option<&mut CurrentTask>,
+    ) {
         if let Some(ref mut current_task) = current_task {
-            current_task
-                .ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
+            current_task.ptrace_event(
+                locked,
+                PtraceOptions::TRACEEXIT,
+                exit_status.signal_info_status() as u64,
+            );
         }
         let mut pids = self.kernel.pids.write();
         let mut state = self.write();
@@ -1438,7 +1445,7 @@ impl ThreadGroup {
         }
 
         let signal = Signal::try_from(unchecked_signal)?;
-        security::check_signal_access_tg(current_task, &target_task, signal)?;
+        security::check_signal_access(current_task, &target_task, signal)?;
 
         Ok(Some(signal))
     }
@@ -1893,7 +1900,7 @@ mod test {
     async fn test_exit_status() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        child.thread_group.exit(ExitStatus::Exit(42), None);
+        child.thread_group.exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child);
         assert_eq!(
             current_task.thread_group.read().zombie_children[0].exit_info.status,
@@ -1966,7 +1973,7 @@ mod test {
 
         assert_eq!(task3.thread_group.read().get_ppid(), task2.id);
 
-        task2.thread_group.exit(ExitStatus::Exit(0), None);
+        task2.thread_group.exit(&mut locked, ExitStatus::Exit(0), None);
         std::mem::drop(task2);
 
         // Task3 parent should be current_task.

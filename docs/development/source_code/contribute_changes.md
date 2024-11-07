@@ -3,9 +3,9 @@
 This guide provides instructions on how to submit your contribution to the
 Fuchsia project.
 
-Fuchsia manages git commits and code reviews through
-[Gerrit's][gerrit]{:.external} web UI. When a commit is uploaded
-to Gerrit, it is referred to as a [change][gerrit-changes]{:.external}.
+Fuchsia manages git commits and code reviews through Gerrit's
+[web UI][gerrit]{:.external}. When a commit is uploaded to Gerrit,
+it is referred to as a [change][gerrit-changes]{:.external}.
 
 To contribute a change to Fuchsia, the steps are:
 
@@ -19,71 +19,74 @@ To contribute a change to Fuchsia, the steps are:
 
 Before you begin, you need to:
 
-*   [Download the Fuchsia source code](/docs/get-started/get_fuchsia_source.md).
+* [Download the Fuchsia source code](/docs/get-started/get_fuchsia_source.md).
 
-    Note: You can complete the next prerequisite items while downloading the
-    Fuchsia source code.
+  Note: You can complete the next prerequisite items while downloading the
+  Fuchsia source code.
 
-*   [Sign the Google Contributor License Agreements (CLA)](#sign-the-google-cla).
-*   [Generate a cookie to authenticate you in Gerrit](#generate-a-cookie).
+* [Sign the Google Contributor License Agreements (CLA)](#sign-the-google-cla).
+* [Generate a cookie to authenticate you in Gerrit](#generate-a-cookie).
 
 ### Sign the Google CLA {#sign-the-google-cla}
 
 Do the following:
 
-1.  Go to the Google Developers'
-    [Contributor License Agreements](https://cla.developers.google.com/){:.external}
-    page.
-1.  Sign the agreement on behalf of **Only Yourself** or **Your Employer**.
+1. Go to the Google Developers'
+   [Contributor License Agreements](https://cla.developers.google.com/){:.external}
+   page.
+1. Sign the agreement on behalf of **Only Yourself** or **Your Employer**.
 
 ### Generate a cookie {#generate-a-cookie}
 
 Do the following:
 
-1.  Log into [Gerrit][gerrit]{:.external}.
-1.  Go to
-    [https://fuchsia.googlesource.com](https://fuchsia.googlesource.com){:.external}.
-1.  At the top of the page, click **Generate Password**.
-1.  Copy the generated code and run it in a terminal of your workstation.
+1. Log into [Gerrit][gerrit]{:.external}.
+1. Go to
+   [https://fuchsia.googlesource.com](https://fuchsia.googlesource.com){:.external}.
+1. At the top of the page, click **Generate Password**.
+1. Copy the generated code and run it in a terminal of your workstation.
 
 ## 2. Create a change in Gerrit {#create-a-change-in-gerrit}
 
 To create a change in Gerrit, do the following:
 
-1.  Go to your Fuchsia directory, for example:
+1. Go to your Fuchsia directory, for example:
 
-    ```posix-terminal
-    cd ~/fuchsia
-    ```
+   ```posix-terminal
+   cd ~/fuchsia
+   ```
 
-1.  Create a new branch:
+1. Create a new branch:
 
-    ```posix-terminal
-    git checkout -b <branch_name>
-    ```
+   ```posix-terminal
+   git checkout -b <branch_name>
+   ```
 
-1.  Create or edit files in the new branch.
+1. Create or edit files in the new branch.
 
-1.  Add the updated files:
+1. Add the updated files:
 
-    ```posix-terminal
-    git add <files>
-    ```
+   ```posix-terminal
+   git add <files>
+   ```
 
-1.  Commit the updated files and write the [commit message][commit-message-style-guide]:
+1. Commit the updated files and write the [commit message][commit-message-style-guide]:
 
-    ```posix-terminal
-    git commit
-    ```
+   ```posix-terminal
+   git commit
+   ```
 
-1.  Upload the commit to Gerrit:
+1. Upload the commit to Gerrit:
 
-    ```posix-terminal
-    git push origin HEAD:refs/for/main
-    ```
+   ```posix-terminal
+   git push origin HEAD:refs/for/main
+   ```
 
-    For more information on uploading changes, see the
-    [Gerrit documentation][gerrit-doc-upload-change]{:.external}.
+   For more information on uploading changes, see the
+   [Gerrit documentation][gerrit-doc-upload-change]{:.external}.
+
+   For more information on special options that control commit behavior, see
+   [Commit message options][commit-message-options].
 
 ## 3. Request a code review {#request-a-code-review}
 
@@ -144,59 +147,59 @@ to submit code for them.
 
 After creating a change, to upload a patch to your change, do the following:
 
-1.  Create or edit files in the same branch.
-1.  Add the updated files:
+1. Create or edit files in the same branch.
+1. Add the updated files:
 
-    ```posix-terminal
-    git add <updated_files>
-    ```
+   ```posix-terminal
+   git add <updated_files>
+   ```
 
-1.  Include the patch in the same commit using the `--amend` option:
+1. Include the patch in the same commit using the `--amend` option:
 
-    ```posix-terminal
-    git commit --amend
-    ```
+   ```posix-terminal
+   git commit --amend
+   ```
 
-1.  Upload the patch to Gerrit:
+1. Upload the patch to Gerrit:
 
-    ```posix-terminal
-    git push origin HEAD:refs/for/main
-    ```
+   ```posix-terminal
+   git push origin HEAD:refs/for/main
+   ```
 
 ### Resolve merge conflicts {#resolve-merge-conflicts}
 
 When Gerrit warns you of merge conflicts in your change, do the following:
 
-1.  Rebase from `origin/main`, which reveals the files that cause merge
-    conflicts:
+1. Rebase from `origin/main`, which reveals the files that cause merge
+   conflicts:
 
-    ```posix-terminal
-    git rebase origin/main
-    ```
+   ```posix-terminal
+   git rebase origin/main
+   ```
 
-1.  Edit those files to resolve the conflicts and add the updated files:
+1. Edit those files to resolve the conflicts and add the updated files:
 
-    ```posix-terminal
-    git add <files_with_resolved_conflicts>
-    ```
+   ```posix-terminal
+   git add <files_with_resolved_conflicts>
+   ```
 
-1.  Finish the rebase:
+1. Finish the rebase:
 
-    ```posix-terminal
-    git rebase --continue
-    ```
+   ```posix-terminal
+   git rebase --continue
+   ```
 
-1.  Commit the updated files using the `--amend` option:
+1. Commit the updated files using the `--amend` option:
 
-    ```posix-terminal
-    git commit --amend
-    ```
+   ```posix-terminal
+   git commit --amend
+   ```
 
-1.  Upload the patch to Gerrit:
+1. Upload the patch to Gerrit:
 
-    ```posix-terminal
-    git push origin HEAD:refs/for/main
-    ```
+   ```posix-terminal
+   git push origin HEAD:refs/for/main
+   ```
 
 ### Delete your local branch {#delete-your-local-branch}
 
@@ -216,18 +219,18 @@ guide](/docs/contribute/commit-message-style-guide.md).
 To understand how to manage changes that span different repositories (petals),
 see the following pages:
 
-*   [Working across different petals](/docs/development/source_code/working_across_petals.md)
-*   [Upload changes from multiple repositories](/docs/development/source_code/upload_changes_from_multiple_repositories.md)
+* [Working across different petals](/docs/development/source_code/working_across_petals.md)
+* [Upload changes from multiple repositories](/docs/development/source_code/upload_changes_from_multiple_repositories.md)
 
 See [Source code layout](/docs/development/source_code/layout.md) for more
 information on the structure of the Fuchsia repository.
-
 
 <!-- Reference links -->
 
 [gerrit]: https://fuchsia-review.googlesource.com
 [gerrit-changes]: https://gerrit-review.googlesource.com/Documentation/concept-changes.html
 [commit-message-style-guide]: /docs/contribute/commit-message-style-guide.md
+[commit-message-options]: /docs/development/source_code/commit_message_options.md
 [gerrit-doc-upload-change]: https://gerrit-documentation.storage.googleapis.com/Documentation/2.12.3/intro-user.html#upload-change
 [user-review-ui]: https://gerrit-review.googlesource.com/Documentation/user-review-ui.html
 [config-labels]: https://gerrit-review.googlesource.com/Documentation/config-labels.html

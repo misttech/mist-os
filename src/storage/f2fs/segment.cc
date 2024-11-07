@@ -251,19 +251,52 @@ block_t SegmentManager::OverprovisionSections() {
 block_t SegmentManager::ReservedSections() {
   return reserved_segments_ / superblock_info_.GetSegsPerSec();
 }
-bool SegmentManager::NeedSSR() {
-  return (!superblock_info_.TestOpt(MountOption::kForceLfs) &&
-          FreeSections() < static_cast<uint32_t>(OverprovisionSections()));
-}
+bool SegmentManager::NeedSSR() { return !superblock_info_.TestOpt(MountOption::kForceLfs); }
 
-int SegmentManager::GetSsrSegment(CursegType type) {
+zx::result<> SegmentManager::GetSsrSegment(CursegType type) {
   CursegInfo *curseg = CURSEG_I(type);
-  auto segno_or = GetVictimByDefault(GcType::kBgGc, type, AllocMode::kSSR);
-  if (segno_or.is_error()) {
-    return 0;
+  if (zx::result segno_or = GetVictimByDefault(GcType::kBgGc, type, AllocMode::kSSR);
+      segno_or.is_ok()) {
+    curseg->next_segno = segno_or.value();
+    return zx::ok();
   }
-  curseg->next_segno = segno_or.value();
-  return 1;
+
+  // It failed to get a segment from the dirty list of |type|. Try to find a segment from dirty
+  // lists of other types.
+  std::span<const CursegType> types;
+  if (IsNodeSeg(type)) {
+    if (type == CursegType::kCursegHotNode) {
+      static constexpr CursegType kTypes[] = {CursegType::kCursegWarmNode,
+                                              CursegType::kCursegColdNode};
+      types = kTypes;
+    } else {
+      static constexpr CursegType kTypes[] = {
+          CursegType::kCursegColdNode, CursegType::kCursegWarmNode, CursegType::kCursegHotNode};
+      types = kTypes;
+    }
+  } else {
+    if (type == CursegType::kCursegHotData) {
+      static constexpr CursegType kTypes[] = {CursegType::kCursegWarmData,
+                                              CursegType::kCursegColdData};
+      types = kTypes;
+    } else {
+      static constexpr CursegType kTypes[] = {
+          CursegType::kCursegColdData, CursegType::kCursegWarmData, CursegType::kCursegHotData};
+      types = kTypes;
+    }
+  }
+
+  for (CursegType current : types) {
+    if (current == type) {
+      continue;
+    }
+    if (zx::result segno_or = GetVictimByDefault(GcType::kBgGc, current, AllocMode::kSSR);
+        segno_or.is_ok()) {
+      curseg->next_segno = segno_or.value();
+      return zx::ok();
+    }
+  }
+  return zx::error(ZX_ERR_UNAVAILABLE);
 }
 
 uint32_t SegmentManager::Utilization() { return superblock_info_.Utilization(); }
@@ -838,14 +871,13 @@ void SegmentManager::AllocateSegmentByDefault(CursegType type, bool force) {
 
   if (force) {
     NewCurseg(type, true);
+  } else if (!superblock_info_.TestCpFlags(CpFlag::kCpCrcRecoveryFlag) &&
+             type == CursegType::kCursegWarmNode) {
+    NewCurseg(type, false);
+  } else if (NeedSSR() && GetSsrSegment(type).is_ok()) {
+    ChangeCurseg(type, true);
   } else {
-    if (type == CursegType::kCursegWarmNode) {
-      NewCurseg(type, false);
-    } else if (NeedSSR() && GetSsrSegment(type)) {
-      ChangeCurseg(type, true);
-    } else {
-      NewCurseg(type, false);
-    }
+    NewCurseg(type, false);
   }
   superblock_info_.IncSegmentCount(curseg->alloc_type);
 }
@@ -903,7 +935,7 @@ block_t SegmentManager::GetBlockAddrOnSegment(LockedPage &page, block_t old_blka
 
     if (p_type == PageType::kNode) {
       page.GetPage<NodePage>().FillNodeFooterBlkaddr(NextFreeBlkAddr(type),
-                                                     superblock_info_.GetCheckpointVer());
+                                                     superblock_info_.GetCheckpointVer(true));
     }
   }
   return new_blkaddr;

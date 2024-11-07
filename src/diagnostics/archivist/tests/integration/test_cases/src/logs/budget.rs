@@ -18,7 +18,7 @@ async fn test_budget() {
             test_topology::PuppetDeclBuilder::new("victim").into(),
         ]),
         archivist_config: Some(ftest::ArchivistConfig {
-            logs_max_cached_original_bytes: Some(3000),
+            logs_max_cached_original_bytes: Some(65536),
             ..Default::default()
         }),
         ..Default::default()
@@ -77,12 +77,12 @@ async fn test_budget() {
 
     // We observe some logs were rolled out.
     let log = observed_logs_2.skip(33).next().await.unwrap();
-    assert_eq!(log.rolled_out_logs(), Some(8946));
+    assert_eq!(log.rolled_out_logs(), Some(8513));
     let mut observed_logs = log_reader.snapshot::<Logs>().await.unwrap().into_iter();
     let msg_b = observed_logs.next().unwrap();
     assert!(!msg_b.moniker.to_string().contains("puppet-victim"));
 
-    // Vicitm logs should have been rolled out.
+    // Victim logs should have been rolled out.
     let messages = observed_logs
         .filter(|log| log.moniker.to_string().contains("puppet-victim"))
         .collect::<Vec<_>>();

@@ -39,7 +39,7 @@ class AmlSuspendTest : public AmlSuspend {
     return zx::ok(std::move(result));
   }
 
-  zx_status_t SystemSuspendEnter(zx_time_t resume_deadline) override {
+  zx_status_t SystemSuspendEnter() override {
     // No-op override for testing.
     return ZX_OK;
   }

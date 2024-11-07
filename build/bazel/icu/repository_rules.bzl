@@ -34,6 +34,14 @@ load("@fuchsia_icu_config//:constants.bzl", "icu_flavors")
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 
+_CONSTANTS_BZL_TEMPLATE = """# AUTO_GENERATED - DO NOT EDIT!
+
+icu_flavors = struct(
+    default_git_commit = "{default_commit}",
+    latest_git_commit = "{latest_commit}",
+)
+"""
+
 def _fuchsia_icu_config_impl(repo_ctx):
     workspace_root = str(repo_ctx.path(Label("@//:WORKSPACE.bazel")).dirname)
 
@@ -44,27 +52,28 @@ def _fuchsia_icu_config_impl(repo_ctx):
     if hasattr(repo_ctx.attr, "content_hash_file"):
         repo_ctx.path(Label("@//:" + repo_ctx.attr.content_hash_file))
 
-    script = repo_ctx.path(Label("//:build/icu/gen-git-head-commit-id.sh"))
-    cmd = " ".join([
-        str(script),
-        "bzl",
-        paths.join(workspace_root, "third_party/icu/default"),
-        paths.join(workspace_root, "third_party/icu/latest"),
-        ">",
-        "constants.bzl",
-    ])
+    # Unlike //build/icu/config.gni which is evaluated 15 times, this repository
+    # rule is invoked only once per Bazel build invocation. See https://fxbug.dev/377674727
+    # it needs to run.
+    ret = repo_ctx.execute(
+        [
+            str(repo_ctx.path(Label("@//build/icu:update-config-json.sh"))),
+            "--fuchsia-dir=%s" % repo_ctx.workspace_root,
+            "--mode=print",
+        ],
+    )
+    if ret.return_code != 0:
+        fail("Cannot read icu config: " + ret.stdout + ret.stderr)
 
-    # $PWD for this script is this repository's root, not the main repo's root.
-    result = repo_ctx.execute([
-        "/bin/bash",
-        "-c",
-        cmd,
-    ])
-    if result.return_code:
-        fail("script exited with error code: {}, stderr: {}".format(
-            result.return_code,
-            result.stderr,
-        ))
+    icu_config = json.decode(ret.stdout)
+
+    constants_bzl = _CONSTANTS_BZL_TEMPLATE.format(
+        default_commit = icu_config["default"],
+        latest_commit = icu_config["latest"],
+    )
+
+    repo_ctx.file("constants.bzl", constants_bzl)
+
     repo_ctx.file("WORKSPACE.bazel", """# DO NOT EDIT! Automatically generated.
 workspace(name = "fuchsia_icu_config")
 """)
