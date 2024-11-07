@@ -113,7 +113,7 @@ pub fn file_system_post_init_security(kernel: &Kernel, file_system: &FileSystemH
 /// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
 /// If no policy has yet been loaded then no work is done, and the `file_system` will instead be
 /// labeled when a policy is first loaded.
-/// If the `file_system` was already labelled then no further work is done.
+/// If the `file_system` was already labeled then no further work is done.
 pub fn file_system_resolve_security<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
@@ -143,6 +143,7 @@ pub struct FsNodeSecurityXattr {
 /// `dir_entry`.
 /// If the `FsNode` security state had already been initialized, or no policy is yet loaded, then
 /// this is a no-op.
+/// Corresponds to the `d_instantiate()` LSM hook.
 pub fn fs_node_init_with_dentry<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
@@ -171,6 +172,7 @@ where
 /// Returns an extended attribute value to set on the newly-created file if the labeling scheme is
 /// `fs_use_xattr`. For other labeling schemes (e.g. `fs_use_trans`, mountpoint-labeling) a label
 /// is set on the `FsNode` security state, but no extended attribute is set nor returned.
+/// Corresponds to the `inode_init_security()` LSM hook.
 pub fn fs_node_init_on_create(
     current_task: &CurrentTask,
     new_node: &FsNode,
@@ -184,7 +186,7 @@ pub fn fs_node_init_on_create(
 
 /// Validate that `current_task` has permission to create a regular file in the `parent` directory,
 /// with the specified file `mode`.
-/// Corresponds to the `security_inode_create()` hook.
+/// Corresponds to the `inode_create()` LSM hook.
 pub fn check_fs_node_create_access(
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -198,7 +200,7 @@ pub fn check_fs_node_create_access(
 
 /// Validate that `current_task` has permission to create a symlink to `old_path` in the `parent`
 /// directory.
-/// Corresponds to the `security_inode_symlink()` hook.
+/// Corresponds to the `inode_symlink()` LSM hook.
 pub fn check_fs_node_symlink_access(
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -212,7 +214,7 @@ pub fn check_fs_node_symlink_access(
 
 /// Validate that `current_task` has permission to create a new directory in the `parent` directory,
 /// with the specified file `mode`.
-/// Corresponds to the `security_inode_mkdir()` hook.
+/// Corresponds to the `inode_mkdir()` LSM hook.
 pub fn check_fs_node_mkdir_access(
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -228,7 +230,7 @@ pub fn check_fs_node_mkdir_access(
 /// `parent` directory, and with the specified file `mode` and `device_id`.
 /// For consistency any calls to `mknod()` with a file `mode` specifying a regular file will be
 /// validated by `check_fs_node_create_access()` rather than by this hook.
-/// Corresponds to the `security_inode_mknod()` hook.
+/// Corresponds to the `inode_mknod()` LSM hook.
 pub fn check_fs_node_mknod_access(
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -250,7 +252,7 @@ pub fn check_fs_node_mknod_access(
 }
 
 /// Validate that `current_task` has  the permission to create a new hard link to a file.
-/// Corresponds to the `security_inode_link()` hook.
+/// Corresponds to the `inode_link()` LSM hook.
 pub fn check_fs_node_link_access(
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -263,7 +265,7 @@ pub fn check_fs_node_link_access(
 }
 
 /// Validate that `current_task` has the permission to remove a hard link to a file.
-/// Corresponds to the `security_inode_unlink()` hook.
+/// Corresponds to the `inode_unlink()` LSM hook.
 pub fn check_fs_node_unlink_access(
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -276,7 +278,7 @@ pub fn check_fs_node_unlink_access(
 }
 
 /// Validate that `current_task` has the permission to remove a directory.
-/// Corresponds to the `security_inode_rmdir()` hook.
+/// Corresponds to the `inode_rmdir()` LSM hook.
 pub fn check_fs_node_rmdir_access(
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -289,18 +291,21 @@ pub fn check_fs_node_rmdir_access(
 }
 
 /// Returns the security state for a new file object created by `current_task`.
+/// Corresponds to the `file_alloc_security()` LSM hook.
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
     profile_duration!("security.hooks.file_alloc_security");
     FileObjectState { _state: selinux_hooks::file_alloc_security(current_task) }
 }
 
 /// Return the default initial `TaskState` for kernel tasks.
+/// Corresponds to the `task_alloc()` LSM hook, in the special case when current_task is null.
 pub fn task_alloc_for_kernel() -> TaskState {
     profile_duration!("security.hooks.task_alloc_for_kernel");
     TaskState { attrs: selinux_hooks::TaskAttrs::for_kernel() }
 }
 
 /// Returns `TaskState` for a new `Task`, based on that of `task`, and the specified clone flags.
+/// Corresponds to the `task_alloc()` LSM hook.
 pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
     profile_duration!("security.hooks.task_alloc");
     TaskState {
@@ -315,7 +320,8 @@ pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
 /// Labels an [`crate::vfs::FsNode`], by attaching a pseudo-label to the `fs_node`, which allows
 /// indirect resolution of the effective label. Makes the security attributes of `fs_node` track the
 /// `task`'s security attributes, even if the task's security attributes change. Called for the
-/// /proc/<pid> `FsNode`s when they are created. Corresponds to the `task_to_inode` hook.
+/// /proc/<pid> `FsNode`s when they are created.
+/// Corresponds to the `task_to_inode` LSM hook.
 pub fn task_to_fs_node(current_task: &CurrentTask, task: &TempRef<'_, Task>, fs_node: &FsNode) {
     profile_duration!("security.hooks.task_to_fs_node");
     // The fs_node_init_with_task hook doesn't require any policy-specific information. Only check
@@ -326,6 +332,9 @@ pub fn task_to_fs_node(current_task: &CurrentTask, task: &TempRef<'_, Task>, fs_
 }
 
 /// Returns `TaskState` for a new `Task`, based on that of the provided `context`.
+/// Corresponds to a combination of the `task_alloc()` and `setprocattr()` LSM hooks.
+/// The difference from those hooks is that this one bypasses the access-checks that would be
+/// performed by `set_procattr()`.
 pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno> {
     profile_duration!("security.hooks.task_for_context");
     Ok(TaskState {
@@ -357,7 +366,11 @@ pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
     )
 }
 
-/// Check if creating a task is allowed.
+/// Checks if creating a task is allowed.
+/// Directly maps to the `selinux_task_create` LSM hook from the original NSA white paper.
+/// Partially corresponds to the `task_alloc()` LSM hook. Compared to `task_alloc()`,
+/// this hook doesn't actually modify the task's label, but instead verifies whether the task has
+/// the "fork" permission on itself.
 pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_task_create_access");
     if_selinux_else_default_ok(current_task, |security_server| {
@@ -369,6 +382,7 @@ pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno>
 }
 
 /// Checks if exec is allowed.
+/// Corresponds to the `check_exec_access()` LSM hook.
 pub fn check_exec_access(
     current_task: &CurrentTask,
     executable_node: &FsNode,
@@ -384,7 +398,7 @@ pub fn check_exec_access(
 }
 
 /// Updates the SELinux thread group state on exec.
-/// Corresponds to the `bprm_committing_creds` and `bprm_committed_creds` hooks.
+/// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` hooks.
 pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
     profile_duration!("security.hooks.update_state_on_exec");
     if_selinux_else(
@@ -397,6 +411,7 @@ pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &Res
 }
 
 /// Checks if `source` may exercise the "getsched" permission on `target`.
+/// Corresponds to the `task_getscheduler()` LSM hook.
 pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_getsched_access");
     if_selinux_else_default_ok(source, |security_server| {
@@ -409,6 +424,7 @@ pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 }
 
 /// Checks if setsched is allowed.
+/// Corresponds to the `task_setscheduler()` LSM hook.
 pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_setsched_access");
     if_selinux_else_default_ok(source, |security_server| {
@@ -421,6 +437,7 @@ pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 }
 
 /// Checks if getpgid is allowed.
+/// Corresponds to the `task_getpgid()` LSM hook.
 pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_getpgid_access");
     if_selinux_else_default_ok(source, |security_server| {
@@ -433,6 +450,7 @@ pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 }
 
 /// Checks if setpgid is allowed.
+/// Corresponds to the `task_setpgid()` LSM hook.
 pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_setpgid_access");
     if_selinux_else_default_ok(source, |security_server| {
@@ -445,7 +463,7 @@ pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 }
 
 /// Called when the current task queries the session Id of the `target` task.
-/// Corresponds to the `task_getsid` LSM hook.
+/// Corresponds to the `task_getsid()` LSM hook.
 pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_task_getsid");
     if_selinux_else_default_ok(source, |security_server| {
@@ -458,6 +476,7 @@ pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errn
 }
 
 /// Checks if sending a signal is allowed.
+/// Corresponds to the `task_kill()` LSM hook.
 pub fn check_signal_access(
     source: &CurrentTask,
     target: &Task,
@@ -474,7 +493,8 @@ pub fn check_signal_access(
     })
 }
 
-// Checks whether the `parent_tracer_task` is allowed to trace the `current_task`.
+/// Checks whether the `parent_tracer_task` is allowed to trace the `current_task`.
+/// Corresponds to the `ptrace_traceme()` LSM hook.
 pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
     profile_duration!("security.hooks.ptrace_traceme");
     if_selinux_else_default_ok(current_task, |security_server| {
@@ -488,6 +508,7 @@ pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> 
 
 /// Checks whether the current `current_task` is allowed to trace `tracee_task`.
 /// This fills the role of both of the LSM `ptrace_traceme` and `ptrace_access_check` hooks.
+/// Corresponds to the `ptrace_access_check()` LSM hook.
 pub fn ptrace_access_check(current_task: &CurrentTask, tracee_task: &Task) -> Result<(), Errno> {
     profile_duration!("security.hooks.ptrace_access_check");
     if_selinux_else_default_ok(current_task, |security_server| {
@@ -500,7 +521,7 @@ pub fn ptrace_access_check(current_task: &CurrentTask, tracee_task: &Task) -> Re
 }
 
 /// Called when the current task calls prlimit on a different task.
-/// Corresponds to the `security_task_prlimit` hook.
+/// Corresponds to the `task_prlimit()` LSM hook.
 pub fn task_prlimit(
     source: &CurrentTask,
     target: &Task,
@@ -521,7 +542,7 @@ pub fn task_prlimit(
 
 /// Check permission before an object specified by `dev_name` is mounted on the mount point named by `path`.
 /// `type` contains the filesystem type. `flags` contains the mount flags. `data` contains the filesystem-specific data.
-/// Corresponds to the `security_sb_mount` hook.
+/// Corresponds to the `sb_mount()` LSM hook.
 pub fn sb_mount(
     current_task: &CurrentTask,
     dev_name: &bstr::BStr,
@@ -546,7 +567,7 @@ pub fn sb_mount(
 
 /// Checks if `current_task` has the permission to unmount the filesystem mounted on
 /// `node` using the unmount flags `flags`.
-/// Corresponds to the `security_sb_umount` hook.
+/// Corresponds to the `sb_umount()` LSM hook.
 pub fn sb_umount(
     current_task: &CurrentTask,
     node: &NamespaceNode,
@@ -558,6 +579,11 @@ pub fn sb_umount(
     })
 }
 
+/// This is called by Starnix even for filesystems which support extended attributes, unlike Linux
+/// LSM.
+/// Partially corresponds to the `inode_setxattr()` LSM hook: It is equivalent to
+/// `inode_setxattr()` for non-security xattrs, while `fs_node_setsecurity()` is always called for
+/// security xattrs. See also [`fs_node_setsecurity()`].
 pub fn check_fs_node_setxattr_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -578,6 +604,7 @@ pub fn check_fs_node_setxattr_access(
     })
 }
 
+/// Corresponds to the `inode_getxattr()` LSM hook.
 pub fn check_fs_node_getxattr_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -589,6 +616,7 @@ pub fn check_fs_node_getxattr_access(
     })
 }
 
+/// Corresponds to the `inode_listxattr()` LSM hook.
 pub fn check_fs_node_listxattr_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -599,6 +627,7 @@ pub fn check_fs_node_listxattr_access(
     })
 }
 
+/// Corresponds to the `inode_removexattr()` LSM hook.
 pub fn check_fs_node_removexattr_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -617,10 +646,11 @@ pub fn check_fs_node_removexattr_access(
 
 /// Returns the value of the specified "security.*" attribute for `fs_node`.
 /// If SELinux is enabled then requests for the "security.selinux" attribute will return the
-/// Security Context corresponding to the SID with which `fs_node` has been labelled, even if the
+/// Security Context corresponding to the SID with which `fs_node` has been labeled, even if the
 /// node's file system does not generally support extended attributes.
-/// If SELinux is not enabled, or the node is not labelled with a SID, then the call is delegated to
+/// If SELinux is not enabled, or the node is not labeled with a SID, then the call is delegated to
 /// the [`crate::vfs::FsNodeOps`], so the returned value may not be a valid Security Context.
+/// Corresponds to the `inode_getsecurity()` LSM hook.
 pub fn fs_node_getsecurity<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
@@ -659,7 +689,19 @@ where
 
 /// Sets the value of the specified security attribute for `fs_node`.
 /// If SELinux is enabled then this also updates the in-kernel SID with which
-/// the file node is labelled.
+/// the file node is labeled.
+///
+/// Partially corresponds to the `inode_setsecurity()` and `inode_setxattr()` LSM hooks:
+/// In Linux, the LSM hooks are called based on the External Attributes support of the filesystem:
+/// * with xattr support: `inode_setxattr()` -> `setxattr()` -> `inode_post_setxattr()`
+/// * without xattr support: `inode_setsecurity()`.
+///
+/// In SEStarnix we instead slice based on whether the xattr being set is in the "security"
+/// namespace, or not:
+/// * in the security namespace: `fs_node_setsecurity()` (calls `setxattr()` internally)
+/// * otherwise: `check_fs_node_setxattr_access()` -> `setxattr()`.
+///
+/// This is consistent with the way the `*_getsecurity()` hook is used in both Linux and SEStarnix.
 pub fn fs_node_setsecurity<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
@@ -715,6 +757,7 @@ pub enum ProcAttr {
 }
 
 /// Returns the Security Context associated with the `name`ed entry for the specified `target` task.
+/// Corresponds to the `getprocattr()` LSM hook.
 pub fn get_procattr(
     current_task: &CurrentTask,
     target: &Task,
@@ -732,6 +775,7 @@ pub fn get_procattr(
 }
 
 /// Sets the Security Context associated with the `name`ed entry for the current task.
+/// Corresponds to the `setprocattr()` LSM hook.
 pub fn set_procattr(
     current_task: &CurrentTask,
     attr: ProcAttr,
