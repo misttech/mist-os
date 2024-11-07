@@ -32,10 +32,4 @@ static_assert(FUCHSIA_LOG_WARNING < FUCHSIA_LOG_ERROR, "");
 static_assert(FUCHSIA_LOG_ERROR < FUCHSIA_LOG_FATAL, "");
 static_assert(FUCHSIA_LOG_FATAL < FUCHSIA_LOG_NONE, "");
 
-// Max size of log buffer
-#define FUCHSIA_SYSLOG_BUFFER_SIZE ((1 << 15) / 8)
-
-// Additional storage for internal log state.
-#define FUCHSIA_SYSLOG_STATE_SIZE (15)
-
 #endif  // LIB_SYSLOG_STRUCTURED_BACKEND_FUCHSIA_SYSLOG_H_
