@@ -17,6 +17,7 @@ extern "C" {
 struct MsdPlatformDevice;
 
 struct MsdDevice;
+struct MsdConnection;
 
 struct MsdDriverCallbacks {
   void (*log)(int32_t level, const char* file, int32_t line, const char* str);
@@ -30,6 +31,10 @@ void msd_device_release(struct MsdDevice* device);
 
 magma_status_t msd_device_query(struct MsdDevice* device, uint64_t id,
                                 magma_handle_t* result_buffer_out, uint64_t* result_out);
+
+struct MsdConnection* msd_device_create_connection(struct MsdDevice* device, uint64_t client_id);
+
+void msd_connection_release(struct MsdConnection* connection);
 
 #ifdef __cplusplus
 }
