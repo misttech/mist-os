@@ -7,7 +7,7 @@
 """Visualizes the output of Zircon's "memgraph" tool.
 
 For usage, see
-https://fuchsia.dev/fuchsia-src/development/memory/memory#visualize_memory_usage
+https://fuchsia.dev/fuchsia-src/development/kernel/memory/memory#visualize_memory_usage
 """
 
 import collections
