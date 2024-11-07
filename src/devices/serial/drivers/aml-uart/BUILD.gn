@@ -59,6 +59,7 @@ source_set("aml-uart-source") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/platform-device/cpp",
     "//sdk/lib/driver/power/cpp",

@@ -13,6 +13,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_test.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include <bind/fuchsia/broadcom/platform/cpp/bind.h>
 #include <gtest/gtest.h>
@@ -25,6 +26,7 @@
 namespace {
 
 using fdf_power::testing::FakeElementControl;
+using fuchsia_power_system::LeaseToken;
 
 static constexpr fuchsia_hardware_serial::wire::SerialPortInfo kSerialInfo = {
     .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
@@ -42,6 +44,8 @@ class FakeSystemActivityGovernor
                                    fidl::kIgnoreBindingClosure);
   }
 
+  bool HasActiveWakeLease() const { return !active_wake_leases_.empty(); }
+
   void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
     fuchsia_power_system::PowerElements elements;
     zx::event::create(0, &wake_handling_);
@@ -56,6 +60,31 @@ class FakeSystemActivityGovernor
     completer.Reply({{std::move(elements)}});
   }
 
+  void TakeWakeLease(TakeWakeLeaseRequest& /* ignored */,
+                     TakeWakeLeaseCompleter::Sync& completer) override {
+    LeaseToken client_token, server_token;
+    LeaseToken::create(/*options=*/0u, &client_token, &server_token);
+
+    // Start an async task to wait for EVENTPAIR_PEER_CLOSED signal on server_token.
+    zx_handle_t token_handle = server_token.get();
+    active_wake_leases_[token_handle] = std::move(server_token);
+    auto wait = std::make_unique<async::WaitOnce>(token_handle, ZX_EVENTPAIR_PEER_CLOSED);
+    wait->Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                [this, token_handle](async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                                     const zx_packet_signal_t*) {
+                  if (status == ZX_ERR_CANCELED) {
+                    return;
+                  }
+                  ZX_ASSERT(status == ZX_OK);
+                  auto it = active_wake_leases_.find(token_handle);
+                  ZX_ASSERT(it != active_wake_leases_.end());
+                  ZX_ASSERT(token_handle == it->second.get());
+                  active_wake_leases_.erase(it);
+                });
+    wait_once_tasks_.push_back(std::move(wait));
+    completer.Reply(std::move(client_token));
+  }
+
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     ADD_FAILURE() << name << " is not implemented";
   }
@@ -66,6 +95,8 @@ class FakeSystemActivityGovernor
  private:
   zx::event wake_handling_;
   fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> bindings_;
+  std::unordered_map<zx_handle_t, LeaseToken> active_wake_leases_;
+  std::vector<std::unique_ptr<async::WaitOnce>> wait_once_tasks_;
 };
 
 class FakeLeaseControl : public fidl::Server<fuchsia_power_broker::LeaseControl> {
@@ -96,8 +127,6 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Lessor> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  bool GetLeaseRequested() { return lease_requested_; }
 
  private:
   bool lease_requested_ = false;
@@ -143,59 +172,6 @@ class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel>
 
  private:
   fuchsia_power_broker::PowerLevel current_level_ = serial::AmlUart::kPowerLevelOff;
-};
-
-class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
- public:
-  fidl::ProtocolHandler<fuchsia_power_broker::Topology> CreateHandler() {
-    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                   fidl::kIgnoreBindingClosure);
-  }
-
-  void AddElement(fuchsia_power_broker::ElementSchema& request,
-                  AddElementCompleter::Sync& completer) override {
-    EXPECT_TRUE(request.element_control().has_value());
-    zx_status_t status = request.element_control()->channel().get_info(
-        ZX_INFO_HANDLE_BASIC, &element_control_info_, sizeof(zx_info_handle_basic_t), nullptr,
-        nullptr);
-    EXPECT_EQ(status, ZX_OK);
-    fidl::BindServer<fuchsia_power_broker::ElementControl>(
-        fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*request.element_control()),
-        &element_control_);
-
-    if (request.lessor_channel()) {
-      fidl::BindServer<fuchsia_power_broker::Lessor>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(*request.lessor_channel()),
-          &wake_lessor_);
-    }
-
-    if (request.level_control_channels()) {
-      fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-          std::move(request.level_control_channels()->required()), &required_level_);
-      fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
-          fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-          std::move(request.level_control_channels()->current()), &current_level_);
-    }
-
-    completer.Reply(fit::success());
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  FakeRequiredLevel& required_level() { return required_level_; }
-  FakeCurrentLevel& current_level() { return current_level_; }
-  bool GetLeaseRequested() { return wake_lessor_.GetLeaseRequested(); }
-  const zx_info_handle_basic_t& element_control_info() const { return element_control_info_; }
-
- private:
-  FakeLessor wake_lessor_;
-  FakeRequiredLevel required_level_;
-  FakeCurrentLevel current_level_;
-  FakeElementControl element_control_;
-  zx_info_handle_basic_t element_control_info_;
-  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> bindings_;
 };
 
 class Environment : public fdf_testing::Environment {
@@ -249,10 +225,6 @@ class Environment : public fdf_testing::Environment {
         to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_system::ActivityGovernor>(
             system_activity_governor_.CreateHandler());
     EXPECT_EQ(ZX_OK, result_sag.status_value());
-    auto result_broker =
-        to_driver_vfs.component().AddUnmanagedProtocol<fuchsia_power_broker::Topology>(
-            power_broker_.CreateHandler());
-    EXPECT_EQ(ZX_OK, result_broker.status_value());
 
     // Configure and add compat.
     compat_server_.Init("default", "topo");
@@ -265,13 +237,12 @@ class Environment : public fdf_testing::Environment {
   }
 
   DeviceState& device_state() { return state_; }
-  FakePowerBroker& power_broker() { return power_broker_; }
+  FakeSystemActivityGovernor& sag() { return system_activity_governor_; }
 
  private:
   DeviceState state_;
   fake_pdev::FakePDevFidl pdev_server_;
   FakeSystemActivityGovernor system_activity_governor_;
-  FakePowerBroker power_broker_;
   compat::DeviceServer compat_server_;
 };
 
@@ -665,23 +636,6 @@ TEST_F(AmlUartAsyncHarness, SerialImplAsyncReadDoubleCallback) {
   driver_test().runtime().Run();
 }
 
-TEST_F(AmlUartHarnessWithPower, PowerElementControl) {
-  zx_info_handle_basic_t broker_element_control, driver_element_control;
-
-  driver_test().RunInDriverContext([&](serial::AmlUartV2& driver) {
-    zx_status_t status =
-        driver.aml_uart_for_testing().element_control_for_testing().channel().get_info(
-            ZX_INFO_HANDLE_BASIC, &driver_element_control, sizeof(zx_info_handle_basic_t), nullptr,
-            nullptr);
-    ASSERT_EQ(status, ZX_OK);
-  });
-
-  driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
-    broker_element_control = env.power_broker().element_control_info();
-  });
-  ASSERT_EQ(broker_element_control.koid, driver_element_control.related_koid);
-}
-
 TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
   FakeTimer fake_timer;
 
@@ -710,7 +664,7 @@ TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
 
   // Verify that no lease has been acquired. Trigger an interrupt.
   driver_test().RunInEnvironmentTypeContext([&data](Environment& env) {
-    ASSERT_FALSE(env.power_broker().GetLeaseRequested());
+    ASSERT_FALSE(env.sag().HasActiveWakeLease());
     env.device_state().Inject(data, kDataLen);
   });
 
@@ -720,7 +674,7 @@ TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
   zx_time_t last_deadline = FakeTimer::current_deadline_;
 
   driver_test().RunInEnvironmentTypeContext([&data](Environment& env) {
-    ASSERT_TRUE(env.power_broker().GetLeaseRequested());
+    ASSERT_TRUE(env.sag().HasActiveWakeLease());
     env.device_state().Inject(data, kDataLen);
   });
 
@@ -731,7 +685,7 @@ TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
   });
 
   driver_test().RunInEnvironmentTypeContext(
-      [](Environment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
+      [](Environment& env) { ASSERT_TRUE(env.sag().HasActiveWakeLease()); });
 
   // Fire the timer and verify that the wake lease has been dropped.
   fake_timer.FireTimer();
@@ -741,7 +695,7 @@ TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
 
   driver_test().runtime().RunUntil([&]() {
     return driver_test().RunInEnvironmentTypeContext<bool>(
-               [](Environment& env) { return env.power_broker().GetLeaseRequested(); }) == false;
+               [](Environment& env) { return env.sag().HasActiveWakeLease(); }) == false;
   });
 
   driver_test().RunInEnvironmentTypeContext(
@@ -750,49 +704,7 @@ TEST_F(AmlUartHarnessWithPower, AcquireWakeLeaseWithRead) {
   // The driver is able to set the timer and acquire lease again.
   driver_test().runtime().RunUntil([&]() { return FakeTimer::current_deadline_ != 0; });
   driver_test().RunInEnvironmentTypeContext(
-      [](Environment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
-}
-
-TEST_F(AmlUartHarnessWithPower, PowerLevelUpdate) {
-  // Wait until we have received the Watch.
-  driver_test().runtime().RunUntil([&]() {
-    return driver_test().RunInEnvironmentTypeContext<bool>(
-        [](Environment& env) { return env.power_broker().required_level().WatchReceived(); });
-  });
-
-  // The driver sets the CurrentLevel to the RequiredLevel kPowerLevelHandling.
-  driver_test().RunInEnvironmentTypeContext([](Environment& env) {
-    env.power_broker().required_level().SetRequiredLevel(serial::AmlUart::kPowerLevelHandling);
-  });
-  driver_test().runtime().RunUntil([&]() {
-    return driver_test().RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>(
-               [](Environment& env) {
-                 return env.power_broker().current_level().current_level();
-               }) == serial::AmlUart::kPowerLevelHandling;
-  });
-
-  // Wait until we have received the Watch.
-  driver_test().runtime().RunUntil([&]() {
-    return driver_test().RunInEnvironmentTypeContext<bool>(
-        [](Environment& env) { return env.power_broker().required_level().WatchReceived(); });
-  });
-
-  // The driver sets the CurrentLevel to the RequiredLevel kPowerLevelOff.
-  driver_test().RunInEnvironmentTypeContext([](Environment& env) {
-    env.power_broker().required_level().SetRequiredLevel(serial::AmlUart::kPowerLevelOff);
-  });
-  driver_test().runtime().RunUntil([&]() {
-    return driver_test().RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>(
-               [](Environment& env) {
-                 return env.power_broker().current_level().current_level();
-               }) == 0;
-  });
-
-  // Wait until we have received the Watch.
-  driver_test().runtime().RunUntil([&]() {
-    return driver_test().RunInEnvironmentTypeContext<bool>(
-        [](Environment& env) { return env.power_broker().required_level().WatchReceived(); });
-  });
+      [](Environment& env) { ASSERT_TRUE(env.sag().HasActiveWakeLease()); });
 }
 
 }  // namespace

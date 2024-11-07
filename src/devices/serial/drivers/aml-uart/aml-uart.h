@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.serialimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
@@ -58,13 +59,7 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
       fdf::MmioBuffer mmio, fdf::UnownedSynchronizedDispatcher irq_dispatcher,
       std::optional<fdf::UnownedSynchronizedDispatcher> timer_dispatcher = std::nullopt,
       bool power_control_enabled = false,
-      std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_end = std::nullopt,
-      std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_end =
-          std::nullopt,
-      std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>>
-          required_level_client_end = std::nullopt,
-      std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>>
-          element_control_client_end = std::nullopt);
+      std::optional<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> sag = std::nullopt);
 
   zx_status_t Config(uint32_t baud_rate, uint32_t flags);
   zx_status_t Enable(bool enable);
@@ -82,7 +77,6 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
       fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  fidl::ClientEnd<fuchsia_power_broker::ElementControl>& element_control_for_testing();
   // Test functions: simulate a data race where the HandleTX / HandleRX functions get called twice.
   void HandleTXRaceForTest();
   void HandleRXRaceForTest();
@@ -115,8 +109,6 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
   void HandleLeaseTimer(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,
                         const zx_packet_signal_t* signal);
 
-  zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AcquireLease();
-
   fdf::PDev pdev_;
   const fuchsia_hardware_serial::wire::SerialPortInfo serial_port_info_;
   fdf::MmioBuffer mmio_;
@@ -143,12 +135,7 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
   async::IrqMethod<AmlUart, &AmlUart::HandleIrq> irq_handler_{this};
 
   bool power_control_enabled_;
-  fidl::SyncClient<fuchsia_power_broker::CurrentLevel> current_level_client_;
-  fidl::Client<fuchsia_power_broker::RequiredLevel> required_level_client_;
-  fidl::SyncClient<fuchsia_power_broker::Lessor> lessor_client_;
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client_end_;
-  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_control_client_end_
-      TA_GUARDED(timer_lock_);
+  fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag_ TA_GUARDED(timer_lock_);
 
   static const uint32_t kPowerLeaseTimeoutMs = 300;
   // Record the current deadline of the lease timer, so that the timer handler can tell whether the
@@ -161,6 +148,9 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
   async::WaitMethod<AmlUart, &AmlUart::HandleLeaseTimer> timer_waiter_{this};
   fdf::UnownedSynchronizedDispatcher timer_dispatcher_;
   fbl::Mutex timer_lock_;
+
+  std::optional<zx::eventpair> token_;
+  bool sag_available_ = false;
 };
 
 }  // namespace serial

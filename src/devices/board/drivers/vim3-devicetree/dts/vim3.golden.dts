@@ -30,40 +30,6 @@
 		pwm-init = <0x21>;
 		reg = <0x00 0xffd24000 0x00 0x18>;
 		serial-port = <0x02 0x06 0x03>;
-
-		power-elements {
-
-			aml-uart-wake-on-interrupt-element {
-
-				power-levels {
-
-					handling-level {
-						level = <0x01>;
-						level-dependencies = <0x37 0x01>;
-
-						level-transition-table {
-
-							transition-to-off {
-								latency-us = <0x00>;
-								target-level = <0x00>;
-							};
-						};
-					};
-
-					off-level {
-						level = <0x00>;
-
-						level-transition-table {
-
-							transition-to-handling {
-								latency-us = <0x00>;
-								target-level = <0x01>;
-							};
-						};
-					};
-				};
-			};
-		};
 	};
 
 	canvas@ff638000 {
@@ -215,7 +181,7 @@
 		compatible = "fuchsia,gpio-buttons";
 		gpio-names = "POWER";
 		gpios = <0x06 0x5c 0x00>;
-		pinctrl-0 = <0x38>;
+		pinctrl-0 = <0x37>;
 	};
 
 	gpio_header {
@@ -646,7 +612,7 @@
 			gpio-buttons-pins {
 				bias-disable;
 				function = <0x00 0x00>;
-				phandle = <0x38>;
+				phandle = <0x37>;
 				pins = <0x5c>;
 			};
 
@@ -739,7 +705,7 @@
 
 			wifi-pins {
 				bias-disable;
-				phandle = <0x39>;
+				phandle = <0x38>;
 				pins = <0x3f>;
 			};
 		};
@@ -1019,7 +985,6 @@
 
 					active-level {
 						level = <0x01>;
-						phandle = <0x37>;
 					};
 
 					inactive-level {
@@ -1061,6 +1026,6 @@
 		compatible = "broadcom,bcm4359";
 		gpio-names = "WIFI_WAKE_HOST";
 		gpios = <0x06 0x3f 0x00>;
-		pinctrl-0 = <0x39>;
+		pinctrl-0 = <0x38>;
 	};
 };

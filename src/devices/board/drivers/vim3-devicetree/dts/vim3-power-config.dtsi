@@ -64,34 +64,6 @@
 	};
 };
 
-&bt_uart {
-	power-elements {
-		aml-uart-wake-on-interrupt-element {
-			power-levels {
-				off-level {
-					level = <0>;
-					level-transition-table {
-						transition-to-handling {
-							target-level = <1>;
-							latency-us = <0>;
-						};
-					};
-				};
-				handling-level {
-					level = <1>;
-					level-dependencies = <&sag_wake_active 1>;
-					level-transition-table {
-						transition-to-off {
-							target-level = <0>;
-							latency-us = <0>;
-						};
-					};
-				};
-			};
-		};
-	};
-};
-
 &audio {
 	power-elements {
 		audio-hw-element {
@@ -107,7 +79,6 @@
 		};
 	};
 };
-
 
 &sd_emmc_c {
 	power-elements {
