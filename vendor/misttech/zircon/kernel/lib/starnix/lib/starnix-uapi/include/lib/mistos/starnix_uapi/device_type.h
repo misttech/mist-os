@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_DEVICE_TYPE_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_DEVICE_TYPE_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_DEVICE_TYPE_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_DEVICE_TYPE_H_
 
 #include <lib/mistos/util/range-map.h>
 #include <zircon/types.h>
@@ -39,9 +39,8 @@ constexpr uint32_t DEVICE_MAPPER_MAJOR = 254;
 class DeviceType {
  public:
   static const DeviceType NONE;
-
   // MEM
-  static const DeviceType _NULL;
+  static const DeviceType NILL;
   static const DeviceType ZERO;
   static const DeviceType FULL;
   static const DeviceType RANDOM;
@@ -100,10 +99,17 @@ class DeviceType {
     return ((value_ >> 12 & 0xffffff00ULL) | (value_ & 0xffULL)) & 0xFFFFFFFF;
   }
 
+  bool operator<(const DeviceType& rhs) const { return value_ < rhs.value_; }
+  bool operator==(const DeviceType& rhs) const { return value_ == rhs.value_; }
+  /*bool operator!=(const DeviceType& rhs) const { return !(*this == rhs); }
+  bool operator>(const DeviceType& rhs) const { return rhs < *this; }
+  bool operator<=(const DeviceType& rhs) const { return !(rhs < *this); }
+  bool operator>=(const DeviceType& rhs) const { return !(*this < rhs); }*/
+
  private:
   uint64_t value_;
 };
 
 }  // namespace starnix_uapi
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_DEVICE_TYPE_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_DEVICE_TYPE_H_

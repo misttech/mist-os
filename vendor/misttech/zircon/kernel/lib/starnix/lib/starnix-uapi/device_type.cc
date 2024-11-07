@@ -8,7 +8,7 @@
 namespace starnix_uapi {
 
 const DeviceType DeviceType::NONE(0);
-const DeviceType DeviceType::_NULL = DeviceType::New(MEM_MAJOR, 3);
+const DeviceType DeviceType::NILL = DeviceType::New(MEM_MAJOR, 3);
 const DeviceType DeviceType::ZERO = DeviceType::New(MEM_MAJOR, 5);
 const DeviceType DeviceType::FULL = DeviceType::New(MEM_MAJOR, 7);
 const DeviceType DeviceType::RANDOM = DeviceType::New(MEM_MAJOR, 8);
