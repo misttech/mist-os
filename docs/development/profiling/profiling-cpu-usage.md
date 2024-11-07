@@ -16,15 +16,11 @@ do the following:
    ```posix-terminal
    fx set <PRODUCT>.<BOARD> \
    --release \
-   --args='enable_frame_pointers=true' \
    --args='experimental_thread_sampler_enabled=true'
    ```
 
-   - `experimental_thread_sampler_enabled=true` enables experimental
-     sampling support.
-   - `enable_frame_pointers=true` enables the profiler to collect stack
-     samples.
-   - `debuginfo="backtrace"` adds the needed debug info to symbolize stacks.
+   - `experimental_thread_sampler_enabled=true` enables experimental kernel assisted sampling
+     support which significantly reduces the overhead of sampling.
 
    Note: Adding the `--release` flag may result in more difficult to follow
    stacks due to inlining and optimization passes. However, it will give overall
