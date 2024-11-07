@@ -28,9 +28,8 @@ declare_args() {
     # stack traces, especially when we have bugs around unwind table generation.
     # It applies only for Fuchsia targets (see below where it is unset).
     #
-    # TODO(https://fxbug.dev/42107277): Theoretically unwind tables should be good enough so we can
-    # remove this option when the issues are addressed.
-    enable_frame_pointers = is_debug
+    # TODO(https://fxbug.dev/376749368) Enabling frame pointers breaks on RISCV release.
+    enable_frame_pointers = is_debug || target_cpu != "riscv64"
   }
 
   # Controls whether to promote warnings to errors.
