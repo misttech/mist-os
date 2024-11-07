@@ -9,6 +9,8 @@
 
 #include <variant>
 
+#include <fbl/auto_lock.h>
+
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/internal.h"
 #include "sdk/lib/fdio/zxio.h"
@@ -70,7 +72,7 @@ int fdio_bind_to_fd(fdio_t* io, int fd, int starting_fd) {
   // Don't release under lock.
   fdio_ptr io_to_close = nullptr;
   {
-    std::lock_guard lock(fdio_lock);
+    fbl::AutoLock lock(&fdio_lock);
     if (fd < 0) {
       // A negative fd implies that any free fd value can be used
       // TODO: bitmap, ffs, etc
@@ -115,7 +117,7 @@ fdio_t* fdio_zxio_create(zxio_storage_t** out_storage) {
 __EXPORT
 size_t fdio_currently_allocated_fd_count(void) {
   size_t count = 0;
-  std::lock_guard lock(fdio_lock);
+  fbl::AutoLock lock(&fdio_lock);
   for (size_t fd = 0; fd < FDIO_MAX_FD; ++fd) {
     if (fdio_fdtab[fd].allocated()) {
       ++count;

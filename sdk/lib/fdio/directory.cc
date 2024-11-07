@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fdio/directory.h>
 
+#include <fbl/auto_lock.h>
 #include <fbl/no_destructor.h>
 
 #include "sdk/lib/fdio/directory_internal.h"

@@ -14,6 +14,8 @@
 
 #include <algorithm>
 
+#include <fbl/auto_lock.h>
+
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/zxio.h"
 
@@ -24,7 +26,7 @@ struct fdio_timer_t {
   // The zx::timer object that implements the timerfd.
   zx::timer handle;
 
-  std::mutex lock;
+  mtx_t lock;
 
   zx::time current_deadline __TA_GUARDED(lock);
   zx::duration interval __TA_GUARDED(lock);
@@ -62,7 +64,7 @@ static zx_status_t fdio_timer_readv(zxio_t* io, const zx_iovec_t* vector, size_t
 
   fdio_timer_t* timer = reinterpret_cast<fdio_timer_t*>(io);
 
-  std::lock_guard lock(timer->lock);
+  fbl::AutoLock lock(&timer->lock);
   if (timer->current_deadline == zx::time()) {
     // The timer was never set.
     return ZX_ERR_SHOULD_WAIT;
@@ -226,7 +228,7 @@ __EXPORT int timerfd_settime(int fd, int flags, const struct itimerspec* new_val
     return ERRNO(EINVAL);
   }
 
-  std::lock_guard lock(timer->lock);
+  fbl::AutoLock lock(&timer->lock);
 
   struct itimerspec old = {};
   if (old_value) {
@@ -265,7 +267,7 @@ int timerfd_gettime(int fd, struct itimerspec* curr_value) {
   if (!timer) {
     return ERRNO(EINVAL);
   }
-  std::lock_guard lock(timer->lock);
+  fbl::AutoLock lock(&timer->lock);
   fdio_timer_get_current_timespec(timer, curr_value);
   return 0;
 }

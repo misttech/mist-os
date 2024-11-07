@@ -12,6 +12,7 @@
 
 #include <cerrno>
 
+#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 
 #include "fidl/fuchsia.io/cpp/wire_types.h"
@@ -180,7 +181,7 @@ zx_status_t fdio_ns_export(fdio_ns_t* ns, fdio_flat_namespace_t** out) { return 
 
 __EXPORT
 zx_status_t fdio_ns_export_root(fdio_flat_namespace_t** out) {
-  std::lock_guard lock(fdio_lock);
+  fbl::AutoLock lock(&fdio_lock);
   return fdio_ns_export(fdio_root_ns, out);
 }
 
