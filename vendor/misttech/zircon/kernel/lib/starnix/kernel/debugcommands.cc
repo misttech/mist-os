@@ -8,13 +8,10 @@
 
 #include <ktl/enforce.h>
 
-static int starnix_main(int argc, const cmd_args* argv, uint32_t flags);
+namespace starnix {
+namespace {
 
-STATIC_COMMAND_START
-STATIC_COMMAND_MASKED("starnix", "", &starnix_main, CMD_AVAIL_NORMAL)
-STATIC_COMMAND_END(fs)
-
-static int starnix_main(int argc, const cmd_args* argv, uint32_t flags) {
+int starnix_main(int argc, const cmd_args* argv, uint32_t flags) {
   int rc = 0;
   if (argc < 2) {
   notenoughargs:
@@ -41,7 +38,8 @@ static int starnix_main(int argc, const cmd_args* argv, uint32_t flags) {
     config.name = "starnix-container";
     auto container = starnix::create_container(config);
     if (container.is_error()) {
-      return container.error_value().error_code();
+      printf("Starnix errno: %d", container.error_value().error_code());
+      return -1;
     }
 
   } else {
@@ -50,3 +48,10 @@ static int starnix_main(int argc, const cmd_args* argv, uint32_t flags) {
   }
   return rc;
 }
+
+}  // namespace
+}  // namespace starnix
+
+STATIC_COMMAND_START
+STATIC_COMMAND("starnix", "Run elf executable in starnix runtime", &starnix::starnix_main)
+STATIC_COMMAND_END(starnix)
