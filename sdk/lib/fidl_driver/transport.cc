@@ -15,8 +15,6 @@
 #include <lib/fidl/cpp/wire/status.h>
 #include <zircon/errors.h>
 
-#include <optional>
-
 namespace fidl {
 namespace internal {
 
