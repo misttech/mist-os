@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
@@ -133,7 +133,7 @@ class FsNode final
   /// The default value will provided a node owned by root, with permission 0777.
   /// The ino will be 0. If left as is, it will be set by the filesystem on insertion.
   template <class F>
-  static FsNode* new_root_with_properties(FsNodeOps* ops, F info_updater) {
+  static FsNode* new_root_with_properties(FsNodeOps* ops, F&& info_updater) {
     auto info = FsNodeInfo::New(0, FILE_MODE(IFDIR, 0777), FsCred::root());
     info_updater(info);
     return FsNode::new_internal(ktl::unique_ptr<FsNodeOps>(ops), util::WeakPtr<Kernel>(),
@@ -182,7 +182,7 @@ class FsNode final
 
   void set_fs(const FileSystemHandle& fs) {
     fs_ = util::WeakPtr<FileSystem>(fs.get());
-    kernel_ = fs->kernel();
+    kernel_ = fs->kernel_;
   }
 
   FsNodeOps& ops() const { return *ops_; }
@@ -245,4 +245,4 @@ class FsNode final
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_H_

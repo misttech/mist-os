@@ -20,9 +20,6 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <trace.h>
 
-#include <optional>
-#include <utility>
-
 #include <fbl/ref_ptr.h>
 
 #include "../kernel_priv.h"
@@ -34,11 +31,11 @@
 namespace starnix {
 
 fbl::RefPtr<Namespace> Namespace::New(FileSystemHandle fs) {
-  return Namespace::new_with_flags(fs, MountFlags::empty());
+  return Namespace::new_with_flags(ktl::move(fs), MountFlags::empty());
 }
 
 fbl::RefPtr<Namespace> Namespace::new_with_flags(FileSystemHandle fs, MountFlags flags) {
-  auto kernel = fs->kernel().Lock();
+  auto kernel = fs->kernel_.Lock();
   ASSERT_MSG(kernel, "can't create namespace without a kernel");
 
   fbl::AllocChecker ac;
@@ -74,7 +71,7 @@ LookupContext LookupContext::with(SymlinkMode _symlink_mode) {
 }
 
 void LookupContext::update_for_path(const FsStr& path) {
-  if (path.data()[path.length()] == '/') {
+  if (path[path.length()] == '/') {
     // The last path element must resolve to a directory. This is because a trailing slash
     // was found in the path.
     must_be_directory = true;

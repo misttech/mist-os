@@ -40,16 +40,13 @@ DirEntryOps::~DirEntryOps() = default;
 
 DefaultDirEntryOps::~DefaultDirEntryOps() = default;
 
-/// The Drop trait for DirEntry removes the entry from the child list of the
-/// parent entry, which means we cannot drop DirEntry objects while holding a
-/// lock on the parent's child list.
 DirEntry::~DirEntry() {
   auto local_name = state_.Read()->local_name;
   LTRACEF_LEVEL(2, "local_name=[%.*s]\n", static_cast<int>(local_name.size()), local_name.data());
 
-  auto maybe_parent = state_.Write()->parent;
+  auto maybe_parent = ktl::move(state_.Write()->parent);
   if (maybe_parent.has_value()) {
-    auto parent = maybe_parent.value();
+    const auto& parent = maybe_parent.value();
     parent->internal_remove_child(this);
   }
   children_.Write()->clear();
@@ -62,8 +59,8 @@ DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> pa
   auto ops = ktl::make_unique<DefaultDirEntryOps>(&ac);
   ZX_ASSERT(ac.check());
   auto result = fbl::AdoptRef(new (&ac) DirEntry(
-      node, ktl::move(ops),
-      {.parent = parent, .local_name = local_name, .is_dead = false, .mount_count = 0}));
+      ktl::move(node), ktl::move(ops),
+      {.parent = ktl::move(parent), .local_name = local_name, .is_dead = false, .mount_count = 0}));
   ZX_ASSERT(ac.check());
 
   // #[cfg(any(test, debug_assertions))]
@@ -74,7 +71,7 @@ DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> pa
   return result;
 }
 
-DirEntryHandle DirEntry::new_unrooted(FsNodeHandle node) { return New(node, {}, {}); }
+DirEntryHandle DirEntry::new_unrooted(FsNodeHandle node) { return New(ktl::move(node), {}, {}); }
 
 DirEntry::DirEntryLockedChildren DirEntry::lock_children() {
   return DirEntry::DirEntryLockedChildren(fbl::RefPtr<DirEntry>(this),

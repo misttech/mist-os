@@ -36,7 +36,7 @@ FdTableEntry::FdTableEntry(FileHandle file, FdTableId fd_table_id, FdFlags flags
 FdTableEntry::~FdTableEntry() {
   LTRACEF_LEVEL(3, "fd_table_id %zx\n", fd_table_id_.id);
   auto fs = file_->name_.entry_->node_->fs();
-  auto kernel = fs->kernel().Lock();
+  auto kernel = fs->kernel_.Lock();
   if (kernel) {
     // kernel->delayed_releaser.flush_file(file, fd_table_id_);
   }
@@ -132,7 +132,7 @@ void FdTableStore::retain(std::function<bool(const FdNumber&, FdTableEntry&)> fu
     auto fd = FdNumber::from_raw(static_cast<uint32_t>(index));
     auto& entry = entries_[index];
     if (entry.has_value()) {
-      if (func(fd, *entry) == false) {
+      if (!func(fd, *entry)) {
         entry = ktl::nullopt;
       }
     }
@@ -228,9 +228,8 @@ fit::result<Errno> FdTable::close(FdNumber fd) const {
 
   if (removed.has_value()) {
     return fit::ok();
-  } else {
-    return fit::error(errno(EBADF));
   }
+  return fit::error(errno(EBADF));
 }
 
 fit::result<Errno, FdFlags> FdTable::get_fd_flags(FdNumber fd) const {

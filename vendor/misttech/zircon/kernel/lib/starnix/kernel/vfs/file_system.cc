@@ -18,9 +18,6 @@
 #include <trace.h>
 #include <zircon/assert.h>
 
-#include <algorithm>
-#include <utility>
-
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 #include <ktl/unique_ptr.h>
@@ -33,7 +30,10 @@
 
 namespace starnix {
 
-FileSystem::~FileSystem() { nodes_.clear(); }
+FileSystem::~FileSystem() {
+  ops_->unmount();
+  nodes_.Lock()->clear();
+}
 
 FileSystemHandle FileSystem::New(const fbl::RefPtr<Kernel>& kernel, CacheMode cache_mode,
                                  FileSystemOps* ops, FileSystemOptions options) {
@@ -52,8 +52,8 @@ FileSystemHandle FileSystem::New(const fbl::RefPtr<Kernel>& kernel, CacheMode ca
       break;
   };
 
-  auto fs = fbl::AdoptRef(new (&ac) FileSystem(kernel, ktl::unique_ptr<FileSystemOps>(ops), options,
-                                               ktl::move(entries)));
+  auto fs = fbl::AdoptRef(new (&ac) FileSystem(kernel, ktl::unique_ptr<FileSystemOps>(ops),
+                                               ktl::move(options), ktl::move(entries)));
   ZX_ASSERT(ac.check());
   return ktl::move(fs);
 }
@@ -66,7 +66,7 @@ FileSystem::FileSystem(const fbl::RefPtr<Kernel>& kernel, ktl::unique_ptr<FileSy
       options_(ktl::move(options)),
       entries_(ktl::move(entries)) {}
 
-ino_t FileSystem::next_node_id() {
+ino_t FileSystem::next_node_id() const {
   ZX_ASSERT(!ops_->generate_node_ids());
   return next_node_id_.fetch_add(1, ktl::memory_order_relaxed);
 }
@@ -75,20 +75,20 @@ void FileSystem::set_root(FsNodeOps* root) { set_root_node(FsNode::new_root(root
 
 // Set up the root of the filesystem. Must not be called more than once.
 void FileSystem::set_root_node(FsNode* root) {
-  if (root->node_id_ == 0) {
-    root->set_id(next_node_id());
-  }
+  auto root_handle = insert_node(root);
+  ZX_ASSERT_MSG(root_.set(root_handle), "FileSystem::set_root can't be called more than once");
+}
 
-  FileSystemHandle handle(this);
-  root->set_fs(handle);
+DirEntryHandle FileSystem::insert_node(FsNode* node) {
+  fbl::RefPtr<FileSystem> self(this);
 
-  auto root_node = root->into_handle();
-  {
-    Guard<Mutex> lock(&nodes_lock_);
-    nodes_.insert(util::WeakPtr(root_node.get()));
+  if (node->node_id_ == 0) {
+    node->set_id(next_node_id());
   }
-  auto r = DirEntry::New(root_node, {}, FsString());
-  ASSERT_MSG(root_.set(r), "FileSystem::set_root can't be called more than once");
+  node->set_fs(self);
+  FsNodeHandle handle = node->into_handle();
+  self->nodes_.Lock()->insert(util::WeakPtr(handle.get()));
+  return DirEntry::New(handle, {}, FsString());
 }
 
 bool FileSystem::has_permanent_entries() const { return false; }
@@ -121,10 +121,9 @@ FsNodeHandle FileSystem::create_node_with_id(ktl::unique_ptr<FsNodeOps> ops, ino
                                              const starnix_uapi::Credentials& credentials) {
   auto node =
       FsNode::new_uncached(ktl::move(ops), fbl::RefPtr<FileSystem>(this), id, info, credentials);
-  {
-    Guard<Mutex> lock(&nodes_lock_);
-    nodes_.insert(prepare_node_for_insertion(/*current_task,*/ node));
-  }
+
+  nodes_.Lock()->insert(prepare_node_for_insertion(/*current_task,*/ node));
+
   return node;
 }
 

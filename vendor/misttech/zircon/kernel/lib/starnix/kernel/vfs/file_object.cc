@@ -17,8 +17,6 @@
 #include <lib/mistos/util/num.h>
 #include <lib/mistos/util/weak_wrapper.h>
 
-#include <utility>
-
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
@@ -80,7 +78,7 @@ fit::result<Errno, FileHandle> FileObject::New(ktl::unique_ptr<FileOps> ops, Nam
     };
   */
   auto fs = name.entry_->node_->fs();
-  auto kernel = fs->kernel().Lock();
+  auto kernel = fs->kernel_.Lock();
   if (!kernel) {
     return fit::error(errno(ENOENT));
   }

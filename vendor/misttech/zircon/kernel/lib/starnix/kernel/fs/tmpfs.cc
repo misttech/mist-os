@@ -74,47 +74,35 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
     return fit::error(errno(ENOMEM));
   }
 
-  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, ktl::move(tmpfs), options);
-  auto mount_options = fs->options().params;
+  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, tmpfs, ktl::move(options));
+  auto mount_options = fs->options_.params;
 
   auto result = [&]() -> fit::result<Errno, FileMode> {
     auto mode_str = mount_options.remove("mode");
     if (mode_str) {
       return FileMode::from_string({mode_str->data(), mode_str->size()});
-    } else {
-      return fit::ok(FILE_MODE(IFDIR, 0777));
     }
-  }();
+    return fit::ok(FILE_MODE(IFDIR, 0777));
+  }() _EP(result);
 
-  if (result.is_error()) {
-    return result.take_error();
-  }
   FileMode mode = result.value();
 
   auto result_uid = [&]() -> fit::result<Errno, uid_t> {
     auto uid_str = mount_options.remove("uid");
     if (uid_str) {
       return parse<uid_t>({uid_str->data(), uid_str->size()});
-    } else {
-      return fit::ok(0);
     }
-  }();
-  if (result_uid.is_error()) {
-    return result.take_error();
-  }
-  uid_t uid = result_uid.value();
+    return fit::ok(0);
+  }() _EP(result_uid);
 
+  uid_t uid = result_uid.value();
   auto result_gid = [&]() -> fit::result<Errno, gid_t> {
     auto gid_str = mount_options.remove("gid");
     if (gid_str) {
       return parse<uid_t>({gid_str->data(), gid_str->size()});
-    } else {
-      return fit::ok(0);
     }
-  }();
-  if (result_gid.is_error()) {
-    return result.take_error();
-  }
+    return fit::ok(0);
+  }() _EP(result_gid);
   uid_t gid = result_gid.value();
 
   auto root_node = FsNode::new_root_with_properties(TmpfsDirectory::New(),
@@ -172,12 +160,7 @@ fit::result<Errno, FsNodeHandle> TmpfsDirectory::mkdir(const FsNode& node,
                                                        const FsStr& name, FileMode mode,
                                                        FsCred owner) const {
   node.update_info<void>([](FsNodeInfo& info) { info.link_count += 1; });
-
-  {
-    auto data = child_count_.Lock();
-    data = *data + 1;
-  }
-
+  *child_count_.Lock() += 1;
   return fit::ok(node.fs()->create_node(current_task,
                                         ktl::unique_ptr<FsNodeOps>(TmpfsDirectory::New()),
                                         FsNodeInfo::new_factory(mode, owner)));
@@ -187,15 +170,8 @@ fit::result<Errno, FsNodeHandle> TmpfsDirectory::mknod(const FsNode& node,
                                                        const CurrentTask& current_task,
                                                        const FsStr& name, FileMode mode,
                                                        DeviceType dev, FsCred owner) const {
-  auto child_result = create_child_node(current_task, node, mode, dev, owner);
-  if (child_result.is_error())
-    return child_result.take_error();
-
-  {
-    auto data = child_count_.Lock();
-    data = *data + 1;
-  }
-
+  auto child_result = create_child_node(current_task, node, mode, dev, owner) _EP(child_result);
+  *child_count_.Lock() += 1;
   return fit::ok(child_result.value());
 }
 
@@ -229,9 +205,7 @@ fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_ta
   ktl::unique_ptr<FsNodeOps> ops;
   auto fmt = mode.fmt();
   if (fmt == FileMode::IFREG) {
-    auto new_result = MemoryFileNode::New();
-    if (new_result.is_error())
-      return new_result.take_error();
+    auto new_result = MemoryFileNode::New() _EP(new_result);
     ops = ktl::unique_ptr<FsNodeOps>(new_result.value());
   } else if (fmt == FileMode::IFIFO || fmt == FileMode::IFBLK || fmt == FileMode::IFCHR ||
              fmt == FileMode::IFSOCK) {

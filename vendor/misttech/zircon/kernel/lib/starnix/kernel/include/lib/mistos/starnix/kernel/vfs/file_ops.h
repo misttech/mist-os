@@ -68,9 +68,8 @@ class FileOps {
   /// Write to the file with an offset. If the file does not have persistent offsets (either
   /// directly, or because it is not seekable), offset will be 0 and can be ignored.
   /// Returns the number of bytes written.
-  virtual fit::result<Errno, size_t> write(/*Locked<WriteOps>& locked,*/ const FileObject& file,
-                                           const CurrentTask& current_task, size_t offset,
-                                           InputBuffer* data) const = 0;
+  virtual fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task,
+                                           size_t offset, InputBuffer* data) const = 0;
 
   /// Adjust the `current_offset` if the file is seekable.
   virtual fit::result<Errno, off_t> seek(const FileObject& file, const CurrentTask& current_task,

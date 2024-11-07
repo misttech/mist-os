@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_SYSTEM_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_SYSTEM_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_SYSTEM_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_SYSTEM_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
@@ -17,6 +17,7 @@
 #include <lib/mistos/starnix_uapi/mount_flags.h>
 #include <lib/mistos/util/onecell.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
 #include <fbl/intrusive_hash_table.h>
@@ -35,17 +36,15 @@ struct Dummy : public fbl::SinglyLinkedListable<Dummy*> {
 };
 
 struct LruCache {
-  LruCache(size_t c) : capacity(c) {}
+  explicit LruCache(size_t c) : capacity(c) {}
 
   size_t capacity;
 
-  DECLARE_MUTEX(LruCache) lock;
-  fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*> entries __TA_GUARDED(lock);
+  mutable starnix_sync::StarnixMutex<fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*>> entries;
 };
 
 struct Permanent {
-  DECLARE_MUTEX(Permanent) lock;
-  fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*> entries __TA_GUARDED(lock);
+  mutable starnix_sync::StarnixMutex<fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*>> entries;
 };
 
 using Entries = ktl::variant<ktl::monostate, ktl::unique_ptr<Permanent>, ktl::unique_ptr<LruCache>>;
@@ -88,15 +87,61 @@ class FsNode;
 using WeakFsNodeHandle = util::WeakPtr<FsNode>;
 
 /// A file system that can be mounted in a namespace.
-class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
+class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
  public:
-  using fbl::RefCountedUpgradeable<FileSystem>::AddRef;
-  using fbl::RefCountedUpgradeable<FileSystem>::Release;
-  using fbl::RefCountedUpgradeable<FileSystem>::Adopt;
-  using fbl::RefCountedUpgradeable<FileSystem>::AddRefMaybeInDestructor;
+  util::WeakPtr<Kernel> kernel_;
 
-  ~FileSystem();
+ private:
+  OnceCell<DirEntryHandle> root_;
 
+  mutable ktl::atomic<uint64_t> next_node_id_;
+
+  ktl::unique_ptr<FileSystemOps> ops_;
+
+ public:
+  /// The options specified when mounting the filesystem. Saved here for display in
+  /// /proc/[pid]/mountinfo.
+  FileSystemOptions options_;
+
+  /// The device ID of this filesystem. Returned in the st_dev field when stating an inode in
+  /// this filesystem.
+  // DeviceType dev_id_;
+
+  /// A file-system global mutex to serialize rename operations.
+  ///
+  /// This mutex is useful because the invariants enforced during a rename
+  /// operation involve many DirEntry objects. In the future, we might be
+  /// able to remove this mutex, but we will need to think carefully about
+  /// how rename operations can interleave.
+  ///
+  /// See DirEntry::rename.
+  // pub rename_mutex: Mutex<()>,
+
+ private:
+  /// The FsNode cache for this file system.
+  ///
+  /// When two directory entries are hard links to the same underlying inode,
+  /// this cache lets us re-use the same FsNode object for both directory
+  /// entries.
+  ///
+  /// Rather than calling FsNode::new directly, file systems should call
+  /// FileSystem::get_or_create_node to see if the FsNode already exists in
+  /// the cache.
+  mutable starnix_sync::StarnixMutex<fbl::HashTable<ino_t, WeakFsNodeHandle>> nodes_;
+
+  /// DirEntryHandle cache for the filesystem. Holds strong references to DirEntry objects. For
+  /// filesystems with permanent entries, this will hold a strong reference to every node to make
+  /// sure it doesn't get freed without being explicitly unlinked. Otherwise, entries are
+  /// maintained in an LRU cache.
+  Entries entries_;
+
+  /// Hack meant to stand in for the fs_use_trans selinux feature. If set, this value will be set
+  /// as the selinux label on any newly created inodes in the filesystem.
+  // pub selinux_context: OnceCell<FsString>,
+
+  // impl FileSystem
+ public:
+  /// Create a new filesystem.
   static FileSystemHandle New(const fbl::RefPtr<Kernel>& kernel, CacheMode cache_mode,
                               FileSystemOps* ops, FileSystemOptions options);
 
@@ -104,6 +149,9 @@ class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
 
   // Set up the root of the filesystem. Must not be called more than once.
   void set_root_node(FsNode* root);
+
+  /// Inserts a node in the FsNode cache.
+  DirEntryHandle insert_node(FsNode* node);
 
   bool has_permanent_entries() const;
 
@@ -176,7 +224,7 @@ class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
   /// Called from the Release trait of FsNode.
   void remove_node(const FsNode& node);
 
-  ino_t next_node_id();
+  ino_t next_node_id() const;
 
   void did_create_dir_entry(const DirEntryHandle& entry);
 
@@ -191,63 +239,14 @@ class FileSystem : private fbl::RefCountedUpgradeable<FileSystem> {
   /// admitted with no locks held that might be required for dropping entries.
   void purge_old_entries();
 
-  const FileSystemOptions& options() const { return options_; }
-
-  util::WeakPtr<Kernel> kernel() { return kernel_; }
+  // C++
+  ~FileSystem();
 
  private:
   FileSystem(const fbl::RefPtr<Kernel>& kernel, ktl::unique_ptr<FileSystemOps> ops,
              FileSystemOptions options, Entries entries);
-
-  util::WeakPtr<Kernel> kernel_;
-
-  OnceCell<DirEntryHandle> root_;
-
-  ktl::atomic<uint64_t> next_node_id_;
-
-  ktl::unique_ptr<FileSystemOps> ops_;
-
-  /// The options specified when mounting the filesystem. Saved here for display in
-  /// /proc/[pid]/mountinfo.
-  FileSystemOptions options_;
-
-  /// The device ID of this filesystem. Returned in the st_dev field when stating an inode in
-  /// this filesystem.
-  // DeviceType dev_id_;
-
-  /// A file-system global mutex to serialize rename operations.
-  ///
-  /// This mutex is useful because the invariants enforced during a rename
-  /// operation involve many DirEntry objects. In the future, we might be
-  /// able to remove this mutex, but we will need to think carefully about
-  /// how rename operations can interleave.
-  ///
-  /// See DirEntry::rename.
-  // pub rename_mutex: Mutex<()>,
-
-  /// The FsNode cache for this file system.
-  ///
-  /// When two directory entries are hard links to the same underlying inode,
-  /// this cache lets us re-use the same FsNode object for both directory
-  /// entries.
-  ///
-  /// Rather than calling FsNode::new directly, file systems should call
-  /// FileSystem::get_or_create_node to see if the FsNode already exists in
-  /// the cache.
-  DECLARE_MUTEX(FileSystem) nodes_lock_;
-  fbl::HashTable<ino_t, WeakFsNodeHandle> nodes_ __TA_GUARDED(nodes_lock_);
-
-  /// DirEntryHandle cache for the filesystem. Holds strong references to DirEntry objects. For
-  /// filesystems with permanent entries, this will hold a strong reference to every node to make
-  /// sure it doesn't get freed without being explicitly unlinked. Otherwise, entries are
-  /// maintained in an LRU cache.
-  Entries entries_;
-
-  /// Hack meant to stand in for the fs_use_trans selinux feature. If set, this value will be set
-  /// as the selinux label on any newly created inodes in the filesystem.
-  // pub selinux_context: OnceCell<FsString>,
 };
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_SYSTEM_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_SYSTEM_H_

@@ -43,11 +43,24 @@ class FileSystemOps {
   /// Whether this file system generates its own node IDs.
   virtual bool generate_node_ids() { return false; }
 
+  /// Rename the given node.
+  ///
+  /// The node to be renamed is passed as "renamed". It currently has
+  /// old_name in old_parent. After the rename operation, it should have
+  /// new_name in new_parent.
+  ///
+  /// If new_parent already has a child named new_name, that node is passed as
+  /// "replaced". In that case, both "renamed" and "replaced" will be
+  /// directories and the rename operation should succeed only if "replaced"
+  /// is empty. The VFS will check that there are no children of "replaced" in
+  /// the DirEntry cache, but the implementation of this function is
+  /// responsible for checking that there are no children of replaced that are
+  /// known only to the file system implementation (e.g., present on-disk but
+  /// not in the DirEntry cache).
   virtual fit::result<Errno> rename(const FileSystem& fs, const CurrentTask& current_task,
                                     const FsNodeHandle& old_parent, const FsStr& old_name,
                                     const FsNodeHandle& new_parent, const FsStr& new_name,
-                                    const FsNodeHandle& renamed,
-                                    const FsNodeHandle* replaced = nullptr) {
+                                    const FsNodeHandle& renamed, const FsNodeHandle* replaced) {
     return fit::error(errno(EROFS));
   }
 

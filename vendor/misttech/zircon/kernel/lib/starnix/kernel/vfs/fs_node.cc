@@ -31,6 +31,10 @@
 
 namespace starnix {
 
+FsNode* FsNode::new_root(FsNodeOps* ops) {
+  return FsNode::new_root_with_properties(ops, [](FsNodeInfo& info) {});
+}
+
 FsNodeHandle FsNode::new_uncached(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                                   const FileSystemHandle& fs, ino_t node_id, FsNodeInfo info) {
   auto creds = current_task->creds();
@@ -39,7 +43,7 @@ FsNodeHandle FsNode::new_uncached(const CurrentTask& current_task, ktl::unique_p
 
 FsNodeHandle FsNode::new_uncached(ktl::unique_ptr<FsNodeOps> ops, const FileSystemHandle& fs,
                                   ino_t node_id, FsNodeInfo info, const Credentials& credentials) {
-  return FsNode::new_internal(ktl::move(ops), fs->kernel(), util::WeakPtr(fs.get()), node_id, info,
+  return FsNode::new_internal(ktl::move(ops), fs->kernel_, util::WeakPtr(fs.get()), node_id, info,
                               credentials)
       ->into_handle();
 }
@@ -113,18 +117,14 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::open(const CurrentTask& cur
   }();
 
   auto fmt_mode = (mode & FileMode::IFMT);
-  if (fmt_mode == FileMode::IFCHR) {
+  if (fmt_mode == FileMode::IFCHR || fmt_mode == FileMode::IFBLK || fmt_mode == FileMode::IFIFO) {
     return fit::error(errno(ENOTSUP));
-  } else if (fmt_mode == FileMode::IFBLK) {
-    return fit::error(errno(ENOTSUP));
-  } else if (fmt_mode == FileMode::IFIFO) {
-    return fit::error(errno(ENOTSUP));
-  } else if (fmt_mode == FileMode::IFSOCK) {
+  }
+  if (fmt_mode == FileMode::IFSOCK) {
     // UNIX domain sockets can't be opened.
     return fit::error(errno(ENXIO));
-  } else {
-    return create_file_ops(current_task, flags);
   }
+  return create_file_ops(current_task, flags);
 }
 
 fit::result<Errno, FsNodeHandle> FsNode::lookup(const CurrentTask& current_task,
@@ -144,27 +144,26 @@ fit::result<Errno, FsNodeHandle> FsNode::mknod(const CurrentTask& current_task,
 
   if (mode.is_dir()) {
     return ops_->mkdir(*this, current_task, name, mode, owner);
-  } else {
-    // https://man7.org/linux/man-pages/man2/mknod.2.html says:
-    //
-    //   mode requested creation of something other than a regular
-    //   file, FIFO (named pipe), or UNIX domain socket, and the
-    //   caller is not privileged (Linux: does not have the
-    //   CAP_MKNOD capability); also returned if the filesystem
-    //   containing pathname does not support the type of node
-    //   requested.
-
-    /*
-      let creds = current_task.creds();
-      if !creds.has_capability(CAP_MKNOD) {
-          if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
-              return error!(EPERM);
-          }
-      }
-      let mut locked = locked.cast_locked::<FileOpsCore>();
-    */
-    return ops_->mknod(/*&mut locked, */ *this, current_task, name, mode, dev, owner);
   }
+  // https://man7.org/linux/man-pages/man2/mknod.2.html says:
+  //
+  //   mode requested creation of something other than a regular
+  //   file, FIFO (named pipe), or UNIX domain socket, and the
+  //   caller is not privileged (Linux: does not have the
+  //   CAP_MKNOD capability); also returned if the filesystem
+  //   containing pathname does not support the type of node
+  //   requested.
+
+  /*
+    let creds = current_task.creds();
+    if !creds.has_capability(CAP_MKNOD) {
+        if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
+            return error!(EPERM);
+        }
+    }
+    let mut locked = locked.cast_locked::<FileOpsCore>();
+  */
+  return ops_->mknod(/*&mut locked, */ *this, current_task, name, mode, dev, owner);
 }
 
 fit::result<Errno, SymlinkTarget> FsNode::readlink(const CurrentTask& current_task) const {

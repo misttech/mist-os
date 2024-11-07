@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_DIR_ENTRY_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_DIR_ENTRY_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_DIR_ENTRY_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_DIR_ENTRY_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
@@ -138,7 +138,7 @@ overloaded(Ts...) -> overloaded<Ts...>;
 /// children for a directory in the DirEntry rather than in the FsNode.
 class DirEntry
     : public fbl::WAVLTreeContainable<util::WeakPtr<DirEntry>, fbl::NodeOptions::AllowClearUnsafe>,
-      private fbl::RefCountedUpgradeable<DirEntry> {
+      public fbl::RefCountedUpgradeable<DirEntry> {
  public:
   using DirEntryChildren = fbl::WAVLTree<FsString, util::WeakPtr<DirEntry>>;
 
@@ -197,6 +197,7 @@ class DirEntry
         CreateNodeFn&& create_fn) {
       static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateNodeFn,
                                           const FsNodeHandle&, const MountInfo&, const FsStr&>);
+
       auto create_child = [&](CreateNodeFn&& create_fn)
           -> fit::result<Errno, ktl::pair<DirEntryHandle, CreationResult<CreateNodeFn>>> {
         auto find_or_create_node = [&](CreateNodeFn&& create_fn)
@@ -218,10 +219,7 @@ class DirEntry
               return lookup_result.take_error();
             }
           }
-        }(create_fn);
-
-        if (find_or_create_node.is_error())
-          return find_or_create_node.take_error();
+        }(create_fn)_EP(find_or_create_node);
 
         auto [node, create_result] = find_or_create_node.value();
 
@@ -270,11 +268,7 @@ class DirEntry
             return fit::ok(ktl::pair(new_child, create_result));
           }
         }
-      }();
-
-      if (result.is_error()) {
-        return result.take_error();
-      }
+      }() _EP(result);
 
       auto [child, create_result] = result.value();
       child->node_->fs()->did_create_dir_entry(child);
@@ -334,11 +328,7 @@ class DirEntry
     static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateNodeFn,
                                         const FsNodeHandle&, const MountInfo&, const FsStr&>);
 
-    auto result = create_entry_internal(current_task, mount, name, fn);
-    if (result.is_error()) {
-      return result.take_error();
-    }
-
+    auto result = create_entry_internal(current_task, mount, name, fn) _EP(result);
     auto [entry, exists] = result.value();
     if (exists) {
       return fit::error(errno(EEXIST));
@@ -355,10 +345,7 @@ class DirEntry
     static_assert(std::is_invocable_r_v<fit::result<Errno, FsNodeHandle>, CreateNodeFn,
                                         const FsNodeHandle&, const MountInfo&, const FsStr&>);
 
-    auto result = create_entry_internal(current_task, mount, name, fn);
-    if (result.is_error()) {
-      return result.take_error();
-    }
+    auto result = create_entry_internal(current_task, mount, name, fn) _EP(result);
     auto [entry, _exists] = result.value();
     return fit::ok(entry);
   }
@@ -381,10 +368,7 @@ class DirEntry
     if (starnix::contains(name, SEPARATOR)) {
       return fit::error(errno(EINVAL));
     }
-    auto result = get_or_create_child(current_task, mount, name, fn);
-    if (result.is_error()) {
-      return result.take_error();
-    }
+    auto result = get_or_create_child(current_task, mount, name, fn) _EP(result);
 
     auto [entry, exists] = result.value();
     if (!exists) {
@@ -450,11 +434,7 @@ class DirEntry
         c->node_->fs()->purge_old_entries();
         return fit::ok(ktl::pair(c, ktl::move(cr)));
       }
-    }();
-
-    if (result.is_error()) {
-      return result.take_error();
-    }
+    }() _EP(result);
 
     auto [child, cr] = result.value();
     auto new_result = [&]() -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
@@ -510,13 +490,12 @@ class DirEntry
  private:
   void internal_remove_child(DirEntry* child);
 
- public:
   // C++
+ public:
+  /// The Drop trait for DirEntry removes the entry from the child list of the
+  /// parent entry, which means we cannot drop DirEntry objects while holding a
+  /// lock on the parent's child list.
   ~DirEntry();
-  using fbl::RefCountedUpgradeable<DirEntry>::AddRef;
-  using fbl::RefCountedUpgradeable<DirEntry>::Release;
-  using fbl::RefCountedUpgradeable<DirEntry>::Adopt;
-  using fbl::RefCountedUpgradeable<DirEntry>::AddRefMaybeInDestructor;
 
   // WAVL-tree Index
   FsString GetKey() const;
@@ -529,4 +508,4 @@ class DirEntry
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_DIR_ENTRY_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_DIR_ENTRY_H_
