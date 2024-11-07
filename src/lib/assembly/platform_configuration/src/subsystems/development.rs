@@ -98,14 +98,18 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.platform_bundle("sl4f");
         }
 
-        match (context.build_type, &config.include_bin_clock) {
-            (BuildType::User, true) => {
+        let is_embeddable = matches!(context.feature_set_level, FeatureSupportLevel::Embeddable);
+        match (context.build_type, &config.include_bin_clock, is_embeddable) {
+            (BuildType::User, true, _) => {
                 anyhow::bail!("bin/clock cannot be provided on user builds")
             }
-            (BuildType::Eng, _) | (BuildType::UserDebug, true) => {
+            (_, true, true) => {
+                anyhow::bail!("bin/clock cannot be provided on embeddable products");
+            }
+            (BuildType::Eng, _, false) | (BuildType::UserDebug, true, false) => {
                 builder.platform_bundle("clock_development_tools")
             }
-            (BuildType::User, false) | (BuildType::UserDebug, false) => {}
+            (_, false, _) => {}
         }
 
         if let Some(soc) =

@@ -132,6 +132,7 @@ fuchsia_product_configuration(
             "development_support": {
                 "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
                 "vsock_development": True,
+                "include_bin_clock": False,
             },
             "driver_framework": {
                 "enable_driver_index_stop_on_idle": True,
