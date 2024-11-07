@@ -64,18 +64,22 @@ zx::result<> KernelPowerDomainRegistry::UpdateDomainPowerLevel(
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
+  if (*power_level < domain->model().idle_levels().size()) {
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
+  }
+
   for (size_t i = 0; i <= (arch_max_num_cpus() - 1) / ZX_CPU_SET_BITS_PER_WORD; ++i) {
     const cpu_num_t cpu_offset = static_cast<cpu_num_t>(i * ZX_CPU_SET_BITS_PER_WORD);
     const uint32_t max_bits =
         ktl::min(arch_max_num_cpus() - cpu_offset, static_cast<uint32_t>(ZX_CPU_SET_BITS_PER_WORD));
     for (size_t j = 0; j < max_bits; ++j) {
       if ((domain->cpus().mask[i] & 1ull << j) != 0) {
-        // No real error returned here, since the domain cannot change beneath, the same domain
-        // where we looked up the power level is still associated with this scheduler. So if we
-        // reached this point, `power_level` must be valid.
-        ZX_ASSERT(percpu::Get(static_cast<cpu_num_t>(j + cpu_offset))
-                      .scheduler.SetPowerLevel(*power_level)
-                      .is_ok());
+        const cpu_num_t cpu_num = static_cast<cpu_num_t>(j + cpu_offset);
+        ZX_DEBUG_ASSERT(cpu_num < arch_max_num_cpus());
+
+        zx::result result = percpu::Get(cpu_num).scheduler.SetPowerLevel(*power_level);
+        ZX_ASSERT_MSG(result.is_ok(), "Unexpected error setting power level: %d",
+                      result.status_value());
       }
     }
   }

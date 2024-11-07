@@ -64,15 +64,6 @@ class PowerState {
  public:
   PowerState() = default;
 
-  // Mostly useful for testing, for validating transitions.
-  PowerState(fbl::RefPtr<PowerDomain> domain, std::optional<uint8_t> idle_power_level,
-             std::optional<uint8_t> active_power_level,
-             std::optional<uint8_t> desired_active_power_level)
-      : domain_(std::move(domain)),
-        idle_power_level_(idle_power_level),
-        active_power_level_(active_power_level),
-        desired_active_power_level_(desired_active_power_level) {}
-
   // Domain the PowerState is being modeled after.
   const fbl::RefPtr<PowerDomain>& domain() const { return domain_; }
 
@@ -80,67 +71,93 @@ class PowerState {
   // domain.
   bool is_serving() const { return domain() && domain()->controller()->is_serving(); }
 
-  // Active power level when device is idle.
-  constexpr bool is_idle() const { return !!idle_power_level_; }
-  constexpr std::optional<uint8_t> idle_power_level() const { return idle_power_level_; }
-
-  // Active power level when device is not idle.
-  constexpr bool is_active() const { return !is_idle() && !!active_power_level_; }
+  // Returns the active power level when device is not idle.
   constexpr std::optional<uint8_t> active_power_level() const { return active_power_level_; }
 
-  // Returns the power level currently affecting the device's power state.
-  constexpr std::optional<uint8_t> power_level() const {
-    return is_idle() ? idle_power_level_ : active_power_level_;
-  }
-
-  // Power level the device needs to be transitioned to.
+  // Returns the active power level the device is in the processo of transitioning to.
   constexpr std::optional<uint8_t> desired_active_power_level() const {
     return desired_active_power_level_;
   }
+
+  // Returns the maximum (i.e. highest power, lowest latency) idle power level.
+  std::optional<uint8_t> max_idle_power_level() const {
+    if (domain()) {
+      return domain()->model().max_idle_power_level();
+    }
+    return std::nullopt;
+  }
+
+  // Returns the power coefficient of the current active power level. Returns zero if there is no
+  // active power level or no domain is set.
+  uint64_t active_power_coefficient_nw() const {
+    if (domain() && active_power_level_.has_value()) {
+      return domain()->model().levels()[*active_power_level_].power_coefficient_nw();
+    }
+    return 0;
+  }
+
+  // Returns the power coefficient of the maximum idle power level. Returns zero if there is no
+  // idle power level or no domain is set.
+  uint64_t max_idle_power_coefficient_nw() const {
+    if (domain()) {
+      return domain()->model().max_idle_power_coefficient_nw().value_or(0);
+    }
+    return 0;
+  }
+
+  // Returns the control interface of the maximum idle power level. Returns nullopt if there is no
+  // idle power level or no domain is set.
+  std::optional<ControlInterface> max_idle_power_level_interface() const {
+    if (domain()) {
+      return domain()->model().max_idle_power_level_interface();
+    }
+    return std::nullopt;
+  }
+
+  // Returns the current utilization of the processor.
+  uint64_t normalized_utilization() const { return normalized_utilization_; }
 
   // Sets the `PowerDomain` and related models that this `PowerState` references. This means,
   // that any `power_level` or `desired_power_level` is only meaningful for that specific
   // `PowerDomain`.
   fbl::RefPtr<PowerDomain> SetOrUpdateDomain(fbl::RefPtr<PowerDomain> domain);
 
-  // Request transition this power state to a given power level, as described on `domain_->model()`.
+  // Posts a request to transition the power domain associated with this power state to a given
+  // active power level from the current energy model.
   //
-  // `cpu_num` represents the number of the device associated with this power state.
-  // `level` represents the desired power level.
+  // Ignored when no domain is set. Asserts that the requested power level is an active power level.
   //
-  // A `PendingPowerLevelTransition` is provided when there is a change in the desired active power
-  // level.
-  std::optional<PowerLevelUpdateRequest> RequestTransition(uint32_t cpu_num, uint8_t level);
+  // `cpu_num` is the CPU associated with this power state.
+  // `level` is the desired power level.
+  //
+  std::optional<PowerLevelUpdateRequest> RequestTransition(uint32_t cpu_num,
+                                                           uint8_t active_power_level);
 
-  // Attempts to update `PowerState::power_level_`. This only succeeds if the underlying model
-  // matches the one referenced on `update`.
-  zx::result<> UpdatePowerLevel(ControlInterface control, uint64_t control_argument);
+  // Updates the active power level of this power state. Typically called in response to the power
+  // level controller completing a power level transition request.
+  zx::result<> UpdateActivePowerLevel(uint8_t active_power_level);
 
-  // Sets the underlying power level.
-  zx::result<> UpdatePowerLevel(uint8_t level);
-
-  // When a device transitions from an idle state into an active state, this is reflected as
-  // clearing the idle power level.
-  void TransitionFromIdle() { idle_power_level_ = std::nullopt; }
-
-  // Update's the associated power domain's total utilization.
+  // Update the utilization of this processor and the total utilization of its domain.
   void UpdateUtilization(int64_t utilization_delta) {
-    domain_->total_normalized_utilization_.fetch_add(utilization_delta);
+    normalized_utilization_ += utilization_delta;
+    if (domain()) {
+      domain()->total_normalized_utilization_.fetch_add(utilization_delta,
+                                                        std::memory_order_acq_rel);
+    }
   }
 
  private:
-  // Power domain the device belongs to, with the model it requires.
-  fbl::RefPtr<PowerDomain> domain_ = nullptr;
+  // The power domain the processor belongs to.
+  fbl::RefPtr<PowerDomain> domain_;
 
-  // When on an idle state, represents the power level currently active on the entity.
-  std::optional<uint8_t> idle_power_level_ = std::nullopt;
-
-  // Active power level of the entity, this is not affected by switching to and from idle power
-  // states.
-  std::optional<uint8_t> active_power_level_ = std::nullopt;
+  // The power level when the processor is actively running.
+  std::optional<uint8_t> active_power_level_;
 
   // Represents the power level that needs be to transitioned to.
-  std::optional<uint8_t> desired_active_power_level_ = std::nullopt;
+  std::optional<uint8_t> desired_active_power_level_;
+
+  // The current normalized utilization of the processor.
+  uint64_t normalized_utilization_{0};
 };
 
 }  // namespace power_management

@@ -53,23 +53,21 @@ GetModel() {
   std::vector<zx_processor_power_level_t> levels;
   std::vector<zx_processor_power_level_transition_t> transitions;
   levels = {
-      // Fake suspend-shutdown
       zx_processor_power_level_t{
-          .options = 0,
+          .options = ZX_PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT,
           .processing_rate = 0,
-          .power_coefficient_nw = 0,
-          .control_interface = ZX_PROCESSOR_POWER_CONTROL_ARM_PSCI,
-          .control_argument = 0x1234,
-          .diagnostic_name = "Fake 0",
+          .power_coefficient_nw = 40'000'000,  // 40 mW
+          .control_interface = ZX_PROCESSOR_POWER_CONTROL_ARM_WFI,
+          .control_argument = 0,
+          .diagnostic_name = "WFI",
       },
-      // Fake CPU Driver plevel.
       zx_processor_power_level_t{
           .options = 0,
-          .processing_rate = 0,
-          .power_coefficient_nw = 0,
+          .processing_rate = 2000,
+          .power_coefficient_nw = 500'000'000,  // 500 mW
           .control_interface = ZX_PROCESSOR_POWER_CONTROL_CPU_DRIVER,
           .control_argument = 0x1234,
-          .diagnostic_name = "Fake 1",
+          .diagnostic_name = "MAX",
       },
   };
 
@@ -390,7 +388,7 @@ class SetPowerStateTest : public zxtest::Test {
   bool cleanup_ = false;
 };
 
-TEST_F(SetPowerStateTest, UpdatePowerLevel) {
+TEST_F(SetPowerStateTest, UpdateActivePowerLevel) {
   NEEDS_NEXT_SKIP(zx_system_set_processor_power_state);
   zx_processor_power_state_t pstate = {
       .domain_id = domain_info_.domain_id,
@@ -399,6 +397,17 @@ TEST_F(SetPowerStateTest, UpdatePowerLevel) {
   };
 
   ASSERT_OK(zx_system_set_processor_power_state(p_.get(), &pstate));
+}
+
+TEST_F(SetPowerStateTest, UpdateIdlePowerLevel) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_state);
+  zx_processor_power_state_t pstate = {
+      .domain_id = domain_info_.domain_id,
+      .control_interface = levels_[0].control_interface,
+      .control_argument = levels_[0].control_argument,
+  };
+
+  ASSERT_STATUS(zx_system_set_processor_power_state(p_.get(), &pstate), ZX_ERR_OUT_OF_RANGE);
 }
 
 TEST_F(SetPowerStateTest, UpdatePowerLevelWithWrongPort) {

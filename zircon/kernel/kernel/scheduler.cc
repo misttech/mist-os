@@ -1199,6 +1199,47 @@ void Scheduler::ProcessSaveStateList(SchedTime now) {
   }
 }
 
+inline void Scheduler::UpdateEstimatedEnergyConsumption(Thread* current_thread,
+                                                        SchedDuration actual_runtime_ns) {
+  // Time in a low-power idle state should only accrue when running the idle
+  // thread.
+  const SchedDuration idle_processor_time_ns{IdlePowerThread::TakeProcessorIdleTime()};
+  DEBUG_ASSERT(idle_processor_time_ns <= actual_runtime_ns);
+  DEBUG_ASSERT(idle_processor_time_ns == 0 || current_thread->IsIdle());
+
+  // Subtract any time the processor spent in the low-power idle state from the
+  // runtime to ensure that active vs. idle power consumption is attributed
+  // correctly. Processors can accumulate both active or idle power consumption,
+  // but threads, including the idle power thread, accumulate only active power
+  // consumption.
+  const SchedDuration active_processor_time_ns = actual_runtime_ns - idle_processor_time_ns;
+
+  cpu_stats& stats = percpu::GetCurrent().stats;
+
+  // The dynamic and leakage contributions are split between the active and max
+  // idle (e.g. clock gating idle) power coefficients, respectively.
+  if (power_level_control_.active_power_coefficient_nw() > 0) {
+    const uint64_t active_energy_consumption_nj =
+        (power_level_control_.active_power_coefficient_nw() +
+         power_level_control_.max_idle_power_coefficient_nw()) *
+        active_processor_time_ns.raw_value();
+
+    stats.active_energy_consumption_nj += active_energy_consumption_nj;
+    current_thread->scheduler_state().estimated_energy_consumption_nj +=
+        active_energy_consumption_nj;
+  }
+
+  // TODO(https://fxbug.dev/377583571): Select the correct power coefficient
+  // when deeper idle states are implemented. For now the max idle power
+  // coefficient corresponds to the most general arch idle state (e.g. WFI,
+  // halt).
+  if (power_level_control_.max_idle_power_coefficient_nw() > 0 && idle_processor_time_ns > 0) {
+    const uint64_t idle_energy_consumption_nj =
+        power_level_control_.max_idle_power_coefficient_nw() * idle_processor_time_ns.raw_value();
+    stats.idle_energy_consumption_nj += idle_energy_consumption_nj;
+  }
+}
+
 void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
                                  EndTraceCallback end_outer_trace) {
   using TransientState = SchedulerQueueState::TransientState;
@@ -1279,10 +1320,12 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   const SchedDuration total_runtime_ns = now - start_of_current_time_slice_ns_;
   const SchedDuration actual_runtime_ns = now - current_state->last_started_running_;
   current_state->last_started_running_ = now;
+  current_state->runtime_ns_ += actual_runtime_ns;
   current_thread->UpdateRuntimeStats(current_thread->state());
 
-  // Update the runtime accounting for the thread that just ran.
-  current_state->runtime_ns_ += actual_runtime_ns;
+  // Update the energy consumption accumulators for the current task and
+  // processor.
+  UpdateEstimatedEnergyConsumption(current_thread, actual_runtime_ns);
 
   // Adjust the rate of the current thread when demand changes. Changes in
   // demand could be due to threads entering or leaving the run queue, or due

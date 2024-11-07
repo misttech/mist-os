@@ -24,6 +24,7 @@
 #include <kernel/percpu.h>
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
+#include <ktl/algorithm.h>
 #include <ktl/atomic.h>
 #include <lk/init.h>
 #include <object/interrupt_dispatcher.h>
@@ -165,13 +166,25 @@ int IdlePowerThread::Run(void* arg) {
       // WARNING: Be careful not to do anything that could pend a preemption after the check above,
       // with the exception of the internal implementation of ArchIdlePowerThread::EnterIdleState.
 
+      const zx_time_t idle_start_time = current_time();
+
       // TODO(eieio): Use scheduler and timer states to determine latency requirements.
       const zx_duration_t max_latency = 0;
       ArchIdlePowerThread::EnterIdleState(max_latency);
 
+      const zx_time_t idle_finish_time = current_time();
+
+      this_idle_power_thread.processor_idle_time_ns_ += idle_finish_time - idle_start_time;
+
       // END WARNING: Pending preemptions is safe again.
     }
   }
+}
+
+zx_duration_t IdlePowerThread::TakeProcessorIdleTime() {
+  zx_duration_t idle_time_ns = 0;
+  ktl::swap(idle_time_ns, percpu::GetCurrent().idle_power_thread.processor_idle_time_ns_);
+  return idle_time_ns;
 }
 
 IdlePowerThread::TransitionResult IdlePowerThread::TransitionFromTo(State expected_state,

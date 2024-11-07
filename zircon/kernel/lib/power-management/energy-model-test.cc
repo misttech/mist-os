@@ -22,29 +22,31 @@
 
 namespace {
 
+using power_management::ControlInterface;
 using power_management::EnergyModel;
 using power_management::PowerDomain;
 using power_management::PowerDomainRegistry;
+using power_management::PowerLevel;
+using power_management::PowerLevelTransition;
 
 TEST(PowerLevelTest, Ctor) {
   constexpr zx_processor_power_level_t kLevel = {
       .options = 0,
       .processing_rate = 456,
       .power_coefficient_nw = 789,
-      .control_interface = cpp23::to_underlying(power_management::ControlInterface::kArmPsci),
+      .control_interface = cpp23::to_underlying(ControlInterface::kArmPsci),
       .control_argument = 12345,
       .diagnostic_name = "foobar one two three",
   };
 
-  power_management::PowerLevel level(0, kLevel);
+  PowerLevel level(0, kLevel);
 
   EXPECT_EQ(level.level(), 0);
   EXPECT_EQ(level.processing_rate(), kLevel.processing_rate);
   EXPECT_EQ(level.power_coefficient_nw(), kLevel.power_coefficient_nw);
-  EXPECT_EQ(level.control(),
-            static_cast<power_management::ControlInterface>(kLevel.control_interface));
+  EXPECT_EQ(level.control(), static_cast<ControlInterface>(kLevel.control_interface));
   EXPECT_EQ(level.control_argument(), kLevel.control_argument);
-  EXPECT_EQ(level.type(), power_management::PowerLevel::Type::kActive);
+  EXPECT_EQ(level.type(), PowerLevel::Type::kActive);
   EXPECT_EQ(level.name(), std::string_view(kLevel.diagnostic_name));
   EXPECT_TRUE(level.TargetsPowerDomain());
   EXPECT_FALSE(level.TargetsCpus());
@@ -55,20 +57,19 @@ TEST(PowerLevelTest, Ctor2) {
       .options = ZX_PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT,
       .processing_rate = 123,
       .power_coefficient_nw = 789,
-      .control_interface = cpp23::to_underlying(power_management::ControlInterface::kArmPsci),
+      .control_interface = cpp23::to_underlying(ControlInterface::kArmPsci),
       .control_argument = 12345,
       .diagnostic_name = "foobar one two three",
   };
 
-  power_management::PowerLevel level(123, kLevel);
+  PowerLevel level(123, kLevel);
 
   EXPECT_EQ(level.level(), 123);
   EXPECT_EQ(level.processing_rate(), kLevel.processing_rate);
   EXPECT_EQ(level.power_coefficient_nw(), kLevel.power_coefficient_nw);
-  EXPECT_EQ(level.control(),
-            static_cast<power_management::ControlInterface>(kLevel.control_interface));
+  EXPECT_EQ(level.control(), static_cast<ControlInterface>(kLevel.control_interface));
   EXPECT_EQ(level.control_argument(), kLevel.control_argument);
-  EXPECT_EQ(level.type(), power_management::PowerLevel::Type::kActive);
+  EXPECT_EQ(level.type(), PowerLevel::Type::kActive);
   EXPECT_EQ(level.name(), std::string_view(kLevel.diagnostic_name));
   EXPECT_FALSE(level.TargetsPowerDomain());
   EXPECT_TRUE(level.TargetsCpus());
@@ -82,7 +83,7 @@ TEST(PowerLevelTransitionTest, Ctor) {
       .to = 1,
   };
 
-  power_management::PowerLevelTransition transition(kTransition);
+  PowerLevelTransition transition(kTransition);
 
   EXPECT_EQ(transition.latency(), zx_duration_from_nsec(kTransition.latency));
   EXPECT_EQ(transition.energy_cost_nj(), kTransition.energy_nj);
@@ -94,7 +95,7 @@ TEST(PowerModelTest, Create) {
           .options = 0,
           .processing_rate = 0,
           .power_coefficient_nw = 1,
-          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kArmPsci),
+          .control_interface = cpp23::to_underlying(ControlInterface::kArmPsci),
           .control_argument = 1,
           .diagnostic_name = "0",
       },
@@ -102,7 +103,7 @@ TEST(PowerModelTest, Create) {
           .options = 0,
           .processing_rate = 4,
           .power_coefficient_nw = 8,
-          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kCpuDriver),
+          .control_interface = cpp23::to_underlying(ControlInterface::kCpuDriver),
           .control_argument = 3,
           .diagnostic_name = "1",
       },
@@ -110,7 +111,7 @@ TEST(PowerModelTest, Create) {
           .options = 0,
           .processing_rate = 0,
           .power_coefficient_nw = 2,
-          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kArmWfi),
+          .control_interface = cpp23::to_underlying(ControlInterface::kArmWfi),
           .control_argument = 0,
           .diagnostic_name = "2",
       },
@@ -118,7 +119,7 @@ TEST(PowerModelTest, Create) {
           .options = 0,
           .processing_rate = 4,
           .power_coefficient_nw = 10,
-          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kCpuDriver),
+          .control_interface = cpp23::to_underlying(ControlInterface::kCpuDriver),
           .control_argument = 1,
           .diagnostic_name = "3",
       },
@@ -215,8 +216,7 @@ TEST(PowerModelTest, Create) {
   ASSERT_TRUE(energy_model.is_ok());
 
   // Proper transformation of the model and the transition table.
-  auto check_level = [](const power_management::PowerLevel& actual,
-                        const power_management::PowerLevel& expected) {
+  auto check_level = [](const PowerLevel& actual, const PowerLevel& expected) {
     EXPECT_EQ(actual.level(), expected.level());
     EXPECT_EQ(actual.control(), expected.control());
     EXPECT_EQ(actual.control_argument(), expected.control_argument());
@@ -236,10 +236,8 @@ TEST(PowerModelTest, Create) {
     if (levels[i].processing_rate() == levels[j].processing_rate()) {
       EXPECT_LE(levels[i].power_coefficient_nw(), levels[j].power_coefficient_nw());
     }
-    check_level(levels[i],
-                power_management::PowerLevel(levels[i].level(), kPowerLevels[levels[i].level()]));
-    check_level(levels[j],
-                power_management::PowerLevel(levels[j].level(), kPowerLevels[levels[j].level()]));
+    check_level(levels[i], PowerLevel(levels[i].level(), kPowerLevels[levels[i].level()]));
+    check_level(levels[j], PowerLevel(levels[j].level(), kPowerLevels[levels[j].level()]));
   }
 
   auto get_original_transition = [&levels](size_t i, size_t j) {
@@ -247,10 +245,10 @@ TEST(PowerModelTest, Create) {
     size_t og_j = levels[j].level();
     for (const auto& transition : kTransitions) {
       if (transition.from == og_i && transition.to == og_j) {
-        return power_management::PowerLevelTransition(transition);
+        return PowerLevelTransition(transition);
       }
     }
-    return power_management::PowerLevelTransition::Invalid();
+    return PowerLevelTransition::Invalid();
   };
 
   auto transitions = energy_model->transitions();
@@ -277,9 +275,8 @@ TEST(PowerModelTest, Create) {
     auto& level = levels[i];
     EXPECT_EQ(energy_model->FindPowerLevel(level.control(), level.control_argument()), i);
   }
-  EXPECT_FALSE(energy_model->FindPowerLevel(power_management::ControlInterface::kArmPsci, 495));
-  EXPECT_FALSE(
-      energy_model->FindPowerLevel(static_cast<power_management::ControlInterface>(495), 0));
+  EXPECT_FALSE(energy_model->FindPowerLevel(ControlInterface::kArmPsci, 495));
+  EXPECT_FALSE(energy_model->FindPowerLevel(static_cast<ControlInterface>(495), 0));
 }
 
 TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
@@ -288,7 +285,7 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
           .options = 0,
           .processing_rate = 0,
           .power_coefficient_nw = 1,
-          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kArmPsci),
+          .control_interface = cpp23::to_underlying(ControlInterface::kArmPsci),
           .control_argument = 1,
           .diagnostic_name = "0",
       },
@@ -296,7 +293,7 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
           .options = 0,
           .processing_rate = 4,
           .power_coefficient_nw = 8,
-          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kCpuDriver),
+          .control_interface = cpp23::to_underlying(ControlInterface::kCpuDriver),
           .control_argument = 3,
           .diagnostic_name = "1",
       },
@@ -304,7 +301,7 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
           .options = 0,
           .processing_rate = 0,
           .power_coefficient_nw = 2,
-          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kArmWfi),
+          .control_interface = cpp23::to_underlying(ControlInterface::kArmWfi),
           .control_argument = 0,
           .diagnostic_name = "2",
       },
@@ -312,7 +309,7 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
           .options = 0,
           .processing_rate = 4,
           .power_coefficient_nw = 10,
-          .control_interface = cpp23::to_underlying(power_management::ControlInterface::kCpuDriver),
+          .control_interface = cpp23::to_underlying(ControlInterface::kCpuDriver),
           .control_argument = 1,
           .diagnostic_name = "3",
       },
@@ -322,8 +319,7 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
   ASSERT_TRUE(energy_model.is_ok());
 
   // Proper transformation of the model and the transition table.
-  auto check_level = [](const power_management::PowerLevel& actual,
-                        const power_management::PowerLevel& expected) {
+  auto check_level = [](const PowerLevel& actual, const PowerLevel& expected) {
     EXPECT_EQ(actual.level(), expected.level());
     EXPECT_EQ(actual.control(), expected.control());
     EXPECT_EQ(actual.control_argument(), expected.control_argument());
@@ -343,19 +339,15 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
     if (levels[i].processing_rate() == levels[j].processing_rate()) {
       EXPECT_LE(levels[i].power_coefficient_nw(), levels[j].power_coefficient_nw());
     }
-    check_level(levels[i],
-                power_management::PowerLevel(levels[i].level(), kPowerLevels[levels[i].level()]));
-    check_level(levels[j],
-                power_management::PowerLevel(levels[j].level(), kPowerLevels[levels[j].level()]));
+    check_level(levels[i], PowerLevel(levels[i].level(), kPowerLevels[levels[i].level()]));
+    check_level(levels[j], PowerLevel(levels[j].level(), kPowerLevels[levels[j].level()]));
   }
 
   for (size_t row = 0; row < energy_model->levels().size(); ++row) {
     for (size_t column = 0; column < energy_model->levels().size(); ++column) {
-      const power_management::PowerLevelTransition& transition =
-          energy_model->transitions()[row][column];
-      EXPECT_EQ(transition.energy_cost_nj(),
-                power_management::PowerLevelTransition::Zero().energy_cost_nj());
-      EXPECT_EQ(transition.latency(), power_management::PowerLevelTransition::Zero().latency());
+      const PowerLevelTransition& transition = energy_model->transitions()[row][column];
+      EXPECT_EQ(transition.energy_cost_nj(), PowerLevelTransition::Zero().energy_cost_nj());
+      EXPECT_EQ(transition.latency(), PowerLevelTransition::Zero().latency());
     }
   }
 
@@ -372,9 +364,8 @@ TEST(PowerModelTest, CreateWithEmptyTransitionsIsOk) {
     auto& level = levels[i];
     EXPECT_EQ(energy_model->FindPowerLevel(level.control(), level.control_argument()), i);
   }
-  EXPECT_FALSE(energy_model->FindPowerLevel(power_management::ControlInterface::kArmPsci, 495));
-  EXPECT_FALSE(
-      energy_model->FindPowerLevel(static_cast<power_management::ControlInterface>(495), 0));
+  EXPECT_FALSE(energy_model->FindPowerLevel(ControlInterface::kArmPsci, 495));
+  EXPECT_FALSE(energy_model->FindPowerLevel(static_cast<ControlInterface>(495), 0));
 }
 
 TEST(PowerDomainRegistryTest, RegisterUniquePowerDomains) {
