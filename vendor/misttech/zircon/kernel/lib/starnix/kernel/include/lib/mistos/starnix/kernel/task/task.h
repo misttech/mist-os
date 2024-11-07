@@ -340,7 +340,7 @@ enum class TaskStateCode : uint8_t {
 };
 
 class TaskPersistentInfoState;
-using TaskPersistentInfo = fbl::RefPtr<starnix_sync::StarnixMutex<TaskPersistentInfoState>>;
+using TaskPersistentInfo = fbl::RefPtr<starnix_sync::Mutex<TaskPersistentInfoState>>;
 
 /// The information of the task that needs to be available to the `ThreadGroup` while computing
 /// which process a wait can target. It is necessary to shared this data with the `ThreadGroup` so
@@ -488,6 +488,10 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   /// Tell you whether you are tracing syscall entry / exit without a lock.
   // pub trace_syscalls: AtomicBool,
+
+  // The pid directory, so it doesn't have to be generated and thrown away on every access.
+  // See https://fxbug.dev/291962828 for details.
+  starnix_sync::Mutex<ktl::optional<FsNodeHandle>> proc_pid_directory_cache_;
 
   /// impl Task
   fbl::RefPtr<Kernel>& kernel() const;

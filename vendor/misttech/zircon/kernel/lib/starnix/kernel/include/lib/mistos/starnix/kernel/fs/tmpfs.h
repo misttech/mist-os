@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_TMPFS_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_TMPFS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_TMPFS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_TMPFS_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/file_system.h>
@@ -48,7 +48,7 @@ class TmpFs : public FileSystemOps {
 class TmpfsDirectory : public FsNodeOps {
  private:
   MemoryXattrStorage xattrs_;
-  mutable starnix_sync::StarnixMutex<uint32_t> child_count_;
+  mutable starnix_sync::Mutex<uint32_t> child_count_;
 
  public:
   /// impl TmpfsDirectory
@@ -94,4 +94,4 @@ fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_ta
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_TMPFS_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_FS_TMPFS_H_

@@ -458,7 +458,7 @@ class ThreadGroup
   /// The resource limits for this thread group.  This is outside mutable_state
   /// to avoid deadlocks where the thread_group lock is held when acquiring
   /// the task lock, and vice versa.
-  mutable starnix_sync::StarnixMutex<starnix_uapi::ResourceLimits> limits;
+  mutable starnix_sync::Mutex<starnix_uapi::ResourceLimits> limits;
 
   /// The next unique identifier for a seccomp filter.  These are required to be
   /// able to distinguish identical seccomp filters, which are treated differently
@@ -475,7 +475,7 @@ class ThreadGroup
   // pub ptracees: Mutex<BTreeMap<pid_t, TaskContainer>>,
 
   /// The signals that are currently pending for this thread group.
-  mutable starnix_sync::StarnixMutex<QueuedSignals> pending_signals_;
+  mutable starnix_sync::Mutex<QueuedSignals> pending_signals_;
 
   /// The monotonic time at which the thread group started.
   zx_instant_mono_t start_time_;

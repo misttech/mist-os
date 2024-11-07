@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_OBJECT_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_OBJECT_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_OBJECT_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_OBJECT_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
@@ -90,10 +90,10 @@ class FileObject : public fbl::RefCounted<FileObject> {
 
   FileSystemHandle fs_;
 
-  mutable starnix_sync::StarnixMutex<off_t> offset_;
+  mutable starnix_sync::Mutex<off_t> offset_;
 
  private:
-  mutable starnix_sync::StarnixMutex<OpenFlags> flags_;
+  mutable starnix_sync::Mutex<OpenFlags> flags_;
 
   // async_owner: Mutex<FileAsyncOwner>,
 
@@ -212,4 +212,4 @@ class FileObject : public fbl::RefCounted<FileObject> {
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_OBJECT_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FILE_OBJECT_H_

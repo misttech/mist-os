@@ -64,7 +64,7 @@ using FdEventsMapper = FdEvents (*)(FdEvents);
 struct EnqueueEventHandler {
  public:
   ReadyItemKey key;
-  fbl::RefPtr<starnix_sync::StarnixMutex<fbl::Vector<ReadyItem>>> queue;
+  fbl::RefPtr<starnix_sync::Mutex<fbl::Vector<ReadyItem>>> queue;
   FdEvents sought_events;
   ktl::optional<FdEventsMapper> mappings;
 };
@@ -76,7 +76,7 @@ struct Enqueue {
 
 struct EnqueueOnce {
  public:
-  fbl::RefPtr<starnix_sync::StarnixMutex<ktl::optional<EnqueueEventHandler>>> handler;
+  fbl::RefPtr<starnix_sync::Mutex<ktl::optional<EnqueueEventHandler>>> handler;
 };
 
 class EventHandler {
@@ -88,7 +88,7 @@ class EventHandler {
     return EventHandler(Enqueue{.handler = ktl::move(e)});
   }
   static EventHandler EnqueueOnceHandler(
-      fbl::RefPtr<starnix_sync::StarnixMutex<ktl::optional<EnqueueEventHandler>>> e) {
+      fbl::RefPtr<starnix_sync::Mutex<ktl::optional<EnqueueEventHandler>>> e) {
     return EventHandler(EnqueueOnce{.handler = ktl::move(e)});
   }
 
@@ -251,8 +251,7 @@ class PortWaiter : public fbl::RefCountedUpgradeable<PortWaiter> {
 
   using CallbackMap = std::map<WaitKey, WaitCallback, std::less<>,
                                util::Allocator<std::pair<const WaitKey, WaitCallback>>>;
-  mutable starnix_sync::StarnixMutex<CallbackMap>
-      callbacks_;  // the key 0 is reserved for 'no handler'
+  mutable starnix_sync::Mutex<CallbackMap> callbacks_;  // the key 0 is reserved for 'no handler'
   AtomicCounter<uint64_t> next_key_;
   bool ignore_signals_;
 
@@ -260,12 +259,11 @@ class PortWaiter : public fbl::RefCountedUpgradeable<PortWaiter> {
   /// can remove itself from the queues.
   ///
   /// This lock is nested inside the WaitQueue.waiters lock.
-  using WaitQueueMap =
-      std::map<WaitKey, util::WeakPtr<starnix_sync::StarnixMutex<WaitQueueImpl>>, std::less<>,
-               util::Allocator<std::pair<
-                   const WaitKey, util::WeakPtr<starnix_sync::StarnixMutex<WaitQueueImpl>>>>>;
+  using WaitQueueMap = std::map<
+      WaitKey, util::WeakPtr<starnix_sync::Mutex<WaitQueueImpl>>, std::less<>,
+      util::Allocator<std::pair<const WaitKey, util::WeakPtr<starnix_sync::Mutex<WaitQueueImpl>>>>>;
 
-  starnix_sync::StarnixMutex<WaitQueueMap> wait_queues_;
+  starnix_sync::Mutex<WaitQueueMap> wait_queues_;
 
   /// impl PortWaiter
  private:
@@ -572,7 +570,7 @@ class Waiter {
 /// the event.
 class WaitQueue {
  private:
-  fbl::RefPtr<starnix_sync::StarnixMutex<WaitQueueImpl>> inner_;
+  fbl::RefPtr<starnix_sync::Mutex<WaitQueueImpl>> inner_;
 
   // impl WaitQueue
  public:
@@ -641,7 +639,7 @@ class WaitQueue {
 };
 
 struct WaitCancelerQueue {
-  util::WeakPtr<starnix_sync::StarnixMutex<WaitQueueImpl>> wait_queue;
+  util::WeakPtr<starnix_sync::Mutex<WaitQueueImpl>> wait_queue;
   WaiterRef waiter;
   WaitKey wait_key;
   WaitEntryId waiter_id;

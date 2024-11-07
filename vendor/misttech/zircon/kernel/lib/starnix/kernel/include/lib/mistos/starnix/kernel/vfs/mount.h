@@ -90,7 +90,7 @@ class Mount : public fbl::RefCountedUpgradeable<Mount> {
 
   FileSystemHandle fs_;
 
-  mutable starnix_sync::StarnixMutex<MountFlags> flags_;
+  mutable starnix_sync::Mutex<MountFlags> flags_;
 
   // A unique identifier for this mount reported in /proc/pid/mountinfo.
   uint64_t id_;

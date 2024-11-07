@@ -149,7 +149,7 @@ bool WaiterRef::notify(WaitKey key, WaitEvents events) {
 WaitQueue::WaitQueue() {
   LTRACE_ENTRY_OBJ;
   fbl::AllocChecker ac;
-  inner_ = fbl::MakeRefCountedChecked<starnix_sync::StarnixMutex<WaitQueueImpl>>(&ac);
+  inner_ = fbl::MakeRefCountedChecked<starnix_sync::Mutex<WaitQueueImpl>>(&ac);
   ZX_ASSERT(ac.check());
 }
 

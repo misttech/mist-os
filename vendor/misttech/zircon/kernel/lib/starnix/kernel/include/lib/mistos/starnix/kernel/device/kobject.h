@@ -46,7 +46,7 @@ class KObject : public fbl::RefCountedUpgradeable<KObject> {
   //
   // The kobject tree has strong references from parent-to-child and weak
   // references from child-to-parent. This will avoid reference cycle.
-  mutable starnix_sync::StarnixMutex<util::BTreeMap<FsString, fbl::RefPtr<KObject>>> children_;
+  mutable starnix_sync::Mutex<util::BTreeMap<FsString, fbl::RefPtr<KObject>>> children_;
 
   // Function to create the associated FsNodeOps.
   using CreateFsNodeOpsFn = std::function<ktl::unique_ptr<FsNodeOps>(util::WeakPtr<KObject>)>;

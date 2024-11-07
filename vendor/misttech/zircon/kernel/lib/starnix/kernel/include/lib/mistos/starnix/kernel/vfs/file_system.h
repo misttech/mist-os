@@ -40,11 +40,11 @@ struct LruCache {
 
   size_t capacity;
 
-  mutable starnix_sync::StarnixMutex<fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*>> entries;
+  mutable starnix_sync::Mutex<fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*>> entries;
 };
 
 struct Permanent {
-  mutable starnix_sync::StarnixMutex<fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*>> entries;
+  mutable starnix_sync::Mutex<fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*>> entries;
 };
 
 using Entries = ktl::variant<ktl::monostate, ktl::unique_ptr<Permanent>, ktl::unique_ptr<LruCache>>;
@@ -127,7 +127,7 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
   /// Rather than calling FsNode::new directly, file systems should call
   /// FileSystem::get_or_create_node to see if the FsNode already exists in
   /// the cache.
-  mutable starnix_sync::StarnixMutex<fbl::HashTable<ino_t, WeakFsNodeHandle>> nodes_;
+  mutable starnix_sync::Mutex<fbl::HashTable<ino_t, WeakFsNodeHandle>> nodes_;
 
   /// DirEntryHandle cache for the filesystem. Holds strong references to DirEntry objects. For
   /// filesystems with permanent entries, this will hold a strong reference to every node to make

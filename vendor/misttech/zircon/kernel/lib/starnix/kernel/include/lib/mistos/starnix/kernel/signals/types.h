@@ -195,7 +195,7 @@ class SignalActions : public fbl::RefCounted<SignalActions> {
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(SignalActions);
 
-  mutable starnix_sync::StarnixMutex<ktl::array<sigaction, Signal::NUM_SIGNALS + 1>> actions_;
+  mutable starnix_sync::Mutex<ktl::array<sigaction, Signal::NUM_SIGNALS + 1>> actions_;
 };
 
 // Whether, and how, this task is blocked. This enum can be extended with new

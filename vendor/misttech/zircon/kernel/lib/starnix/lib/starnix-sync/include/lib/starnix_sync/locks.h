@@ -18,26 +18,22 @@ template <typename Data>
 class MutexGuard;
 
 template <typename Data>
-class StarnixMutex : public fbl::RefCountedUpgradeable<StarnixMutex<Data>> {
+class Mutex : public fbl::RefCountedUpgradeable<Mutex<Data>> {
  public:
-  StarnixMutex() = default;
-  explicit StarnixMutex(Data&& data) : data_(data) {}
+  Mutex() = default;
+  explicit Mutex(Data&& data) : data_(data) {}
 
   MutexGuard<Data> Lock() { return MutexGuard(this); }
-  MutexGuard<Data> Lock() const { return MutexGuard(this); }
 
  private:
   // No moving or copying allowed.
-  DISALLOW_COPY_ASSIGN_AND_MOVE(StarnixMutex);
+  DISALLOW_COPY_ASSIGN_AND_MOVE(Mutex);
 
   friend class MutexGuard<Data>;
 
-  mutable DECLARE_MUTEX(StarnixMutex) lock_;
+  DECLARE_MUTEX(Mutex) lock_;
   Data data_ __TA_GUARDED(lock_);
 };
-
-// template <typename Data>
-// using StarnixMutex = Mutex<Data>;
 
 /// An RAII mutex guard returned by `MutexGuard::map`, which can point to a
 /// subfield of the protected data.
@@ -46,10 +42,10 @@ class MappedMutexGuard : public Guard<::Mutex> {
  public:
   __WARN_UNUSED_CONSTRUCTOR explicit MappedMutexGuard(Guard<::Mutex>&& adopt, Data* data)
       __TA_ACQUIRE(adopt.lock())
-      : Guard(AdoptLock, ktl::move(adopt)), data_(data) {}
+      : Guard{AdoptLock, ktl::move(adopt)}, data_{data} {}
 
   MappedMutexGuard(MappedMutexGuard&& other)
-      : Guard(AdoptLock, ktl::move(other.take())), data_(other.data_) {
+      : Guard{AdoptLock, ktl::move(other.take())}, data_{other.data_} {
     other.data_ = nullptr;
   }
 
@@ -84,10 +80,10 @@ class MappedMutexGuard : public Guard<::Mutex> {
 template <typename Data>
 class MutexGuard : public Guard<::Mutex> {
  public:
-  __WARN_UNUSED_CONSTRUCTOR explicit MutexGuard(StarnixMutex<Data>* mtx)
-      : Guard{&mtx->lock_}, data_(&mtx->data_) {}
+  __WARN_UNUSED_CONSTRUCTOR explicit MutexGuard(Mutex<Data>* mtx)
+      : Guard{&mtx->lock_}, data_{&mtx->data_} {}
 
-  MutexGuard(MutexGuard&& other) : Guard(AdoptLock, ktl::move(other.take())), data_(other.data_) {
+  MutexGuard(MutexGuard&& other) : Guard{AdoptLock, ktl::move(other.take())}, data_{other.data_} {
     other.data_ = nullptr;
   }
 
@@ -137,8 +133,8 @@ class RwLock {
   RwLock() = default;
   explicit RwLock(Data&& data) : data_(data) {}
 
-  RwLockReadGuard Read() const { return ktl::move(RwLockReadGuard(this)); }
-  RwLockWriteGuard Write() { return ktl::move(RwLockWriteGuard(this)); }
+  RwLockReadGuard Read() const { return RwLockReadGuard(this); }
+  RwLockWriteGuard Write() { return RwLockWriteGuard(this); }
 
  private:
   // No moving or copying allowed.

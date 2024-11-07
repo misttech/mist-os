@@ -323,7 +323,7 @@ class DeviceRegistry {
 
  private:
   /// Mutable state for the device registry.
-  mutable starnix_sync::StarnixMutex<DeviceRegistryState> state_;
+  mutable starnix_sync::Mutex<DeviceRegistryState> state_;
 
  public:
   // impl DeviceRegistry

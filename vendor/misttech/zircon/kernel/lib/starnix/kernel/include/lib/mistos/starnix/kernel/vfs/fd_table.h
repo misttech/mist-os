@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FD_TABLE_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FD_TABLE_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FD_TABLE_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FD_TABLE_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
@@ -120,13 +120,13 @@ class FdTableInner : public fbl::RefCounted<FdTableInner> {
  private:
   friend class FdTable;
 
-  mutable starnix_sync::StarnixMutex<FdTableStore> store_;
+  mutable starnix_sync::Mutex<FdTableStore> store_;
 };
 
 class Task;
 class FdTable {
  private:
-  mutable starnix_sync::StarnixMutex<fbl::RefPtr<FdTableInner>> inner_;
+  mutable starnix_sync::Mutex<fbl::RefPtr<FdTableInner>> inner_;
 
  public:
   // impl FdTable
@@ -189,4 +189,4 @@ constexpr Flag<starnix::FdFlagsEnum> Flags<starnix::FdFlagsEnum>::FLAGS[] = {
     {starnix::FdFlagsEnum::CLOEXEC},
 };
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FD_TABLE_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FD_TABLE_H_

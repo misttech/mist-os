@@ -37,7 +37,7 @@ TaskPersistentInfo TaskPersistentInfoState::New(pid_t tid, pid_t pid,
                                                 const Credentials& creds,
                                                 ktl::optional<Signal> exit_signal) {
   fbl::AllocChecker ac;
-  auto info = fbl::AdoptRef(new (&ac) starnix_sync::StarnixMutex<TaskPersistentInfoState>(
+  auto info = fbl::AdoptRef(new (&ac) starnix_sync::Mutex<TaskPersistentInfoState>(
       TaskPersistentInfoState(tid, pid, command, creds, exit_signal)));
   ASSERT(ac.check());
   return info;

@@ -62,7 +62,7 @@ class MemoryDirectoryFile : public FileOps {
 
   // Current position for readdir operations
   // nullopt represents an unbounded/start position
-  mutable starnix_sync::StarnixMutex<FsString> readdir_position_;
+  mutable starnix_sync::Mutex<FsString> readdir_position_;
 };
 
 }  // namespace starnix

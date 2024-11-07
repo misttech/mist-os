@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_XATTR_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_XATTR_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_XATTR_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_XATTR_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_args.h>
@@ -19,7 +19,7 @@ namespace starnix {
 
 class MemoryXattrStorage : public XattrStorage {
  private:
-  mutable starnix_sync::StarnixMutex<FsStringHashTable> xattrs;
+  mutable starnix_sync::Mutex<FsStringHashTable> xattrs;
 
  public:
   /// impl XattrStorage
@@ -40,4 +40,4 @@ class MemoryXattrStorage : public XattrStorage {
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_XATTR_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_XATTR_H_
