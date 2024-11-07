@@ -20,7 +20,15 @@
 #include <ramdevice-client/ramnand.h>
 #include <zxtest/zxtest.h>
 
+#include "src/storage/lib/paver/abr-client.h"
+#include "src/storage/lib/paver/astro.h"
 #include "src/storage/lib/paver/device-partitioner.h"
+#include "src/storage/lib/paver/kola.h"
+#include "src/storage/lib/paver/luis.h"
+#include "src/storage/lib/paver/nelson.h"
+#include "src/storage/lib/paver/sherlock.h"
+#include "src/storage/lib/paver/vim3.h"
+#include "src/storage/lib/paver/x64.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -34,6 +42,37 @@ constexpr uint32_t kPageSize = 2048;
 constexpr uint32_t kPagesPerBlock = 128;
 constexpr uint32_t kSkipBlockSize = kPageSize * kPagesPerBlock;
 constexpr uint32_t kNumBlocks = 400;
+
+class PaverTest : public zxtest::Test {
+ protected:
+  void SetUp() override {
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(
+        std::make_unique<paver::SherlockPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
+
+    // X64PartitionerFactory must be placed last if test will be run on x64 devices.
+    // This is because X64PartitionerFactory determines whether itself is suitable to be used for
+    // the device based on arch hardcoded at compile time. It will always be the case for x64
+    // devices. The initialization will update to x64 GPT table, which can confuse paver test for
+    // other boards.
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
+
+    paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
+    abr::ClientFactory::Register(std::make_unique<paver::AstroAbrClientFactory>());
+    abr::ClientFactory::Register(std::make_unique<paver::NelsonAbrClientFactory>());
+    abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
+    abr::ClientFactory::Register(std::make_unique<paver::KolaAbrClientFactory>());
+    abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
+    abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
+
+    // Same as X64PartitionerFactory, needs to place last.
+    abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
+  }
+};
 
 struct DeviceAndController {
   zx::channel device;

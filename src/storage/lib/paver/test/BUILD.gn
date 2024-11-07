@@ -6,43 +6,141 @@ import("//build/components.gni")
 import("//build/fuzz.gni")
 import("//build/test.gni")
 
-test("test") {
+source_set("test-utils") {
+  testonly = true
+  sources = [ "test-utils.cc" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fdio",
+    "//src/storage/lib/paver",
+    "//src/storage/lib/ramdevice_client/cpp:ramdevice-client-test",
+    "//src/storage/lib/vfs/cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zxtest",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/lib/zbi-format",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+executable("abr_test") {
+  testonly = true
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
     if (configs + fdio_config - fdio_config != configs) {
       configs -= fdio_config
     }
   }
-
-  output_name = "paver-test"
-  sources = [
-    "abr-test.cc",
-    "block-devices-test.cc",
-    "data-sink-test.cc",
-    "device-partitioner-test.cc",
-    "fvm-test.cc",
-    "main.cc",
-    "partition-client-test.cc",
-    "paver-context-test.cc",
-    "paversvc-test.cc",
-    "stream-reader-test.cc",
-    "test-utils.cc",
-    "validation-test.cc",
-  ]
+  sources = [ "abr-test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    ":test-utils",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//src/storage/gpt",
+    "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/paver",
+    "//zircon/system/ulib/mock-boot-arguments",
+    "//zircon/system/ulib/zxtest",
+    "//zircon/third_party/ulib/cksum",
+  ]
+}
+
+fuchsia_unittest_component("abr-test") {
+  deps = [ ":abr_test" ]
+}
+
+executable("device_partitioner_test") {
+  testonly = true
+  if (is_fuchsia) {
+    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
+  }
+  sources = [ "device-partitioner-test.cc" ]
+  deps = [
+    ":test-utils",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
-    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_testing",
-    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_testing",
     "//sdk/fidl/fuchsia.system.state:fuchsia.system.state_cpp",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/sys/cpp/testing:cpp",
+    "//src/devices/lib/amlogic",
+    "//src/firmware/lib/abr",
+    "//src/lib/files",
+    "//src/lib/uuid",
+    "//src/storage/gpt",
+    "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/block_client/cpp:fake_device",
+    "//src/storage/lib/paver",
+    "//zircon/kernel/lib/arch",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fdio-caller",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_component("device-partitioner-test") {
+  deps = [ ":device_partitioner_test" ]
+}
+
+executable("fvm_test") {
+  testonly = true
+  if (is_fuchsia) {
+    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
+  }
+  sources = [ "fvm-test.cc" ]
+  deps = [
+    ":test-utils",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fdio",
+    "//src/storage/lib/paver",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_component("fvm-test") {
+  deps = [ ":fvm_test" ]
+}
+
+executable("paversvc_test") {
+  testonly = true
+  if (is_fuchsia) {
+    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
+  }
+  sources = [ "paversvc-test.cc" ]
+  deps = [
+    ":test-utils",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
+    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_testing",
     "//sdk/lib/async",
     "//sdk/lib/async-default",
     "//sdk/lib/async-loop:async-loop-cpp",
@@ -50,29 +148,16 @@ test("test") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/sys/cpp/testing:unit",
     "//src/devices/lib/amlogic",
     "//src/firmware/lib/abr",
-    "//src/lib/files",
-    "//src/lib/uuid",
-    "//src/storage/fvm",
     "//src/storage/gpt",
     "//src/storage/lib/block_client/cpp",
-    "//src/storage/lib/block_client/cpp:fake_device",
-    "//src/storage/lib/block_server:block_server_cc",
-    "//src/storage/lib/block_server:fake_block_server_cc",
-    "//src/storage/lib/fs_management",
     "//src/storage/lib/paver",
-    "//src/storage/lib/ramdevice_client/cpp:ramdevice-client-test",
-    "//src/storage/lib/utils:topological_path",
-    "//src/storage/lib/vfs/cpp",
     "//third_party/android/platform/system:sparse_format",
     "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/mock-boot-arguments",
-    "//zircon/system/ulib/svc",
     "//zircon/system/ulib/sysconfig-client:sysconfig-sync-client",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
@@ -80,9 +165,55 @@ test("test") {
   ]
 }
 
-fuchsia_unittest_package("paver-test") {
+fuchsia_unittest_component("paversvc-test") {
+  deps = [ ":paversvc_test" ]
+}
+
+executable("misc_test") {
+  testonly = true
+  if (is_fuchsia) {
+    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
+  }
+  sources = [
+    "block-devices-test.cc",
+    "data-sink-test.cc",
+    "partition-client-test.cc",
+    "paver-context-test.cc",
+    "stream-reader-test.cc",
+    "validation-test.cc",
+  ]
   deps = [
-    ":test",
+    ":test-utils",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/fdio",
+    "//src/lib/files",
+    "//src/storage/lib/block_server:fake_block_server_cc",
+    "//src/storage/lib/vfs/cpp",
+    "//zircon/kernel/lib/arch",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_unittest_component("misc-test") {
+  deps = [ ":misc_test" ]
+}
+
+fuchsia_test_package("paver-test") {
+  test_components = [
+    ":abr-test",
+    ":device-partitioner-test",
+    ":fvm-test",
+    ":paversvc-test",
+    ":misc-test",
+  ]
+  deps = [
     "//src/devices/block/drivers/core",
     "//src/devices/block/drivers/ftl",
     "//src/devices/block/drivers/gpt",
