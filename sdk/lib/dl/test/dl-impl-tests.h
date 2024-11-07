@@ -5,6 +5,7 @@
 #ifndef LIB_DL_TEST_DL_IMPL_TESTS_H_
 #define LIB_DL_TEST_DL_IMPL_TESTS_H_
 
+#include <lib/fit/defer.h>
 #include <lib/stdcompat/functional.h>
 
 #include "../runtime-dynamic-linker.h"

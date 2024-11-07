@@ -5,6 +5,7 @@
 #include <lib/symbolizer-markup/line-buffered-sink.h>
 #include <lib/symbolizer-markup/writer.h>
 
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -235,9 +236,9 @@ TEST(SymbolizerMarkupTests, Module) {
   std::string markup;
   symbolizer_markup::Writer writer(Sink{markup});
 
-  writer.ElfModule(5, "moduleA", cpp20::as_bytes(cpp20::span{kBuildIdA}))
+  writer.ElfModule(5, "moduleA", std::as_bytes(std::span{kBuildIdA}))
       .Newline()
-      .ElfModule(10, "moduleB", cpp20::as_bytes(cpp20::span{kBuildIdB}));
+      .ElfModule(10, "moduleB", std::as_bytes(std::span{kBuildIdB}));
 
   constexpr std::string_view kExpected = R"""({{{module:5:moduleA:elf:545975394d10a07d}}}
 {{{module:10:moduleB:elf:ba43d6f6911e8723}}})""";

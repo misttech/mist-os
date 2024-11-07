@@ -10,14 +10,6 @@ library_headers("headers") {
     "lib/symbolizer-markup/line-buffered-sink.h",
     "lib/symbolizer-markup/writer.h",
   ]
-
-  public_deps = [
-    "//sdk/lib/fit",
-    "//sdk/lib/stdcompat",
-  ]
-  if (!is_fuchsia) {
-    public_deps += [ "//zircon/system/public" ]
-  }
 }
 
 source_set("symbolizer-markup") {

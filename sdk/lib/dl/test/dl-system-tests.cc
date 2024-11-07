@@ -5,6 +5,7 @@
 #include "dl-system-tests.h"
 
 #include <dlfcn.h>
+#include <lib/fit/defer.h>
 
 #include <cstring>
 
