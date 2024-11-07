@@ -43,8 +43,7 @@ zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
     fbl::RefPtr<fdio_internal::LocalVnode> parent, fbl::String name,
     fidl::ClientEnd<fio::Directory> remote) {
   zxio_storage_t remote_storage;
-  if (zx_status_t status =
-          zxio::CreateDirectory(const_cast<zxio_storage_t*>(&remote_storage), std::move(remote));
+  if (zx_status_t status = zxio::CreateDirectory(&remote_storage, std::move(remote));
       status != ZX_OK) {
     return zx::error(status);
   }
