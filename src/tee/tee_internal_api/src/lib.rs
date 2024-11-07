@@ -131,8 +131,8 @@ pub enum Error {
     AccessDenied = binding::TEE_ERROR_ACCESS_DENIED,
     #[error("Canceled")]
     Cancel = binding::TEE_ERROR_CANCEL,
-    #[error("Conflict")]
-    Conflict = binding::TEE_ERROR_ACCESS_CONFLICT,
+    #[error("Access conflict")]
+    AccessConflict = binding::TEE_ERROR_ACCESS_CONFLICT,
     #[error("Excess data")]
     ExcessData = binding::TEE_ERROR_EXCESS_DATA,
     #[error("Bad format")]
@@ -360,6 +360,8 @@ handle!(SessionContext, usize);
 // Trusted Storage data types
 //
 
+pub const OBJECT_ID_MAX_LEN: usize = binding::TEE_OBJECT_ID_MAX_LEN as usize;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Attribute {
@@ -393,6 +395,20 @@ impl Attribute {
     // Whether the attribute is given by a memory reference.
     pub fn is_memory_reference(&self) -> bool {
         self.id.memory_reference()
+    }
+
+    pub fn as_value(&self) -> &ValueFields {
+        assert!(self.is_value());
+        // SAFETY: The above assertion ensures that this variant is what is
+        // 'live'.
+        unsafe { &self.content.value }
+    }
+
+    pub fn as_memory_reference(&self) -> &MemRef {
+        assert!(self.is_memory_reference());
+        // SAFETY: The above assertion ensures that this variant is what is
+        // 'live'.
+        unsafe { &self.content.memref }
     }
 }
 
@@ -442,6 +458,12 @@ bitflags! {
   }
 }
 
+impl Usage {
+    pub fn default() -> Usage {
+        Usage::from_bits_retain(0xffffffff)
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HandleFlags(u32);
@@ -460,7 +482,7 @@ bitflags! {
         const DATA_ACCESS_WRITE_META = binding::TEE_DATA_FLAG_ACCESS_WRITE_META;
         const DATA_SHARE_READ = binding::TEE_DATA_FLAG_SHARE_READ;
         const DATA_SHARE_WRITE = binding::TEE_DATA_FLAG_SHARE_WRITE;
-        const DATA_FLAG_EXCLUSIVE = binding::TEE_DATA_FLAG_EXCLUSIVE;
+        const DATA_FLAG_OVERWRITE = binding::TEE_DATA_FLAG_OVERWRITE;
   }
 }
 

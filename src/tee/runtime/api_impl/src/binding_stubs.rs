@@ -18,11 +18,12 @@ use tee_internal::binding::{
     TEE_Attribute, TEE_BigInt, TEE_BigIntFMM, TEE_BigIntFMMContext, TEE_Identity,
     TEE_ObjectEnumHandle, TEE_ObjectHandle, TEE_ObjectInfo, TEE_OperationHandle, TEE_OperationInfo,
     TEE_OperationInfoMultiple, TEE_Param, TEE_PropSetHandle, TEE_Result, TEE_TASessionHandle,
-    TEE_Time, TEE_Whence, TEE_OBJECT_ID_MAX_LEN, TEE_SUCCESS, TEE_UUID,
+    TEE_Time, TEE_Whence, TEE_SUCCESS, TEE_UUID,
 };
 use tee_internal::{
     to_tee_result, Attribute, AttributeId, Error, HandleFlags, ObjectEnumHandle, ObjectHandle,
     PropSetHandle, Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
+    OBJECT_ID_MAX_LEN,
 };
 
 // This function returns a list of the C entry point that we want to expose from
@@ -753,7 +754,7 @@ extern "C" fn TEE_GetObjectInfo1(
     assert!(!objectInfo.is_null());
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
-        let info = storage::get_object_info1(object)?;
+        let info = storage::get_object_info(object);
         // SAFETY: `objectInfo` nullity checked above.
         unsafe {
             *objectInfo = *info.to_binding();
@@ -769,9 +770,12 @@ extern "C" fn TEE_GetObjectInfo(object: TEE_ObjectHandle, objectInfo: *mut TEE_O
 
 #[no_mangle]
 extern "C" fn TEE_RestrictObjectUsage1(object: TEE_ObjectHandle, objectUsage: u32) -> TEE_Result {
-    let object = *ObjectHandle::from_binding(&object);
-    let usage = Usage::from_bits(objectUsage).unwrap();
-    to_tee_result(storage::restrict_object_usage1(object, usage))
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        let usage = Usage::from_bits_retain(objectUsage);
+        storage::restrict_object_usage(object, usage);
+        Ok(())
+    }())
 }
 
 #[no_mangle]
@@ -791,13 +795,21 @@ extern "C" fn TEE_GetObjectBufferAttribute(
         let object = *ObjectHandle::from_binding(&object);
         let id = AttributeId::from_u32(attributeID).unwrap();
         // SAFETY: `size` nullity checked above.
-        let buffer = unsafe { slice_from_raw_parts_mut(buffer, *size) };
-        storage::get_object_buffer_attribute(object, id, buffer)?;
+        let initial_size = unsafe { *size };
+        let buffer = slice_from_raw_parts_mut(buffer, initial_size);
+        let (attribute_size, result) =
+            match storage::get_object_buffer_attribute(object, id, buffer) {
+                Ok(written) => {
+                    debug_assert!(written.len() <= initial_size);
+                    (written.len(), Ok(()))
+                }
+                Err(err) => (err.actual_size, Err(err.error)),
+            };
         // SAFETY: `size` nullity checked above.
         unsafe {
-            *size = buffer.len();
+            *size = attribute_size;
         }
-        Ok(())
+        result
     }())
 }
 
@@ -911,7 +923,7 @@ extern "C" fn TEE_CopyObjectAttributes1(
     to_tee_result(|| -> TeeResult {
         let src = *ObjectHandle::from_binding(&srcObject);
         let dest = *ObjectHandle::from_binding(&destObject);
-        storage::copy_object_attributes1(src, dest)
+        storage::copy_object_attributes(src, dest)
     }())
 }
 
@@ -945,7 +957,7 @@ extern "C" fn TEE_OpenPersistentObject(
     assert!(!object.is_null());
     to_tee_result(|| -> TeeResult {
         let storage = Storage::from_u32(storageID).unwrap();
-        let flags = HandleFlags::from_bits(flags).unwrap();
+        let flags = HandleFlags::from_bits_retain(flags);
         let id = slice_from_raw_parts(objectID, objectIDLen);
         let obj = storage::open_persistent_object(storage, id, flags)?;
         // SAFETY: `object` nullity checked above.
@@ -969,7 +981,7 @@ extern "C" fn TEE_CreatePersistentObject(
 ) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let storage = Storage::from_u32(storageID).unwrap();
-        let flags = HandleFlags::from_bits(flags).unwrap();
+        let flags = HandleFlags::from_bits_retain(flags);
         let id = slice_from_raw_parts(objectID, objectIDLen);
         let attrs = *ObjectHandle::from_binding(&attributes);
         let initial_data = slice_from_raw_parts(initialData, initialDataLen);
@@ -988,7 +1000,7 @@ extern "C" fn TEE_CreatePersistentObject(
 extern "C" fn TEE_CloseAndDeletePersistentObject1(object: TEE_ObjectHandle) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
-        storage::close_and_delete_peristent_object1(object)
+        storage::close_and_delete_persistent_object(object)
     }())
 }
 
@@ -1016,7 +1028,7 @@ extern "C" fn TEE_AllocatePersistentObjectEnumerator(
 ) -> TEE_Result {
     assert!(!objectEnumerator.is_null());
     to_tee_result(|| -> TeeResult {
-        let enumerator = storage::allocate_persistent_object_enumerator()?;
+        let enumerator = storage::allocate_persistent_object_enumerator();
         // SAFETY: `objectEnumerator` nullity checked above.
         unsafe {
             *objectEnumerator = *enumerator.to_binding();
@@ -1061,8 +1073,8 @@ extern "C" fn TEE_GetNextPersistentObject(
     assert!(!objectIDLen.is_null());
     to_tee_result(|| -> TeeResult {
         let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-        let id = slice_from_raw_parts_mut(objectID, TEE_OBJECT_ID_MAX_LEN as usize);
-        let info = storage::get_next_persistent_object(enumerator, id)?;
+        let id_buf = slice_from_raw_parts_mut(objectID, OBJECT_ID_MAX_LEN);
+        let (info, id) = storage::get_next_persistent_object(enumerator, id_buf)?;
         // SAFETY: `objectInfo` and `objectIDLen` nullity checked above.
         unsafe {
             *objectInfo = *info.to_binding();
@@ -1086,7 +1098,7 @@ extern "C" fn TEE_ReadObjectData(
         let written = storage::read_object_data(object, buffer)?;
         // SAFETY: `count` nullity checked above.
         unsafe {
-            *count = written;
+            *count = written.len();
         }
         Ok(())
     }())
@@ -1116,13 +1128,13 @@ extern "C" fn TEE_TruncateObjectData(object: TEE_ObjectHandle, size: usize) -> T
 #[no_mangle]
 extern "C" fn TEE_SeekObjectData(
     object: TEE_ObjectHandle,
-    offset: usize,
+    offset: std::os::raw::c_long,
     whence: TEE_Whence,
 ) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let whence = Whence::from_u32(whence).unwrap();
-        storage::seek_data_object(object, offset, whence)
+        storage::seek_data_object(object, offset.try_into().unwrap(), whence)
     }())
 }
 
