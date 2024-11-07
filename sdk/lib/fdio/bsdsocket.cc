@@ -83,7 +83,7 @@ int socket(int domain, int type, int protocol) {
   if (out_code) {
     return ERRNO(out_code);
   }
-  const fdio_ptr io = result.value();
+  const fdio_ptr& io = result.value();
 
   if (type & SOCK_NONBLOCK) {
     io->ioflag() |= IOFLAG_NONBLOCK;

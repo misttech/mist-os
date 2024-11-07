@@ -1613,7 +1613,7 @@ int closedir(DIR* dir) {
 }
 
 namespace {
-zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr io) {
+zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr& io) {
   if (dir->iterator != nullptr) {
     return ZX_OK;
   }
