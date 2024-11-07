@@ -52,9 +52,8 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
 
   void TriggerIrq(size_t timer_index) {
     ASSERT_TRUE(timer_index < kNumberOfTimers);
-    ASSERT_EQ(
-        fake_interrupts_[*kTimerToIrqsIndexes[timer_index]].trigger(0, zx::clock::get_monotonic()),
-        ZX_OK);
+    ASSERT_EQ(fake_interrupts_[*kTimerToIrqsIndexes[timer_index]].trigger(0, zx::clock::get_boot()),
+              ZX_OK);
   }
 
   void TriggerAllIrqs() {
