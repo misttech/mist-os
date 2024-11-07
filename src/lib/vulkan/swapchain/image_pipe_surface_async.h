@@ -97,8 +97,7 @@ class ImagePipeSurfaceAsync : public ImagePipeSurface {
     std::vector<std::unique_ptr<FenceSignaler>> release_fences;
   };
   std::vector<PendingPresent> queue_ __attribute__((guarded_by(mutex_)));
-  bool present_pending_ __attribute__((guarded_by(mutex_))) = false;
-  std::vector<std::unique_ptr<FenceSignaler>> previous_present_release_fences_
+  std::vector<std::unique_ptr<FenceSignaler>> previous_present_release_fence_signalers_
       __attribute__((guarded_by(mutex_)));
   SupportedImageProperties supported_image_properties_;
   bool channel_closed_ __attribute__((guarded_by(mutex_))) = false;
