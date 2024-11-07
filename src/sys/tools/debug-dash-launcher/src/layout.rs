@@ -196,11 +196,7 @@ mod tests {
         let file_path = temp_dir_path.join(file_name);
         std::fs::write(&file_path, "Hippos Rule!").unwrap();
         let temp_dir_path = temp_dir_path.display().to_string();
-        fuchsia_fs::directory::open_in_namespace_deprecated(
-            &temp_dir_path,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap()
+        fuchsia_fs::directory::open_in_namespace(&temp_dir_path, fio::PERM_READABLE).unwrap()
     }
 
     fn create_ns_entries() -> Vec<fcrunner::ComponentNamespaceEntry> {
