@@ -17,8 +17,12 @@ group("tests") {
 test("dl-unittests") {
   visibility = [ ":*" ]
 
-  sources = [ "dl-tests.cc" ]
+  sources = [
+    "concat-view-tests.cc",
+    "dl-tests.cc",
+  ]
   deps = [
+    "..:concat-view",
     "..:diagnostics",
     "..:error",
     "..:stateful-error",

@@ -153,6 +153,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // startup or loaded by dlopen() with the RTLD_GLOBAL flag.
   constexpr bool is_global() const { return abi_module_.symbols_visible; }
   constexpr void set_global() { abi_module_.symbols_visible = true; }
+  constexpr bool is_local() const { return !is_global(); }
 
  private:
   // A RuntimeModule can only be created with Module::Create...).

@@ -12,6 +12,7 @@
 
 #include <ranges>
 
+#include "concat-view.h"
 #include "diagnostics.h"
 #include "runtime-module.h"
 
@@ -167,56 +168,50 @@ class LinkingSession {
     return &runtime_modules_.back();
   }
 
-  // Return the list of modules that will be used for symbol resolution. This is
-  // is an ordered list of global modules that have already been loaded and the
-  // non-global dependencies of the root module loaded by this session.
-  ModuleRefList BuildResolutionList(Diagnostics& diag, const auto& session_modules) {
-    auto loaded_global_modules = std::ranges::views::filter(
-        loaded_modules_, [](const RuntimeModule& m) { return m.is_global(); });
-    auto local_non_global_modules = std::ranges::views::filter(
-        session_modules, [](const RuntimeModule& m) { return !m.is_global(); });
-
-    ModuleRefList resolution_modules;
-    auto enqueue = [&diag, &resolution_modules](const RuntimeModule& m) {
-      return resolution_modules.push_back(diag, "resolution module container", &m);
-    };
-
-    if (!std::ranges::all_of(loaded_global_modules, enqueue) ||
-        !std::ranges::all_of(local_non_global_modules, enqueue)) {
-      return {};
-    }
-
-    return resolution_modules;
-  }
-
   // Perform relocations on all pending modules to be loaded. Return a boolean
   // if relocations succeeded on all modules.
   bool Relocate(Diagnostics& diag, const auto& session_modules) {
-    // TODO(https://fxbug.dev/373886578): Replace with a concat-view adaptor.
-    ModuleRefList resolution_modules = BuildResolutionList(diag, session_modules);
-    if (resolution_modules.is_empty()) {
+    if (session_modules.empty()) {
       return false;
     }
-    auto view = RuntimeModule::const_derefed_element_view(resolution_modules);
-    auto relocate_and_relro = [&](SessionModule& session_module) -> bool {
+
+    // Construct a view of modules that will be used for symbol resolution.
+    // This is an ordered list of global modules that have already been loaded,
+    // followed by the non-global modules being loaded by this session.
+    auto loaded_global = std::views::filter(loaded_modules_, &RuntimeModule::is_global);
+    auto session_local = std::views::filter(session_modules, &RuntimeModule::is_local);
+    auto relocate_and_relro =
+        // The concat_view created here will be used as const since the lambda
+        // is not mutable--anyway RuntimeModule::Relocate et al take the module
+        // list object as const& rather than assuming it's a view.  filter_view
+        // doesn't have const overloads so it can't be used as const and thus
+        // can't be directly in a const concat_view.  However, ref_view has
+        // const overloads that don't need the referenced view to have them.
+        [resolution_modules =
+             ConcatView{
+                 std::ranges::ref_view(loaded_global),
+                 std::ranges::ref_view(session_local),
+             },
+         &diag](SessionModule& session_module) -> bool {
       // TODO(https://fxbug.dev/339662473): this doesn't use the root module's
       // name in the scoped diagnostics. Add test for missing transitive symbol
       // and make sure the correct name is used in the error message.
       ld::ScopedModuleDiagnostics root_module_diag{diag, session_module.name().str()};
-      return session_module.Relocate(diag, view) && session_module.ProtectRelro(diag);
+      return session_module.Relocate(diag, resolution_modules) && session_module.ProtectRelro(diag);
     };
     return std::all_of(std::begin(session_modules_), std::end(session_modules_),
                        relocate_and_relro);
   }
 
-  // The list of "temporary" SessionModules needed to perform loading, decoding,
-  // relocations, etc during this LinkingSession. There is a 1:1 mapping between
-  // elements in session_modules_ and runtime_modules_: each element in
-  // this list is responsible for filling out the runtime and ABI data for the
-  // corresponding RuntimeModule located at the same index in runtime_modules_.
-  // In other words, session_modules_[idx].runtime_module() is a reference to
-  // the runtime module at runtime_modules_[idx]. Unlike runtime_modules_, this
-  // list will live only as long as this LinkingSession instance.
+  // The list of "temporary" SessionModules needed to perform loading,
+  // decoding, relocations, etc during this LinkingSession.  There is a 1:1
+  // mapping between elements in session_modules_ and runtime_modules_: each
+  // element in this list is responsible for filling out the runtime and ABI
+  // data for the corresponding RuntimeModule located at the same index in
+  // runtime_modules_.  In other words, session_modules_[idx].runtime_module()
+  // is a reference to the runtime module at runtime_modules_[idx]. Unlike
+  // runtime_modules_, this list will live only as long as this LinkingSession
+  // instance.
   SessionModuleList session_modules_;
 
   // The list of "permanent" RuntimeModules created during this LinkingSession.

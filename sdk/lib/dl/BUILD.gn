@@ -21,6 +21,7 @@ source_set("runtime") {
     "runtime-module.cc",
     "runtime-module.h",
   ]
+  deps = [ ":concat-view" ]
   if (is_fuchsia) {
     sources += [ "unmap-zircon.cc" ]
   } else {
@@ -47,6 +48,10 @@ source_set("stateful-error") {
     "//sdk/lib/fit",
   ]
   sources = [ "stateful-error.cc" ]
+}
+
+source_set("concat-view") {
+  public = [ "concat-view.h" ]
 }
 
 group("tests") {
