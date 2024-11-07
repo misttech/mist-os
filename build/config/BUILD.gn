@@ -1342,7 +1342,7 @@ config("werror") {
 
     # New versions of C++ often include new deprecations, so treat them as
     # warnings by default.
-    if ((defined(experimental_cxx_version) && experimental_cxx_version >= 20) ||
+    if (experimental_cxx_version != false ||
         # TODO(https://fxbug.dev/327227416): Remove after addressing
         # Xcode-specific deprecation warnings.
         is_mac) {
