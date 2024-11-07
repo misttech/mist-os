@@ -16,6 +16,7 @@
 #include "src/developer/debug/shared/message_loop_poll.h"
 #include "src/developer/debug/zxdb/client/download_observer.h"
 #include "src/developer/debug/zxdb/client/pretty_stack_manager.h"
+#include "src/developer/debug/zxdb/client/process_observer.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/source_file_provider_impl.h"
 #include "src/developer/debug/zxdb/client/system.h"
@@ -31,6 +32,7 @@ namespace symbolizer {
 // better testing.
 class SymbolizerImpl : public Symbolizer,
                        public zxdb::DownloadObserver,
+                       public zxdb::ProcessObserver,
                        public zxdb::SystemObserver {
  public:
   explicit SymbolizerImpl(const CommandLineOptions& options);
@@ -85,6 +87,16 @@ class SymbolizerImpl : public Symbolizer,
   // |SystemObserver| implementation.
   void DidCreateSymbolServer(zxdb::SymbolServer* server) override;
   void OnSymbolServerStatusChanged(zxdb::SymbolServer* server) override;
+
+  // |ProcessObserver| implementation.
+  void DidCreateProcess(zxdb::Process* process, uint64_t timestamp) override;
+  void WillDestroyProcess(zxdb::Process* process, DestroyReason reason, int exit_code,
+                          uint64_t timestamp) override;
+  void WillLoadModuleSymbols(zxdb::Process* process, int num_modules) override;
+  void DidLoadModuleSymbols(zxdb::Process* process, zxdb::LoadedModuleSymbols* module) override;
+  void DidLoadAllModuleSymbols(zxdb::Process* process) override;
+  void WillUnloadModuleSymbols(zxdb::Process* process, zxdb::LoadedModuleSymbols* module) override;
+  void OnSymbolLoadFailure(zxdb::Process* process, const zxdb::Err& err) override;
 
  private:
   // Ensures a process is created on target_. Should be called before each Bactrace().

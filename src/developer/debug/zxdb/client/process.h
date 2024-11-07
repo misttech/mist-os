@@ -183,4 +183,6 @@ class Process : public ClientObject {
 
 }  // namespace zxdb
 
+std::ostream& operator<<(std::ostream& os, const zxdb::Process& process);
+
 #endif  // SRC_DEVELOPER_DEBUG_ZXDB_CLIENT_PROCESS_H_

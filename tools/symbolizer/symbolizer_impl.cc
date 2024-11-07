@@ -129,6 +129,7 @@ SymbolizerImpl::SymbolizerImpl(const CommandLineOptions& options)
   // Hook observers.
   session_.system().AddObserver(this);
   session_.AddDownloadObserver(this);
+  session_.AddProcessObserver(this);
 
   // Disable indexing on ModuleSymbols to accelerate the loading time.
   session_.system().GetSymbols()->set_create_index(false);
@@ -587,6 +588,40 @@ void SymbolizerImpl::OnSymbolServerStatusChanged(zxdb::SymbolServer* unused_serv
 
   waiting_auth_ = false;
   loop_.QuitNow();
+}
+
+void SymbolizerImpl::DidCreateProcess(zxdb::Process* process, uint64_t timestamp) {
+  FX_LOGS(DEBUG) << "Created " << *process << "\n";
+}
+
+void SymbolizerImpl::WillDestroyProcess(zxdb::Process* process, DestroyReason reason, int exit_code,
+                                        uint64_t timestamp) {
+  FX_LOGS(DEBUG) << "Destroying " << *process << " with exit code " << exit_code << ": "
+                 << DestroyReasonToString(reason) << "\n";
+}
+
+void SymbolizerImpl::WillLoadModuleSymbols(zxdb::Process* process, int num_modules) {
+  FX_LOGS(DEBUG) << "About to load " << num_modules << " module symbols for " << *process << "\n";
+}
+
+void SymbolizerImpl::DidLoadModuleSymbols(zxdb::Process* process,
+                                          zxdb::LoadedModuleSymbols* module) {
+  FX_LOGS(DEBUG) << "Loaded module symbols for " << *process << ", build id " << module->build_id()
+                 << "\n";
+}
+
+void SymbolizerImpl::DidLoadAllModuleSymbols(zxdb::Process* process) {
+  FX_LOGS(DEBUG) << "Loaded all module symbols for " << *process << "\n";
+}
+
+void SymbolizerImpl::WillUnloadModuleSymbols(zxdb::Process* process,
+                                             zxdb::LoadedModuleSymbols* module) {
+  FX_LOGS(DEBUG) << "Unloading module symbols for " << *process << ", build id "
+                 << module->build_id() << "\n";
+}
+
+void SymbolizerImpl::OnSymbolLoadFailure(zxdb::Process* process, const zxdb::Err& err) {
+  FX_LOGS(WARNING) << "Symbols failed to load for " << *process << ": " << err.msg() << "\n";
 }
 
 void SymbolizerImpl::InitProcess() {
