@@ -7,9 +7,12 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_TESTING_TESTING_H_
 
 #include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/vfs/anon_node.h>
+#include <lib/mistos/starnix/kernel/vfs/file_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/file_system_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
 #include <ktl/optional.h>
 #include <ktl/pair.h>
@@ -20,6 +23,54 @@ namespace starnix {
 class Kernel;
 
 namespace testing {
+
+// An FsNodeOps implementation that panics if you try to open it. Useful as a stand-in for testing
+// APIs that require a FsNodeOps implementation but don't actually use it.
+class PanickingFsNode : public FsNodeOps {
+ public:
+  PanickingFsNode() = default;
+
+  fs_node_impl_not_dir();
+
+  fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
+                                                               const CurrentTask& current_task,
+                                                               OpenFlags flags) const override {
+    panic("should not be called");
+  }
+};
+
+// An implementation of FileOps that panics on any read, write, or ioctl operation.
+class PanickingFile : public FileOps {
+ public:
+  PanickingFile() = default;
+
+  // Creates a FileObject whose implementation panics on reads, writes, and ioctls.
+  static fbl::RefPtr<FileObject> new_file(const CurrentTask& current_task) {
+    fbl::AllocChecker ac;
+    auto file = ktl::make_unique<PanickingFile>(&ac);
+    ASSERT(ac.check());
+    return Anon::new_file(current_task, ktl::move(file), OpenFlags(OpenFlagsEnum::RDWR));
+  }
+
+  // impl FileOps for PanickingFile
+  fileops_impl_nonseekable();
+  fileops_impl_noop_sync();
+
+  fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task,
+                                   size_t offset, InputBuffer* data) const final {
+    panic("write called on PanickingFile");
+  }
+
+  fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask& current_task,
+                                  size_t offset, OutputBuffer* data) const final {
+    panic("read called on PanickingFile");
+  }
+
+  fit::result<Errno, SyscallResult> ioctl(const FileObject& file, const CurrentTask& current_task,
+                                          uint32_t request, long arg) const final {
+    panic("ioctl called on PanickingFile");
+  }
+};
 
 class AutoReleasableTask {
  public:
@@ -144,8 +195,6 @@ ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
     create_kernel_task_and_unlocked_with_selinux(/*security_server: Arc<SecurityServer>*/);
 
 fbl::RefPtr<Kernel> create_test_kernel(/*security_server: Arc<SecurityServer>*/);
-
-TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs);
 
 /// An old way of creating a task for testing
 ///

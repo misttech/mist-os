@@ -24,7 +24,8 @@ namespace starnix {
 
 Kernel::Kernel(const ktl::string_view& cmdline)
     : kthreads_(KernelThreads::New(util::WeakPtr(this))),
-      cmdline_{ktl::move(cmdline)} {
+      cmdline_{cmdline},
+      device_registry_(DeviceRegistry::Default()) {
   LTRACE_ENTRY_OBJ;
 }
 

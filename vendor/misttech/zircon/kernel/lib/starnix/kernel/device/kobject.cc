@@ -13,18 +13,6 @@ KObjectHandle KObject::new_root(const FsString& name) {
   return new_root_with_dir<FsNodeOps>(name, KObjectDirectory::New);
 }
 
-template <typename N, typename F>
-KObjectHandle KObject::new_root_with_dir(const FsString& name, F&& fn) {
-  fbl::AllocChecker ac;
-  auto kobject = fbl::AdoptRef(new (&ac) KObject(
-      name, {},
-      [create_fs_node_ops = ktl::move(fn)](const util::WeakPtr<KObject>& kobject)
-          -> ktl::unique_ptr<N> { return ktl::unique_ptr<N>(create_fs_node_ops(kobject)); }));
-  ZX_ASSERT(ac.check());
-
-  return kobject;
-}
-
 ktl::optional<KObjectHandle> KObject::parent() const {
   if (parent_.has_value()) {
     return ktl::optional<KObjectHandle>{parent_.value().Lock()};

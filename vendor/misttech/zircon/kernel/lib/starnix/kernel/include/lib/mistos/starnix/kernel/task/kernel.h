@@ -6,6 +6,7 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_KERNEL_H_
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/device/registry.h>
 #include <lib/mistos/starnix/kernel/lifecycle/atomic_counter.h>
 #include <lib/mistos/starnix/kernel/task/kernel_threads.h>
 #include <lib/mistos/starnix/kernel/task/pid_table.h>
@@ -81,7 +82,7 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   // pub fusectl_fs: OnceCell<Arc<FuseCtlFs>>,
 
   /// The registry of device drivers.
-  // pub device_registry: DeviceRegistry,
+  DeviceRegistry device_registry_;
 
   /// The service directory of the container.
   // container_svc: Option<fio::DirectoryProxy>,
