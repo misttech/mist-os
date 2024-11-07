@@ -644,13 +644,17 @@ std::vector<debug_ipc::ProcessThreadId> DebugAgent::ClientSuspendAll(zx_koid_t e
 }
 
 bool DebugAgent::IsAttachedToParentOrAncestorOf(zx_koid_t parent) {
-  while (parent != root_job_->koid()) {
+  while (parent != ZX_KOID_INVALID && parent != root_job_->koid()) {
     auto debugged_job = GetDebuggedJob(parent);
     if (debugged_job && debugged_job->type() == JobExceptionChannelType::kException) {
       // We are already attached to a parent job between the process and the root job.
       return true;
     }
 
+    // Note if the process was torn down asynchronously by someone else, the ancestry tree could be
+    // gone already, resulting in this being ZX_KOID_INVALID.
+    //
+    // TODO(https://fxbug.dev/377671670): Write better tests for this.
     parent = system_interface().GetParentJobKoid(parent);
   }
 
