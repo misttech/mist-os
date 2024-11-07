@@ -17,22 +17,9 @@ const indentPrefix = "  "
 
 // knownRules assigns true to known rules that can be converted from Bazel to GN.
 var knownRules = map[string]bool{
-	"go_binary":          true,
-	"go_library":         true,
-	"go_test":            true,
-	"install_host_tools": true,
-	"sdk_host_tool":      true,
-}
-
-// attrsToOmitByRules stores a mapping from known rules to attributes to omit when
-// converting them to GN.
-var attrsToOmitByRules = map[string]map[string]bool{
-	"go_library": {
-		// In GN we default cgo to true when compiling Go code, and explicitly disable
-		// it in very few places. However, in Bazel, cgo defaults to false, and
-		// require users to explicitly set when C sources are included.
-		"cgo": true,
-	},
+	"go_library": true,
+	"go_binary":  true,
+	"go_test":    true,
 }
 
 // These identifiers with the same meanings are represented differently in Bazel
@@ -182,9 +169,8 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 		return nil, fmt.Errorf("%s is not a known Bazel rule to convert to GN", fn.Name)
 	}
 
-	attrsToOmit := attrsToOmitByRules[fn.Name]
-
-	// Loops through all arguments to handle special ones first.
+	// Loops through all args to first determine the name of this target, because
+	// GN target name is not a regular field like others.
 	var name string
 	var remainingArgs []*syntax.BinaryExpr
 	var wrappingConditions []string
@@ -196,9 +182,6 @@ func callExprToGN(expr *syntax.CallExpr) ([]string, error) {
 		ident, ok := binaryExpr.X.(*syntax.Ident)
 		if !ok {
 			return nil, fmt.Errorf("unexpected node type on the left hand side of binary expression in target definition, want syntax.Ident, got %T", binaryExpr.X)
-		}
-		if attrsToOmit[ident.Name] {
-			continue
 		}
 		if ident.Name == "name" {
 			lines, err := exprToGN(binaryExpr.Y, nil)
