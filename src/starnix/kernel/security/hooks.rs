@@ -28,19 +28,19 @@ use std::sync::Arc;
 /// Executes the `hook` closure if SELinux is enabled, and has a policy loaded.
 /// If SELinux is not enabled, or has no policy loaded, then the `default` closure is executed,
 /// and its result returned.
-fn if_selinux_else_with_arg<F, R, D, A>(arg: A, task: &Task, hook: F, default: D) -> R
+fn if_selinux_else_with_context<F, R, D, C>(context: C, task: &Task, hook: F, default: D) -> R
 where
-    F: FnOnce(A, &Arc<SecurityServer>) -> R,
-    D: Fn(A) -> R,
+    F: FnOnce(C, &Arc<SecurityServer>) -> R,
+    D: Fn(C) -> R,
 {
     if let Some(state) = task.kernel().security_state.state.as_ref() {
         if state.server.has_policy() {
-            hook(arg, &state.server)
+            hook(context, &state.server)
         } else {
-            default(arg)
+            default(context)
         }
     } else {
-        default(arg)
+        default(context)
     }
 }
 
@@ -52,18 +52,27 @@ where
     F: FnOnce(&Arc<SecurityServer>) -> R,
     D: Fn() -> R,
 {
-    if_selinux_else_with_arg((), task, |_, security_server| hook(security_server), |_| default())
+    if_selinux_else_with_context(
+        (),
+        task,
+        |_, security_server| hook(security_server),
+        |_| default(),
+    )
 }
 
 /// Specialization of `if_selinux_else(...)` for hooks which return a `Result<..., Errno>`, that
 /// arranges to return a default `Ok(...)` result value if SELinux is not enabled, or not yet
 /// configured with a policy.
-fn if_selinux_else_default_ok_with_arg<R, F, A>(arg: A, task: &Task, hook: F) -> Result<R, Errno>
+fn if_selinux_else_default_ok_with_context<R, F, C>(
+    context: C,
+    task: &Task,
+    hook: F,
+) -> Result<R, Errno>
 where
-    F: FnOnce(A, &Arc<SecurityServer>) -> Result<R, Errno>,
+    F: FnOnce(C, &Arc<SecurityServer>) -> Result<R, Errno>,
     R: Default,
 {
-    if_selinux_else_with_arg(arg, task, hook, |_| Ok(R::default()))
+    if_selinux_else_with_context(context, task, hook, |_| Ok(R::default()))
 }
 
 /// Specialization of `if_selinux_else(...)` for hooks which return a `Result<..., Errno>`, that
@@ -123,7 +132,7 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     profile_duration!("security.hooks.file_system_resolve_security");
-    if_selinux_else_default_ok_with_arg(locked, current_task, |locked, security_server| {
+    if_selinux_else_default_ok_with_context(locked, current_task, |locked, security_server| {
         selinux_hooks::file_system_resolve_security(
             locked,
             security_server,
@@ -662,7 +671,7 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     profile_duration!("security.hooks.fs_node_getsecurity");
-    if_selinux_else_with_arg(
+    if_selinux_else_with_context(
         locked,
         current_task,
         |locked, security_server| {
@@ -714,7 +723,7 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     profile_duration!("security.hooks.fs_node_setsecurity");
-    if_selinux_else_with_arg(
+    if_selinux_else_with_context(
         locked,
         current_task,
         |locked, security_server| {
@@ -802,7 +811,7 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     profile_duration!("security.hooks.selinuxfs_policy_loaded");
-    if_selinux_else_with_arg(
+    if_selinux_else_with_context(
         locked,
         current_task,
         |locked, security_server| {
