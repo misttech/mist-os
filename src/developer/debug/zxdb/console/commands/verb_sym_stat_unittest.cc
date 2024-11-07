@@ -62,6 +62,16 @@ TEST_F(VerbSymStat, SymStat) {
 
   session().system().GetDownloadManager()->InjectDownloadForTesting("abc123");
   event = console().GetOutputEvent();
+  EXPECT_EQ("Starting download for abc123", event.output.AsString());
+  event = console().GetOutputEvent();
+  EXPECT_EQ("Adding server gs://fake-bucket to download for abc123", event.output.AsString());
+  event = console().GetOutputEvent();
+  EXPECT_EQ("Error downloading abc123 from gs://fake-bucket: NotFound", event.output.AsString());
+  event = console().GetOutputEvent();
+  EXPECT_EQ(
+      "Download for abc123 failed(General): debuginfo for build_id abc123 not found on 1 servers\n",
+      event.output.AsString());
+  event = console().GetOutputEvent();
   EXPECT_EQ("Downloading symbols...", event.output.AsString());
 
   console().ProcessInputLine("sym-stat");
