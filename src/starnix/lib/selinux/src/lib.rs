@@ -327,6 +327,10 @@ common_permission_enum! {
         Link("link"),
         /// Permission to open a file.
         Open("open"),
+        /// Permission checked against the existing label when updating a file's security label.
+        RelabelFrom("relabelfrom"),
+        /// Permission checked against the new label when updating a file's security label.
+        RelabelTo("relabelto"),
         /// Permission to modify attributes, including uid, gid and extended attributes.
         SetAttr("setattr"),
         /// Permission to delete a file or remove a hard link.

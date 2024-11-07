@@ -1284,7 +1284,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fs_node_setsecurity_selinux_enforcing_invalid_context_succeeds() {
+    async fn fs_node_setsecurity_selinux_enforcing_invalid_context_fails() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
             |locked, current_task, _security_server| {
                 let node = &testing::create_test_file(locked, current_task).entry.node;
@@ -1300,12 +1300,9 @@ mod tests {
                     "!".into(), // Note: Not a valid security context.
                     XattrOp::Set,
                 )
-                .is_ok());
+                .is_err());
 
-                assert_eq!(
-                    Some(SecurityId::initial(InitialSid::Unlabeled)),
-                    selinux_hooks::get_cached_sid(node)
-                );
+                assert_eq!(before_sid, selinux_hooks::get_cached_sid(node));
             },
         )
     }
@@ -1422,10 +1419,12 @@ mod tests {
     #[fuchsia::test]
     async fn fs_node_getsecurity_delegates_to_get_xattr() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |locked, current_task, _security_server| {
+            |locked, current_task, security_server| {
                 let node = &testing::create_test_file(locked, current_task).entry.node;
 
                 // Set an invalid value in `node`'s "security.selinux" attribute.
+                // This requires SELinux to be in permissive mode, otherwise the "relabelto" permission check will fail.
+                security_server.set_enforcing(false);
                 const TEST_VALUE: &str = "Something Random";
                 fs_node_setsecurity(
                     locked,
@@ -1436,6 +1435,7 @@ mod tests {
                     XattrOp::Set,
                 )
                 .expect("set_xattr(security.selinux) failed");
+                security_server.set_enforcing(true);
 
                 // Reading the security attribute should pass-through to read the value from the file system.
                 let result = fs_node_getsecurity(

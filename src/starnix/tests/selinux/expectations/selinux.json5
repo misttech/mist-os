@@ -46,7 +46,6 @@
                 "*open*",
                 "*perf_event*",
                 "*readlink*",
-                "*relabel*",
                 "*rename*",
                 "*rxdir*",
                 "*sem*",
