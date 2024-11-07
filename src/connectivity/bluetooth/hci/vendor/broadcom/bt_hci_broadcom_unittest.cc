@@ -46,8 +46,7 @@ const std::array<uint8_t, 6> kCommandCompleteEvent = {
     0x00,        // return_code (success)
 };
 
-class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
-                            public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
+class FakeTransportDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
                             public fidl::Server<fhbt::HciTransport>,
                             public fidl::Server<fhbt::Snoop> {
  public:
@@ -61,8 +60,6 @@ class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
   }
   fhbt::HciService::InstanceHandler GetHciInstanceHandler() {
     return fhbt::HciService::InstanceHandler({
-        .hci = hci_binding_group_.CreateHandler(
-            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
         .hci_transport = hci_transport_binding_group_.CreateHandler(
             this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
         .snoop = snoop_binding_group_.CreateHandler(
@@ -71,38 +68,6 @@ class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
   }
 
   void SetCustomizedReply(std::vector<uint8_t> reply) { customized_reply_.emplace(reply); }
-
-  // fucshia_hardware_bluetooth::Hci request handler implementations:
-  void OpenCommandChannel(OpenCommandChannelRequestView request,
-                          OpenCommandChannelCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-  void OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                          OpenAclDataChannelCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                          OpenScoDataChannelCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-  void ConfigureSco(fidl::WireServer<fhbt::Hci>::ConfigureScoRequestView request,
-                    fidl::WireServer<fhbt::Hci>::ConfigureScoCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-  void ResetSco(ResetScoCompleter::Sync& completer) override {}
-  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                          OpenIsoDataChannelCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-  void OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                        OpenSnoopChannelCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Hci> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
-    ZX_PANIC("Unknown method in Hci requests");
-  }
 
   // fhbt::HciTransport request handler implementations:
   void Send(SendRequest& request, SendCompleter::Sync& completer) override {
@@ -177,7 +142,6 @@ class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
   std::optional<std::vector<uint8_t>> customized_reply_;
 
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_binding_group_;
-  fidl::ServerBindingGroup<fhbt::Hci> hci_binding_group_;
   fidl::ServerBindingGroup<fhbt::HciTransport> hci_transport_binding_group_;
   fidl::ServerBindingGroup<fhbt::Snoop> snoop_binding_group_;
 };
@@ -280,19 +244,19 @@ class BtHciBroadcomTest : public ::testing::Test {
     EXPECT_TRUE(features.value().acl_priority_command());
   }
 
-  void OpenVendorWithHciClient() {
+  void OpenVendorWithHciTransportClient() {
     // Connect to Vendor protocol through devfs, get the channel handle from node server.
     zx::result connect_result = driver_test().ConnectThroughDevfs<fhbt::Vendor>("bt-hci-broadcom");
     ASSERT_EQ(ZX_OK, connect_result.status_value());
 
-    fidl::ClientEnd<fhbt::Hci> hci_end(connect_result.value().TakeChannel());
-    hci_client_.Bind(std::move(hci_end));
+    fidl::ClientEnd<fhbt::HciTransport> hci_transport_end(connect_result.value().TakeChannel());
+    hci_transport_client_.Bind(std::move(hci_transport_end));
   }
 
   fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
 
   fidl::WireSyncClient<fhbt::Vendor> vendor_client_;
-  fidl::WireSyncClient<fhbt::Hci> hci_client_;
+  fidl::WireSyncClient<fhbt::HciTransport> hci_transport_client_;
 };
 
 class BtHciBroadcomInitializedTest : public BtHciBroadcomTest {
@@ -386,9 +350,12 @@ TEST_F(BtHciBroadcomTest, VendorProtocolUnknownMethod) {
   SetMetadata();
   ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  OpenVendorWithHciClient();
+  OpenVendorWithHciTransportClient();
 
-  auto result = hci_client_->ResetSco();
+  fidl::Arena arena;
+  std::vector<uint8_t> packet = {1};
+  auto packet_view = fidl::VectorView<uint8_t>::FromExternal(packet);
+  auto result = hci_transport_client_->Send(fhbt::wire::SentPacket::WithAcl(arena, packet_view));
 
   ASSERT_EQ(result.status(), ZX_ERR_NOT_SUPPORTED);
 }
