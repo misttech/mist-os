@@ -357,7 +357,7 @@ pub enum Type {
     Vector { ty: Box<Type>, nullable: bool, element_count: Option<usize> },
     String { nullable: bool, byte_count: Option<usize> },
     Handle { object_type: fidl::ObjectType, rights: fidl::Rights, nullable: bool },
-    Request { identifier: String, rights: fidl::Rights, nullable: bool },
+    Endpoint { role: EndpointRole, protocol: String, rights: fidl::Rights, nullable: bool },
 }
 
 impl Type {
@@ -367,7 +367,7 @@ impl Type {
         match self {
             Bool | U8 | I8 => Ok(1),
             U16 | I16 => Ok(2),
-            FrameworkError | U32 | I32 | F32 | Handle { .. } | Request { .. } => Ok(4),
+            FrameworkError | U32 | I32 | F32 | Handle { .. } | Endpoint { .. } => Ok(4),
             U64 | I64 | F64 => Ok(8),
             Vector { .. } | String { .. } => Ok(16),
             Array(a, b) => Ok(a.inline_size(ns)? * b),
@@ -377,7 +377,10 @@ impl Type {
                 LookupResult::Struct(s) => Ok(if *nullable { 8 } else { s.size }),
                 LookupResult::Table(_) => Ok(16),
                 LookupResult::Union(_) => Ok(16),
-                LookupResult::Protocol(_) => Ok(4),
+                LookupResult::Protocol(_) => Err(Error::LibraryError(format!(
+                    "Protocol names cannot be used as identifiers: {}",
+                    name
+                ))),
             },
             Unknown(_) | UnknownString(_) => {
                 Err(Error::LibraryError("Cannot get size for unknown type.".to_owned()))
@@ -396,7 +399,8 @@ impl Type {
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct TypeInfo {
-    pub kind: String,
+    #[serde(rename = "kind_v2")]
+    pub kind: TypeKind,
     #[serde(default)]
     #[serde(rename = "obj_type")]
     #[serde(deserialize_with = "object_type")]
@@ -405,6 +409,8 @@ pub struct TypeInfo {
     #[serde(deserialize_with = "rights")]
     pub rights: Option<fidl::Rights>,
     pub identifier: Option<String>,
+    pub protocol: Option<String>,
+    pub role: Option<EndpointRole>,
     pub subtype: Option<String>,
     pub element_type: Box<Option<TypeInfo>>,
     pub element_count: Option<usize>,
@@ -413,74 +419,100 @@ pub struct TypeInfo {
     pub nullable: bool,
 }
 
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum TypeKind {
+    Primitive,
+    Vector,
+    Array,
+    Handle,
+    Identifier,
+    String,
+    Endpoint,
+    Internal,
+
+    #[serde(untagged)]
+    Unknown(String),
+}
+
+#[derive(Clone, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum EndpointRole {
+    Client,
+    Server,
+}
+
 impl From<TypeInfo> for Type {
     fn from(info: TypeInfo) -> Type {
         let nullable = info.nullable;
 
-        if info.kind == "primitive" {
-            let subtype = if let Some(x) = info.subtype.clone() {
-                x
-            } else {
-                return Type::Unknown(info);
-            };
-            match subtype.into() {
-                Type::UnknownString(_) => Type::Unknown(info),
-                ty @ _ => ty,
+        match info.kind {
+            TypeKind::Primitive => {
+                let subtype = if let Some(x) = info.subtype.clone() {
+                    x
+                } else {
+                    return Type::Unknown(info);
+                };
+                match subtype.into() {
+                    Type::UnknownString(_) => Type::Unknown(info),
+                    ty @ _ => ty,
+                }
             }
-        } else if info.kind == "vector" {
-            match *info.element_type {
+            TypeKind::Vector => match *info.element_type {
                 Some(t) => Type::Vector {
                     ty: Box::new(t.into()),
                     nullable,
                     element_count: info.maybe_element_count,
                 },
                 _ => Type::Unknown(info),
-            }
-        } else if info.kind == "array" {
-            if info.element_type.is_some() && info.element_count.is_some() {
-                Type::Array(
-                    Box::new(info.element_type.unwrap().into()),
-                    info.element_count.unwrap(),
-                )
-            } else {
-                Type::Unknown(info)
-            }
-        } else if info.kind == "handle" {
-            if let Some(object_type) = info.object_type {
-                Type::Handle {
-                    object_type,
-                    rights: info.rights.unwrap_or(fidl::Rights::SAME_RIGHTS),
-                    nullable,
+            },
+            TypeKind::Array => {
+                if info.element_type.is_some() && info.element_count.is_some() {
+                    Type::Array(
+                        Box::new(info.element_type.unwrap().into()),
+                        info.element_count.unwrap(),
+                    )
+                } else {
+                    Type::Unknown(info)
                 }
-            } else {
-                Type::Unknown(info)
             }
-        } else if info.kind == "identifier" {
-            if let Some(identifier) = info.identifier {
-                Type::Identifier { name: identifier, nullable }
-            } else {
-                Type::Unknown(info)
+            TypeKind::Handle => {
+                if let Some(object_type) = info.object_type {
+                    Type::Handle {
+                        object_type,
+                        rights: info.rights.unwrap_or(fidl::Rights::SAME_RIGHTS),
+                        nullable,
+                    }
+                } else {
+                    Type::Unknown(info)
+                }
             }
-        } else if info.kind == "string" {
-            Type::String { nullable, byte_count: info.maybe_element_count }
-        } else if info.kind == "request" {
-            if let Some(identifier) = info.subtype.clone() {
-                Type::Request {
-                    identifier,
+            TypeKind::Identifier => {
+                if let Some(identifier) = info.identifier {
+                    Type::Identifier { name: identifier, nullable }
+                } else {
+                    Type::Unknown(info)
+                }
+            }
+            TypeKind::String => Type::String { nullable, byte_count: info.maybe_element_count },
+            TypeKind::Endpoint => {
+                let Some(role) = info.role.clone() else { return Type::Unknown(info) };
+                let Some(protocol) = info.protocol.clone() else { return Type::Unknown(info) };
+                Type::Endpoint {
+                    role,
+                    protocol,
                     rights: info.rights.unwrap_or(fidl::Rights::CHANNEL_DEFAULT),
                     nullable: info.nullable,
                 }
-            } else {
-                Type::Unknown(info)
             }
-        } else if info.kind == "internal" {
-            if info.subtype.as_deref() == Some("framework_error") {
-                Type::FrameworkError
-            } else {
-                Type::Unknown(info)
+            TypeKind::Internal => {
+                if info.subtype.as_deref() == Some("framework_error") {
+                    Type::FrameworkError
+                } else {
+                    Type::Unknown(info)
+                }
             }
-        } else {
-            Type::Unknown(info)
+            TypeKind::Unknown(_) => Type::Unknown(info),
         }
     }
 }
