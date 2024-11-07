@@ -8,14 +8,13 @@
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/mistos/util/default_construct.h>
 #include <lib/unittest/unittest.h>
 #include <zircon/assert.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
 #include <ktl/span.h>
-
-#include "lib/mistos/util/default_construct.h"
 
 namespace unit_testing {
 

@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_BUFFERS_IO_BUFFERS_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_BUFFERS_IO_BUFFERS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_BUFFERS_IO_BUFFERS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_BUFFERS_IO_BUFFERS_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
@@ -222,9 +222,7 @@ class InputBuffer : public Buffer {
   ///
   /// In case of success, always returns `buffer.len()`.
   virtual fit::result<Errno, size_t> read_exact(ktl::span<uint8_t>& buffer) {
-    auto result = read(buffer);
-    if (result.is_error())
-      return result.take_error();
+    auto result = read(buffer) _EP(result);
     auto size = result.value();
     if (size != buffer.size()) {
       return fit::error(errno(EINVAL));
@@ -233,10 +231,20 @@ class InputBuffer : public Buffer {
   }
 
   // C++
-  ~InputBuffer() override = default;
+  virtual ~InputBuffer() override = default;
 };
 
-class InputBufferExt : public InputBuffer {};
+class InputBufferExt : public InputBuffer {
+ public:
+  /// Reads up to `limit` bytes into a returned `Vec`.
+  virtual fit::result<Errno, fbl::Vector<uint8_t>> read_to_vec_limited(size_t limit) {
+    return read_to_vec<Errno, uint8_t>(
+        limit, [&](ktl::span<uint8_t>& buf) -> fit::result<Errno, NumberOfElementsRead> {
+          auto result = this->read(buf) _EP(result);
+          return fit::ok(NumberOfElementsRead(result.value()));
+        });
+  }
+};
 
 /// An OutputBuffer that write data to user space memory through a `TaskMemoryAccessor`.
 template <typename M>
@@ -416,7 +424,14 @@ class UserBuffersOutputBuffer : public OutputBuffer {
 /// An InputBuffer that read data from user space memory through a `TaskMemoryAccessor`.
 template <typename M>
 class UserBuffersInputBuffer : public InputBuffer {
+ private:
+  const M* mm_;
+  UserBuffers buffers_;
+  size_t available_;
+  size_t bytes_read_;
+
  public:
+  // impl<'a, M: TaskMemoryAccessor> UserBuffersInputBuffer<'a, M>
   static fit::result<Errno, UserBuffersInputBuffer> new_inner(const M* mm, UserBuffers buffers) {
     auto available = UserBuffer::cap_buffers_to_max_rw_count(mm->maximum_valid_address(), buffers);
     if (available.is_error()) {
@@ -453,6 +468,7 @@ class UserBuffersInputBuffer : public InputBuffer {
     return fit::ok(read);
   }
 
+  // impl<'a> UserBuffersInputBuffer<'a, CurrentTask>
   static fit::result<Errno, UserBuffersInputBuffer> unified_new(const CurrentTask& mm,
                                                                 UserBuffers buffers) {
     return new_inner(&static_cast<const TaskMemoryAccessor&>(mm), ktl::move(buffers));
@@ -466,12 +482,15 @@ class UserBuffersInputBuffer : public InputBuffer {
     return unified_new(mm, ktl::move(input_iovec));
   }
 
+  // impl<'a> UserBuffersInputBuffer<'a, Task>
+
   // impl Buffer
   fit::result<Errno, size_t> segments_count() const final {
     return fit::ok(ktl::count_if(buffers_.begin(), buffers_.end(),
                                  [](const UserBuffer& b) { return b.is_null(); }));
   }
 
+  // impl<'a, M: TaskMemoryAccessor> Buffer for UserBuffersInputBuffer<'a, M>
   fit::result<Errno> peek_each_segment(PeekBufferSegmentsCallback callback) final {
     // This `UserBuffersInputBuffer` made sure that each segment only pointed
     // to valid user-space address ranges on creation so each `buffer` is
@@ -486,7 +505,7 @@ class UserBuffersInputBuffer : public InputBuffer {
     return fit::ok();
   }
 
-  // impl InputBuffer
+  // impl<'a, M: TaskMemoryAccessor> InputBuffer for UserBuffersInputBuffer<'a, M>
   fit::result<Errno, size_t> peek(ktl::span<uint8_t>& uninit_bytes) final {
     return peek_each_inner(
         [&](UserBuffer& buffer, size_t read_so_far) -> fit::result<Errno, size_t> {
@@ -562,11 +581,6 @@ class UserBuffersInputBuffer : public InputBuffer {
   explicit UserBuffersInputBuffer(const M* mm, UserBuffers buffers, size_t available,
                                   size_t bytes_read)
       : mm_(mm), buffers_(ktl::move(buffers)), available_(available), bytes_read_(bytes_read) {}
-
-  const M* mm_;
-  UserBuffers buffers_;
-  size_t available_;
-  size_t bytes_read_;
 };
 
 /// An OutputBuffer that write data to an internal buffer.
@@ -749,4 +763,4 @@ class VecInputBuffer : public InputBuffer {
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_BUFFERS_IO_BUFFERS_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_BUFFERS_IO_BUFFERS_H_
