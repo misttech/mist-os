@@ -165,7 +165,7 @@ impl ScopeRef {
     }
 
     /// Creates a [`WeakScopeRef`] for this scope.
-    pub fn downgrade(&self) -> WeakScopeRef {
+    fn downgrade(&self) -> WeakScopeRef {
         WeakScopeRef { inner: Arc::downgrade(&self.inner) }
     }
 
@@ -201,7 +201,7 @@ impl fmt::Debug for ScopeRef {
 
 /// A weak reference to a scope.
 #[derive(Clone)]
-pub struct WeakScopeRef {
+struct WeakScopeRef {
     inner: Weak<ScopeInner>,
 }
 

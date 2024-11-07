@@ -16,6 +16,7 @@ use std::collections::hash_set;
 use std::future::{Future, IntoFuture};
 use std::mem::{self, ManuallyDrop};
 use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 use std::{fmt, hash};
@@ -43,7 +44,7 @@ use std::{fmt, hash};
 /// tasks that run in the background and reasoning about their side effects.
 ///
 /// [sc]: https://en.wikipedia.org/wiki/Structured_concurrency
-#[must_use]
+#[must_use = "Scopes should be explicitly awaited or cancelled"]
 pub struct Scope {
     // LINT.IfChange
     inner: ScopeRef,
@@ -87,8 +88,9 @@ impl Scope {
     /// it eliminates the possibility of a task poll completing on another
     /// thread after the scope object has been dropped, which can sometimes
     /// result in surprising behavior.
-    pub fn cancel(self) -> Join {
-        Join::new(self).cancel()
+    pub fn cancel(self) -> impl Future<Output = ()> {
+        self.inner.cancel_all_tasks();
+        Join::new(self)
     }
 
     /// Detach the scope, allowing its tasks to continue running in the
@@ -121,6 +123,23 @@ impl Drop for Scope {
     }
 }
 
+impl IntoFuture for Scope {
+    type Output = ();
+
+    type IntoFuture = Join;
+
+    fn into_future(self) -> Self::IntoFuture {
+        self.join()
+    }
+}
+
+impl Deref for Scope {
+    type Target = ScopeRef;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
 pin_project! {
     /// Join handle for a [`Scope`].
     ///
@@ -149,17 +168,9 @@ impl Join {
     /// polling.
     ///
     /// See [`Scope::cancel`] for more details.
-    pub fn cancel(self) -> Self {
+    pub fn cancel(self: Pin<&mut Self>) -> impl Future<Output = ()> + '_ {
         self.scope.inner.cancel_all_tasks();
         self
-    }
-
-    /// Detach the scope, allowing its tasks to continue running in the
-    /// background.
-    ///
-    /// See [`Scope::detach`] for more details.
-    pub fn detach(self) {
-        self.scope.detach();
     }
 }
 
@@ -179,24 +190,17 @@ impl Future for Join {
     }
 }
 
-impl IntoFuture for Scope {
-    type Output = ();
-
-    type IntoFuture = Join;
-
-    fn into_future(self) -> Self::IntoFuture {
-        self.join()
-    }
-}
-
-impl Deref for Scope {
-    type Target = ScopeRef;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
 /// A reference to a scope, which may be used to spawn tasks.
+///
+/// ## Ownership and cycles
+///
+/// Tasks running on a `Scope` may hold a `ScopeRef` to that scope. This does
+/// not create an ownership cycle because the task will drop the `ScopeRef`
+/// once it completes or is cancelled.
+///
+/// Naturally, scopes containing tasks that never complete and that are never
+/// cancelled will never be freed. Holding a `ScopeRef` does not contribute to
+/// this problem.
 #[derive(Clone)]
 pub struct ScopeRef {
     // LINT.IfChange
@@ -265,11 +269,6 @@ impl ScopeRef {
         Scope { inner: child }
     }
 
-    /// Create a [`WeakScopeRef`] for this scope.
-    pub fn downgrade(&self) -> WeakScopeRef {
-        WeakScopeRef { inner: Arc::downgrade(&self.inner) }
-    }
-
     /// Wait for there to be no tasks. This is racy: as soon as this returns it is possible for
     /// another task to have been spawned on this scope.
     pub async fn on_no_tasks(&self) {
@@ -291,9 +290,13 @@ impl fmt::Debug for ScopeRef {
     }
 }
 
+//
+// # Internal API
+//
+
 /// A weak reference to a scope.
 #[derive(Clone)]
-pub struct WeakScopeRef {
+struct WeakScopeRef {
     inner: Weak<ScopeInner>,
 }
 
@@ -320,10 +323,6 @@ impl Eq for WeakScopeRef {
     // Weak::ptr_eq should return consistent results, even when the inner value
     // has been dropped.
 }
-
-//
-// # Internal API
-//
 
 // This module exists as a privacy boundary so that we can make sure any
 // operation that might cause the scope to finish also wakes its waker.
@@ -601,6 +600,10 @@ impl Drop for ScopeInner {
 impl ScopeRef {
     fn lock(&self) -> ConditionGuard<'_, ScopeState> {
         self.inner.state.lock()
+    }
+
+    fn downgrade(&self) -> WeakScopeRef {
+        WeakScopeRef { inner: Arc::downgrade(&self.inner) }
     }
 
     #[inline(always)]
@@ -1168,6 +1171,27 @@ mod tests {
         let mut join = pin!(scope.join());
         assert_eq!(executor.run_until_stalled(&mut join), Poll::Ready(()));
         assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(1));
+    }
+
+    #[test]
+    fn cancel_completes_while_task_holds_scope_ref() {
+        let mut executor = TestExecutor::new();
+        let scope = executor.root_scope().new_child();
+        let scope_ref = scope.make_ref();
+        let mut task = scope.compute(async move {
+            loop {
+                pending::<()>().await; // never returns
+                scope_ref.spawn(async {});
+            }
+        });
+
+        // Join should not complete because the task never does.
+        let mut join = pin!(scope.join());
+        assert_eq!(executor.run_until_stalled(&mut join), Poll::Pending);
+
+        let mut cancel = pin!(join.cancel());
+        assert_eq!(executor.run_until_stalled(&mut cancel), Poll::Ready(()));
+        assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
     }
 
     #[test]

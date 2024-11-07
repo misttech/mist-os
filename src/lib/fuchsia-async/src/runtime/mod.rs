@@ -40,13 +40,13 @@ pub use self::fuchsia::{
 ///
 /// See the [`Scope`] documentation for details.
 pub mod scope {
-    pub use super::implementation::scope::{Scope, ScopeRef, WeakScopeRef};
+    pub use super::implementation::scope::{Scope, ScopeRef};
 
     #[cfg(target_os = "fuchsia")]
     pub use super::implementation::scope::Join;
 }
 
-pub use scope::Scope;
+pub use scope::{Scope, ScopeRef};
 
 use futures::prelude::*;
 use pin_project_lite::pin_project;
