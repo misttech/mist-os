@@ -53,12 +53,14 @@ typedef zx_status_t (*fdio_open_local_func_t)(zxio_storage_t*, void*, zxio_ops_t
 zx_status_t fdio_ns_bind_local(fdio_ns_t* ns, const char* path, fdio_open_local_func_t on_open,
                                void* context) ZX_AVAILABLE_SINCE(10);
 
-// Create a new directory within a namespace, bound to the directory-protocol-compatible handle h
+// Create a new directory within a namespace, bound to the directory-protocol-compatible handle
+// `remote`.
 //
 // The path must be an absolute path like "/x/y/z". It is relative to the root
 // of the namespace.
 //
-// Ownership of `h` is transferred to `ns`: it is closed on error.
+// Ownership of `remote` is transferred to `ns` except on path-related errors: it is closed on
+// bind-related errors.
 //
 // # Errors
 //
@@ -71,7 +73,7 @@ zx_status_t fdio_ns_bind_local(fdio_ns_t* ns, const char* path, fdio_open_local_
 //   * `ZX_ERR_INVALID_ARGS`: `path` is null or is not an absolute path.
 //
 //   * `ZX_ERR_BAD_PATH`: `path` is not a valid path.
-zx_status_t fdio_ns_bind(fdio_ns_t* ns, const char* path, zx_handle_t h) ZX_AVAILABLE_SINCE(1);
+zx_status_t fdio_ns_bind(fdio_ns_t* ns, const char* path, zx_handle_t remote) ZX_AVAILABLE_SINCE(1);
 
 // Unbinds `path` from a namespace, closing the handle within `ns` that corresponds to that path
 // when all references to the node go out of scope.

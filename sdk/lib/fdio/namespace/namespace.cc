@@ -102,7 +102,7 @@ zx_status_t fdio_ns_bind_local(fdio_ns_t* ns, const char* path, fdio_open_local_
 }
 
 __EXPORT
-zx_status_t fdio_ns_bind(fdio_ns_t* ns, const char* path, zx_handle_t remote_raw) {
+zx_status_t fdio_ns_bind(fdio_ns_t* ns, const char* path, zx_handle_t remote) {
   if (path == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -111,8 +111,7 @@ zx_status_t fdio_ns_bind(fdio_ns_t* ns, const char* path, zx_handle_t remote_raw
   if (!fdio_internal::CleanPath(path, &clean, &is_dir)) {
     return ZX_ERR_BAD_PATH;
   }
-  auto remote = fidl::ClientEnd<fio::Directory>(zx::channel(remote_raw));
-  return ns->Bind(clean, std::move(remote));
+  return ns->Bind(clean, fidl::ClientEnd<fio::Directory>(zx::channel(remote)));
 }
 
 __EXPORT
