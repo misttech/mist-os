@@ -496,6 +496,7 @@ impl EventLoop {
                             |fnet_interfaces_ext::Address {
                                  addr,
                                  valid_until: _,
+                                 preferred_lifetime_info: _,
                                  assignment_state,
                              }| {
                                 assert_eq!(

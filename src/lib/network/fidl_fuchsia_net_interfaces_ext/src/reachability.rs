@@ -47,6 +47,7 @@ pub fn is_globally_routable(
         |Address {
              addr: fnet::Subnet { addr, prefix_len: _ },
              valid_until: _,
+             preferred_lifetime_info: _,
              assignment_state,
          }| {
             let assigned = match assignment_state {
@@ -150,6 +151,8 @@ pub async fn wait_for_reachability(
 mod tests {
     use super::*;
 
+    use crate::PREFERRED_FOREVER;
+
     use anyhow::Context as _;
     use futures::FutureExt as _;
     use net_declare::fidl_subnet;
@@ -172,25 +175,29 @@ mod tests {
                     addr: Some(IPV4_GLOBAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
                     assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-                    ..Default::default()
+                    preferred_lifetime_info: Some(PREFERRED_FOREVER),
+                    __source_breaking: Default::default(),
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV4_LINK_LOCAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
                     assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-                    ..Default::default()
+                    preferred_lifetime_info: Some(PREFERRED_FOREVER),
+                    __source_breaking: Default::default(),
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV6_GLOBAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
                     assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-                    ..Default::default()
+                    preferred_lifetime_info: Some(PREFERRED_FOREVER),
+                    __source_breaking: Default::default(),
                 },
                 fnet_interfaces::Address {
                     addr: Some(IPV6_LINK_LOCAL),
                     valid_until: Some(zx::ZX_TIME_INFINITE),
                     assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-                    ..Default::default()
+                    preferred_lifetime_info: Some(PREFERRED_FOREVER),
+                    __source_breaking: Default::default(),
                 },
             ]),
             has_default_ipv4_route: Some(true),
@@ -202,6 +209,14 @@ mod tests {
     #[test]
     fn test_is_globally_routable() -> Result<(), anyhow::Error> {
         const ID: u64 = 1;
+        const ASSIGNED_ADDR: Address = Address {
+            addr: IPV4_GLOBAL,
+            valid_until: zx::ZX_TIME_INFINITE,
+            preferred_lifetime_info: fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(
+                zx::ZX_TIME_INFINITE,
+            ),
+            assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
+        };
         // These combinations are not globally routable.
         assert!(!is_globally_routable(&Properties {
             port_class: PortClass::Loopback,
@@ -221,38 +236,22 @@ mod tests {
             ..valid_interface(ID).try_into()?
         }));
         assert!(!is_globally_routable(&Properties {
-            addresses: vec![Address {
-                addr: IPV4_GLOBAL,
-                valid_until: zx::ZX_TIME_INFINITE,
-                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
-            }],
+            addresses: vec![Address { addr: IPV4_GLOBAL, ..ASSIGNED_ADDR }],
             has_default_ipv4_route: false,
             ..valid_interface(ID).try_into()?
         }));
         assert!(!is_globally_routable(&Properties {
-            addresses: vec![Address {
-                addr: IPV6_GLOBAL,
-                valid_until: zx::ZX_TIME_INFINITE,
-                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
-            }],
+            addresses: vec![Address { addr: IPV6_GLOBAL, ..ASSIGNED_ADDR }],
             has_default_ipv6_route: false,
             ..valid_interface(ID).try_into()?
         }));
         assert!(!is_globally_routable(&Properties {
-            addresses: vec![Address {
-                addr: IPV6_LINK_LOCAL,
-                valid_until: zx::ZX_TIME_INFINITE,
-                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
-            }],
+            addresses: vec![Address { addr: IPV6_LINK_LOCAL, ..ASSIGNED_ADDR }],
             has_default_ipv6_route: true,
             ..valid_interface(ID).try_into()?
         }));
         assert!(!is_globally_routable(&Properties {
-            addresses: vec![Address {
-                addr: IPV4_LINK_LOCAL,
-                valid_until: zx::ZX_TIME_INFINITE,
-                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
-            }],
+            addresses: vec![Address { addr: IPV4_LINK_LOCAL, ..ASSIGNED_ADDR }],
             has_default_ipv4_route: true,
             ..valid_interface(ID).try_into()?
         }));
@@ -260,21 +259,13 @@ mod tests {
         // These combinations are globally routable.
         assert!(is_globally_routable(&valid_interface(ID).try_into()?));
         assert!(is_globally_routable(&Properties {
-            addresses: vec![Address {
-                addr: IPV4_GLOBAL,
-                valid_until: zx::ZX_TIME_INFINITE,
-                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
-            }],
+            addresses: vec![Address { addr: IPV4_GLOBAL, ..ASSIGNED_ADDR }],
             has_default_ipv4_route: true,
             has_default_ipv6_route: false,
             ..valid_interface(ID).try_into()?
         }));
         assert!(is_globally_routable(&Properties {
-            addresses: vec![Address {
-                addr: IPV6_GLOBAL,
-                valid_until: zx::ZX_TIME_INFINITE,
-                assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
-            }],
+            addresses: vec![Address { addr: IPV6_GLOBAL, ..ASSIGNED_ADDR }],
             has_default_ipv4_route: false,
             has_default_ipv6_route: true,
             ..valid_interface(ID).try_into()?

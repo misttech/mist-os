@@ -94,6 +94,7 @@ impl From<(fidl_fuchsia_net_interfaces_ext::Properties, Option<fidl_fuchsia_net:
                 |fidl_fuchsia_net_interfaces_ext::Address {
                      addr,
                      valid_until: _,
+                     preferred_lifetime_info: _,
                      assignment_state,
                  }| {
                     // Event stream is created with `IncludedAddresses::OnlyAssigned`.

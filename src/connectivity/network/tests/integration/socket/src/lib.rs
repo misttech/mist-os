@@ -1071,8 +1071,8 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &st
             iface.properties.addresses.iter().find_map(
                 |fnet_interfaces_ext::Address {
                      addr: fnet::Subnet { addr, prefix_len: _ },
-                     valid_until: _,
                      assignment_state,
+                     ..
                  }| {
                     assert_eq!(
                         *assignment_state,
@@ -1115,8 +1115,8 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation<N: Netstack>(name: &st
             (!iface.properties.addresses.iter().any(
                 |fnet_interfaces_ext::Address {
                      addr: fnet::Subnet { addr, prefix_len: _ },
-                     valid_until: _,
                      assignment_state,
+                     ..
                  }| {
                     assert_eq!(
                         *assignment_state,

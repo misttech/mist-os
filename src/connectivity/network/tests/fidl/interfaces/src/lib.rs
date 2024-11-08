@@ -60,12 +60,18 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                                 fidl_fuchsia_net_interfaces_ext::Address {
                                     addr: fidl_subnet!("127.0.0.1/8"),
                                     valid_until: zx::sys::ZX_TIME_INFINITE,
+                                    preferred_lifetime_info: fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::PreferredUntil(
+                                        zx::sys::ZX_TIME_INFINITE
+                                    ),
                                     assignment_state:
                                         fnet_interfaces::AddressAssignmentState::Assigned,
                                 },
                                 fidl_fuchsia_net_interfaces_ext::Address {
                                     addr: fidl_subnet!("::1/128"),
                                     valid_until: zx::sys::ZX_TIME_INFINITE,
+                                    preferred_lifetime_info: fidl_fuchsia_net_interfaces::PreferredLifetimeInfo::PreferredUntil(
+                                        zx::sys::ZX_TIME_INFINITE
+                                    ),
                                     assignment_state:
                                         fnet_interfaces::AddressAssignmentState::Assigned,
                                 },
@@ -96,6 +102,7 @@ async fn watcher_existing<N: Netstack>(name: &str) {
                     addresses.contains(&fidl_fuchsia_net_interfaces_ext::Address {
                         addr: *addr,
                         valid_until: zx::sys::ZX_TIME_INFINITE,
+                        preferred_lifetime_info: fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER,
                         assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                     }) && *online
                         && name == rhs_name
@@ -262,11 +269,15 @@ async fn watcher_after_state_closed<N: Netstack>(name: &str) {
                         fidl_fuchsia_net_interfaces_ext::Address {
                             addr: fidl_subnet!("127.0.0.1/8"),
                             valid_until: zx::sys::ZX_TIME_INFINITE,
+                            preferred_lifetime_info:
+                                fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER,
                             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                         },
                         fidl_fuchsia_net_interfaces_ext::Address {
                             addr: fidl_subnet!("::1/128"),
                             valid_until: zx::sys::ZX_TIME_INFINITE,
+                            preferred_lifetime_info:
+                                fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER,
                             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                         },
                     ],
@@ -378,9 +389,7 @@ async fn test_include_all_addresses<N: Netstack>(name: &str) {
                 .iter()
                 .any(
                     |fidl_fuchsia_net_interfaces_ext::Address {
-                         addr,
-                         valid_until: _,
-                         assignment_state,
+                         addr, assignment_state, ..
                      }| {
                         *addr == IPV6_ADDRESS && *assignment_state == want_assignment_state
                     },
@@ -1211,8 +1220,17 @@ async fn addresses_while_offline<N: Netstack>(
         want: fidl_fuchsia_net::Subnet,
     ) -> bool {
         addresses.into_iter().any(
-            |&fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until, assignment_state }| {
+            |&fidl_fuchsia_net_interfaces_ext::Address {
+                 addr,
+                 valid_until,
+                 assignment_state,
+                 preferred_lifetime_info,
+             }| {
                 assert_eq!(valid_until, zx::sys::ZX_TIME_INFINITE);
+                assert_eq!(
+                    preferred_lifetime_info,
+                    fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER
+                );
                 assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
                 addr == want
             },
@@ -1415,8 +1433,8 @@ async fn watcher<N: Netstack>(name: &str) {
                                 ),
                                 prefix_len: _,
                             },
-                            valid_until: _,
                             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
+                            ..
                         }
                     );
                     addr
@@ -1499,6 +1517,7 @@ async fn watcher<N: Netstack>(name: &str) {
         .chain(std::iter::once(fidl_fuchsia_net_interfaces_ext::Address {
             addr: subnet,
             valid_until: zx::sys::ZX_TIME_INFINITE,
+            preferred_lifetime_info: fidl_fuchsia_net_interfaces_ext::PREFERRED_FOREVER,
             assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
         }))
         .collect();
@@ -1657,11 +1676,7 @@ async fn test_readded_address_present<N: Netstack>(name: &str) {
         .expect("get addresses");
     assert!(
         addresses.iter().any(
-            |&fidl_fuchsia_net_interfaces_ext::Address {
-                 addr,
-                 valid_until: _,
-                 assignment_state,
-             }| {
+            |&fidl_fuchsia_net_interfaces_ext::Address { addr, assignment_state, .. }| {
                 assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
                 addr == SRC_IP
             }
@@ -1766,9 +1781,7 @@ async fn test_lifetime_change_on_hidden_addr<N: Netstack>(
                 .iter()
                 .any(
                     |fidl_fuchsia_net_interfaces_ext::Address {
-                         addr,
-                         valid_until: _,
-                         assignment_state,
+                         addr, assignment_state, ..
                      }| {
                         assert_eq!(
                             *assignment_state,

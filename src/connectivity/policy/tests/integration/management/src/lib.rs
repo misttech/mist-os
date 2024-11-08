@@ -908,8 +908,8 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
                             && addresses.iter().any(
                                 |&fidl_fuchsia_net_interfaces_ext::Address {
                                      addr: fnet::Subnet { addr, prefix_len: _ },
-                                     valid_until: _,
                                      assignment_state,
+                                     ..
                                  }| {
                                     assert_eq!(
                                         assignment_state,
@@ -1024,8 +1024,8 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
                             && addresses.iter().any(
                                 |&fidl_fuchsia_net_interfaces_ext::Address {
                                      addr: fnet::Subnet { addr, prefix_len: _ },
-                                     valid_until: _,
                                      assignment_state,
+                                     ..
                                  }| {
                                     assert_eq!(
                                         assignment_state,

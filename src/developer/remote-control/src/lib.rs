@@ -578,6 +578,7 @@ mod tests {
                                                         addr,
                                                         valid_until: Some(1),
                                                         assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
+                                                        preferred_lifetime_info: Some(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(1)),
                                                         ..Default::default()
                                                     })
                                                     .collect(),

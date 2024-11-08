@@ -145,10 +145,10 @@ impl TryFrom<fhardware_network::PortClass> for PortClass {
     }
 }
 
-// TODO(https://fxbug.dev/42144953): Prevent this type from becoming stale.
 /// Properties of a network interface.
 #[derive(Clone, Debug, Eq, PartialEq, ValidFidlTable)]
 #[fidl_table_src(fnet_interfaces::Properties)]
+#[fidl_table_strict(device_class)]
 pub struct Properties {
     /// An opaque identifier for the interface. Its value will not be reused
     /// even if the device is removed and subsequently re-added. Immutable.
@@ -167,11 +167,11 @@ pub struct Properties {
     pub port_class: PortClass,
 }
 
-// TODO(https://fxbug.dev/42144953): Prevent this type from becoming stale.
 /// An address and its properties.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ValidFidlTable)]
 #[fidl_table_src(fnet_interfaces::Address)]
 #[fidl_table_validator(AddressValidator)]
+#[fidl_table_strict]
 pub struct Address {
     /// The address and prefix length.
     pub addr: fidl_fuchsia_net::Subnet,
@@ -182,9 +182,16 @@ pub struct Address {
     // TODO(https://fxbug.dev/42155335): Replace with zx::MonotonicInstant once there is support for custom
     // conversion functions.
     pub valid_until: zx::zx_time_t,
+    /// Preferred lifetime information.
+    pub preferred_lifetime_info: fnet_interfaces::PreferredLifetimeInfo,
     /// The address's assignment state.
     pub assignment_state: fnet_interfaces::AddressAssignmentState,
 }
+
+/// A constant value for [`fnet_interfaces::PreferredLifetimeInfo`] that is an
+/// address with preference in the infinite future.
+pub const PREFERRED_FOREVER: fnet_interfaces::PreferredLifetimeInfo =
+    fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(i64::MAX);
 
 /// Helper struct implementing Address validation.
 pub struct AddressValidator;
@@ -192,10 +199,18 @@ pub struct AddressValidator;
 impl Validate<Address> for AddressValidator {
     type Error = String;
     fn validate(
-        Address { addr: _, valid_until, assignment_state: _ }: &Address,
+        Address { addr: _, valid_until, assignment_state: _, preferred_lifetime_info }: &Address,
     ) -> Result<(), Self::Error> {
         if *valid_until <= 0 {
             return Err(format!("non-positive value for valid_until={}", *valid_until));
+        }
+        match preferred_lifetime_info {
+            fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(v) => {
+                if *v <= 0 {
+                    return Err(format!("non-positive value for preferred_lifetime_info={}", *v));
+                }
+            }
+            fnet_interfaces::PreferredLifetimeInfo::Deprecated(_) => (),
         }
         Ok(())
     }
@@ -839,7 +854,8 @@ mod tests {
             addr: Some(addr),
             valid_until: Some(valid_until),
             assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-            ..Default::default()
+            preferred_lifetime_info: Some(PREFERRED_FOREVER),
+            __source_breaking: Default::default(),
         }
     }
 
@@ -1089,15 +1105,23 @@ mod tests {
     #[test]
     fn test_address_validator() {
         let valid = fidl_address(ADDR, 42);
-        let fidl_fuchsia_net_interfaces::Address { addr, valid_until, assignment_state, .. } =
-            valid.clone();
+        let fidl_fuchsia_net_interfaces::Address {
+            addr,
+            valid_until,
+            assignment_state,
+            preferred_lifetime_info,
+            __source_breaking: _,
+        } = valid.clone();
         assert_eq!(
-            Address::try_from(valid).expect("failed to create address from valid fidl table"),
+            Address::try_from(valid.clone())
+                .expect("failed to create address from valid fidl table"),
             Address {
                 addr: addr.expect("addr field missing from valid address"),
                 valid_until: valid_until.expect("valid_until field missing from valid address"),
                 assignment_state: assignment_state
                     .expect("assignment_state missing from valid address"),
+                preferred_lifetime_info: preferred_lifetime_info
+                    .expect("preferred_lifetime_info missing from valid address")
             }
         );
         let invalid = fidl_address(ADDR, 0);
@@ -1105,6 +1129,18 @@ mod tests {
             Address::try_from(invalid),
             Err(AddressValidationError::Logical(e @ String { .. }))
                 if e == "non-positive value for valid_until=0"
+        );
+
+        let invalid = fnet_interfaces::Address {
+            preferred_lifetime_info: Some(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(
+                0,
+            )),
+            ..valid
+        };
+        assert_matches!(
+            Address::try_from(invalid),
+            Err(AddressValidationError::Logical(e @ String { .. }))
+                if e == "non-positive value for preferred_lifetime_info=0"
         );
     }
 }

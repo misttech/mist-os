@@ -15,6 +15,7 @@ use {
 /// Information on a neighboring device in the local network.
 #[derive(Clone, Debug, Eq, PartialEq, ValidFidlTable)]
 #[fidl_table_src(fnet_neighbor::Entry)]
+#[fidl_table_strict]
 pub struct Entry {
     /// Identifier for the interface used for communicating with the neighbor.
     pub interface: u64,
@@ -61,4 +62,5 @@ impl std::fmt::Display for Entry {
 /// Options for modifying the behavior of `EntryIterator`.
 #[derive(Clone, Debug, Eq, PartialEq, ValidFidlTable)]
 #[fidl_table_src(fnet_neighbor::EntryIteratorOptions)]
+#[fidl_table_strict]
 pub struct EntryIteratorOptions {}

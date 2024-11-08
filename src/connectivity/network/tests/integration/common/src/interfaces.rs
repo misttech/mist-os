@@ -135,6 +135,7 @@ pub async fn wait_for_v4_and_v6_ll(
              &fidl_fuchsia_net_interfaces_ext::Address {
                  addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                  valid_until: _,
+                 preferred_lifetime_info: _,
                  assignment_state,
              }| {
                 assert_eq!(
@@ -179,6 +180,7 @@ pub async fn wait_for_v6_ll(
             |&fidl_fuchsia_net_interfaces_ext::Address {
                  addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                  valid_until: _,
+                 preferred_lifetime_info: _,
                  assignment_state,
              }| {
                 assert_eq!(

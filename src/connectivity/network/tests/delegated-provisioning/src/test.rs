@@ -51,6 +51,7 @@ async fn delegated_provisioning_test() {
                                  addr: fnet::Subnet { addr, prefix_len: _ },
                                  valid_until: _,
                                  assignment_state: _,
+                                 preferred_lifetime_info: _,
                              }| match addr {
                                 fnet::IpAddress::Ipv4(addr) => addr == constants::DHCP_DYNAMIC_IP,
                                 fnet::IpAddress::Ipv6(_) => false,

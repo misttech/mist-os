@@ -655,6 +655,7 @@ fn start_dhcpv6_client(
         |&fnet_interfaces_ext::Address {
              addr: fnet::Subnet { addr, prefix_len: _ },
              valid_until: _,
+             preferred_lifetime_info: _,
              assignment_state,
          }| {
             assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
@@ -1846,6 +1847,7 @@ impl<'a> NetCfg<'a> {
                                 |&fnet_interfaces_ext::Address {
                                      addr: fnet::Subnet { addr, prefix_len: _ },
                                      valid_until: _,
+                                     preferred_lifetime_info: _,
                                      assignment_state,
                                  }| {
                                     assert_eq!(
@@ -3479,12 +3481,13 @@ mod tests {
     });
 
     fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
-        fnet_interfaces::Address {
-            addr: Some(addr),
-            valid_until: Some(zx::MonotonicInstant::INFINITE.into_nanos()),
-            assignment_state: Some(fnet_interfaces::AddressAssignmentState::Assigned),
-            ..Default::default()
+        fnet_interfaces_ext::Address {
+            addr,
+            valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+            preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
+            assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
         }
+        .into()
     }
 
     fn ipv6addrs(a: Option<fnet::Ipv6SocketAddress>) -> Vec<fnet_interfaces::Address> {

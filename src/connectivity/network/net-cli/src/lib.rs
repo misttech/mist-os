@@ -2659,6 +2659,9 @@ mod tests {
                     addr,
                     assignment_state,
                     valid_until: zx_types::ZX_TIME_INFINITE,
+                    preferred_lifetime_info: finterfaces::PreferredLifetimeInfo::PreferredUntil(
+                        zx_types::ZX_TIME_INFINITE,
+                    ),
                 })
                 .collect(),
             has_default_ipv4_route: false,
@@ -2951,6 +2954,9 @@ mac               -
                             .try_into()
                             .unwrap(),
                         assignment_state: finterfaces::AddressAssignmentState::Tentative,
+                        preferred_lifetime_info: finterfaces::PreferredLifetimeInfo::PreferredUntil(
+                            zx_types::ZX_TIME_INFINITE,
+                        ),
                     }],
                     has_default_ipv4_route: false,
                     has_default_ipv6_route: true,
@@ -2967,6 +2973,9 @@ mac               -
                         addr: fidl_subnet!("2001:db8::1/64"),
                         valid_until: i64::MAX,
                         assignment_state: finterfaces::AddressAssignmentState::Unavailable,
+                        preferred_lifetime_info: finterfaces::PreferredLifetimeInfo::PreferredUntil(
+                            zx_types::ZX_TIME_INFINITE,
+                        ),
                     }],
                     has_default_ipv4_route: true,
                     has_default_ipv6_route: true,
@@ -3002,23 +3011,7 @@ mac               -
                             port_class: Some(port_class.into()),
                             online: Some(online),
                             addresses: Some(
-                                addresses
-                                    .into_iter()
-                                    .map(
-                                        |finterfaces_ext::Address {
-                                             addr,
-                                             valid_until,
-                                             assignment_state,
-                                         }| {
-                                            finterfaces::Address {
-                                                addr: Some(addr),
-                                                valid_until: Some(valid_until),
-                                                assignment_state: Some(assignment_state),
-                                                ..Default::default()
-                                            }
-                                        },
-                                    )
-                                    .collect(),
+                                addresses.into_iter().map(finterfaces::Address::from).collect(),
                             ),
                             has_default_ipv4_route: Some(has_default_ipv4_route),
                             has_default_ipv6_route: Some(has_default_ipv6_route),

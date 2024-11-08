@@ -1366,6 +1366,7 @@ fn interface_properties_to_address_messages(
             |fnet_interfaces_ext::Address {
                  addr: fnet::Subnet { addr, prefix_len },
                  valid_until: _,
+                 preferred_lifetime_info: _,
                  assignment_state,
              }| {
                 let mut addr_header = AddressHeader::default();
@@ -1722,12 +1723,13 @@ pub(crate) mod testutil {
         addr: fnet::Subnet,
         assignment_state: fnet_interfaces::AddressAssignmentState,
     ) -> fnet_interfaces::Address {
-        fnet_interfaces::Address {
-            addr: Some(addr),
-            valid_until: Some(zx::sys::ZX_TIME_INFINITE),
-            assignment_state: Some(assignment_state),
-            ..Default::default()
+        fnet_interfaces_ext::Address {
+            addr,
+            valid_until: zx::sys::ZX_TIME_INFINITE,
+            preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
+            assignment_state,
         }
+        .into()
     }
 
     pub(crate) fn test_addr(addr: fnet::Subnet) -> fnet_interfaces::Address {
@@ -1786,13 +1788,15 @@ mod tests {
         let addresses = vec![
             fnet_interfaces_ext::Address {
                 addr: TEST_V4_ADDR,
-                valid_until: Default::default(),
+                valid_until: i64::MAX,
                 assignment_state: AddressAssignmentState::Assigned,
+                preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
             },
             fnet_interfaces_ext::Address {
                 addr: TEST_V6_ADDR,
-                valid_until: Default::default(),
+                valid_until: i64::MAX,
                 assignment_state: AddressAssignmentState::Assigned,
+                preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
             },
         ];
         create_interface(id, name, port_class, online, addresses)
@@ -1857,23 +1861,7 @@ mod tests {
                 port_class: Some(port_class.into()),
                 online: Some(online),
                 addresses: Some(
-                    addresses
-                        .into_iter()
-                        .map(
-                            |fnet_interfaces_ext::Address {
-                                 addr,
-                                 valid_until,
-                                 assignment_state,
-                             }| {
-                                fnet_interfaces::Address {
-                                    addr: Some(addr),
-                                    valid_until: Some(valid_until),
-                                    assignment_state: Some(assignment_state),
-                                    ..Default::default()
-                                }
-                            },
-                        )
-                        .collect(),
+                    addresses.into_iter().map(fnet_interfaces::Address::from).collect(),
                 ),
                 has_default_ipv4_route: Some(has_default_ipv4_route),
                 has_default_ipv6_route: Some(has_default_ipv6_route),

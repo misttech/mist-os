@@ -183,8 +183,8 @@ async fn assert_client_acquires_addr<D: DhcpClient>(
                     if iface.properties.addresses.iter().any(
                         |&fidl_fuchsia_net_interfaces_ext::Address {
                              addr,
-                             valid_until: _,
                              assignment_state,
+                             ..
                          }| {
                             assert_eq!(
                                 assignment_state,
@@ -225,6 +225,7 @@ async fn assert_interface_assigned_addr(
                      addr: subnet,
                      valid_until,
                      assignment_state,
+                     preferred_lifetime_info: _,
                  }| {
                     assert_eq!(
                         assignment_state,

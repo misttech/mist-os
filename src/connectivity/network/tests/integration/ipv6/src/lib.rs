@@ -114,6 +114,7 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
                     |fidl_fuchsia_net_interfaces_ext::Address {
                          addr,
                          valid_until: _,
+                         preferred_lifetime_info: _,
                          assignment_state,
                      }| {
                         assert_eq!(
@@ -382,6 +383,7 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
                          addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                          valid_until: _,
+                         preferred_lifetime_info: _,
                          assignment_state,
                      }| {
                         assert_eq!(
@@ -481,6 +483,7 @@ async fn add_address_for_dad<
             |fidl_fuchsia_net_interfaces_ext::Address {
                  addr: fidl_fuchsia_net::Subnet { addr, prefix_len },
                  valid_until: _,
+                 preferred_lifetime_info: _,
                  assignment_state,
              }| {
                 assert_eq!(
@@ -617,6 +620,7 @@ async fn duplicate_address_detection<N: Netstack>(name: &str) {
             |&fidl_fuchsia_net_interfaces_ext::Address {
                  addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                  valid_until: _,
+                 preferred_lifetime_info: _,
                  assignment_state,
              }| {
                 assert_eq!(
@@ -996,6 +1000,7 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
                  &fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                      valid_until: _,
+                     preferred_lifetime_info: _,
                      assignment_state,
                  }| {
                     assert_eq!(
@@ -1338,6 +1343,7 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac<N: Netstack>(name: &str) {
                 |fidl_fuchsia_net_interfaces_ext::Address {
                      addr: fidl_fuchsia_net::Subnet { addr, prefix_len: _ },
                      valid_until: _,
+                     preferred_lifetime_info: _,
                      assignment_state,
                  }| {
                     assert_eq!(

@@ -1756,11 +1756,8 @@ impl<'a> TestInterface<'a> {
     ) -> Result<Vec<fnet_interfaces_ext::Address>> {
         let mut result = Vec::new();
         for address in self.get_addrs(fnet_interfaces_ext::IncludedAddresses::All).await? {
-            let fnet_interfaces_ext::Address {
-                addr: fnet::Subnet { addr, prefix_len },
-                valid_until: _,
-                assignment_state: _,
-            } = &address;
+            let fnet_interfaces_ext::Address { addr: fnet::Subnet { addr, prefix_len }, .. } =
+                &address;
             match addr {
                 fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address { addr: _ }) => {
                     continue

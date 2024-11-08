@@ -2578,11 +2578,13 @@ mod tests {
                 fnet_interfaces_ext::Address {
                     addr: fidl_subnet!("1.2.3.0/24"),
                     valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                    preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
                     assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                 },
                 fnet_interfaces_ext::Address {
                     addr: fidl_subnet!("123::4/64"),
                     valid_until: zx::MonotonicInstant::INFINITE.into_nanos(),
+                    preferred_lifetime_info: fnet_interfaces_ext::PREFERRED_FOREVER,
                     assignment_state: fnet_interfaces::AddressAssignmentState::Assigned,
                 },
             ],

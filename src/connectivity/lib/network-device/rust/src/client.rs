@@ -130,6 +130,7 @@ impl Client {
 /// Network device base info with all required fields.
 #[derive(Debug, Clone, ValidFidlTable)]
 #[fidl_table_src(netdev::PortBaseInfo)]
+#[fidl_table_strict]
 pub struct PortBaseInfo {
     /// Port's class.
     pub port_class: netdev::PortClass,
@@ -142,6 +143,7 @@ pub struct PortBaseInfo {
 /// Network device information with all required fields.
 #[derive(Debug, Clone, ValidFidlTable)]
 #[fidl_table_src(netdev::PortInfo)]
+#[fidl_table_strict]
 pub struct PortInfo {
     /// Port's identifier.
     pub id: Port,
@@ -152,6 +154,7 @@ pub struct PortInfo {
 /// Dynamic port information with all required fields.
 #[derive(Debug, Clone, PartialEq, Eq, ValidFidlTable)]
 #[fidl_table_src(netdev::PortStatus)]
+#[fidl_table_strict]
 pub struct PortStatus {
     /// Port status flags.
     pub flags: netdev::StatusFlags,

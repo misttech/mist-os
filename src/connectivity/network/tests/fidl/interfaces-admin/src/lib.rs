@@ -177,22 +177,26 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
             Item = Result<fidl_fuchsia_net_interfaces::Event, fidl::Error>,
         >,
         if_state: &mut fidl_fuchsia_net_interfaces_ext::InterfaceState<()>,
-        valid_until: zx::sys::zx_time_t,
+        want_valid_until: zx::sys::zx_time_t,
     ) -> Result<(), anyhow::Error> {
         fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
             event_stream,
             if_state,
             move |iface| {
-                iface
-                    .properties
-                    .addresses
-                    .contains(&fidl_fuchsia_net_interfaces_ext::Address {
-                        addr: ADDR,
-                        valid_until,
-                        assignment_state:
-                            fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned,
-                    })
-                    .then_some(())
+                iface.properties.addresses.iter().find_map(
+                    |fidl_fuchsia_net_interfaces_ext::Address {
+                         addr,
+                         valid_until,
+                         assignment_state,
+                         preferred_lifetime_info: _,
+                     }| {
+                        (*addr == ADDR
+                            && *valid_until == want_valid_until
+                            && *assignment_state
+                                == fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned)
+                            .then_some(())
+                    },
+                )
             },
         )
         .await
@@ -341,11 +345,9 @@ async fn add_address_sets_correct_valid_until<N: Netstack>(name: &str) {
              state: (),
          }| {
             addresses.iter().find_map(
-                |fidl_fuchsia_net_interfaces_ext::Address {
-                     addr,
-                     valid_until,
-                     assignment_state: _,
-                 }| { (*addr == ADDR).then_some(*valid_until) },
+                |fidl_fuchsia_net_interfaces_ext::Address { addr, valid_until, .. }| {
+                    (*addr == ADDR).then_some(*valid_until)
+                },
             )
         },
     )
@@ -387,6 +389,7 @@ async fn add_address_errors<N: Netstack>(name: &str) {
     let (control, v4_addr, v6_addr) = futures::stream::iter(addresses).fold((control, None, None), |(control, v4, v6), fidl_fuchsia_net_interfaces_ext::Address {
         addr,
         valid_until: _,
+        preferred_lifetime_info: _,
         assignment_state,
     }| {
         assert_eq!(assignment_state, fnet_interfaces::AddressAssignmentState::Assigned);
@@ -1053,6 +1056,7 @@ async fn add_address_and_remove<N: Netstack>(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
                          addr,
                          valid_until: _,
+                         preferred_lifetime_info: _,
                          assignment_state,
                      }| {
                         assert_eq!(
@@ -1085,6 +1089,7 @@ async fn add_address_and_remove<N: Netstack>(
                             |&fidl_fuchsia_net_interfaces_ext::Address {
                                  addr,
                                  valid_until: _,
+                                 preferred_lifetime_info: _,
                                  assignment_state,
                              }| {
                                 assert_eq!(
@@ -1148,11 +1153,7 @@ async fn add_address_and_remove<N: Netstack>(
          }| {
             addresses
                 .iter()
-                .all(
-                    |fnet_interfaces_ext::Address { addr, valid_until: _, assignment_state: _ }| {
-                        addr != &subnet
-                    },
-                )
+                .all(|fnet_interfaces_ext::Address { addr, .. }| addr != &subnet)
                 .then_some(())
         },
     )
@@ -1248,6 +1249,7 @@ async fn add_address_and_detach<N: Netstack>(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
                          addr,
                          valid_until: _,
+                         preferred_lifetime_info: _,
                          assignment_state,
                      }| {
                         assert_eq!(
@@ -1357,8 +1359,7 @@ async fn remove_slaac_address<N: Netstack>(name: &str) {
             addresses.iter().find_map(
                 |&fnet_interfaces_ext::Address {
                      addr: subnet @ fnet::Subnet { addr, prefix_len: _ },
-                     valid_until: _,
-                     assignment_state: _,
+                     ..
                  }| {
                     match addr {
                         fnet::IpAddress::Ipv4(_) => None,
@@ -2561,6 +2562,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
                          addr,
                          valid_until: got_valid_until,
                          assignment_state,
+                         preferred_lifetime_info: _,
                      }| {
                         assert_eq!(
                             assignment_state,
@@ -2607,9 +2609,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
                 .iter()
                 .all(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
-                         addr,
-                         valid_until: _,
-                         assignment_state,
+                         addr, assignment_state, ..
                      }| {
                         assert_eq!(
                             assignment_state,
@@ -2644,9 +2644,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
                 .iter()
                 .all(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
-                         addr,
-                         valid_until: _,
-                         assignment_state,
+                         addr, assignment_state, ..
                      }| {
                         assert_eq!(
                             assignment_state,
@@ -2676,9 +2674,7 @@ async fn control_add_remove_address<N: Netstack>(name: &str) {
                 .iter()
                 .all(
                     |&fidl_fuchsia_net_interfaces_ext::Address {
-                         addr,
-                         valid_until: _,
-                         assignment_state,
+                         addr, assignment_state, ..
                      }| {
                         assert_eq!(
                             assignment_state,
@@ -3738,8 +3734,8 @@ async fn temporary_address_generation<N: Netstack>(name: &str) {
                 |(prefix1_count, prefix2_assigned_count),
                  &fnet_interfaces_ext::Address {
                      addr: fnet::Subnet { addr, prefix_len: _ },
-                     valid_until: _,
                      assignment_state,
+                     ..
                  }| {
                     match addr {
                         fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => {}
@@ -3786,8 +3782,7 @@ async fn temporary_address_generation<N: Netstack>(name: &str) {
                 .filter_map(
                     |&fnet_interfaces_ext::Address {
                          addr: fnet::Subnet { addr, prefix_len: _ },
-                         valid_until: _,
-                         assignment_state: _,
+                         ..
                      }| {
                         match addr {
                             fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => None,
