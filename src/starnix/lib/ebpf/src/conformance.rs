@@ -879,13 +879,7 @@ pub mod test {
             let buffer_size = memory.len() as u64;
             builder.set_packet_memory_id(memory_id.clone());
             builder.set_args(&[
-                Type::PtrToMemory {
-                    id: memory_id,
-                    offset: 0,
-                    buffer_size,
-                    fields: Default::default(),
-                    mappings: Default::default(),
-                },
+                Type::PtrToMemory { id: memory_id, offset: 0, buffer_size },
                 Type::from(buffer_size),
             ]);
         } else {
