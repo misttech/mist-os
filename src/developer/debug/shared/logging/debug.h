@@ -84,6 +84,9 @@ enum class LogCategory {
   // Associated with debug adapter.
   kDebugAdapter,
 
+  // Associated with the build ID index.
+  kBuildIDIndex,
+
   // All the previous categories are enabled.
   // Log statements in this category will always be outputting if debug logging is enabled.
   kAll,

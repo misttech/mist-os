@@ -80,6 +80,8 @@ const char* LogCategoryToString(LogCategory category) {
       return "WorkerPool";
     case LogCategory::kDebugAdapter:
       return "DebugAdapter";
+    case LogCategory::kBuildIDIndex:
+      return "BuildIDIndex";
     case LogCategory::kAll:
       return "All";
     case LogCategory::kNone:

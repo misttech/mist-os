@@ -109,6 +109,8 @@ class SymbolServer : public ClientObject {
   fit::callback<void(SymbolServer*, State)> state_change_callback_;
 };
 
+std::string ServerStateToString(const SymbolServer::State& state);
+
 }  // namespace zxdb
 
 #endif  // SRC_DEVELOPER_DEBUG_ZXDB_CLIENT_SYMBOL_SERVER_H_

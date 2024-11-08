@@ -68,6 +68,7 @@ void BuildIDIndex::AddBuildIDMappingForTest(const std::string& build_id,
 }
 
 void BuildIDIndex::ClearAll() {
+  DEBUG_LOG(BuildIDIndex) << "Clearing build id index.";
   ids_txts_.clear();
   build_id_dirs_.clear();
   sources_.clear();
@@ -84,6 +85,8 @@ void BuildIDIndex::AddIdsTxt(const std::string& ids_txt, const std::string& buil
                    [&ids_txt](const auto& it) { return it.path == ids_txt; }) != ids_txts_.end())
     return;
 
+  DEBUG_LOG(BuildIDIndex) << "Adding ids.txt " << ids_txt << " for build id dir " << build_dir
+                          << ".";
   ids_txts_.push_back({ids_txt, build_dir});
   ClearCache();
 }
@@ -93,6 +96,7 @@ void BuildIDIndex::AddBuildIdDir(const std::string& dir, const std::string& buil
                    [&dir](const auto& it) { return it.path == dir; }) != build_id_dirs_.end())
     return;
 
+  DEBUG_LOG(BuildIDIndex) << "Adding build id dir " << build_dir << " for path " << dir << ".";
   build_id_dirs_.push_back({dir, build_dir});
   ClearCache();
 }
@@ -102,10 +106,16 @@ void BuildIDIndex::AddSymbolServer(const std::string& url, bool require_authenti
                    [&url](const auto& it) { return it.url == url; }) != symbol_servers_.end())
     return;
 
+  if (require_authentication) {
+    DEBUG_LOG(BuildIDIndex) << "Adding private symbol server " << url << ".";
+  } else {
+    DEBUG_LOG(BuildIDIndex) << "Adding public symbol server " << url << ".";
+  }
   symbol_servers_.push_back({url, require_authentication});
 }
 
 void BuildIDIndex::SetCacheDir(const std::string& cache_dir) {
+  DEBUG_LOG(BuildIDIndex) << "Setting symbol cache dir to " << cache_dir << ".";
   AddBuildIdDir(cache_dir);
   cache_dir_ = std::make_unique<CacheDir>(cache_dir);
 }
@@ -119,6 +129,7 @@ void BuildIDIndex::AddSymbolIndex(const std::string& contents,
     return;
   }
 
+  DEBUG_LOG(BuildIDIndex) << "Loading symbol index from string contents.";
   std::vector<std::filesystem::path> files_to_load;
   LoadSymbolIndexDocument(document, relative_to, files_to_load);
 
@@ -242,6 +253,7 @@ void BuildIDIndex::LoadIndexFilesFromQueue(std::vector<std::filesystem::path>& f
   while (!files_to_load.empty()) {
     std::filesystem::path file_name = files_to_load.back();
     files_to_load.pop_back();
+    DEBUG_LOG(BuildIDIndex) << "Loading symbol index file " << file_name << "...";
 
     // Avoid recursive includes.
     if (visited.find(file_name) != visited.end()) {
@@ -367,6 +379,7 @@ void BuildIDIndex::IndexSourcePath(const std::string& path) {
 
 bool BuildIDIndex::IndexSourceFile(const std::string& file_path, const std::string& build_dir,
                                    bool preserve) {
+  DEBUG_LOG(BuildIDIndex) << "Indexing source file " << file_path << ".";
   auto elf = elflib::ElfLib::Create(file_path);
   if (!elf)
     return false;
@@ -374,6 +387,8 @@ bool BuildIDIndex::IndexSourceFile(const std::string& file_path, const std::stri
   std::string build_id = elf->GetGNUBuildID();
   if (build_id.empty())
     return false;
+
+  DEBUG_LOG(BuildIDIndex) << "Source file " << file_path << " has build id " << build_id << ".";
 
   if (cache_dir_)
     cache_dir_->NotifyFileAccess(file_path);
@@ -400,6 +415,7 @@ bool BuildIDIndex::IndexSourceFile(const std::string& file_path, const std::stri
 }
 
 void BuildIDIndex::EnsureCacheClean() {
+  DEBUG_LOG(BuildIDIndex) << "Cleaning symbol cache.";
   if (!cache_dirty_)
     return;
 
