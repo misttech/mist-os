@@ -18,7 +18,7 @@ var ipv6PmtuExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber
 }
 
 var ipv6PmtuExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
-	{2, 1}: Fail,
+	{2, 1}: Pass,
 	{2, 2}: Fail,
 	{3, 1}: Fail,
 	{3, 2}: Fail,
