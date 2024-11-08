@@ -28,6 +28,11 @@ std::set<LogCategory>& GetLogCategories() {
 }
 
 bool IsLogCategoryActive(LogCategory category) {
+  // If TRACE-level logging is enabled, always log all debug log categories.
+  if (fuchsia_logging::IsSeverityEnabled(FUCHSIA_LOG_TRACE)) {
+    return true;
+  }
+
   if (!IsDebugLoggingActive())
     return false;
 
