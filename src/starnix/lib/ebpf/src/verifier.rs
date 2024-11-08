@@ -137,10 +137,6 @@ impl Field {
     fn new(offset: i16, width: DataWidth) -> Self {
         Self { offset, width }
     }
-
-    fn offset_as_u64(&self) -> u64 {
-        i64::from(self.offset) as u64
-    }
 }
 
 /// Defines field layout in a struct pointed by `Type::PtrToStruct`.
@@ -162,8 +158,8 @@ impl StructDescriptor {
     /// Finds the field type for load/store at the specified location. None is returned if the
     /// access is invalid and the program must be rejected. Second value indicates that the field
     /// access should be remapped.
-    fn find_field(&self, base_offset: u64, field: Field) -> Option<(FieldType, Option<Field>)> {
-        let offset = (base_offset as usize).overflowing_add(field.offset as usize).0;
+    fn find_field(&self, base_offset: i64, field: Field) -> Option<(FieldType, Option<Field>)> {
+        let offset: usize = (base_offset).checked_add(field.offset as i64)?.try_into().ok()?;
         let field_desc =
             self.fields.iter().find(|f| f.offset <= offset && offset < f.offset + f.size())?;
         let mapping = self.mappings.iter().find(|m| m.source_offset == field_desc.offset);
@@ -256,13 +252,13 @@ pub enum Type {
     PtrToStack { offset: StackOffset },
     /// A pointer to the kernel memory. The full buffer is `buffer_size` bytes long. The pointer is
     /// situated at `offset` from the start of the buffer.
-    PtrToMemory { id: MemoryId, offset: u64, buffer_size: u64 },
+    PtrToMemory { id: MemoryId, offset: i64, buffer_size: u64 },
     /// A pointer to a struct with the specified `StructDescriptor`.
-    PtrToStruct { id: MemoryId, offset: u64, descriptor: Arc<StructDescriptor> },
+    PtrToStruct { id: MemoryId, offset: i64, descriptor: Arc<StructDescriptor> },
     /// A pointer to the kernel memory. The full buffer size is determined by an instance of
     /// `PtrToEndArray` with the same `id`. The pointer is situadted at `offset` from the start of
     /// the buffer.
-    PtrToArray { id: MemoryId, offset: u64 },
+    PtrToArray { id: MemoryId, offset: i64 },
     /// A pointer to the kernel memory that represents the first non accessible byte of a
     /// `PtrToArray` with the same `id`.
     PtrToEndArray { id: MemoryId },
@@ -523,8 +519,8 @@ impl Type {
                 JumpType::Ge,
                 Type::PtrToEndArray { id: id1 },
                 Type::PtrToArray { id: id2, offset },
-            ) if id1 == id2 => {
-                context.update_array_bounds(id1.clone(), *offset);
+            ) if id1 == id2 && *offset >= 0 => {
+                context.update_array_bounds(id1.clone(), *offset as u64);
                 (type1, type2)
             }
             (
@@ -538,8 +534,8 @@ impl Type {
                 JumpType::Gt,
                 Type::PtrToEndArray { id: id1 },
                 Type::PtrToArray { id: id2, offset },
-            ) if id1 == id2 => {
-                context.update_array_bounds(id1.clone(), *offset + 1);
+            ) if id1 == id2 && *offset >= -1 => {
+                context.update_array_bounds(id1.clone(), (*offset + 1) as u64);
                 (type1, type2)
             }
             (JumpWidth::W64, JumpType::Eq, _, _) => (type1.clone(), type1),
@@ -590,11 +586,12 @@ impl Type {
             }
             (Type::MemoryParameter { size, .. }, Type::PtrToMemory { offset, buffer_size, .. }) => {
                 let expected_size = size.size(context)?;
-                if expected_size <= buffer_size - offset {
-                    Ok(())
-                } else {
-                    Err(format!("out of bound read at pc {}", context.pc))
-                }
+                i64::try_from(*buffer_size)
+                    .ok()
+                    .and_then(|v| v.checked_sub(*offset))
+                    .and_then(|v| u64::try_from(v).ok())
+                    .and_then(|size_left| (expected_size <= size_left).then_some(()))
+                    .ok_or_else(|| format!("out of bound read at pc {}", context.pc))
             }
 
             (Type::MemoryParameter { size, input, output }, Type::PtrToStack { offset }) => {
@@ -1301,17 +1298,18 @@ impl ComputationContext {
 
     fn check_memory_access(
         &self,
-        dst_offset: u64,
+        dst_offset: i64,
         dst_buffer_size: u64,
-        instruction_offset: u64,
+        instruction_offset: i16,
         width: usize,
     ) -> Result<(), String> {
-        let final_offset = dst_offset.overflowing_add(instruction_offset).0;
-        if final_offset
-            .checked_add(width as u64)
-            .ok_or_else(|| format!("out of bound access at pc {}", self.pc))?
-            > dst_buffer_size
-        {
+        let final_offset = dst_offset
+            .checked_add(instruction_offset as i64)
+            .ok_or_else(|| format!("out of bound access at pc {}", self.pc))?;
+        let end_offset = final_offset
+            .checked_add(width as i64)
+            .ok_or_else(|| format!("out of bound access at pc {}", self.pc))?;
+        if final_offset < 0 || end_offset as u64 > dst_buffer_size {
             return Err(format!("out of bound access at pc {}", self.pc));
         }
         Ok(())
@@ -1327,20 +1325,10 @@ impl ComputationContext {
         let addr = addr.inner(self)?;
         match *addr {
             Type::PtrToStack { offset } => {
-                return self.stack.store(
-                    self.pc,
-                    offset + field.offset_as_u64(),
-                    value,
-                    field.width,
-                );
+                return self.stack.store(self.pc, offset + field.offset as u64, value, field.width);
             }
             Type::PtrToMemory { offset, buffer_size, .. } => {
-                self.check_memory_access(
-                    offset,
-                    buffer_size,
-                    field.offset_as_u64(),
-                    field.width.bytes(),
-                )?;
+                self.check_memory_access(offset, buffer_size, field.offset, field.width.bytes())?;
             }
             Type::PtrToStruct { offset, ref descriptor, .. } => {
                 let (field_type, mapped_field) = descriptor
@@ -1357,7 +1345,7 @@ impl ComputationContext {
                 self.check_memory_access(
                     offset,
                     *self.array_bounds.get(&id).unwrap_or(&0),
-                    field.offset_as_u64(),
+                    field.offset,
                     field.width.bytes(),
                 )?;
             }
@@ -1381,16 +1369,10 @@ impl ComputationContext {
         let addr = addr.inner(self)?;
         match *addr {
             Type::PtrToStack { offset } => {
-                let stack_offset = offset + field.offset_as_u64();
-                self.stack.load(self, stack_offset, field.width)
+                self.stack.load(self, offset + field.offset as u64, field.width)
             }
             Type::PtrToMemory { ref id, offset, buffer_size, .. } => {
-                self.check_memory_access(
-                    offset,
-                    buffer_size,
-                    field.offset_as_u64(),
-                    field.width.bytes(),
-                )?;
+                self.check_memory_access(offset, buffer_size, field.offset, field.width.bytes())?;
                 Ok(Type::unknown_written_scalar_value())
             }
             Type::PtrToStruct { ref id, offset, ref descriptor, .. } => {
@@ -1424,7 +1406,7 @@ impl ComputationContext {
                 self.check_memory_access(
                     offset,
                     *self.array_bounds.get(&id).unwrap_or(&0),
-                    field.offset_as_u64(),
+                    field.offset,
                     field.width.bytes(),
                 )?;
                 Ok(Type::unknown_written_scalar_value())
@@ -1570,24 +1552,32 @@ impl ComputationContext {
                 Type::PtrToMemory { id, offset: x, buffer_size },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
-                let offset = op(x, y);
-                Type::PtrToMemory { id: id.clone(), offset, buffer_size: buffer_size }
+                let offset = op(x as u64, y);
+                Type::PtrToMemory {
+                    id: id.clone(),
+                    offset: offset as i64,
+                    buffer_size: buffer_size,
+                }
             }
             (
                 alu_type,
                 Type::PtrToStruct { id, offset: x, descriptor },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
-                let offset = op(x, y);
-                Type::PtrToStruct { id: id.clone(), offset, descriptor: descriptor.clone() }
+                let offset = op(x as u64, y);
+                Type::PtrToStruct {
+                    id: id.clone(),
+                    offset: offset as i64,
+                    descriptor: descriptor.clone(),
+                }
             }
             (
                 alu_type,
                 Type::PtrToArray { id, offset: x },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
-                let offset = op(x, y);
-                Type::PtrToArray { id: id.clone(), offset }
+                let offset = op(x as u64, y);
+                Type::PtrToArray { id: id.clone(), offset: offset as i64 }
             }
             (
                 AluType::Sub,
@@ -1603,7 +1593,7 @@ impl ComputationContext {
                 AluType::Sub,
                 Type::PtrToArray { id: id1, offset: x1 },
                 Type::PtrToArray { id: id2, offset: x2 },
-            ) if id1 == id2 => Type::from(op(x1, x2)),
+            ) if id1 == id2 => Type::from(op(x1 as u64, x2 as u64)),
             (AluType::Sub, Type::PtrToStack { offset: x1 }, Type::PtrToStack { offset: x2 }) => {
                 Type::from(op(x1.reg(), x2.reg()))
             }
@@ -1846,7 +1836,7 @@ impl ComputationContext {
                 JumpWidth::W64,
                 Type::PtrToArray { id: id1, offset: x, .. },
                 Type::PtrToArray { id: id2, offset: y, .. },
-            ) if *id1 == *id2 => Ok(Some(op(*x, *y))),
+            ) if *id1 == *id2 => Ok(Some(op(*x as u64, *y as u64))),
 
             (JumpWidth::W64, Type::PtrToArray { id: id1, .. }, Type::PtrToEndArray { id: id2 })
             | (JumpWidth::W64, Type::PtrToEndArray { id: id1 }, Type::PtrToArray { id: id2, .. })

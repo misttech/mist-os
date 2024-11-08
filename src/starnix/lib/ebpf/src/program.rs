@@ -980,4 +980,27 @@ mod test {
         assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), 1);
         assert_eq!(data.mutable_field, 0x42);
     }
+
+    #[test]
+    fn test_fake_array_bounds_check() {
+        // Verify that negative offsets in memory ptrs are handled properly and cannot be used to
+        // bypass array bounds checks.
+        let program = r#"
+        mov %r0, 0
+        ldxdw %r2, [%r1+16]
+        ldxdw %r1, [%r1+8]
+        # Subtract 8 from `data` and pretend checking array bounds.
+        mov %r3, %r1
+        sub %r3, 0x8
+        jgt %r3, %r2, +1
+        # Read 8 bytes from `data`. This should be rejected by the verifier.
+        ldxdw %r0, [%r1]
+        exit
+        "#;
+        let code = parse_asm(program);
+
+        let mut builder = EbpfProgramBuilder::<()>::default();
+        builder.set_args(&[ProgramArgument::get_type()]);
+        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+    }
 }
