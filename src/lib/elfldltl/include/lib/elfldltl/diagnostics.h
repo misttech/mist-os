@@ -7,7 +7,6 @@
 
 #include <stdio.h>
 #include <zircon/assert.h>
-#include <zircon/compiler.h>
 
 #include <string_view>
 #include <tuple>
@@ -17,6 +16,7 @@
 #include "field.h"
 #include "internal/const-string.h"
 #include "internal/diagnostics-printf.h"
+#include "internal/no_unique_address.h"
 
 namespace elfldltl {
 
@@ -220,9 +220,9 @@ struct FixedBool : std::integral_constant<bool, Value> {};
 // An alternative Flags type can be defined like this one to make one or more
 // of the values fixed, or to change the default value of a mutable flag.
 struct DiagnosticsPanicFlags {
-  __NO_UNIQUE_ADDRESS FixedBool<false, 0> multiple_errors;
-  __NO_UNIQUE_ADDRESS FixedBool<true, 1> warnings_are_errors;
-  __NO_UNIQUE_ADDRESS FixedBool<false, 2> extra_checking;
+  ELFLDLTL_NO_UNIQUE_ADDRESS FixedBool<false, 0> multiple_errors;
+  ELFLDLTL_NO_UNIQUE_ADDRESS FixedBool<true, 1> warnings_are_errors;
+  ELFLDLTL_NO_UNIQUE_ADDRESS FixedBool<false, 2> extra_checking;
 };
 
 // elfldltl::Diagnostics provides a canonical implementation of a diagnostics
@@ -314,7 +314,7 @@ class Diagnostics {
  private:
   // This is either a wrapper around an integer, or is an empty object.
   // The tag is unused but makes the two Count types always distinct so
-  // that adjacent empty members with __NO_UNIQUE_ADDRESS can be elided.
+  // that adjacent empty members with [[no_unique_address]] can be elided.
   template <bool Counting, auto Tag>
   struct Count;
 
@@ -344,10 +344,10 @@ class Diagnostics {
   static constexpr bool kCount =
       !std::is_base_of_v<std::false_type, decltype(std::declval<Flags>().multiple_errors)>;
 
-  __NO_UNIQUE_ADDRESS Report report_;
-  __NO_UNIQUE_ADDRESS Flags flags_;
-  __NO_UNIQUE_ADDRESS Count<kCount, &Flags::multiple_errors> errors_;
-  __NO_UNIQUE_ADDRESS Count<kCount, &Flags::warnings_are_errors> warnings_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Report report_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Flags flags_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Count<kCount, &Flags::multiple_errors> errors_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Count<kCount, &Flags::warnings_are_errors> warnings_;
 };
 
 // This creates a callable object to use as the Report function in a

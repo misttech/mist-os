@@ -64,6 +64,7 @@ library_headers("headers") {
     "lib/elfldltl/internal/diagnostics-printf.h",
     "lib/elfldltl/internal/dynamic-tag-error.h",
     "lib/elfldltl/internal/load-segment-types.h",
+    "lib/elfldltl/internal/no_unique_address.h",
     "lib/elfldltl/internal/phdr-error.h",
     "lib/elfldltl/layout.h",
     "lib/elfldltl/link.h",

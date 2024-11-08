@@ -5,8 +5,6 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_PHDR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_PHDR_H_
 
-#include <zircon/compiler.h>
-
 #include <algorithm>
 #include <bit>
 #include <limits>
@@ -17,6 +15,7 @@
 
 #include "constants.h"
 #include "diagnostics.h"
+#include "internal/no_unique_address.h"
 #include "internal/phdr-error.h"
 
 namespace elfldltl {
@@ -325,7 +324,7 @@ class PhdrStackObserver : public PhdrSingletonObserver<Elf, ElfPhdrType::kStack>
 
   std::optional<Phdr> phdr_;
   std::optional<size_type>& size_;
-  __NO_UNIQUE_ADDRESS std::conditional_t<CanBeExecutable, bool&, Empty> executable_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS std::conditional_t<CanBeExecutable, bool&, Empty> executable_;
 };
 
 // A generic metadata, singleton observer that validates constraints around
@@ -592,10 +591,11 @@ class PhdrLoadObserver
 
   // The highest `p_align`-aligned address and offset seen thus far.
   size_type high_memory_watermark_;
-  __NO_UNIQUE_ADDRESS std::conditional_t<kTrackFileOffsets, size_type, Empty> high_file_watermark_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS std::conditional_t<kTrackFileOffsets, size_type, Empty>
+      high_file_watermark_;
 
   // Additional tail of observer function.
-  __NO_UNIQUE_ADDRESS Callback callback_;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Callback callback_;
 };
 
 // This acts as a deduction guide with partial explicit specialization.

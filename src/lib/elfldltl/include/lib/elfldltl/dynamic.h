@@ -5,8 +5,6 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DYNAMIC_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DYNAMIC_H_
 
-#include <zircon/compiler.h>
-
 #include <optional>
 #include <span>
 #include <string_view>
@@ -15,6 +13,7 @@
 
 #include "init-fini.h"
 #include "internal/dynamic-tag-error.h"
+#include "internal/no_unique_address.h"
 #include "layout.h"
 #include "relocation.h"
 #include "symbol.h"
@@ -636,7 +635,7 @@ class DynamicNeededObserver
 
  private:
   const SymbolInfo& si;
-  __NO_UNIQUE_ADDRESS Callback callback;
+  ELFLDLTL_NO_UNIQUE_ADDRESS Callback callback;
 };
 
 // Deduction guides.
