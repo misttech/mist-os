@@ -167,5 +167,28 @@ EOF
   BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "Failed to find a product bundle"
 }
 
+TEST_fx-get-flash-source-with-main-product-label() {
+  cat > "${BT_TEMP_DIR}/out/default/args.json" <<EOF
+{
+  "use_bazel_images_only": true,
+  "main_product_label": "//build/images/fuchsia:product_bundle_eng"
+}
+EOF
+  cat > "${BT_TEMP_DIR}/out/default/product_bundles.json" <<EOF
+[
+  {
+    "label": "//build/images/fuchsia:product_bundle_eng(//build/toolchain/fuchsia:x64)",
+    "name": "core.x64",
+    "path": "obj/build/images/fuchsia/product_bundle_eng",
+    "product_version": "12.99991231.0.1",
+    "transfer_manifest_path": "obj/build/images/fuchsia/transfer.json",
+    "transfer_manifest_url": "file://obj/build/images/fuchsia/transfer.json"
+  }
+]
+EOF
+
+  BT_EXPECT_EQ "$(${fx} get-flash-source)" "product-bundle:obj/build/images/fuchsia/product_bundle_eng"
+}
+
 
 BT_RUN_TESTS "$@"
