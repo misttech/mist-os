@@ -26,16 +26,14 @@ if (is_host) {
     deps = [
       "//src/developer/ffx/lib/e2e_emu",
       "//src/developer/ffx/lib/symbolize",
+      "//src/lib/diagnostics/log/rust_cpp_bridge",
       "//src/lib/fuchsia",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tracing",
     ]
-    product_bundle = ":product_bundle($default_toolchain)"
 
-    # Get the symbolizer to log as much as it can about symbol resolution to help debug
-    # infra-only failures.
-    env = [ "FUCHSIA_HOST_LOG_MIN_SEVERITY=TRACE" ]
+    product_bundle = ":product_bundle($default_toolchain)"
   }
 
   group("host_tests") {
