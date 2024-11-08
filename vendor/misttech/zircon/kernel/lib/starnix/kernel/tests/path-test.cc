@@ -4,6 +4,7 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/starnix/kernel/vfs/path.h>
+#include <lib/mistos/util/testing/unittest.h>
 #include <lib/unittest/unittest.h>
 
 #include <ktl/string_view.h>
@@ -22,31 +23,27 @@ bool test_path_builder() {
   actual = p.build_absolute();
   expected = ktl::string_view("/");
   ASSERT_EQ(expected.size(), actual.size());
-  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
-                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
+  ASSERT_STREQ(expected, actual);
 
   p = PathBuilder();
   actual = p.build_relative();
   expected = ktl::string_view("");
   ASSERT_EQ(expected.size(), actual.size());
-  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
-                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
+  ASSERT_STREQ(expected, actual);
 
   p = PathBuilder();
   p.prepend_element("foo");
   actual = p.build_absolute();
   expected = ktl::string_view("/foo");
   ASSERT_EQ(expected.size(), actual.size());
-  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
-                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
+  ASSERT_STREQ(expected, actual);
 
   p = PathBuilder();
   p.prepend_element("foo");
   actual = p.build_relative();
   expected = ktl::string_view("foo");
   ASSERT_EQ(expected.size(), actual.size());
-  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
-                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
+  ASSERT_STREQ(expected, actual);
 
   p = PathBuilder();
   p.prepend_element("foo");
@@ -54,8 +51,7 @@ bool test_path_builder() {
   actual = p.build_absolute();
   expected = ktl::string_view("/bar/foo");
   ASSERT_EQ(expected.size(), actual.size());
-  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
-                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
+  ASSERT_STREQ(expected, actual);
 
   p = PathBuilder();
   p.prepend_element("foo");
@@ -64,8 +60,7 @@ bool test_path_builder() {
   actual = p.build_absolute();
   expected = ktl::string_view("/bar/1234567890123456789012345678901234567890/foo");
   ASSERT_EQ(expected.size(), actual.size());
-  ASSERT_BYTES_EQ(reinterpret_cast<const uint8_t*>(expected.data()),
-                  reinterpret_cast<const uint8_t*>(actual.data()), expected.size());
+  ASSERT_STREQ(expected, actual);
 
   END_TEST;
 }

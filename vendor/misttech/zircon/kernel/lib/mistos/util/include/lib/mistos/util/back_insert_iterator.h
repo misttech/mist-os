@@ -15,6 +15,13 @@ namespace util {
 template <typename Container>
 class back_insert_iterator {
  public:
+  // Standard C++ named requirements Container API.
+  using iterator_category = std::output_iterator_tag;
+  using value_type = void;
+  using difference_type = ptrdiff_t;
+  using pointer = void;
+  using reference = void;
+
   explicit back_insert_iterator(Container& container) : container_(&container) {}
 
   back_insert_iterator& operator=(const typename Container::value_type& value) {
