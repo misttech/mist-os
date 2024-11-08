@@ -11,12 +11,10 @@ using zx;
 @available(added=HEAD)
 @discoverable
 open protocol Device {
-    flexible OpenSocket(resource table {
+    flexible RegisterSocket(resource table {
         1: server_socket zx.Handle:SOCKET;
         2: socket_label string:MAX;
-    }) -> (table {
-        1: status zx.Status;
-    });
+    }) -> () error zx.Status;
 };
 
 @available(added=HEAD)
