@@ -29,8 +29,6 @@ namespace {
 
 constexpr uint8_t kCccrVendorAddressMin = 0xf0;
 
-constexpr uint32_t kBcmManufacturerId = 0x02d0;
-
 uint32_t SdioReadTupleBody(const uint8_t* tuple_body, size_t start, size_t numbytes) {
   uint32_t res = 0;
 
@@ -122,6 +120,9 @@ zx_status_t SdioControllerDevice::ProbeLocked() {
     return st;
   }
 
+  // Increment to account for function 0, which is not represented in OCR.
+  hw_info_.num_funcs++;
+
   if ((st = sdmmc_->MmcSelectCard()) != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "MMC_SELECT_CARD failed, retcode = %d", st);
     return st;
@@ -138,12 +139,6 @@ zx_status_t SdioControllerDevice::ProbeLocked() {
   if ((st = ProcessCis(0)) != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Read CIS failed, retcode = %d", st);
     return st;
-  }
-
-  // BCM43458 includes function 0 in its OCR register. This violates the SDIO specification and
-  // the assumptions made here. Check the manufacturer ID to account for this quirk.
-  if (funcs_[0].hw_info.manufacturer_id != kBcmManufacturerId) {
-    hw_info_.num_funcs++;
   }
 
   if ((st = TrySwitchUhs()) != ZX_OK) {
