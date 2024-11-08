@@ -12,14 +12,13 @@
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/starnix_sync/locks.h>
 
-#include <fbl/intrusive_hash_table.h>
 #include <ktl/string_view.h>
 
 namespace starnix {
 
 class MemoryXattrStorage : public XattrStorage {
  private:
-  mutable starnix_sync::Mutex<FsStringHashTable> xattrs;
+  mutable starnix_sync::Mutex<FsStringHashTable> xattrs_;
 
  public:
   /// impl XattrStorage
@@ -35,7 +34,7 @@ class MemoryXattrStorage : public XattrStorage {
   static MemoryXattrStorage Default();
 
  private:
-  MemoryXattrStorage() = default;
+  MemoryXattrStorage();
 };
 
 }  // namespace starnix

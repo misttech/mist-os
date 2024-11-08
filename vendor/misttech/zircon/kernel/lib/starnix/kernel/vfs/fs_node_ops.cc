@@ -16,6 +16,8 @@
 
 namespace starnix {
 
+FsNodeOps::~FsNodeOps() = default;
+
 fit::result<Errno, FsNodeHandle> FsNodeOps::lookup(const FsNode& node,
                                                    const CurrentTask& current_task,
                                                    const FsStr& name) const {
@@ -30,5 +32,7 @@ fit::result<Errno, FsNodeHandle> FsNodeOps::create_tmpfile(const FsNode& node,
                                                            FileMode mode, FsCred owner) const {
   return fit::error(errno(EOPNOTSUPP));
 }
+
+XattrStorage::~XattrStorage() = default;
 
 }  // namespace starnix

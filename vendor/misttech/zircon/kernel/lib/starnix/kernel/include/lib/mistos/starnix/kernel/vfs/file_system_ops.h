@@ -9,6 +9,8 @@
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 
+#include <fbl/ref_ptr.h>
+
 #include <asm/statfs.h>
 
 namespace starnix {
@@ -20,8 +22,6 @@ using FsNodeHandle = fbl::RefPtr<FsNode>;
 
 class FileSystemOps {
  public:
-  virtual ~FileSystemOps() = default;
-
   /// Return information about this filesystem.
   ///
   /// A typical implementation looks like this:
@@ -73,6 +73,9 @@ class FileSystemOps {
 
   /// Called when the filesystem is unmounted.
   virtual void unmount() {}
+
+  // C++
+  virtual ~FileSystemOps() = default;
 };
 
 }  // namespace starnix

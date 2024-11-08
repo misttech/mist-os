@@ -5,10 +5,10 @@
 
 #include "lib/mistos/starnix/kernel/vfs/path.h"
 
+#include <lib/mistos/util/back_insert_iterator.h>
 #include <stdio.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/intrusive_single_list.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
 #include <ktl/string_view.h>

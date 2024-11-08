@@ -9,14 +9,15 @@
 
 namespace starnix {
 
+MemoryXattrStorage::MemoryXattrStorage() = default;
+
 fit::result<Errno, FsString> MemoryXattrStorage::get_xattr(const FsStr& name) const {
-  auto _xattrs = xattrs.Lock();
-  auto value = _xattrs->find(name);
-  if (value != _xattrs->end()) {
+  auto xattrs = xattrs_.Lock();
+  auto value = xattrs->find(name);
+  if (value != xattrs->end()) {
     return fit::ok((*value).value);
-  } else {
-    return fit::error(errno(ENODATA));
   }
+  return fit::error(errno(ENODATA));
 }
 
 fit::result<Errno> MemoryXattrStorage::set_xattr(const FsStr& name, const FsStr& value,

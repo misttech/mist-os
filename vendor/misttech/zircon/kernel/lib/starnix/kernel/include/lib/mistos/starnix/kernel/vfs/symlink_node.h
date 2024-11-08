@@ -11,8 +11,6 @@
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix/kernel/vfs/xattr.h>
 
-#include <utility>
-
 namespace starnix {
 
 // A node that represents a symlink to another node.

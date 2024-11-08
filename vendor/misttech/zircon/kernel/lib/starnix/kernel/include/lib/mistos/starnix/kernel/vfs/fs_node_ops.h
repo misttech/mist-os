@@ -112,18 +112,19 @@ class FsNodeOps {
   /// is used to create directories instead.
   virtual fit::result<Errno, FsNodeHandle> mknod(const FsNode& node,
                                                  const CurrentTask& current_task, const FsStr& name,
-                                                 FileMode mode, DeviceType dev, FsCred owner) const;
+                                                 FileMode mode, DeviceType dev,
+                                                 FsCred owner) const = 0;
 
   /// Create and return the given child node as a subdirectory.
   virtual fit::result<Errno, FsNodeHandle> mkdir(const FsNode& node,
                                                  const CurrentTask& current_task, const FsStr& name,
-                                                 FileMode mode, FsCred owner) const;
+                                                 FileMode mode, FsCred owner) const = 0;
 
   /// Creates a symlink with the given `target` path.
   virtual fit::result<Errno, FsNodeHandle> create_symlink(const FsNode& node,
                                                           const CurrentTask& current_task,
                                                           const FsStr& name, const FsStr& target,
-                                                          FsCred owner) const;
+                                                          FsCred owner) const = 0;
 
   /// Creates an anonymous file.
   ///
@@ -253,7 +254,7 @@ class FsNodeOps {
   }
 
   // C++
-  virtual ~FsNodeOps() = default;
+  virtual ~FsNodeOps();
 };
 
 /// Implements [`FsNodeOps`] methods in a way that makes sense for symlinks.
@@ -298,6 +299,10 @@ class FsNodeOps {
   }                                                                                                \
   using __fs_node_impl_dir_readonly_force_semicolon = int
 
+/// Trait that objects can implement if they need to handle extended attribute storage. Allows
+/// delegating extended attribute operations in [`FsNodeOps`] to another object.
+///
+/// See [`fs_node_impl_xattr_delegate`] for usage details.
 class XattrStorage {
  public:
   /// Delegate for [`FsNodeOps::get_xattr`].
@@ -312,7 +317,7 @@ class XattrStorage {
   /// Delegate for [`FsNodeOps::list_xattrs`].
   virtual fit::result<Errno, fbl::Vector<FsString>> list_xattrs(const FsStr& name) const = 0;
 
-  virtual ~XattrStorage() = default;
+  virtual ~XattrStorage();
 };
 
 /// Implements extended attribute ops for [`FsNodeOps`] by delegating to another object which

@@ -6,12 +6,9 @@
 #ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_PATH_H_
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_PATH_H_
 
-#include <lib/mistos/util/back_insert_iterator.h>
 #include <lib/mistos/util/bstring.h>
 #include <stdio.h>
 
-#include <fbl/alloc_checker.h>
-#include <fbl/intrusive_single_list.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
 #include <ktl/string_view.h>
