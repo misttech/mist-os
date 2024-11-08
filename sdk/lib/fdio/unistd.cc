@@ -1539,7 +1539,7 @@ int chroot(const char* path) {
     // cwd.
     if (root_path.length() > 1) {
       const std::string_view cwd_view(fdio_cwd_path);
-      if (cwd_view.find(root_path) == 0u && fdio_cwd_path[root_path.length()] == '/') {
+      if (cwd_view.starts_with(root_path) && fdio_cwd_path[root_path.length()] == '/') {
         fdio_cwd_path.RemovePrefix(root_path.length());
       } else {
         fdio_cwd_path.Set(kUnreachable);
