@@ -96,6 +96,8 @@ fio::OpenFlags posix_flags_to_fio(int32_t flags) {
     case O_RDWR:
       rights |= fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable;
       break;
+    default:
+      break;
   }
 
   fio::OpenFlags result =
@@ -1419,6 +1421,8 @@ int faccessat(int dirfd, const char* filename, int amode, int flag) {
     case R_OK | W_OK:
       rights_flags = O_RDWR;
       break;
+    default:
+      break;
   }
   return STATUS(
       fdio_internal::open_at_ignore_eisdir(dirfd, filename, rights_flags, 0).status_value());
@@ -2062,6 +2066,9 @@ ssize_t sendmsg(int fd, const struct msghdr* msg, int flags) {
           if (status == ZX_ERR_TIMED_OUT) {
             status = ZX_ERR_SHOULD_WAIT;
           }
+          break;
+        default:
+          break;
       }
     }
     if (status != ZX_OK) {
@@ -2113,6 +2120,9 @@ ssize_t recvmsg(int fd, struct msghdr* msg, int flags) {
           if (status == ZX_ERR_TIMED_OUT) {
             status = ZX_ERR_SHOULD_WAIT;
           }
+          break;
+        default:
+          break;
       }
     }
     if (status != ZX_OK) {

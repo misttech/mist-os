@@ -403,6 +403,8 @@ int getsockopt(int fd, int level, int optname, void* __restrict optval,
         return do_timeout(io->rcvtimeo());
       case SO_SNDTIMEO:
         return do_timeout(io->sndtimeo());
+      default:
+        break;
     }
   }
 
@@ -450,6 +452,8 @@ int setsockopt(int fd, int level, int optname, const void* optval, socklen_t opt
           return do_timeout(io->rcvtimeo());
         case SO_SNDTIMEO:
           return do_timeout(io->sndtimeo());
+        default:
+          break;
       }
       break;
     }
