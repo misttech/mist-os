@@ -449,10 +449,10 @@ class PhdrLoadObserver
         vaddr_size_(vaddr_size),
         page_size_(page_size),
         callback_(std::move(callback)) {
-    ZX_ASSERT(std::has_single_bit(page_size));
+    assert(std::has_single_bit(page_size));
     vaddr_start_ = 0;
     vaddr_size_ = 0;
-    ZX_DEBUG_ASSERT(NoHeadersSeen());
+    assert(NoHeadersSeen());
   }
 
   template <typename C = Callback, typename = std::enable_if_t<std::is_default_constructible_v<C>>>

@@ -64,7 +64,7 @@ inline BootstrapModule FinishBootstrapModule(abi::Abi<>::Module& module,
 // for assertion failures in case messages can be printed, but it's not really
 // expected to return from FormatError et al and various kinds of failures
 // might get crashes without or after FormatError returns.  It will usually be
-// used with some kind of TrapDiagnostics() or PanicDiagnostics() object.
+// used with some kind of TrapDiagnostics() or similar object.
 //
 // The optional argument should be the system runtime page size.  If it's not
 // given, then the returned Module's vaddr_start and and vaddr_end will not be

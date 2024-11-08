@@ -109,16 +109,6 @@ TEST(ElfldltlDiagnosticsTests, Trap) {
   ASSERT_DEATH(diag.FormatWarning("warnings are fatal"), "");
 }
 
-TEST(ElfldltlDiagnosticsTests, Panic) {
-  auto diag = elfldltl::PanicDiagnostics();
-
-  EXPECT_EQ(1u, diag.errors());
-  ASSERT_DEATH(diag.FormatError("errors are fatal"), "");
-
-  EXPECT_EQ(1u, diag.warnings());
-  ASSERT_DEATH(diag.FormatWarning("warnings are fatal"), "");
-}
-
 TEST(ElfldltlDiagnosticsTests, OneString) {
   std::string error = "no error";
   auto diag = elfldltl::OneStringDiagnostics(error);

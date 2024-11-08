@@ -40,7 +40,10 @@ void Symbolize::ReplaceModulesStorage(ModuleList modules) {
 }
 
 void Symbolize::AddModule(const ElfImage* module) {
-  auto diag = elfldltl::PanicDiagnostics(name_, ": ");
+  elfldltl::Diagnostics diag{
+      elfldltl::PrintfDiagnosticsReport(__zx_panic, name_, ": "),
+      elfldltl::DiagnosticsPanicFlags(),
+  };
   [[maybe_unused]] bool ok = modules_.push_back(diag, "too many modules loaded", module);
   ZX_DEBUG_ASSERT(ok);
 }

@@ -6,7 +6,6 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DIAGNOSTICS_H_
 
 #include <stdio.h>
-#include <zircon/assert.h>
 
 #include <string_view>
 #include <tuple>
@@ -379,18 +378,6 @@ constexpr auto FprintfDiagnosticsReport(FILE* stream, Prefix&&... prefix) {
   return PrintfDiagnosticsReport(printer, std::forward<Prefix>(prefix)...);
 }
 
-// This is PrintfDiagnosticsReport but using ZX_PANIC for printf.
-template <typename... Prefix>
-constexpr auto PanicDiagnosticsReport(Prefix&&... prefix) {
-  constexpr auto panic = [](const char* format, auto&&... args) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-nonliteral"
-    ZX_PANIC(format, std::forward<decltype(args)>(args)...);
-#pragma GCC diagnostic pop
-  };
-  return PrintfDiagnosticsReport(panic, std::forward<Prefix>(prefix)...);
-}
-
 // This returns a Diagnostics object that crashes immediately for any error or
 // warning.  There are no library dependencies of any kind.  This behavior is
 // appropriate only for self-relocation and bootstrapping cases where if there
@@ -402,20 +389,6 @@ constexpr auto TrapDiagnostics() {
     return false;
   };
   return Diagnostics(trap, DiagnosticsPanicFlags());
-}
-
-// This is similar to TrapDiagnostics but it uses the <zircon/assert.h>
-// ZX_PANIC call to write the message and crash, with an optional fixed prefix.
-// So it has some library dependencies but might be able to generate some error
-// output beofre crashing.  Any arguments are stored in the diagnostics object
-// and then treated as if initial arguments to every FormatError et al call so
-// they can form a prefix on every message.  Those arguments are forwarded
-// perfectly, so if passed as an lvalue reference, the reference will be stored
-// rather than its referent copied.
-template <typename... Prefix>
-constexpr auto PanicDiagnostics(Prefix&&... prefix) {
-  return Diagnostics(PanicDiagnosticsReport(std::forward<Prefix>(prefix)...),
-                     DiagnosticsPanicFlags());
 }
 
 // This returns a Diagnostics object that simply stores a single error or
