@@ -9,6 +9,6 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "test/power_testing_client_test_bin",
+        binary: "test/power_framework_test_realm_test_cpp_bin",
     },
 }

@@ -5,18 +5,13 @@
 source_set("cpp") {
   testonly = true
   sources = [
-    "client.cc",
-    "client.h",
+    "power_framework_test_realm.cc",
+    "power_framework_test_realm.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_cpp",
-    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_cpp",
     "//src/power/testing/client:client_includes",
-    "//src/power/testing/fake-suspend:test.suspendcontrol_cpp",
   ]
   deps = [ "//sdk/lib/component/incoming/cpp" ]
 }
