@@ -5,12 +5,9 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DWARF_EH_FRAME_HDR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DWARF_EH_FRAME_HDR_H_
 
+#include <compare>
 #include <ios>
 #include <iterator>
-
-#if __cpp_impl_three_way_comparison >= 201907L
-#include <compare>
-#endif
 
 #include "../diagnostics.h"
 #include "../layout.h"
@@ -57,13 +54,8 @@ struct EhFrameHdrEntry {
 
   constexpr bool operator!=(const EhFrameHdrEntry& other) const { return !(*this == other); }
 
-#if __cpp_impl_three_way_comparison >= 201907L
   constexpr bool operator<=>(const EhFrameHdrEntry& other) const { return pc <=> other.pc; }
   constexpr bool operator<=>(SizeType other) const { return pc <=> other.pc; }
-#else
-  constexpr bool operator<(const EhFrameHdrEntry& other) const { return pc < other.pc; }
-  constexpr bool operator<(SizeType other) const { return pc < other; }
-#endif
 
   SizeType pc = 0, fde = 0;
 };
@@ -127,36 +119,10 @@ class EhFrameHdr {
 
     constexpr bool operator!=(const iterator& other) const { return !(*this == other); }
 
-#if __cpp_impl_three_way_comparison >= 201907L
-
     constexpr std::strong_ordering operator<=>(const iterator& other) const {
       assert(hdr_ == other.hdr_);
       return pos_ <=> other.pos_;
     }
-
-#else  // No operator<=> support.
-
-    constexpr bool operator<(const iterator& other) const {
-      assert(hdr_ == other.hdr_);
-      return pos_ < other.pos_;
-    }
-
-    constexpr bool operator>(const iterator& other) const {
-      assert(hdr_ == other.hdr_);
-      return pos_ > other.pos_;
-    }
-
-    constexpr bool operator<=(const iterator& other) const {
-      assert(hdr_ == other.hdr_);
-      return pos_ <= other.pos_;
-    }
-
-    constexpr bool operator>=(const iterator& other) const {
-      assert(hdr_ == other.hdr_);
-      return pos_ >= other.pos_;
-    }
-
-#endif  // operator<=> support.
 
     constexpr const value_type& operator*() const { return entry_; }
 
