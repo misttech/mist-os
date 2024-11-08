@@ -438,24 +438,32 @@ TEST_F(SdhciTest, SetBusFreq) {
 
   auto clock = ClockControl::Get().FromValue(0);
 
+  EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(0));
+  EXPECT_TRUE(clock.ReadFrom(driver_test().driver()->mmio_).internal_clock_enable());
+
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(12'500'000));
   EXPECT_EQ(clock.ReadFrom(driver_test().driver()->mmio_).frequency_select(), 4);
   EXPECT_TRUE(clock.sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(65'190));
   EXPECT_EQ(clock.ReadFrom(driver_test().driver()->mmio_).frequency_select(), 767);
   EXPECT_TRUE(clock.sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(100'000'000));
   EXPECT_EQ(clock.ReadFrom(driver_test().driver()->mmio_).frequency_select(), 0);
   EXPECT_TRUE(clock.sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(26'000'000));
   EXPECT_EQ(clock.ReadFrom(driver_test().driver()->mmio_).frequency_select(), 2);
   EXPECT_TRUE(clock.sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
 
   EXPECT_OK(driver_test().driver()->SdmmcSetBusFreq(0));
   EXPECT_FALSE(clock.ReadFrom(driver_test().driver()->mmio_).sd_clock_enable());
+  EXPECT_TRUE(clock.internal_clock_enable());
 
   ASSERT_OK(StopDriver());
 }

@@ -224,6 +224,8 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
   bool DataStageReadReady() TA_REQ(mtx_);
   void DataStageWriteReady() TA_REQ(mtx_);
 
+  zx_status_t SetBusClock(uint32_t frequency_hz);
+
   zx::interrupt irq_;
   thrd_t irq_thread_;
   bool irq_thread_started_ = false;

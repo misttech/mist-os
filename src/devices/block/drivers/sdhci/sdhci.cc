@@ -54,6 +54,12 @@ uint16_t GetClockDividerValue(const uint32_t base_clock, const uint32_t target_r
     return 0;
   }
 
+  // SDHCI Versions 1.00 and 2.00 handle the clock divider slightly
+  // differently compared to SDHCI version 3.00. Since this driver doesn't
+  // support SDHCI versions < 3.00, we ignore this incongruency for now.
+  //
+  // V3.00 supports a 10 bit divider where the SD clock frequency is defined
+  // as F/(2*D) where F is the base clock frequency and D is the divider.
   uint32_t result = base_clock / (2 * target_rate);
   if (result * target_rate * 2 < base_clock)
     result++;
@@ -828,27 +834,32 @@ zx_status_t Sdhci::SdmmcSetBusFreq(uint32_t bus_freq) {
     return st;
   }
 
+  return SetBusClock(bus_freq);
+}
+
+zx_status_t Sdhci::SetBusClock(uint32_t frequency_hz) {
   // Turn off the SD clock before messing with the clock rate.
-  auto clock = ClockControl::Get().ReadFrom(&*regs_mmio_buffer_).set_sd_clock_enable(0);
-  if (bus_freq == 0) {
-    clock.WriteTo(&*regs_mmio_buffer_);
-    return ZX_OK;
-  }
-  clock.set_internal_clock_enable(0).WriteTo(&*regs_mmio_buffer_);
+  auto clock = ClockControl::Get()
+                   .ReadFrom(&*regs_mmio_buffer_)
+                   .set_sd_clock_enable(0)
+                   .WriteTo(&*regs_mmio_buffer_)
+                   .set_internal_clock_enable(1);
 
-  // Write the new divider into the control register.
-  clock.set_frequency_select(GetClockDividerValue(base_clock_, bus_freq))
-      .set_internal_clock_enable(1)
-      .WriteTo(&*regs_mmio_buffer_);
-
-  if (st = WaitForInternalClockStable(); st != ZX_OK) {
-    return st;
+  if (frequency_hz > 0) {
+    // Write the new divider into the control register.
+    clock.set_frequency_select(GetClockDividerValue(base_clock_, frequency_hz));
   }
 
-  // Turn the SD clock back on.
-  clock.set_sd_clock_enable(1).WriteTo(&*regs_mmio_buffer_);
+  clock.WriteTo(&*regs_mmio_buffer_);
 
-  FDF_LOG(DEBUG, "sdhci: set bus frequency to %u", bus_freq);
+  if (zx_status_t status = WaitForInternalClockStable(); status != ZX_OK) {
+    return status;
+  }
+
+  if (frequency_hz > 0) {
+    // Turn the SD clock back on.
+    clock.set_sd_clock_enable(1).WriteTo(&*regs_mmio_buffer_);
+  }
 
   return ZX_OK;
 }
@@ -996,12 +1007,10 @@ void Sdhci::PrepareStop(fdf::PrepareStopCompleter completer) {
 }
 
 zx_status_t Sdhci::Init() {
+  SetBusClock(0);
+
   // Perform a software reset against both the DAT and CMD interface.
   SoftwareReset::Get().ReadFrom(&*regs_mmio_buffer_).set_reset_all(1).WriteTo(&*regs_mmio_buffer_);
-
-  // Disable both clocks.
-  auto clock = ClockControl::Get().ReadFrom(&*regs_mmio_buffer_);
-  clock.set_internal_clock_enable(0).set_sd_clock_enable(0).WriteTo(&*regs_mmio_buffer_);
 
   // Wait for reset to take place. The reset is completed when all three
   // of the following flags are reset.
@@ -1104,24 +1113,6 @@ zx_status_t Sdhci::Init() {
     info_.max_transfer_size = std::numeric_limits<BlockCountType>::max() * kBlockSize;
   }
 
-  // Configure the clock.
-  clock.ReadFrom(&*regs_mmio_buffer_).set_internal_clock_enable(1);
-
-  // SDHCI Versions 1.00 and 2.00 handle the clock divider slightly
-  // differently compared to SDHCI version 3.00. Since this driver doesn't
-  // support SDHCI versions < 3.00, we ignore this incongruency for now.
-  //
-  // V3.00 supports a 10 bit divider where the SD clock frequency is defined
-  // as F/(2*D) where F is the base clock frequency and D is the divider.
-  clock.set_frequency_select(GetClockDividerValue(base_clock_, kSdFreqSetupHz))
-      .WriteTo(&*regs_mmio_buffer_);
-
-  // Wait for the clock to stabilize.
-  status = WaitForInternalClockStable();
-  if (status != ZX_OK) {
-    return ZX_ERR_TIMED_OUT;
-  }
-
   // Set the command timeout.
   TimeoutControl::Get()
       .ReadFrom(&*regs_mmio_buffer_)
@@ -1138,7 +1129,10 @@ zx_status_t Sdhci::Init() {
   power.WriteTo(&*regs_mmio_buffer_);
 
   // Enable the SD clock.
-  clock.ReadFrom(&*regs_mmio_buffer_).set_sd_clock_enable(1).WriteTo(&*regs_mmio_buffer_);
+  status = SetBusClock(kSdFreqSetupHz);
+  if (status != ZX_OK) {
+    return status;
+  }
 
   // Disable all interrupts
   {
