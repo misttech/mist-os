@@ -279,10 +279,16 @@ impl HrTimerManager {
             // Note: This fidl::QueryResponseFut is scheduled when created. To prevent suspend
             // before the next hrtimer is started, it needs to be created before
             // `reset_timer_event` is called.
+            // TODO(373928684): Make use of the setup_event to guarantee the timer is setup
+            // before suspension.
+            let setup_event = zx::Event::create();
+            let duplicate_event =
+                setup_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into();
             let start_and_wait = device_async_proxy.start_and_wait(
                 HRTIMER_DEFAULT_ID,
                 &fhrtimer::Resolution::Duration(resolution_nsecs),
                 ticks as u64,
+                duplicate_event,
             );
             // The hrtimer client is responsible for clearing the timer fired
             // signal, so we clear it here right before starting the next

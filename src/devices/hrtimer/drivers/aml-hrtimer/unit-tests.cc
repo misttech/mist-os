@@ -305,8 +305,11 @@ class DriverTest : public ::testing::Test {
     });
     zx::eventpair lease;
     std::thread thread([this, timer_id, &lease]() {
+      zx::event setup_event;
+      ASSERT_EQ(ZX_OK, zx::event::create(0, &setup_event));
       auto result_start = client_->StartAndWait(
-          {timer_id, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+          {timer_id, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
+           std::move(setup_event)});
       ASSERT_FALSE(result_start.is_error());
       ASSERT_TRUE(result_start->keep_alive().is_valid());
       lease = std::move(result_start->keep_alive());
@@ -765,10 +768,19 @@ TEST_F(DriverTest, StartAndWaitTriggering) {
   std::vector<std::thread> threads;
   for (auto& i : kTimersSupportWait) {
     threads.emplace_back([this, i]() {
-      auto result_start = client_->StartAndWait(
-          {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+      zx::event setup_event;
+      ASSERT_EQ(ZX_OK, zx::event::create(0, &setup_event));
+      zx::event duplicate_event;
+      setup_event.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_event);
+      auto result_start =
+          client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
+                                 std::move(duplicate_event)});
       ASSERT_FALSE(result_start.is_error());
       ASSERT_TRUE(result_start->keep_alive().is_valid());
+
+      // setup_event must have been signaled since the timer expired.
+      zx_signals_t signals = {};
+      ASSERT_EQ(setup_event.wait_one(ZX_EVENT_SIGNALED, zx::time::infinite(), &signals), ZX_OK);
     });
 
     // Wait until the driver has acquired the timer wait completer before triggering the IRQ.
@@ -859,11 +871,20 @@ TEST_F(DriverTest, StartAndWait2Triggering) {
 TEST_F(DriverTest, StartAndWaitStop) {
   for (auto& i : kTimersSupportWait) {
     std::thread thread([this, i]() {
-      auto result_start = client_->StartAndWait(
-          {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+      zx::event setup_event;
+      ASSERT_EQ(ZX_OK, zx::event::create(0, &setup_event));
+      zx::event duplicate_event;
+      setup_event.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_event);
+      auto result_start =
+          client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
+                                 std::move(duplicate_event)});
       ASSERT_TRUE(result_start.is_error());
       ASSERT_EQ(result_start.error_value().domain_error(),
                 fuchsia_hardware_hrtimer::DriverError::kCanceled);
+
+      // setup_event must have been signaled since the timer expired.
+      zx_signals_t signals = {};
+      ASSERT_EQ(setup_event.wait_one(ZX_EVENT_SIGNALED, zx::time::infinite(), &signals), ZX_OK);
     });
 
     // Wait until the driver has acquired a wait completer such that we can cancel the timer.
@@ -993,8 +1014,11 @@ TEST_F(DriverTestNoAutoStop, CancelOnDriverStop) {
     ASSERT_FALSE(result_event.is_error());
 
     threads.emplace_back([this, i]() {
-      auto result_start = client_->StartAndWait(
-          {i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+      zx::event setup_event;
+      ASSERT_EQ(ZX_OK, zx::event::create(0, &setup_event));
+      auto result_start =
+          client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
+                                 std::move(setup_event)});
       ASSERT_TRUE(result_start.is_error());
       // Check that we cancel on driver stop.
       ASSERT_EQ(result_start.error_value().domain_error(),
@@ -1035,8 +1059,10 @@ TEST_F(DriverTest, LeaseNotRequested4) {
   driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     ASSERT_FALSE(env.system_activity_governor().GetLeaseRequested());
   });
-  auto result_start =
-      client_->StartAndWait({4, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+  zx::event setup_event;
+  ASSERT_EQ(ZX_OK, zx::event::create(0, &setup_event));
+  auto result_start = client_->StartAndWait(
+      {4, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0, std::move(setup_event)});
   ASSERT_TRUE(result_start.is_error());
   driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     ASSERT_FALSE(env.system_activity_governor().GetLeaseRequested());
@@ -1099,11 +1125,16 @@ class DriverTestNoPower : public ::testing::Test {
 
 TEST_F(DriverTestNoPower, StartAndWaitTriggeringNoPower) {
   for (auto& i : kTimersSupportWait) {
+    zx::event setup_event;
+    ASSERT_EQ(ZX_OK, zx::event::create(0, &setup_event));
     auto result_start =
-        client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
+        client_->StartAndWait({i, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0,
+                               std::move(setup_event)});
     ASSERT_TRUE(result_start.is_error());  // Must fail, no power configuration.
     ASSERT_EQ(result_start.error_value().domain_error(),
               fuchsia_hardware_hrtimer::DriverError::kBadState);
+
+    // setup_event is not signaled since the timer was not setup.
   }
 }
 
