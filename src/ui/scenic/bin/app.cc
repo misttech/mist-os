@@ -133,19 +133,19 @@ scenic_structured_config::Config GetConfig() {
   // Retrieve structured configuration
   auto values = scenic_structured_config::Config::TakeFromStartupHandle();
 
-  FX_LOGS(INFO) << "Scenic renderer: " << ToString(GetRendererType(values));
-  FX_LOGS(INFO) << "Scenic min_predicted_frame_duration(us): "
-                << values.frame_scheduler_min_predicted_frame_duration_in_us();
-  FX_LOGS(INFO) << "Scenic pointer auto focus: " << values.pointer_auto_focus();
-  FX_LOGS(INFO) << "display_composition: " << values.display_composition();
-  FX_LOGS(INFO) << "Scenic i_can_haz_display_id: "
+  FX_LOGS(INFO) << "Scenic renderer: " << ToString(GetRendererType(values))
+                << " min_predicted_frame_duration(us): "
+                << values.frame_scheduler_min_predicted_frame_duration_in_us()
+                << " pointer auto focus: " << values.pointer_auto_focus()
+                << " display_composition: " << values.display_composition()
+                << " i_can_haz_display_id: "
                 << GetDisplayId(values)
                        .value_or(fuchsia_hardware_display_types::DisplayId{
                            {.value = fuchsia_hardware_display_types::kInvalidDispId}})
-                       .value();
-  FX_LOGS(INFO) << "Scenic i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0);
-  FX_LOGS(INFO) << "Scenic display_rotation: " << GetDisplayRotation(values);
-  FX_LOGS(INFO) << "visual_debugging_level: " << static_cast<int>(values.visual_debugging_level());
+                       .value()
+                << " i_can_haz_display_mode: " << GetDisplayMode(values).value_or(0)
+                << " display_rotation: " << GetDisplayRotation(values)
+                << " visual_debugging_level: " << static_cast<int>(values.visual_debugging_level());
 
   return values;
 }
