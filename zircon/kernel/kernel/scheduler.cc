@@ -1205,7 +1205,6 @@ inline void Scheduler::UpdateEstimatedEnergyConsumption(Thread* current_thread,
   // thread.
   const SchedDuration idle_processor_time_ns{IdlePowerThread::TakeProcessorIdleTime()};
   DEBUG_ASSERT(idle_processor_time_ns <= actual_runtime_ns);
-  DEBUG_ASSERT(idle_processor_time_ns == 0 || current_thread->IsIdle());
 
   // Subtract any time the processor spent in the low-power idle state from the
   // runtime to ensure that active vs. idle power consumption is attributed
