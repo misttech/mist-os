@@ -5,7 +5,6 @@
 import("//build/python/python_library.gni")
 python_library("wlanix_testing") {
   testonly = true
-  enable_mypy = true
   sources = [
     "__init__.py",
     "base_test.py",
