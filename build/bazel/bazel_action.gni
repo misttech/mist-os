@@ -837,15 +837,9 @@ template("bazel_action") {
 
     # Forward GN sanitizer configuration to Bazel
     if (is_hwasan) {
-      args += [
-        "--features=hwasan",
-        "--config=link_local",  # Workaround for b/353675498
-      ]
+      args += [ "--features=hwasan" ]
     } else if (is_asan) {
-      args += [
-        "--features=asan",
-        "--config=link_local",  # Workaround for b/353675498
-      ]
+      args += [ "--features=asan" ]
     }
     if (is_lsan) {
       args += [ "--features=lsan" ]
