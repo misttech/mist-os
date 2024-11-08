@@ -47,13 +47,17 @@ class ScenicCtfTest : public zxtest::Test, public ui_testing::LoggingEventLoop {
 
   const std::shared_ptr<sys::ServiceDirectory>& LocalServiceDirectory() const;
 
-  /// Override DisplayRotation() to provide fuchsia.scenic.DisplayRotation to
-  /// test realm. By default, it returns 0.
+  /// Override DisplayRotation() to provide fuchsia.scenic.DisplayRotation to test realm. By
+  /// default, it returns 0.
   virtual uint64_t DisplayRotation() const;
 
-  /// Override Renderer() to provide fuchsia.scenic.Renderer to test realm.
-  /// By default, it returns "vulkan".
+  /// Override Renderer() to provide fuchsia.scenic.Renderer to test realm. By default, it returns
+  /// "vulkan".
   virtual fuchsia::ui::test::context::RendererType Renderer() const;
+
+  /// Override DisplayComposition() to provide fuchsia.scenic.DisplayComposition to test realm. True
+  /// by default.
+  virtual bool DisplayComposition() const;
 
   /// Connect to the FIDL protocol which served from the realm proxy use default served path if no
   /// name passed in.
