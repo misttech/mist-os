@@ -5,8 +5,7 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_ABI_SPAN_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INTERNAL_ABI_SPAN_H_
 
-#include <lib/stdcompat/span.h>
-
+#include <span>
 #include <type_traits>
 
 #include "../abi-ptr.h"
@@ -74,12 +73,12 @@ class AbiSpanImplBase {
     return Span<>{ptr_ + (AsSpan().size() - n), n};
   }
 
-  template <size_t Offset, size_t Count = cpp20::dynamic_extent>
+  template <size_t Offset, size_t Count = std::dynamic_extent>
   constexpr auto subspan() const {
     static_assert(Offset <= N);
     assert(Offset <= AsSpan().size());
-    if constexpr (Count == cpp20::dynamic_extent) {
-      if constexpr (N == cpp20::dynamic_extent) {
+    if constexpr (Count == std::dynamic_extent) {
+      if constexpr (N == std::dynamic_extent) {
         return Span<>{
             ptr_ + Offset,
             static_cast<size_type>(AsSpan().size() - Offset),
@@ -95,9 +94,9 @@ class AbiSpanImplBase {
   }
 
   constexpr auto subspan(size_type offset,
-                         size_type count = static_cast<size_type>(cpp20::dynamic_extent)) const {
+                         size_type count = static_cast<size_type>(std::dynamic_extent)) const {
     assert(offset <= AsSpan().size());
-    if (count == static_cast<size_type>(cpp20::dynamic_extent)) {
+    if (count == static_cast<size_type>(std::dynamic_extent)) {
       count = AsSpan().size() - offset;
     } else {
       assert(count <= AsSpan().size() - offset);
@@ -133,17 +132,17 @@ class AbiSpanImpl<T, N, Elf, Traits, std::void_t<decltype(AbiPtr<T, Elf, Traits>
   using const_pointer = const T*;
   using reference = T&;
   using const_reference = const T&;
-  using iterator = typename cpp20::span<T, N>::iterator;
-  using reverse_iterator = typename cpp20::span<T, N>::reverse_iterator;
+  using iterator = typename std::span<T, N>::iterator;
+  using reverse_iterator = typename std::span<T, N>::reverse_iterator;
 
   using AbiSpanImplBase<T, N, Elf, Traits>::AbiSpanImplBase;
   using AbiSpanImplBase<T, N, Elf, Traits>::operator=;
 
   constexpr T* data() const { return this->AsSpan().ptr().get(); }
 
-  constexpr cpp20::span<T, N> get() const {
+  constexpr std::span<T, N> get() const {
     const auto count = this->AsSpan().size();
-    return cpp20::span<T, N>{data(), count};
+    return std::span<T, N>{data(), count};
   }
 
   constexpr decltype(auto) front() const { return get().front(); }

@@ -233,7 +233,7 @@ class EhFrameHdr {
     constexpr void Decode() {
       assert(pos_ < hdr_->fde_table_.size_bytes());
       assert(hdr_->fde_table_.size_bytes() - pos_ >= hdr_->entry_size_);
-      cpp20::span bytes = hdr_->fde_table_.subspan(pos_, hdr_->entry_size_);
+      std::span bytes = hdr_->fde_table_.subspan(pos_, hdr_->entry_size_);
       auto pc = EncodedPtr::Read<Elf>(hdr_->encoding_.fde_table, bytes);
       assert(pc);
       assert(pc->encoded_size == hdr_->entry_size_ / 2);
@@ -245,7 +245,7 @@ class EhFrameHdr {
         // The value has already been sign-extended, so the adjustments below
         // will work the same as either signed or unsigned.  Pro forma no-op to
         // use the signed value as unsigned.
-        pc->ptr = cpp20::bit_cast<uint64_t>(pc->sptr);
+        pc->ptr = std::bit_cast<uint64_t>(pc->sptr);
       }
       switch (EncodedPtr::Modifier(hdr_->encoding_.fde_table)) {
         case EncodedPtr::kAbs:
@@ -420,7 +420,7 @@ class EhFrameHdr {
   }
 
  private:
-  cpp20::span<const std::byte> fde_table_;
+  std::span<const std::byte> fde_table_;
   address_size_type vaddr_ = 0;
   address_size_type eh_frame_ptr_ = 0;
   EhFrameHdrEncoding encoding_;

@@ -47,7 +47,7 @@ class TestSymtab {
     si.set_strtab(strtab());
   }
 
-  cpp20::span<const Sym> symtab() const { return {symtab_.data(), symtab_.size()}; }
+  std::span<const Sym> symtab() const { return {symtab_.data(), symtab_.size()}; }
 
   std::string_view strtab() const { return strtab_; }
 

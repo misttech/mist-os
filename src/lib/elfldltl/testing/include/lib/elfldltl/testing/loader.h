@@ -185,7 +185,7 @@ class LoadTests : public ::testing::Test {
         .entry = ehdr.entry,
     };
 
-    cpp20::span<const Phdr> phdrs = result->phdrs.get();
+    std::span<const Phdr> phdrs = result->phdrs.get();
     ASSERT_TRUE(elfldltl::DecodePhdrs(diag, phdrs,
                                       result->info.GetPhdrObserver(result->loader.page_size()),
                                       PhdrStackObserver<Elf>{result->stack_size}));

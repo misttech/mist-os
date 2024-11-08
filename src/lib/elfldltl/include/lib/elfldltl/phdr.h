@@ -5,13 +5,13 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_PHDR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_PHDR_H_
 
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/compiler.h>
 
 #include <algorithm>
+#include <bit>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <type_traits>
 
@@ -146,7 +146,7 @@ struct PhdrObserver {};
 // false then this stops processing early and returns false.  Otherwise, each
 // observer's Finish method is called, stopping early if one returns false.
 template <class Diagnostics, class Phdr, size_t N, class... Observers>
-constexpr bool DecodePhdrs(Diagnostics&& diagnostics, cpp20::span<const Phdr, N> phdrs,
+constexpr bool DecodePhdrs(Diagnostics&& diagnostics, std::span<const Phdr, N> phdrs,
                            Observers&&... observers) {
   for (const Phdr& phdr : phdrs) {
     if ((!DecodePhdr(diagnostics, phdr, observers) || ...)) {
@@ -177,7 +177,7 @@ constexpr bool DecodePhdr(Diagnostics&& diagnostics, const Phdr& phdr,
     // An `align` of 0 signifies no alignment constraints, which in practice
     // means an alignment of 1.
     auto align = phdr.align() > 0 ? phdr.align() : 1;
-    if (!cpp20::has_single_bit(align)) {
+    if (!std::has_single_bit(align)) {
       if (ok = diagnostics.FormatError(Error::kBadAlignment); !ok) {
         return false;
       }
@@ -450,7 +450,7 @@ class PhdrLoadObserver
         vaddr_size_(vaddr_size),
         page_size_(page_size),
         callback_(std::move(callback)) {
-    ZX_ASSERT(cpp20::has_single_bit(page_size));
+    ZX_ASSERT(std::has_single_bit(page_size));
     vaddr_start_ = 0;
     vaddr_size_ = 0;
     ZX_DEBUG_ASSERT(NoHeadersSeen());
@@ -612,7 +612,7 @@ constexpr auto MakePhdrLoadObserver(typename Elf::size_type page_size,
 // segments, excluding the RELRO region.  Returns false as soon as the first
 // callback returns false, or else returns true.
 template <class Phdr, typename T>
-constexpr bool OnPhdrWritableSegments(cpp20::span<const Phdr> phdrs, T&& callback) {
+constexpr bool OnPhdrWritableSegments(std::span<const Phdr> phdrs, T&& callback) {
   using size_type = decltype(phdrs.front().memsz());
   static_assert(std::is_invocable_r_v<bool, T, size_type, size_type>);
 

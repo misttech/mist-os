@@ -6,9 +6,9 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_LOADINFO_MUTABLE_MEMORY_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <optional>
+#include <span>
 #include <vector>
 
 #include "container.h"
@@ -107,8 +107,8 @@ class LoadInfoMutableMemory {
   // be followed shortly by a Store call anyway.
 
   template <typename T>
-  std::optional<cpp20::span<const T>> ReadArray(size_type address, size_type count) {
-    std::optional<cpp20::span<const T>> result;
+  std::optional<std::span<const T>> ReadArray(size_type address, size_type count) {
+    std::optional<std::span<const T>> result;
     auto read = [address, count, &result](auto& memory) -> bool {
       result = memory.template ReadArray<T>(address, count);
       return true;
@@ -118,8 +118,8 @@ class LoadInfoMutableMemory {
   }
 
   template <typename T>
-  std::optional<cpp20::span<const T>> ReadArray(size_type address) {
-    std::optional<cpp20::span<const T>> result;
+  std::optional<std::span<const T>> ReadArray(size_type address) {
+    std::optional<std::span<const T>> result;
     auto read = [address, &result](auto& memory) -> bool {
       result = memory.template ReadArray<T>(address);
       return true;

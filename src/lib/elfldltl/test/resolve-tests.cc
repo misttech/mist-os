@@ -148,7 +148,7 @@ TYPED_TEST(ElfldltlResolveTests, SingleModule) {
   const Sym* a = kASymbol.Lookup(si);
   ASSERT_NE(a, nullptr);
 
-  cpp20::span modules{&module, 1};
+  std::span modules{&module, 1};
   auto resolve = elfldltl::MakeSymbolResolver(module, modules, diag, kNoTlsdesc<Elf>);
   auto found = resolve(*a, elfldltl::RelocateTls::kNone);
   ASSERT_TRUE(found.is_ok()) << found.error_value();
@@ -347,7 +347,7 @@ TYPED_TEST(ElfldltlResolveTests, GnuUniqueError) {
   const Sym* a = kASymbol.Lookup(si);
   ASSERT_NE(a, nullptr);
 
-  cpp20::span modules{&module, 1};
+  std::span modules{&module, 1};
   auto resolve = elfldltl::MakeSymbolResolver(module, modules, expected, kNoTlsdesc<Elf>);
   auto found = resolve(*a, elfldltl::RelocateTls::kNone);
   EXPECT_TRUE(found.is_error());

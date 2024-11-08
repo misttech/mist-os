@@ -6,10 +6,10 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FD_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 #include <unistd.h>
 
 #include <cerrno>
+#include <span>
 
 #include <fbl/unique_fd.h>
 
@@ -24,7 +24,7 @@ namespace elfldltl {
 
 namespace internal {
 
-inline fit::result<PosixError> ReadFd(int fd, off_t offset, cpp20::span<std::byte> buffer) {
+inline fit::result<PosixError> ReadFd(int fd, off_t offset, std::span<std::byte> buffer) {
   do {
     ssize_t n = pread(fd, buffer.data(), buffer.size(), offset);
     if (n < 0) {
@@ -42,7 +42,7 @@ inline fit::result<PosixError> ReadFd(int fd, off_t offset, cpp20::span<std::byt
 inline int MakeInvalidFd() { return -1; }
 
 inline fit::result<PosixError> ReadUniqueFd(const fbl::unique_fd& fd, off_t offset,
-                                            cpp20::span<std::byte> buffer) {
+                                            std::span<std::byte> buffer) {
   return ReadFd(fd.get(), offset, buffer);
 }
 

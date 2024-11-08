@@ -29,7 +29,7 @@ struct DynamicFuzzer {
     auto image_address = provider.ConsumeIntegral<typename Elf::size_type>();
     FuzzerInputs inputs(provider);
     auto [dyn, image] = inputs.inputs();
-    cpp20::span image_bytes{const_cast<std::byte*>(image.data()), image.size()};
+    std::span image_bytes{const_cast<std::byte*>(image.data()), image.size()};
     elfldltl::DirectMemory memory(image_bytes, image_address);
 
     std::vector<std::string> errors;

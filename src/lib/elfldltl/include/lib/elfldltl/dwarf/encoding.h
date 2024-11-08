@@ -5,10 +5,10 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DWARF_ENCODING_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_DWARF_ENCODING_H_
 
-#include <lib/stdcompat/span.h>
-
+#include <cassert>
 #include <cstdint>
 #include <optional>
+#include <span>
 
 #include "../layout.h"
 
@@ -24,7 +24,7 @@ struct Uleb128 {
   // Read one ULEB128 value from the byte buffer.  Returns std::nullopt if the
   // buffer is too short or if the encoding uses more bytes than should be
   // necessary for a 64-bit value.
-  static std::optional<Uleb128> Read(cpp20::span<const std::byte> bytes);
+  static std::optional<Uleb128> Read(std::span<const std::byte> bytes);
 
   // This is the value, zero-extended to uint64_t.
   uint64_t value = 0;
@@ -42,7 +42,7 @@ struct Sleb128 {
   // Read one SLEB128 value from the byte buffer.  Returns std::nullopt if the
   // buffer is too short or if the encoding uses more bytes than should be
   // necessary for a 64-bit value.
-  static std::optional<Sleb128> Read(cpp20::span<const std::byte> bytes);
+  static std::optional<Sleb128> Read(std::span<const std::byte> bytes);
 
   // This is the value, sign-extended to int64_t.
   int64_t value = 0;
@@ -231,7 +231,7 @@ struct EncodedPtr {
   // responsible for applying modifiers and indirection to the value.
   template <class Elf = Elf<>>
   static constexpr std::optional<EncodedPtr> Read(
-      uint8_t encoding, cpp20::span<const std::byte> bytes,
+      uint8_t encoding, std::span<const std::byte> bytes,
       uint8_t address_size = sizeof(typename Elf::Addr)) {
     if (Type(encoding) == kSleb128) {
       if (auto leb = Sleb128::Read(bytes)) {

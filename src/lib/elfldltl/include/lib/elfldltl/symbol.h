@@ -5,12 +5,11 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SYMBOL_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SYMBOL_H_
 
-#include <lib/stdcompat/span.h>
-#include <lib/stdcompat/type_traits.h>
-
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
+#include <type_traits>
 
 #include "abi-span.h"
 #include "compat-hash.h"
@@ -136,7 +135,7 @@ class SymbolName : public std::string_view {
     std::string_view::operator=(name);
     compat_hash_ = kCompatNoHash;
     gnu_hash_ = kGnuNoHash;
-    if (cpp20::is_constant_evaluated()) {  // Precompute in constexpr.
+    if (std::is_constant_evaluated()) {  // Precompute in constexpr.
       compat_hash();
       gnu_hash();
     }
@@ -144,9 +143,9 @@ class SymbolName : public std::string_view {
   }
 
   uint32_t compat_hash_ =  // Precompute in constexpr.
-      cpp20::is_constant_evaluated() ? CompatHashString(*this) : kCompatNoHash;
+      std::is_constant_evaluated() ? CompatHashString(*this) : kCompatNoHash;
   uint32_t gnu_hash_ =  // Precompute in constexpr.
-      cpp20::is_constant_evaluated() ? GnuHashString(*this) : kGnuNoHash;
+      std::is_constant_evaluated() ? GnuHashString(*this) : kGnuNoHash;
 };
 
 // This type can be used as a constructor tag to zero-construct an object whose
@@ -293,7 +292,7 @@ class SymbolInfo {
   // Fetch the raw symbol table.  Note this size may be an upper bound.  It's
   // all valid memory to read, but there might be garbage data past the last
   // actual valid symbol table index.
-  constexpr cpp20::span<const Sym> symtab() const { return symtab_; }
+  constexpr std::span<const Sym> symtab() const { return symtab_; }
 
   // Fetch the symbol table and try to reduce its apparent size to its real
   // size or at least a better approximation.  This provides no guarantee that
@@ -301,7 +300,7 @@ class SymbolInfo {
   // work to try to ensure it.  If using only indices that are presumed to be
   // valid, such as those in relocation entries, just use symtab() instead.
   // This is better for blind enumeration.
-  cpp20::span<const Sym> safe_symtab() const { return symtab_.subspan(0, safe_symtab_size()); }
+  std::span<const Sym> safe_symtab() const { return symtab_.subspan(0, safe_symtab_size()); }
 
   // Return the CompatHash object (see compat-hash.h) if DT_HASH is present.
   constexpr std::optional<CompatHash> compat_hash() const {
@@ -343,21 +342,21 @@ class SymbolInfo {
     return *this;
   }
 
-  constexpr SymbolInfo& set_strtab_as_span(cpp20::span<const char> strtab) {
+  constexpr SymbolInfo& set_strtab_as_span(std::span<const char> strtab) {
     return set_strtab({strtab.data(), strtab.size()});
   }
 
-  constexpr SymbolInfo& set_symtab(cpp20::span<const Sym> symtab) {
+  constexpr SymbolInfo& set_symtab(std::span<const Sym> symtab) {
     symtab_ = symtab;
     return *this;
   }
 
-  constexpr SymbolInfo& set_compat_hash(cpp20::span<const Word> table) {
+  constexpr SymbolInfo& set_compat_hash(std::span<const Word> table) {
     compat_hash_ = table;
     return *this;
   }
 
-  constexpr SymbolInfo& set_gnu_hash(cpp20::span<const Addr> table) {
+  constexpr SymbolInfo& set_gnu_hash(std::span<const Addr> table) {
     gnu_hash_ = table;
     return *this;
   }
@@ -379,7 +378,7 @@ class SymbolInfo {
 
  private:
   template <typename T>
-  using Span = AbiSpan<const T, cpp20::dynamic_extent, Elf, AbiTraits>;
+  using Span = AbiSpan<const T, std::dynamic_extent, Elf, AbiTraits>;
 
   // In directly-usable instantiations, ensure that the empty state is
   // guaranteed NUL terminated.  In remoting instantiations, the values will
@@ -465,7 +464,7 @@ class SymbolInfoForSingleLookup : public SymbolInfo<Elf> {
                                                ElfSymBind bind = ElfSymBind::kGlobal)
       : symbol_{.info = Sym::MakeInfo(bind, type)} {
     this->set_strtab({name, std::string_view{name}.size() + 1});
-    this->set_symtab(cpp20::span{&symbol_, 1});
+    this->set_symtab(std::span{&symbol_, 1});
   }
 
   const Sym& symbol() const { return symbol_; }

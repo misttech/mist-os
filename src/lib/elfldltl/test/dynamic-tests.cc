@@ -34,7 +34,7 @@ TYPED_TEST(ElfldltlDynamicTests, Empty) {
   };
 
   // No matchers and nothing to match.
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn)));
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, std::span(dyn)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, MissingTerminator) {
@@ -45,7 +45,7 @@ TYPED_TEST(ElfldltlDynamicTests, MissingTerminator) {
   elfldltl::DirectMemory memory({}, 0);
 
   // Empty span has no terminator.
-  cpp20::span<const typename Elf::Dyn> dyn;
+  std::span<const typename Elf::Dyn> dyn;
 
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, dyn));
 }
@@ -62,7 +62,7 @@ TYPED_TEST(ElfldltlDynamicTests, RejectTextrel) {
     };
 
     ExpectOkDiagnostics diag;
-    EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn_notextrel),
+    EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, std::span(dyn_notextrel),
                                         elfldltl::DynamicTextrelRejectObserver{}));
   }
 
@@ -77,7 +77,7 @@ TYPED_TEST(ElfldltlDynamicTests, RejectTextrel) {
         elfldltl::DynamicTextrelRejectObserver::kMessage,
     };
 
-    EXPECT_TRUE(elfldltl::DecodeDynamic(expected, memory, cpp20::span(dyn_textrel),
+    EXPECT_TRUE(elfldltl::DecodeDynamic(expected, memory, std::span(dyn_textrel),
                                         elfldltl::DynamicTextrelRejectObserver{}));
   }
 
@@ -94,7 +94,7 @@ TYPED_TEST(ElfldltlDynamicTests, RejectTextrel) {
     auto expected = elfldltl::testing::ExpectedSingleError{
         elfldltl::DynamicTextrelRejectObserver::kMessage,
     };
-    EXPECT_TRUE(elfldltl::DecodeDynamic(expected, memory, cpp20::span(dyn_flags_textrel),
+    EXPECT_TRUE(elfldltl::DecodeDynamic(expected, memory, std::span(dyn_flags_textrel),
                                         elfldltl::DynamicTextrelRejectObserver{}));
   }
 }
@@ -112,7 +112,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverEmpty) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, empty_memory, cpp20::span(dyn_noreloc),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, empty_memory, std::span(dyn_noreloc),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   EXPECT_TRUE(info.rel_relative().empty());
@@ -201,7 +201,7 @@ class RelocInfoTestImage {
     };
   } image_;
 
-  cpp20::span<std::byte> image_bytes() { return cpp20::as_writable_bytes(cpp20::span(&image_, 1)); }
+  std::span<std::byte> image_bytes() { return std::as_writable_bytes(std::span(&image_, 1)); }
 };
 
 TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverFullValid) {
@@ -266,7 +266,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverFullValid) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_goodreloc),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_goodreloc),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   EXPECT_EQ(2u, info.rel_relative().size());
@@ -339,7 +339,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelent) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relent),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_bad_relent),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   // With keep-going, the data is delivered anyway.
@@ -410,7 +410,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelaent) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relaent),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_bad_relaent),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   // With keep-going, the data is delivered anyway.
@@ -481,7 +481,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelrent) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relrent),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_bad_relrent),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   // With keep-going, the data is delivered anyway.
@@ -553,7 +553,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverMissingPltrel) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_missing_pltrel),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_missing_pltrel),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_JMPREL was ignored but the rest is normal.
@@ -622,7 +622,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadPltrel) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_pltrel),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_bad_pltrel),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_JMPREL was ignored but the rest is normal.
@@ -698,7 +698,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelAddr) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_rel_addr),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_bad_rel_addr),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_REL was ignored but the rest is normal.
@@ -771,7 +771,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSz) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relsz),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_bad_relsz),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_REL was ignored but the rest is normal.
@@ -844,7 +844,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSzAlign) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relsz_align),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_bad_relsz_align),
                                       elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_REL was ignored but the rest is normal.
@@ -875,8 +875,8 @@ class SymbolInfoTestImage {
     // Build up some good symbol data in a memory image.
     soname_offset_ = test_syms_.AddString("libfoo.so");
 
-    auto symtab_bytes = cpp20::as_bytes(test_syms_.symtab());
-    cpp20::span<const std::byte> strtab_bytes{
+    auto symtab_bytes = std::as_bytes(test_syms_.symtab());
+    std::span<const std::byte> strtab_bytes{
         reinterpret_cast<const std::byte*>(test_syms_.strtab().data()),
         test_syms_.strtab().size(),
     };
@@ -892,13 +892,13 @@ class SymbolInfoTestImage {
     image_.insert(image_.end(), strtab_bytes.begin(), strtab_bytes.end());
 
     gnu_hash_addr_ = next_addr();
-    auto gnu_hash_data = cpp20::span(kTestGnuHash<typename Elf::Addr>);
-    auto gnu_hash_bytes = cpp20::as_bytes(gnu_hash_data);
+    auto gnu_hash_data = std::span(kTestGnuHash<typename Elf::Addr>);
+    auto gnu_hash_bytes = std::as_bytes(gnu_hash_data);
     image_.insert(image_.end(), gnu_hash_bytes.begin(), gnu_hash_bytes.end());
 
     hash_addr_ = next_addr();
-    auto hash_data = cpp20::span(kTestCompatHash<typename Elf::Word>);
-    auto hash_bytes = cpp20::as_bytes(hash_data);
+    auto hash_data = std::span(kTestCompatHash<typename Elf::Word>);
+    auto hash_bytes = std::as_bytes(hash_data);
     image_.insert(image_.end(), hash_bytes.begin(), hash_bytes.end());
   }
 
@@ -944,7 +944,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverEmpty) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, empty_memory, cpp20::span(dyn_nosyms),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, empty_memory, std::span(dyn_nosyms),
                                       elfldltl::DynamicSymbolInfoObserver(info)));
 
   EXPECT_EQ(info.strtab().size(), 1u);
@@ -988,7 +988,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverFullValid) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_goodsyms),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), std::span(dyn_goodsyms),
                                       elfldltl::DynamicSymbolInfoObserver(info)));
 
   EXPECT_EQ(info.strtab().size(), test_image.test_syms().strtab().size());
@@ -1033,7 +1033,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSonameOffset) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_soname_offset),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_bad_soname_offset),
                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1064,7 +1064,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSyment) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_syment),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_bad_syment),
                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1091,7 +1091,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrsz) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_missing_strsz),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_missing_strsz),
                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1122,7 +1122,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrtab) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_missing_strtab),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_missing_strtab),
                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1159,7 +1159,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadStrtabAddr) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_strtab_addr),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_bad_strtab_addr),
                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1198,7 +1198,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAddr) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_symtab_addr),
+  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_bad_symtab_addr),
                                        elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1236,7 +1236,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAlign) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_symtab_align),
+  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_bad_symtab_align),
                                        elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1275,7 +1275,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAddr) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_hash_addr),
+  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_bad_hash_addr),
                                        elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1311,7 +1311,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAlign) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_hash_align),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_bad_hash_align),
                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1347,7 +1347,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAddr) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_gnu_hash_addr),
+  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_bad_gnu_hash_addr),
                                        elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1380,7 +1380,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAlign) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_gnu_hash_align),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, std::span(dyn_bad_gnu_hash_align),
                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
@@ -1406,7 +1406,7 @@ TYPED_TEST(ElfldltlDynamicTests, ObserveNeededEmpty) {
   };
 
   EXPECT_TRUE(
-      elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn),
+      elfldltl::DecodeDynamic(diag, memory, std::span(dyn),
                               elfldltl::DynamicNeededObserver(si, [](std::string_view needed) {
                                 ADD_FAILURE() << "Unexpected needed entry:", needed.data();
                                 return false;
@@ -1442,7 +1442,7 @@ TYPED_TEST(ElfldltlDynamicTests, ObserveNeeded) {
     return true;
   };
 
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn),
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, std::span(dyn),
                                       elfldltl::DynamicNeededObserver(si, expect_next)));
 }
 
@@ -1476,7 +1476,7 @@ TYPED_TEST(ElfldltlDynamicTests, ObserveValueCollection) {
   static const constexpr std::string_view kCollectionError = "Failed to push value to collection.";
   elfldltl::StdContainer<std::vector>::Container<size_type> values;
   EXPECT_TRUE(elfldltl::DecodeDynamic(
-      diag, memory, cpp20::span(dyn),
+      diag, memory, std::span(dyn),
       elfldltl::DynamicValueCollectionObserver<
           Elf, elfldltl::ElfDynTag::kNeeded,
           elfldltl::StdContainer<std::vector>::Container<size_type>, kCollectionError>(values)));

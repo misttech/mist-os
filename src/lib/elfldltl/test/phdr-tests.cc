@@ -7,9 +7,9 @@
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/phdr.h>
 #include <lib/elfldltl/testing/typed-test.h>
-#include <lib/stdcompat/span.h>
 
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -53,7 +53,7 @@ TYPED_TEST(ElfldltlPhdrTests, Empty) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   // No matchers and nothing to match.
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>{}));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span<const Phdr>{}));
 
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
@@ -68,7 +68,7 @@ TYPED_TEST(ElfldltlPhdrTests, NullObserverNoNulls) {
 
   std::vector<std::string> warnings;
   auto diag = elfldltl::CollectStringsDiagnostics(warnings, kFlags);
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrNullObserver<Elf>()));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs), elfldltl::PhdrNullObserver<Elf>()));
 
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
@@ -87,7 +87,7 @@ TYPED_TEST(ElfldltlPhdrTests, NullObserverOneNull) {
 
   std::vector<std::string> warnings;
   auto diag = elfldltl::CollectStringsDiagnostics(warnings, kFlags);
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrNullObserver<Elf>()));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs), elfldltl::PhdrNullObserver<Elf>()));
 
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(1u, diag.warnings());
@@ -107,7 +107,7 @@ TYPED_TEST(ElfldltlPhdrTests, NullObserverThreeNulls) {
 
   std::vector<std::string> warnings;
   auto diag = elfldltl::CollectStringsDiagnostics(warnings, kFlags);
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrNullObserver<Elf>()));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs), elfldltl::PhdrNullObserver<Elf>()));
 
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(3u, diag.warnings());
@@ -132,7 +132,7 @@ TYPED_TEST(ElfldltlPhdrTests, SingletonObserverAtMostOneHeaderPerType) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors);
   std::optional<Phdr> dynamic, interp, eh_frame, relro;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs),  //
+      diag, std::span(kPhdrs),  //
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kDynamic>(dynamic),
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kInterp>(interp),
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kEhFrameHdr>(eh_frame),
@@ -168,7 +168,7 @@ TYPED_TEST(ElfldltlPhdrTests, SingletonObserverMultipleHeadersPerType) {
   auto diag = elfldltl::CollectStringsDiagnostics(warnings, kFlags);
   std::optional<Phdr> interp, eh_frame, relro;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs),  //
+      diag, std::span(kPhdrs),  //
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kInterp>(interp),
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kEhFrameHdr>(eh_frame),
       elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kRelro>(relro)));
@@ -197,7 +197,7 @@ TYPED_TEST(ElfldltlPhdrTests, UnknownFlags) {
   auto diag = elfldltl::CollectStringsDiagnostics(warnings, kFlags);
   std::optional<Phdr> load, dynamic, interp, stack, relro;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),  //
+      elfldltl::DecodePhdrs(diag, std::span(kPhdrs),  //
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kLoad>(load),
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kDynamic>(dynamic),
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kInterp>(interp),
@@ -232,7 +232,7 @@ TYPED_TEST(ElfldltlPhdrTests, BadAlignment) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
   std::optional<Phdr> load, dynamic, interp, note, relro;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),  //
+      elfldltl::DecodePhdrs(diag, std::span(kPhdrs),  //
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kLoad>(load),
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kDynamic>(dynamic),
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kInterp>(interp),
@@ -289,7 +289,7 @@ TYPED_TEST(ElfldltlPhdrTests, OffsetNotEquivVaddr) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
   std::optional<Phdr> load, dynamic, interp, note, relro;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),  //
+      elfldltl::DecodePhdrs(diag, std::span(kPhdrs),  //
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kLoad>(load),
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kDynamic>(dynamic),
                             elfldltl::PhdrSingletonObserver<Elf, ElfPhdrType::kInterp>(interp),
@@ -319,7 +319,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrNonzeroSize) {
   std::optional<size_type> size;
   bool executable = false;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs),
+      diag, std::span(kPhdrs),
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   ASSERT_TRUE(size);
@@ -340,7 +340,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrZeroSize) {
   std::optional<size_type> size;
   bool executable = false;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs),
+      diag, std::span(kPhdrs),
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   ASSERT_FALSE(size);
@@ -358,7 +358,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkNoPhdrSize) {
   std::optional<size_type> size;
   bool executable = false;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span<const Phdr>{},
+      diag, std::span<const Phdr>{},
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   ASSERT_FALSE(size);
@@ -378,7 +378,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrWithX) {
   std::optional<size_type> size;
   bool executable = false;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs),
+      diag, std::span(kPhdrs),
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   ASSERT_TRUE(size);
@@ -402,7 +402,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkPhdrWithoutX) {
   std::optional<size_type> size;
   bool executable = false;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs),
+      diag, std::span(kPhdrs),
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   EXPECT_FALSE(executable);
@@ -422,7 +422,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecOkNoPhdr) {
   std::optional<size_type> size;
   bool executable = false;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span<const Phdr>{},
+      diag, std::span<const Phdr>{},
       elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/true>(size, executable)));
 
   EXPECT_TRUE(executable);
@@ -442,9 +442,8 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrNonzeroSize) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   std::optional<size_type> size;
-  EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
-                            elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(
+      diag, std::span(kPhdrs), elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
   ASSERT_TRUE(size);
   EXPECT_EQ(0x1000u, *size);
@@ -462,9 +461,8 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrZeroSize) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   std::optional<size_type> size;
-  EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
-                            elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(
+      diag, std::span(kPhdrs), elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
   ASSERT_FALSE(size);
 }
@@ -480,7 +478,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkNoPhdrSize) {
 
   std::optional<size_type> size;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>{},
+      elfldltl::DecodePhdrs(diag, std::span<const Phdr>{},
                             elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
   ASSERT_FALSE(size);
@@ -498,9 +496,8 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrWithX) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   std::optional<size_type> size;
-  EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
-                            elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(
+      diag, std::span(kPhdrs), elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
   EXPECT_EQ(1u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
@@ -520,9 +517,8 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkPhdrWithoutX) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
 
   std::optional<size_type> size;
-  EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
-                            elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
+  EXPECT_TRUE(elfldltl::DecodePhdrs(
+      diag, std::span(kPhdrs), elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
   EXPECT_EQ(0u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
@@ -539,7 +535,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverExecNotOkNoPhdr) {
 
   std::optional<size_type> size;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>{},
+      elfldltl::DecodePhdrs(diag, std::span<const Phdr>{},
                             elfldltl::PhdrStackObserver<Elf, /*CanBeExecutable=*/false>(size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -561,7 +557,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverNonReadable) {
 
   std::optional<size_type> size;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrStackObserver<Elf>(size)));
+      elfldltl::DecodePhdrs(diag, std::span(kPhdrs), elfldltl::PhdrStackObserver<Elf>(size)));
 
   EXPECT_EQ(1u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
@@ -582,7 +578,7 @@ TYPED_TEST(ElfldltlPhdrTests, StackObserverNonWritable) {
 
   std::optional<size_type> size;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs), elfldltl::PhdrStackObserver<Elf>(size)));
+      elfldltl::DecodePhdrs(diag, std::span(kPhdrs), elfldltl::PhdrStackObserver<Elf>(size)));
 
   EXPECT_EQ(1u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
@@ -599,7 +595,7 @@ TYPED_TEST(ElfldltlPhdrTests, MetadataObserverNoPhdr) {
 
   std::optional<Phdr> phdr;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>{},
+      elfldltl::DecodePhdrs(diag, std::span<const Phdr>{},
                             elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kInterp>(phdr)));
 
   EXPECT_FALSE(phdr);
@@ -624,7 +620,7 @@ TYPED_TEST(ElfldltlPhdrTests, MetadataObserverUnalignedVaddr) {
   auto diag = elfldltl::CollectStringsDiagnostics(errors, kFlags);
   std::optional<Phdr> phdr;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs), elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kInterp>(phdr)));
+      diag, std::span(kPhdrs), elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kInterp>(phdr)));
 
   EXPECT_EQ(1u, diag.errors());
   EXPECT_EQ(0u, diag.warnings());
@@ -651,7 +647,7 @@ TYPED_TEST(ElfldltlPhdrTests, MetadataObserverFileszNotEqMemsz) {
 
   std::optional<Phdr> phdr;
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs), elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kInterp>(phdr)));
+      diag, std::span(kPhdrs), elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kInterp>(phdr)));
 
   EXPECT_TRUE(phdr);
   EXPECT_EQ(1u, diag.errors());
@@ -679,7 +675,7 @@ TYPED_TEST(ElfldltlPhdrTests, MetadataObserverIncompatibleEntrySize) {
 
   std::optional<Phdr> phdr;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+      elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                             elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kDynamic, Dyn>(phdr)));
 
   EXPECT_TRUE(phdr);
@@ -706,7 +702,7 @@ TYPED_TEST(ElfldltlPhdrTests, MetadataObserverIncompatibleEntryAlignment) {
 
   std::optional<Phdr> phdr;
   EXPECT_TRUE(
-      elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+      elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                             elfldltl::PhdrMetadataObserver<Elf, ElfPhdrType::kDynamic, Dyn>(phdr)));
 
   EXPECT_TRUE(phdr);
@@ -727,7 +723,7 @@ TYPED_TEST(ElfldltlPhdrTests, LoadObserverNoPhdr) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>{},
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span<const Phdr>{},
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(0u, vaddr_start);
@@ -751,7 +747,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverSmallAlign) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -775,7 +771,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverZeroMemsz) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(0u, diag.errors());
@@ -799,7 +795,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverMemszTooSmall) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -825,7 +821,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverMemEndOverflow) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -851,7 +847,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverAlignedMemEndOverflow) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -883,7 +879,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverFileEndOverflow) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -915,7 +911,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverAlignedFileEndOverflow) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -941,7 +937,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverUnordered) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -969,7 +965,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverOverlappingMemoryRange) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -1019,7 +1015,7 @@ TYPED_TEST(ElfldltlPhdrTests, BasicLoadObserverCompliant) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kAlign / 2, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(0u, diag.errors());
@@ -1065,7 +1061,7 @@ TYPED_TEST(ElfldltlPhdrTests, FileRangeMonotonicLoadObserverUnordered) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -1108,7 +1104,7 @@ TYPED_TEST(ElfldltlPhdrTests, FileRangeMonotonicLoadObserverOverlappingAlignedFi
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kAlign, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -1165,7 +1161,7 @@ TYPED_TEST(ElfldltlPhdrTests, FileRangeMonotonicLoadObserverCompliant) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kAlign, vaddr_start, vaddr_size)));
 
   // EXPECT_EQ("", errors.front());
@@ -1205,7 +1201,7 @@ TYPED_TEST(ElfldltlPhdrTests, ContiguousLoadObserverHighFirstOffset) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kAlign, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -1236,7 +1232,7 @@ TYPED_TEST(ElfldltlPhdrTests, ContiguousLoadObserverNonContiguousFileRanges) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kPageSize, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(1u, diag.errors());
@@ -1289,7 +1285,7 @@ TYPED_TEST(ElfldltlPhdrTests, ContiguousLoadObserverCompliant) {
 
   size_type vaddr_start = 0;
   size_type vaddr_size = 0;
-  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span(kPhdrs),
+  EXPECT_TRUE(elfldltl::DecodePhdrs(diag, std::span(kPhdrs),
                                     LoadObserver(kAlign, vaddr_start, vaddr_size)));
 
   EXPECT_EQ(0u, diag.errors());
@@ -1373,7 +1369,7 @@ TYPED_TEST(ElfldltlPhdrTests, LoadObserverCallback) {
   };
 
   EXPECT_TRUE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs),
+      diag, std::span(kPhdrs),
       elfldltl::MakePhdrLoadObserver<Elf>(kPageSize, vaddr_start, vaddr_size, check_phdrs)));
 
   EXPECT_EQ(0u, diag.errors());
@@ -1425,7 +1421,7 @@ TYPED_TEST(ElfldltlPhdrTests, LoadObserverCallbackBailout) {
     return false;
   };
   EXPECT_FALSE(elfldltl::DecodePhdrs(
-      diag, cpp20::span(kPhdrs),
+      diag, std::span(kPhdrs),
       elfldltl::MakePhdrLoadObserver<Elf>(kPageSize, vaddr_start, vaddr_size, bail_early)));
 
   EXPECT_EQ(0u, diag.errors());
@@ -1644,7 +1640,7 @@ TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFile) {
     Phdr phdrs[1]{};
   } elfbytes;
   elfldltl::DirectMemory file{
-      cpp20::span<std::byte>{reinterpret_cast<std::byte*>(&elfbytes), sizeof(elfbytes)}};
+      std::span<std::byte>{reinterpret_cast<std::byte*>(&elfbytes), sizeof(elfbytes)}};
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), elfbytes.ehdr);
 
   EXPECT_EQ(0u, diag.errors());
@@ -1675,7 +1671,7 @@ TYPED_TEST(ElfldltlPhdrTests, ReadPhdrsFromFilePhXNum) {
     Phdr phdrs[1]{};
   } elfbytes;
   elfldltl::DirectMemory file{
-      cpp20::span<std::byte>{reinterpret_cast<std::byte*>(&elfbytes), sizeof(elfbytes)}};
+      std::span<std::byte>{reinterpret_cast<std::byte*>(&elfbytes), sizeof(elfbytes)}};
   auto result = ReadPhdrsFromFile(diag, file, elfldltl::NoArrayFromFile<Phdr>(), elfbytes.ehdr);
 
   EXPECT_EQ(0u, diag.errors());

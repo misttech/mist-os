@@ -5,14 +5,13 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_MEMORY_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_MEMORY_H_
 
-#include <lib/stdcompat/functional.h>
-#include <lib/stdcompat/span.h>
-
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <tuple>
 
 #include <fbl/alloc_checker.h>
@@ -47,7 +46,7 @@ namespace elfldltl {
 //
 //   This is like ReadFromFile, but for an array of T[count].  The const
 //   Result& referring to the return value's value() is implicitly convertible
-//   to cpp20::span<const T>, but it might own the data.  Any particular File
+//   to std::span<const T>, but it might own the data.  Any particular File
 //   implementation is free to ignore `allocator` instead always return its own
 //   result type that may or may not be an owning type.
 //
@@ -56,13 +55,13 @@ namespace elfldltl {
 // respect to T.
 //
 //  * template <typename T>
-//    std::optional<cpp20::span<const T>> ReadArray(uintptr_t address, size_t count);
+//    std::optional<std::span<const T>> ReadArray(uintptr_t address, size_t count);
 //
 //   This returns a view of T[count] if that's accessible at the address.  The
 //   data must be permanently accessible for the lifetime of the Memory object.
 //
 //  * template <typename T>
-//    std::optional<cpp20::span<const T>> ReadArray(uintptr_t address);
+//    std::optional<std::span<const T>> ReadArray(uintptr_t address);
 //
 //   This is the same but for when the caller doesn't know the size of the
 //   array.  So this returns a view of T[n] for some n > 0 that is accessible,
@@ -117,15 +116,15 @@ class NewArrayFromFile {
     Result& operator=(const Result&) noexcept = delete;
     constexpr Result& operator=(Result&&) noexcept = default;
 
-    constexpr cpp20::span<T> get() const { return {ptr_.get(), size_}; }
+    constexpr std::span<T> get() const { return {ptr_.get(), size_}; }
 
-    constexpr cpp20::span<T> release() { return {ptr_.release(), size_}; }
+    constexpr std::span<T> release() { return {ptr_.release(), size_}; }
 
     constexpr explicit operator bool() const { return ptr_ != nullptr; }
 
-    constexpr operator cpp20::span<T>() const { return get(); }
+    constexpr operator std::span<T>() const { return get(); }
 
-    constexpr operator cpp20::span<const T>() const { return get(); }
+    constexpr operator std::span<const T>() const { return get(); }
 
    private:
     Ptr ptr_;
@@ -139,7 +138,7 @@ class NewArrayFromFile {
   constexpr NewArrayFromFile& operator=(NewArrayFromFile&&) = default;
 
   std::optional<Result> operator()(size_t size) const {
-    return std::apply(cpp20::bind_front(New, size), args_);
+    return std::apply(std::bind_front(New, size), args_);
   }
 
  private:
@@ -187,9 +186,9 @@ class FixedArrayFromFile {
     Result& operator=(const Result&) noexcept = delete;
     constexpr Result& operator=(Result&&) noexcept = default;
 
-    constexpr operator cpp20::span<T>() { return cpp20::span(data_).subspan(0, size_); }
+    constexpr operator std::span<T>() { return std::span(data_).subspan(0, size_); }
 
-    constexpr operator cpp20::span<const T>() const { return cpp20::span(data_).subspan(0, size_); }
+    constexpr operator std::span<const T>() const { return std::span(data_).subspan(0, size_); }
 
     constexpr operator bool() const { return size_ > 0; }
 
@@ -221,13 +220,13 @@ class DirectMemory {
   // This takes a memory image and the file-relative address it corresponds to.
   // The one-argument form can be used to use the File API before the base is
   // known.  Then set_base must be called before using the Memory API.
-  explicit DirectMemory(cpp20::span<std::byte> image, uintptr_t base = ~uintptr_t{})
+  explicit DirectMemory(std::span<std::byte> image, uintptr_t base = ~uintptr_t{})
       : image_(image), base_(base) {}
 
   DirectMemory& operator=(const DirectMemory&) = default;
 
-  cpp20::span<std::byte> image() const { return image_; }
-  void set_image(cpp20::span<std::byte> image) { image_ = image; }
+  std::span<std::byte> image() const { return image_; }
+  void set_image(std::span<std::byte> image) { image_ = image; }
 
   uintptr_t base() const { return base_; }
   void set_base(uintptr_t base) { base_ = base; }
@@ -246,8 +245,8 @@ class DirectMemory {
   // ReadArrayFromFile, or ReadArray, yield the address value that
   // must have been passed to ReadArray et al.
   template <typename T>
-  std::optional<uintptr_t> GetVaddr(cpp20::span<const T> data) const {
-    cpp20::span bytes = cpp20::as_bytes(data);
+  std::optional<uintptr_t> GetVaddr(std::span<const T> data) const {
+    std::span bytes = std::as_bytes(data);
     if (bytes.data() < image_.data() || bytes.data() > &image_.back()) [[unlikely]] {
       return std::nullopt;
     }
@@ -260,7 +259,7 @@ class DirectMemory {
 
   template <typename T>
   std::optional<uintptr_t> GetVaddr(const T* ptr) const {
-    return GetVaddr(cpp20::span{ptr, 1});
+    return GetVaddr(std::span{ptr, 1});
   }
 
   // File API assumes this file's first segment has page-aligned p_offset of 0.
@@ -278,8 +277,8 @@ class DirectMemory {
   }
 
   template <typename T, typename Allocator>
-  std::optional<cpp20::span<const T>> ReadArrayFromFile(size_t offset, Allocator&& allocator,
-                                                        size_t count) {
+  std::optional<std::span<const T>> ReadArrayFromFile(size_t offset, Allocator&& allocator,
+                                                      size_t count) {
     auto data = ReadAll<T>(offset);
     if (data.empty() || count > data.size()) [[unlikely]] {
       return std::nullopt;
@@ -292,7 +291,7 @@ class DirectMemory {
   // p_offset).
 
   template <typename T>
-  std::optional<cpp20::span<const T>> ReadArray(uintptr_t ptr, size_t count) {
+  std::optional<std::span<const T>> ReadArray(uintptr_t ptr, size_t count) {
     if (ptr < base_) [[unlikely]] {
       return std::nullopt;
     }
@@ -300,7 +299,7 @@ class DirectMemory {
   }
 
   template <typename T>
-  std::optional<cpp20::span<const T>> ReadArray(uintptr_t ptr) {
+  std::optional<std::span<const T>> ReadArray(uintptr_t ptr) {
     if (ptr < base_) [[unlikely]] {
       return std::nullopt;
     }
@@ -339,7 +338,7 @@ class DirectMemory {
 
  private:
   template <typename T>
-  cpp20::span<const T> ReadAll(size_t offset) {
+  std::span<const T> ReadAll(size_t offset) {
     if (offset >= image_.size()) [[unlikely]] {
       return {};
     }
@@ -359,7 +358,7 @@ class DirectMemory {
     }
   }
 
-  cpp20::span<std::byte> image_;
+  std::span<std::byte> image_;
   uintptr_t base_ = 0;
 };
 

@@ -5,9 +5,8 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INIT_FINI_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_INIT_FINI_H_
 
-#include <lib/stdcompat/span.h>
-
 #include <optional>
+#include <span>
 
 #include "abi-span.h"
 
@@ -43,7 +42,7 @@ struct InitFiniInfo {
   // absolute function pointers after relocation.  If the original file data
   // (or the load image before relocation) is being read, the these addresses
   // need the load bias added.
-  constexpr cpp20::span<const Addr> array() const { return array_; }
+  constexpr std::span<const Addr> array() const { return array_; }
 
   // A single function pointer, from the legacy DT_INIT or DT_FINI entry.  This
   // is not contiguous with the array and is stored separately in the ELF
@@ -56,7 +55,7 @@ struct InitFiniInfo {
     return std::nullopt;
   }
 
-  constexpr InitFiniInfo& set_array(cpp20::span<const Addr> array) {
+  constexpr InitFiniInfo& set_array(std::span<const Addr> array) {
     array_ = array;
     return *this;
   }
@@ -119,7 +118,7 @@ struct InitFiniInfo {
   }
 
  private:
-  AbiSpan<const Addr, cpp20::dynamic_extent, Elf, AbiTraits> array_;
+  AbiSpan<const Addr, std::dynamic_extent, Elf, AbiTraits> array_;
   Addr legacy_ = 0;
 
  public:

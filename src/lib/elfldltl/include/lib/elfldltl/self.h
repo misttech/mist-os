@@ -5,10 +5,9 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SELF_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_SELF_H_
 
-#include <lib/stdcompat/span.h>
-
 #include <climits>
 #include <cstdint>
+#include <span>
 #include <variant>
 
 #include "layout.h"
@@ -114,7 +113,7 @@ class Self : public SelfBase {
 
   // Examine the calling ELF module's file header to find its own program
   // headers.  See Ehdr() above about link-time constraints.
-  static cpp20::span<const typename Elf::Phdr> Phdrs() {
+  static std::span<const typename Elf::Phdr> Phdrs() {
     // This could just use ReadPhdrsFromFile with Memory() as the File API and
     // TrapDiagnostics() as the Diagnostics API.  But even those degenerate
     // uses introduce some extra dependencies and checks we don't really need
@@ -141,7 +140,7 @@ class Self : public SelfBase {
   // extreme upper bound on the actual dynamic section that can be accessed.
   // It must always be examined linearly from the front and not examined past
   // the elfldltl::ElfDynTag::kNull terminator entry.
-  static cpp20::span<const typename Elf::Dyn> Dynamic() {
+  static std::span<const typename Elf::Dyn> Dynamic() {
     // This is pedantically speaking undefined behavior since that array
     // doesn't go that far.  But we have no way to determine its size without
     // looking at memory (either scanning it for the null terminator, or

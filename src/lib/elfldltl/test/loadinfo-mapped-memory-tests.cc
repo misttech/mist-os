@@ -34,19 +34,18 @@ FORMAT_TYPED_TEST_SUITE(ElfldltlLoadInfoMappedMemoryTests);
 
 class MockDirectMemory {
  public:
-  MockDirectMemory() { ON_CALL(*this, ReadBytes).WillByDefault(Return(cpp20::span(kData))); }
+  MockDirectMemory() { ON_CALL(*this, ReadBytes).WillByDefault(Return(std::span(kData))); }
 
-  MOCK_METHOD(std::optional<cpp20::span<const std::byte>>, ReadBytes,
-              (uintptr_t ptr, size_t count));
+  MOCK_METHOD(std::optional<std::span<const std::byte>>, ReadBytes, (uintptr_t ptr, size_t count));
 
   // This is a workaround for MOCK_METHOD's incompatibility with templated functions.
   // LoadInfoMappedMemory calls into this ReadArray function, which in turn calls
   // the ReadBytes MOCK_METHOD above in tests.
   template <typename T>
-  std::optional<cpp20::span<const T>> ReadArray(uintptr_t ptr, size_t count) {
+  std::optional<std::span<const T>> ReadArray(uintptr_t ptr, size_t count) {
     if (std::optional result = ReadBytes(ptr, count * sizeof(T))) {
-      return cpp20::span{reinterpret_cast<const T*>(result->data()),
-                         result->size_bytes() / sizeof(T)};
+      return std::span{reinterpret_cast<const T*>(result->data()),
+                       result->size_bytes() / sizeof(T)};
     }
     return std::nullopt;
   }
@@ -56,9 +55,9 @@ class MockDirectMemory {
 // matches kData properties.
 template <typename T>
 constexpr auto IsExpectedData() {
-  return Optional(AllOf(
-      Property(&cpp20::span<const T>::data, Pointer(reinterpret_cast<const T*>(kData.data()))),
-      Property(&cpp20::span<const T>::size, Eq(kData.size() / sizeof(T)))));
+  return Optional(
+      AllOf(Property(&std::span<const T>::data, Pointer(reinterpret_cast<const T*>(kData.data()))),
+            Property(&std::span<const T>::size, Eq(kData.size() / sizeof(T)))));
 }
 
 TYPED_TEST(ElfldltlLoadInfoMappedMemoryTests, ReadInBounds) {

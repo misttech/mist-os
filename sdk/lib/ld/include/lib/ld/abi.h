@@ -29,6 +29,7 @@
 #include <lib/elfldltl/svr4-abi.h>
 #include <lib/elfldltl/symbol.h>
 #include <lib/elfldltl/tls-layout.h>
+#include <lib/stdcompat/span.h>
 
 #include <string_view>
 

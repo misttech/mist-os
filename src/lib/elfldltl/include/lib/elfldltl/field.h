@@ -5,11 +5,10 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FIELD_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FIELD_H_
 
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/type_traits.h>
-#include <lib/stdcompat/utility.h>
-
+#include <bit>
 #include <cstdint>
+#include <type_traits>
+#include <utility>
 
 namespace elfldltl {
 
@@ -67,16 +66,16 @@ class FieldStorage {
   template <typename Byte, typename = std::enable_if_t<sizeof(Byte) == 1>>
   static constexpr value_type Convert(std::array<Byte, sizeof(value_type)> bytes) {
     auto [first, last] = [&bytes]() {
-      if constexpr (cpp20::endian::native == cpp20::endian::little) {
+      if constexpr (std::endian::native == std::endian::little) {
         return std::make_pair(bytes.crbegin(), bytes.crend());
-      } else if constexpr (cpp20::endian::native == cpp20::endian::big) {
+      } else if constexpr (std::endian::native == std::endian::big) {
         return std::make_pair(bytes.cbegin(), bytes.cend());
       }
     }();
     value_type x{};
     for (auto it = first; it != last; ++it) {
       x <<= 8;
-      x |= cpp20::bit_cast<uint8_t>(*it);
+      x |= std::bit_cast<uint8_t>(*it);
     }
     return x;
   }
@@ -141,18 +140,18 @@ class SignedField final : public FieldStorage<T, kSwap> {
 
   using Storage::Storage;
 
-  constexpr SignedField(value_type value) : Storage{cpp20::bit_cast<T>(value)} {}
+  constexpr SignedField(value_type value) : Storage{std::bit_cast<T>(value)} {}
 
   constexpr SignedField(const SignedField&) = default;
 
   constexpr SignedField& operator=(const SignedField&) = default;
 
   constexpr SignedField& operator=(value_type x) {
-    Storage::operator=(cpp20::bit_cast<T>(x));
+    Storage::operator=(std::bit_cast<T>(x));
     return *this;
   }
 
-  constexpr value_type get() const { return cpp20::bit_cast<value_type>(Storage::get()); }
+  constexpr value_type get() const { return std::bit_cast<value_type>(Storage::get()); }
 
   constexpr value_type operator()() const { return get(); }
 

@@ -9,6 +9,7 @@
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/relocation.h>
 #include <lib/elfldltl/soname.h>
+#include <lib/stdcompat/bit.h>
 
 #include "abi.h"
 #include "load.h"

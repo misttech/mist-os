@@ -70,7 +70,7 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
               result->info.vaddr_start() + result->loader.load_bias());
 
     auto diag = elfldltl::testing::ExpectOkDiagnostics();
-    cpp20::span<const Phdr> phdrs = result->phdrs.get();
+    std::span<const Phdr> phdrs = result->phdrs.get();
     std::optional<Phdr> ph;
     std::optional<Phdr> relro_phdr;
     elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<Elf>(ph),
@@ -239,7 +239,7 @@ TYPED_TEST(ElfldltlLoaderTests, LargeBssSegment) {
   EXPECT_EQ(*data->rodata, 5);
   EXPECT_EQ(*data->data, 18);
   EXPECT_EQ(data->data[kSmallDataCount - 1], 1);
-  cpp20::span bss(data->bss, kLargeBssCount);
+  std::span bss(data->bss, kLargeBssCount);
   EXPECT_THAT(bss, testing::Each(testing::Eq(0)));
 
   *data->data = 1;

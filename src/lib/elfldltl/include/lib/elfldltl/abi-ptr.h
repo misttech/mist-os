@@ -5,10 +5,9 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ABI_PTR_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_ABI_PTR_H_
 
-#include <lib/stdcompat/version.h>
-
 #include <cassert>
 #include <cstdint>
+#include <version>
 
 #if __cpp_impl_three_way_comparison >= 201907L
 #include <compare>

@@ -6,12 +6,13 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_NOTE_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
+#include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
@@ -27,7 +28,7 @@ namespace elfldltl {
 // This represents one decoded ELF note.  It's created ephemerally to yield
 // views on the name and desc (payload), along with the type value.
 struct ElfNote {
-  using Bytes = cpp20::span<const std::byte>;
+  using Bytes = std::span<const std::byte>;
 
   constexpr ElfNote() = default;
 

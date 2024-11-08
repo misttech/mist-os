@@ -171,8 +171,8 @@ class ElfldltlNoteObserverTests : public ::testing::Test {
   template <typename T, typename Diag, typename... Observers>
   bool ObserveNotes(T& notes_data, Diag& diag, Observers&&... observers) {
     elfldltl::DirectMemory file{
-        cpp20::span<std::byte>{reinterpret_cast<std::byte*>(std::addressof(notes_data)),
-                               sizeof(notes_data)},
+        std::span<std::byte>{reinterpret_cast<std::byte*>(std::addressof(notes_data)),
+                             sizeof(notes_data)},
         0};
     static constexpr Phdr phdr = {
         .offset = 0,

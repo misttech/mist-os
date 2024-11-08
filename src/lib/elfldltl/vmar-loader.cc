@@ -4,11 +4,12 @@
 
 #include "lib/elfldltl/vmar-loader.h"
 
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/vmar.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
+
+#include <bit>
+#include <span>
 
 namespace {
 
@@ -22,15 +23,15 @@ constexpr char kHexDigits[] = "0132456789ABCDEF";
 template <const std::string_view& Prefix>
 void SetVmoName(zx::unowned_vmo vmo, std::string_view base_name, size_t n) {
   std::array<char, ZX_MAX_NAME_LEN> buffer{};
-  cpp20::span vmo_name(buffer);
+  std::span vmo_name(buffer);
 
   // First, "data" or "bss".
   size_t name_idx = Prefix.copy(vmo_name.data(), vmo_name.size());
 
   // Then the ordinal in hex (almost surely just one digit, but who knows).
   // Count the bits and divide with round-up to count the nybbles.
-  const size_t hex_chars = (cpp20::bit_width(n | 1) + 3) / 4;
-  cpp20::span hex = cpp20::span(vmo_name).subspan(name_idx, hex_chars);
+  const size_t hex_chars = (std::bit_width(n | 1) + 3) / 4;
+  std::span hex = std::span(vmo_name).subspan(name_idx, hex_chars);
   for (auto it = hex.rbegin(); it != hex.rend(); ++it) {
     *it = kHexDigits[n & 0xf];
     n >>= 4;
@@ -42,7 +43,7 @@ void SetVmoName(zx::unowned_vmo vmo, std::string_view base_name, size_t n) {
   vmo_name[name_idx++] = ':';
 
   // Finally append the original VMO name, however much fits.
-  cpp20::span avail = vmo_name.subspan(name_idx);
+  std::span avail = vmo_name.subspan(name_idx);
   name_idx += base_name.copy(avail.data(), avail.size());
   ZX_DEBUG_ASSERT(name_idx <= vmo_name.size());
 

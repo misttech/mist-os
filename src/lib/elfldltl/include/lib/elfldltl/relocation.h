@@ -5,10 +5,9 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_RELOCATION_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_RELOCATION_H_
 
-#include <lib/stdcompat/bit.h>
-#include <lib/stdcompat/span.h>
-
 #include <algorithm>
+#include <bit>
+#include <span>
 #include <type_traits>
 #include <variant>
 
@@ -46,9 +45,9 @@ class RelocationInfo {
 
   // These span types hold the various relocation tables in their raw forms.
   // The JMPREL table is in either REL or RELA format, so a variant is used.
-  using RelTable = cpp20::span<const Rel>;
-  using RelaTable = cpp20::span<const Rela>;
-  using RelrTable = cpp20::span<const Addr>;
+  using RelTable = std::span<const Rel>;
+  using RelaTable = std::span<const Rela>;
+  using RelrTable = std::span<const Addr>;
   using JmprelTable = std::variant<RelTable, RelaTable>;
 
   // Fetch the various relocation tables.  The REL and RELA tables have
@@ -97,7 +96,7 @@ class RelocationInfo {
   // are valid, or else the index of the first invalid entry.
 
   template <ElfMachine Machine, class Reloc>  // DT_REL or DT_RELA
-  static size_t ValidateRelative(cpp20::span<const Reloc> relocs) {
+  static size_t ValidateRelative(std::span<const Reloc> relocs) {
     constexpr auto valid = [](const auto& reloc) -> bool {
       constexpr uint32_t relative_type =
           static_cast<uint32_t>(RelocationTraits<Machine>::Type::kRelative);
@@ -106,7 +105,7 @@ class RelocationInfo {
     return std::count_if(relocs.begin(), relocs.end(), valid);
   }
 
-  static size_t ValidateRelative(cpp20::span<const Addr> relocs) {  // DT_RELR
+  static size_t ValidateRelative(std::span<const Addr> relocs) {  // DT_RELR
     // The first entry must be a fresh address (low bit clear), and all
     // possible bit patterns are valid for all subsequent entries.
     return (relocs.empty() || (relocs.front() & 1) != 0) ? 0 : relocs.size();
@@ -151,7 +150,7 @@ class RelocationInfo {
           // were an Elf::Rel record with the r_offset implied by this bit
           // position incrementing the running address by address-size per bit.
           while (bitmap != 0) {
-            int skip = cpp20::countr_zero(bitmap) + 1;
+            int skip = std::countr_zero(bitmap) + 1;
             bitmap >>= skip;
             bitmap_offset += skip * sizeof(size_type);
             if (!visit(bitmap_offset)) {

@@ -51,13 +51,13 @@ struct [[gnu::packed]] TestData {
 };
 
 template <typename T>
-constexpr cpp20::span<const std::byte> AsBytes(T& data) {
-  return cpp20::as_bytes(cpp20::span{&data, 1});
+constexpr std::span<const std::byte> AsBytes(T& data) {
+  return std::as_bytes(std::span{&data, 1});
 }
 
 constexpr elfldltl::FileAddress kErrorArg{0x123u};
 
-constexpr cpp20::span<const std::byte> kNoBytes{};
+constexpr std::span<const std::byte> kNoBytes{};
 
 TYPED_TEST(ElfldltlDwarfTests, SectionDataEmpty) {
   using Elf = typename TestFixture::Elf;
@@ -623,9 +623,9 @@ TYPED_TEST(ElfldltlDwarfTests, EncodedPtrFromMemory) {
     set(kIndirectedTo, kIndirectValue);
     return words;
   }();
-  const cpp20::span<std::byte> kImage{
-      const_cast<std::byte*>(cpp20::as_bytes(cpp20::span{kData}).data()),
-      cpp20::span(kData).size_bytes(),
+  const std::span<std::byte> kImage{
+      const_cast<std::byte*>(std::as_bytes(std::span{kData}).data()),
+      std::span(kData).size_bytes(),
   };
 
   elfldltl::DirectMemory memory{kImage, kMemoryBase};
@@ -700,9 +700,9 @@ TYPED_TEST(ElfldltlDwarfTests, EhFrameHdr) {
       0xcdd,
       0x138,
   };
-  const cpp20::span<std::byte> kImage{
-      const_cast<std::byte*>(cpp20::as_bytes(cpp20::span{kData}).data()),
-      cpp20::span(kData).size_bytes(),
+  const std::span<std::byte> kImage{
+      const_cast<std::byte*>(std::as_bytes(std::span{kData}).data()),
+      std::span(kData).size_bytes(),
   };
 
   elfldltl::DirectMemory memory{kImage, kVaddr};
@@ -767,10 +767,10 @@ TYPED_TEST(ElfldltlDwarfTests, CfiEntry) {
 
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
-  cpp20::span kData = AsBytes(kTestEhFrame<Elf>);
-  const cpp20::span<std::byte> kImage{
+  std::span kData = AsBytes(kTestEhFrame<Elf>);
+  const std::span<std::byte> kImage{
       const_cast<std::byte*>(kData.data()),
-      cpp20::span(kData).size_bytes(),
+      std::span(kData).size_bytes(),
   };
   elfldltl::DirectMemory memory{kImage, 0x358};
 

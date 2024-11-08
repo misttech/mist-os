@@ -5,8 +5,7 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_CONSTANTS_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_CONSTANTS_H_
 
-#include <lib/stdcompat/bit.h>
-
+#include <bit>
 #include <cstdint>
 
 namespace elfldltl {
@@ -36,9 +35,9 @@ enum class ElfData : uint8_t {
   k2Msb = 2,
   kNative =
       []() {
-        if constexpr (cpp20::endian::native == cpp20::endian::little) {
+        if constexpr (std::endian::native == std::endian::little) {
           return k2Lsb;
-        } else if constexpr (cpp20::endian::native == cpp20::endian::big) {
+        } else if constexpr (std::endian::native == std::endian::big) {
           return k2Msb;
         }
       }()

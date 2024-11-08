@@ -11,7 +11,7 @@ namespace {
 
 // First two default template arguments.
 static_assert(std::is_same_v<elfldltl::AbiSpan<int>,
-                             elfldltl::AbiSpan<int, cpp20::dynamic_extent, elfldltl::Elf<>>>);
+                             elfldltl::AbiSpan<int, std::dynamic_extent, elfldltl::Elf<>>>);
 
 FORMAT_TYPED_TEST_SUITE(ElfldltlAbiSpanTests);
 
@@ -30,12 +30,11 @@ constexpr void BasicCtorAndAssignTests() {
 TYPED_TEST(ElfldltlAbiSpanTests, Basic) {
   using Elf = typename TestFixture::Elf;
   using LocalSpan =
-      elfldltl::AbiSpan<const int, cpp20::dynamic_extent, Elf, elfldltl::LocalAbiTraits>;
+      elfldltl::AbiSpan<const int, std::dynamic_extent, Elf, elfldltl::LocalAbiTraits>;
   using RemoteSpan =
-      elfldltl::AbiSpan<const int, cpp20::dynamic_extent, Elf, elfldltl::RemoteAbiTraits>;
+      elfldltl::AbiSpan<const int, std::dynamic_extent, Elf, elfldltl::RemoteAbiTraits>;
 
-  static_assert(
-      std::is_same_v<LocalSpan, elfldltl::AbiSpan<const int, cpp20::dynamic_extent, Elf>>);
+  static_assert(std::is_same_v<LocalSpan, elfldltl::AbiSpan<const int, std::dynamic_extent, Elf>>);
 
   BasicCtorAndAssignTests<LocalSpan>();
 
@@ -46,14 +45,14 @@ TYPED_TEST(ElfldltlAbiSpanTests, Basic) {
   EXPECT_TRUE(local.get().empty());
 
   int var;
-  local = LocalSpan{cpp20::span{&var, 1}};
+  local = LocalSpan{std::span{&var, 1}};
   EXPECT_FALSE(local.empty());
   EXPECT_EQ(local.size(), 1u);
   EXPECT_EQ(local.size_bytes(), sizeof(int));
   EXPECT_EQ(local.data(), &var);
 
   auto direct = local.get();
-  static_assert(std::is_same_v<decltype(direct), cpp20::span<const int>>);
+  static_assert(std::is_same_v<decltype(direct), std::span<const int>>);
   EXPECT_EQ(direct.data(), &var);
   EXPECT_EQ(direct.size(), 1u);
 
@@ -131,9 +130,9 @@ void TestSubspan() {
 TYPED_TEST(ElfldltlAbiSpanTests, SubSpan) {
   using Elf = typename TestFixture::Elf;
   using LocalSpan =
-      elfldltl::AbiSpan<const int, cpp20::dynamic_extent, Elf, elfldltl::LocalAbiTraits>;
+      elfldltl::AbiSpan<const int, std::dynamic_extent, Elf, elfldltl::LocalAbiTraits>;
   using RemoteSpan =
-      elfldltl::AbiSpan<const int, cpp20::dynamic_extent, Elf, elfldltl::RemoteAbiTraits>;
+      elfldltl::AbiSpan<const int, std::dynamic_extent, Elf, elfldltl::RemoteAbiTraits>;
 
   TestSubspan<LocalSpan>();
   TestSubspan<RemoteSpan>();
@@ -141,10 +140,10 @@ TYPED_TEST(ElfldltlAbiSpanTests, SubSpan) {
 
 TYPED_TEST(ElfldltlAbiSpanTests, Iterators) {
   using Elf = typename TestFixture::Elf;
-  using Span = elfldltl::AbiSpan<const int, cpp20::dynamic_extent, Elf>;
+  using Span = elfldltl::AbiSpan<const int, std::dynamic_extent, Elf>;
 
   constexpr int kInts[] = {1, 2, 3, 4, 5};
-  const cpp20::span direct{kInts};
+  const std::span direct{kInts};
   const Span five{direct};
 
   EXPECT_EQ(five.begin(), direct.begin());
@@ -155,10 +154,10 @@ TYPED_TEST(ElfldltlAbiSpanTests, Iterators) {
 
 TYPED_TEST(ElfldltlAbiSpanTests, Access) {
   using Elf = typename TestFixture::Elf;
-  using Span = elfldltl::AbiSpan<const int, cpp20::dynamic_extent, Elf>;
+  using Span = elfldltl::AbiSpan<const int, std::dynamic_extent, Elf>;
 
   constexpr int kInts[] = {1, 2, 3, 4, 5};
-  const cpp20::span direct{kInts};
+  const std::span direct{kInts};
   const Span five{direct};
 
   EXPECT_EQ(&five.front(), &kInts[0]);
