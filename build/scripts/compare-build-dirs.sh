@@ -425,6 +425,8 @@ function diff_file_relpath() {
 
     # All others.
     # Binary files diffs will still only be reported tersely.
+    # TODO(b/377967111): fix python hermetic test nondeterminism:
+    rtc_conformance_test_bin) expect=diff; diff_binary "$left" "$right" ;;
     *)
       file_type="$(file "$left" | head -n 1 | cut -d: -f2-)"
       case "$file_type" in
