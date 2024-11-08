@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <zircon/lookup.h>
 
+#include <algorithm>
 #include <cerrno>
 #include <cstdarg>
 #include <mutex>
@@ -342,7 +343,7 @@ int _getaddrinfo_from_dns(struct address buf[MAXADDRS], char canon[256], const c
         };
         const auto& octets = addr.ipv4().addr;
         static_assert(sizeof(address.addr) >= sizeof(octets));
-        std::copy(octets.begin(), octets.end(), address.addr);
+        std::ranges::copy(octets, address.addr);
       } break;
       case fnet::wire::IpAddress::Tag::kIpv6: {
         // TODO(https://fxbug.dev/42095276): Figure out a way to expose scope ID for IPv6
@@ -352,7 +353,7 @@ int _getaddrinfo_from_dns(struct address buf[MAXADDRS], char canon[256], const c
         };
         const auto& octets = addr.ipv6().addr;
         static_assert(sizeof(address.addr) >= sizeof(octets));
-        std::copy(octets.begin(), octets.end(), address.addr);
+        std::ranges::copy(octets, address.addr);
       } break;
     }
   }
