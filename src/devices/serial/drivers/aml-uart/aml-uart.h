@@ -87,11 +87,6 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
     return serial_port_info_;
   }
 
-  static const fuchsia_power_broker::PowerLevel kPowerLevelHandling =
-      static_cast<fuchsia_power_broker::PowerLevel>(fuchsia_power_broker::BinaryPowerLevel::kOn);
-  static const fuchsia_power_broker::PowerLevel kPowerLevelOff =
-      static_cast<fuchsia_power_broker::PowerLevel>(fuchsia_power_broker::BinaryPowerLevel::kOff);
-
  private:
   bool Readable();
   bool Writable();
@@ -100,8 +95,6 @@ class AmlUart : public fdf::WireServer<fuchsia_hardware_serialimpl::Device> {
   void HandleTX();
   fit::closure MakeReadCallbackLocked(zx_status_t status, void* buf, size_t len) TA_REQ(read_lock_);
   fit::closure MakeWriteCallbackLocked(zx_status_t status) TA_REQ(write_lock_);
-
-  void WatchRequiredLevel();
 
   void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                  const zx_packet_interrupt_t* interrupt);

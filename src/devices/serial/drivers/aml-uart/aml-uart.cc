@@ -74,11 +74,6 @@ AmlUart::AmlUart(fdf::PDev pdev,
   }
 }
 
-// Keep watching the required level, since the driver doesn't toggle the hardware power state
-// according to power element levels, report the current level to power broker immediately with the
-// required level value received from power broker.
-void AmlUart::WatchRequiredLevel() {}
-
 constexpr auto kMinBaudRate = 2;
 
 bool AmlUart::Readable() { return !Status::Get().ReadFrom(&mmio_).rx_empty(); }

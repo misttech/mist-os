@@ -46,20 +46,6 @@ class FakeSystemActivityGovernor
 
   bool HasActiveWakeLease() const { return !active_wake_leases_.empty(); }
 
-  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
-    fuchsia_power_system::PowerElements elements;
-    zx::event::create(0, &wake_handling_);
-    zx::event duplicate;
-    wake_handling_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
-
-    fuchsia_power_system::WakeHandling wake_handling = {
-        {.assertive_dependency_token = std::move(duplicate)}};
-
-    elements = {{.wake_handling = std::move(wake_handling)}};
-
-    completer.Reply({{std::move(elements)}});
-  }
-
   void TakeWakeLease(TakeWakeLeaseRequest& /* ignored */,
                      TakeWakeLeaseCompleter::Sync& completer) override {
     LeaseToken client_token, server_token;
@@ -134,46 +120,6 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
   std::optional<fidl::ServerBinding<fuchsia_power_broker::LeaseControl>> lease_control_binding_;
 };
 
-class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
- public:
-  void Watch(WatchCompleter::Sync& completer) override {
-    ZX_ASSERT(!completer_);
-    completer_.emplace(completer.ToAsync());
-  }
-
-  void SetRequiredLevel(fuchsia_power_broker::PowerLevel level) {
-    // Make sure driver is watching the required level before calling this function.
-    ZX_ASSERT(completer_);
-    completer_->Reply(fit::success(level));
-    completer_.reset();
-  }
-
-  bool WatchReceived() { return completer_.has_value(); }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  std::optional<WatchCompleter::Async> completer_;
-};
-
-class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
- public:
-  void Update(fuchsia_power_broker::CurrentLevelUpdateRequest& request,
-              UpdateCompleter::Sync& completer) override {
-    current_level_ = request.current_level();
-    completer.Reply(fit::success());
-  }
-
-  fuchsia_power_broker::PowerLevel current_level() { return current_level_; }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-
- private:
-  fuchsia_power_broker::PowerLevel current_level_ = serial::AmlUart::kPowerLevelOff;
-};
-
 class Environment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
@@ -184,32 +130,6 @@ class Environment : public fdf_testing::Environment {
               zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     state_.set_irq_signaller(config.irqs[0].borrow());
     config.mmios[0] = state_.GetMmio();
-
-    // Add power configuration to config.
-    constexpr uint8_t kPowerLevelOff =
-        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOff);
-    constexpr uint8_t kPowerLevelHandling =
-        static_cast<uint8_t>(fuchsia_power_broker::BinaryPowerLevel::kOn);
-    constexpr char kPowerElementName[] = "aml-uart-wake-on-interrupt";
-    fuchsia_hardware_power::LevelTuple wake_handling_on = {{
-        .child_level = kPowerLevelHandling,
-        .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
-    }};
-    fuchsia_hardware_power::PowerDependency wake_handling = {{
-        .child = kPowerElementName,
-        .parent = fuchsia_hardware_power::ParentElement::WithSag(
-            fuchsia_hardware_power::SagElement::kWakeHandling),
-        .level_deps = {{std::move(wake_handling_on)}},
-        .strength = fuchsia_hardware_power::RequirementType::kAssertive,
-    }};
-    fuchsia_hardware_power::PowerLevel off = {{.level = kPowerLevelOff, .name = "off"}};
-    fuchsia_hardware_power::PowerLevel on = {{.level = kPowerLevelHandling, .name = "on"}};
-    fuchsia_hardware_power::PowerElement element = {
-        {.name = kPowerElementName, .levels = {{std::move(off), std::move(on)}}}};
-    fuchsia_hardware_power::PowerElementConfiguration wake_config = {
-        {.element = std::move(element), .dependencies = {{std::move(wake_handling)}}}};
-    config.power_elements.push_back(wake_config);
-
     pdev_server_.SetConfig(std::move(config));
 
     // Add pdev.
