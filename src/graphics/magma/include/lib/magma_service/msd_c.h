@@ -16,6 +16,7 @@ extern "C" {
 // Driver specific - should contain language independent objects (handles)
 struct MsdPlatformDevice;
 
+struct MsdBuffer;
 struct MsdDevice;
 struct MsdConnection;
 
@@ -35,6 +36,10 @@ magma_status_t msd_device_query(struct MsdDevice* device, uint64_t id,
 struct MsdConnection* msd_device_create_connection(struct MsdDevice* device, uint64_t client_id);
 
 void msd_connection_release(struct MsdConnection* connection);
+
+struct MsdBuffer* msd_driver_import_buffer(magma_handle_t buffer_handle, uint64_t client_id);
+
+void msd_buffer_release(struct MsdBuffer* msd_buffer);
 
 #ifdef __cplusplus
 }
