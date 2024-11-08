@@ -91,7 +91,7 @@ where
     // This hook is called every time an `FsNode` is linked to a `DirEntry`, so it is expected that
     // the `FsNode` may already have been labeled.
     let fs_node = &dir_entry.node;
-    if fs_node.info().security_state.label.is_initialized() {
+    if fs_node.security_state.lock().label.is_initialized() {
         return Ok(());
     }
 
@@ -101,7 +101,7 @@ where
     let parent = dir_entry.parent();
     if let Some(parent) = parent {
         let parent_node = &parent.node;
-        if let FsNodeLabel::FromTask { weak_task } = parent_node.info().security_state.label.clone()
+        if let FsNodeLabel::FromTask { weak_task } = parent_node.security_state.lock().label.clone()
         {
             fs_node_set_label_with_task(fs_node, weak_task);
             return Ok(());
@@ -251,7 +251,7 @@ pub(super) fn fs_node_init_on_create(
     // By definition this is a new `FsNode` so should not have already been labeled
     // (unless we're working in the context of overlayfs and affected by
     // https://fxbug.dev/369067922).
-    if new_node.info().security_state.label.is_initialized() {
+    if new_node.security_state.lock().label.is_initialized() {
         track_stub!(TODO("https://fxbug.dev/369067922"), "new FsNode already labeled");
     }
 
@@ -1042,15 +1042,14 @@ impl FsNodeLabel {
 /// cause the security id to *not* be recomputed by the SELinux LSM when determining the effective
 /// security id of this [`FsNode`].
 pub(super) fn set_cached_sid(fs_node: &FsNode, sid: SecurityId) {
-    fs_node.update_info(|info| info.security_state.label = FsNodeLabel::SecurityId { sid });
+    fs_node.security_state.lock().label = FsNodeLabel::SecurityId { sid };
 }
 
 /// Sets the Task associated with `fs_node` to `task`.
 /// The effective security id of the [`FsNode`] will be that of the task, even if the security id
 /// of the task changes.
 pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>) {
-    fs_node
-        .update_info(|info| info.security_state.label = FsNodeLabel::FromTask { weak_task: task });
+    fs_node.security_state.lock().label = FsNodeLabel::FromTask { weak_task: task };
 }
 
 /// Returns the security id currently stored in `fs_node`, if any. This API should only be used
@@ -1058,7 +1057,7 @@ pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>)
 /// current value before engaging logic that may compute a new value. Access control enforcement
 /// code should use `get_effective_fs_node_security_id()`, *not* this function.
 pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
-    match fs_node.info().security_state.label.clone() {
+    match fs_node.security_state.lock().label.clone() {
         FsNodeLabel::SecurityId { sid } => Some(sid),
         FsNodeLabel::FromTask { weak_task } => {
             weak_task.upgrade().map(|t| t.read().security_state.attrs.current_sid)
@@ -1080,7 +1079,7 @@ mod tests {
 
     /// Clears the cached security id on `fs_node`.
     fn clear_cached_sid(fs_node: &FsNode) {
-        fs_node.update_info(|info| info.security_state.label = FsNodeLabel::Uninitialized);
+        fs_node.security_state.lock().label = FsNodeLabel::Uninitialized;
     }
 
     #[fuchsia::test]

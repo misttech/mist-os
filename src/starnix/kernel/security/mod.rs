@@ -12,6 +12,7 @@
 //! to kernel structures, but not the other way around.
 
 use selinux::{SecurityId, SecurityServer};
+use starnix_sync::Mutex;
 use std::sync::Arc;
 
 /// SELinux implementations called by the LSM hooks.
@@ -38,11 +39,18 @@ pub struct ResolvedElfState {
     sid: Option<SecurityId>,
 }
 
-/// The opaque type used by [`crate::vfs::FsNodeInfo`] to store security state. Note that
-/// [`crate::vfs::FsNodeInfo`] implements `Default` and `Clone`, requiring [`FsNodeState`] to
-/// implement them as well.
-#[derive(Debug, Default, Clone)]
-pub struct FsNodeState {
+/// The opaque type used by [`crate::vfs::FsNodeInfo`] to store security state.
+#[derive(Debug, Default)]
+pub struct FsNodeState(Mutex<FsNodeInner>);
+
+impl FsNodeState {
+    pub fn lock(&self) -> starnix_sync::MutexGuard<'_, FsNodeInner> {
+        self.0.lock()
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct FsNodeInner {
     label: selinux_hooks::FsNodeLabel,
 }
 

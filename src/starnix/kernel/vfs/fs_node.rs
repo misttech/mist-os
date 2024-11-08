@@ -178,6 +178,10 @@ pub struct FsNode {
 
     /// Inotify watchers on this node. See inotify(7).
     pub watchers: inotify::InotifyWatchers,
+
+    /// The security state associated with this node. Must always be acquired last
+    /// relative to other `FsNode` locks.
+    pub security_state: security::FsNodeState,
 }
 
 pub type FsNodeHandle = Arc<FsNodeReleaser>;
@@ -197,7 +201,6 @@ pub struct FsNodeInfo {
     pub time_status_change: UtcInstant,
     pub time_access: UtcInstant,
     pub time_modify: UtcInstant,
-    pub security_state: security::FsNodeState,
     pub casefold: bool,
     // If this node is fscrypt encrypted, stores the id of the user wrapping key used to encrypt
     // it.
@@ -1235,6 +1238,7 @@ impl FsNode {
                 write_guard_state: Default::default(),
                 fsverity: Mutex::new(FsVerityState::None),
                 watchers: Default::default(),
+                security_state: Default::default(),
             };
             #[cfg(any(test, debug_assertions))]
             {
@@ -1244,6 +1248,8 @@ impl FsNode {
                 let _l3 = result.flock_info.lock();
                 let _l4 = result.write_guard_state.lock();
                 let _l5 = result.fsverity.lock();
+                // TODO(https://fxbug.dev/367585803): Add lock levels to SELinux implementation.
+                let _l6 = result.security_state.lock();
             }
             result
         }
@@ -2042,6 +2048,7 @@ impl FsNode {
             let mut locked = locked.cast_locked::<FileOpsCore>();
             self.ops().update_attributes(&mut locked, current_task, &new_info, has)?;
         }
+
         *info = new_info;
         Ok(())
     }
