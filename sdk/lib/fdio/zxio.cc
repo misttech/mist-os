@@ -20,6 +20,8 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <algorithm>
+
 #include <fbl/auto_lock.h>
 
 #include "fdio_unistd.h"
@@ -170,9 +172,7 @@ Errno zxio::posix_ioctl(int request, va_list va) {
       if (status != ZX_OK) {
         return Errno(ENOTTY);
       }
-      if (available > INT_MAX) {
-        available = INT_MAX;
-      }
+      available = std::min<size_t>(available, INT_MAX);
       int* actual = va_arg(va, int*);
       *actual = static_cast<int>(available);
       return Errno(Errno::Ok);
