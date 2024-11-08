@@ -145,12 +145,10 @@ class FsNode final
   static FsNodeHandle new_uncached(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                                    const FileSystemHandle& fs, ino_t node_id, FsNodeInfo info);
 
-  /// Create a node without inserting it into the FileSystem node cache (no CurrentTask is needed).
-  /// This is usually not what you want! Only use if you're also using get_or_create_node, like
-  /// ext4.
-  // [C++ only]
-  static FsNodeHandle new_uncached(ktl::unique_ptr<FsNodeOps> ops, const FileSystemHandle& fs,
-                                   ino_t node_id, FsNodeInfo info, const Credentials& credentials);
+  // Used by BootFS (no current task available)
+  static FsNodeHandle new_uncached_with_creds(ktl::unique_ptr<FsNodeOps> ops,
+                                              const FileSystemHandle& fs, ino_t node_id,
+                                              FsNodeInfo info, const Credentials& credentials);
 
   FsNodeHandle into_handle() {
     FsNodeHandle handle = fbl::AdoptRef(this);

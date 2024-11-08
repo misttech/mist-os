@@ -164,7 +164,7 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
   //
   // Currently, apply the required selinux context if the selinux workaround is enabled on this
   // filesystem.
-  WeakFsNodeHandle prepare_node_for_insertion(/*const CurrentTask& current_task,*/
+  WeakFsNodeHandle prepare_node_for_insertion(const CurrentTask& current_task,
                                               const FsNodeHandle& node);
 
   template <typename CreateFn>
@@ -206,15 +206,15 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
   FsNodeHandle create_node_with_id(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                                    ino_t id, FsNodeInfo info);
 
-  // [C++ only]
-  FsNodeHandle create_node_with_id(ktl::unique_ptr<FsNodeOps> ops, ino_t id, FsNodeInfo info,
-                                   const starnix_uapi::Credentials& credentials);
+  // Used by BootFS (no current task available)
+  FsNodeHandle create_node_with_id_and_creds(ktl::unique_ptr<FsNodeOps> ops, ino_t id,
+                                             FsNodeInfo info,
+                                             const starnix_uapi::Credentials& credentials);
 
   template <typename NodeInfoFn>
+    requires std::is_invocable_r_v<FsNodeInfo, NodeInfoFn, ino_t>
   FsNodeHandle create_node(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                            NodeInfoFn&& info) {
-    static_assert(std::is_invocable_r_v<FsNodeInfo, NodeInfoFn, ino_t>);
-
     auto node_id = next_node_id();
     return create_node_with_id(current_task, ktl::move(ops), node_id, info(node_id));
   }

@@ -159,14 +159,14 @@ class TreeBuilder {
                                     "Internal error.  We have already checked all the entry names. \
                              There should be no collisions, nor overly long names.");
               }
-              return fs->create_node_with_id(ktl::move(res), id,
-                                             FsNodeInfo::new_factory(mode_, creds_)(id),
-                                             Credentials::root());
+              return fs->create_node_with_id_and_creds(ktl::move(res), id,
+                                                       FsNodeInfo::new_factory(mode_, creds_)(id),
+                                                       Credentials::root());
             },
             [&](Leaf& l) -> FsNodeHandle {
-              return fs->create_node_with_id(ktl::move(l.entry_), id,
-                                             FsNodeInfo::new_factory(mode_, entry_creds_)(id),
-                                             Credentials::root());
+              return fs->create_node_with_id_and_creds(
+                  ktl::move(l.entry_), id, FsNodeInfo::new_factory(mode_, entry_creds_)(id),
+                  Credentials::root());
             }},
         variant_);
   }

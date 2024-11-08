@@ -95,7 +95,7 @@ DirEntryHandle FileSystem::insert_node(FsNode* node) {
 
 bool FileSystem::has_permanent_entries() const { return false; }
 
-WeakFsNodeHandle FileSystem::prepare_node_for_insertion(/*const CurrentTask& current_task,*/
+WeakFsNodeHandle FileSystem::prepare_node_for_insertion(const CurrentTask& current_task,
                                                         const FsNodeHandle& node) {
   /*
     if let Some(label) = self.selinux_context.get() {
@@ -114,18 +114,18 @@ WeakFsNodeHandle FileSystem::prepare_node_for_insertion(/*const CurrentTask& cur
 FsNodeHandle FileSystem::create_node_with_id(const CurrentTask& current_task,
                                              ktl::unique_ptr<FsNodeOps> ops, ino_t id,
                                              FsNodeInfo info) {
-  auto creds = current_task->creds();
-  return create_node_with_id(ktl::move(ops), id, info, creds);
+  auto node =
+      FsNode::new_uncached(current_task, ktl::move(ops), fbl::RefPtr<FileSystem>(this), id, info);
+  nodes_.Lock()->insert(prepare_node_for_insertion(current_task, node));
+  return node;
 }
 
-FsNodeHandle FileSystem::create_node_with_id(ktl::unique_ptr<FsNodeOps> ops, ino_t id,
-                                             FsNodeInfo info,
-                                             const starnix_uapi::Credentials& credentials) {
-  auto node =
-      FsNode::new_uncached(ktl::move(ops), fbl::RefPtr<FileSystem>(this), id, info, credentials);
-
-  nodes_.Lock()->insert(prepare_node_for_insertion(/*current_task,*/ node));
-
+FsNodeHandle FileSystem::create_node_with_id_and_creds(
+    ktl::unique_ptr<FsNodeOps> ops, ino_t id, FsNodeInfo info,
+    const starnix_uapi::Credentials& credentials) {
+  auto node = FsNode::new_uncached_with_creds(ktl::move(ops), fbl::RefPtr<FileSystem>(this), id,
+                                              info, credentials);
+  nodes_.Lock()->insert(util::WeakPtr(node.get()));
   return node;
 }
 

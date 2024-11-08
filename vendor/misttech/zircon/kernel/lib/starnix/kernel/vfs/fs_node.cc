@@ -38,11 +38,14 @@ FsNode* FsNode::new_root(FsNodeOps* ops) {
 FsNodeHandle FsNode::new_uncached(const CurrentTask& current_task, ktl::unique_ptr<FsNodeOps> ops,
                                   const FileSystemHandle& fs, ino_t node_id, FsNodeInfo info) {
   auto creds = current_task->creds();
-  return FsNode::new_uncached(ktl::move(ops), fs, node_id, info, creds)->into_handle();
+  return FsNode::new_internal(ktl::move(ops), fs->kernel_, util::WeakPtr(fs.get()), node_id, info,
+                              creds)
+      ->into_handle();
 }
 
-FsNodeHandle FsNode::new_uncached(ktl::unique_ptr<FsNodeOps> ops, const FileSystemHandle& fs,
-                                  ino_t node_id, FsNodeInfo info, const Credentials& credentials) {
+FsNodeHandle FsNode::new_uncached_with_creds(ktl::unique_ptr<FsNodeOps> ops,
+                                             const FileSystemHandle& fs, ino_t node_id,
+                                             FsNodeInfo info, const Credentials& credentials) {
   return FsNode::new_internal(ktl::move(ops), fs->kernel_, util::WeakPtr(fs.get()), node_id, info,
                               credentials)
       ->into_handle();
