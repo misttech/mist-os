@@ -9,8 +9,9 @@ use crate::mocks::activity_service::MockActivityService;
 use crate::mocks::input_settings_service::MockInputSettingsService;
 use crate::mocks::kernel_service::MockKernelService;
 use crate::mocks::system_controller::MockSystemControllerService;
-use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, ServiceMarker};
 use fidl::AsHandleRef as _;
+use fuchsia_component::client::Service;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
@@ -409,6 +410,18 @@ impl TestEnv {
         let path = driver_path.strip_prefix("/dev/").unwrap();
 
         fuchsia_component::client::connect_to_named_protocol_at_dir_root::<P>(&dev, path).unwrap()
+    }
+
+    /// Connects to a protocol exposed by a component within the RealmInstance.
+    pub async fn connect_to_first_service_instance<S: ServiceMarker>(&self, marker: S) -> S::Proxy {
+        Service::open_from_dir(self.realm_instance.as_ref().unwrap().root.get_exposed_dir(), marker)
+            .unwrap()
+            .watch_for_any()
+            .await
+            .unwrap()
+            .connect()
+            .await
+            .unwrap()
     }
 
     /// Destroys the TestEnv and underlying RealmInstance.
