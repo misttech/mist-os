@@ -32,8 +32,10 @@
 namespace starnix {
 
 FileSystem::~FileSystem() {
+  LTRACE_ENTRY_OBJ;
   ops_->unmount();
-  nodes_.Lock()->clear();
+  // nodes_.Lock()->clear();
+  LTRACE_EXIT_OBJ;
 }
 
 FileSystemHandle FileSystem::New(const fbl::RefPtr<Kernel>& kernel, CacheMode cache_mode,
@@ -129,10 +131,15 @@ FsNodeHandle FileSystem::create_node_with_id_and_creds(
   return node;
 }
 
-/// Remove the given FsNode from the node cache.
-///
-/// Called from the Release trait of FsNode.
-void FileSystem::remove_node(const FsNode& node) {}
+void FileSystem::remove_node(const FsNode& node) {
+  auto nodes = nodes_.Lock();
+  if (auto weak_node = nodes->find(node.node_id_); weak_node != nodes->end()) {
+    // If strong count is zero (Lock will fail), means it was alread destroyed.
+    if (!weak_node.CopyPointer().Lock()) {
+      nodes->erase(node.node_id_);
+    }
+  }
+}
 
 void FileSystem::did_create_dir_entry(const DirEntryHandle& entry) { LTRACE; }
 

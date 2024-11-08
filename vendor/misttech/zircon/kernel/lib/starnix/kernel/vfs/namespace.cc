@@ -53,7 +53,7 @@ Namespace::Namespace(MountHandle root_mount, uint64_t id)
   LTRACEF_LEVEL(2, "id=%lu\n", id_);
 }
 
-Namespace::~Namespace() = default;
+Namespace::~Namespace() { LTRACE_ENTRY_OBJ; }
 
 LookupContext LookupContext::New(SymlinkMode _symlink_mode) {
   return {.symlink_mode = _symlink_mode,

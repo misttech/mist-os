@@ -322,6 +322,8 @@ fit::result<Errno> NamespaceNode::truncate(const CurrentTask& current_task, uint
   return fit::error(errno(ENOTSUP));
 }
 
+NamespaceNode::~NamespaceNode() { LTRACE_ENTRY_OBJ; }
+
 SymlinkTarget::SymlinkTarget(Variant variant) : variant_(ktl::move(variant)) {}
 
 SymlinkTarget SymlinkTarget::Path(const FsString& path) { return SymlinkTarget(path); }

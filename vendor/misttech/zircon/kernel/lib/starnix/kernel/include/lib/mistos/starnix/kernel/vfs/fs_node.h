@@ -39,9 +39,8 @@ class CurrentTask;
 using PipeHandle = fbl::RefPtr<Pipe>;
 using starnix_uapi::Credentials;
 
-class FsNode final
-    : public fbl::SinglyLinkedListable<util::WeakPtr<FsNode>, fbl::NodeOptions::AllowClearUnsafe>,
-      public fbl::RefCountedUpgradeable<FsNode> {
+class FsNode final : public fbl::SinglyLinkedListable<util::WeakPtr<FsNode>>,
+                     public fbl::RefCountedUpgradeable<FsNode> {
  public:
   /// Weak reference to the `FsNodeHandle` of this `FsNode`. This allows to retrieve the
   /// `FsNodeHandle` from a `FsNode`.
@@ -153,7 +152,7 @@ class FsNode final
   FsNodeHandle into_handle() {
     FsNodeHandle handle = fbl::AdoptRef(this);
     weak_handle_ = util::WeakPtr<FsNode>(handle.get());
-    return std::move(handle);
+    return ktl::move(handle);
   }
 
  private:
@@ -225,6 +224,9 @@ class FsNode final
     auto _info = info_.Write();
     return mutator(*_info);
   }
+
+  // impl Releasable for FsNode
+  // Release code is implemented in the dtcor.
 
   // C++
 

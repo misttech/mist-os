@@ -207,6 +207,8 @@ class NamespaceNode {
 
   // C++
   bool operator==(const NamespaceNode& other) const;
+
+  ~NamespaceNode();
 };
 
 class SymlinkTarget {

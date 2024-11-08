@@ -49,7 +49,6 @@ DirEntry::~DirEntry() {
     const auto& parent = maybe_parent.value();
     parent->internal_remove_child(this);
   }
-  children_.Write()->clear();
 }
 
 DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> parent,
@@ -141,6 +140,9 @@ fbl::Vector<FsString> DirEntry::copy_child_names() {
 
 void DirEntry::internal_remove_child(DirEntry* child) {
   auto local_name = child->local_name();
+
+  LTRACEF_LEVEL(2, "local_name=[%.*s]\n", static_cast<int>(local_name.length()), local_name.data());
+
   auto children = this->children_.Write();
   if (auto weak_child = children->find(local_name);
       weak_child.IsValid() && weak_child != children->end()) {

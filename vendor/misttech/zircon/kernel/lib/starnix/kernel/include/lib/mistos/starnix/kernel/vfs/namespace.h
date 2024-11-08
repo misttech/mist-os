@@ -16,9 +16,6 @@
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
 
-#include <optional>
-#include <utility>
-
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
@@ -45,7 +42,6 @@ class Namespace : public fbl::RefCounted<Namespace> {
 
  public:
   // impl Namespace
-
   static fbl::RefPtr<Namespace> New(FileSystemHandle fs);
 
   static fbl::RefPtr<Namespace> new_with_flags(FileSystemHandle fs, MountFlags flags);

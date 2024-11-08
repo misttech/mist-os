@@ -27,8 +27,7 @@ source_set("tests") {
     "task/syscalls-test.cc",
     "thread_group-test.cc",
     "vfs/fs_context-test.cc",
-
-    #"vfs/namespace-test.cc",
+    "vfs/namespace-test.cc",
     "vfs/syscalls-test.cc",
   ]
   deps = [

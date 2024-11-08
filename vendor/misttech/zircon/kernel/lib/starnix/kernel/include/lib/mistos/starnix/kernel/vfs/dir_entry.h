@@ -136,9 +136,8 @@ overloaded(Ts...) -> overloaded<Ts...>;
 /// A directory cannot have more than one hard link, which means there is a
 /// single DirEntry for each Directory FsNode. That invariant lets us store the
 /// children for a directory in the DirEntry rather than in the FsNode.
-class DirEntry
-    : public fbl::WAVLTreeContainable<util::WeakPtr<DirEntry>, fbl::NodeOptions::AllowClearUnsafe>,
-      public fbl::RefCountedUpgradeable<DirEntry> {
+class DirEntry : public fbl::WAVLTreeContainable<util::WeakPtr<DirEntry>>,
+                 public fbl::RefCountedUpgradeable<DirEntry> {
  public:
   using DirEntryChildren = fbl::WAVLTree<FsString, util::WeakPtr<DirEntry>>;
 
@@ -426,10 +425,8 @@ class DirEntry
         c->node_->fs()->did_access_dir_entry(c);
         return fit::ok(ktl::pair(c, CreationResult<CreateNodeFn>(create_fn)));
       } else {
-        auto result = lock_children().get_or_create_child(current_task, mount, name, create_fn);
-        if (result.is_error()) {
-          return result.take_error();
-        }
+        auto result =
+            lock_children().get_or_create_child(current_task, mount, name, create_fn) _EP(result);
         auto [c, cr] = result.value();
         c->node_->fs()->purge_old_entries();
         return fit::ok(ktl::pair(c, ktl::move(cr)));
@@ -455,11 +452,8 @@ class DirEntry
                 } else {
                   this->internal_remove_child(child.get());
                   // child.destroy(&current_task.kernel().mounts);
-                  auto result =
-                      lock_children().get_or_create_child(current_task, mount, name, e.create_fn);
-                  if (result.is_error()) {
-                    return result.take_error();
-                  }
+                  auto result = lock_children().get_or_create_child(current_task, mount, name,
+                                                                    e.create_fn) _EP(result);
                   auto [c, cr2] = result.value();
                   c->node_->fs()->purge_old_entries();
 

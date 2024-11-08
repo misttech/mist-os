@@ -16,6 +16,7 @@
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node_ops.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
+#include <trace.h>
 #include <zircon/assert.h>
 
 #include <optional>
@@ -25,9 +26,15 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
 
+#include "../kernel_priv.h"
+
 #include <ktl/enforce.h>
 
 #include <linux/errno.h>
+
+// #include <ktl/enforce.h>
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
@@ -80,7 +87,18 @@ FsNode* FsNode::new_internal(ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<Kerne
   return fsnode;
 }
 
-FsNode::~FsNode() = default;
+FsNode::~FsNode() {
+  LTRACE_ENTRY_OBJ;
+  if (auto fs = fs_.Lock()) {
+    fs->remove_node(*this);
+  }
+
+  // auto result = ops_->forget(*this, CurrentTask::Get());
+  // if (result.is_error()) {
+  //   log_error("Error on FsNodeOps::forget: %d", result.error_value());
+  // }
+  LTRACE_EXIT_OBJ;
+}
 
 FsNode::FsNode(WeakFsNodeHandle weak_handle, util::WeakPtr<Kernel> kernel,
                ktl::unique_ptr<FsNodeOps> ops, util::WeakPtr<FileSystem> fs, ino_t node_id,
@@ -166,7 +184,7 @@ fit::result<Errno, FsNodeHandle> FsNode::mknod(const CurrentTask& current_task,
     }
     let mut locked = locked.cast_locked::<FileOpsCore>();
   */
-  return ops_->mknod(/*&mut locked, */ *this, current_task, name, mode, dev, owner);
+  return ops_->mknod(*this, current_task, name, mode, dev, owner);
 }
 
 fit::result<Errno, SymlinkTarget> FsNode::readlink(const CurrentTask& current_task) const {
