@@ -6217,6 +6217,9 @@ mod tests {
         server_port: NonZeroU16,
         /// Whether to set REUSE_ADDR for the client.
         client_reuse_addr: bool,
+        /// Whether to send bidirectional test data after establishing the
+        /// connection.
+        send_test_data: bool,
     }
 
     /// The following test sets up two connected testing context - one as the
@@ -6237,7 +6240,7 @@ mod tests {
     ///   - the accepted socket from remote.
     fn bind_listen_connect_accept_inner<I: TcpTestIpExt>(
         listen_addr: I::Addr,
-        BindConfig { client_port, server_port, client_reuse_addr }: BindConfig,
+        BindConfig { client_port, server_port, client_reuse_addr, send_test_data }: BindConfig,
         seed: u128,
         drop_rate: f64,
     ) -> (
@@ -6368,24 +6371,27 @@ mod tests {
         let ClientBuffers { send: client_snd_end, receive: client_rcv_end } =
             client_ends.0.as_ref().lock().take().unwrap();
         let ClientBuffers { send: accepted_snd_end, receive: accepted_rcv_end } = accepted_ends;
-        for snd_end in [client_snd_end.clone(), accepted_snd_end] {
-            snd_end.lock().extend_from_slice(b"Hello");
-        }
 
-        for (c, id) in [(LOCAL, &client), (REMOTE, &accepted)] {
-            net.with_context(c, |ctx| ctx.tcp_api::<I>().do_send(id))
-        }
-        net.run_until_idle_with(&mut maybe_drop_frame);
+        if send_test_data {
+            for snd_end in [client_snd_end.clone(), accepted_snd_end] {
+                snd_end.lock().extend_from_slice(b"Hello");
+            }
 
-        for rcv_end in [client_rcv_end, accepted_rcv_end] {
-            assert_eq!(
-                rcv_end.lock().read_with(|avail| {
-                    let avail = avail.concat();
-                    assert_eq!(avail, b"Hello");
-                    avail.len()
-                }),
-                5
-            );
+            for (c, id) in [(LOCAL, &client), (REMOTE, &accepted)] {
+                net.with_context(c, |ctx| ctx.tcp_api::<I>().do_send(id))
+            }
+            net.run_until_idle_with(&mut maybe_drop_frame);
+
+            for rcv_end in [client_rcv_end, accepted_rcv_end] {
+                assert_eq!(
+                    rcv_end.lock().read_with(|avail| {
+                        let avail = avail.concat();
+                        assert_eq!(avail, b"Hello");
+                        avail.len()
+                    }),
+                    5
+                );
+            }
         }
 
         // Check the listener is in correct state.
@@ -6457,14 +6463,14 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false }, I::UNSPECIFIED_ADDRESS)]
-    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false }, I::UNSPECIFIED_ADDRESS)]
-    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true }, I::UNSPECIFIED_ADDRESS)]
-    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true }, I::UNSPECIFIED_ADDRESS)]
-    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
-    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
-    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
-    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
+    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false, send_test_data: true }, I::UNSPECIFIED_ADDRESS)]
+    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false, send_test_data: true }, I::UNSPECIFIED_ADDRESS)]
+    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true, send_test_data: true }, I::UNSPECIFIED_ADDRESS)]
+    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true, send_test_data: true }, I::UNSPECIFIED_ADDRESS)]
+    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false, send_test_data: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
+    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: false, send_test_data: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
+    #[test_case(BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: true, send_test_data: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
+    #[test_case(BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true, send_test_data: true }, *<I as TestIpExt>::TEST_ADDRS.remote_ip)]
     fn bind_listen_connect_accept<I: TcpTestIpExt>(bind_config: BindConfig, listen_addr: I::Addr)
     where
         TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>: TcpContext<
@@ -6996,7 +7002,12 @@ mod tests {
         run_with_many_seeds(|seed| {
             let (_net, _client, _client_snd_end, _accepted) = bind_listen_connect_accept_inner::<I>(
                 I::UNSPECIFIED_ADDRESS,
-                BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false },
+                BindConfig {
+                    client_port: None,
+                    server_port: PORT_1,
+                    client_reuse_addr: false,
+                    send_test_data: true,
+                },
                 seed,
                 0.2,
             );
@@ -7308,7 +7319,12 @@ mod tests {
         set_logger_for_test();
         let (mut net, local, _local_snd_end, remote) = bind_listen_connect_accept_inner::<I>(
             I::UNSPECIFIED_ADDRESS,
-            BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false },
+            BindConfig {
+                client_port: None,
+                server_port: PORT_1,
+                client_reuse_addr: false,
+                send_test_data: false,
+            },
             0,
             0.0,
         );
@@ -7376,7 +7392,12 @@ mod tests {
         set_logger_for_test();
         let (mut net, local, _local_snd_end, _remote) = bind_listen_connect_accept_inner::<I>(
             I::UNSPECIFIED_ADDRESS,
-            BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false },
+            BindConfig {
+                client_port: None,
+                server_port: PORT_1,
+                client_reuse_addr: false,
+                send_test_data: false,
+            },
             0,
             0.0,
         );
@@ -7425,7 +7446,12 @@ mod tests {
         set_logger_for_test();
         let (mut net, local, _local_snd_end, remote) = bind_listen_connect_accept_inner::<I>(
             I::UNSPECIFIED_ADDRESS,
-            BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false },
+            BindConfig {
+                client_port: None,
+                server_port: PORT_1,
+                client_reuse_addr: false,
+                send_test_data: false,
+            },
             0,
             0.0,
         );
@@ -8106,7 +8132,12 @@ mod tests {
     {
         let (mut net, local, local_snd_end, _remote) = bind_listen_connect_accept_inner::<I>(
             I::UNSPECIFIED_ADDRESS,
-            BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false },
+            BindConfig {
+                client_port: None,
+                server_port: PORT_1,
+                client_reuse_addr: false,
+                send_test_data: false,
+            },
             0,
             0.0,
         );
@@ -8255,6 +8286,7 @@ mod tests {
                 client_port: Some(CLIENT_PORT),
                 server_port: SERVER_PORT,
                 client_reuse_addr: true,
+                send_test_data: false,
             },
             0,
             0.0,
@@ -8424,7 +8456,12 @@ mod tests {
         set_logger_for_test();
         let (mut net, _local, _local_snd_end, _remote) = bind_listen_connect_accept_inner::<I>(
             I::UNSPECIFIED_ADDRESS,
-            BindConfig { client_port: Some(PORT_1), server_port: PORT_1, client_reuse_addr: true },
+            BindConfig {
+                client_port: Some(PORT_1),
+                server_port: PORT_1,
+                client_reuse_addr: true,
+                send_test_data: false,
+            },
             0,
             0.0,
         );
@@ -8587,7 +8624,12 @@ mod tests {
     {
         let (mut net, local, _local_snd_end, remote) = bind_listen_connect_accept_inner::<I>(
             I::UNSPECIFIED_ADDRESS,
-            BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false },
+            BindConfig {
+                client_port: None,
+                server_port: PORT_1,
+                client_reuse_addr: false,
+                send_test_data: false,
+            },
             0,
             0.0,
         );
@@ -8762,7 +8804,12 @@ mod tests {
     {
         let (mut net, client, _client_snd_end, accepted) = bind_listen_connect_accept_inner(
             I::UNSPECIFIED_ADDRESS,
-            BindConfig { client_port: None, server_port: PORT_1, client_reuse_addr: false },
+            BindConfig {
+                client_port: None,
+                server_port: PORT_1,
+                client_reuse_addr: false,
+                send_test_data: false,
+            },
             0,
             0.0,
         );
