@@ -611,10 +611,7 @@ impl AddressStatus<Ipv6PresentAddressStatus> {
         let assigned = core_ctx.with_ip_address_state(
             device,
             &addr_id,
-            |Ipv6AddressState {
-                 flags: Ipv6AddressFlags { deprecated: _, assigned },
-                 config: _,
-             }| { *assigned },
+            |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| *assigned,
         );
 
         if assigned {

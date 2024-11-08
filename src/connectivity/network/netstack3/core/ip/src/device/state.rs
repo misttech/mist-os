@@ -24,6 +24,7 @@ use netstack3_base::{
     Instant, InstantBindingsTypes, NestedIntoCoreTimerCtx, NotFoundError, ReferenceNotifiers,
     TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
+use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::device::dad::DadBindingsTypes;
@@ -846,6 +847,91 @@ impl<I: Instant> InspectableValue for Lifetime<I> {
     }
 }
 
+impl<I: Instant> Lifetime<I> {
+    /// Creates a new `Lifetime` `duration` from `now`, saturating to
+    /// `Infinite`.
+    pub fn from_ndp(now: I, duration: NonZeroNdpLifetime) -> Self {
+        match duration {
+            NonZeroNdpLifetime::Finite(d) => Self::after(now, d.get()),
+            NonZeroNdpLifetime::Infinite => Self::Infinite,
+        }
+    }
+
+    /// Creates a new `Lifetime` `duration` from `now`, saturating to
+    /// `Infinite`.
+    pub fn after(now: I, duration: Duration) -> Self {
+        match now.checked_add(duration) {
+            Some(i) => Self::Finite(i),
+            None => Self::Infinite,
+        }
+    }
+}
+
+/// An address' preferred lifetime information.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PreferredLifetime<Instant> {
+    /// Address is preferred. It can be used for new connections.
+    ///
+    /// `Lifetime` indicates until when the address is expected to remain in
+    /// preferred state.
+    Preferred(Lifetime<Instant>),
+    /// Address is deprecated, it should not be used for new connections.
+    Deprecated,
+}
+
+impl<Instant> PreferredLifetime<Instant> {
+    /// Creates a new `PreferredLifetime` that is preferred until `instant`.
+    pub const fn preferred_until(instant: Instant) -> Self {
+        Self::Preferred(Lifetime::Finite(instant))
+    }
+
+    /// Creates a new `PreferredLifetime` that is preferred with an infinite
+    /// lifetime.
+    pub const fn preferred_forever() -> Self {
+        Self::Preferred(Lifetime::Infinite)
+    }
+
+    /// Returns true if the address is deprecated.
+    pub const fn is_deprecated(&self) -> bool {
+        match self {
+            Self::Preferred(_) => false,
+            Self::Deprecated => true,
+        }
+    }
+}
+
+impl<I: Instant> PreferredLifetime<I> {
+    /// Creates a new `PreferredLifetime` that is preferred for `duration` after
+    /// `now`.
+    pub fn preferred_for(now: I, duration: NonZeroNdpLifetime) -> Self {
+        Self::Preferred(Lifetime::from_ndp(now, duration))
+    }
+
+    /// Creates a new `PreferredLifetime` that is preferred for `duration` after
+    /// `now` if it is `Some`, `deprecated` otherwise.
+    pub fn maybe_preferred_for(now: I, duration: Option<NonZeroNdpLifetime>) -> Self {
+        match duration {
+            Some(d) => Self::preferred_for(now, d),
+            None => Self::Deprecated,
+        }
+    }
+}
+
+impl<Instant> Default for PreferredLifetime<Instant> {
+    fn default() -> Self {
+        Self::Preferred(Lifetime::Infinite)
+    }
+}
+
+impl<I: Instant> InspectableValue for PreferredLifetime<I> {
+    fn record<N: Inspector>(&self, name: &str, inspector: &mut N) {
+        match self {
+            Self::Deprecated => inspector.record_str(name, "deprecated"),
+            Self::Preferred(lifetime) => inspector.record_inspectable_value(name, lifetime),
+        }
+    }
+}
+
 /// The configuration for an IPv4 address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Ipv4AddrConfig<Instant> {
@@ -906,7 +992,8 @@ impl<Inst: Instant> Inspectable for Ipv4AddressState<Inst> {
     }
 }
 
-/// Configuration for an IPv6 address assigned via SLAAC.
+/// Configuration for an IPv6 address assigned via SLAAC that varies based on
+/// whether the address is static or temporary
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SlaacConfig<Instant> {
     /// The address is static.
@@ -924,7 +1011,7 @@ pub enum SlaacConfig<Instant> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Ipv6AddrConfig<Instant> {
     /// Configured by stateless address autoconfiguration.
-    Slaac(SlaacConfig<Instant>),
+    Slaac(Ipv6AddrSlaacConfig<Instant>),
 
     /// Manually configured.
     Manual(Ipv6AddrManualConfig<Instant>),
@@ -934,6 +1021,15 @@ impl<Instant> Default for Ipv6AddrConfig<Instant> {
     fn default() -> Self {
         Self::Manual(Default::default())
     }
+}
+
+/// The common configuration for a SLAAC-assigned IPv6 address.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Ipv6AddrSlaacConfig<Instant> {
+    /// The inner slaac config, tracking static and temporary behavior.
+    pub inner: SlaacConfig<Instant>,
+    /// The address' preferred lifetime.
+    pub preferred_lifetime: PreferredLifetime<Instant>,
 }
 
 /// The configuration for a manually-assigned IPv6 address.
@@ -962,13 +1058,15 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
     /// lifetime; it is never timed out."
     ///
     /// [RFC 4862 Section 5.3]: https://tools.ietf.org/html/rfc4862#section-5.3
-    pub(crate) const SLAAC_LINK_LOCAL: Self =
-        Self::Slaac(SlaacConfig::Static { valid_until: Lifetime::Infinite });
+    pub(crate) const SLAAC_LINK_LOCAL: Self = Self::Slaac(Ipv6AddrSlaacConfig {
+        inner: SlaacConfig::Static { valid_until: Lifetime::Infinite },
+        preferred_lifetime: PreferredLifetime::Preferred(Lifetime::Infinite),
+    });
 
     /// The lifetime for which the address is valid.
     pub fn valid_until(&self) -> Lifetime<Instant> {
         match self {
-            Ipv6AddrConfig::Slaac(slaac_config) => match slaac_config {
+            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => match inner {
                 SlaacConfig::Static { valid_until } => *valid_until,
                 SlaacConfig::Temporary(TemporarySlaacConfig {
                     valid_until,
@@ -980,13 +1078,28 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
             Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => *valid_until,
         }
     }
+
+    /// Returns the preferred lifetime for this address.
+    pub fn preferred_lifetime(&self) -> PreferredLifetime<Instant> {
+        match self {
+            // TODO(https://fxbug.dev/42056881): Allow manual addresses to
+            // carry lifetime.
+            Ipv6AddrConfig::Manual(_) => PreferredLifetime::preferred_forever(),
+            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { preferred_lifetime, .. }) => {
+                *preferred_lifetime
+            }
+        }
+    }
+
+    /// Returns true if the address is deprecated.
+    pub fn is_deprecated(&self) -> bool {
+        self.preferred_lifetime().is_deprecated()
+    }
 }
 
 /// Flags associated with an IPv6 device address.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Ipv6AddressFlags {
-    /// True if the address is deprecated.
-    pub deprecated: bool,
     /// True if the address is assigned.
     pub assigned: bool,
 }
@@ -1002,32 +1115,35 @@ pub struct Ipv6AddressState<Instant> {
 
 impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
     fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self { flags: Ipv6AddressFlags { deprecated, assigned }, config } = self;
-        inspector.record_bool("Deprecated", *deprecated);
+        let Self { flags: Ipv6AddressFlags { assigned }, config } = self;
         inspector.record_bool("Assigned", *assigned);
 
         if let Some(config) = config {
-            let (is_slaac, valid_until) = match config {
-                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => {
-                    (false, *valid_until)
-                }
-                Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until }) => (true, *valid_until),
-                Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(TemporarySlaacConfig {
-                    valid_until,
-                    desync_factor,
-                    creation_time,
-                    dad_counter,
-                })) => {
-                    // Record the extra temporary slaac configuration before
-                    // returning.
-                    inspector.record_double("DesyncFactorSecs", desync_factor.as_secs_f64());
-                    inspector.record_uint("DadCounter", *dad_counter);
-                    inspector.record_inspectable_value("CreationTime", creation_time);
-                    (true, Lifetime::Finite(*valid_until))
+            let is_slaac = match config {
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until: _ }) => false,
+                Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
+                    match inner {
+                        SlaacConfig::Static { valid_until: _ } => {}
+                        SlaacConfig::Temporary(TemporarySlaacConfig {
+                            valid_until: _,
+                            desync_factor,
+                            creation_time,
+                            dad_counter,
+                        }) => {
+                            // Record the extra temporary slaac configuration before
+                            // returning.
+                            inspector
+                                .record_double("DesyncFactorSecs", desync_factor.as_secs_f64());
+                            inspector.record_uint("DadCounter", *dad_counter);
+                            inspector.record_inspectable_value("CreationTime", creation_time);
+                        }
+                    }
+                    true
                 }
             };
             inspector.record_bool("IsSlaac", is_slaac);
-            inspector.record_inspectable_value("ValidUntil", &valid_until);
+            inspector.record_inspectable_value("ValidUntil", &config.valid_until());
+            inspector.record_inspectable_value("PreferredLifetime", &config.preferred_lifetime());
         }
     }
 }
@@ -1059,7 +1175,7 @@ impl<BT: IpDeviceStateBindingsTypes> Ipv6AddressEntry<BT> {
             dad_state: Mutex::new(dad_state),
             state: RwLock::new(Ipv6AddressState {
                 config: Some(config),
-                flags: Ipv6AddressFlags { deprecated: false, assigned },
+                flags: Ipv6AddressFlags { assigned },
             }),
         }
     }
@@ -1140,7 +1256,10 @@ mod tests {
                     nonces: Default::default(),
                     added_extra_transmits_after_detecting_looped_back_ns: false,
                 },
-                Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until }),
+                Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
+                    inner: SlaacConfig::Static { valid_until },
+                    preferred_lifetime: PreferredLifetime::Preferred(Lifetime::Infinite),
+                }),
             ))
             .unwrap();
         // Adding the same address with different prefix and configuration

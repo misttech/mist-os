@@ -22,7 +22,8 @@ use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr,
 use netstack3_base::sync::WeakRc;
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
-    IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext,
+    InstantBindingsTypes, IpDeviceAddr, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
+    RemoveResourceResultWithContext,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
@@ -35,12 +36,12 @@ use netstack3_ip::device::{
     IpAddressIdSpecContext, IpAddressState, IpDeviceAddresses, IpDeviceConfiguration,
     IpDeviceEvent, IpDeviceFlags, IpDeviceIpExt, IpDeviceMulticastGroups,
     IpDeviceStateBindingsTypes, IpDeviceStateContext, IpDeviceStateIpExt, IpDeviceTimerId,
-    Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressEntry,
-    Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
-    Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
-    Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, SlaacAddressEntry,
-    SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig, SlaacConfig, SlaacContext,
-    SlaacCounters, SlaacState,
+    Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig,
+    Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
+    Ipv6DeviceConfiguration, Ipv6DeviceTimerId, Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext,
+    Ipv6NetworkLearnedParameters, Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext,
+    RsState, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
+    SlaacConfig, SlaacContext, SlaacCounters, SlaacState,
 };
 use netstack3_ip::gmp::{
     GmpQueryHandler, GmpStateRef, IgmpContext, IgmpGroupState, IgmpState, IgmpStateContext,
@@ -97,17 +98,12 @@ where
                 core_ctx,
                 device_id,
                 &addr_id,
-                |Ipv6AddressState {
-                     flags: Ipv6AddressFlags { deprecated, assigned: _ },
-                     config,
-                 }| {
+                |Ipv6AddressState { flags: Ipv6AddressFlags { assigned: _ }, config }| {
                     let addr_sub = addr_id.addr_sub();
                     match config {
-                        Some(Ipv6AddrConfig::Slaac(config)) => Some(SlaacAddressEntry {
-                            addr_sub,
-                            config: *config,
-                            deprecated: *deprecated,
-                        }),
+                        Some(Ipv6AddrConfig::Slaac(config)) => {
+                            Some(SlaacAddressEntry { addr_sub, config: *config })
+                        }
                         None | Some(Ipv6AddrConfig::Manual(_)) => None,
                     }
                 },
@@ -134,12 +130,11 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             let mut locked = locked.adopt(&**entry);
             let mut state = locked
                 .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
-            let Ipv6AddressState { config, flags: Ipv6AddressFlags { deprecated, assigned: _ } } =
-                &mut *state;
+            let Ipv6AddressState { config, flags: Ipv6AddressFlags { assigned: _ } } = &mut *state;
 
             match config {
                 Some(Ipv6AddrConfig::Slaac(config)) => {
-                    cb(SlaacAddressEntryMut { addr_sub, config, deprecated })
+                    cb(SlaacAddressEntryMut { addr_sub, config })
                 }
                 None | Some(Ipv6AddrConfig::Manual(_)) => {}
             }
@@ -163,7 +158,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
         &mut self,
         bindings_ctx: &mut BC,
         add_addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
-        slaac_config: SlaacConfig<BC::Instant>,
+        slaac_config: Ipv6AddrSlaacConfig<BC::Instant>,
         and_then: F,
     ) -> Result<O, ExistsError> {
         let SlaacAddrs { core_ctx, device_id, config } = self;
@@ -181,19 +176,12 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             let mut locked = core_ctx.core_ctx.adopt(entry.deref());
             let mut state = locked
                 .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
-            let Ipv6AddressState { config, flags: Ipv6AddressFlags { deprecated, assigned: _ } } =
-                &mut *state;
-            and_then(
-                SlaacAddressEntryMut {
-                    addr_sub,
-                    config: assert_matches::assert_matches!(
-                        config,
-                        Some(Ipv6AddrConfig::Slaac(c)) => c
-                    ),
-                    deprecated,
-                },
-                bindings_ctx,
-            )
+            let Ipv6AddressState { config, flags: _ } = &mut *state;
+            let config = assert_matches::assert_matches!(
+                config,
+                Some(Ipv6AddrConfig::Slaac(c)) => c
+            );
+            and_then(SlaacAddressEntryMut { addr_sub, config }, bindings_ctx)
         })
     }
 
@@ -216,7 +204,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             assert_eq!(&addr_sub.addr(), addr);
             bindings_ctx.defer_removal_result(result);
             match config {
-                Ipv6AddrConfig::Slaac(s) => (addr_sub, s),
+                Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => (addr_sub, inner),
                 Ipv6AddrConfig::Manual(_manual_config) => {
                     unreachable!(
                         "address {addr_sub} on device {device_id:?} should have been a SLAAC \
@@ -400,6 +388,32 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     }
 }
 
+fn get_ipv6_sas_candidate<
+    BT: InstantBindingsTypes,
+    CC: device::IpDeviceAddressContext<Ipv6, BT>,
+>(
+    core_ctx: &mut CC,
+    device_id: &CC::DeviceId,
+    addr_id: &CC::AddressId,
+) -> SasCandidate<CC::DeviceId> {
+    core_ctx.with_ip_address_state(
+        device_id,
+        &addr_id,
+        |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config }| {
+            SasCandidate {
+                addr_sub: addr_id.addr_sub(),
+                assigned: *assigned,
+                // Assume an address is deprecated if config
+                // is not available. That means the address
+                // is going away, so we should not prefer
+                // it.
+                deprecated: config.map(|c| c.is_deprecated()).unwrap_or(true),
+                device: device_id.clone(),
+            }
+        },
+    )
+}
+
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
     ip::IpDeviceStateContext<Ipv6> for CoreCtx<'_, BC, L>
 {
@@ -419,18 +433,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
                 IpDeviceAddr::new_from_ipv6_source(ip::socket::select_ipv6_source_address(
                     remote,
                     device_id,
-                    addrs.map(|addr_id| {
-                        device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
-                            core_ctx,
-                            device_id,
-                            &addr_id,
-                            |Ipv6AddressState { flags, config: _ }| SasCandidate {
-                                addr_sub: addr_id.addr_sub(),
-                                flags: *flags,
-                                device: device_id.clone(),
-                            },
-                        )
-                    }),
+                    addrs.map(|addr_id| get_ipv6_sas_candidate(core_ctx, device_id, &addr_id)),
                 ))
             },
         )
@@ -696,8 +699,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::FilterState<Ipv6>>
         let mut locked = self.core_ctx.adopt(addr.deref());
         let mut state = locked
             .write_lock_with::<crate::lock_ordering::Ipv6DeviceAddressState, _>(|c| c.right());
-        let Ipv6AddressState { flags: Ipv6AddressFlags { deprecated: _, assigned }, config: _ } =
-            &mut *state;
+        let Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ } = &mut *state;
 
         cb(assigned)
     }
@@ -879,18 +881,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
                 ip::socket::select_ipv6_source_address(
                     Some(dst_ip),
                     device_id,
-                    addrs.map(|addr_id| {
-                        device::IpDeviceAddressContext::<Ipv6, _>::with_ip_address_state(
-                            core_ctx,
-                            device_id,
-                            &addr_id,
-                            |Ipv6AddressState { flags, config: _ }| SasCandidate {
-                                addr_sub: addr_id.addr_sub(),
-                                flags: *flags,
-                                device: device_id.clone(),
-                            },
-                        )
-                    }),
+                    addrs.map(|addr_id| get_ipv6_sas_candidate(core_ctx, device_id, &addr_id)),
                 )
             },
         );
@@ -1280,10 +1271,7 @@ impl<
                         core_ctx,
                         device,
                         &addr_id,
-                        |Ipv6AddressState {
-                             flags: Ipv6AddressFlags { deprecated: _, assigned },
-                             config: _,
-                         }| {
+                        |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| {
                             if *assigned {
                                 LinkLocalUnicastAddr::new(addr_id.addr_sub().addr().get())
                             } else {

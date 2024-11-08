@@ -67,9 +67,10 @@ pub mod device {
         IpDeviceConfiguration, IpDeviceFlags, IpDeviceMulticastGroups, IpDeviceStateBindingsTypes,
         IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry, Ipv4AddressState,
         Ipv4DeviceConfiguration, Ipv4DeviceConfigurationAndFlags, Ipv6AddrConfig,
-        Ipv6AddrManualConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
-        Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6NetworkLearnedParameters,
-        Lifetime, SlaacConfig, TemporarySlaacConfig,
+        Ipv6AddrManualConfig, Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags,
+        Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
+        Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, SlaacConfig,
+        TemporarySlaacConfig,
     };
     pub use crate::internal::device::{
         add_ip_addr_subnet_with_config, clear_ipv4_device_state, clear_ipv6_device_state,

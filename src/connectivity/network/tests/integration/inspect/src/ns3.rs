@@ -693,8 +693,8 @@ async fn inspect_devices(name: &str) {
                     Addresses: {
                         "::1/128": {
                             ValidUntil: "infinite",
+                            PreferredLifetime: "infinite",
                             IsSlaac: false,
-                            Deprecated: false,
                             Assigned: true,
                         }
                     },
@@ -738,7 +738,7 @@ async fn inspect_devices(name: &str) {
                 IPv4: {
                     "Addresses": {
                         "192.168.0.1/24": {
-                            ValidUntil: "infinite"
+                            ValidUntil: "infinite",
                         }
                     },
                     Configuration: {
@@ -751,8 +751,8 @@ async fn inspect_devices(name: &str) {
                     "Addresses": {
                         "fe80::ff:fe00:1/64": {
                             ValidUntil: "infinite",
+                            PreferredLifetime: "infinite",
                             IsSlaac: true,
-                            Deprecated: false,
                             // This will always be `false` because DAD will never complete; we set
                             // the number of DAD transmits to `u16::MAX` above.
                             Assigned: false,

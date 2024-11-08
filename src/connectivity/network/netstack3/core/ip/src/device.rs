@@ -58,8 +58,8 @@ use crate::internal::device::state::{
     IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
     IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
     Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-    Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
-    Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime,
+    Ipv6AddrSlaacConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
+    Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
@@ -1109,10 +1109,7 @@ impl<
         let assigned = self.with_ip_address_state(
             device_id,
             &addr_id,
-            |Ipv6AddressState {
-                 flags: Ipv6AddressFlags { deprecated: _, assigned },
-                 config: _,
-             }| { *assigned },
+            |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| *assigned,
         );
 
         if assigned {
@@ -1697,8 +1694,15 @@ impl<CC: SlaacHandler<BC>, BC: InstantContext> IpAddressRemovalHandler<Ipv6, BC>
         reason: AddressRemovedReason,
     ) {
         match config {
-            Ipv6AddrConfig::Slaac(s) => {
-                SlaacHandler::on_address_removed(self, bindings_ctx, device_id, addr_sub, s, reason)
+            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
+                SlaacHandler::on_address_removed(
+                    self,
+                    bindings_ctx,
+                    device_id,
+                    addr_sub,
+                    inner,
+                    reason,
+                )
             }
             Ipv6AddrConfig::Manual(_manual_config) => (),
         }
@@ -1931,10 +1935,9 @@ pub(crate) mod testutil {
                     .with_ip_address_state(
                         device_id,
                         &addr_id,
-                        |Ipv6AddressState {
-                             flags: Ipv6AddressFlags { deprecated: _, assigned },
-                             config: _,
-                         }| { *assigned },
+                        |Ipv6AddressState { flags: Ipv6AddressFlags { assigned }, config: _ }| {
+                            *assigned
+                        },
                     )
                     .then(|| addr_id.addr_sub())
             })))
