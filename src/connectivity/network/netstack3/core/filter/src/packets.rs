@@ -540,8 +540,19 @@ impl<I: IpExt, B: BufferMut> ForwardedPacket<I, B> {
 
     /// Discard the metadata carried by the [`ForwardedPacket`] and return the
     /// inner buffer.
+    ///
+    /// The returned buffer is guaranteed to contain a valid IP frame, the
+    /// start of the buffer points at the start of the IP header.
     pub fn into_buffer(self) -> B {
         self.buffer
+    }
+
+    /// Returns a reference to the forwarded buffer.
+    ///
+    /// The returned reference is guaranteed to contain a valid IP frame, the
+    /// start of the buffer points at the start of the IP header.
+    pub fn buffer(&self) -> &B {
+        &self.buffer
     }
 }
 

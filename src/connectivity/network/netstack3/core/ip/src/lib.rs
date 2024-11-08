@@ -20,6 +20,7 @@ mod internal {
     pub(super) mod api;
     pub(super) mod base;
     pub(super) mod device;
+    pub(super) mod fragmentation;
     pub(super) mod gmp;
     pub(super) mod icmp;
     pub(super) mod ipv6;
@@ -235,6 +236,7 @@ pub use internal::base::{
     TransparentLocalDelivery, TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS,
     DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
 };
+pub use internal::fragmentation::FragmentationCounters;
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
 pub use internal::routing::rules::{

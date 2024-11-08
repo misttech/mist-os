@@ -15,7 +15,7 @@ use netstack3_ip::icmp::{
 use netstack3_ip::multicast_forwarding::MulticastForwardingCounters;
 use netstack3_ip::nud::{NudCounters, NudCountersInner};
 use netstack3_ip::raw::RawIpSocketCounters;
-use netstack3_ip::{IpCounters, IpLayerIpExt};
+use netstack3_ip::{FragmentationCounters, IpCounters, IpLayerIpExt};
 use netstack3_tcp::{TcpCounters, TcpCountersInner};
 use netstack3_udp::{UdpCounters, UdpCountersInner};
 
@@ -285,6 +285,7 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         version_rx,
         multicast_no_interest,
         invalid_cached_conntrack_entry,
+        fragmentation,
     } = counters;
     inspector.record_child("PacketTx", |inspector| {
         inspector.record_counter("Sent", send_ip_packet);
@@ -312,11 +313,29 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         inspector.record_counter("TtlExpired", ttl_expired);
     });
     inspector.record_counter("RxIcmpError", receive_icmp_error);
-    inspector.record_child("Fragments", |inspector| {
+    inspector.record_child("FragmentsRx", |inspector| {
         inspector.record_counter("ReassemblyError", fragment_reassembly_error);
         inspector.record_counter("NeedMoreFragments", need_more_fragments);
         inspector.record_counter("InvalidFragment", invalid_fragment);
         inspector.record_counter("CacheFull", fragment_cache_full);
+    });
+    inspector.record_child("FragmentsTx", |inspector| {
+        let FragmentationCounters {
+            fragmentation_required,
+            fragments,
+            error_not_allowed,
+            error_mtu_too_small,
+            error_body_too_long,
+            error_inner_size_limit_exceeded,
+            error_fragmented_serializer,
+        } = fragmentation;
+        inspector.record_counter("FragmentationRequired", fragmentation_required);
+        inspector.record_counter("Fragments", fragments);
+        inspector.record_counter("ErrorNotAllowed", error_not_allowed);
+        inspector.record_counter("ErrorMtuTooSmall", error_mtu_too_small);
+        inspector.record_counter("ErrorBodyTooLong", error_body_too_long);
+        inspector.record_counter("ErrorInnerSizeLimitExceeded", error_inner_size_limit_exceeded);
+        inspector.record_counter("ErrorFragmentedSerializer", error_fragmented_serializer);
     });
 }
 

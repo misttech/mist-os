@@ -987,11 +987,20 @@ async fn inspect_counters(name: &str) {
                     TtlExpired: 0u64,
                 },
                 RxIcmpError: 0u64,
-                "Fragments": {
+                "FragmentsRx": {
                     ReassemblyError: 0u64,
                     NeedMoreFragments: 0u64,
                     InvalidFragment: 0u64,
                     CacheFull: 0u64,
+                },
+                "FragmentsTx": {
+                    FragmentationRequired: 0u64,
+                    Fragments: 0u64,
+                    ErrorNotAllowed: 0u64,
+                    ErrorMtuTooSmall: 0u64,
+                    ErrorBodyTooLong: 0u64,
+                    ErrorInnerSizeLimitExceeded: 0u64,
+                    ErrorFragmentedSerializer: 0u64,
                 },
             },
             "IPv6": {
@@ -1024,11 +1033,20 @@ async fn inspect_counters(name: &str) {
                     TtlExpired: 0u64,
                 },
                 RxIcmpError: 0u64,
-                "Fragments": {
+                "FragmentsRx": {
                     ReassemblyError: 0u64,
                     NeedMoreFragments: 0u64,
                     InvalidFragment: 0u64,
                     CacheFull: 0u64,
+                },
+                "FragmentsTx": {
+                    FragmentationRequired: 0u64,
+                    Fragments: 0u64,
+                    ErrorNotAllowed: 0u64,
+                    ErrorMtuTooSmall: 0u64,
+                    ErrorBodyTooLong: 0u64,
+                    ErrorInnerSizeLimitExceeded: 0u64,
+                    ErrorFragmentedSerializer: 0u64,
                 },
             },
             "MulticastForwarding": {

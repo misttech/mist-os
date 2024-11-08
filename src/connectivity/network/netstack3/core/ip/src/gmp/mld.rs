@@ -434,6 +434,7 @@ mod tests {
         self, DeviceIpLayerMetadata, IpCounters, IpDeviceMtuContext, IpLayerPacketMetadata,
         IpPacketDestination, IpSendFrameError, SendIpPacketMeta,
     };
+    use crate::internal::fragmentation::FragmentableIpSerializer;
     use crate::internal::gmp::{
         GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
         QueryReceivedActions, QueryReceivedGenericAction,
@@ -557,8 +558,7 @@ mod tests {
             body: S,
         ) -> Result<(), IpSendFrameError<S>>
         where
-            S: Serializer + netstack3_filter::IpPacket<Ipv6>,
-            S::Buffer: BufferMut,
+            S: FragmentableIpSerializer<Ipv6, Buffer: BufferMut> + netstack3_filter::IpPacket<Ipv6>,
         {
             base::send_ip_frame(
                 self,

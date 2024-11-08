@@ -527,6 +527,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
 
     // Send a packet on the socket while imposing an MTU which will not
     // allow a packet to be sent.
+    // The MTU used here is so small that fragmentation can't even be attempted.
     let res = IpSocketHandler::<I, _>::send_ip_packet(
         &mut core_ctx.context(),
         &mut bindings_ctx,
@@ -537,16 +538,6 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
     assert_eq!(res, Err(IpSockSendError::Mtu));
 
     assert_matches!(bindings_ctx.take_ethernet_frames()[..], []);
-    // Try sending a packet which will be larger than the device's MTU,
-    // and make sure it fails.
-    let res = IpSocketHandler::<I, _>::send_ip_packet(
-        &mut core_ctx.context(),
-        &mut bindings_ctx,
-        &sock,
-        (&[0; Ipv6::MINIMUM_LINK_MTU.get() as usize][..]).into_serializer(),
-        &socket_options,
-    );
-    assert_eq!(res, Err(IpSockSendError::Mtu));
 
     // Make sure that sending on an unroutable socket fails.
     ip::testutil::del_routes_to_subnet::<I, _>(&mut core_ctx.context(), subnet).unwrap();
