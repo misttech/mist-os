@@ -11,16 +11,13 @@
 #include <cerrno>
 #include <span>
 
-#include <fbl/unique_fd.h>
-
 #include "file.h"
 #include "posix.h"
 
 namespace elfldltl {
 
-// elfldltl::UniqueFdFile is constructible from fbl::unique_fd and meets the
-// File API (see <lib/elfldltl/memory.h>) by calling pread.  The same thing
-// for unowned plain `int` file descriptors is provided by elfldltl::FdFile.
+// elfldltl::FdFile is constructible from int file descriptor and meets the
+// File API (see <lib/elfldltl/memory.h>) by calling pread.
 
 namespace internal {
 
@@ -41,23 +38,15 @@ inline fit::result<PosixError> ReadFd(int fd, off_t offset, std::span<std::byte>
 
 inline int MakeInvalidFd() { return -1; }
 
-inline fit::result<PosixError> ReadUniqueFd(const fbl::unique_fd& fd, off_t offset,
-                                            std::span<std::byte> buffer) {
-  return ReadFd(fd.get(), offset, buffer);
-}
+template <class Diagnostics>
+using FdFileBase = File<Diagnostics, int, off_t, internal::ReadFd, internal::MakeInvalidFd>;
 
 }  // namespace internal
 
 template <class Diagnostics>
-using FdFileBase = File<Diagnostics, int, off_t, internal::ReadFd, internal::MakeInvalidFd>;
-
-template <class Diagnostics>
-using UniqueFdFileBase = File<Diagnostics, fbl::unique_fd, off_t, internal::ReadUniqueFd>;
-
-template <class Diagnostics>
-class FdFile : public FdFileBase<Diagnostics> {
+class FdFile : public internal::FdFileBase<Diagnostics> {
  public:
-  using FdFileBase<Diagnostics>::FdFileBase;
+  using internal::FdFileBase<Diagnostics>::FdFileBase;
 
   FdFile(const FdFile&) noexcept = default;
 
@@ -70,35 +59,13 @@ class FdFile : public FdFileBase<Diagnostics> {
   int borrow() const { return this->get(); }
 };
 
-// Deduction guide.
+// Deduction guides.
+
 template <class Diagnostics>
 FdFile(int fd, Diagnostics& diagnostics) -> FdFile<Diagnostics>;
 
 template <class Diagnostics>
 FdFile(Diagnostics& diagnostics) -> FdFile<Diagnostics>;
-
-template <class Diagnostics>
-class UniqueFdFile : public UniqueFdFileBase<Diagnostics> {
- public:
-  using Base = UniqueFdFileBase<Diagnostics>;
-
-  using Base::Base;
-
-  UniqueFdFile(UniqueFdFile&&) noexcept = default;
-
-  UniqueFdFile& operator=(UniqueFdFile&&) noexcept = default;
-
-  int get() const { return Base::get().get(); }
-
-  int borrow() const { return get(); }
-};
-
-// Deduction guide.
-template <class Diagnostics>
-UniqueFdFile(fbl::unique_fd fd, Diagnostics& diagnostics) -> UniqueFdFile<Diagnostics>;
-
-template <class Diagnostics>
-UniqueFdFile(Diagnostics& diagnostics) -> UniqueFdFile<Diagnostics>;
 
 }  // namespace elfldltl
 

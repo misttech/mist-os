@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <lib/elfldltl/posix.h>
+#include <lib/elfldltl/unique-fd.h>
 #include <lib/ld/memory.h>
 #include <lib/stdcompat/string_view.h>
 #include <lib/trivial-allocator/new.h>

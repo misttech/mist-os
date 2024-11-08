@@ -6,6 +6,7 @@
 #include <lib/elfldltl/file.h>
 #include <lib/elfldltl/memory.h>
 #include <lib/elfldltl/testing/diagnostics.h>
+#include <lib/elfldltl/unique-fd.h>
 #include <stdio.h>
 
 #include <gmock/gmock.h>

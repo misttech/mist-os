@@ -5,6 +5,7 @@
 #include "ld-startup-in-process-tests-posix.h"
 
 #include <fcntl.h>
+#include <lib/elfldltl/fd.h>
 #include <lib/elfldltl/layout.h>
 #include <lib/ld/abi.h>
 #include <lib/stdcompat/span.h>

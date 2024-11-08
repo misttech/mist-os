@@ -9,42 +9,16 @@ has_fd = !is_kernel && toolchain_variant.tags + [ "standalone" ] -
                        [ "standalone" ] == toolchain_variant.tags
 
 library_headers("headers") {
-  public_deps = [
-    "//sdk/lib/fit",
-
-    # <lib/elfldltl/memory.h> has #include <fbl/alloc_checker.h>.
-    "//zircon/system/ulib/fbl",
-  ]
-  if (has_fd) {
-    public_deps += [
-      # <lib/elfldltl/mapped-fd-file.h> has #include <lib/fit/result.h>.
-      "//sdk/lib/fit",
-    ]
-  }
-  if (is_fuchsia && !is_kernel) {
-    # Make sure that there's no transitive deps on libzircon, so header-only
-    # use of the library doesn't affect dynamic linking dependencies.
-    if (zircon_toolchain == false) {
-      _headers = ""
-    } else {
-      _headers = ":headers"
-    }
-    public_deps += [
-      # <lib/elfldltl/vmo.h> has #include <lib/zx/vmo.h>.
-      "//zircon/system/ulib/zx$_headers",
-    ]
-  }
-  if (is_kernel) {
-    public_deps += [
-      "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/libc",
-    ]
-  }
-
+  # These APIs are close to being universally portable.  They depend only on
+  # standard C++20 and <lib/fit/result.h> and rely only on library features
+  # available in all environments.  This may include references to container
+  # and allocation APIs that cannot actually be used in special environments
+  # (without infallible allocation), but using the headers should be compatible
+  # as long as the specific functions and classes relying on those library
+  # features are not used.
   headers = [
     "lib/elfldltl/abi-ptr.h",
     "lib/elfldltl/abi-span.h",
-    "lib/elfldltl/alloc-checker-container.h",
     "lib/elfldltl/compat-hash.h",
     "lib/elfldltl/constants.h",
     "lib/elfldltl/container.h",
@@ -55,7 +29,6 @@ library_headers("headers") {
     "lib/elfldltl/dwarf/encoding.h",
     "lib/elfldltl/dwarf/section-data.h",
     "lib/elfldltl/dynamic.h",
-    "lib/elfldltl/fd.h",
     "lib/elfldltl/field.h",
     "lib/elfldltl/file.h",
     "lib/elfldltl/gnu-hash.h",
@@ -72,18 +45,13 @@ library_headers("headers") {
     "lib/elfldltl/loadinfo-mapped-memory.h",
     "lib/elfldltl/loadinfo-mutable-memory.h",
     "lib/elfldltl/machine.h",
-    "lib/elfldltl/mapped-fd-file.h",
-    "lib/elfldltl/mapped-vmo-file.h",
     "lib/elfldltl/memory.h",
-    "lib/elfldltl/mmap-loader.h",
     "lib/elfldltl/note.h",
     "lib/elfldltl/phdr.h",
-    "lib/elfldltl/posix.h",
     "lib/elfldltl/preallocated-vector.h",
     "lib/elfldltl/relocation.h",
     "lib/elfldltl/relro.h",
     "lib/elfldltl/resolve.h",
-    "lib/elfldltl/segment-with-vmo.h",
     "lib/elfldltl/self.h",
     "lib/elfldltl/static-pie-with-vdso.h",
     "lib/elfldltl/static-pie.h",
@@ -91,10 +59,55 @@ library_headers("headers") {
     "lib/elfldltl/svr4-abi.h",
     "lib/elfldltl/symbol.h",
     "lib/elfldltl/tls-layout.h",
-    "lib/elfldltl/vmar-loader.h",
-    "lib/elfldltl/vmo.h",
-    "lib/elfldltl/zircon.h",
   ]
+  public_deps = [ "//sdk/lib/fit" ]
+
+  # These APIs depend on some POSIX-like file-descriptor-based APIs.
+  if (has_fd) {
+    headers += [
+      "lib/elfldltl/fd.h",
+      "lib/elfldltl/mapped-fd-file.h",
+      "lib/elfldltl/mmap-loader.h",
+      "lib/elfldltl/posix.h",
+    ]
+  }
+
+  # These APIs depend on the corresponding <fbl/...> APIs.
+  headers += [
+    "lib/elfldltl/alloc-checker-container.h",
+    "lib/elfldltl/unique-fd.h",
+  ]
+  public_deps += [ "//zircon/system/ulib/fbl" ]
+
+  # These APIs depend on Fuchsia userland APIs (<lib/zx/...>, etc.).
+  if (is_fuchsia && !is_kernel) {
+    headers += [
+      "lib/elfldltl/mapped-vmo-file.h",
+      "lib/elfldltl/vmar-loader.h",
+      "lib/elfldltl/vmo.h",
+      "lib/elfldltl/segment-with-vmo.h",
+      "lib/elfldltl/zircon.h",
+    ]
+
+    # Make sure that there's no transitive deps on libzircon, so header-only
+    # use of the library doesn't affect dynamic linking dependencies.
+    if (zircon_toolchain == false) {
+      _headers = ""
+    } else {
+      _headers = ":headers"
+    }
+    public_deps += [
+      # <lib/elfldltl/vmo.h> has #include <lib/zx/vmo.h>.
+      "//zircon/system/ulib/zx$_headers",
+    ]
+  }
+
+  if (is_kernel) {
+    public_deps += [
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
+    ]
+  }
 }
 
 static_library("elfldltl") {
@@ -110,13 +123,12 @@ static_library("elfldltl") {
       deps += [ ":self" ]
     }
   }
+
   if (has_fd) {
     sources += [ "mapped-fd-file.cc" ]
-    deps += [
-      "//sdk/lib/fit",
-      "//zircon/system/ulib/fbl",
-    ]
+    deps += [ "//sdk/lib/fit" ]
   }
+
   if (is_fuchsia && !is_kernel) {
     sources += [
       "mapped-vmo-file.cc",

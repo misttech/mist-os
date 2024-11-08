@@ -5,8 +5,8 @@
 #ifndef LIB_DL_TEST_DL_LOAD_TESTS_BASE_H_
 #define LIB_DL_TEST_DL_LOAD_TESTS_BASE_H_
 
-#include <lib/elfldltl/fd.h>
 #include <lib/elfldltl/mmap-loader.h>
+#include <lib/elfldltl/unique-fd.h>
 #include <lib/fit/function.h>
 
 #include <string_view>
