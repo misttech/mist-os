@@ -169,6 +169,7 @@ size_checker_input = {
       pkgs = [
         "memory_monitor",
         "memory_sampler",
+        "memory_pressure_signaler",
       ]
       limit = 2621440  # 2.5 MiB
       creep_limit = 102400  # 100 KiB
