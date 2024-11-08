@@ -76,7 +76,7 @@ zx_status_t fdio_timer_readv(zxio_t* io, const zx_iovec_t* vector, size_t vector
     return ZX_ERR_SHOULD_WAIT;
   }
 
-  uint64_t count = 1;
+  int64_t count = 1;
   if (timer->interval > zx::duration()) {
     count = (now - timer->current_deadline) / timer->interval + 1;
     timer->current_deadline += timer->interval * count;

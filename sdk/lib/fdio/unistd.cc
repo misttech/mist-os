@@ -84,7 +84,7 @@ constexpr fio::OpenFlags kZxioFsMask = fio::OpenFlags::kNodeReference | fio::Ope
                                        fio::OpenFlags::kDirectory | fio::OpenFlags::kAppend;
 
 // Map POSIX O_* flags to equivalent fuchsia.io OpenFlags.
-fio::OpenFlags posix_flags_to_fio(uint32_t flags) {
+fio::OpenFlags posix_flags_to_fio(int32_t flags) {
   fio::OpenFlags rights = {};
   switch (flags & O_ACCMODE) {
     case O_RDONLY:
@@ -108,8 +108,8 @@ fio::OpenFlags posix_flags_to_fio(uint32_t flags) {
 }
 
 // Map fuchsia.io OpenFlags to equivalent POSIX O_* flags.
-uint32_t fio_flags_to_posix(fio::OpenFlags flags) {
-  uint32_t result = 0;
+int32_t fio_flags_to_posix(fio::OpenFlags flags) {
+  int32_t result = static_cast<int32_t>(static_cast<uint32_t>(flags & kZxioFsMask));
   if ((flags & (fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable)) ==
       (fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightWritable)) {
     result |= O_RDWR;
@@ -118,8 +118,6 @@ uint32_t fio_flags_to_posix(fio::OpenFlags flags) {
   } else {
     result |= O_RDONLY;
   }
-
-  result |= static_cast<uint32_t>(flags & kZxioFsMask);
   return result;
 }
 
@@ -165,7 +163,7 @@ zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, int flags, uint32
   // http://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
   const bool flags_incompatible_with_directory =
       ((flags & ~O_PATH & O_ACCMODE) != O_RDONLY) || (flags & O_CREAT);
-  fio::OpenFlags fio_flags = posix_flags_to_fio(static_cast<uint32_t>(flags));
+  fio::OpenFlags fio_flags = posix_flags_to_fio(flags);
   if (S_ISDIR(mode)) {
     fio_flags |= fio::OpenFlags::kDirectory;
   }
@@ -431,14 +429,14 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
   memset(s, 0, sizeof(struct stat));
   s->st_mode = zxio_get_posix_mode(attr.protocols, attr.abilities);
   s->st_ino = attr.has.id ? attr.id : fio::wire::kInoUnknown;
-  s->st_size = attr.content_size;
+  s->st_size = static_cast<off_t>(attr.content_size);
   s->st_blksize = VNATTR_BLKSIZE;
-  s->st_blocks = attr.storage_size / VNATTR_BLKSIZE;
+  s->st_blocks = static_cast<blkcnt_t>(attr.storage_size) / VNATTR_BLKSIZE;
   s->st_nlink = attr.link_count;
-  s->st_ctim.tv_sec = attr.creation_time / ZX_SEC(1);
-  s->st_ctim.tv_nsec = attr.creation_time % ZX_SEC(1);
-  s->st_mtim.tv_sec = attr.modification_time / ZX_SEC(1);
-  s->st_mtim.tv_nsec = attr.modification_time % ZX_SEC(1);
+  s->st_ctim.tv_sec = static_cast<time_t>(attr.creation_time / ZX_SEC(1));
+  s->st_ctim.tv_nsec = static_cast<int64_t>(attr.creation_time % ZX_SEC(1));
+  s->st_mtim.tv_sec = static_cast<time_t>(attr.modification_time / ZX_SEC(1));
+  s->st_mtim.tv_nsec = static_cast<int64_t>(attr.modification_time % ZX_SEC(1));
   return ZX_OK;
 }
 
@@ -707,7 +705,7 @@ ssize_t preadv(int fd, const struct iovec* iov, int iovcnt, off_t offset) {
     if (status != ZX_OK) {
       return ERROR(status);
     }
-    return actual;
+    return static_cast<ssize_t>(actual);
   }
 }
 
@@ -751,7 +749,7 @@ ssize_t pwritev(int fd, const struct iovec* iov, int iovcnt, off_t offset) {
     if (status != ZX_OK) {
       return ERROR(status);
     }
-    return actual;
+    return static_cast<ssize_t>(actual);
   }
 }
 
@@ -901,7 +899,7 @@ int fcntl(int fd, int cmd, ...) {
       if (status != ZX_OK) {
         return ERROR(status);
       }
-      uint32_t fdio_flags = fdio_internal::fio_flags_to_posix(flags);
+      int32_t fdio_flags = fdio_internal::fio_flags_to_posix(flags);
       if (io->ioflag() & IOFLAG_NONBLOCK) {
         fdio_flags |= O_NONBLOCK;
       }
@@ -1410,7 +1408,7 @@ int faccessat(int dirfd, const char* filename, int amode, int flag) {
   // Check that the file has each of the permissions in mode.
   // Ignore X_OK, since it does not apply to our permission model
   amode &= ~X_OK;
-  uint32_t rights_flags = 0;
+  int32_t rights_flags = 0;
   switch (amode & (R_OK | W_OK)) {
     case R_OK:
       rights_flags = O_RDONLY;
@@ -1842,7 +1840,7 @@ int ppoll(struct pollfd* fds, nfds_t n, const struct timespec* timeout_ts,
       ++items_index;
     }
     // Mask unrequested events. Avoid clearing events that are ignored in pollfd::events.
-    pfd.revents &= static_cast<int16_t>(pfd.events | POLLNVAL | POLLHUP | POLLERR);
+    pfd.revents = static_cast<int16_t>(pfd.revents & (pfd.events | POLLNVAL | POLLHUP | POLLERR));
     if (pfd.revents != 0) {
       ++nfds;
     }
@@ -1855,7 +1853,7 @@ __EXPORT
 int poll(struct pollfd* fds, nfds_t n, int timeout) {
   struct timespec timeout_ts = {
       .tv_sec = timeout / 1000,
-      .tv_nsec = (timeout % 1000) * 1000000,
+      .tv_nsec = static_cast<int64_t>(timeout % 1000) * 1000000,
   };
   struct timespec* ts = timeout >= 0 ? &timeout_ts : nullptr;
   return ppoll(fds, n, ts, nullptr);
@@ -2076,7 +2074,7 @@ ssize_t sendmsg(int fd, const struct msghdr* msg, int flags) {
     if (out_code) {
       return ERRNO(out_code);
     }
-    return actual;
+    return static_cast<ssize_t>(actual);
   }
 }
 
@@ -2123,7 +2121,7 @@ ssize_t recvmsg(int fd, struct msghdr* msg, int flags) {
     if (out_code) {
       return ERRNO(out_code);
     }
-    return actual;
+    return static_cast<ssize_t>(actual);
   }
 }
 
