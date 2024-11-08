@@ -19,5 +19,6 @@ group("tests") {
     "encoding:tests",
     "message/rust:tests",
     "rust:tests",
+    "rust_cpp_bridge:tests",
   ]
 }
