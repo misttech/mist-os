@@ -13,7 +13,6 @@
 #include <lib/zxio/types.h>
 #include <zircon/processargs.h>
 
-#include <new>
 #include <utility>
 
 #include <fbl/auto_lock.h>

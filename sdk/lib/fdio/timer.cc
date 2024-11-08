@@ -12,8 +12,6 @@
 #include <time.h>
 #include <zircon/assert.h>
 
-#include <algorithm>
-
 #include <fbl/auto_lock.h>
 
 #include "sdk/lib/fdio/fdio_unistd.h"
