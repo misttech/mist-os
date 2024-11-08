@@ -25,13 +25,11 @@ rustc_binary("network_unified_binary") {
   sources = [ "src/main.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
-  if (is_asan || is_lto_variant || target_cpu == "riscv64" || is_debug) {
-    # This is a known massive target.
-    # Remote build on a worker with more memory.
-    _concurrent_jobs = concurrent_jobs.rust_highmem
-    configs += _concurrent_jobs.configs
-    forward_variables_from(_concurrent_jobs.vars, "*")
-  }
+  # This is a known massive target.
+  # Remote build on a worker with more memory.
+  _concurrent_jobs = concurrent_jobs.rust_highmem
+  configs += _concurrent_jobs.configs
+  forward_variables_from(_concurrent_jobs.vars, "*")
 
   configs += [ ":config" ]
 }
