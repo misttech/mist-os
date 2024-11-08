@@ -20,7 +20,6 @@
 
 #include <align.h>
 #include <platform.h>
-#include <string.h>
 #include <zircon/assert.h>
 
 #include <ktl/algorithm.h>
@@ -61,7 +60,7 @@ static void FixUnalignedStorage(uintptr_t storage_beg, uintptr_t storage_end, ui
     if ((new_beg == new_end || new_beg >= beg_up) && old_beg != old_end && old_beg < beg_up) {
       // Keep granule prefix outside of the storage unpoisoned.
       uintptr_t beg_down = ROUNDDOWN(storage_beg, granularity);
-      *(uint8_t*)addr2shadow(beg_down) = static_cast<uint8_t>(storage_beg - beg_down);
+      *addr2shadow(beg_down) = static_cast<uint8_t>(storage_beg - beg_down);
       old_beg = ktl::max(beg_up, old_beg);
       old_end = ktl::max(beg_up, old_end);
       new_beg = ktl::max(beg_up, new_beg);
@@ -136,5 +135,90 @@ void __sanitizer_annotate_contiguous_container(const void* beg_p, const void* en
   if (b1 != b2) {
     ASSERT(b2 - b1 == granularity);
     *(uint8_t*)addr2shadow(b1) = static_cast<uint8_t>(new_end - b1);
+  }
+}
+
+void __sanitizer_annotate_double_ended_contiguous_container(const void* storage_beg_p,
+                                                            const void* storage_end_p,
+                                                            const void* old_container_beg_p,
+                                                            const void* old_container_end_p,
+                                                            const void* new_container_beg_p,
+                                                            const void* new_container_end_p) {
+  uintptr_t storage_beg = reinterpret_cast<uintptr_t>(storage_beg_p);
+  uintptr_t storage_end = reinterpret_cast<uintptr_t>(storage_end_p);
+  uintptr_t old_beg = reinterpret_cast<uintptr_t>(old_container_beg_p);
+  uintptr_t old_end = reinterpret_cast<uintptr_t>(old_container_end_p);
+  uintptr_t new_beg = reinterpret_cast<uintptr_t>(new_container_beg_p);
+  uintptr_t new_end = reinterpret_cast<uintptr_t>(new_container_end_p);
+
+  constexpr uintptr_t granularity = kAsanGranularity;
+
+  if (!(old_beg <= old_end && new_beg <= new_end) ||
+      !(storage_beg <= new_beg && new_end <= storage_end) ||
+      !(storage_beg <= old_beg && old_end <= storage_end)) {
+    printf(
+        "KASAN bad parameters to\n"
+        "__sanitizer_annotate_double_ended_contiguous_container:\n"
+        "      storage: [%p, %p)\n"
+        "      old_container: [%p, %p)\n"
+        "      new_container: [%p, %p)\n",
+        (void*)storage_beg, (void*)storage_end, (void*)old_beg, (void*)old_end, (void*)new_beg,
+        (void*)new_end);
+    if (!IS_ALIGNED(storage_beg, granularity))
+      printf("ERROR: beg is not aligned by %zu\n", granularity);
+    panic("kasan\n");
+  }
+
+  if ((old_beg == old_end && new_beg == new_end) || (old_beg == new_beg && old_end == new_end))
+    return;  // Nothing to do here.
+
+  FixUnalignedStorage(storage_beg, storage_end, old_beg, old_end, new_beg, new_end);
+
+  // Handle non-intersecting new/old containers separately
+  if (old_beg == old_end || new_beg == new_end || new_end <= old_beg || old_end <= new_beg) {
+    if (old_beg != old_end) {
+      // Poison the old container
+      uintptr_t a = ROUNDDOWN(old_beg, granularity);
+      uintptr_t b = ROUNDUP(old_end, granularity);
+      asan_poison_shadow(a, b - a, kAsanContiguousContainerOOBMagic);
+    }
+
+    if (new_beg != new_end) {
+      // Unpoison the new container
+      uintptr_t a = ROUNDDOWN(new_beg, granularity);
+      uintptr_t b = ROUNDDOWN(new_end, granularity);
+      asan_unpoison_shadow(a, b - a);
+      if (!IS_ALIGNED(new_end, granularity))
+        *(uint8_t*)addr2shadow(b) = static_cast<uint8_t>(new_end - b);
+    }
+    return;
+  }
+
+  // Handle intersecting containers
+  if (new_beg < old_beg) {
+    uintptr_t a = ROUNDDOWN(new_beg, granularity);
+    uintptr_t c = ROUNDDOWN(old_beg, granularity);
+    asan_unpoison_shadow(a, c - a);
+  } else if (new_beg > old_beg) {
+    uintptr_t a = ROUNDDOWN(old_beg, granularity);
+    uintptr_t c = ROUNDDOWN(new_beg, granularity);
+    asan_poison_shadow(a, c - a, kAsanContiguousContainerOOBMagic);
+  }
+
+  if (new_end > old_end) {
+    uintptr_t a = ROUNDDOWN(old_end, granularity);
+    uintptr_t c = ROUNDDOWN(new_end, granularity);
+    asan_unpoison_shadow(a, c - a);
+    if (!IS_ALIGNED(new_end, granularity))
+      *(uint8_t*)addr2shadow(c) = static_cast<uint8_t>(new_end - c);
+  } else if (new_end < old_end) {
+    uintptr_t a2 = ROUNDUP(new_end, granularity);
+    uintptr_t c2 = ROUNDUP(old_end, granularity);
+    asan_poison_shadow(a2, c2 - a2, kAsanContiguousContainerOOBMagic);
+
+    if (!IS_ALIGNED(new_end, granularity)) {
+      uintptr_t a = ROUNDDOWN(new_end, granularity);
+      *(uint8_t*)addr2shadow(a) = static_cast<uint8_t>(new_end - a);
+    }
   }
 }
