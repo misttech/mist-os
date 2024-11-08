@@ -35,19 +35,7 @@ properties:
             properties:
               inactive-level:
                 $ref: power-element.yaml#/definitions/power-level
-              wake-handling-level:
-                $ref: power-element.yaml#/definitions/power-level
-              active-level:
-                $ref: power-element.yaml#/definitions/power-level
-            additionalProperties: false
-
-      wake-handling-element:
-        $ref: "power-element.yaml#/patternProperties/^[a-zA-Z0-9-]*-element$"
-        properties:
-          power-levels:
-            $ref: "power-element.yaml#/patternProperties/^[a-zA-Z0-9-]*-element$/properties/power-levels"
-            properties:
-              inactive-level:
+              suspending-level:
                 $ref: power-element.yaml#/definitions/power-level
               active-level:
                 $ref: power-element.yaml#/definitions/power-level
@@ -68,7 +56,6 @@ properties:
     additionalProperties: false
     required:
       - execution-state-element
-      - wake-handling-element
       - application-activity-element
 
 required:
@@ -85,21 +72,11 @@ examples:
             inactive-level {
               level = <0>;
             };
-            wake-handling-level {
+            sag_execution_suspending: suspending-level {
               level = <1>;
             };
             active-level {
               level = <2>;
-            };
-          };
-        };
-        wake-handling-element {
-          power-levels {
-            inactive-level {
-              level = <0>;
-            };
-            sag_wake_active: active-level {
-              level = <1>;
             };
           };
         };
@@ -126,7 +103,7 @@ examples:
             ...
             handling-level {
               level = <1>;
-              level-dependencies = <&sag_wake_active 2>;
+              level-dependencies = <&sag_execution_suspending 2>;
             };
           };
         };

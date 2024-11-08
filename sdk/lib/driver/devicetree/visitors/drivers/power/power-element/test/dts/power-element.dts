@@ -16,7 +16,7 @@
             inactive-level {
               level = <0>;
             };
-            wake-handling-level {
+            sag_execution_suspending: suspending-level {
               level = <1>;
             };
             sag_execution_active: active-level {
@@ -26,16 +26,6 @@
         };
         execution-resume-latency-element {
           power-levels {
-          };
-        };
-        wake-handling-element {
-          power-levels {
-            inactive-level {
-              level = <0>;
-            };
-            sag_wake_active: active-level {
-              level = <1>;
-            };
           };
         };
         application-activity-element {
@@ -83,7 +73,7 @@
             };
             handling-level {
               level = <1>;
-              level-dependencies = <&sag_wake_active 2 &cpu_on_level 1>;
+              level-dependencies = <&sag_execution_suspending 2 &cpu_on_level 1>;
             };
             on-level {
               level = <2>;

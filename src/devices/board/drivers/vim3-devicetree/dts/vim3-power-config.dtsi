@@ -18,21 +18,11 @@
 					sag_execution_inactive: inactive-level {
 						level = <0>;
 					};
-					sag_execution_handling: wake-handling-level {
+					sag_execution_suspending: suspending-level {
 						level = <1>;
 					};
 					sag_execution_active: active-level {
 						level = <2>;
-					};
-				};
-			};
-			wake-handling-element {
-				power-levels {
-					sag_wake_inactive: inactive-level {
-						level = <0>;
-					};
-					sag_wake_active: active-level {
-						level = <1>;
 					};
 				};
 			};

@@ -88,18 +88,16 @@ TEST(PowerElementVisitorTest, TestMetadataAndBindProperty) {
           if (dependency.parent()->sag().value() ==
               fuchsia_hardware_power::SagElement::kExecutionState) {
             dependencies_tested++;
-            EXPECT_EQ(dependency.level_deps()->at(0).child_level(), 2u);
-            EXPECT_EQ(dependency.level_deps()->at(0).parent_level(), 2u);
-            EXPECT_EQ(dependency.strength(),
-                      static_cast<fuchsia_hardware_power::RequirementType>(1u));
-          }
-          if (dependency.parent()->sag().value() ==
-              fuchsia_hardware_power::SagElement::kWakeHandling) {
-            dependencies_tested++;
-            EXPECT_EQ(dependency.level_deps()->at(0).child_level(), 1u);
-            EXPECT_EQ(dependency.level_deps()->at(0).parent_level(), 1u);
-            EXPECT_EQ(dependency.strength(),
-                      static_cast<fuchsia_hardware_power::RequirementType>(2u));
+            if (dependency.level_deps()->at(0).parent_level() == 2u) {
+              EXPECT_EQ(dependency.level_deps()->at(0).child_level(), 2u);
+              EXPECT_EQ(dependency.strength(),
+                        static_cast<fuchsia_hardware_power::RequirementType>(1u));
+            } else {
+              EXPECT_EQ(dependency.level_deps()->at(0).child_level(), 1u);
+              EXPECT_EQ(dependency.level_deps()->at(0).parent_level(), 1u);
+              EXPECT_EQ(dependency.strength(),
+                        static_cast<fuchsia_hardware_power::RequirementType>(2u));
+            }
           }
         }
 

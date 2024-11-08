@@ -973,22 +973,8 @@
 						level = <0x00>;
 					};
 
-					wake-handling-level {
+					suspending-level {
 						level = <0x01>;
-					};
-				};
-			};
-
-			wake-handling-element {
-
-				power-levels {
-
-					active-level {
-						level = <0x01>;
-					};
-
-					inactive-level {
-						level = <0x00>;
 					};
 				};
 			};
