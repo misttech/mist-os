@@ -1192,19 +1192,13 @@ int fstat(int fd, struct stat* s) {
   return STATUS(fdio_internal::stat_impl(io, s));
 }
 
-namespace {
-int fstatat(int dirfd, std::string_view filename, struct stat* s, int flags) {
-  zx::result io = fdio_internal::open_at(dirfd, filename.data(), O_PATH, 0);
+__EXPORT
+int fstatat(int dirfd, const char* fn, struct stat* s, int flags) {
+  zx::result io = fdio_internal::open_at(dirfd, fn, O_PATH, 0);
   if (io.is_error()) {
     return ERROR(io.status_value());
   }
   return STATUS(fdio_internal::stat_impl(io.value(), s));
-}
-}
-
-__EXPORT
-int fstatat(int dirfd, const char* fn, struct stat* s, int flags) {
-  return fstatat(dirfd, std::string_view(fn), s, flags);
 }
 
 __EXPORT
@@ -1249,7 +1243,7 @@ char* realpath(const char* __restrict filename, char* __restrict resolved) {
   }
   if (do_stat) {
     struct stat s;
-    const int ret = fstatat(AT_FDCWD, clean_buffer, &s, 0);
+    const int ret = fstatat(AT_FDCWD, clean_buffer.c_str(), &s, 0);
     if (ret < 0) {
       return nullptr;
     }

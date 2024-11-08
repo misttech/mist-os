@@ -31,11 +31,8 @@ namespace fio = fuchsia_io;
 namespace {
 
 std::pair<std::string_view, bool> FindNextPathSegment(std::string_view path) {
-  auto next_slash = path.find('/');
-  if (next_slash == std::string_view::npos) {
-    return {path, true};
-  }
-  return {std::string_view(path.data(), next_slash), false};
+  const size_t next_slash = path.find('/');
+  return {path.substr(0, next_slash), next_slash == std::string_view::npos};
 }
 
 zx::result<fbl::RefPtr<fdio_internal::LocalVnode>> CreateRemoteVnode(
