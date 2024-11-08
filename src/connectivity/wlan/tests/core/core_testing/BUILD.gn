@@ -1,0 +1,19 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_library.gni")
+python_library("core_testing") {
+  testonly = true
+  sources = [
+    "__init__.py",
+    "base_test.py",
+    "handlers.py",
+    "ies.py",
+  ]
+  library_deps = [
+    "//src/testing/end_to_end/honeydew",
+    "//third_party/antlion",
+    "//third_party/mobly",
+  ]
+}

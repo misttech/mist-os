@@ -202,28 +202,6 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             if has_fullmac || has_softmac {
                 // Select the policy layer
                 match connectivity_config.wlan.policy_layer {
-                    WlanPolicyLayer::ViaWlanix => {
-                        builder.platform_bundle("wlan_wlanix");
-
-                        // Ensure we don't have invalid recovery settings
-                        if connectivity_config.wlan.recovery_profile.is_some() {
-                            bail!(
-                                "wlan.recovery_profile is invalid with wlan.policy_layer ViaWlanix"
-                            )
-                        }
-                        if connectivity_config.wlan.recovery_enabled {
-                            bail!(
-                                "wlan.recovery_enabled is invalid with wlan.policy_layer ViaWlanix"
-                            )
-                        }
-
-                        // Ensure we don't have invalid roaming settings
-                        if let WlanRoamingPolicy::Enabled { .. } =
-                            connectivity_config.wlan.roaming_policy
-                        {
-                            bail!("wlan.roaming_policy is invalid with wlan.policy_layer ViaWlanix")
-                        }
-                    }
                     WlanPolicyLayer::Platform => {
                         builder.platform_bundle("wlan_policy");
 
@@ -271,6 +249,51 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                                 roaming_policy_str.into(),
                             ),
                         )?;
+                    }
+                    WlanPolicyLayer::ViaWlanix => {
+                        builder.platform_bundle("wlan_wlanix");
+
+                        // Ensure we don't have invalid recovery settings
+                        if connectivity_config.wlan.recovery_profile.is_some() {
+                            bail!(
+                                "wlan.recovery_profile is invalid with wlan.policy_layer ViaWlanix"
+                            )
+                        }
+                        if connectivity_config.wlan.recovery_enabled {
+                            bail!(
+                                "wlan.recovery_enabled is invalid with wlan.policy_layer ViaWlanix"
+                            )
+                        }
+
+                        // Ensure we don't have invalid roaming settings
+                        if let WlanRoamingPolicy::Enabled { .. } =
+                            connectivity_config.wlan.roaming_policy
+                        {
+                            bail!("wlan.roaming_policy is invalid with wlan.policy_layer ViaWlanix")
+                        }
+                    }
+                    WlanPolicyLayer::None => {
+                        // Ensure we only exclude a policy layer on an Eng build.
+                        context.ensure_build_type_and_feature_set_level(
+                            &[BuildType::Eng],
+                            &[FeatureSupportLevel::Standard],
+                            "WLAN Policy None",
+                        )?;
+
+                        // Ensure we don't have invalid recovery settings
+                        if connectivity_config.wlan.recovery_profile.is_some() {
+                            bail!("wlan.recovery_profile is invalid without a wlan.policy_layer")
+                        }
+                        if connectivity_config.wlan.recovery_enabled {
+                            bail!("wlan.recovery_enabled is invalid without a wlan.policy_layer")
+                        }
+
+                        // Ensure we don't have invalid roaming settings
+                        if let WlanRoamingPolicy::Enabled { .. } =
+                            connectivity_config.wlan.roaming_policy
+                        {
+                            bail!("wlan.roaming_policy is invalid without a wlan.policy_layer")
+                        }
                     }
                 }
 
