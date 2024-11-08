@@ -1562,9 +1562,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext, CC: SlaacContext<BC>>(
                         }
                     }));
 
-                    // TODO(https://fxbug.dev/377746345): Avoid this unwrap, we
-                    // should be able to do saturating adds here.
-                    let valid_until = now.checked_add(valid_for.get()).unwrap();
+                    let valid_until = now.saturating_add(valid_for.get());
 
                     let desync_factor = if let Some(d) = desync_factor(
                         &mut bindings_ctx.rng(),

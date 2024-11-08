@@ -689,8 +689,8 @@ struct RetransTimer<I> {
 impl<I: Instant> RetransTimer<I> {
     fn new(now: I, rto: Duration, user_timeout: Duration, max_retries: NonZeroU8) -> Self {
         let wakeup_after = rto.min(user_timeout);
-        let at = now.add(wakeup_after);
-        let user_timeout_until = now.add(user_timeout);
+        let at = now.panicking_add(wakeup_after);
+        let user_timeout_until = now.saturating_add(user_timeout);
         Self { at, rto, user_timeout_until, remaining_retries: Some(max_retries) }
     }
 
@@ -705,12 +705,12 @@ impl<I: Instant> RetransTimer<I> {
             // timer to expire as soon as possible.
             Duration::ZERO
         };
-        *at = now.add(core::cmp::min(*rto, remaining));
+        *at = now.panicking_add(core::cmp::min(*rto, remaining));
     }
 
     fn rearm(&mut self, now: I) {
         let Self { at, rto, user_timeout_until: _, remaining_retries: _ } = self;
-        *at = now.add(*rto);
+        *at = now.panicking_add(*rto);
     }
 
     fn timed_out(&self, now: I) -> bool {
@@ -762,7 +762,7 @@ struct KeepAliveTimer<I> {
 
 impl<I: Instant> KeepAliveTimer<I> {
     fn idle(now: I, keep_alive: &KeepAlive) -> Self {
-        let at = now.add(keep_alive.idle.into());
+        let at = now.saturating_add(keep_alive.idle.into());
         Self { at, already_sent: 0 }
     }
 }
@@ -1057,7 +1057,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 //   been received for the connection within an interval.
                 if keep_alive.enabled && !FIN_QUEUED && readable_bytes == 0 {
                     if *at <= now {
-                        *at = now.add(keep_alive.interval.into());
+                        *at = now.saturating_add(keep_alive.interval.into());
                         *already_sent = already_sent.saturating_add(1);
                         // Per RFC 9293 Section 3.8.4:
                         //   Such a segment generally contains SEG.SEQ = SND.NXT-1
@@ -1193,7 +1193,8 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     && !zero_window_probe
                 {
                     if timer.is_none() {
-                        *timer = Some(SendTimer::SWSProbe { at: now.add(SWS_PROBE_TIMEOUT) })
+                        *timer =
+                            Some(SendTimer::SWSProbe { at: now.panicking_add(SWS_PROBE_TIMEOUT) })
                     }
                     return None;
                 }
@@ -1583,7 +1584,7 @@ pub struct TimeWait<I> {
 }
 
 fn new_time_wait_expiry<I: Instant>(now: I) -> I {
-    now.add(MSL * 2)
+    now.panicking_add(MSL * 2)
 }
 
 #[derive(Debug)]
@@ -2192,8 +2193,9 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 // If the connection is already defunct, we set
                                 // a timeout to reclaim, but otherwise, a later
                                 // `close` call should set the timer.
-                                timeout_at: fin_wait2_timeout
-                                    .and_then(|timeout| defunct.then_some(now.add(timeout))),
+                                timeout_at: fin_wait2_timeout.and_then(|timeout| {
+                                    defunct.then_some(now.saturating_add(timeout))
+                                }),
                             };
                             assert_eq!(
                                 self.transition_to_state(counters, State::FinWait2(finwait2)),
@@ -2305,7 +2307,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                     NonZeroU32::new(u32::try_from(data.len()).unwrap_or(u32::MAX))
                                 {
                                     rcv.timer = Some(ReceiveTimer::DelayedAck {
-                                        at: now.add(ACK_DELAY_THRESHOLD),
+                                        at: now.panicking_add(ACK_DELAY_THRESHOLD),
                                         received_bytes,
                                     })
                                 }
@@ -2816,7 +2818,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 if let (CloseReason::Close { now }, Some(fin_wait2_timeout)) =
                     (close_reason, socket_options.fin_wait2_timeout)
                 {
-                    assert_eq!(timeout_at.replace(now.add(fin_wait2_timeout)), None);
+                    assert_eq!(timeout_at.replace(now.saturating_add(fin_wait2_timeout)), None);
                 }
                 Err(CloseError::Closing)
             }
@@ -5439,7 +5441,7 @@ mod test {
         );
         // so the above poll_send call will install a timer, which will fire
         // after `keep_alive.idle`.
-        assert_eq!(state.poll_send_at(), Some(clock.now().add(keep_alive.idle.into())));
+        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(keep_alive.idle.into())));
 
         // Now we receive an ACK after an hour.
         clock.sleep(Duration::from_secs(60 * 60));
@@ -5454,7 +5456,7 @@ mod test {
             (None, None, DataAcked::No, NewlyClosed::No)
         );
         // the timer is reset to fire in 2 hours.
-        assert_eq!(state.poll_send_at(), Some(clock.now().add(keep_alive.idle.into())),);
+        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(keep_alive.idle.into())),);
         clock.sleep(keep_alive.idle.into());
 
         // Then there should be `count` probes being sent out after `count`
@@ -5649,7 +5651,7 @@ mod test {
             .into(),
         });
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now(), &counters), None);
-        assert_eq!(state.poll_send_at(), Some(clock.now().add(Estimator::RTO_INIT)));
+        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(Estimator::RTO_INIT)));
 
         // Send the first probe after first RTO.
         clock.sleep(Estimator::RTO_INIT);
@@ -5674,7 +5676,7 @@ mod test {
         );
         // The timer should backoff exponentially.
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now(), &counters), None);
-        assert_eq!(state.poll_send_at(), Some(clock.now().add(Estimator::RTO_INIT * 2)));
+        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(Estimator::RTO_INIT * 2)));
 
         // No probe should be sent before the timeout.
         clock.sleep(Estimator::RTO_INIT);
@@ -6093,7 +6095,7 @@ mod test {
             ),
             (None, None, DataAcked::No, NewlyClosed::No)
         );
-        assert_eq!(state.poll_send_at(), Some(clock.now().add(ACK_DELAY_THRESHOLD)));
+        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(ACK_DELAY_THRESHOLD)));
         clock.sleep(ACK_DELAY_THRESHOLD);
         assert_eq!(
             state.poll_send(&counters, u32::MAX, clock.now(), &socket_options),
@@ -6122,7 +6124,7 @@ mod test {
             (None, None, DataAcked::No, NewlyClosed::No)
         );
         // ... but just a timer.
-        assert_eq!(state.poll_send_at(), Some(clock.now().add(ACK_DELAY_THRESHOLD)));
+        assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(ACK_DELAY_THRESHOLD)));
         // Now the second full sized segment arrives, an ACK should be sent
         // immediately.
         assert_eq!(
@@ -6299,7 +6301,10 @@ mod test {
             ),
             Err(CloseError::Closing)
         );
-        assert_eq!(state.poll_send_at(), Some(clock.now().add(DEFAULT_FIN_WAIT2_TIMEOUT)));
+        assert_eq!(
+            state.poll_send_at(),
+            Some(clock.now().panicking_add(DEFAULT_FIN_WAIT2_TIMEOUT))
+        );
         clock.sleep(DEFAULT_FIN_WAIT2_TIMEOUT);
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now(), &counters), None);
         assert_eq!(state, State::Closed(Closed { reason: Some(ConnectionError::TimedOut) }));
@@ -6861,7 +6866,10 @@ mod test {
             ),
             None,
         );
-        assert_eq!(snd.timer, Some(SendTimer::SWSProbe { at: clock.now().add(SWS_PROBE_TIMEOUT) }));
+        assert_eq!(
+            snd.timer,
+            Some(SendTimer::SWSProbe { at: clock.now().panicking_add(SWS_PROBE_TIMEOUT) })
+        );
         clock.sleep(SWS_PROBE_TIMEOUT);
 
         // After the overriding timeout, we should push out whatever the

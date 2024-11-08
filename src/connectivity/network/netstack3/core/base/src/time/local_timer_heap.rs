@@ -340,7 +340,7 @@ mod testutil {
             timers: impl IntoIterator<Item = (K, V, Duration)>,
         ) {
             let now = bindings_ctx.now();
-            self.assert_timers(timers.into_iter().map(|(k, v, d)| (k, v, now.add(d))))
+            self.assert_timers(timers.into_iter().map(|(k, v, d)| (k, v, now.panicking_add(d))))
         }
 
         /// Assets that the next time to fire has `key` and `value`.

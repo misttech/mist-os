@@ -228,7 +228,7 @@ impl<
     fn new(bindings_ctx: &mut BC) -> Self {
         Self {
             queue: Default::default(),
-            expires_at: bindings_ctx.now().add(PENDING_ROUTE_EXPIRATION),
+            expires_at: bindings_ctx.now().panicking_add(PENDING_ROUTE_EXPIRATION),
         }
     }
 

@@ -59,6 +59,14 @@ impl Instant for StackTime {
         )))
     }
 
+    fn saturating_add(&self, duration: Duration) -> Self {
+        StackTime(fasync::MonotonicInstant::from_nanos(
+            self.0
+                .into_nanos()
+                .saturating_add(i64::try_from(duration.as_nanos()).unwrap_or(i64::MAX)),
+        ))
+    }
+
     fn checked_sub(&self, duration: Duration) -> Option<StackTime> {
         Some(StackTime(fasync::MonotonicInstant::from_nanos(
             self.0.into_nanos().checked_sub(i64::try_from(duration.as_nanos()).ok()?)?,
