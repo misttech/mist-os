@@ -105,7 +105,7 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
 
   /// The device ID of this filesystem. Returned in the st_dev field when stating an inode in
   /// this filesystem.
-  // DeviceType dev_id_;
+  DeviceType dev_id_;
 
   /// A file-system global mutex to serialize rename operations.
   ///

@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/vfs/file_system.h"
 
 #include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
@@ -64,6 +65,7 @@ FileSystem::FileSystem(const fbl::RefPtr<Kernel>& kernel, ktl::unique_ptr<FileSy
       next_node_id_(1),
       ops_(ktl::move(ops)),
       options_(ktl::move(options)),
+      dev_id_(kernel->device_registry_.next_anonymous_dev_id()),
       entries_(ktl::move(entries)) {}
 
 ino_t FileSystem::next_node_id() const {

@@ -445,6 +445,14 @@ class DeviceRegistry {
     return devices(mode)->register_major(major, ktl::move(entry));
   }
 
+  /// Allocate an anonymous device identifier.
+  DeviceType next_anonymous_dev_id() {
+    auto state = state_.Lock();
+    auto id = DeviceType::New(0, state->next_anon_minor);
+    state->next_anon_minor++;
+    return id;
+  }
+
   /// Instantiate a file for the specified device.
   ///
   /// The device will be looked up in the device registry by `DeviceMode` and `DeviceType`.
