@@ -122,17 +122,25 @@ source_set("functional") {
 # will be removed from the main "fxl" target, and moved to this one.
 source_set("cli") {
   sources = [
-    "command_line.cc",
-    "command_line.h",
     "log_settings_command_line.cc",
     "log_settings_command_line.h",
-    "observer_list.h",
   ]
 
   public_deps = [
-    ":fxl",
+    ":cli_no_logging",
     "//sdk/lib/syslog/cpp",
   ]
+}
+
+# Command-line parsing, but without the syslog depenency.
+source_set("cli_no_logging") {
+  sources = [
+    "command_line.cc",
+    "command_line.h",
+    "observer_list.h",
+  ]
+
+  public_deps = [ ":fxl" ]
 }
 
 group("fxl_cli") {
