@@ -91,6 +91,33 @@
 //! }
 //! ```
 //!
+//! ## Strict conversion
+//!
+//! By default, this derive does _not_ cause compilation errors if the source FIDL table has more
+//! fields than the validated struct. This behavior can be changed with the `fidl_table_strict`
+//! attribute. For example, the snippet below fails to compile if `FidlHello` has more fields than
+//! the ones in `ValidatedFidlTable`.
+//!
+//! ```
+//! #[derive(ValidFidlTable)]
+//! #[fidl_table_src(FidlHello)]
+//! #[fidl_table_strict]
+//! struct ValidatedFidlTable {
+//!     hello: u32,
+//! }
+//! ```
+//!
+//! Fields from the FIDL table can be explicitly ignored by giving `fidl_table_strict` arguments:
+//!
+//! ```
+//! #[derive(ValidFidlTable)]
+//! #[fidl_table_src(FidlHello)]
+//! #[fidl_table_strict(world)]
+//! struct ValidatedFidlTable {
+//!     hello: u32,
+//! }
+//! ```
+//!
 //! This adds a `Logical(YourErrorType)` variant to the generated error enum.
 // TODO(turnage): Infer optionality based on parsing for
 //                "Option<" in field types.

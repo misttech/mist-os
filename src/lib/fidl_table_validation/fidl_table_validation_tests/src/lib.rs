@@ -333,3 +333,41 @@ fn works_with_nested_identifier_default(inner: Option<Example>, expect_ok: bool)
         assert_matches!(got, Err(WrapExampleValidationError::InvalidField(_)));
     }
 }
+
+#[test]
+fn strict_validation() {
+    #[derive(ValidFidlTable, Debug, PartialEq)]
+    #[fidl_table_src(Example)]
+    #[fidl_table_strict]
+    struct Valid {
+        num: u32,
+        // NOTE: Compilation fails if not all FIDL fields are here.
+        new_field_not_in_validated_type: String,
+    }
+
+    assert_matches!(
+        Valid::try_from(Example { num: Some(10), ..Default::default() }),
+        Err(ExampleValidationError::MissingField(
+            ExampleMissingFieldError::NewFieldNotInValidatedType
+        ))
+    );
+}
+
+#[test]
+fn strict_validation_ignore() {
+    #[derive(ValidFidlTable, Debug, PartialEq)]
+    #[fidl_table_src(Example)]
+    #[fidl_table_strict(new_field_not_in_validated_type)]
+    struct Valid {
+        num: u32,
+    }
+
+    assert_matches!(
+        Valid::try_from(Example {
+            num: Some(10),
+            new_field_not_in_validated_type: Some("hello".to_string()),
+            ..Default::default()
+        }),
+        Ok(Valid { num: 10 })
+    );
+}
