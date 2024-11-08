@@ -89,6 +89,8 @@ void PciSdhci::SdhciHwReset() {
   zx_nanosleep(zx_deadline_after(ZX_USEC(300)));
 }
 
+zx_status_t PciSdhci::SdhciVendorSetBusClock(uint32_t frequency_hz) { return ZX_ERR_STOP; }
+
 void PciSdhci::DdkUnbind(ddk::UnbindTxn txn) { device_unbind_reply(zxdev()); }
 
 zx_status_t PciSdhci::Bind(void* /* unused */, zx_device_t* parent) {

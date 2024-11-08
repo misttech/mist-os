@@ -838,6 +838,12 @@ zx_status_t Sdhci::SdmmcSetBusFreq(uint32_t bus_freq) {
 }
 
 zx_status_t Sdhci::SetBusClock(uint32_t frequency_hz) {
+  if (zx_status_t status = sdhci_.VendorSetBusClock(frequency_hz); status == ZX_OK) {
+    return ZX_OK;
+  } else if (status != ZX_ERR_STOP) {
+    return status;
+  }
+
   // Turn off the SD clock before messing with the clock rate.
   auto clock = ClockControl::Get()
                    .ReadFrom(&*regs_mmio_buffer_)
