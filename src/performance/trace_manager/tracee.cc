@@ -56,6 +56,15 @@ bool Tracee::Initialize(fidl::VectorPtr<std::string> categories, size_t buffer_s
   FX_DCHECK(terminate_callback);
   FX_DCHECK(alert_callback);
 
+  // HACK(https://fxbug.dev/308796439): Until we get kernel trace streameing, kernel tracing is
+  // special: it always allocates a fixed sized buffer in the kernel set by a boot arg. We're not at
+  // liberty here in trace_manager to check what the bootarg is, but the default is 32MB. For
+  // ktrace_provider, we should allocate a buffer at least large enough to hold the full kernel
+  // trace.
+  if (bundle_->name == "ktrace_provider") {
+    buffer_size = std::max(buffer_size, size_t{32} * 1024 * 1024);
+  }
+
   zx::vmo buffer_vmo;
   zx_status_t status = zx::vmo::create(buffer_size, 0u, &buffer_vmo);
   if (status != ZX_OK) {
