@@ -384,8 +384,8 @@ def _build_fuchsia_package_impl(ctx):
 
     # Write our package_manifest file. If we have subpackage to flatten, we will
     # parse the subpackages contents, and append them into package manifest of
-    # parent package.
-    content = "\n".join(["%s=%s" % (r.dest, r.src.path) for r in package_resources])
+    # parent package.  Sort for determinism.
+    content = "\n".join(["%s=%s" % (r.dest, r.src.path) for r in sorted(package_resources, key = lambda s: s.dest)])
 
     meta_content_inputs = []
     if ctx.attr.subpackages_to_flatten:
