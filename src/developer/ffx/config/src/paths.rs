@@ -54,7 +54,7 @@ impl EnvironmentContext {
             (_, EnvironmentKind::ConfigDomain { isolate_root: Some(isolate_root), .. }) => {
                 Ok(isolate_root.join("daemon.sock").into())
             }
-            (_, _) => Ok(ascendd::default_ascendd_path()),
+            (_, _) => Ok(default_ascendd_path()),
         }
     }
 
@@ -114,6 +114,12 @@ fn get_runtime_base() -> Result<PathBuf> {
             Ok(home)
         })
     }
+}
+
+fn default_ascendd_path() -> PathBuf {
+    let mut path = std::env::temp_dir();
+    path.push("ascendd");
+    path
 }
 
 fn get_runtime_base_path() -> Result<PathBuf> {
