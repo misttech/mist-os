@@ -28,11 +28,11 @@ class FsNode;
 class LookupContext;
 class SymlinkTarget;
 
-using DeviceType = starnix_uapi::DeviceType;
+using starnix_uapi::DeviceType;
 using DirEntryHandle = fbl::RefPtr<DirEntry>;
 using FileHandle = fbl::RefPtr<FileObject>;
-using FileMode = starnix_uapi::FileMode;
-using FsCred = starnix_uapi::FsCred;
+using starnix_uapi::FileMode;
+using starnix_uapi::FsCred;
 using FsNodeHandle = fbl::RefPtr<FsNode>;
 using starnix_uapi::Access;
 using starnix_uapi::OpenFlags;

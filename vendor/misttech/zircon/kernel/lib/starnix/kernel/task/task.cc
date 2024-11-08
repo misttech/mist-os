@@ -20,8 +20,6 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <utility>
-
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
 #include <object/thread_dispatcher.h>

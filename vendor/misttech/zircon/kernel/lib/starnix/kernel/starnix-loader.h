@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_STARNIX_LOADER_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_STARNIX_LOADER_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_STARNIX_LOADER_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_STARNIX_LOADER_H_
 
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/memory.h>
@@ -362,4 +362,4 @@ extern template zx_status_t StarnixLoader::MapWritable<true>(  //
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_STARNIX_LOADER_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_STARNIX_LOADER_H_
