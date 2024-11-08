@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::common::{Executor, ExecutorTime};
-use super::scope::ScopeRef;
+use super::scope::ScopeHandle;
 use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
 
@@ -29,7 +29,7 @@ pub struct SendExecutor {
     inner: Arc<Executor>,
     // LINT.IfChange
     /// The root scope.
-    root_scope: ScopeRef,
+    root_scope: ScopeHandle,
     // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
     /// Worker thread handles
     threads: Vec<thread::JoinHandle<()>>,
@@ -50,7 +50,7 @@ impl SendExecutor {
             /* is_local */ false,
             num_threads.try_into().expect("no more than 256 threads are supported"),
         ));
-        let root_scope = ScopeRef::root(inner.clone());
+        let root_scope = ScopeHandle::root(inner.clone());
         Executor::set_local(root_scope.clone());
         Self { inner, root_scope, threads: Vec::default() }
     }
@@ -139,7 +139,7 @@ impl SendExecutor {
 
     #[doc(hidden)]
     /// Returns the root scope of the executor.
-    pub fn root_scope(&self) -> &ScopeRef {
+    pub fn root_scope(&self) -> &ScopeHandle {
         &self.root_scope
     }
 

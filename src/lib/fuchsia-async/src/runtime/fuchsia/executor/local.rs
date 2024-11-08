@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::common::{EHandle, Executor, ExecutorTime, MAIN_TASK_ID};
-use super::scope::ScopeRef;
+use super::scope::ScopeHandle;
 use super::time::{BootInstant, MonotonicInstant};
 use crate::atomic_future::AtomicFuture;
 use zx::BootDuration;
@@ -47,7 +47,7 @@ impl LocalExecutor {
             /* is_local */ true,
             /* num_threads */ 1,
         ));
-        let root_scope = ScopeRef::root(inner.clone());
+        let root_scope = ScopeHandle::root(inner.clone());
         Executor::set_local(root_scope.clone());
         Self { ehandle: EHandle { root_scope } }
     }
@@ -115,7 +115,7 @@ impl LocalExecutor {
 
     #[doc(hidden)]
     /// Returns the root scope of the executor.
-    pub fn root_scope(&self) -> &ScopeRef {
+    pub fn root_scope(&self) -> &ScopeHandle {
         self.ehandle.root_scope()
     }
 }
@@ -157,7 +157,7 @@ impl TestExecutor {
             /* is_local */ true,
             /* num_threads */ 1,
         ));
-        let root_scope = ScopeRef::root(inner.clone());
+        let root_scope = ScopeHandle::root(inner.clone());
         Executor::set_local(root_scope.clone());
         Self { local: LocalExecutor { ehandle: EHandle { root_scope } } }
     }
@@ -197,7 +197,7 @@ impl TestExecutor {
 
     #[doc(hidden)]
     /// Returns the root scope of the executor.
-    pub fn root_scope(&self) -> &ScopeRef {
+    pub fn root_scope(&self) -> &ScopeHandle {
         self.local.root_scope()
     }
 

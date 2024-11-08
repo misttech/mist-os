@@ -4,7 +4,7 @@
 
 use super::super::timer::Timers;
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
-use super::scope::ScopeRef;
+use super::scope::ScopeHandle;
 use super::time::{BootInstant, MonotonicInstant};
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
@@ -28,7 +28,7 @@ pub(crate) const TASK_READY_WAKEUP_ID: u64 = u64::MAX - 1;
 pub(crate) const MAIN_TASK_ID: usize = 0;
 
 thread_local!(
-    static EXECUTOR: RefCell<Option<ScopeRef>> = RefCell::new(None)
+    static EXECUTOR: RefCell<Option<ScopeHandle>> = RefCell::new(None)
 );
 
 pub enum ExecutorTime {
@@ -127,7 +127,7 @@ impl Executor {
         }
     }
 
-    pub fn set_local(root_scope: ScopeRef) {
+    pub fn set_local(root_scope: ScopeHandle) {
         EXECUTOR.with(|e| {
             let mut e = e.borrow_mut();
             assert!(e.is_none(), "Cannot create multiple Fuchsia Executors");
@@ -167,7 +167,7 @@ impl Executor {
         }
     }
 
-    pub fn spawn(self: &Arc<Self>, scope: &ScopeRef, future: AtomicFuture<'static>) -> usize {
+    pub fn spawn(self: &Arc<Self>, scope: &ScopeHandle, future: AtomicFuture<'static>) -> usize {
         let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
         let task = {
             let task = Task::new(next_id, scope.clone(), future);
@@ -182,7 +182,7 @@ impl Executor {
 
     pub fn spawn_local<F: Future<Output = R> + 'static, R: 'static>(
         self: &Arc<Self>,
-        scope: &ScopeRef,
+        scope: &ScopeHandle,
         future: F,
         detached: bool,
     ) -> usize {
@@ -199,7 +199,7 @@ impl Executor {
     }
 
     /// Spawns the main future.
-    pub fn spawn_main(self: &Arc<Self>, root_scope: &ScopeRef, future: AtomicFuture<'static>) {
+    pub fn spawn_main(self: &Arc<Self>, root_scope: &ScopeHandle, future: AtomicFuture<'static>) {
         let task = Task::new(MAIN_TASK_ID, root_scope.clone(), future);
         if !root_scope.insert_task(MAIN_TASK_ID, task.clone()) {
             panic!("Could not spawn main task");
@@ -430,7 +430,7 @@ impl Executor {
     /// [3]: by returning an upgraded Arc, tokio trusts callers to not "use it for too long", an
     /// opaque non-clone-copy-or-send guard would be stronger than this. See:
     /// https://github.com/tokio-rs/tokio/blob/b42f21ec3e212ace25331d0c13889a45769e6006/tokio/src/io/driver/mod.rs#L297
-    pub fn on_parent_drop(&self, root_scope: &ScopeRef) {
+    pub fn on_parent_drop(&self, root_scope: &ScopeHandle) {
         // Drop all tasks.
         // Any use of fasync::unblock can involve a waker. Wakers hold weak references to tasks, but
         // as part of waking, there's an upgrade to a strong reference, so for a small amount of
@@ -571,7 +571,7 @@ impl Executor {
     /// # Safety
     ///
     /// The caller must guarantee that the executor isn't running.
-    pub(super) unsafe fn drop_main_task(&self, root_scope: &ScopeRef) {
+    pub(super) unsafe fn drop_main_task(&self, root_scope: &ScopeHandle) {
         root_scope.drop_task_unchecked(MAIN_TASK_ID);
     }
 
@@ -615,7 +615,7 @@ impl Drop for Executor {
 #[derive(Clone)]
 pub struct EHandle {
     // LINT.IfChange
-    pub(super) root_scope: ScopeRef,
+    pub(super) root_scope: ScopeHandle,
     // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
 }
 
@@ -650,7 +650,7 @@ impl EHandle {
     ///
     /// Most users should create an owned scope with
     /// [`Scope::new`][crate::Scope::new] instead of using this method.
-    pub fn root_scope(&self) -> &ScopeRef {
+    pub fn root_scope(&self) -> &ScopeHandle {
         &self.root_scope
     }
 
@@ -688,7 +688,7 @@ impl EHandle {
     /// See `Inner::spawn`.
     pub(crate) fn spawn<R: Send + 'static>(
         &self,
-        scope: &ScopeRef,
+        scope: &ScopeHandle,
         future: impl Future<Output = R> + Send + 'static,
     ) -> usize {
         self.inner().spawn(scope, AtomicFuture::new(future, false))
@@ -705,7 +705,7 @@ impl EHandle {
     /// See `Inner::spawn_local`.
     pub(crate) fn spawn_local<R: 'static>(
         &self,
-        scope: &ScopeRef,
+        scope: &ScopeHandle,
         future: impl Future<Output = R> + 'static,
     ) -> usize {
         self.inner().spawn_local(scope, future, false)
@@ -732,11 +732,11 @@ impl EHandle {
 pub(super) struct Task {
     id: usize,
     pub(super) future: AtomicFuture<'static>,
-    pub(super) scope: ScopeRef,
+    pub(super) scope: ScopeHandle,
 }
 
 impl Task {
-    fn new(id: usize, scope: ScopeRef, future: AtomicFuture<'static>) -> Arc<Self> {
+    fn new(id: usize, scope: ScopeHandle, future: AtomicFuture<'static>) -> Arc<Self> {
         let this = Arc::new(Self { id, future, scope });
 
         // Take a weak reference now to be used as a waker.
