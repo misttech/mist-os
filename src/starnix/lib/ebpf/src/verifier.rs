@@ -563,11 +563,7 @@ impl Type {
             }
             (Type::MapKeyParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
                 let schema = context.get_map_schema(*map_ptr_index)?;
-                if !context.stack.can_read_data_ptr(*offset, schema.key_size as u64) {
-                    Err(format!("cannot read key buffer from the stack at pc {}", context.pc))
-                } else {
-                    Ok(())
-                }
+                context.stack.read_data_ptr(context.pc, *offset, schema.key_size as u64)
             }
             (
                 Type::MapValueParameter { map_ptr_index },
@@ -578,11 +574,7 @@ impl Type {
             }
             (Type::MapValueParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
                 let schema = context.get_map_schema(*map_ptr_index)?;
-                if !context.stack.can_read_data_ptr(*offset, schema.value_size as u64) {
-                    Err(format!("cannot read value buffer from the stack at pc {}", context.pc))
-                } else {
-                    Ok(())
-                }
+                context.stack.read_data_ptr(context.pc, *offset, schema.value_size as u64)
             }
             (Type::MemoryParameter { size, .. }, Type::PtrToMemory { offset, buffer_size, .. }) => {
                 let expected_size = size.size(context)?;
@@ -596,18 +588,17 @@ impl Type {
 
             (Type::MemoryParameter { size, input, output }, Type::PtrToStack { offset }) => {
                 let size = size.size(context)?;
-                let buffer_end = *offset + size;
+                let buffer_end = offset.checked_add(size).unwrap_or(StackOffset::INVALID);
                 if !buffer_end.is_valid() {
                     Err(format!("out of bound access at pc {}", context.pc))
                 } else {
                     if *output {
                         next.stack.write_data_ptr(context.pc, *offset, size)?;
                     }
-                    if !input || context.stack.can_read_data_ptr(*offset, size) {
-                        Ok(())
-                    } else {
-                        Err(format!("out of bound read at pc {}", context.pc))
+                    if *input {
+                        context.stack.read_data_ptr(context.pc, *offset, size)?;
                     }
+                    Ok(())
                 }
             }
             (
@@ -859,73 +850,48 @@ impl<'a> VerificationContext<'a> {
     }
 }
 
+const STACK_ELEMENT_SIZE: usize = std::mem::size_of::<u64>();
+const STACK_MAX_INDEX: usize = BPF_STACK_SIZE / STACK_ELEMENT_SIZE;
+
 /// An offset inside the stack. The offset is from the end of the stack.
 /// downward.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct StackOffset(u64);
+pub struct StackOffset(i64);
 
 impl Default for StackOffset {
     fn default() -> Self {
-        Self(BPF_STACK_SIZE as u64)
+        Self(BPF_STACK_SIZE as i64)
     }
 }
 
 impl StackOffset {
+    const INVALID: Self = Self(i64::MIN);
+
     /// Whether the current offset is valid.
     fn is_valid(&self) -> bool {
-        self.0 <= (BPF_STACK_SIZE as u64)
+        self.0 >= 0 && self.0 <= (BPF_STACK_SIZE as i64)
     }
 
     /// The value of the register.
     fn reg(&self) -> u64 {
-        self.0
+        self.0 as u64
     }
 
-    /// The offset into the equivalent byte array.
-    fn offset(&self) -> usize {
-        self.0 as usize
-    }
-
-    /// The index into the stack array this offset points to.
+    /// The index into the stack array this offset points to. Can be called only if `is_valid()`
+    /// is true.
     fn array_index(&self) -> usize {
-        self.offset() / std::mem::size_of::<u64>()
+        usize::try_from(self.0).unwrap() / STACK_ELEMENT_SIZE
     }
 
     /// The offset inside the aligned u64 in the stack.
     fn sub_index(&self) -> usize {
-        self.offset() % std::mem::size_of::<u64>()
+        usize::try_from(self.0).unwrap() % STACK_ELEMENT_SIZE
+    }
+
+    fn checked_add<T: TryInto<i64>>(self, rhs: T) -> Option<Self> {
+        self.0.checked_add(rhs.try_into().ok()?).map(Self)
     }
 }
-
-impl std::ops::Add<u64> for StackOffset {
-    type Output = Self;
-
-    fn add(self, rhs: u64) -> Self {
-        Self(self.reg().overflowing_add(rhs).0)
-    }
-}
-
-impl std::ops::AddAssign<u64> for StackOffset {
-    fn add_assign(&mut self, rhs: u64) {
-        self.0 = self.reg().overflowing_add(rhs).0
-    }
-}
-
-impl std::ops::Sub<u64> for StackOffset {
-    type Output = Self;
-
-    fn sub(self, rhs: u64) -> Self {
-        Self(self.reg().overflowing_sub(rhs).0)
-    }
-}
-
-impl std::ops::SubAssign<u64> for StackOffset {
-    fn sub_assign(&mut self, rhs: u64) {
-        self.0 = self.reg().overflowing_sub(rhs).0
-    }
-}
-
-const STACK_MAX_INDEX: usize = BPF_STACK_SIZE / std::mem::size_of::<u64>();
 
 /// The state of the stack
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -976,75 +942,70 @@ impl Stack {
     ) -> Result<(), String> {
         for i in 0..bytes {
             self.store(pc, offset, Type::unknown_written_scalar_value(), DataWidth::U8)?;
-            offset += 1;
+            offset = offset.checked_add(1).unwrap();
         }
         Ok(())
     }
 
-    fn can_read_data_ptr(&self, mut offset: StackOffset, bytes: u64) -> bool {
-        let can_read = |t: &Type, start_offset: usize, mut end_offset: usize| -> bool {
-            match t {
-                Type::ScalarValue { unwritten_mask, .. } => {
-                    if start_offset == 0 && end_offset == 0 {
-                        return *unwritten_mask == 0;
+    fn read_data_ptr(
+        &self,
+        pc: ProgramCounter,
+        offset: StackOffset,
+        bytes: u64,
+    ) -> Result<(), String> {
+        let read_element =
+            |index: usize, start_offset: usize, end_offset: usize| -> Result<(), String> {
+                match self.get(index) {
+                    Type::ScalarValue { unwritten_mask, .. } => {
+                        debug_assert!(end_offset > start_offset);
+                        let unwritten_bits = Self::extract_sub_value(
+                            *unwritten_mask,
+                            start_offset,
+                            end_offset - start_offset,
+                        );
+                        if unwritten_bits == 0 {
+                            Ok(())
+                        } else {
+                            Err(format!("reading unwritten value from the stack at pc {}", pc))
+                        }
                     }
-                    if end_offset == 0 {
-                        end_offset = std::mem::size_of::<u64>();
-                    }
-                    debug_assert!(end_offset > start_offset);
-                    Self::extract_sub_value(
-                        *unwritten_mask,
-                        start_offset,
-                        end_offset - start_offset,
-                    ) == 0
+                    _ => Err(format!("invalid read from the stack at pc {}", pc)),
                 }
-                _ => false,
-            }
-        };
+            };
         if bytes == 0 {
-            return true;
-        }
-        let mut end_offset = offset + bytes;
-        if (end_offset - 1).array_index() as usize >= STACK_MAX_INDEX {
-            return false;
-        }
-        // Handle the case where all the data is contained in a single u64.
-        if offset.array_index() == (end_offset - 1).array_index() {
-            return can_read(
-                &self.get(offset.array_index()),
-                offset.sub_index(),
-                end_offset.sub_index(),
-            );
+            return Ok(());
         }
 
-        // Handle the first element, that might be partial
-        if offset.sub_index() != 0 {
-            if !can_read(
-                &self.get(offset.array_index()),
-                offset.sub_index(),
-                std::mem::size_of::<u64>(),
-            ) {
-                return false;
-            }
-            offset += (std::mem::size_of::<u64>() - offset.sub_index()) as u64;
+        if !offset.is_valid() {
+            return Err(format!("invalid stack offset at pc {}", pc));
         }
 
-        // Handle the last element, that might be partial
+        let end_offset = offset
+            .checked_add(bytes)
+            .filter(|v| v.is_valid())
+            .ok_or_else(|| format!("stack overflow at pc {}", pc))?;
+
+        // Handle the case where all the data is contained in a single element excluding the last
+        // byte (the case when the read ends at an element edge, i.e. `end_offset.sub_index()==0`,
+        // is covered by the default path below).
+        if offset.array_index() == end_offset.array_index() {
+            return read_element(offset.array_index(), offset.sub_index(), end_offset.sub_index());
+        }
+
+        // Handle the first element, that might be partial.
+        read_element(offset.array_index(), offset.sub_index(), STACK_ELEMENT_SIZE)?;
+
+        // Handle the last element, that might be partial.
         if end_offset.sub_index() != 0 {
-            if !can_read(&self.get(end_offset.array_index()), 0, end_offset.sub_index()) {
-                return false;
-            }
-            end_offset -= end_offset.sub_index() as u64;
+            read_element(end_offset.array_index(), 0, end_offset.sub_index())?;
         }
 
         // Handle the any full type between beginning and end.
-        for i in offset.array_index()..end_offset.array_index() {
-            if !can_read(&self.get(i), 0, std::mem::size_of::<u64>()) {
-                return false;
-            }
+        for i in (offset.array_index() + 1)..end_offset.array_index() {
+            read_element(i, 0, STACK_ELEMENT_SIZE)?;
         }
 
-        true
+        Ok(())
     }
 
     fn store(
@@ -1054,8 +1015,8 @@ impl Stack {
         value: Type,
         width: DataWidth,
     ) -> Result<(), String> {
-        if offset.array_index() >= STACK_MAX_INDEX {
-            return Err(format!("out of bound store at pc {}", pc));
+        if !offset.is_valid() {
+            return Err(format!("out of bounds store at pc {}", pc));
         }
         if offset.sub_index() % width.bytes() != 0 {
             return Err(format!("misaligned access at pc {}", pc));
@@ -1107,15 +1068,15 @@ impl Stack {
 
     fn load(
         &self,
-        context: &ComputationContext,
+        pc: ProgramCounter,
         offset: StackOffset,
         width: DataWidth,
     ) -> Result<Type, String> {
         if offset.array_index() >= STACK_MAX_INDEX {
-            return Err(format!("out of bound load at pc {}", context.pc));
+            return Err(format!("out of bounds load at pc {}", pc));
         }
         if offset.sub_index() % width.bytes() != 0 {
-            return Err(format!("misaligned access at pc {}", context.pc));
+            return Err(format!("misaligned access at pc {}", pc));
         }
 
         let index = offset.array_index();
@@ -1133,7 +1094,7 @@ impl Stack {
                         Self::extract_sub_value(unwritten_mask, sub_index, width.bytes());
                     Ok(Type::ScalarValue { value, unknown_mask, unwritten_mask })
                 }
-                _ => Err(format!("incorrect load of {} bytes at pc {}", width.bytes(), context.pc)),
+                _ => Err(format!("incorrect load of {} bytes at pc {}", width.bytes(), pc)),
             }
         }
     }
@@ -1325,7 +1286,8 @@ impl ComputationContext {
         let addr = addr.inner(self)?;
         match *addr {
             Type::PtrToStack { offset } => {
-                return self.stack.store(self.pc, offset + field.offset as u64, value, field.width);
+                let offset_sum = offset.checked_add(field.offset).unwrap_or(StackOffset::INVALID);
+                return self.stack.store(self.pc, offset_sum, value, field.width);
             }
             Type::PtrToMemory { offset, buffer_size, .. } => {
                 self.check_memory_access(offset, buffer_size, field.offset, field.width.bytes())?;
@@ -1369,7 +1331,8 @@ impl ComputationContext {
         let addr = addr.inner(self)?;
         match *addr {
             Type::PtrToStack { offset } => {
-                self.stack.load(self, offset + field.offset as u64, field.width)
+                let offset_sum = offset.checked_add(field.offset).unwrap_or(StackOffset::INVALID);
+                self.stack.load(self.pc, offset_sum, field.width)
             }
             Type::PtrToMemory { ref id, offset, buffer_size, .. } => {
                 self.check_memory_access(offset, buffer_size, field.offset, field.width.bytes())?;
@@ -2098,7 +2061,10 @@ impl DataDependencies {
         }
         let addr = context.reg(dst)?.clone();
         if let Type::PtrToStack { offset: stack_offset } = addr {
-            let stack_offset = stack_offset + offset as u64;
+            let stack_offset = stack_offset.checked_add(offset).unwrap_or(StackOffset::INVALID);
+            if !stack_offset.is_valid() {
+                return Err(format!("Invalid stack offset at {}", context.pc));
+            }
             if is_read || self.stack.contains(&stack_offset.array_index()) {
                 is_read = true;
                 self.stack.insert(stack_offset.array_index());
@@ -2725,7 +2691,10 @@ impl BpfVisitor for DataDependencies {
         if self.registers.contains(&dst) {
             let addr = context.reg(src)?.clone();
             if let Type::PtrToStack { offset: stack_offset } = addr {
-                let stack_offset = stack_offset + offset as u64;
+                let stack_offset = stack_offset.checked_add(offset).unwrap_or(StackOffset::INVALID);
+                if !stack_offset.is_valid() {
+                    return Err(format!("Invalid stack offset at {}", context.pc));
+                }
                 self.stack.insert(stack_offset.array_index());
             }
         }
@@ -2778,7 +2747,10 @@ impl BpfVisitor for DataDependencies {
         let context = &context.computation_context;
         let addr = context.reg(dst)?.clone();
         if let Type::PtrToStack { offset: stack_offset } = addr {
-            let stack_offset = stack_offset + offset as u64;
+            let stack_offset = stack_offset.checked_add(offset).unwrap_or(StackOffset::INVALID);
+            if !stack_offset.is_valid() {
+                return Err(format!("Invalid stack offset at {}", context.pc));
+            }
             if self.stack.remove(&stack_offset.array_index()) {
                 if let Source::Reg(src) = src {
                     self.registers.insert(src);
@@ -4027,7 +3999,7 @@ fn run_on_stack_offset<F>(v: StackOffset, f: F) -> StackOffset
 where
     F: FnOnce(u64) -> u64,
 {
-    StackOffset(f(v.reg()))
+    StackOffset(f(v.reg()) as i64)
 }
 
 fn error_and_log<T>(
@@ -4134,5 +4106,34 @@ mod tests {
         c1.pc = 8;
         assert_eq!(c1.partial_cmp(&c2), None);
         assert_eq!(c2.partial_cmp(&c1), None);
+    }
+
+    #[test]
+    fn test_stack_access() {
+        let mut s = Stack::default();
+
+        // Store data in the range [8, 26) and verify that `read_data_ptr()` fails for any
+        // reads outside of that range.
+        assert!(s
+            .store(1, StackOffset(8), Type::unknown_written_scalar_value(), DataWidth::U64)
+            .is_ok());
+        assert!(s
+            .store(1, StackOffset(16), Type::unknown_written_scalar_value(), DataWidth::U64)
+            .is_ok());
+        assert!(s
+            .store(1, StackOffset(24), Type::unknown_written_scalar_value(), DataWidth::U16)
+            .is_ok());
+
+        for offset in 0..32 {
+            for end in (offset + 1)..32 {
+                assert_eq!(
+                    s.read_data_ptr(2, StackOffset(offset), (end - offset) as u64).is_ok(),
+                    offset >= 8 && end <= 26
+                );
+            }
+        }
+
+        // Verify that overflows are handled properly.
+        assert!(s.read_data_ptr(2, StackOffset(12), u64::MAX - 2).is_err());
     }
 }
